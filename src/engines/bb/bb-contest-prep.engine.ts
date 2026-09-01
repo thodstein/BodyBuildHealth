@@ -692,8 +692,25 @@ export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[
 // (nutritionTargetsForPrepDate для каждого дня плана) — повторные сборки
 // с одинаковыми ключами не пересчитываются.
 const _peakWeekCache = new Map<string, PeakWeekDayPlan[]>();
+function peakWeekCacheKey(eff: BBContestPrepConfig): string {
+  // Фаза 3.17: ключ должен покрывать ВСЕ поля, влияющие на buildPeakWeek, иначе
+  // два конфига, различающиеся bodyFatPct/pedContext/cycleDay/specialization/
+  // hasTrialPeak/heightCm/confirmedManipulation, получали закэшированный результат.
+  const parts: Array<string | number | boolean | null | undefined> = [
+    eff.sex, eff.category, eff.weightKg, eff.carbLoadStrategy, eff.waterStrategy, eff.sodiumStrategy,
+    eff.bodyFatPct, eff.heightCm, eff.cycleDay, eff.hasTrialPeak, eff.experienceLevel, eff.prepCount,
+    eff.confirmedManipulation, eff.preferLowFiberCarbs, eff.creatineStrategy,
+    eff.pedContext?.ghIU, eff.pedContext?.trenMg, eff.pedContext?.testMg, eff.pedContext?.nandMg,
+    eff.pedContext?.insulinIU, eff.pedContext?.t3Mcg, eff.pedContext?.anavarMg, eff.pedContext?.diuretic ? 1 : 0,
+    eff.specialization,
+    eff.allergens?.join(',') ?? '',
+    eff.showDate,
+    eff.schedule?.stage ?? '', eff.schedule?.wake ?? '',
+  ];
+  return parts.map(p => String(p ?? '')).join('|');
+}
 function peakWeekCached(eff: BBContestPrepConfig): PeakWeekDayPlan[] {
-  const key = `${eff.sex}|${eff.category}|${eff.weightKg}|${eff.carbLoadStrategy}|${eff.waterStrategy}|${eff.sodiumStrategy}|${eff.showDate}|${eff.preferLowFiberCarbs ? 1 : 0}|${eff.creatineStrategy ?? ''}|${eff.allergens?.join(',') ?? ''}`;
+  const key = peakWeekCacheKey(eff);
   const hit = _peakWeekCache.get(key);
   if (hit) return hit;
   const built = buildPeakWeek(eff);
@@ -1134,8 +1151,11 @@ function weekVolume(wk: BBPlan['weeks'][number]): number {
 
 /**
  * Преобразовать сессию в пик-недельную (памп/деплеция) по порядковому номеру.
- * si 0 → верх круговой, si 1 → низ круговой, si 2 → full-body лёгкий,
- * si ≥ 3 → отдых (пустая сессия с пометкой).
+ *
+ * Фаза 3.14: читает РЕАЛЬНЫЕ фазы стратегии из PHASES_BY_STRATEGY, а не всегда
+ * «3 деплеции». Для 'front' (2 деплеции) и 'back' дни load/peak получают ОТДЫХ,
+ * а не 3-ю/4-ю деплецию. Только deplete_* фазы — тренировка, остальные — покой.
+ * si 0..6 → день D-6..show; вне 7 дней — отдых.
  */
 function toPeakWeekSession(
   session: BBPlan['weeks'][number]['sessions'][number],
@@ -1143,15 +1163,20 @@ function toPeakWeekSession(
   cfg: BBContestPrepConfig,
   peakWeek: PeakWeekDayPlan[],
 ): any {
-  const training = peakWeek[Math.min(si, 2)]?.training ?? TRAINING_BY_PHASE.deplete_3;
-  if (si >= 3) {
+  const strat = canonicalCarbStrategy(cfg.carbLoadStrategy) as CarbLoadStrategy;
+  const phases = PHASES_BY_STRATEGY[strat] ?? PHASES_BY_STRATEGY.moderate;
+  const dayPhase = phases[si];
+  const isDeplete = !!dayPhase && dayPhase.startsWith('deplete');
+  // День не из окна пик-недели или не деплеция (load/peak/show) → отдых.
+  if (si >= phases.length || !isDeplete) {
     return {
       ...session,
       exercises: [],
       peakWeekRest: true,
-      comment: `Пик-неделя: отдых. Позирование ${POSING_BY_DAY[7] ?? 60} мин, растяжка.`,
+      comment: `🎭 Пик-неделя (${dayPhase ? (PHASE_LABELS_RU[dayPhase] ?? dayPhase) : 'день вне окна'}): отдых. Позирование ${POSING_BY_DAY[Math.min(7, si + 1)] ?? 60} мин, растяжка${dayPhase?.startsWith('load') ? ' — гликоген наполняется, без тренировки.' : '.'}`,
     };
   }
+  const training = peakWeek[Math.min(si, 2)]?.training ?? TRAINING_BY_PHASE.deplete_3;
   const exercises = session.exercises.map(e => {
     const isSpec = muscleMatchesSpecialization((e as any).muscle, cfg.specialization);
     const baseSets = Math.max(2, Math.round((e.sets || 3) * 0.8)) + (isSpec ? 2 : 0); // ⭐ спец-добивка в пик-неделе
@@ -2212,8 +2237,8 @@ export interface MealPlanInput {
 }
 
 /** Обратная проекция плана в конфиг (для переиспользования функций пик-недели). */
-export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
-  return {
+export function configFromPlan(plan: BBContestPrepPlan, trialOverride?: TestPeakWeekResult | null): BBContestPrepConfig {
+  const cfg: BBContestPrepConfig = {
     sex: plan.sex,
     category: plan.category,
     weightKg: plan.preparation.startingWeightKg,
@@ -2229,6 +2254,31 @@ export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
     sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'tapered' : 'stable',
     contraindications: plan.safety.contraindications,
   };
+  // Фаза 3.16: подставить ИСПЫТАННЫЙ протокол в финальный (resolvePeakStrategy='tested').
+  // Раньше buildPeakWeek брал воду/натрий/карбы только из конфига — trial не влиял.
+  let trial = trialOverride;
+  if (trial === undefined && (plan as any).testPeakWeekId) {
+    try { trial = latestTestPeakWeek((plan as any).testPeakWeekId); } catch { trial = null; }
+  }
+  if (trial && trial.verdict === 'tested_ok') return applyTrialToPeakConfig({ ...cfg, hasTrialPeak: true }, trial);
+  if (trial) cfg.hasTrialPeak = true;
+  return cfg;
+}
+
+/**
+ * Фаза 3.16: применить результат успешного trial (verdict='tested_ok') к финальному
+ * конфигу пик-недели. Подставляет проверенную карб-стратегию (spill→back, flat→front,
+ * непредсказуемый→undulating, ровный→linear) и помечает протокол испытанным (hasTrialPeak),
+ * что снижает деплецию и разрешает подтверждённые значения в buildPeakWeek.
+ */
+export function applyTrialToPeakConfig(cfg: BBContestPrepConfig, t: TestPeakWeekResult | null | undefined): BBContestPrepConfig {
+  if (!t || t.verdict !== 'tested_ok') return cfg;
+  const next: BBContestPrepConfig = { ...cfg, hasTrialPeak: true };
+  const rec = recommendCarbStrategyFromTrial(t);
+  if (rec && canonicalCarbStrategy(next.carbLoadStrategy) !== rec) {
+    next.carbLoadStrategy = rec;
+  }
+  return next;
 }
 
 /** Фаза плана по дате (из plan.phases). */
