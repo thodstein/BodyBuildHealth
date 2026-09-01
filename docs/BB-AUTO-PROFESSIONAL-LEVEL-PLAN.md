@@ -1,6 +1,30 @@
 # ББ-авто + Тапер-ББ: план доведения до профессионального уровня
 
-Дата: Aug 31 2026. Статус: **план сохранён, реализация не начата.**
+Дата: Aug 31 2026. Статус: **реализация завершена (Sep 1 2026) — Фазы 0-5 выполнены, кроме трёх чистых UI-полировок (4.20/4.26-bulk/4.28) и полного удаления 5.30 (см. ниже).**
+
+## Сводка выполнения (Sep 1 2026)
+
+| Фаза | Статус | Коммиты |
+|------|--------|---------|
+| Фаза 0 (шаг «Реальные веса») | ✅ выполнена (ранее) | 5f38f02b8 |
+| Фаза 1 (движки) | ✅ выполнена (ранее) | c2d854ce1…b438ae296 |
+| Фаза 2.6 (FOCUS_PHASE_OVERRIDES) | ✅ уже реализовано (getPhaseConfig) | — |
+| Фаза 2.7 cooldown-ротация | ✅ выполнена | 0ea1666d |
+| Фаза 2.8 суперсет A/B | ✅ выполнена | 0f676a39 |
+| Фаза 2.9 MGF/IGF1 target + tEq | ✅ выполнена | 737cc77f |
+| Фаза 2.10 per-muscle ACWR/adherence loop | ✅ выполнена | 9eb7aeab |
+| Фаза 2.11 единый MRV-конвейер | ✅ выполнена | cac54e90 |
+| Фаза 3.12-3.18 Тапер-ББ | ✅ выполнена (12,13,14,15,16,17,18) | 18350f83, fc44f786 |
+| Фаза 4.19 heatmap, 4.21 taper-кривая, 4.22 таблица мезо, 4.23 даты, 4.24 print+ics, 4.27 дифф | ✅ выполнена (data-билдеры + print) | 945535f5 |
+| Фаза 4.25 «🍽 В планировщик питания» | ✅ выполнена | 99152851 |
+| Фаза 4.26 своп-модал строгие группы / bulk/undo | ◐ строгие группы были ранее; bulk/undo — остаток |
+| Фаза 4.20 FF-график, 4.28 чистка UI | ⬜ остаток (чистая UI-полировка) |
+| Фаза 5.29 merge trial, 5.31 targetBodyFat, 5.32 алиасы→stable, 5.33 liveAdjust | ✅ выполнена | 9249662c |
+| Фаза 5.30 удалить deprecated | ◐ удалён prependPreparationWeeks; bb-peak-week/generatePLPeaking оставлены (риск) |
+
+Проверка: `tsc 0` по файлам BB, полный `vitest run bb` = **1873 passed / 56 failed (все пред-существующие
+из baseline ~59: vitest-каталог EXERCISE_CATALOG без 16 упражнений + чужие WIP bb-macrocycle v7,
+bb-auto-annual-ctx и др.).** Новых регрессий нет.
 
 Основан на полном анализе движков (`src/engines/bb/*`), UI (`BbAutoConstructor.tsx` 6.7k строк + связанные)
 и системы Тапер-ББ (`bb-contest-prep.engine.ts` 2.9k строк, `bb-prep-cycle`, `lms-taper` для сравнения).
@@ -142,14 +166,20 @@ params → ped → split → plan → [weights] → quality → adjust → conte
 # ФАЗА 5 — Консолидация / чистка / внутренние противоречия
 
 29. **Слить две trial-peak системы** — `bb-trial-peak.engine` (`he_bb_trial_peaks_v2`) и `TestPeakWeekResult`
-    (`he_bb_test_peak_weeks`) с разными порогами.
+    (`he_bb_test_peak_weeks`) с разными порогами. ✅ ВЫПОЛНЕНО (Ф5): bb-trial-peak делегирует в канон
+    `TestPeakWeekResult` (единый сторадж he_bb_test_peak_weeks, единый scoreTestPeakWeek, единый recommend),
+    he_bb_trial_peaks_v2 — только чтение legacy-миграции.
 30. **Удалить deprecated** `bb-peak-week.engine`, `generatePLPeaking`/deprecated `training-integration` BB-путь,
-    `prependPreparationWeeks` (якорь).
+    `prependPreparationWeeks` (якорь). ⚠ ЧАСТИЧНО: удалён мёртвый `prependPreparationWeeks`; `bb-peak-week.engine`
+    (используется только 3 тест-файлами) и `generatePLPeaking` (production training-integration) оставлены —
+    удаление рискованно (ломает PL-путь/тесты), требует отдельного раунда с верификацией.
 31. **Единый `CATEGORY_PROFILES` для targetBodyFat** — `bb-show-coach.bodyReadiness` хардкодит 10/7/5%,
-    а `CATEGORY_PROFILES.targetBodyFatPct` — bikini 13/wellness 14/figure 11 (прямое противоречие).
+    а `CATEGORY_PROFILES.targetBodyFatPct` — bikini 13/wellness 14/figure 11 (прямое противоречие). ✅ ВЫПОЛНЕНО (Ф5):
+    bodyReadiness использует CATEGORY_PROFILES.targetBodyFatPct (единый источник).
 32. **Legacy-алиасы → канон** в дефолтах: `bb-prep-cycle`/`recommendBBShowConfig`/`TaperPlannerTab`
-    возвращают `waterStrategy:'minimal'`/`sodiumStrategy:'constant'` (канон — `stable`).
-33. **Починить вызов `liveAdjustForPeakDay`** в `BbAutoConstructor:5637` — передаётся бинарный флаг вместо spillScore.
+    возвращают `waterStrategy:'minimal'`/`sodiumStrategy:'constant'` (канон — `stable`). ✅ ВЫПОЛНЕНО (Ф5):
+    все дефолты → 'stable' (bb-prep-cycle, recommendBBShowConfig, TaperPlannerTab, BbAutoConstructor, PeakWeekTab, PeakingPanel).
+33. **Починить вызов `liveAdjustForPeakDay`** в `BbAutoConstructor:5637` — передаётся бинарный флаг вместо spillScore. ✅ ВЫПОЛНЕНО (Ф5): передаётся честный spillScore `6 - waterRetention` (1-5).
 
 ---
 
