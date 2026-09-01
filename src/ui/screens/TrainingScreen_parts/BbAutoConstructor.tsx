@@ -103,7 +103,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -670,6 +670,8 @@ export const BbAutoConstructor: React.FC = () => {
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
+  // Фаза 4.23: дата старта мезоцикла → календарные диапазоны недель + «📍 текущая неделя».
+  const [startDateInput, setStartDateInput] = useState<string>(() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } });
   // 🔄 «Начать заново»: подтверждение сброса сборки.
   const [resetAsk, setResetAsk] = useState(false);
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
@@ -2289,12 +2291,37 @@ export const BbAutoConstructor: React.FC = () => {
     }
   };
 
+  /** Фаза 4.24: экспорт обычного ББ-плана в .ics (календарь) по датам недель. */
+  const handleExportIcs = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    try {
+      const startDate = startDateInput || new Date().toISOString().slice(0, 10);
+      const ics = buildBBPlanIcs(plan, { startDate });
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bb-plan-${(plan.pattern?.id || 'plan')}.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash('📅 Календарь .ics скачан (по неделям/дням от ' + startDate + ')');
+    } catch { flash('⚠ Не удалось сформировать .ics'); }
+  };
+
+  /** Фаза 4.23: календарные диапазоны недель от даты старта + «📍 текущая неделя». */
+  const weekDateInfo = useMemo(() => {
+    if (!builtPlan || !startDateInput) return null;
+    try { return bbWeekDateRanges(applyEditsToPlan(builtPlan), { startDate: startDateInput }); }
+    catch { return null; }
+  }, [builtPlan, startDateInput, exerciseEdits]);
+  const currentWeek = weekDateInfo?.find(w => w.isCurrent);
+
   /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];
-    for (const wk of plan.weeks) {
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];    for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
         for (const ex of s.exercises) {
@@ -5005,7 +5032,13 @@ export const BbAutoConstructor: React.FC = () => {
         })()}
         <PlanFeedbackCard plan={builtPlan} workMax={bbWorkMax} strategy={loadStrategy} onApply={setBuiltPlan} />
         <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="объём · вес · пик · сравнение">
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              {/* Фаза 4.23: дата старта мезоцикла + «📍 текущая неделя» */}
+              <label style={{ fontSize:11, color:'rgba(255,255,255,0.7)', display:'inline-flex', alignItems:'center', gap:4 }}>
+                📅 Старт:
+                <input type="date" value={startDateInput || ''} onChange={e => setStartDateInput(e.target.value)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'3px 6px' }} />
+              </label>
+              {currentWeek ? <span style={{ fontSize:11, color:'#38bdf8', fontWeight:700, background:'rgba(56,189,248,0.12)', padding:'3px 8px', borderRadius:16, border:'1px solid rgba(56,189,248,0.25)' }}>📍 Текущая неделя: {currentWeek.week} ({currentWeek.start})</span> : null}
               {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#f59e0b' }}>⚠ Есть предупреждения валидации — сохранение доступно, но проверьте замечания.</div>}
              <button style={BTN_GHOST} onClick={() => adjustVolume(0.8)}>📦 Объём -20%</button>
              <button style={BTN_GHOST} onClick={() => adjustVolume(1.1)}>📦 Объём +10%</button>
@@ -5022,6 +5055,8 @@ export const BbAutoConstructor: React.FC = () => {
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
               <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
+              <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
+              <button style={BTN_GHOST} onClick={handlePrintPlan}>📋 Вся таблица</button>
              <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
            </div>
 
