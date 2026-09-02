@@ -27,7 +27,7 @@ import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList в
 import { usePlannerReportState } from "./planner-report-state"; // Хвост-1: состояние отчётов вынесено в под-хук
 import { usePlannerSpecialMealState } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
-import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
+import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
@@ -156,8 +156,8 @@ export interface PlanCtx {
   preferredFoods: string[]; setPreferredFoods: (v: any) => void;
   excludedFoods: string[]; setExcludedFoods: (v: any) => void;
   preferredByMeal: Record<string, string[]>; setPreferredByMeal: (v: any) => void;
-  specificity: Specificity; setSpecificity: (v: Specificity) => void;
-  intolerances: Intolerances; setIntolerances: (v: any) => void;
+  
+intolerances: Intolerances; setIntolerances: (v: any) => void;
   tasteProfile: TasteProfile; setTasteProfile: (v: any) => void;
   excludedCategories: string[]; setExcludedCategories: (v: any) => void;
   allergenExcludedCount: number; setAllergenExcludedCount: (v: number) => void;
@@ -571,7 +571,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setPlanTab('plan');
     } catch {}
   };
-  const applyCombatNutrition = useCallback(() => {
+  const applyCombatNutrition = () => {
     if (!combatNutrition) return;
     try {
       const cn: any = combatNutrition;
@@ -585,7 +585,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         try { generatePlan(planDays as 1 | 3 | 7, undefined, selectedDayIndex); setPlanTab('plan'); } catch {}
       }, 0);
     } catch {}
-  }, [combatNutrition, planDays, selectedDayIndex]);
+  };
   const [lifeStage, setLifeStage] = useState<LifeStage>(() => {
     try {
       const v = (s as any)?.goals?.lifeStage as LifeStage;
@@ -1059,24 +1059,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   useEffect(() => { try { updateSection('nutrition', { preferredByMeal }); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
-  const [specificity, setSpecificity] = useState<Specificity>(() => {
-    try {
-      const v = (s as any)?.nutrition?.specificity;
-      if (v === 'generic' || v === 'specific') return v;
-    } catch {}
-    try {
-      const v = localStorage.getItem('he_specificity');
-      if (v === 'generic' || v === 'specific') return v;
-    } catch {}
-    return 'varied';
-  });
-  useEffect(() => {
-    try {
-      // Маппинг Specificity → UnifiedSettings.specificity: 'everyday' → 'generic', остальное → 'specific'
-      const mapped = specificity === 'everyday' ? 'generic' : 'specific';
-      updateSection('nutrition', { specificity: mapped as any });
-    } catch {}
-  }, [specificity]);
   const [intolerances, setIntolerances] = useState<Intolerances>(() => {
     let v: any = null;
     try {
@@ -3447,7 +3429,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     morningTrainLoad, setMorningTrainLoad,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,
     addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
-    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories, excludedFoods, setExcludedFoods,
+    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories, excludedFoods, setExcludedFoods,
     allergenExcludedCount, setAllergenExcludedCount, planTargets, setPlanTargets,
     carbPeriodization, setCarbPeriodization, heavyTrainDay, setHeavyTrainDay,
     workScheduleEnabled, setWorkScheduleEnabled,

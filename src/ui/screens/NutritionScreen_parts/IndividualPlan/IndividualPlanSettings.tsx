@@ -97,7 +97,7 @@ export const IndividualPlanSettings: React.FC = () => {
     addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
     planType, setPlanType,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
-    specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
+    intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
     customNotes, setCustomNotes,
     carbPeriodization, setCarbPeriodization, trainingDays, setTrainingDays, DAY_LABELS,
     heavyTrainDay, setHeavyTrainDay,
@@ -1693,8 +1693,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           </div>
           <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Вариативность теперь в карточке «Разнообразие» выше (пул + ротация).</div>
         </div>
-                {/* D: Specificity */}
-        {/* Роунд-2 v5: specificity UI удалён (no-op, бюджет 'max' покрывает premium) */}
         {/* E: Intolerances */}
         <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
         <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
