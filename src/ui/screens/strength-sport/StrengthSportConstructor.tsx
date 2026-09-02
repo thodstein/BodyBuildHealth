@@ -20,6 +20,7 @@ import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/str
 import { estimate1RMFromVelocitySS, VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
+import { injectTAWeakPoints } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -232,6 +233,16 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch {}
     let p = buildStrengthSportPlan(input);
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
+    // ТА-диагностика: инъекция коррекций с MRV-бюджетом (аналогично PL diagnosticExerciseMap)
+    if (weakPoints.length) {
+      const inj = injectTAWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
+      if (inj.injected > 0) p.rationale = inj.plan.rationale;
+      p = inj.plan;
+      if (inj.notes.length) {
+        // лог для отладки, не блокирует сборку
+        try { console.info('[TA injection]', inj.notes.join(' | ')); } catch {}
+      }
+    }
     setPlan(p);
     saveStrengthSportPlan(p);
     try {

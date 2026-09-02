@@ -261,6 +261,31 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(()=>setToast(''),3000);
   };
 
+  const applyMobilityToProfile = () => {
+    const restrictions: string[] = [];
+    if (!state.ohsHeelsFlat) restrictions.push('ankle');
+    if (state.ohsKneeValgus) restrictions.push('hip');
+    if (!state.ohsHipBelowParallel) restrictions.push('hip');
+    if (!state.ohsTrunkUpright) restrictions.push('hip');
+    if (!state.ohsArmsOverMidfoot) restrictions.push('shoulder');
+    if (!state.ohsLumbarNeutral) restrictions.push('lower_back');
+    if (state.kneeToWallCm && Number.isFinite(parseFloat(state.kneeToWallCm)) && parseFloat(state.kneeToWallCm) < 12) restrictions.push('ankle');
+    if (state.ankleDeg && Number.isFinite(parseFloat(state.ankleDeg)) && parseFloat(state.ankleDeg) < 35) restrictions.push('ankle');
+    const uniq = [...new Set(restrictions)];
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      const p = raw ? JSON.parse(raw) : {};
+      p.health = p.health || {};
+      p.health.mobilityRestrictions = uniq;
+      p.training = p.training || {};
+      (p.training as any).mobilityRestrictions = uniq;
+      localStorage.setItem('he_profile_v2', JSON.stringify(p));
+      try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
+      setToast(`✓ Мобильность ${uniq.join(', ') || 'OK'} → профиль (учтётся в ТА-плане)`);
+      setTimeout(() => setToast(''), 2500);
+    } catch {}
+  };
+
   // Lifter limiter suggestions for selected phase (top 2)
   const limiterForPhase = useMemo(() => {
     const wp = weakPoints[0];
@@ -487,6 +512,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize: 10, color: DIM }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
               </div>
             )}
+            <button onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
             {/* Legacy compat fields hidden but synced */}
             <div style={{ display: 'none' }}><input value={state.overheadSquat} readOnly /><input value={state.ankleDorsiflex} readOnly /></div>
           </div>

@@ -244,9 +244,11 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   if (acwr?.zone === 'dangerous' && sets > 2) sets = Math.max(2, Math.round(sets * 0.65));
   else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
   else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
-  // PRO carry: VBT порог 15% скорости (Hindle 1.83м stride)
+  // PRO VBT пороги: TA power 10%, pull 15% (PLOS 2026), carry 15% (Hindle)
   const isCarryVBT = ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry','truck_pull','arm_over_arm','sandbag_carry','sled_push','sled_drag','duck_walk'].some(k=> id.includes(k.replace('_walk','')) || id===k);
-  const vbtThresh = isCarryVBT ? 15 : 20;
+  const isTAPull = id.includes('pull') || id.includes('squat');
+  const isTA = id.includes('snatch') || id.includes('clean') || id.includes('jerk');
+  const vbtThresh = isTAPull ? 15 : isTA ? 10 : isCarryVBT ? 15 : 20;
   if (typeof vLoss === 'number' && vLoss > vbtThresh && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
   // H1: VelocityHistory 3 точки → zone 20/30% (carry 15/25%)
   const vHist = (input as any).velocityHistory as Record<string, number[]> | undefined;
@@ -259,10 +261,9 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
       if (best > 0) histLoss = (best - last) / best * 100;
     }
   }
-  // дублируем пороги для carry вне scope rir — объявляем заранее
-  // isCarryVBT уже определён выше для VBT, переиспользуем histThresh*
-  const histThreshLow = isCarryVBT ? 15 : 20;
-  const histThreshHigh = isCarryVBT ? 25 : 30;
+  // дублируем пороги для TA/carry вне scope rir
+  const histThreshLow = isTAPull ? 15 : isTA ? 10 : isCarryVBT ? 15 : 20;
+  const histThreshHigh = isTAPull ? 25 : isTA ? 20 : isCarryVBT ? 25 : 30;
   if (histLoss > histThreshLow && sets > 2) sets = Math.max(2, Math.round(sets * (histLoss > histThreshHigh ? 0.80 : 0.90)));
   // P3 diary e1RM trend: -5% down → -15%, plateau <2% → +1 сет
   const trends: any[] = (input as any).diaryTrend || [];
