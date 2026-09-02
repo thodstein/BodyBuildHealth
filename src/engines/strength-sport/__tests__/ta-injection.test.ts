@@ -54,4 +54,19 @@ describe('TA injection PRO — MRV + dedup parity', () => {
     }
     expect(checked).toBe(48);
   });
+  it('property: 192 combos injection (modes×levels×goals×days) without throw', () => {
+    const modes: any[] = ['weightlifting', 'strongman', 'hybrid'];
+    const levels: any[] = ['beginner', 'intermediate', 'advanced', 'enhanced'];
+    const goals: any[] = ['strength', 'hypertrophy', 'peaking', 'technique'];
+    const days = [2, 3, 4, 5];
+    let checked = 0;
+    for (const mode of modes) for (const level of levels) for (const goal of goals) for (const d of days) {
+      const p = buildStrengthSportPlan({ mode, goal, level, weeks: 4, daysPerWeek: d, workMax: { snatch: 70, backSquat: 120, deadlift: 150 } } as any);
+      const r = injectTAWeakPoints(p, mode === 'weightlifting' ? ['snatch_off_floor' as WLWeakPoint] : mode === 'strongman' ? ['pull_start' as WLWeakPoint] : ['squat_bottom' as WLWeakPoint]);
+      expect(r.plan.weeksData.length).toBe(4);
+      expect(Number.isFinite(r.plan.weeksData[0].totalSets || 0)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBe(192);
+  });
 });

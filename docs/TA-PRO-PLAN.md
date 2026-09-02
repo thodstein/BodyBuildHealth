@@ -51,3 +51,8 @@
 - **Bar path** Enode table yT -0.014/1.0 r2 0.99, xLoop -0.45/1.08, bfPCA extractBfPCAPatterns Pattern1 backward +0.42 corr (Kipp)
 - **Diary** candidateTAWeakPointsFromDiary phaseForReps reps≤2→max moment /3-5→mid — отображение в header 📓 фазы
 - **Верификация** itest 421/421 	a-injection 6/6 strength-sport 412/412
+
+## Финал P2 (0754e45b + c19958b85) — parity 192 + pose live
+- **Parity 192** 	a-injection.test.ts 48→192 (modes×levels×goals×days) without throw, strength-sport-matrix 192 уже 421/421
+- **Pose live** ensurePoseModel CDN mediapipe/pose@0.5 + detectPoseFromVideo + 3 теста estimateAngles/hasPoseSupport/livePoseStatus
+- **VBT пик** LOAD_VELOCITY_PROFILE_SS.snatch 0.85→1.30 peak (Wood), phase6-pro.test обновлён
