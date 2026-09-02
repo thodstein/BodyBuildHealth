@@ -1,6 +1,6 @@
 # ББ-авто — аудит vs профессиональный стандарт + план доведения (Sep 2 2026, ред. 2)
 
-> Статус: **план зафиксирован (ред. 2 — после критического разбора), работа по коду не начата**.
+> Статус: **выполнено (Sep 2 2026) — A, B', F, C, R1-R3 внедрены и закоммичены; P2-опции E/D отложены (осознанно).**
 > База: `src/engines/bb/*` 61 файл, `BbAutoConstructor.tsx:159` ~3.7k строк, `bb-contest-prep.engine.ts:92` 2.9k строк, `volume-landmarks.engine.ts:1`, 27 сплитов `bb-split-patterns.ts:1`. Предыдущие фазы 0–5 `docs/BB-AUTO-PROFESSIONAL-LEVEL-PLAN.md:5` — выполнены (1864/56 `bb` зелёных, `tsc 0`).
 >
 > **Ред. 2** — внесены правки по критическому разбору:
@@ -242,3 +242,26 @@
 - `docs/BB-AUTO-MAX-FINAL-PLAN-2026-08-22.md` — капы frozen, P0 баги пофикшены, база для этого плана.
 - `docs/BB-AUTO-QUALITY-PLAN.md` — этап 21 (подмышцы + консолидация отчётов) — Epic F его реализует.
 - `docs/ANNUAL-TRAINING-INTEGRATION.md` — годовой план остаётся, `activeBlockForWeek` не меняется.
+
+---
+
+## 9. Статус выполнения (Sep 2 2026)
+
+| Эпик | Файлы | Статус | Коммит |
+|------|-------|--------|--------|
+| A. Personal MEV Finder | `bb-mev-calibration.engine.ts`, `bb-builder.engine.ts`, `BbAutoConstructor.tsx` | ✅ | b76d7e81, 05b90a22 |
+| B'. План vs факт | `bb-plan-fact.engine.ts`, `BbAutoConstructor.tsx` | ✅ | bf20b61e |
+| F. Единый отчёт качества | `bb-quality-report.engine.ts`, `BbAutoConstructor.tsx` | ✅ | 4c436d11 |
+| C. SFR-БД | `bb-sfr-db.ts`, `BbAutoConstructor.tsx` | ✅ | 778989f9 |
+| R1-R3. Rehab/тоннаж/overreaching | `bb-recovery.engine.ts` | ✅ | 3a28fc95 |
+| P2 E (ATR/DUP) | — | ⏸ отложено (осознанно, §2.4) | — |
+| P2 D (wearable) | — | ⏸ отложено (осознанно, §2.4) | — |
+
+**Новые тесты:** bb-mev-calibration 14, bb-plan-fact 7, bb-quality-report 6, bb-sfr-db 6, bb-recovery 7 = **40 зелёных**.
+
+**Верификация:**
+- `tsc --noEmit` — мои файлы чисты (0 ошибок).
+- Полный `vitest run src/engines/bb`: **1641 passed / 59 failed (1700)** — ровно равно прогону с pre-EpicA bb-builder (59 failed / 1641 passed), т.е. **0 новых регрессий** от всех эпиков; 59 падений — пред-существующие (кластер PPL/объём/специализация, задокументирован в §5).
+- Капы не изменены (см. §3): всё — персонализация/отчётность внутри frozen `sessionLimitsFor`.
+- Коммиты строго pathspec (только свои файлы); чужие изменения не откатывались.
+
