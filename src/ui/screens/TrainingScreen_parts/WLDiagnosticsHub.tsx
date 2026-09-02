@@ -14,7 +14,8 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
@@ -44,6 +45,13 @@ type WLState = {
   fvrLoad110: string;
   fvrVmax110: string;
   fvrHAcc: string;
+  // LVP ramp 50/65/75/90
+  lvpLift: string;
+  lvp50: string;
+  lvp65: string;
+  lvp75: string;
+  lvp90: string;
+  lvpResult: string;
   // OHS 6 segments
   ohsHeelsFlat: boolean;
   ohsKneeValgus: boolean;
@@ -71,6 +79,7 @@ const DEFAULT_STATE: WLState = {
   leftMax: '', rightMax: '',
   vbtWeight: '', vbtVel: '', vbtBest: '', vbtLast: '', vbtVthres: '',
   fvrLoad80: '', fvrVmax80: '', fvrLoad110: '', fvrVmax110: '', fvrHAcc: '0.8',
+  lvpLift: 'snatch', lvp50: '2.70', lvp65: '2.15', lvp75: '1.80', lvp90: '1.55', lvpResult: '',
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   overheadSquat: '', ankleDorsiflex: '',
   kneeToWallCm: '', ankleDeg: '',
@@ -485,10 +494,30 @@ export const WLDiagnosticsHub: React.FC = () => {
               {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres snatch {TA_VTHRES_NORMS.snatch.min}-{TA_VTHRES_NORMS.snatch.max} (opt {TA_VTHRES_NORMS.snatch.optimal}), clean {TA_VTHRES_NORMS.clean.min}-{TA_VTHRES_NORMS.clean.max}</div>}
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
-          </div>
-        )}
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>LVP ramp — индивидуальный профиль (PLOS Wood 2026)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'80px 1fr 1fr 1fr 1fr', gap:6, marginTop:6, alignItems:'end' }}>
+                <label style={{ fontSize:10, color:DIM }}>Лифт<br/><select value={state.lvpLift} onChange={e=> setState(s=>({...s, lvpLift: e.target.value}))} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }}><option value="snatch">Рывок</option><option value="clean">Толчок</option><option value="squat">Присед</option><option value="deadlift">Тяга</option><option value="yoke_walk">Йок</option></select></label>
+                <label style={{ fontSize:10, color:DIM }}>50% м/с<br/><input value={state.lvp50} onChange={e=> setState(s=>({...s, lvp50:e.target.value}))} placeholder="2.70" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>65% м/с<br/><input value={state.lvp65} onChange={e=> setState(s=>({...s, lvp65:e.target.value}))} placeholder="2.15" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>80% м/с<br/><input value={state.lvp75} onChange={e=> setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.80" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>90% м/с<br/><input value={state.lvp90} onChange={e=> setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.55" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
+              </div>
+              <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                <button onClick={()=> {
+                  const pts = [{pct:0.5, velocity:parseFloat(state.lvp50)}, {pct:0.65, velocity:parseFloat(state.lvp65)}, {pct:0.80, velocity:parseFloat(state.lvp75)}, {pct:0.90, velocity:parseFloat(state.lvp90)}].filter(p=> Number.isFinite(p.velocity) && p.velocity>0) as any;
+                  const res = calibrateLVP(state.lvpLift, pts);
+                  if (res) { saveLVPProfile(res); setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
+                  else { setState(s=>({...s, lvpResult: 'Ошибка: нужно ≥3 точки, spread ≥0.2, slope<0' })); }
+                }} style={{ padding:'6px 12px', borderRadius:8, background:'linear-gradient(135deg,#a855f7,#3b82f6)', color:'#fff', border:'none', fontWeight:700, fontSize:11, cursor:'pointer' }}>Калибровать LVP</button>
+                <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>{state.lvpResult}</span>
+              </div>
+              <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
+            </div>
+           </div>
+         )}
 
-        {tab === 'video' && (
+         {tab === 'video' && (
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Видео / Bar tracking — Kinovea + Enode</div>
             <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Полевая методика Ang 2023 (loadsol + Kinovea free). Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
