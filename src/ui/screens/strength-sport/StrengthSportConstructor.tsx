@@ -17,14 +17,17 @@ import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event
 import { TAPER_CESSATION_DAYS } from '../../../engines/strength-sport/strength-sport-taper.engine';
 import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
-import { estimate1RMFromVelocitySS, VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { estimate1RMFromVelocitySS, VBT_SS_THRESHOLDS, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
+import { hrvReport } from '../../../engines/strength-sport/strength-sport-hrv.engine';
+import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
 import { injectTAWeakPoints } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 import { injectSMWeakPoints } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
-import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
+import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS, moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
@@ -58,8 +61,12 @@ export const StrengthSportConstructor: React.FC = () => {
   const [competitionDate, setCompetitionDate] = useState<string>('');
   const [patternId, setPatternId] = useState<string>('');
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
+  const [hrv, setHrv] = useState<any>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [vbtPerLift, setVbtPerLift] = useState<Record<string, {best:number,last:number}>>({ snatch:{best:0,last:0}, clean:{best:0,last:0}, squat:{best:0,last:0} });
+  const [lvpLift, setLvpLift] = useState<string>('snatch');
+  const [lvpPoints, setLvpPoints] = useState<Array<{pct:number,velocity:number}>>([{pct:0.5, velocity:2.70},{pct:0.65, velocity:2.15},{pct:0.80, velocity:1.80},{pct:0.90, velocity:1.55}]);
+  const [lvpResult, setLvpResult] = useState<any>(null);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
   const [contest, setContest] = useState<StrongmanContest | null>(null);
   const [contestStrategy, setContestStrategy] = useState<'conservative'|'balanced'|'aggressive'>('balanced');
@@ -123,6 +130,10 @@ export const StrengthSportConstructor: React.FC = () => {
   const [msg, setMsg] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
+  const contestSim = useMemo(() => {
+    if (!contest || mode !== 'strongman') return null;
+    try { return simulateContest(contest as any, workMax as any, contestStrategy as any); } catch { return null; }
+  }, [contest, workMax, contestStrategy, mode]);
   React.useEffect(() => { try { localStorage.setItem('he_vbt_ss_v1', JSON.stringify(vbtMap)); } catch {} }, [vbtMap]);
 
   React.useEffect(() => {
@@ -140,6 +151,18 @@ export const StrengthSportConstructor: React.FC = () => {
           if(ew) setAcwr({ ratio: ew.ratio, zone: ew.zone });
         }catch{}
       }
+      // HRV EWMA
+      try {
+        const hrvRaw = localStorage.getItem('he_hrv_log');
+        if (hrvRaw) {
+          const hArr = JSON.parse(hrvRaw);
+          const vals = Array.isArray(hArr) ? hArr.map((s:any)=> s.hrvMs ?? s.hrv ?? s.value).filter((v:any)=> Number.isFinite(v)) as number[] : [];
+          if (vals.length >= 7) {
+            const rep = hrvReport(vals);
+            if (rep) setHrv(rep);
+          }
+        }
+      } catch {}
     } catch {}
   }, [plan]);
 
@@ -448,6 +471,7 @@ export const StrengthSportConstructor: React.FC = () => {
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
             {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)': acwr.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={acwr.zone==='dangerous'?'rgba(239,68,68,0.22)': acwr.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
+            {hrv && <Badge color={hrv.zone==='dangerous'?'#fecaca': hrv.zone==='caution'?'#fde68a':'#86efac'} bg={hrv.zone==='dangerous'?'rgba(239,68,68,0.12)': hrv.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={hrv.zone==='dangerous'?'rgba(239,68,68,0.22)': hrv.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>HRV {hrv.ewma ?? hrv.last} мс · {hrv.zone}</Badge>}
           </div>
           {msg && <span style={{ fontSize:11.5, fontWeight:700, color:'#fff', background: mode==='strongman'?'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(239,68,68,0.12))':'linear-gradient(135deg, rgba(48,209,88,0.18), rgba(14,165,233,0.12))', border:'1px solid rgba(255,255,255,0.10)', padding:'6px 12px', borderRadius:20, backdropFilter:'blur(8px)', boxShadow:'0 4px 16px rgba(0,0,0,0.18)' }}>{msg}</span>}
         </div>
@@ -507,6 +531,7 @@ export const StrengthSportConstructor: React.FC = () => {
               <StrengthPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[{id:'1',label:'1 неделя',desc:'объём −45%'},{id:'2',label:'2 недели',desc:'−35% → −55%'}]} />
             )}
             {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': '— оптимум'}</InfoBanner>}
+            {hrv && <InfoBanner tone={hrv.zone==='dangerous'?'warn': hrv.zone==='caution'?'warn':'info'}><Highlight color={hrv.zone==='dangerous'?'#ff3b30':hrv.zone==='caution'?'#ff9f0a':'#30d158'}>HRV {hrv.ewma ?? hrv.last} мс</Highlight> · {hrv.zone} {hrv.zone==='dangerous'?'— recovery ×0.85': hrv.zone==='caution'?'— recovery ×0.94':'— оптимум'} · mean {hrv.mean}±{hrv.sd}</InfoBanner>}
             <Divider />
             <GroupHeading icon="⚡" text="Скорость (VBT)" desc=">20% → объём ×0.90, RIR+1" />
             <Field label={`VBT потеря`} hint={`потеря скорости vs бюджет`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#30d158'}>{velocityLoss}%</Highlight></div></Field>
@@ -539,9 +564,34 @@ export const StrengthSportConstructor: React.FC = () => {
               })}
             </div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS).</div>
-          </SectionCard>
+           </SectionCard>
 
-          <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса">
+           <SectionCard icon="📈" title="LVP калибровка" subtitle="Индивидуальный профиль скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent>
+             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+               <StrengthPopupSelect label="Лифт" value={lvpLift} onChange={v=> setLvpLift(v)} options={[{id:'snatch',label:'🏋️ Рывок'},{id:'clean',label:'🏋️ Толчок'},{id:'squat',label:'🦵 Присед'},{id:'deadlift',label:'🏋️ Тяга'},{id:'yoke_walk',label:'🚜 Йок'},{id:'farmers_walk',label:'🚜 Фермер'}]} />
+               <div style={{ display:'flex', alignItems:'flex-end', gap:6 }}>
+                 <button onClick={()=> {
+                   const res = calibrateLVP(lvpLift, lvpPoints as any);
+                   if (res) { saveLVPProfile(res); setLvpResult(res); setMsg(`✦ LVP ${lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setMsg(''),2000); }
+                   else { setMsg('⚠ Need ≥3 точки с покрытием 20%'); setTimeout(()=>setMsg(''),2000); }
+                 }} style={{ ...BTN_PRIMARY, flex:1 }}>Калибровать</button>
+                 <button onClick={()=> { const all=loadLVPProfiles(); setMsg(`LVP профилей: ${Object.keys(all).join(', ')||'—'}`); setTimeout(()=>setMsg(''),2000); }} style={BTN}>Показать</button>
+               </div>
+             </div>
+             <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6, marginTop:8 }}>
+               {lvpPoints.map((pt,idx)=> (
+                 <div key={idx} style={{ background:'rgba(0,0,0,0.14)', padding:'6px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{Math.round(pt.pct*100)}% → м/с</div>
+                   <input type="number" step={0.05} value={pt.velocity||''} onChange={e=> { const v=Number(e.target.value)||0; setLvpPoints(s=> s.map((p,i)=> i===idx?{...p, velocity:v}:p)); }} style={{ ...INPUT, fontSize:11, padding:'4px 6px' }} placeholder="1.80" />
+                   <div style={{ fontSize:9, color: velocityTypeForLift(lvpLift)==='peak' ? '#22c55e':'#f59e0b' }}>{velocityTypeForLift(lvpLift)==='peak'?'peak':'mpv'}</div>
+                 </div>
+               ))}
+             </div>
+             {lvpResult && <div style={{ fontSize:10, color: lvpResult.valid ? '#22c55e':'#f59e0b', background: lvpResult.valid?'rgba(34,197,94,0.08)':'rgba(245,158,11,0.08)', padding:'6px 8px', borderRadius:8, border:`0.5px solid ${lvpResult.valid?'rgba(34,197,94,0.18)':'rgba(245,158,11,0.18)'}` }}>r² {lvpResult.r2} slope {lvpResult.slope} intercept {lvpResult.intercept} {lvpResult.valid?'✅ валиден ≥0.85':'⚠ проверьте'} · e1RM пример {estimate1RMFromVelocitySS(80, lvpResult.valid? velocityForLVP(lvpResult,0.8)??0 : 0, lvpLift)||'—'}кг</div>}
+             <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (PLOS Wood 2026: individual калибровка обязательна).</div>
+           </SectionCard>
+
+           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
               <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
@@ -616,6 +666,19 @@ export const StrengthSportConstructor: React.FC = () => {
                       </select>
                       <span style={{ fontSize:10, color:'rgba(255,255,255,0.36)' }}>Taper: йок/камень 7д · лог/фермер 5д · броски 4д</span>
                     </div>
+                    {contestSim && (
+                      <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:6 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10 · avg {contestSim.avgPoints}</div>
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                          {contestSim.events.map(ev=> (
+                            <span key={ev.id} style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: ev.isWeak ? 'rgba(239,68,68,0.14)':'rgba(34,197,94,0.10)', border:`0.5px solid ${ev.isWeak?'rgba(239,68,68,0.22)':'rgba(34,197,94,0.18)'}`, color: ev.isWeak?'#fecaca':'#86efac' }}>{ev.id} {ev.points}pts {ev.effectiveRatio*100>0?`${Math.round(ev.effectiveRatio*100)}%`:''}</span>
+                          ))}
+                        </div>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>Rec order: {contestSim.recOrder.join(' → ')}</div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.36)' }}>{contestSim.rationale.join(' · ')}</div>
+                        {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них (injection)</div>}
+                      </div>
+                    )}
                     <InfoBanner tone="strong">Contest Packet: план строит event_day/overhead/deadlift под заявленные ивенты, прогрессия веса к контест-весу, taper cess 7/5/4д (Winwood), medley 90с cap180</InfoBanner>
                   </div>
                 )}
@@ -970,6 +1033,15 @@ export const StrengthSportConstructor: React.FC = () => {
                   const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
                   return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}{b.competitionDate ? ' 🏁' : ''}</span>;
                 })}
+              </div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {annual.blocks.map((b:any, idx:number)=> (
+                  <div key={b.id} style={{ display:'flex', gap:2, alignItems:'center', background:'rgba(255,255,255,0.04)', padding:'4px 6px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize:10, color:'#fff' }}>{idx+1}. {b.weeks}нед</span>
+                    <button disabled={idx===0} onClick={()=> { const n=moveAnnualBlock(annual, idx, idx-1); if(n){ saveAnnualSS(n); setAnnual(n); setMsg(`◀ блок ${idx+1} → ${idx}`); setTimeout(()=>setMsg(''),1500);} }} style={{ ...BTN_SMALL, padding:'2px 6px', fontSize:10, opacity: idx===0?0.4:1 }}>◀</button>
+                    <button disabled={idx===annual.blocks.length-1} onClick={()=> { const n=moveAnnualBlock(annual, idx, idx+1); if(n){ saveAnnualSS(n); setAnnual(n); setMsg(`▶ блок ${idx+1} → ${idx+2}`); setTimeout(()=>setMsg(''),1500);} }} style={{ ...BTN_SMALL, padding:'2px 6px', fontSize:10, opacity: idx===annual.blocks.length-1?0.4:1 }}>▶</button>
+                  </div>
+                ))}
               </div>
               <div style={{ display:'flex', height:16, borderRadius:10, overflow:'hidden', border:'0.5px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.18)' }}>
                 {annual.blocks.map((b:any)=> {
