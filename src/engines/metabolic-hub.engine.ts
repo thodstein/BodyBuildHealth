@@ -799,9 +799,14 @@ export function calcABSIWrapper(w:number,h:number,weight:number){ return calcABS
 
 // ——— Adaptive TDEE v2 (MacroFactor-стиль) — Hall density + trend R² ———
 export interface AdaptiveTDEEResult { tdee:number; tdeeNoAT:number; trend:number; r2:number; days:number; n:number; density:number; atKcal:number; confidence:'low'|'medium'|'high'; plateau:boolean; targets:{ maintain:number; cut:number; bulk:number }; note:string; weeklySeries: Array<{days:number; trend:number; r2:number}> }
-export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntakeKcal:number; bodyFatPct?:number; goal?:'cut'|'maintain'|'bulk'|'health' }): AdaptiveTDEEResult | null {
-  const wh=params.weightHistory; if(!wh||wh.length<7||!params.avgIntakeKcal) return null;
-  const intake=params.avgIntakeKcal;
+export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntakeKcal:number; bodyFatPct?:number; goal?:'cut'|'maintain'|'bulk'|'health'; intakeHistory?: Array<{date:string;kcal:number}> }): AdaptiveTDEEResult | null {
+  const wh=params.weightHistory; if(!wh||wh.length<7) return null;
+  let intake=params.avgIntakeKcal;
+  if(Array.isArray(params.intakeHistory) && params.intakeHistory.length>=7){
+    const last7=params.intakeHistory.slice(-7).filter(p=> typeof p.kcal==='number' && p.kcal>500 && p.kcal<8000);
+    if(last7.length>=5) intake=Math.round(last7.reduce((s,p)=>s+p.kcal,0)/last7.length);
+  }
+  if(!intake) return null;
   const density=energyDensityPerKg(params.bodyFatPct, undefined);
   const win = (n:number)=>{
     const pts=wh.slice(-n);
@@ -846,9 +851,20 @@ export function parseWeeklyScheduleText(text:string): Array<{ key:string; hours:
   const out: Array<{key:string;hours:number}>=[];
   const add=(kw:string[], key:string)=>{
     for(const k of kw){ if(lower.includes(k)){
-      const m=lower.match(new RegExp(k+".*?([0-9]+[\\.,]?[0-9]*)\\s*ч","i"));
-      const h=m? Number(m[1].replace(',','.')): 1;
-      out.push({key, hours: clamp(h,0.3,15)}); break;
+      // улучшено: 45мин → 0.75ч, 1.5ч, 30м, 2×
+      let h=1;
+      const mMin=lower.match(new RegExp(k+".*?([0-9]+[\\.,]?[0-9]*)\\s*(мин|м\\b)","i"));
+      const mHour=lower.match(new RegExp(k+".*?([0-9]+[\\.,]?[0-9]*)\\s*(ч|час)","i"));
+      const mMult=lower.match(new RegExp("([0-9]+)\\s*[×x]\\s*"+k,"i"));
+      if(mMin){ h= Number(mMin[1].replace(',','.'))/60; }
+      else if(mHour){ h= Number(mHour[1].replace(',','.')); }
+      else if(mMult){ h= Number(mMult[1])*1; }
+      else {
+        const mAny=lower.match(new RegExp(k+".*?([0-9]+[\\.,]?[0-9]*)","i"));
+        if(mAny) h=Number(mAny[1].replace(',','.'));
+        if(h>10) h/=60; // 45 → 0.75ч если без единицы
+      }
+      out.push({key, hours: clamp(h,0.25,15)}); break;
     }}
   };
   add(['силов','кач','бб','жим','тяг'],'strength');
@@ -938,14 +954,21 @@ export function calcBodyCompProjection(input:{ weight:number; height:number; bod
   const ffmi0=ffm0/(hM*hM)+6.1*(1.80-hM);
   const out: Array<{year:number; weight:number; bodyFat:number; ffmi:number}>=[];
   for(let y=0;y<=input.years;y++){
-    // simple model: +0.4 FFMI/year first 2y then +0.15 (Morton), bf varies by mode
+    if(input.mode==='hold_ffmi'){
+      // hold FFMI constant — рекомп: BF снижается, вес = FFM/(1-BF)
+      const ffmi=ffmi0;
+      const ffm=(ffmi -6.1*(1.80-hM))*hM*hM;
+      const bf=Math.max(5, Math.round((input.bodyFat - y*0.5)*10)/10);
+      const weight=ffm/(1-bf/100);
+      out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:bf, ffmi:Math.round(ffmi*10)/10 });
+      continue;
+    }
     const prog = y<=2 ? y*0.4 : 0.8 + (y-2)*0.15;
     const ffmi = Math.min(ffmi0+prog, 26.2);
     const ffm = (ffmi -6.1*(1.80-hM)) * hM*hM;
     let weight:number, bf:number;
     if(input.mode==='hold_bf'){ bf=input.bodyFat; weight=ffm/(1-bf/100); }
-    else if(input.mode==='hold_weight'){ weight=input.weight; bf=Math.max(5, (1-ffm/weight)*100); }
-    else { weight=ffm/(1-input.bodyFat/100); bf=input.bodyFat; } // hold_ffmi same as hold_bf for now
+    else { weight=input.weight; bf=Math.max(5, (1-ffm/weight)*100); } // hold_weight
     out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:Math.round(bf*10)/10, ffmi:Math.round(ffmi*10)/10 });
   }
   return out;
@@ -962,7 +985,7 @@ export function calcBeverageRank(totalLossMl:number, sodiumLossMg:number): Array
   return list.sort((a,b)=>b.score-a.score);
 }
 export function calcLeafScore(answers: boolean[]): { score:number; risk:'low'|'moderate'|'high'; note:string } {
-  const score=answers.filter(Boolean).length;
+  const score=answers.filter(Boolean).length*2;
   const risk=score>=8?'high':score>=4?'moderate':'low';
   const note=risk==='high'?'LEAF ≥8 — высокий RED-S (Mountjoy)':risk==='moderate'?'LEAF 4-7 — умеренный':'LEAF <4 — низкий';
   return { score, risk, note };

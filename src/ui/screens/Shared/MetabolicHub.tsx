@@ -247,6 +247,7 @@ export const MetabolicHub: React.FC = () => {
       showToast(`Донация ${entry.date} записана (HCT ${hct}% → ожид. ~${Math.max(36, Math.round((hct-4)*10)/10)}% через 7д)`);
     }catch{ showToast('Донация записана'); }
   }, [hct, showToast]);
+  useEffect(()=>{ try{ const raw=localStorage.getItem('he_sweat_profiles_v1'); if(raw){ const p=JSON.parse(raw); if(p && typeof p==='object') setSweatProfiles(p); } }catch{} },[]);
 
   // labs + pharma live refresh (HCT/ферритин/GFR + ААС)
   const refreshLabs = useCallback(()=>{
@@ -591,6 +592,38 @@ export const MetabolicHub: React.FC = () => {
         </div>
         {adaptiveTDEE && adaptiveTDEE.plateau && <div style={{ marginTop:8, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24' }}>⏸ Плато сушки: тренд {adaptiveTDEE.trend}кг/нед — проверь дефицит/шаги · AT {adaptiveTDEE.atKcal}ккал</div>}
         {adaptiveTDEE && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>Adaptive TDEE v2: 7/14/21д окна → R² {adaptiveTDEE.r2} дни {adaptiveTDEE.days} плотность {adaptiveTDEE.density} · TDEE без AT {adaptiveTDEE.tdeeNoAT} · {adaptiveTDEE.note}</div>}
+        {adaptiveTDEE && <div style={{ marginTop:6, display:'flex', gap:3, alignItems:'end', height: 18 }}>{adaptiveTDEE.weeklySeries.map((w,i)=>(
+          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+            <div style={{ width:'100%', height: Math.max(6, Math.min(24, w.r2*24)), borderRadius:3, background: w.r2>0.6?'#22c55e': w.r2>0.35?'#f59e0b':'#ef4444', border:'1px solid rgba(255,255,255,0.06)' }} title={`${w.days}д R²${w.r2} тренд ${w.trend}`} />
+            <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)' }}>{w.days}д</span>
+          </div>
+        ))}</div>}
+      </div>
+      {/* Wizard 3 шага */}
+      <div style={{ ...CARD, padding:10, display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.04)' }}>
+        <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.55)', textTransform:'uppercase' }}>Мастер:</span>
+        {([1,2,3] as const).map(s=>(
+          <button key={s} onClick={()=> setWizardStep(s)} style={{ flex:1, minHeight:34, borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:800, border: wizardStep===s ? '1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background: wizardStep===s ? 'rgba(96,165,250,0.14)':'rgba(255,255,255,0.02)', color: wizardStep===s ? '#60a5fa':'#fff' }}>
+            {s===1?'① Тело':s===2?'② Активность':'③ Цель/Лабы'}
+          </button>
+        ))}
+        <button onClick={()=>{
+          const tdee=oneAnswer.tdee;
+          const payload={ tdee, low:oneAnswer.low, high:oneAnswer.high, water:oneAnswer.water, ea:oneAnswer.ea, ts:Date.now(), source:'metabolic-hub-one-answer' };
+          try{ localStorage.setItem('he_metabolic_one_answer', JSON.stringify(payload)); }catch{}
+          const html=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — сводка</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5}</style></head><body><h1>⚖️ Метаболика PRO — сводка ${new Date().toLocaleString('ru-RU')}</h1><p>TDEE ${tdee} (${oneAnswer.low}-${oneAnswer.high}) · Вода ${oneAnswer.water}мл · EA ${oneAnswer.ea ?? '—'} · HCT ${hematology.hct ?? '—'}% · WHtR ${whtr?.toFixed(2) ?? '—'}</p><p>BMR ${kbju.nat.bmr} PAL ${kbju.nat.pal} · КБЖУ ${kbju.nat.kcal} Б${kbju.nat.p} Ж${kbju.nat.f} У${kbju.nat.c} · FFMI ${fat.ffmiNorm} · EA ${ea?.ea ?? '—'} (${ea?.zoneLabel ?? ''})</p><script>window.print()</`+`script></body></html>`;
+          const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else showToast('Всплывающие окна заблокированы');
+        }} style={{ padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer' }}>🖨 PDF</button>
+        <button onClick={()=>{
+          const tdee=oneAnswer.tdee;
+          const full=`Метаболика PRO — полный отчёт ${new Date().toLocaleString('ru-RU')}
+TDEE ${tdee} (${oneAnswer.low}-${oneAnswer.high}) · Вода ${oneAnswer.water}мл · EA ${oneAnswer.ea ?? '—'} (${ea?.zoneLabel ?? ''}) · HCT ${hematology.hct ?? '—'}% · WHtR ${whtr?.toFixed(2) ?? '—'}
+BMR ${kbju.nat.bmr} PAL ${kbju.nat.pal} · КБЖУ ${kbju.nat.kcal} Б${kbju.nat.p} Ж${kbju.nat.f} У${kbju.nat.c}
+FFMI ${fat.ffmiNorm} · LEAF ${leafCalc.score}/16 · MetS ${mets.score}/5 · TyG ${tyg ?? '—'} · FIB-4 ${fib4 ?? '—'}
+Adaptive TDEE ${adaptiveTDEE?.tdee ?? '—'} R²${adaptiveTDEE?.r2 ?? '—'} · Пот ${sweatTest?.rateLPerH?.toFixed(2) ?? '—'}л/ч`;
+          const html2=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — полный отчёт</title><style>body{font-family:system-ui;padding:24px;color:#111;white-space:pre-wrap}h1{font-size:18px}</style></head><body><h1>⚖️ Метаболика PRO — полный отчёт</h1><pre>${full.replace(/</g,'&lt;')}</pre><script>window.print()</`+`script></body></html>`;
+          const w2=window.open('','_blank'); if(w2){ w2.document.write(html2); w2.document.close(); } else showToast('Всплывающие окна заблокированы');
+        }} style={{ padding:'8px 8px', borderRadius:8, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:9, fontWeight:700, cursor:'pointer' }}>📄 Всё PDF</button>
       </div>
 
        {/* Переключатель ААС */}
@@ -635,9 +668,9 @@ export const MetabolicHub: React.FC = () => {
         </div>
       </div>
 
-      {/* Ввод — группы */}
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Антропометрия и цель</div>
+      {/* Ввод — группы — wizard step 1: Тело */}
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===1 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Антропометрия и цель — ① Тело</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="Вес, кг" value={weight} min={30} max={200} onChange={setWeight} />
           <PopupNumber label="Рост, см" value={height} min={140} max={220} onChange={setHeight} />
@@ -660,8 +693,8 @@ export const MetabolicHub: React.FC = () => {
         )}
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Активность (NEAT + EAT) — PRO</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===2 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Активность (NEAT + EAT) — ② Активность</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupSelect label="Бытовая" value={activityLevel} options={[{id:'low',label:'Низкая (офис)'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая (на ногах)'}]} onChange={v=> setActivityLevel(v as any)} />
           <PopupNumber label="Тренировок/нед" value={trainingDays} min={0} max={7} onChange={setTrainingDays} />
@@ -685,8 +718,8 @@ export const MetabolicHub: React.FC = () => {
         {adaptiveTDEE && <div style={{ fontSize:8, color: adaptiveTDEE.confidence==='high'?'#22c55e': adaptiveTDEE.confidence==='medium'?'#f59e0b':'#f87171', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>Adaptive v2 (7/14/21д): TDEE {adaptiveTDEE.tdee} (без AT {adaptiveTDEE.tdeeNoAT}) · R²{adaptiveTDEE.r2} дни {adaptiveTDEE.days} · {adaptiveTDEE.note}</div>}
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Замеры для Navy (опционально)</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===1 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Замеры для Navy — ① Тело</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="Шея, см" value={neck} min={28} max={60} onChange={setNeck} />
           <PopupNumber label="Талия, см" value={waist} min={55} max={150} onChange={setWaist} />
@@ -699,8 +732,8 @@ export const MetabolicHub: React.FC = () => {
         {fat.jp!=null && <div style={{ fontSize:8, color:'#a78bfa', background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.12)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>JP3 {fat.jp}% · Durnin {fat.durnin ?? '—'}% · BIA {fat.bia ?? '—'}% → {fat.measured}% приоритет калипера</div>}
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>💦 Пот-тест (Baker) — измерь свой пот</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===2 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>💦 Пот-тест — ② Активность</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="Вес до, кг" value={preKg} min={40} max={150} step={0.1} onChange={setPreKg} />
           <PopupNumber label="Вес после, кг" value={postKg} min={40} max={150} step={0.1} onChange={setPostKg} />
@@ -730,8 +763,8 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Акклиматизация 10-14д: объём +10-20%, Na −40% (Periard). 3 профиля — cool (20°C) / warm (25°C) / hot (30°C+влажн.).</div>
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>🧪 Метаболический синдром + WHtR/ABSI/BAI (опц.)</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===3 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>🧪 Метаболический синдром — ③ Цель/Лабы</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="HDL, мг/дл" value={hdlMgDl ?? 50} min={20} max={120} onChange={v=> setHdlMgDl(v||undefined)} />
           <PopupNumber label="Сис. АД" value={systolic ?? 120} min={80} max={200} onChange={v=> setSystolic(v||undefined)} />
@@ -747,8 +780,8 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>WHtR ≥0.5 риск, ABSI &gt;0.083 риск, TyG ≥8.8 IR, FIB-4 &lt;1.30 низкий &gt;2.67 высокий, QUICKI &lt;0.33 IR. ATP III ≥3/5 = MetS.</div>
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Pro-измерения — калипер / BIA / Липиды / FLI (опц.)</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===1 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Pro-измерения — ① Тело</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="JP3 сумма, мм" value={skinfoldSum3 ?? 30} min={8} max={150} onChange={v=> setSkinfoldSum3(v||undefined)} />
           <PopupNumber label="Durnin 4 сумма, мм" value={skinfoldSum4 ?? 40} min={10} max={200} onChange={v=> setSkinfoldSum4(v||undefined)} />
@@ -782,8 +815,8 @@ export const MetabolicHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Stress Load + щитовидка + HOMA (опц.)</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===3 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Stress Load + щитовидка + HOMA — ③ Лабы</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="FT4, пмоль/л" value={ft4 ?? 17} min={5} max={30} step={0.5} onChange={v=> setFt4(v||undefined)} />
           <PopupNumber label="Глюкоза натощак, мг/дл" value={glucoseMgDl ?? 90} min={60} max={180} onChange={v=> setGlucoseMgDl(v||undefined)} />
@@ -800,8 +833,8 @@ export const MetabolicHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Восстановление (Stress Load) + кофеин/алкоголь</div>
+      <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===2 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Восстановление — ② Активность</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="Стресс 1-10" value={stress} min={1} max={10} onChange={setStress} />
           <PopupNumber label="Сон, ч" value={sleepHours} min={3} max={11} step={0.5} onChange={setSleepHours} />
@@ -819,8 +852,8 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center' }}>{caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
         </div>
       </div>
-      <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)' }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#06b6d4', marginBottom:8 }}>🔋 RED-S скрининг (IOC CAT2-lite) — LEAF-Q 8 вопросов + RMR/кости</div>
+      <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#06b6d4', marginBottom:8 }}>🔋 RED-S — ③ Лабы</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <div style={{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
             {['Травмы (частые)','Болезни (частые)','ЖКТ вздутие','ЖКТ газы','Менстр. нарушения','Усталость','Настроение','Сон'].map((q,i)=>(
@@ -844,11 +877,11 @@ export const MetabolicHub: React.FC = () => {
         {dietBreakPlan && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>MATADOR: {dietBreakPlan.slice(0,8).map(p=> p.phase==='deficit'?'−':'○').join('')} {dietBreakPlan.length}нед · break каждые 6нед ×2нед maintenance</div>}
       </div>
 
-      <div style={{ ...CARD, border:'1px solid rgba(239,68,68,0.12)', padding:10, background:'rgba(239,68,68,0.04)' }}>
+      <div style={{ ...CARD, border:'1px solid rgba(239,68,68,0.12)', padding:10, background:'rgba(239,68,68,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
           <span style={{ fontSize:14 }}>🩸</span>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#f87171' }}>Гематокрит / вязкость — лабы (опционально)</div>
+            <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#f87171' }}>Гематокрит — ③ Лабы</div>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1.35 }}>HCT — главный маркер на ААС. &gt;52% → донация. Подтянется из Профиля → Лабы.</div>
           </div>
           <span style={{ fontSize:8, padding:'3px 7px', borderRadius:20, background: hematology.zone==='unknown' ? 'rgba(255,255,255,0.06)' : `${hematology.color}18`, border:`1px solid ${hematology.color}33`, color: hematology.zone==='unknown' ? 'rgba(255,255,255,0.55)' : hematology.color, fontWeight:800 }}>{hematology.zone==='unknown' ? 'нет HCT' : hematology.zoneLabel}</span>
@@ -1077,6 +1110,7 @@ export const MetabolicHub: React.FC = () => {
                   <Bar v={kbju.neat} max={kbju.nat.tdee} color="#22c55e" label={`NEAT ${kbju.neat}`} />
                   <Bar v={kbju.eat} max={kbju.nat.tdee} color="#f59e0b" label={`EAT ${kbju.eat}`} />
                   <Bar v={kbju.tefNat} max={kbju.nat.tdee} color="#a78bfa" label={`TEF ${kbju.tefNat}`} />
+                  {caffeineCurve.tefBoostKcal>0 && <Bar v={caffeineCurve.tefBoostKcal} max={kbju.nat.tdee} color="#f43f5e" label={`Caf ${caffeineCurve.tefBoostKcal}`} />}
                 </div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4 }}>TDEE {kbju.nat.tdee}= BMR{kbju.bmr}+NEAT{kbju.neat}+EAT{kbju.eat}+TEF{kbju.tefNat} (TEF ~10% внутри PAL, показан для наглядности)</div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:3 }}>FAO 2004: BEE=BMR×1.10 (TEF), TEE=BEE×PAL. У нас TDEE=BMR×PAL — PAL FAO уже включает TEF; TEF отдельно информативен, BEE≈{kbju.bmr + kbju.tefNat}ккал</div>

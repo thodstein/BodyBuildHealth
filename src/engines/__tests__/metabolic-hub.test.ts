@@ -627,4 +627,47 @@ describe('metabolic-hub v3 — Adaptive TDEE v2, MET, RED-S, Sweat, WHtR, MetS',
     expect(e.sodiumMg).toBe(900);
     expect(e.chlorideMg).toBe(1350);
   });
+  it('Carb/Sodium loading', async () => {
+    const { calcCarbLoading, calcSodiumLoading } = await import('../metabolic-hub.engine');
+    const c=calcCarbLoading(80,2,10);
+    expect(c.dailyG).toBe(800); expect(c.totalCarbG).toBe(1600);
+    const s=calcSodiumLoading(80,2,5);
+    expect(s.dailyG).toBe(5); expect(s.totalSodiumG).toBe(10);
+  });
+  it('Body comp hold_ffmi vs hold_bf', async () => {
+    const { calcBodyCompProjection } = await import('../metabolic-hub.engine');
+    const bf=calcBodyCompProjection({ weight:80, height:180, bodyFat:12, years:3, mode:'hold_bf' });
+    const ff=calcBodyCompProjection({ weight:80, height:180, bodyFat:12, years:3, mode:'hold_ffmi' });
+    expect(bf[3].ffmi).toBeGreaterThan(ff[3].ffmi);
+    expect(ff[3].ffmi).toBeCloseTo(bf[0].ffmi, 0.1);
+    expect(ff[3].bodyFat).toBeLessThan(12);
+  });
+  it('parseWeeklyScheduleText 45мин and 1.5ч', async () => {
+    const { parseWeeklyScheduleText, buildMetHours } = await import('../metabolic-hub.engine');
+    const p1=parseWeeklyScheduleText('пн: силовая 45мин, вт: бег 1.5ч');
+    expect(p1).not.toBeNull();
+    expect(p1!.find(x=>x.key==='strength')!.hours).toBeCloseTo(0.75,0.05);
+    expect(p1!.find(x=>x.key==='running_moderate')!.hours).toBeCloseTo(1.5,0.05);
+    const mh=buildMetHours(p1!);
+    expect(mh).toBeGreaterThan(10);
+  });
+  it('calcLeafScore 8q', async () => {
+    const { calcLeafScore } = await import('../metabolic-hub.engine');
+    const r=calcLeafScore([true,true,false,false,true,false,false,false]);
+    expect(r.score).toBe(6); expect(r.risk).toBe('moderate');
+    expect(calcLeafScore(Array(8).fill(true)).risk).toBe('high');
+  });
+  it('beverage rank', async () => {
+    const { calcBeverageRank } = await import('../metabolic-hub.engine');
+    const r=calcBeverageRank(1500, 1350);
+    expect(r[0].score).toBeGreaterThanOrEqual(r[1].score);
+    expect(r.length).toBe(4);
+  });
+  it('scheduleMetHours integration', async () => {
+    const { calcSteps } = await import('../metabolic-hub.engine');
+    const base={ weight:80, height:180, age:30, sex:'male' as const };
+    const s1=calcSteps({ ...base, activityLevel:'medium', trainingDays:3 });
+    const s2=calcSteps({ ...base, activityLevel:'medium', metHoursPerWeek:25 } as any);
+    expect(s2.pal).toBeGreaterThan(s1.pal);
+  });
 });
