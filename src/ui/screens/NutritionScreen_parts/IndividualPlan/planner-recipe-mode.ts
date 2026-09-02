@@ -261,7 +261,7 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur', 'honey', 'bread_white', 'whole_grain_bread', 'raisins', 'dates_dried', 'dried_apricots'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur', 'bread_white', 'whole_grain_bread'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
 // C5 (Эпик C): субротация фиксированных пулов по seed дня — иначе каждый недобор
@@ -1084,7 +1084,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     //   |ккал − цель| ≤ 25%, Б ≥ 0.80×цели, Ж ≤ 1.35×цели, У ≥ 0.70×цели.
     // Первый ПРОШЕДШИЙ берётся; ни один не прошёл — лучший по дистанции (как раньше)
     // + вариант остаётся доступным пользователю. Пустая декомпозиция → следующий.
-    const tryBuild = (cand: Recipe): { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null => {
+    const tryBuild = (cand: Recipe): { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null; rawCarbs: number } | null => {
       const flat = flattenRecipeOption(cand);
       const built = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
       if (!built || built.length === 0) return null;
@@ -1093,6 +1093,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       let finalItems: PlanItemLike[] = (s !== 1)
         ? built.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
         : built as PlanItemLike[];
+      // rawCarbs: угли ЧИСТОГО рецепта (после масштаба, до сайд-добивки) — по ним carb-гейт.
+      const rawCarbs = sumMealTotals(finalItems).c || 0;
       flat.appliedScale = s;
       // Р-2.1: пол реалистичных порций в рецептурном ядре («18 г каши» — нет),
       // бюджет строго ×1.03 от цели приёма — пол не рушит сходимость дня ±3%.
@@ -1134,7 +1136,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
           const side = ok[0];
           if (!side || dMacro <= 8) break;
-          let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
+          // Comfort-кап: крупяной сайд ≤200 г (не «булгур 400 г»); дедуп по id (не двоить).
+          const _SIDE_CAP: Record<string, number> = { bulgur: 200, rice_white: 250, rice_basmati: 250, buckwheat: 200, potato_boiled: 300, pasta_durum: 200, sweet_potato: 300 };
+          const _sideCap = _SIDE_CAP[side.id] ?? 200;
+          let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, _sideCap) / 10) * 10;
           if (g < 30) break;
           finalItems = [...finalItems, scaleItem({
             name: side.name, id: side.id, amount: 100,
@@ -1147,10 +1152,22 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           sidesAdded++;
         }
       }
-      return { flat, items: finalItems, totals: sumMealTotals(finalItems), sideNote };
+      return { flat, items: finalItems, totals: sumMealTotals(finalItems), sideNote, rawCarbs };
     };
-    let chosen: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
-    let fallback: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
+    let chosen: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null; rawCarbs: number } | null = null;
+    let fallback: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null; rawCarbs: number } | null = null;
+    // F-carb-gate: рецепт обязан покрывать ≥55% углеводной цели ПРИРОДНЫМИ углями рецепта
+    // (rawCarbs, до сайдов) — иначе «нут на 103 г углей, добитый сайдами ради гейта»,
+    // который после резки корректором остаётся 33/103.
+    const _carbGateOk = (built: { rawCarbs: number }): boolean => {
+      // Гейт только для ОСНОВНЫХ приёмов: peri-слоты (пред/пост/перед сном) — функциональные
+      // окна, их рецепты по природе углеводно легче, и «пост-трен без риса» — норма.
+      // Порог 35%: ниже — «нут на углеводный приём» (абсурд); 35-50% — применяем с варном,
+      // день дотянет корректор (полный отказ ломал минимум разнообразия недели).
+      if (!isMain) return true;
+      if ((tgt.c || 0) < 50) return true;
+      return built.rawCarbs >= 0.35 * (tgt.c || 40) && built.rawCarbs <= 1.30 * (tgt.c || 40) + 10;
+    };
     // C5 (Эпик C): ккал-гейт приёмки ±25% пропускал ПОЛОВИННЫЙ недобор (рецепт = 50%
     // приёма, остальное — сайды) — снижаем до ±15% (перекусы ±20%: их догоняет ребаланс).
     const kcalTol = isSnackSlot ? 0.20 : 0.15;
@@ -1166,6 +1183,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     for (const cand of ranked) {
       const built = tryBuild(cand);
       if (!built) continue;
+      if (!_carbGateOk(built)) continue;
       if (!fallback) fallback = built;
       if (_passesGate(built)) { chosen = built; break; }
     }
@@ -1176,6 +1194,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       for (const cand of rankedAll) {
         const built = tryBuild(cand);
         if (!built) continue;
+        if (!_carbGateOk(built)) continue;
         const tk = built.totals.kcal || 1;
         if (Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= 0.25
           && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5

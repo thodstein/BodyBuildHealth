@@ -86,7 +86,7 @@ function isCoreRecipeItem(meal: CorrectorMeal, itemId: string): boolean {
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein', 'egg_whole', 'tuna_canned'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'honey', 'bread_white', 'whole_grain_bread', 'raisins', 'dates_dried', 'dried_apricots'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'bread_white', 'whole_grain_bread'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter'];
 
 function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>): FoodItem[] {
@@ -418,7 +418,14 @@ export function correctDayToTargets(
       })[0];
       const per100Best = eff === 'p' ? (best.protein || 0) : eff === 'c' ? (best.carbs || 0) : (best.fat || 0);
       if (per100Best <= 0) break;
+      // «Комфортные» доборки (хлеб/мёд/сухофрукты) — дегустационные капы и ЗАПРЕТ дубля
+      // в одном приёме (иначе «Финики 180г + Финики 70г» в обеде).
+      const COMFORT_CAP: Record<string, number> = {
+        honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60,
+        bread_white: 100, bread_rye: 100, bread_borodinsky: 100, bread_fitness: 100, whole_grain_bread: 100,
+      };
       let grams = Math.max(20, Math.min(200, Math.round(need / per100Best * 100 / 10) * 10));
+      if (COMFORT_CAP[best.id] !== undefined) grams = Math.min(grams, COMFORT_CAP[best.id]);
       // кап орехов/семян и клетчатки — не превышаем 85г
       const bestFam = stapleFamilyOf(best.id) || '';
       if ((bestFam === 'nuts' || bestFam === 'seeds') && currentNutGrams(meals) + grams > 85) {
@@ -440,12 +447,16 @@ export function correctDayToTargets(
       const over = curMacro + per100Best * grams / 100 - maxMacro;
       if (over > 0) grams = Math.max(0, grams - Math.ceil(over / per100Best * 100 / 10) * 10);
       if (grams < 10) break;
-      // выбираем приём с минимальной долей ккал (недогруженный)
-      let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout').reduce((a, b) => {
-        const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
-        const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
-        return aShare <= bShare ? a : b;
-      }, meals[0] || meals[meals.length - 1]);
+      // выбираем приём с минимальной долей ккал (недогруженный);
+      // для комфортных источников — приём, где этого id ещё НЕТ (не дублируем)
+      const _comfortDup = COMFORT_CAP[best.id] !== undefined;
+      let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout')
+        .filter(m => !_comfortDup || !m.items.some(it => it.id === best.id))
+        .reduce((a, b) => {
+          const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
+          const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
+          return aShare <= bShare ? a : b;
+        }, meals[0] || meals[meals.length - 1]);
       if (!targetMeal) targetMeal = meals[meals.length - 1];
       const role: string = eff === 'p' ? 'protein' : eff === 'c' ? 'carb_slow' : 'fat';
       const newItem: CorrectorItem = {

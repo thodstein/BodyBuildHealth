@@ -1592,28 +1592,29 @@ function buildWholeMeal(
       // внутри buildWholeMeal убран намеренно: он ломал сходимость белка/жиров (side-эффекты
       // белка в углеводных носителях) и возвращал «гречка+рис» — остаток добирается
       // рецептурным сайдом (recipe-режим) или посадкой.
-      // F1 (Эпик F): ИСКЛЮЧЕНИЕ — крупный углеводный остаток после комфортного капа каши (150-170 г).
-      // Второй (и, при большом остатке, третий) источник = «комфортные» углеводы (хлеб+мёд/варенье,
-      // сухофрукты), НЕ ещё одна каша (жалоба «ещё порция каши — не вариант; дайте хлеб с вареньем»).
-      // Так день набирает угли без перегруза ЖКТ огромным объёмом сухой крупы.
+      // F1 (Эпик F): добивка углеводного остатка ПОСЛЕ комфортного капа каши.
+      // Ровно ОДИН комфортный источник на приём (хлеб/мёд/сухофрукты) с жёсткими
+      // «дегустационными» капами: финики/изюм ≤60 г, мёд ≤40 г, хлеб ≤100 г.
+      // Раньше loop добавлял до 3 источников и «Финики 180 г + Финики 70 г» в один приём.
       if (!breakfast && remC > 40) {
+        const usedIds2 = new Set(items.map(i => i.id));
         const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
-        let comfortPass = 0;
-        while (remC > 40 && comfortPass < 3) {
-          const usedIds2 = new Set(items.map(i => i.id));
-          const comfortPool = COMFORT_CARB_IDS
-            .map(id => FOOD_DB.find(f => f.id === id))
-            .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
-          const alt2 = comfortPool.length > 0
-            ? comfortPool
-            : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam);
-          const src2 = alt2.length > 0 ? pickPriority(alt2, seed + 27 + comfortPass, { lockedIds, recentIds, hardRecentIds }) : undefined;
-          if (!src2) break;
-          const g2 = Math.min(gramsForMacro(src2, remC, 'carbs', carbPortionCap(src2)), 250);
-          if (g2 < 30) break;
-          const it2 = makeItem(src2, g2, 'carb_slow');
-          items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
-          comfortPass++;
+        const COMFORT_PORTION_CAP: Record<string, number> = {
+          honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60,
+          bread_white: 100, bread_rye: 100, bread_borodinsky: 100, bread_fitness: 100, whole_grain_bread: 100,
+        };
+        const comfortPool = COMFORT_CARB_IDS
+          .map(id => FOOD_DB.find(f => f.id === id))
+          .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
+        const src2 = comfortPool.length > 0 ? pickPriority(comfortPool, seed + 27, { lockedIds, recentIds, hardRecentIds })
+          : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam)[0];
+        if (src2) {
+          const portionCap = COMFORT_PORTION_CAP[src2.id] ?? 100;
+          const g2 = Math.min(portionCap, Math.floor(Math.min(gramsForMacro(src2, Math.min(remC, 80), 'carbs', carbPortionCap(src2)), 250) / 10) * 10);
+          if (g2 >= 30) {
+            const it2 = makeItem(src2, g2, 'carb_slow');
+            items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
+          }
         }
       }
     }
