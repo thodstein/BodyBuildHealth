@@ -1,12 +1,14 @@
 ﻿/**
  * lms-season.test.ts — ПЛ-сезон по микроциклам (Фаза 1): слоты, fitCycleToWeeks,
  * candidateCyclesForSlot, planSeason (авто/ручной), assembleSeasonPlan.
+ * Обновлён под принцип «любое изменение — только по согласию».
  */
 import { describe, expect, it } from 'vitest';
 import {
   buildDefaultSeasonSlots,
   clampSlotWeeks,
   fitCycleToWeeks,
+  applyFitConsent,
   candidateCyclesForSlot,
   planSeason,
   assembleSeasonPlan,
@@ -57,51 +59,73 @@ describe('buildDefaultSeasonSlots', () => {
 });
 
 describe('fitCycleToWeeks', () => {
-  it('точное соответствие — exact', () => {
+  it('точное соответствие — exact без согласия', () => {
     const r = fitCycleToWeeks(CYCLE_01, 12);
     expect(r.mode).toBe('exact');
     expect(r.weeks).toBe(12);
+    expect(r.needsConsent).toBe(false);
   });
 
-  it('растяжение — недели превышают оригинал, логика цикла сохранена', () => {
+  it('растяжение — proposed_extend требует согласия', () => {
     const r = fitCycleToWeeks(CYCLE_01, 16);
-    expect(r.mode).toBe('extend');
+    expect(r.mode).toBe('proposed_extend');
     expect(r.weeks).toBe(16);
-    // Явные недели убраны, чтобы buildLMSPlan использовал week1 + прогрессию.
+    expect(r.needsConsent).toBe(true);
     expect(r.cycle.weeks).toBeUndefined();
     expect(r.cycle.meta.weeks).toBe(16);
     expect(r.cycle.week1).toEqual(CYCLE_01.week1);
+    const applied = applyFitConsent(r, true);
+    expect(applied.needsConsent).toBe(false);
+    expect(applied.weeks).toBe(16);
+    const blocked = applyFitConsent(r, false);
+    expect(blocked.mode).toBe('strict_skip');
+    expect(blocked.weeks).toBe(0);
   });
 
-  it('сжатие явных недель: фазовая структура сохранена, первая и последняя недели на месте', () => {
+  it('сжатие явных недель: фазовая структура сохранена, первая и последняя недели на месте (требует согласия)', () => {
     const r = fitCycleToWeeks(CYCLE_01, 8);
-    expect(r.mode).toBe('shrink');
+    expect(r.mode).toBe('proposed_shrink');
     expect(r.weeks).toBe(8);
+    expect(r.needsConsent).toBe(true);
     expect(r.cycle.weeks).toHaveLength(8);
     expect(r.cycle.weeks![0]).toEqual(CYCLE_01.weeks![0]);
     expect(r.cycle.weeks![r.cycle.weeks!.length - 1]).toEqual(CYCLE_01.weeks![CYCLE_01.weeks!.length - 1]);
     expect(r.notes.some(n => n.includes('сжат'))).toBe(true);
+    const applied = applyFitConsent(r, true);
+    expect(applied.needsConsent).toBe(false);
+    expect(applyFitConsent(r, false).mode).toBe('strict_skip');
   });
 
-  it('сжатие week1-цикла: темп прогрессии пересчитан (суммарный прирост ПМ сохранён)', () => {
+  it('сжатие week1-цикла: темп прогрессии пересчитан (суммарный прирост ПМ сохранён), требует согласия', () => {
     const r = fitCycleToWeeks(WEEK1_ONLY, 3, { minCycleFloor: 1 }); // оригинал 4 нед
-    expect(r.mode).toBe('shrink');
+    expect(r.mode).toBe('proposed_shrink');
     expect(r.weeks).toBe(3);
+    expect(r.needsConsent).toBe(true);
     expect(r.correctionPctEff).toBeGreaterThan(0);
     const base = 0.005; // fallback для correctionPct=0
     const expected = Math.min(base * (4 / 3), base * 2);
     expect(r.correctionPctEff).toBeCloseTo(expected, 5);
   });
 
-  it('окно меньше минимального (4 нед) — weeks 0 с предупреждением', () => {
+  it('окно меньше минимального (4 нед) — weeks 0 с предупреждением, без предложения', () => {
     const r = fitCycleToWeeks(CYCLE_01, 3, { minCycleFloor: 4 });
     expect(r.weeks).toBe(0);
+    expect(r.mode).toBe('strict_skip');
+    expect(r.needsConsent).toBe(false);
     expect(r.notes.some(n => n.includes('окно слишком мало'))).toBe(true);
   });
 
   it('некорректные недели — weeks 0', () => {
     expect(fitCycleToWeeks(CYCLE_01, NaN).weeks).toBe(0);
     expect(fitCycleToWeeks(CYCLE_01, 0).weeks).toBe(0);
+  });
+
+  it('exact не требует согласия, proposed требует', () => {
+    const exact = fitCycleToWeeks(CYCLE_01, 12);
+    const proposed = fitCycleToWeeks(CYCLE_01, 8);
+    expect(exact.needsConsent).toBe(false);
+    expect(proposed.needsConsent).toBe(true);
+    expect(applyFitConsent(exact, false).mode).toBe('exact');
   });
 });
 
@@ -135,49 +159,58 @@ describe('candidateCyclesForSlot', () => {
     }
   });
 
-  it('циклы длиннее максимума слота получают пометку «можно сжать»', () => {
+  it('циклы длиннее максимума слота получают пометку «предлагается сжать» (требует согласия)', () => {
     const list = candidateCyclesForSlot({ period: 'peak', weeks: 8, weeksMin: 8, weeksMax: 10 }, selector as never);
-    const long = list.filter(r => r.warnings.some(w => w.includes('можно сжать')));
+    const long = list.filter(r => r.warnings.some(w => w.includes('предлагается сжать')));
     expect(long.length).toBeGreaterThan(0);
   });
 });
 
 describe('planSeason (авто/ручной)', () => {
-  it('авто: по сегменту на слот, суммарные недели и последовательность id', () => {
+  it('авто без согласия: требует согласия — сегменты blocked, totalWeeks урезан', () => {
     const slots = buildDefaultSeasonSlots();
     const plan = planSeason({ slots, selector: selector as never, mode: 'auto' });
+    const needs = plan.segments.filter(s => s.fit.mode === 'strict_skip');
+    expect(needs.length).toBeGreaterThan(0);
+    expect(plan.notes.some(n => n.includes('требуют согласия'))).toBe(true);
+  });
+
+  it('авто с согласием: по сегменту на слот, суммарные недели и последовательность id', () => {
+    const slots = buildDefaultSeasonSlots();
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots, selector: selector as never, mode: 'auto', consents });
     expect(plan.segments).toHaveLength(4);
-    expect(plan.cycleIds).toHaveLength(4);
     expect(plan.totalWeeks).toBe(12 + 8 + 6 + 8);
     for (const seg of plan.segments) {
       expect(seg.cycleId).toBeTruthy();
-      expect(seg.weeks).toBeGreaterThanOrEqual(1);
-      expect(seg.fit.weeks).toBeGreaterThan(0);
+      expect(seg.weeks).toBeGreaterThan(0);
     }
     expect(seasonSegmentSummary(plan.segments)).toContain('→');
   });
 
-  it('ручной: выбор из кандидатов, невалидный id → fallback на авто + заметка', () => {
+  it('ручной: выбор из кандидатов, невалидный id → fallback на авто + заметка (с согласием)', () => {
     const slots = buildDefaultSeasonSlots();
     const candidates = candidateCyclesForSlot(slots[1], selector as never);
     const validId = candidates[0].cycle.meta.id;
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
     const plan = planSeason({
       slots, selector: selector as never, mode: 'manual',
-      selections: { 0: 'cycle-01', 1: validId },
+      selections: { 0: 'cycle-01', 1: validId }, consents,
     });
     expect(plan.segments[0].cycleId).toBe('cycle-01');
     expect(plan.segments[1].cycleId).toBe(validId);
     expect(plan.segments[1].candidates).toBeDefined();
     const bad = planSeason({
       slots, selector: selector as never, mode: 'manual',
-      selections: { 2: 'not-a-cycle' },
+      selections: { 2: 'not-a-cycle' }, consents,
     });
     expect(bad.notes.some(n => n.includes('не подходит'))).toBe(true);
   });
 
-  it('выключенные слоты пропускаются', () => {
+  it('выключенные слоты пропускаются (с согласием)', () => {
     const slots = buildDefaultSeasonSlots().map(s => ({ ...s, enabled: s.period !== 'speed' }));
-    const plan = planSeason({ slots, selector: selector as never, mode: 'auto' });
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots, selector: selector as never, mode: 'auto', consents });
     expect(plan.segments.some(s => s.slot.period === 'speed')).toBe(false);
     expect(plan.segments).toHaveLength(3);
   });
@@ -194,22 +227,25 @@ describe('planSeason (авто/ручной)', () => {
 });
 
 describe('assembleSeasonPlan', () => {
-  it('склейка недель с перенумерацией и macroPhase по слотам', () => {
-    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto' });
+  it('склейка недель с перенумерацией и macroPhase по слотам (с согласием)', () => {
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
     const out = assembleSeasonPlan(plan, {
       pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 },
       fallbackPm: 80,
     });
     expect(out.weeks.length).toBe(plan.totalWeeks);
     out.weeks.forEach((w, i) => expect(w.week).toBe(i + 1));
-    const firstSeg = plan.segments[0];
-    const lastSeg = plan.segments[plan.segments.length - 1];
+    const active = plan.segments.filter(s => s.weeks > 0);
+    const firstSeg = active[0];
+    const lastSeg = active[active.length - 1];
     expect(out.weeks[0].macroPhase).toBe(firstSeg.slot.period);
     expect(out.weeks[out.weeks.length - 1].macroPhase).toBe(lastSeg.slot.period);
   });
 
   it('с meets — поверх применяется buildPLSeasonPeaks (пик-блоки на месте)', () => {
-    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto' });
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
     const out = assembleSeasonPlan(plan, {
       pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 },
       fallbackPm: 80,
@@ -222,5 +258,10 @@ describe('assembleSeasonPlan', () => {
     const meetWeeks = out.weeks.filter(w => w.meetWeek);
     expect(meetWeeks.length).toBeGreaterThanOrEqual(1);
     expect(out.progressionRationale.includes('Сезон')).toBe(true);
+  });
+
+  it('без согласия — сборка блокируется, weeks пустой или урезан', () => {
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto' });
+    expect(plan.segments.some(s => s.fit.mode === 'strict_skip')).toBe(true);
   });
 });

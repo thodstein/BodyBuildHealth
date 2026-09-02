@@ -7,9 +7,11 @@
  *   - РУЧНОЙ: пользователь выбирает цикл из подходящих в базе (candidateCyclesForSlot);
  *   - fitCycleToWeeks: растяжение (weeksOverride) ИЛИ сжатие цикла с сохранением логики
  *     (явные недели — фазовая выборка; week1+correctionPct — пересчёт темпа прогрессии);
+ *     ЛЮБОЕ ИЗМЕНЕНИЕ РАСКЛАДКИ — ТОЛЬКО ПО СОГЛАСИЮ (needsConsent + applyFitConsent);
  *   - assembleSeasonPlan: склейка недель сегментов + опционально buildPLSeasonPeaks (задача 2).
  *
  * Аддитивный: не меняет сигнатуры существующих экспортов движка; только новые чистые функции.
+ * Источник LMS_CYCLES — immutable канон, fit всегда возвращает производную копию.
  */
 import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, type LMSRankedCycle, type LMSSelectorInput } from './lms-selector.engine';
@@ -59,11 +61,16 @@ export function clampSlotWeeks(slot: PLSeasonSlot, weeks: number): number {
 // ─── Подгонка цикла под окно недель ─────────────────────────────────────────────
 
 export interface FitResult {
-  cycle: SRCycleTemplate;          // производный шаблон (сжатый/растянутый)
-  weeks: number;                   // фактическая длина после подгонки (0 = невозможно)
-  mode: 'exact' | 'extend' | 'shrink';
+  cycle: SRCycleTemplate;          // производный шаблон (сжатый/растянутый) или исходник при exact/skip
+  weeks: number;                   // фактическая длина после подгонки (0 = невозможно/без согласия)
+  mode: 'exact' | 'proposed_extend' | 'proposed_shrink' | 'strict_skip';
   correctionPctEff?: number;
+  needsConsent: boolean;           // true → требуется согласие пользователя
   notes: string[];
+}
+
+export interface FitOptions {
+  minCycleFloor?: number;           // default 4
 }
 
 /** Выборка индексов недель при сжатии: первая + равномерный шаг + последняя. */
@@ -91,22 +98,22 @@ function sampleIndices(n: number, target: number): number[] {
 export function fitCycleToWeeks(
   cycle: SRCycleTemplate,
   targetWeeks: number,
-  opts?: { minCycleFloor?: number },
+  opts?: FitOptions,
 ): FitResult {
   const t = Number(targetWeeks);
   if (!cycle || !cycle.meta) {
-    return { cycle, weeks: 0, mode: 'shrink', notes: ['цикл не передан'] };
+    return { cycle: cycle as SRCycleTemplate, weeks: 0, mode: 'strict_skip', needsConsent: false, notes: ['цикл не передан'] };
   }
   if (!Number.isFinite(t) || t < 1) {
-    return { cycle, weeks: 0, mode: 'shrink', notes: ['некорректное число недель'] };
+    return { cycle, weeks: 0, mode: 'strict_skip', needsConsent: false, notes: ['некорректное число недель'] };
   }
   const floor = Math.max(1, Math.round(opts?.minCycleFloor ?? 4));
   const orig = originalCycleWeeks(cycle);
   if (t < floor) {
-    return { cycle, weeks: 0, mode: 'shrink', notes: [`окно слишком мало (${t} нед < минимальных ${floor} нед)`] };
+    return { cycle, weeks: 0, mode: 'strict_skip', needsConsent: false, notes: [`окно слишком мало (${t} нед < минимальных ${floor} нед)`] };
   }
   if (t === orig) {
-    return { cycle, weeks: t, mode: 'exact', notes: ['точное соответствие длине цикла'] };
+    return { cycle, weeks: t, mode: 'exact', needsConsent: false, notes: ['точное соответствие длине цикла'] };
   }
   if (t > orig) {
     // Растяжение: убираем явные недели (если были) — buildLMSPlan с weeksOverride
@@ -115,26 +122,50 @@ export function fitCycleToWeeks(
     return {
       cycle: derived,
       weeks: t,
-      mode: 'extend',
-      notes: [`цикл растянут с ${orig} до ${t} нед — та же раскладка, темп прогрессии ${(cycle.meta.correctionPct * 100).toFixed(2)}%/нед`],
+      mode: 'proposed_extend',
+      needsConsent: true,
+      notes: [`цикл растянут с ${orig} до ${t} нед — та же раскладка, темп прогрессии ${(cycle.meta.correctionPct * 100).toFixed(2)}%/нед (требует согласия)`],
     };
   }
-  // Сжатие (t < orig) — логика цикла сохраняется.
-  const notes: string[] = [`цикл сжат с ${orig} до ${t} нед`];
+  // Сжатие (t < orig) — логика цикла сохраняется, но только как предложение.
+  const notes: string[] = [`цикл сжат с ${orig} до ${t} нед (предложение, требует согласия)`];
   const derivedMeta = { ...cycle.meta, weeks: t };
   let derived: SRCycleTemplate = { ...cycle, meta: derivedMeta };
   if (Array.isArray(cycle.weeks) && cycle.weeks.length > 0) {
     const idx = sampleIndices(cycle.weeks.length, t);
     const weeks = idx.map((i) => cycle.weeks![i]);
     derived = { ...derived, weeks };
-    notes.push('явные недели источника: фазовая структура сохранена (первая и последняя недели на месте)');
+    notes.push('явные недели источника: фазовая структура сохранена (первая и последняя недели на месте) — требует согласия');
   } else {
     const base = cycle.meta.correctionPct > 0 ? cycle.meta.correctionPct : 0.005;
     const eff = Math.min(base * (orig / t), base * 2);
     derived = { ...derived, meta: { ...derivedMeta, correctionPct: eff } };
-    notes.push(`темп прогрессии скорректирован ${(base * 100).toFixed(2)}% → ${(eff * 100).toFixed(2)}%/нед — суммарный прирост ПМ за ${t} нед сохранён`);
+    notes.push(`темп прогрессии скорректирован ${(base * 100).toFixed(2)}% → ${(eff * 100).toFixed(2)}%/нед — суммарный прирост ПМ за ${t} нед сохранён (требует согласия)`);
   }
-  return { cycle: derived, weeks: t, mode: 'shrink', correctionPctEff: derived.meta.correctionPct, notes };
+  return { cycle: derived, weeks: t, mode: 'proposed_shrink', needsConsent: true, correctionPctEff: derived.meta.correctionPct, notes };
+}
+
+/**
+ * Применить согласие пользователя к результату fitCycleToWeeks.
+ * - consent=true  → возвращает исходный FitResult с needsConsent=false (применено по согласию)
+ * - consent=false → возвращает strict_skip без изменения раскладки
+ */
+export function applyFitConsent(result: FitResult, consent: boolean): FitResult {
+  if (!result.needsConsent) return result;
+  if (consent) {
+    return {
+      ...result,
+      needsConsent: false,
+      notes: [...result.notes, '✓ применено по согласию пользователя'],
+    };
+  }
+  return {
+    cycle: result.cycle,
+    weeks: 0,
+    mode: 'strict_skip',
+    needsConsent: false,
+    notes: ['⛔ Без согласия — раскладка не изменена'],
+  };
 }
 
 // ─── Кандидаты под слот ─────────────────────────────────────────────────────────
@@ -198,11 +229,11 @@ export function candidateCyclesForSlot(
   const ranked = rankCycles({ ...input, goal: goalMap[slot.period] }).filter(
     (r) => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding',
   );
-  // Подмешиваем пометку «можно сжать» для циклов, длиннее максимума слота.
+  // Подмешиваем пометку «предлагается сжать» для циклов, длиннее максимума слота.
   return ranked.map((r) => {
     const ow = originalCycleWeeks(r.cycle);
     if (ow > slot.weeksMax) {
-      const warnings = [...r.warnings, `длина ${ow} нед — можно сжать до ${slot.weeksMax} (впишется в окно слота)`];
+      const warnings = [...r.warnings, `длина ${ow} нед — предлагается сжать до ${slot.weeksMax} (впишется в окно слота, требует согласия)`];
       return { ...r, warnings };
     }
     return r;
@@ -213,7 +244,7 @@ function speedFitNote(cycle: SRCycleTemplate, slot: Pick<PLSeasonSlot, 'period' 
   const ow = originalCycleWeeks(cycle);
   const orient = speedOrientationOf(cycle).join(', ');
   if (ow <= slot.weeksMax) return `длина ${ow} нед вписывается в окно слота (${slot.weeksMin}-${slot.weeksMax}) · скорость: ${orient}`;
-  return `длина ${ow} нед — можно сжать до ${slot.weeksMax} · скорость: ${orient}`;
+  return `длина ${ow} нед — предлагается сжать до ${slot.weeksMax} · скорость: ${orient} (требует согласия)`;
 }
 
 // ─── Авто-сбор сезона ───────────────────────────────────────────────────────────
@@ -223,6 +254,7 @@ export interface PLSeasonInput {
   selector: LMSSelectorInput;
   mode: 'auto' | 'manual';
   selections?: Record<number, string>; // manual: id цикла на слот по индексу
+  consents?: Record<number, boolean>;  // согласие на изменение каждого слота (slotIdx → true/false)
   taper?: MacroTaperOpts;
   meets?: PLSeasonMeet[];
 }
@@ -267,9 +299,18 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan {
       notes.push(`⚠ слот ${i + 1} («${slot.label}»): нет подходящих циклов в базе — слот пропущен`);
       return;
     }
-    const fit = fitCycleToWeeks(chosen.cycle, slot.weeks, { minCycleFloor: 4 });
-    const weeks = fit.weeks > 0 ? fit.weeks : Math.max(slot.weeksMin, 4);
+    let fit = fitCycleToWeeks(chosen.cycle, slot.weeks, { minCycleFloor: 4 });
+    // Любое изменение требует согласия
+    if (fit.needsConsent) {
+      const consent = input.consents?.[i] === true;
+      fit = applyFitConsent(fit, consent);
+      if (fit.mode === 'strict_skip') {
+        notes.push(`⛔ слот ${i + 1} («${slot.label}»): требует согласия на изменение ${originalCycleWeeks(chosen.cycle)}→${slot.weeks} нед — сегмент пропущен`);
+      }
+    }
+    const weeks = fit.weeks > 0 ? fit.weeks : 0;
     const rationale = [...chosen.rationale, ...chosen.warnings, ...fit.notes];
+    // strict_skip сегменты всё равно пушим для UI (чтобы показать бейдж), но weeks=0 не считаем в total
     segments.push({
       slot,
       cycleId: chosen.cycle.meta.id,
@@ -279,12 +320,20 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan {
       candidates: input.mode === 'manual' ? candidates : undefined,
       rationale,
     });
-    cycleIds.push(chosen.cycle.meta.id);
+    if (weeks > 0) cycleIds.push(chosen.cycle.meta.id);
   });
   const totalWeeks = segments.reduce((sum, seg) => sum + seg.weeks, 0);
   const seasonNotes = notes.concat(
-    segments.map((seg, i) => `нед ${weekRangeOf(segments, i)}: ${seg.cycleTitle} (${seg.weeks} нед)`),
+    segments.filter(s => s.weeks > 0).map((seg, idx) => {
+      // Пересчитываем индексы только для ненулевых сегментов для отображения, но используем общий weekRange
+      return `нед ${weekRangeOf(segments, segments.indexOf(seg))}: ${seg.cycleTitle} (${seg.weeks} нед${seg.fit.needsConsent ? '' : seg.fit.mode === 'proposed_shrink' || seg.fit.mode === 'proposed_extend' ? ' по согласию' : ''})`;
+    }),
   );
+  // Если есть strict_skip сегменты — добавляем итоговое предупреждение
+  const blocked = segments.filter(s => s.fit.mode === 'strict_skip');
+  if (blocked.length > 0) {
+    seasonNotes.push(`⛔ ${blocked.length} слот(ов) требуют согласия на изменение раскладки — сборка заблокирована до решения`);
+  }
   return { segments, totalWeeks, notes: seasonNotes, cycleIds };
 }
 
@@ -292,6 +341,7 @@ function weekRangeOf(segments: PLSeasonSegment[], idx: number): string {
   let start = 1;
   for (let i = 0; i < idx; i++) start += segments[i].weeks;
   const end = start + segments[idx].weeks - 1;
+  if (segments[idx].weeks === 0) return '—';
   return start === end ? `${start}` : `${start}–${end}`;
 }
 
@@ -330,10 +380,11 @@ export interface AssembleSeasonOptions {
 }
 
 export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptions): LMSBuildOutput {
+  const activeSegments = plan.segments.filter(s => s.weeks > 0 && s.fit.mode !== 'strict_skip');
   const allWeeks: LMSPlanWeek[] = [];
   const outputs: LMSBuildOutput[] = [];
   let weekCursor = 1;
-  for (const seg of plan.segments) {
+  for (const seg of activeSegments) {
     const out = buildLMSPlan({
       template: seg.fit.cycle,
       pmMap: opts.pmMap,
@@ -379,8 +430,18 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
     weeks = res.weeks;
     notes.push(...res.notes);
   }
+  // Если все сегменты заблокированы согласием — возвращаем пустой план с предупреждением
+  if (activeSegments.length === 0) {
+    const template = plan.segments[0]?.fit.cycle as SRCycleTemplate | undefined ?? (LMS_CYCLES[0] as unknown as SRCycleTemplate);
+    return {
+      template,
+      progressionRationale: notes.join('\n') || '⛔ Сборка заблокирована — требуется согласие на изменение раскладки',
+      weeks: [],
+      cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],
+    };
+  }
   const first = outputs[0];
-  const template = first?.template ?? (plan.segments[0]?.fit.cycle as SRCycleTemplate | undefined) ?? (LMS_CYCLES[0] as unknown as SRCycleTemplate);
+  const template = first?.template ?? (activeSegments[0]?.fit.cycle as SRCycleTemplate | undefined) ?? (LMS_CYCLES[0] as unknown as SRCycleTemplate);
   return {
     template,
     progressionRationale: notes.join('\n'),
@@ -393,8 +454,15 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
 
 export function seasonSegmentSummary(segments: PLSeasonSegment[]): string {
   return segments
-    .map((seg, i) => `${weekRangeOf(segments, i)}: ${seg.cycleTitle} (${seg.weeks} нед${seg.fit.mode === 'shrink' ? ', сжат' : seg.fit.mode === 'extend' ? ', растянут' : ''})`)
-    .join(' → ');
+    .filter(s => s.weeks > 0)
+    .map((seg, _i, arr) => {
+      const idx = segments.indexOf(seg);
+      const range = weekRangeOf(segments, idx);
+      const consentTag = seg.fit.needsConsent ? '' : (seg.fit.mode === 'proposed_shrink' || seg.fit.mode === 'proposed_extend' ? ' по согласию' : '');
+      const modeTag = seg.fit.mode === 'proposed_shrink' ? ', предлагается сжать' : seg.fit.mode === 'proposed_extend' ? ', предлагается растянуть' : seg.fit.mode === 'strict_skip' ? ', ⛔ без согласия' : '';
+      return `${range}: ${seg.cycleTitle} (${seg.weeks} нед${consentTag}${modeTag})`;
+    })
+    .join(' → ') || '— нет активных слотов —';
 }
 
 /** Тип-гард для SRCycleTemplate с явной многонедельной раскладкой. */
