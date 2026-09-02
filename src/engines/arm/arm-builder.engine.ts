@@ -269,8 +269,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     let raw = 1;
     let usedAdapt = false;
     try {
-      const fakePeds = pedsKeys.map(k => ({ id: k, dose: Number(input.pedDoses![k]) }));
-      const adapt = adaptForPEDs(fakePeds as any, 10, input.pedDoses as any, input.courseIntensity as any);
+      const fakePeds = pedsKeys.map(k => ({ id: k, dose: Number(input.pedDoses![k]) } as any));
+      const adapt = adaptForPEDs(fakePeds as any, { default: 10 } as any, input.pedDoses as any, input.courseIntensity as any);
       raw = adapt.combinedMrvMultiplier || 1;
       // если adapt вернул 1 а дозы >0 и id неизвестный — fallback к doseSum (иначе тест test_e падает)
       const doseSumChk = pedsKeys.reduce((s,k)=> s + (Number(input.pedDoses![k])||0),0);
