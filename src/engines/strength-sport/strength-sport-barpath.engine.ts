@@ -117,12 +117,50 @@ export function computeBarPathMetrics(points: Array<{ x: number; y: number; t?: 
 }
 
 /**
- * Коррекция горизонтальных метрик Enode по Chavda 2024 Table1.
- * Enode_corrected = Intercept + Slope * Enode
- * Для вертикали r²=0.99 — коррекция не нужна.
+ * Таблица коррекции Enode по Chavda 2024 Table1 (Passing–Bablok).
+ * Вертикаль r²=0.99 → без bias; горизонталь — fixed+proportional bias.
  */
+export const ENODE_CORRECTION_TABLE: Record<string, { intercept: number; slope: number; r2: number; note: string }> = {
+  yT: { intercept: -0.014, slope: 1.0, r2: 0.99, note: 'вертикаль без bias' },
+  yMax: { intercept: -0.014, slope: 1.0, r2: 0.99, note: 'вертикаль' },
+  vMax: { intercept: 0, slope: 1.0, r2: 0.99, note: 'пик скорость вертикаль r²0.99' },
+  xT: { intercept: -0.3, slope: 1.02, r2: 0.85, note: 'горизонталь xT fixed bias' },
+  xLoop: { intercept: -0.45, slope: 1.08, r2: 0.82, note: 'петля horizontal proportional bias' },
+  xCatch: { intercept: -0.35, slope: 1.05, r2: 0.83, note: 'xCatch' },
+};
+
 export function correctEnodeHorizontal(value: number, slope = 1.02, intercept = -0.3): number {
   return Math.round((intercept + slope * value) * 10) / 10;
+}
+
+export function correctEnodeByVariable(value: number, variable: keyof typeof ENODE_CORRECTION_TABLE = 'xLoop'): number {
+  const row = ENODE_CORRECTION_TABLE[variable];
+  if (!row) return correctEnodeHorizontal(value);
+  return Math.round((row.intercept + row.slope * value) * 10) / 10;
+}
+
+// ── bfPCA stub (Kipp 2024) — 3 паттерна траектории ──
+export interface BfPCAPattern { pattern: 1 | 2 | 3; score: number; correlationWithPerformance: number; interpretation: string; isOptimal: boolean; }
+
+export function extractBfPCAPatterns(xs: number[], ys: number[]): BfPCAPattern[] {
+  if (!xs || xs.length < 3 || !ys || ys.length < 3) return [];
+  const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const maxY = Math.max(...ys);
+  const crossings = xs.filter((x, i) => i > 0 && ((xs[i - 1] < 0 && x >= 0) || (xs[i - 1] > 0 && x <= 0))).length;
+  // Pattern1: general forward/backward (meanX) → коррелирует положительно с результатом, отрицательно с пик скоростью
+  const p1Score = Math.round(meanX * 10) / 10;
+  const p1Corr = 0.42; // Spearman из Kipp
+  // Pattern2: peak height (maxY)
+  const p2Score = Math.round(maxY * 10) / 10;
+  const p2Corr = -0.15;
+  // Pattern3: crossing vertical line (cnt)
+  const p3Score = crossings;
+  const p3Corr = -0.38;
+  return [
+    { pattern: 1, score: p1Score, correlationWithPerformance: p1Corr, interpretation: 'Pattern1: общее смещение вперёд/назад (backward → лучше)', isOptimal: meanX > -1 },
+    { pattern: 2, score: p2Score, correlationWithPerformance: p2Corr, interpretation: 'Pattern2: пик высоты', isOptimal: true },
+    { pattern: 3, score: p3Score, correlationWithPerformance: p3Corr, interpretation: 'Pattern3: пересечение вертикали (≥3 → хуже)', isOptimal: crossings < 3 },
+  ];
 }
 
 /**

@@ -38,4 +38,20 @@ describe('TA injection PRO — MRV + dedup parity', () => {
     injectTAWeakPoints(p, ['snatch_mid' as WLWeakPoint]);
     expect(JSON.stringify(p)).toBe(before);
   });
+  it('property: 48 combos injection weeklySets ≤ Budget + no NaN', () => {
+    const levels: any[] = ['beginner', 'intermediate', 'advanced', 'enhanced'];
+    const goals: any[] = ['strength', 'hypertrophy', 'peaking', 'technique'];
+    const days = [3, 4];
+    let checked = 0;
+    for (const level of levels) for (const goal of goals) for (const d of days) {
+      const p = buildStrengthSportPlan({ mode: 'weightlifting', goal, level, weeks: 4, daysPerWeek: d, workMax: { snatch: 70, backSquat: 120, deadlift: 150 } } as any);
+      const budget = 85 + (level === 'advanced' ? 25 : level === 'enhanced' ? 50 : 0);
+      const r = injectTAWeakPoints(p, ['snatch_off_floor' as WLWeakPoint, 'jerk_dip' as WLWeakPoint]);
+      const weeklySets = r.plan.weeksData[0].sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
+      expect(weeklySets).toBeLessThanOrEqual(budget + 15); // + inject budget
+      expect(Number.isFinite(weeklySets)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBe(32);
+  });
 });

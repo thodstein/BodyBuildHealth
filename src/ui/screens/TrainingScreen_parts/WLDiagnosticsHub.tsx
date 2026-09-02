@@ -20,7 +20,7 @@ import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limite
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
-import { detectTAWeakFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
+import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -118,6 +118,18 @@ export const WLDiagnosticsHub: React.FC = () => {
       const logs = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(logs)) return [];
       return detectTAWeakFromDiary(logs as any);
+    } catch { return []; }
+  }, []);
+
+  const diaryPhases = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log');
+      const logs = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(logs)) return [];
+      const sn = candidateTAWeakPointsFromDiary(logs as any, 'snatch');
+      const cl = candidateTAWeakPointsFromDiary(logs as any, 'clean');
+      const jk = candidateTAWeakPointsFromDiary(logs as any, 'jerk');
+      return [...sn, ...cl, ...jk].slice(0, 3);
     } catch { return []; }
   }, []);
 
@@ -339,7 +351,8 @@ export const WLDiagnosticsHub: React.FC = () => {
           <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
           {scoring.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
-        {diaryWeaks.length > 0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 6 }}>📓 Дневник: слабые {diaryWeaks.map(w => `${w.label} ${w.deltaPct}%`).join(', ')}</div>}
+        {diaryWeaks.length > 0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 4 }}>📓 Дневник группы: {diaryWeaks.map(w => `${w.label} ${w.deltaPct}%`).join(', ')}</div>}
+        {diaryPhases.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 6 }}>📓 Дневник фазы (reps≤2 → max moment, 3-5 → mid): {diaryPhases.map(wp => WL_WEAKPOINT_LABELS[wp as WLWeakPoint] || wp).join(' · ')} <span style={{ color: DIM }}>(phaseForReps)</span></div>}
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика) + bar path с метриками (SRD 4/6см) + VBT/FvR2 → получи RSS-скор, verification и точечные коррекции. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в ТА-конструктор»</b> отправит фазы с biomech в планировщик (mode:weightlifting).
         </div>

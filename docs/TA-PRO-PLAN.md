@@ -41,3 +41,13 @@
 ## Связь
 - `WLDiagnosticsHub → planner-bridge weakpoints → StrengthSportConstructor weakPoints → buildStrengthSportPlan weakPoints ×1.15 + injection 3×5 @intensityPct`
 - `OHS → he_profile_v2.health.mobilityRestrictions → filterByMobility` (щит от травм)
+
+## Доведение до PRO-final (ababa434e + e3c3d5f7)
+- **Injection** strength-sport-ta-injection.engine.ts 3×5 @intensityPct, dedup + Budget cap, dayMap 1-based, technique_day приоритет — parity PL 5 тестов + property 32 combos
+- **Hub OHS→профиль** WLDiagnosticsHub: applyMobilityToProfile — he_profile_v2.health.mobilityRestrictions → ilterByMobility в builder, кнопка OHS в профиль
+- **VBT builder** strength-sport-builder:247 isTA 10% / isTAPull 15% / carry 15% + hist 10/15/20
+- **Pose** strength-sport-pose.engine.ts BlazePose stub estimateAnglesFromLandmarks hip/knee/ankle/shoulder, livePoseStatus, mock stream — рендер в summary + video tab
+- **Export** strength-sport-wl-export + WLDiagnosticsHub: handleExport 🖨 HTML + critical gate score≤49 баннер
+- **Bar path** Enode table yT -0.014/1.0 r2 0.99, xLoop -0.45/1.08, bfPCA extractBfPCAPatterns Pattern1 backward +0.42 corr (Kipp)
+- **Diary** candidateTAWeakPointsFromDiary phaseForReps reps≤2→max moment /3-5→mid — отображение в header 📓 фазы
+- **Верификация** itest 421/421 	a-injection 6/6 strength-sport 412/412

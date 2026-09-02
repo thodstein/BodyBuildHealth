@@ -3172,3 +3172,12 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **D UX (WLDiagnosticsHub.tsx 268→520с):** 6 табов снач/взятие/толчок/VBT-video/мобильность, числовые углы + биомеханика, bar path метрики + SRD бейдж + Vorobyev тип, VBT пиковые зоны + FvR2 6 полей, OHS 6 чеков + knee-to-wall + heel retest, IMTP/ISPP ≥85% (Essex 81% дисп), Kinovea CSV импорт, RSS gauge + verification, limiter подсказки, applyToPlanner с biomech/fvr/ohs. Сохраняет совместимость: 4 таба теста, deficit_snatch коррекции.
 - **Тесты:** NEW 	a-diagnostics-pro.test.ts 23/23 (биомеханика 16, barpath 6, VBT/FvR2, RSS floors, OHS, Kinovea) + strength-sport 412/412 + wl-diagnostics-hub 4/4. Чужая pl-deadpoints 3/26 — предсуществующий дубль заголовка, не тронут.
 - **Проверено:** tsc 0 по своим (worktree-времени 5.14с), vitest strength-sport 412, commit строго pathspec, push 76054adb.
+
+### ТА PRO — доведение (ababa434e + e3c3d5f7)
+- **Injection** TA: strength-sport-ta-injection.engine.ts 3×5 @intensityPct, per-day dedup, Budget cap, dayMap, technique_day — parity PL, проводка StrengthSportConstructor:234 после inalize, uildStrengthSportPlan weakPoints ×1.15 уже был
+- **OHS→профиль:** WLDiagnosticsHub: applyMobilityToProfile пишет he_profile_v2.health+training.mobilityRestrictions → ilterByMobility фильтрация пула
+- **VBT builder:** strength-sport-builder:247 isTA 10% / pull 15% / carry 15% (PLOS), hist 10/15//20/25/30
+- **Pose/Export:** strength-sport-pose.engine.ts BlazePose stub + strength-sport-wl-export + WLDiagnosticsHub handleExport 🖨 HTML + critical гейтинг score≤49
+- **Bar path:** Enode table ENODE_CORRECTION_TABLE + extractBfPCAPatterns Pattern1-3 (Kipp 0.42/-0.38)
+- **Diary phase:** candidateTAWeakPointsFromDiary phaseForReps в header
+- **Тесты:** 	a-injection 6/6 property 32 combos, strength-sport 421/421
