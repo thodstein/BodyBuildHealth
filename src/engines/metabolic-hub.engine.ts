@@ -21,6 +21,9 @@ import {
   energyDensityPerKg,
   hallAdaptationFactor,
   calcSweatElectrolytes,
+  calcSweatRate,
+  buildHydrationPlan,
+  calcCaffeineCurve,
   estimateAdaptiveThermogenesis,
   reverseDietPlan,
   calcHomaIR,
@@ -33,6 +36,17 @@ import {
   calcFLI,
   checkPSMF,
   menstrualWaterRetention,
+  calcWHtR,
+  calcABSI,
+  calcBAI,
+  calcTyG,
+  calcMetS_ATP3,
+  calcFIB4,
+  calcAPRI,
+  calcQUICKI,
+  MET_CATALOG,
+  palFromMetHours,
+  computePalFromMet,
   type WeightPoint as WeightPointBase,
 } from '../core/metabolic-constants';
 import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
@@ -78,6 +92,18 @@ export interface MetabolicInput {
   biaResistanceOhm?: number; // сопротивление Ом для Kyle BIA
   glucoseMgDl?: number; insulinMuMl?: number; // для HOMA-IR
   deficitKcal?: number; weeksInDeficit?: number; // для AT
+  // P0-2 MET
+  metHoursPerWeek?: number; // честные MET-часы/нед (Ainsworth) — альтернатива palTrainingAdd
+  // P0-3 RED-S screening
+  measuredRMR?: number; // измеренный RMR для ratio
+  leafScore?: number; // 0-16 LEAF-Q-lite
+  boneFlag?: boolean; // стресс-перелом в анамнезе
+  menstrualFlag?: boolean; // аменорея
+  // P1-3 metabolic health extra
+  hdlMgDl?: number; systolic?: number; diastolic?: number;
+  ast?: number; alt?: number; plt?: number; // для FIB-4/APRI
+  // P2 caffeine timing
+  caffeineHoursSince?: number; // ч с последнего кофе
 }
 
 export const calcTrendFromHistory = calcTrendBase;
@@ -100,6 +126,23 @@ function aasMult(input: MetabolicInput, maxBoost:number){
   // 500мг → ~50% от максимума, 1500мг → ~90% — насыщение (выдумано, для UI диапазона)
   const frac = dose<=0 ? 0.6 : Math.min(1, 0.4 + 0.6 * (dose/800));
   return 1 + maxBoost * frac;
+}
+// ——— PAL дедуп — единая точка ———
+function getEffectivePal(input: MetabolicInput): { palEff:number; palBase:number; trainAdd:number; cardioAdd:number } {
+  const palKey = ((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high';
+  const palBase = ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[palKey] ?? 1.55;
+  let trainAdd: number;
+  if (typeof input.metHoursPerWeek === 'number' && input.metHoursPerWeek>0) {
+    trainAdd = palFromMetHours(input.metHoursPerWeek);
+  } else if (input.weeklyVolumeTons && input.weeklyVolumeTons>2) {
+    trainAdd = clamp(input.weeklyVolumeTons * 0.018, 0.02, 0.24);
+  } else {
+    trainAdd = palTrainingAdd(input.trainingDays);
+  }
+  const cardioAdd = palCardioAdd(input.cardioMin);
+  let palEff = clamp(palBase + trainAdd + cardioAdd, 1.25, 2.40);
+  if (input.standingHours && input.standingHours>4) palEff = clamp(palEff + (input.standingHours - 4)*0.008, 1.25, 2.40);
+  return { palEff, palBase, trainAdd, cardioAdd };
 }
 
 // ——— Вода ——— (EFSA 2010 + IOM 2004 + Baker 2017)
@@ -157,21 +200,7 @@ export function calcWater(input: MetabolicInput) {
 // ——— Шаги ——— (MET-модель + персональный TEF + PRO NEAT — Levine 2002)
 export function calcSteps(input: MetabolicInput) {
   const { bmr } = computeBMR(input);
-  // PAL PRO: дедуп — используем palTrainingAdd/palCardioAdd (MET-калиброваны 0.040/0.030), + Levine NEAT
-  let palEff = computePalSimple({ activityLevel: input.activityLevel as any, trainingDays: input.trainingDays, cardioMin: input.cardioMin });
-  // Levine NEAT: стоя + fidget поверх PAL (но не дублируем — PAL уже 0.012/0.07, добавляем разницу к 1.8×/2×)
-  // Оставляем легкую добавку для точного NEAT-bypass: дополнительно только если very_high или высокий тоннаж
-  if (input.standingHours && input.standingHours > 4) palEff = clamp(palEff + (input.standingHours - 4) * 0.008, 1.25, 2.40);
-  // если есть тоннаж — замени trainAdd на тоннаж-EAT (точнее механически)
-  const __palKey1 = ((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high';
-  const palBase = ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[__palKey1] ?? 1.55;
-  let trainAdd = palTrainingAdd(input.trainingDays);
-  let cardioAdd = palCardioAdd(input.cardioMin);
-  if (input.weeklyVolumeTons && input.weeklyVolumeTons>2) {
-    // 1 тонна ~ 550ккал механики /0.22 КПД = ~357ккал/сут = 0.18 PAL для 2000 BMR — совпадает с calcWater totalSweat
-    const tonsEAT = clamp(input.weeklyVolumeTons * 0.018, 0.02, 0.24);
-    trainAdd = tonsEAT;
-  }
+  const { palEff, palBase, trainAdd, cardioAdd } = getEffectivePal(input);
   const tdeeNat = Math.round(bmr * palEff);
   const mult = aasMult(input, 0.08);
   const tdeeAAS = Math.round(tdeeNat * mult);
@@ -239,13 +268,7 @@ export function calcKBJU(input: MetabolicInput) {
   const bmr = Math.round(bmrBase.bmr * thyroidMult);
   const lean = bmrBase.lean;
   const method = bmrBase.method + (thyroidMult !== 1 ? `+thyroid×${thyroidMult.toFixed(2)}` : '') as any;
-  let palEff = computePalSimple({ activityLevel: input.activityLevel as any, trainingDays: input.trainingDays, cardioMin: input.cardioMin });
-  if (input.standingHours && input.standingHours > 4) palEff = clamp(palEff + (input.standingHours - 4) * 0.008, 1.25, 2.40);
-  const __palKey2 = ((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high';
-  const palBase = ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[__palKey2] ?? 1.55;
-  let trainAdd = palTrainingAdd(input.trainingDays);
-  let cardioAdd = palCardioAdd(input.cardioMin);
-  if (input.weeklyVolumeTons && input.weeklyVolumeTons>2) trainAdd = clamp(input.weeklyVolumeTons * 0.018, 0.02, 0.24);
+  const { palEff, palBase, trainAdd, cardioAdd } = getEffectivePal(input);
   let tdeeNat = Math.round(bmr * palEff);
   const mult = aasMult(input, 0.10);
   let tdeeAAS = Math.round(tdeeNat * mult);
@@ -766,3 +789,131 @@ export const checkPSMFWrap = checkPSMF;
 export const calcMenstrualWater = menstrualWaterRetention;
 export const calcFiberSplit = fiberSplit;
 export const calcLBMPreservation = lbmPreservationScore;
+// Re-export new constants helpers for UI
+export { MET_CATALOG, calcWHtR, calcABSI, calcBAI, calcTyG, calcFIB4, calcAPRI, calcQUICKI, calcSweatRate, buildHydrationPlan, calcCaffeineCurve };
+export function calcMetSWrapper(p:{ waistCm:number; tgMgDl?:number; hdlMgDl?:number; systolic?:number; diastolic?:number; glucoseMgDl?:number; sex:'male'|'female' }){
+  return calcMetS_ATP3(p as any);
+}
+export function calcWHtRWrapper(w:number,h:number){ return calcWHtR(w,h); }
+export function calcABSIWrapper(w:number,h:number,weight:number){ return calcABSI(w,h,weight); }
+
+// ——— Adaptive TDEE v2 (MacroFactor-стиль) — Hall density + trend R² ———
+export interface AdaptiveTDEEResult { tdee:number; tdeeNoAT:number; trend:number; r2:number; days:number; n:number; density:number; atKcal:number; confidence:'low'|'medium'|'high'; plateau:boolean; targets:{ maintain:number; cut:number; bulk:number }; note:string; weeklySeries: Array<{days:number; trend:number; r2:number}> }
+export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntakeKcal:number; bodyFatPct?:number; goal?:'cut'|'maintain'|'bulk'|'health' }): AdaptiveTDEEResult | null {
+  const wh=params.weightHistory; if(!wh||wh.length<7||!params.avgIntakeKcal) return null;
+  const intake=params.avgIntakeKcal;
+  const density=energyDensityPerKg(params.bodyFatPct, undefined);
+  const win = (n:number)=>{
+    const pts=wh.slice(-n);
+    if(pts.length<3) return null;
+    const c=calcTrendWithConfidence(pts);
+    return { ...c, pts };
+  };
+  const w7=win(7), w14=win(14), w21=wh.length>=21?win(21):null;
+  // выбираем окно с лучшим R² где n>=7
+  let best=w14;
+  const candidates=[w7,w14,w21].filter(Boolean) as any[];
+  // prefer R²>0.35 maximal days with R²>0.35 else 14
+  const good=candidates.filter(c=>c.r2>0.35).sort((a,b)=>b.days-a.days);
+  if(good.length) best=good[0];
+  else if(w7 && w7.r2>0.5) best=w7;
+  if(!best) best=w14!;
+  const trend=best.trend; const r2=best.r2; const days=best.days; const n=best.n;
+  const atKcal = trend < -0.15 ? estimateAdaptiveThermogenesis({ deficitKcal: Math.round(Math.abs(trend)*density/7), weeksInDeficit: Math.round(days/7) }) : 0;
+  const tdeeNoAT = Math.round(intake - (trend*density/7));
+  const tdee = Math.round(intake - (trend*density/7) - atKcal*0.3);
+  let confidence: AdaptiveTDEEResult['confidence']='low';
+  if(r2>0.6 && n>=10) confidence='high'; else if(r2>0.35) confidence='medium';
+  const plateau = params.goal==='cut' && trend > -0.12;
+  const targets={ maintain: tdee, cut: Math.round(tdee-500), bulk: Math.round(tdee+300) };
+  const weeklySeries=candidates.map(c=>({days:c.days, trend:c.trend, r2:c.r2}));
+  const note=plateau ? `Плато сушки: тренд ${trend}кг/нед при дефиците — адаптация ${atKcal}ккал (Trexler)` : `TDEE ~${tdee} (без AT ${tdeeNoAT}) тренд ${trend} R²${r2} плотность ${density} · цели: cut ${targets.cut}/ bulk ${targets.bulk}`;
+  return { tdee, tdeeNoAT, trend, r2, days, n, density, atKcal, confidence, plateau, targets, note, weeklySeries };
+}
+
+// ——— MET-builder — честный PAL ———
+export function calcMETPal(basePal:number, metHoursPerWeek?:number, standingHours?:number, fidgetLevel?:1|2|3){
+  return computePalFromMet({ basePal, metHoursPerWeek, standingHours, fidgetLevel });
+}
+export function buildMetHours(schedule: Array<{ key:string; hours:number }>): number {
+  let sum=0;
+  for(const s of schedule){ const m=(MET_CATALOG as any)[s.key]?.met ?? 6; sum+=m*s.hours; }
+  return Math.round(sum*10)/10;
+}
+export function parseWeeklyScheduleText(text:string): Array<{ key:string; hours:number }> | null {
+  if(!text||typeof text!=='string') return null;
+  const lower=text.toLowerCase();
+  const out: Array<{key:string;hours:number}>=[];
+  const add=(kw:string[], key:string)=>{
+    for(const k of kw){ if(lower.includes(k)){
+      const m=lower.match(new RegExp(k+".*?([0-9]+[\\.,]?[0-9]*)\\s*ч","i"));
+      const h=m? Number(m[1].replace(',','.')): 1;
+      out.push({key, hours: clamp(h,0.3,15)}); break;
+    }}
+  };
+  add(['силов','кач','бб','жим','тяг'],'strength');
+  add(['кроссфит','crossfit'],'crossfit');
+  add(['hiit','табата'],'hiit');
+  add(['бег','run'],'running_moderate');
+  add(['вело','cycling','байк'],'cycling');
+  add(['плав','swim'],'swimming');
+  add(['ходьб','walk'],'walking');
+  add(['йога','yoga'],'yoga');
+  add(['пилates','пилат'],'pilates');
+  return out.length?out:null;
+}
+
+// ——— RED-S CAT2-lite — screening ———
+export interface RedsScreeningInput { ea:number|null; sex:'male'|'female'; leafScore?:number; rmrRatio?:number; boneFlag?:boolean; menstrualFlag?:boolean; hgb?:number }
+export interface RedsScreeningResult { risk:'low'|'moderate'|'high'; color:string; score:number; flags:string[]; note:string }
+export function calcRedsScreening(input:RedsScreeningInput): RedsScreeningResult {
+  let score=0; const flags:string[]=[];
+  if(input.ea!=null){
+    const leaCut=input.sex==='female'?30:25; const optCut=input.sex==='female'?45:40;
+    if(input.ea < leaCut){ score+=3; flags.push(`LEA <${leaCut}`);} else if(input.ea < optCut){ score+=1; flags.push(`EA ${leaCut}-${optCut}`);}
+  }
+  if(typeof input.leafScore==='number'){
+    if(input.leafScore>=8){ score+=2; flags.push(`LEAF ${input.leafScore} ≥8`);} else if(input.leafScore>=4){ score+=1; flags.push(`LEAF ${input.leafScore} 4-7`);}
+  }
+  if(typeof input.rmrRatio==='number' && input.rmrRatio<0.90){ score+=2; flags.push(`RMR ratio ${input.rmrRatio.toFixed(2)} <0.90`);}
+  if(input.boneFlag){ score+=2; flags.push('Стресс-перелом');}
+  if(input.menstrualFlag){ score+=2; flags.push('Аменорея');}
+  let risk:RedsScreeningResult['risk']='low'; let color='#22c55e';
+  if(score>=4){ risk='high'; color='#ef4444';} else if(score>=2){ risk='moderate'; color='#f59e0b';}
+  const note=risk==='high'? 'Высокий RED-S — к спортивному врачу (IOC CAT2)' : risk==='moderate'? 'Умеренный RED-S — +150-300ккал/ −EEE, контроль 2-4нед' : 'Низкий RED-S — мониторинг EA/LEEP';
+  return { risk, color, score, flags, note };
+}
+
+// ——— Sweat Lab wrappers ———
+export interface SweatTestInput { preKg:number; postKg:number; fluidL:number; hours:number; sodiumMgPerL?:number; weightKg?:number }
+export function calcSweatTest(input:SweatTestInput){
+  const rate=calcSweatRate(input.preKg,input.postKg,input.fluidL,input.hours);
+  if(rate==null) return null;
+  const sodium=input.sodiumMgPerL ?? 900;
+  const elect=calcSweatElectrolytes(rate*1000*input.hours, sodium);
+  const plan=buildHydrationPlan(rate, input.hours, sodium, input.weightKg ?? 80);
+  return { rateLPerH: rate, totalLossMl: Math.round(rate*1000*input.hours), elect, plan };
+}
+
+// ——— Diet break / MATADOR ———
+export function buildDietBreakPlan(totalWeeks:number, deficitWeeks:number, breakEvery?:number, breakDays?:number): Array<{ week:number; phase:'deficit'|'maintenance'; kcalDelta:number; note:string }> {
+  const every=breakEvery ?? 6; const bDays=breakDays ?? 14;
+  const breakWeeks=Math.round(bDays/7);
+  const plan: Array<{week:number;phase:'deficit'|'maintenance';kcalDelta:number;note:string}>=[]; let w=1;
+  while(w<=totalWeeks){
+    for(let i=0;i<every && w<=totalWeeks;i++){ plan.push({ week:w, phase:'deficit', kcalDelta:-500, note:'Дефицит -500' }); w++; }
+    for(let i=0;i<breakWeeks && w<=totalWeeks;i++){ plan.push({ week:w, phase:'maintenance', kcalDelta:0, note:'Diet break maintenance (Byrne MATADOR)' }); w++; }
+    if(totalWeeks - deficitWeeks <=0) break;
+  }
+  return plan.slice(0,totalWeeks);
+}
+export function calcRefeedNeed(weeksInDeficit:number, bodyFat?:number, ea?:number|null): { needed:boolean; carbBoostPct:number; note:string } {
+  const bf=bodyFat ?? 15;
+  const longDeficit=weeksInDeficit>=6 && bf<15;
+  const lowEA=ea!=null && ea < 30;
+  const needed=longDeficit || lowEA;
+  const boost=needed? 25:0;
+  return { needed, carbBoostPct:boost, note: needed ? `Refeed 1×/нед +${boost}% углей (лептин/T3 Trexler)` : 'Refeed не нужен' };
+}
+
+// ——— TyG / FIB-4 wrappers already via calcTyG etc — exported above ———

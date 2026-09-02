@@ -189,6 +189,93 @@ export function computePalSimple(opts: {
   return clamp(palBase + trainAdd + cardioAdd, 1.25, 2.40);
 }
 
+// ── MET-каталог (Ainsworth Compendium 2011) — для честного PAL ──
+export const MET_CATALOG: Record<string, { met:number; label:string }> = {
+  strength: { met: 6.0, label: 'Силовая 6 MET' },
+  bodybuilding: { met: 6.0, label: 'ББ 6' },
+  crossfit: { met: 8.0, label: 'Кроссфит 8' },
+  hiit: { met: 9.0, label: 'HIIT 9' },
+  running_easy: { met: 8.5, label: 'Бег легко 8.5' },
+  running_moderate: { met: 10.0, label: 'Бег средн. 10' },
+  running_hard: { met: 12.5, label: 'Бег тяж. 12.5' },
+  cycling: { met: 7.5, label: 'Вело 7.5' },
+  swimming: { met: 8.0, label: 'Плавание 8' },
+  walking: { met: 3.8, label: 'Ходьба 3.8' },
+  walking_brisk: { met: 4.3, label: 'Ходьба быстр. 4.3' },
+  yoga: { met: 3.0, label: 'Йога 3' },
+  pilates: { met: 4.0, label: 'Пилатес 4' },
+  football: { met: 7.0, label: 'Футбол 7' },
+  boxing: { met: 9.0, label: 'Бокс 9' },
+  rowing: { met: 7.0, label: 'Гребля 7' },
+  elliptical: { met: 5.5, label: 'Эллипс 5.5' },
+  stair: { met: 8.0, label: 'Степпер 8' },
+};
+/** Честный PAL из MET-часов/нед: 1 met-ч/нед ≈0.0067 PAL (калибровано: 18 met-ч → 0.12 PAL как 3× силовая) */
+export function palFromMetHours(metHoursPerWeek: number): number {
+  return clamp(metHoursPerWeek * 0.0067, 0, 0.40);
+}
+export function computePalFromMet(opts: { basePal?: number; metHoursPerWeek?: number; standingHours?: number; fidgetLevel?: 1|2|3 }): number {
+  const base = opts.basePal ?? 1.55;
+  const metAdd = palFromMetHours(opts.metHoursPerWeek ?? 0);
+  const standAdd = opts.standingHours && opts.standingHours>4 ? (opts.standingHours-4)*0.008 : 0;
+  const fidgetAdd = opts.fidgetLevel===3 ? 0.02 : opts.fidgetLevel===1 ? -0.015 : 0;
+  return clamp(base + metAdd + standAdd + fidgetAdd, 1.25, 2.40);
+}
+
+// ── WHtR / ABSI / BAI — антропометрия ──
+export function calcWHtR(waistCm:number, heightCm:number): number | null {
+  if(!isFinite(waistCm) || !isFinite(heightCm) || heightCm<100 || waistCm<40) return null;
+  return Math.round((waistCm/heightCm)*1000)/1000;
+}
+export function calcABSI(waistCm:number, heightCm:number, weightKg:number): number | null {
+  if(!isFinite(waistCm)||!isFinite(heightCm)||!isFinite(weightKg)||heightCm<100||waistCm<40||weightKg<30) return null;
+  const bmi = weightKg/(((heightCm/100)**2));
+  if(bmi<=0) return null;
+  const waistM = waistCm/100; const heightM=heightCm/100;
+  const absi = waistM / (Math.pow(bmi, 2/3) * Math.pow(heightM, 1/2));
+  return Math.round(absi*1000)/1000;
+}
+export function calcBAI(hipCm:number, heightCm:number): number | null {
+  if(!isFinite(hipCm)||!isFinite(heightCm)||heightCm<100||hipCm<50) return null;
+  const hM=heightCm/100;
+  return Math.round(((hipCm / (hM * Math.sqrt(hM))) - 18)*10)/10;
+}
+
+// ── TyG / MetS / FIB-4 / QUICKI / APRI — метаболическое здоровье ──
+export function calcTyG(tgMgDl?:number, glucoseMgDl?:number): number | null {
+  if(typeof tgMgDl!=='number'||typeof glucoseMgDl!=='number'||tgMgDl<=0||glucoseMgDl<=0) return null;
+  return Math.round(Math.log((tgMgDl*glucoseMgDl)/2)*100)/100;
+}
+export function calcMetS_ATP3(params:{ waistCm:number; tgMgDl?:number; hdlMgDl?:number; systolic?:number; diastolic?:number; glucoseMgDl?:number; sex:'male'|'female' }): { score:number; criteria:string[]; hasMetS:boolean; note:string } {
+  const crit:string[]=[];
+  const waistCut = params.sex==='male' ? 102 : 88;
+  if(params.waistCm>=waistCut) crit.push(`Талия ≥${waistCut}`);
+  if(typeof params.tgMgDl==='number' && params.tgMgDl>=150) crit.push('ТГ ≥150');
+  if(typeof params.hdlMgDl==='number'){
+    const hdlCut=params.sex==='male'?40:50;
+    if(params.hdlMgDl<hdlCut) crit.push(`HDL <${hdlCut}`);
+  }
+  if((typeof params.systolic==='number'&&params.systolic>=130)||(typeof params.diastolic==='number'&&params.diastolic>=85)) crit.push('АД ≥130/85');
+  if(typeof params.glucoseMgDl==='number'&&params.glucoseMgDl>=100) crit.push('Глюкоза ≥100');
+  const score=crit.length; const hasMetS=score>=3;
+  return { score, criteria:crit, hasMetS, note: hasMetS ? `MetS ${score}/5 — синдром (≥3)` : `MetS ${score}/5 — нет синдрома` };
+}
+export function calcFIB4(age:number, ast?:number, alt?:number, plt?:number): number | null {
+  if(!isFinite(age)||typeof ast!=='number'||typeof alt!=='number'||typeof plt!=='number'||ast<=0||alt<=0||plt<=0) return null;
+  const v = (age*ast)/(plt*Math.sqrt(alt));
+  return Math.round(v*100)/100;
+}
+export function calcAPRI(ast?:number, plt?:number, astULN=40): number | null {
+  if(typeof ast!=='number'||typeof plt!=='number'||ast<=0||plt<=0) return null;
+  return Math.round(((ast/astULN)/plt*100)*100)/100;
+}
+export function calcQUICKI(glucoseMgDl?:number, insulinMuMl?:number): number | null {
+  if(typeof glucoseMgDl!=='number'||typeof insulinMuMl!=='number'||glucoseMgDl<=0||insulinMuMl<=0) return null;
+  const gMgDl=glucoseMgDl, i=insulinMuMl;
+  const v=1/(Math.log10(gMgDl)+Math.log10(i));
+  return Math.round(v*1000)/1000;
+}
+
 // Полная модель для планировщика (учитывает шаги/быт/NЕАТ/интенсивность)
 export function computePalFull(opts: {
   workoutsPerWeek?: number;
@@ -372,6 +459,34 @@ export function calcSweatElectrolytes(volumeMl: number, sodiumMgPerL: number): S
   const potassiumMg = Math.round(L * 180); // среднее 180мг/л (4.6 mmol)
   const magnesiumMg = Math.round(L * 12); // 0.5 mmol ≈12мг/л
   return { sodiumMg, chlorideMg, potassiumMg, magnesiumMg };
+}
+// Sweat test: (preKg - postKg + fluidL)/hours → L/h (Baker)
+export function calcSweatRate(preKg:number, postKg:number, fluidL:number, hours:number): number | null {
+  if(!isFinite(preKg)||!isFinite(postKg)||!isFinite(fluidL)||!isFinite(hours)||hours<=0) return null;
+  const loss = preKg - postKg + fluidL;
+  if(loss < -1 || loss > 5) return null;
+  const rate = loss / hours; // L/h
+  if(rate < 0.1 || rate > 3.5) return null;
+  return Math.round(rate*1000)/1000; // L/h
+}
+export function buildHydrationPlan(sweatRateLPerH:number, hours:number, sodiumMgPerL:number, weightKg:number): { totalLossMl:number; sodiumLossMg:number; preMl:number; duringMlPerH:number; postMl:number; bottles05:number; hyponatremiaRisk:boolean; note:string } {
+  const totalLossMl = Math.round(sweatRateLPerH*1000*hours);
+  const sodiumLossMg = Math.round(sweatRateLPerH*hours*sodiumMgPerL);
+  const preMl = Math.round(clamp(weightKg*6, 300, 600)); // 5-7мл/кг за 4ч (ACSM)
+  const duringMlPerH = Math.round(clamp(sweatRateLPerH*1000*0.75, 300, 1200)); // 75% потерь (Hew-Butler guard: не >1.2л/ч)
+  const postMl = Math.round(totalLossMl*1.5 - duringMlPerH*hours); // 150% восстановление
+  const bottles05 = Math.ceil((preMl + duringMlPerH*hours + Math.max(0,postMl))/500);
+  const hyponatremiaRisk = hours>=4 && duringMlPerH>=900 && sodiumMgPerL<600; // plain water + long + low Na (Hew-Butler ~1L/h)
+  const note = hyponatremiaRisk ? '⚠ Риск гипонатриемии (Hew-Butler 2015) — добавь Na 500-700мг/л' : `План: pre ${preMl}мл + during ${duringMlPerH}мл/ч + post ${Math.max(0,postMl)}мл · бутылок 0.5л: ${bottles05}`;
+  return { totalLossMl, sodiumLossMg, preMl, duringMlPerH, postMl: Math.max(0,postMl), bottles05, hyponatremiaRisk, note };
+}
+// Caffeine curve: half-life 5ч (Dulloo 1989), peak 30-60мин, -50% at 5ч, +3% TEF per 100мг
+export function calcCaffeineCurve(mg:number, hoursSince:number, weightKg=75): { remainingMg:number; tefBoostKcal:number; sleepCutoffH:number; note:string } {
+  const hl=5; // half-life hours
+  const remainingMg = Math.round(mg*Math.pow(0.5, Math.max(0,hoursSince)/hl));
+  const tefBoostKcal = Math.round(mg*0.03); // ~3ккал/100мг Dulloo
+  const sleepCutoffH = mg>200 ? 8 : mg>100 ? 6 : 4;
+  return { remainingMg, tefBoostKcal, sleepCutoffH, note: `${remainingMg}мг осталось (peak 45мин, HL 5ч) · TEF +${tefBoostKcal} · cut-off ${sleepCutoffH}ч до сна` };
 }
 
 // ── Adaptive thermogenesis — Trexler 2014 / Rosenbaum 2010 ──

@@ -1,6 +1,6 @@
 # Metabolic Hub Pro — Evidence & Formulas
 
-**14 в 1**: Вода · Шаги · КБЖУ · Жир · Stress Load (SLI) · Кровь · EA · Алко · Белок · Поиск · NEAT · AT · Thyroid/HOMA · Lipid/FLI
+**17 в 1**: Вода · Шаги · КБЖУ · Жир · Stress Load (SLI) · Кровь · EA RED-S CAT2 · Алко · Белок · Поиск Adaptive v2 · NEAT · AT MATADOR · Thyroid/HOMA · Lipid/FLI · Пот-тест · MetS/TyG/FIB-4 · WHtR/ABSI/BAI
 
 Канон — `src/engines/metabolic-hub.engine.ts:1`, `src/core/metabolic-constants.ts:1`, UI `src/ui/screens/Shared/MetabolicHub.tsx:1`. Источник истины — профиль `he_profile_v2` + дневник `he_nutrition_v2`.
 
@@ -30,14 +30,14 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 ### TEF — Westerterp 2004
 `P 25% C 7% F 3% Alc 15% Suter 1992` — PAL FAO уже включает ~10%, TEF в хабе информативен (BEE=BMR+TEF, TEE=BMR×PAL).
 
-### PAL — FAO 2001 + Levine 2002
-`low 1.40 medium 1.55 high 1.75 very_high 1.95` + `trainAdd 0.040/нед MET`, `cardioAdd 0.030/ч`, `very_high` для 2×/д. Дедуп `palTrainingAdd/palCardioAdd`. DLW band ±12%.
+### PAL — FAO 2001 + Levine 2002 + Ainsworth 2011 MET
+`low 1.40 medium 1.55 high 1.75 very_high 1.95` + `trainAdd 0.040/нед MET`, `cardioAdd 0.030/ч`, `very_high` для 2×/д. Дедуп `getEffectivePal` (единая точка). **Новое**: `MET_CATALOG` 18 активностей + `palFromMetHours(metH*0.0067)` — честный PAL из MET-часов/нед (FindTDEE/TheTDEE 2026: dropdown ошибается ±300ккал). DLW band ±12%.
 
 ### Вода — EFSA 2010 + IOM 2004 + Baker 2017
-`IOM 35/33/30 мл/кг (M/F/>60)` база, lean×40/fat×20 — экспериментальная справка. Baker полный панель: Na 900мг/л средн., Cl×1.5, K 180мг/л, Mg 12мг/л на литр пота. Климат Sawka нелинейно.
+`IOM 35/33/30 мл/кг (M/F/>60)` база, lean×40/fat×20 — экспериментальная справка. Baker полный панель: Na 900мг/л средн., Cl×1.5, K 180мг/л, Mg 12мг/л на литр пота. Климат Sawka нелинейно. **Новое**: `calcSweatRate(pre-post+fluid)/ч` + `buildHydrationPlan` pre 6мл/кг + during 0.75×потери + post 150% + бутылки 0.5л + hyponatremia guard Hew-Butler ≥900мл/ч plain water 4ч+.
 
-### Жир — Hodgdon 1984 Navy (дюймы) + FFMI Kouri/Helms
-`Navy ±3.5%`, `FFMI_norm +6.1×(1.80-H)`, лимит 26.2. JP3/7 ±3% Siri, Durnin-Womersley ±4% 4-site, BIA Kyle 2004 400-900 Ом. Deurenberg `1.2×BMI+0.23×age-10.8×sex-5.4` завышает у BMI>27 — помечено.
+### Жир — Hodgdon 1984 Navy (дюймы) + FFMI Kouri/Helms + WHtR/ABSI/BAI
+`Navy ±3.5%`, `FFMI_norm +6.1×(1.80-H)`, лимит 26.2. JP3/7 ±3% Siri, Durnin-Womersley ±4% 4-site, BIA Kyle 2004 400-900 Ом. Deurenberg `1.2×BMI+0.23×age-10.8×sex-5.4` завышает у BMI>27 — помечено. **Новое**: `WHtR ≥0.5 риск`, `ABSI >0.083`, `BAI` — антропо-доп.
 
 ### Stress Load Index (бывш. HPA) — E
 `50+(stress-5)×4.5+(7-sleep)×5.5+(3-sleepQ)×4+(acwr-1.15)×28 + кофеин/алко/TSH` — веса invented, шкала 0-100 invented, дисклеймер E. Для диагноза — PSS-10+PSQI+слюна 4 точки Clow 2004. AAS EXP −14% Heber 1985.
@@ -45,8 +45,8 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 ### Кровь — ESC 2023 / ASA
 Зоны `<48 норма 48-51 внимание 51-54 донация >54 стоп >60 критично`, вода +300/500/750, железо ZERO >51, `hgb≈hct×3.4` (MCHC).
 
-### EA — Loucks 2007 / IOC 2014 / Mountjoy 2018
-`(EI-EEE)/FFM`, `EEE net = gross×0.85` (вычет RMR во время упр.), `F LEA <30 M <25`, `F optimal ≥45 M ≥40`.
+### EA — Loucks 2007 / IOC 2014 / Mountjoy 2018 + RED-S CAT2 2023
+`(EI-EEE)/FFM`, `EEE net = gross×0.85` (вычет RMR во время упр.), `F LEA <30 M <25`, `F optimal ≥45 M ≥40`. **Новое**: `calcRedsScreening` CAT2-lite — LEAF-Q-lite ≥8 + RMR ratio <0.90 (Mountjoy) + стресс-перелом/аменорея → score → low/moderate/high (IOC).
 
 ### Алко — Atwater 7.1 + Suter 1992
 `TEF 15%`, блок жира `illustration 22/45/73%` ступенями + `exact g×1.2%` линейно (Suter Fig2).
@@ -54,14 +54,14 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 ### Белок — Morton 2018 / Schoenfeld-Aragon 2018 / Res 2012
 `2.5г leuc`, `0.40г/кг/прием ×4`, ceiling `0.55г/кг waste`, `DIAAS 0.11 whey vs 0.07 plant`, `pre-sleep 35г казеин +0.22кг LBM`.
 
-### Maintenance — Hall 2011
-Плотность `p×9400+(1-p)×1800` Forbes `p via BF` (7700 фикс ошибка 45% у сухих), `AT Trexler −80-120ккал` при >3нед дефицита, `adapt exp(-t/90)` непрерывно, DLW band. Goal `Hall+AT` days=|totalKcal|/500×1/adapt.
+### Maintenance — Hall 2011 + Adaptive v2 (MacroFactor)
+Плотность `p×9400+(1-p)×1800` Forbes `p via BF` (7700 фикс ошибка 45% у сухих), `AT Trexler −80-120ккал` при >3нед дефицита, `adapt exp(-t/90)` непрерывно, DLW band. Goal `Hall+AT` days=|totalKcal|/500×1/adapt. **Новое**: `calcAdaptiveTDEE` — 7/14/21д окна → выбор best R²>0.35, TDEE=intake−trend×density/7−AT×0.3, plateau `trend>−0.12` для cut, targets cut −500/bulk +300 (MacroFactor/MacroCodex).
 
 ### NEAT — Levine 1999/2002
-`+40ккал/ч стоя, fidget +90/−40, ходьба steps×0.04×W/70`.
+`+40ккал/ч стоя, fidget +90/−40, ходьба steps×0.04×W/70`. **Новое**: NEAT как первый гаситель дефицита — +2ч стоя +2000 шагов = +160ккал без кардио (BiteKit 2026).
 
-### Thyroid — Kim 2014, HOMA — Wallace 2004
-`FT4 17 средн. +2.2%/pmol`, `TSH>4.5 ×0.95`, HOMA `<1.4 optimal 1.4-2.5 attention ≥2.5 IR` → угли ≤3г/кг.
+### Thyroid — Kim 2014, HOMA — Wallace 2004, TyG/FIB-4/MetS
+`FT4 17 средн. +2.2%/pmol`, `TSH>4.5 ×0.95`, HOMA `<1.4 optimal 1.4-2.5 attention ≥2.5 IR` → угли ≤3г/кг. **Новое**: `TyG=ln(TG×Gluc/2) ≥8.8 IR`, `MetS ATP III ≥3/5`, `FIB-4 <1.30 низкий >2.67 высокий`, `APRI`, `QUICKI <0.33 IR`, `Caffeine HL 5ч` Dulloo 1989 +3% TEF, `Diet break MATADOR 2нед/2нед` Byrne.
 
 ### Lipid — Mensink 2003, FLI — Bedogni 2006
 `SFA 10г +12 LDL / fiber 10г −5`, `FLI logit 0.953×lnTG+0.139×BMI+0.718×lnGGT+0.053×waist → <30 нет стеатоза >60 стеатоз`. PSMF Blackburn EA<15, menstrual Benton +1.2кг лютеин.
@@ -70,4 +70,4 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 Все `aasMult` EXP ⚠️: вода +12%, TDEE +8%, КБЖУ +10%, SLI −14%, FFMI +1.8 Bhasin 600мг → +2кг воды ~3% (не +12%). Точнее через +FFM Cunningham.
 
 ## Тесты
-`metabolic-hub.test.ts:1` 68 тестов, `nutrition-v2-audit` 4, `tSC` свои 0.
+`metabolic-hub.test.ts:1` 84 теста (68→84 +16 v3: adaptive v2, MET, RED-S, sweat, WHtR/ABSI/BAI, TyG/MetS/FIB-4, caffeine, MATADOR), `nutrition-v2-audit` 4, `tSC` свои 0.

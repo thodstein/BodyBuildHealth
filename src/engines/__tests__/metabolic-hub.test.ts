@@ -504,3 +504,127 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     expect(menstrualWaterRetention('follicular').kg).toBe(0);
   });
 });
+
+describe('metabolic-hub v3 — Adaptive TDEE v2, MET, RED-S, Sweat, WHtR, MetS', () => {
+  it('Adaptive TDEE v2: intake 2800 trend -0.4 -> TDEE ~3200 ±AT', async () => {
+    const { calcAdaptiveTDEE } = await import('../metabolic-hub.engine');
+    const wh = [
+      { date:'2026-01-01', kg:83},{date:'2026-01-04', kg:82.8},{date:'2026-01-08', kg:82.6},{date:'2026-01-11', kg:82.45},{date:'2026-01-14', kg:82.3},{date:'2026-01-17', kg:82.15},{date:'2026-01-20', kg:82.0},{date:'2026-01-23', kg:81.85}
+    ];
+    const r = calcAdaptiveTDEE({ weightHistory: wh, avgIntakeKcal: 2800, bodyFatPct: 15, goal:'cut' });
+    expect(r).not.toBeNull();
+    expect(r!.tdee).toBeGreaterThan(3000);
+    expect(r!.tdee).toBeLessThan(3600);
+    expect(r!.r2).toBeGreaterThan(0.3);
+    expect(r!.targets.cut).toBe(r!.tdee-500);
+    expect(r!.targets.bulk).toBe(r!.tdee+300);
+  });
+  it('Adaptive TDEE v2: <7 points -> null', async () => {
+    const { calcAdaptiveTDEE } = await import('../metabolic-hub.engine');
+    const wh=[{date:'2026-01-01',kg:80},{date:'2026-01-03',kg:79.9}];
+    expect(calcAdaptiveTDEE({ weightHistory: wh, avgIntakeKcal: 2500 } as any)).toBeNull();
+  });
+  it('Adaptive TDEE v2 plateau detection', async () => {
+    const { calcAdaptiveTDEE } = await import('../metabolic-hub.engine');
+    const wh=[
+      {date:'2026-01-01',kg:80},{date:'2026-01-04',kg:80.0},{date:'2026-01-08',kg:80.0},{date:'2026-01-11',kg:79.98},{date:'2026-01-14',kg:80.02},{date:'2026-01-17',kg:80.01},{date:'2026-01-20',kg:80}
+    ];
+    const r=calcAdaptiveTDEE({ weightHistory: wh, avgIntakeKcal: 2200, bodyFatPct: 12, goal:'cut' });
+    expect(r?.plateau).toBe(true);
+  });
+  it('MET PAL: 18 met-h -> +0.12 vs base', async () => {
+    const { palFromMetHours, computePalFromMet } = await import('../../core/metabolic-constants');
+    expect(palFromMetHours(18)).toBeCloseTo(0.12, 0.02);
+    const pal = computePalFromMet({ basePal:1.55, metHoursPerWeek:18 });
+    expect(pal).toBeGreaterThan(1.60);
+    expect(pal).toBeLessThan(1.75);
+  });
+  it('MET: getEffectivePal via calcSteps', async () => {
+    const { calcSteps } = await import('../metabolic-hub.engine');
+    const base={ weight:80, height:180, age:30, sex:'male' as const };
+    const low=calcSteps({ ...base, activityLevel:'medium', trainingDays:3 });
+    const met=calcSteps({ ...base, activityLevel:'medium', metHoursPerWeek:30 } as any);
+    expect(met.pal).toBeGreaterThan(low.pal);
+    expect(met.tdeeNat).toBeGreaterThan(low.tdeeNat);
+  });
+  it('RED-S screening: low EA -> high', async () => {
+    const { calcRedsScreening } = await import('../metabolic-hub.engine');
+    const high=calcRedsScreening({ ea:20, sex:'female', leafScore:9, boneFlag:true } as any);
+    expect(high.risk).toBe('high');
+    expect(high.score).toBeGreaterThanOrEqual(4);
+    const low=calcRedsScreening({ ea:46, sex:'male', leafScore:1 } as any);
+    expect(low.risk).toBe('low');
+  });
+  it('RED-S: RMR ratio <0.90 adds flag', async () => {
+    const { calcRedsScreening } = await import('../metabolic-hub.engine');
+    const r=calcRedsScreening({ ea:35, sex:'male', rmrRatio:0.85 } as any);
+    expect(r.flags.join(',')).toContain('RMR ratio');
+    expect(r.score).toBeGreaterThanOrEqual(2);
+  });
+  it('Sweat rate: (80-79.2+0.5)/1 =1.3 L/h', async () => {
+    const { calcSweatTest } = await import('../metabolic-hub.engine');
+    const r=calcSweatTest({ preKg:80, postKg:79.2, fluidL:0.5, hours:1, sodiumMgPerL:900, weightKg:80 });
+    expect(r).not.toBeNull();
+    expect(r!.rateLPerH).toBeCloseTo(1.3, 0.05);
+    expect(r!.plan.preMl).toBeGreaterThan(300);
+    expect(r!.plan.bottles05).toBeGreaterThan(1);
+  });
+  it('Sweat: hyponatremia risk when long + plain water', async () => {
+    const { calcSweatTest } = await import('../metabolic-hub.engine');
+    const r=calcSweatTest({ preKg:75, postKg:74, fluidL:4, hours:4, sodiumMgPerL:400, weightKg:75 });
+    expect(r?.plan.hyponatremiaRisk).toBe(true);
+  });
+  it('WHtR / ABSI / BAI', async () => {
+    const { calcWHtR, calcABSI, calcBAI } = await import('../../core/metabolic-constants');
+    expect(calcWHtR(84,180)).toBeCloseTo(0.467,0.01);
+    expect(calcABSI(84,180,80)).toBeGreaterThan(0.07);
+    expect(calcABSI(84,180,80)).toBeLessThan(0.09);
+    expect(calcBAI(96,180)).toBeGreaterThan(15);
+  });
+  it('TyG >=8.8 IR', async () => {
+    const { calcTyG } = await import('../../core/metabolic-constants');
+    expect(calcTyG(150,100)).toBeGreaterThan(8.8);
+    expect(calcTyG(80,85)).toBeLessThan(8.8);
+    expect(calcTyG(undefined as any, 100)).toBeNull();
+  });
+  it('MetS ATP III', async () => {
+    const { calcMetS_ATP3 } = await import('../../core/metabolic-constants');
+    const mets=calcMetS_ATP3({ waistCm:102, tgMgDl:180, hdlMgDl:35, systolic:135, diastolic:88, glucoseMgDl:105, sex:'male' });
+    expect(mets.score).toBeGreaterThanOrEqual(3);
+    expect(mets.hasMetS).toBe(true);
+    const ok=calcMetS_ATP3({ waistCm:80, tgMgDl:90, hdlMgDl:55, systolic:115, diastolic:75, glucoseMgDl:85, sex:'male' });
+    expect(ok.hasMetS).toBe(false);
+  });
+  it('FIB-4 and QUICKI', async () => {
+    const { calcFIB4, calcQUICKI, calcAPRI } = await import('../../core/metabolic-constants');
+    const fib=calcFIB4(45,30,35,220);
+    expect(fib).toBeGreaterThan(0.5); expect(fib).toBeLessThan(3);
+    const q=calcQUICKI(90,10);
+    expect(q).toBeGreaterThan(0.3); expect(q).toBeLessThan(0.4);
+    const apri=calcAPRI(40,200);
+    expect(apri).toBeGreaterThan(0);
+  });
+  it('Caffeine curve HL 5h', async () => {
+    const { calcCaffeineCurve } = await import('../../core/metabolic-constants');
+    const c0=calcCaffeineCurve(200,0);
+    expect(c0.remainingMg).toBe(200);
+    const c5=calcCaffeineCurve(200,5);
+    expect(c5.remainingMg).toBeCloseTo(100,5);
+    expect(c5.sleepCutoffH).toBe(6);
+  });
+  it('Diet break MATADOR 12w', async () => {
+    const { buildDietBreakPlan, calcRefeedNeed } = await import('../metabolic-hub.engine');
+    const p=buildDietBreakPlan(12,9);
+    expect(p.length).toBe(12);
+    expect(p.filter(x=>x.phase==='maintenance').length).toBeGreaterThan(0);
+    const re=calcRefeedNeed(7,12,22);
+    expect(re.needed).toBe(true);
+    expect(calcRefeedNeed(2,18,40).needed).toBe(false);
+  });
+  it('Sweat electrolytes still correct after refactor', async () => {
+    const { calcSweatElectrolytes } = await import('../../core/metabolic-constants');
+    const e=calcSweatElectrolytes(1000,900);
+    expect(e.sodiumMg).toBe(900);
+    expect(e.chlorideMg).toBe(1350);
+  });
+});
