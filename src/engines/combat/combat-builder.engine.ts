@@ -10,8 +10,8 @@ import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadW
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
-import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB } from './combat-selection';
-import { accentForDiscipline } from './combat-specialization';
+import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB } from './combat-selection';
+import { accentForDiscipline, accentForFightStyle, styleNarrative } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB, isAxialLoadExerciseCB, isMobilityRestrictedCB } from './combat-mobility';
@@ -23,14 +23,15 @@ import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recove
 import { COMBAT_LANDMARKS } from './combat-volume';
 import { vbtRecommendationCombat } from './combat-vbt.engine';
 import { coreWeeklyPlan } from './combat-core.engine';
+import { neckWeeklyPlan, NECK_IDS } from './combat-neck.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet, CombatPhase } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
-  upper_power: ['bench_bar', 'row_bar', 'ohp', 'pullup', 'neck_harness_ext', 'neck_lateral_flex', 'gi_grip_pullup', 'face_pull', 'push_press', 'landmine_press', 'fat_bar_row', 'towel_pullup', 'band_pull_apart', 'ytw_raise', 'single_arm_row'],
+  upper_power: ['bench_bar', 'row_bar', 'ohp', 'pullup', 'neck_harness_ext', 'neck_lateral_flex', 'neck_isometric_front', 'neck_isometric_side', 'gi_grip_pullup', 'face_pull', 'push_press', 'landmine_press', 'fat_bar_row', 'towel_pullup', 'band_pull_apart', 'ytw_raise', 'single_arm_row'],
   lower_power: ['squat', 'front_squat', 'rdl', 'bulgarian_split_heavy', 'single_leg_rdl_combat', 'cossack_squat', 'calf_raise', 'trap_bar_dead', 'zercher_squat', 'nordic_curl', 'glute_ham_raise', 'step_up', 'hip_thrust', 'kb_swing'],
-  full_power: ['bench_bar', 'row_bar', 'squat', 'rdl', 'ohp', 'pullup', 'neck_harness_ext', 'plate_pinch', 'hang_clean', 'high_pull', 'push_press', 'landmine_press', 'farmer_carry', 'kb_swing', 'hip_thrust'],
-  full_conditioning: ['neck_harness_ext', 'neck_lateral_flex', 'neck_flexion', 'neck_rotation', 'landmine_rotation', 'landmine_180', 'pallof_rotation_press', 'med_ball_throw', 'med_ball_slam', 'med_ball_rot_throw', 'box_jump', 'depth_jump', 'broad_jump', 'gi_grip_pullup', 'suitcase_carry', 'sled_push', 'sled_pull', 'deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'battle_rope'],
-  neck_grip: ['neck_harness_ext', 'neck_lateral_flex', 'neck_bridge_wrestler', 'neck_flexion', 'neck_rotation', 'gi_grip_pullup', 'plate_pinch', 'wrist_roller', 'wrist_flexion', 'wrist_extension', 'towel_pullup', 'rope_climb', 'fat_bar_row', 'farmer_carry', 'sledge_hammer'],
+  full_power: ['bench_bar', 'row_bar', 'squat', 'rdl', 'ohp', 'pullup', 'neck_harness_ext', 'neck_isometric_back', 'plate_pinch', 'hang_clean', 'high_pull', 'push_press', 'landmine_press', 'farmer_carry', 'kb_swing', 'hip_thrust'],
+  full_conditioning: ['neck_harness_ext', 'neck_lateral_flex', 'neck_flexion', 'neck_rotation', 'neck_isometric_front', 'neck_isometric_side', 'neck_band_rotation_isometric', 'neck_eccentric_flexion', 'landmine_rotation', 'landmine_180', 'pallof_rotation_press', 'med_ball_throw', 'med_ball_slam', 'med_ball_rot_throw', 'box_jump', 'depth_jump', 'broad_jump', 'gi_grip_pullup', 'suitcase_carry', 'sled_push', 'sled_pull', 'deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'battle_rope'],
+  neck_grip: ['neck_harness_ext', 'neck_lateral_flex', 'neck_bridge_wrestler', 'neck_flexion', 'neck_rotation', 'neck_isometric_front', 'neck_isometric_back', 'neck_isometric_side', 'neck_band_rotation_isometric', 'neck_eccentric_flexion', 'neck_harness_rotation', 'gi_grip_pullup', 'plate_pinch', 'wrist_roller', 'wrist_flexion', 'wrist_extension', 'towel_pullup', 'rope_climb', 'fat_bar_row', 'farmer_carry', 'sledge_hammer'],
 };
 
 function clampWeeks(w: number): number { return Math.max(2, Math.min(12, Math.round(Number(w) || 6))); }
@@ -86,6 +87,12 @@ const CB_EX_META: Record<string, { name: string; group: string; pattern: string 
   wrist_extension: { name: 'Разгибания запястий', group: 'grip', pattern: 'isolation' },
   neck_flexion: { name: 'Шея сгибание (кивок)', group: 'neck', pattern: 'isolation' },
   neck_rotation: { name: 'Шея ротация с резинкой', group: 'neck', pattern: 'isolation' },
+  neck_isometric_front: { name: 'Изометрия шеи фронтальная', group: 'neck', pattern: 'isolation' },
+  neck_isometric_back: { name: 'Изометрия затылок', group: 'neck', pattern: 'isolation' },
+  neck_isometric_side: { name: 'Изометрия боковая', group: 'neck', pattern: 'isolation' },
+  neck_band_rotation_isometric: { name: 'Ротация изометрия с резинкой', group: 'neck', pattern: 'isolation' },
+  neck_eccentric_flexion: { name: 'Эксцентрика шеи (3с)', group: 'neck', pattern: 'isolation' },
+  neck_harness_rotation: { name: 'Шея ротация с упряжью', group: 'neck', pattern: 'isolation' },
   deadbug: { name: 'Мёртвый жук', group: 'core', pattern: 'anti_extension' },
   hollow_hold: { name: 'Лодочка', group: 'core', pattern: 'anti_extension' },
   side_plank: { name: 'Боковая планка', group: 'core', pattern: 'anti_lateral' },
@@ -148,6 +155,12 @@ const CB_TECHNIQUE: Record<string,string> = {
   wrist_extension:'Разгибания: предплечье на скамье, только кисть',
   neck_flexion:'Кивок вперёд: 12-20 повт, резинка/диск',
   neck_rotation:'Ротация шеи: медленно, 10-12/сторону',
+  neck_isometric_front:'Изометрия фронт: стена/ладонь 20с, подбородок втянут — Collins −5% сотряс/0.45кг',
+  neck_isometric_back:'Изометрия затылок: стена 20с, без прогиба — Bracing (UFC)',
+  neck_isometric_side:'Боковая изометрия: ладонь на висок 15с/стор',
+  neck_band_rotation_isometric:'Анти-ротация: резинка 15с/стор, кор жёстко',
+  neck_eccentric_flexion:'Эксцентрика 3с вниз, 1с пауза — Fownes-Walpole',
+  neck_harness_rotation:'Ротация с упряжью: 10/стор, 360° контроль',
   deadbug:'Мёртвый жук: поясница прижата, 8-10/сторону',
   hollow_hold:'Лодочка: поясница в пол, 20-40с',
   side_plank:'Боковая: линия тело-прямая, 30-45с',
@@ -211,14 +224,7 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   return out;
 }
 function gentleFactorCB(id: string, injuries: any[]|undefined): number {
-  if (!injuries||injuries.length===0) return 1;
-  const txt=JSON.stringify(injuries).toLowerCase();
-  if ((txt.includes('neck')||txt.includes('ше')) && id.includes('neck')) return 0.6;
-  if ((txt.includes('knee')||txt.includes('колен')) && ['squat','front_squat','bulgarian_split_heavy','cossack_squat','trap_bar_dead','zercher_squat','nordic_curl','glute_ham_raise','step_up','box_jump','depth_jump','broad_jump','sled_push'].includes(id)) return 0.6;
-  if ((txt.includes('shoulder')||txt.includes('плеч')) && ['bench_bar','ohp','push_press','landmine_press','hang_clean','high_pull','band_external_rotation','ytw_raise'].includes(id)) return 0.65;
-  if ((txt.includes('wrist')||txt.includes('запяст')||txt.includes('кист')) && ['gi_grip_pullup','plate_pinch','wrist_roller','towel_pullup','rope_climb','fat_bar_row','wrist_flexion','wrist_extension','sledge_hammer','battle_rope'].includes(id)) return 0.7;
-  if ((txt.includes('back')||txt.includes('спин')||txt.includes('поясн')) && ['rdl','trap_bar_dead','sledge_hammer','sled_pull','deadbug','ab_wheel'].includes(id)) return 0.65;
-  return 1;
+  return gentleFactorForCB(id, injuries);
 }
 
 function weightForCombatExercise(id: string, input: CombatInput, goal: string): number {
@@ -248,15 +254,25 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
     const FALLBACK_COEFF: Record<string, number> = {
       landmine_rotation:0.85, neck_harness_ext:0.95, plate_pinch:0.90, pullup:0.95, row_bar:0.90, ohp:0.90,
       med_ball_throw:0.85, kb_swing:0.85, squat:0.90, rdl:0.90,
+      pallof_rotation_press:0.85, band_external_rotation:0.85, band_pull_apart:0.88,
+      sled_push:0.88, sled_pull:0.88, high_pull:0.90, hang_clean:0.90,
+      sledge_hammer:0.88, battle_rope:0.90, rope_climb:0.90, towel_pullup:0.90,
+      med_ball_slam:0.88, med_ball_rot_throw:0.85,
     };
-    if (!hasCable && ['landmine_rotation','plate_pinch','pullup','row_bar','ohp','med_ball_throw','kb_swing'].includes(id) && FALLBACK_COEFF[id]) {
-      w = Math.round(w*FALLBACK_COEFF[id]/2.5)*2.5;
+    // кабель-замены: pallof→landmine, rope→pullup, sled→squat/row
+    if (!hasCable) {
+      if (['landmine_rotation','plate_pinch','pullup','row_bar','ohp','med_ball_throw','kb_swing','pallof_rotation_press','band_external_rotation','band_pull_apart','sledge_hammer','battle_rope','rope_climb','towel_pullup','med_ball_slam','med_ball_rot_throw'].includes(id) && FALLBACK_COEFF[id]) {
+        w = Math.round(w*FALLBACK_COEFF[id]/2.5)*2.5;
+      }
     }
-    if (!hasSled && ['squat','row_bar','rdl','med_ball_throw','kb_swing'].includes(id) && FALLBACK_COEFF[id]) {
-      // sled fallback уже учтён выше, но если нет sled и id squat/rdl — это sled_push→squat
-      if (id==='squat' || id==='rdl') w = Math.round(w*(FALLBACK_COEFF[id]||0.90)/2.5)*2.5;
+    if (!hasSled) {
+      if (['squat','row_bar','rdl','med_ball_throw','kb_swing','sled_push','sled_pull'].includes(id) && FALLBACK_COEFF[id]) {
+        if (['squat','rdl','sled_push','sled_pull'].includes(id)) w = Math.round(w*(FALLBACK_COEFF[id]||0.90)/2.5)*2.5;
+      }
     }
+    // комментарий для замены — уже в meta technique fallback, но добавляем явный след в weightFor trace (для finalize warning)
   }
+  // trace для UI: если была замена, вес скорректирован ×coeff
   return w;
 }
 
@@ -319,7 +335,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const wcProtocol = input.weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
   if (forceDowngraded) rationale.push(`Частота зала снижена ${origPatternId}→${pattern.id} из-за высокой внезальной ${outsideSessions}×/нед (sparring) — перегруз предотвращён`);
-  rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
+  rationale.push(`Дисциплина: ${discipline} · стиль ${input.fightStyle || 'hybrid'} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
+  rationale.push(styleNarrative(input.fightStyle as any, discipline as any));
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
@@ -398,10 +415,24 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
         if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
-        // fightStyle: striker→rotational +1, grappler→neck/grip +1
-        const fs = input.fightStyle as string | undefined;
-        if (fs === 'striker' && (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation'))) sets = Math.min(6, sets + 1);
-        else if (fs === 'grappler' && (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup'))) sets = Math.min(6, sets + 1);
+        // fightStyle: striker→rotational+plyo+contrast, grappler→neck/grip+unilateral — детально (P1-4)
+        const fs = (input.fightStyle as string | undefined) || 'hybrid';
+        const styleMap = accentForFightStyle(fs as any, discipline as any);
+        // striker: rotational, plyo
+        if (fs === 'striker') {
+          if (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation')) sets = Math.min(6, sets + 1);
+          if (id.includes('box_jump') || id.includes('depth_jump') || id.includes('broad_jump') || id.includes('med_ball_throw') || id.includes('sledge_hammer') || id.includes('battle_rope')) {
+            const m = (styleMap as any).plyo || 1;
+            if (m !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * m)));
+            else sets = Math.min(6, sets + 1);
+          }
+        } else if (fs === 'grappler') {
+          if (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup') || id.includes('farmer') || id.includes('fat_bar')) sets = Math.min(6, sets + 1);
+          if (id.includes('bulgarian') || id.includes('single_leg_rdl') || id.includes('cossack') || id.includes('step_up') || id.includes('farmer')) {
+            const m = (styleMap as any).unilateral || 1.15;
+            sets = Math.max(2, Math.min(6, Math.round(sets * m)));
+          }
+        }
         // весогонка + тапер: ISSN — дефицит и тапер умножаются (Helms), не min. Для делода — только wcm.
         const wcm = wcProtocol ? weightCutVolumeMultiplier(w, weeks, wcProtocol) : 1;
         const legacyWc = !wcProtocol && goal === 'weight_cut' ? 0.85 : 1;
@@ -425,6 +456,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
+        // repsCap для graded (как BB: 15 для knee squat etc)
+        const cap = repsCapForCB(id, input.injuries as any);
+        if (cap != null && reps[1] > cap) {
+          const low = Math.min(reps[0], Math.max(5, cap - 4));
+          reps = [low, cap] as any;
+        }
         // ACWR / velocity корректировка (VBT — через combat-vbt, вес тоже корректируем)
         const vLoss = input.velocityLossPct as number | undefined;
         if (input.acwr?.zone === 'dangerous') rir = Math.min(4, rir + 2);
@@ -596,7 +633,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     }
   }
 
-  const snap: any = { ...input, outsideLoad: effectiveOutsideLoad };
+  const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };
   const plan: CombatPlan = {
     id: `cb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     discipline,

@@ -61,5 +61,73 @@ export function vbtRecommendationCombat(lossPct: number): { action: string; rirA
   return { action: 'Оптимально', rirAdd: 0, volumeMult: 1 };
 }
 
+// --- Per-exercise history + EWMA (как в cardio-diary hrvEwma) ---
+export interface VbtHistoryEntry { liftId: string; velocity: number; date: string; weight?: number }
+
+export function loadVbtHistoryCB(): VbtHistoryEntry[] {
+  try {
+    for (const key of ['he_combat_vbt_log','he_vbt_log','he_vbt_history','he_training_vbt']) {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+      if (!raw) continue;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        const out = arr.map((x: any) => ({
+          liftId: String(x.liftId || x.id || x.exerciseId || 'squat'),
+          velocity: Number(x.velocity ?? x.vel ?? x.v),
+          date: String(x.date || new Date().toISOString().slice(0,10)),
+          weight: x.weight != null ? Number(x.weight) : undefined,
+        })).filter((e: any) => Number.isFinite(e.velocity) && e.velocity > 0.05 && e.velocity < 4);
+        if (out.length) return out;
+      }
+    }
+    // fallback: workout_log may contain velocity
+    try {
+      const wl = typeof localStorage !== 'undefined' ? localStorage.getItem('he_workout_log') : null;
+      if (wl) {
+        const arr = JSON.parse(wl);
+        const out: VbtHistoryEntry[] = [];
+        for (const sess of arr || []) for (const ex of (sess.exercises || [])) for (const s of (ex.sets || [])) if (s.velocity) out.push({ liftId: ex.id || ex.name, velocity: Number(s.velocity), date: sess.date, weight: s.weight });
+        if (out.length) return out.slice(-48);
+      }
+    } catch {}
+  } catch {}
+  return [];
+}
+
+export function saveVbtHistoryCB(entries: VbtHistoryEntry[]): void {
+  try { localStorage.setItem('he_combat_vbt_log', JSON.stringify(entries.slice(-48))); } catch {}
+}
+
+export function vbtEwma(velocities: number[], alpha = 0.3): number | null {
+  if (!Array.isArray(velocities) || velocities.length===0) return null;
+  const vals = velocities.filter(v=> typeof v==='number' && v>0.05 && v<4);
+  if (!vals.length) return null;
+  let ewma = vals[0];
+  for (let i=1;i<vals.length;i++) ewma = alpha*vals[i] + (1-alpha)*ewma;
+  return Math.round(ewma*100)/100;
+}
+
+export function vbtHistoryForLift(history: VbtHistoryEntry[], liftId: string): number[] {
+  const low = (liftId||'').toLowerCase();
+  return history.filter(e => e.liftId.toLowerCase()===low || e.liftId.toLowerCase().includes(low) || low.includes(e.liftId.toLowerCase())).map(e=> e.velocity);
+}
+
+export function diagnoseVelocityLossEwma(bestVel: number, history: number[]|VbtHistoryEntry[], liftId?: string, threshold: 20|10|25|40 = 20, weight?: number): { lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; ewma: number | null; recommendation: string } {
+  const vels = Array.isArray(history) && history.length && typeof (history as any)[0]==='object' && 'velocity' in (history as any)[0] ? (history as VbtHistoryEntry[]).filter(e=> !liftId || e.liftId===liftId).map(e=> e.velocity) : history as number[];
+  const ewma = vbtEwma(vels);
+  const last = vels.length ? vels[vels.length-1] : bestVel * 0.85;
+  return { ...diagnoseVelocityLossCombat(bestVel, last, threshold, weight, liftId), ewma };
+}
+
+export function vbtTrendForLift(history: VbtHistoryEntry[], liftId: string): { recentEwma: number | null; prevEwma: number | null; changePct: number | null } {
+  const vels = vbtHistoryForLift(history, liftId);
+  if (vels.length < 6) return { recentEwma: null, prevEwma: null, changePct: null };
+  const recent = vbtEwma(vels.slice(-7));
+  const prev = vbtEwma(vels.slice(-14, -7));
+  if (recent == null || prev == null || prev===0) return { recentEwma: recent, prevEwma: prev, changePct: null };
+  const changePct = Math.round((recent - prev)/prev*100*10)/10;
+  return { recentEwma: recent, prevEwma: prev, changePct };
+}
+
 export { thresholdForIntent };
 export type { VBTIntent, VelocityLossResult };

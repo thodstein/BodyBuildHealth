@@ -83,9 +83,16 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
     // пересчёт totalSets/tonnage после trim
     wk.totalSets = wk.sessions.reduce((s, sess)=> s + sess.exercises.reduce((a,e)=>a+e.sets,0),0);
     (wk as any).totalTonnage = wk.sessions.reduce((s, sess)=> s + sess.exercises.reduce((a,e)=> a + e.workSets.reduce((x,ws)=> x + ws.weight*ws.reps,0),0),0);
-    if (lmN && neckSets < lmN.mev) warnings.push(`Нед ${wk.week}: шея ${neckSets} < MEV ${lmN.mev} — недобор.`);
+    if (lmN && neckSets < lmN.mev) warnings.push(`Нед ${wk.week}: шея ${neckSets} < MEV ${lmN.mev} — недобор (Collins: +0.45кг шеи = −5% сотряс).`);
     if (lmG && gripSets < (lmG.mev||4)) warnings.push(`Нед ${wk.week}: хват ${gripSets} < MEV ${lmG.mev} — добавьте хват.`);
-    if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — риск.`);
+    if (neckSets > 14) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов >14 — риск перегруза, оставьте изометрию.`);
+    // шея 4 плоскости: флексия/экстензия/латераль/ротация — проверка мультипланарности (BJSM Delphi)
+    const neckIds = wk.sessions.flatMap(s=> s.exercises.filter(e=> e.id.includes('neck')).map(e=> e.id));
+    const hasFlex = neckIds.some(id=> ['neck_flexion','neck_isometric_front','neck_eccentric_flexion'].includes(id));
+    const hasExt = neckIds.some(id=> ['neck_harness_ext','neck_bridge_wrestler','neck_isometric_back'].includes(id));
+    const hasLat = neckIds.some(id=> ['neck_lateral_flex','neck_isometric_side'].includes(id));
+    const hasRot = neckIds.some(id=> ['neck_rotation','neck_harness_rotation','neck_band_rotation_isometric'].includes(id));
+    if (!hasFlex || !hasExt || !hasLat || !hasRot) warnings.push(`Нед ${wk.week}: шея не мультипланарна (flex:${hasFlex?'✓':'✗'} ext:${hasExt?'✓':'✗'} lat:${hasLat?'✓':'✗'} rot:${hasRot?'✓':'✗'}) — добавьте изометрию 4 плоскости (Iron Neck).`);
     if (coreAnti < 4) warnings.push(`Нед ${wk.week}: core anti <4 сетов (${coreAnti}) — добавьте deadbug/side plank/pallof.`);
     // prehab: auto-добавка если <3 сетов на upper — вставляем face_pull 3×15 в первую upper/full сессию (изолировано, не ломает бюджет)
     const hasUpper = wk.sessions.some(s=> s.sessionTag.includes('upper') || s.sessionTag.includes('full_power'));

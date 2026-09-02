@@ -61,8 +61,11 @@ describe('combat PRO phase6', () => {
     expect(s1.some(s=> s.modality==='aerobic')).toBe(true);
     const sTaper = conditioningSessionsForWeek(10,'realization','power',2);
     expect(sTaper.every(s=> s.modality==='aerobic')).toBe(true);
-    const none = conditioningSessionsForWeek(1,'accumulation','power',5);
-    expect(none.length).toBe(0);
+    // P0-2: при 5× outside сохраняем 1× Zone2 (Boxing Science 77% aerobic) вместо 0
+    const maint = conditioningSessionsForWeek(1,'accumulation','power',5);
+    expect(maint.length).toBe(1);
+    expect(maint[0].modality).toBe('aerobic');
+    expect(maint[0].durationMin).toBe(30);
   });
 
   it('ACWR зоны', () => {

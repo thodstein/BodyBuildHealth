@@ -25,6 +25,9 @@ export function useCombatWizard() {
   const [sodiumMode, setSodiumMode] = useState<'stable'|'moderate_cut'>('stable');
   const [carbMode, setCarbMode] = useState<'stable'|'deplete_reload'>('stable');
   const [heatSessions, setHeatSessions] = useState(false);
+  const [weighInType, setWeighInType] = useState<'day_before_24h'|'same_day_2h'>('day_before_24h');
+  const [confirmedManipulation, setConfirmedManipulation] = useState(false);
+  const [orsSodium, setOrsSodium] = useState(65);
   const [methodology, setMethodology] = useState<CombatInput['methodology']>('compound_first');
   const [dupMode, setDupMode] = useState<CombatInput['dupMode']>('off');
   const [intensityTech, setIntensityTech] = useState<CombatInput['intensityTech']>('none');
@@ -101,7 +104,7 @@ export function useCombatWizard() {
     // step
     step, setStep,
     discipline, setDiscipline, goal, setGoal, level, setLevel, weeks, setWeeks, days, setDays,
-    weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions,
+    weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions, weighInType, setWeighInType, confirmedManipulation, setConfirmedManipulation, orsSodium, setOrsSodium,
     methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
     periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
     outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,

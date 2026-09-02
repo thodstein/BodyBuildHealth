@@ -30,18 +30,30 @@ function migrateCombatPlan(raw: any): CombatPlan {
   if (Array.isArray(raw.weeksData)) {
     for(const w of raw.weeksData) {
       if (w.phase === 'gpp' && (!model || model === 'atr_10' || model === 'atr')) w.phase = 'accumulation';
-      // power оставляем как есть — для ATR он маппится в transmutation только при >=9нед, для linear — power валиден
     }
   }
   // ensure conditioning field exists (null for old)
   if (!('conditioning' in raw)) raw.conditioning = null;
-  // ensure inputSnapshot new fields defaults
+  // ensure inputSnapshot new fields defaults (v3)
   if (raw.inputSnapshot) {
     if (!('periodizationModel' in raw.inputSnapshot)) raw.inputSnapshot.periodizationModel = 'atr_10';
     if (!('conditioningMode' in raw.inputSnapshot)) raw.inputSnapshot.conditioningMode = 'auto';
+    if (!('fightStyle' in raw.inputSnapshot)) raw.inputSnapshot.fightStyle = 'hybrid';
+    if (!('weighInType' in raw.inputSnapshot) && raw.inputSnapshot.weightCutProtocol) {
+      raw.inputSnapshot.weightCutProtocol.weighInType = raw.inputSnapshot.weightCutProtocol.weighInType || 'day_before_24h';
+    }
+    if (raw.inputSnapshot.weightCutProtocol) {
+      if (!('fiberGPerDay' in raw.inputSnapshot.weightCutProtocol)) raw.inputSnapshot.weightCutProtocol.fiberGPerDay = 10;
+      if (!('orsSodiumMmolPerDl' in raw.inputSnapshot.weightCutProtocol)) raw.inputSnapshot.weightCutProtocol.orsSodiumMmolPerDl = 65;
+      if (!('confirmedManipulation' in raw.inputSnapshot.weightCutProtocol)) raw.inputSnapshot.weightCutProtocol.confirmedManipulation = false;
+    }
+    if (!('sparringLoad' in raw.inputSnapshot)) raw.inputSnapshot.sparringLoad = null;
   }
   // tag version
-  if (!raw.version) raw.version = 2;
+  const v = Number(raw.version) || 1;
+  if (v < 2) raw.version = 2;
+  if (v < 3) raw.version = 3;
+  if (!raw.version) raw.version = 3;
   return raw as CombatPlan;
 }
 

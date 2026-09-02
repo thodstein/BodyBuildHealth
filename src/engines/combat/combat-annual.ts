@@ -26,29 +26,80 @@ export function buildAnnualFromCB(plans: CombatPlan[]): AnnualCB {
 }
 
 // ATR 10нед: 5 Accum /3 Trans /2 Real (+ transition 2-4нед после главного)
-export function buildAnnualATR(discipline: string, totalWeeks = 52, startDate?: string | null): AnnualCB {
+// Issurin residual: strength 30-40д, aerobic 25-35д, anaerobic 18-24д, speed 2-7д — для multi-cycle кумуляция
+export function buildAnnualATR(discipline: string, totalWeeks = 52, startDate?: string | null, opts?: { cycles?: number; disciplinePerCycle?: string[] }): AnnualCB {
   const tw = Math.max(8, Math.min(52, Math.round(totalWeeks)));
-  // пропорции ATR 50/30/20 — используем largest remainder как в periodization
-  const accum = Math.round(tw * 0.5);
-  const trans = Math.round(tw * 0.3);
-  const real = Math.max(1, tw - accum - trans);
-  const blocks: AnnualCBBlock[] = [
-    { id:`atr_acc_${discipline}_${tw}`, startWeek:1, weeks:accum, discipline, phase:'accumulation', status:'planned' },
-    { id:`atr_trans_${discipline}_${tw}`, startWeek:accum+1, weeks:trans, discipline, phase:'transmutation', status:'planned' },
-    { id:`atr_real_${discipline}_${tw}`, startWeek:accum+trans+1, weeks:real, discipline, phase:'realization', status:'planned' },
-  ];
-  // если 52 нед — добавляем transition 2 нед в конце для восстановления (как в Performance MMA)
-  if (tw >= 40) {
-    const transWeeks = 2;
-    // урезаем realization на 2 для transition
-    blocks[2].weeks = Math.max(1, blocks[2].weeks - transWeeks);
-    blocks.push({ id:`atr_transit_${discipline}_${tw}`, startWeek: tw - transWeeks + 1, weeks: transWeeks, discipline, phase:'transition', status:'planned' });
-    // пересчёт startWeek
-    let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
-  } else {
-    let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
+  const cycles = Math.max(1, Math.min(4, Math.round(opts?.cycles ?? 1)));
+  if (cycles === 1) {
+    // пропорции ATR 50/30/20 — используем largest remainder как в periodization
+    const accum = Math.round(tw * 0.5);
+    const trans = Math.round(tw * 0.3);
+    const real = Math.max(1, tw - accum - trans);
+    const blocks: AnnualCBBlock[] = [
+      { id:`atr_acc_${discipline}_${tw}`, startWeek:1, weeks:accum, discipline, phase:'accumulation', status:'planned' },
+      { id:`atr_trans_${discipline}_${tw}`, startWeek:accum+1, weeks:trans, discipline, phase:'transmutation', status:'planned' },
+      { id:`atr_real_${discipline}_${tw}`, startWeek:accum+trans+1, weeks:real, discipline, phase:'realization', status:'planned' },
+    ];
+    if (tw >= 40) {
+      const transWeeks = 2;
+      blocks[2].weeks = Math.max(1, blocks[2].weeks - transWeeks);
+      blocks.push({ id:`atr_transit_${discipline}_${tw}`, startWeek: tw - transWeeks + 1, weeks: transWeeks, discipline, phase:'transition', status:'planned' });
+      let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
+    } else {
+      let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
+    }
+    return { id:`ann_atr_${discipline}_${tw}`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
   }
-  return { id:`ann_atr_${discipline}_${tw}`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
+  // Multi-cycle: делим год на cycles макро-циклов 8-13нед (Issurin 8-13), каждый 5/3/2
+  const basePerCycle = Math.floor(tw / cycles);
+  const remainder = tw - basePerCycle * cycles;
+  const blocks: AnnualCBBlock[] = [];
+  let curWeek = 1;
+  for (let c = 0; c < cycles; c++) {
+    const cWeeks = basePerCycle + (c < remainder ? 1 : 0);
+    const cDisc = opts?.disciplinePerCycle?.[c] || discipline;
+    // внутри цикла 50/30/20 с transition 2нед между циклами (кроме последнего)
+    const isLast = c === cycles - 1;
+    const effWeeks = isLast && tw >= 40 ? cWeeks : (cWeeks > 10 ? cWeeks - 1 : cWeeks); // резерв 1нед transition между циклами
+    const accum = Math.round(effWeeks * 0.5);
+    const trans = Math.round(effWeeks * 0.3);
+    const real = Math.max(1, effWeeks - accum - trans);
+    blocks.push({ id:`atr_c${c+1}_acc_${cDisc}`, startWeek: curWeek, weeks: accum, discipline: cDisc, phase:'accumulation', status:'planned' });
+    curWeek += accum;
+    blocks.push({ id:`atr_c${c+1}_trans_${cDisc}`, startWeek: curWeek, weeks: trans, discipline: cDisc, phase:'transmutation', status:'planned' });
+    curWeek += trans;
+    blocks.push({ id:`atr_c${c+1}_real_${cDisc}`, startWeek: curWeek, weeks: real, discipline: cDisc, phase:'realization', status:'planned' });
+    curWeek += real;
+    if (!isLast) {
+      // transition 1-2нед: residual strength 30-40д покрывает, aerobic 25-35д — активный отдых
+      blocks.push({ id:`atr_c${c+1}_transit`, startWeek: curWeek, weeks: 1, discipline: cDisc, phase:'transition', status:'planned' });
+      curWeek += 1;
+    } else if (tw >= 40) {
+      blocks.push({ id:`atr_transit_final`, startWeek: curWeek, weeks: 2, discipline: cDisc, phase:'transition', status:'planned' });
+      curWeek += 2;
+    }
+  }
+  // нормализация startWeek после возможного переполнения из-за округлений
+  let w = 1; for (const b of blocks) { b.startWeek = w; w += b.weeks; }
+  const total = w - 1;
+  // если total != tw — коррекция последнего transition
+  if (total !== tw) {
+    const diff = tw - total;
+    const last = blocks[blocks.length - 1];
+    if (last.phase === 'transition') last.weeks = Math.max(1, last.weeks + diff);
+  }
+  w = 1; for (const b of blocks) { b.startWeek = w; w += b.weeks; }
+  return { id:`ann_atr_${discipline}_${tw}_${cycles}c`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
+}
+
+export function buildAnnualATRCycles(discipline: string, cycles: number, totalWeeks = 52, startDate?: string | null, disciplinePerCycle?: string[]): AnnualCB {
+  return buildAnnualATR(discipline, totalWeeks, startDate, { cycles, disciplinePerCycle });
+}
+
+export function annualResidualNote(cycle: number): string {
+  // Issurin residual table
+  const notes = ['Сила 30-40д · аэроб 25-35д · анаэроб 18-24д · скорость 2-7д — следующий цикл опирается на базу предыдущего'];
+  return notes[0];
 }
 
 export function annualCBPhaseForWeek(annual: AnnualCB | null, week: number): AnnualCBPhase | null {

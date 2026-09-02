@@ -42,7 +42,7 @@ export const CombatConstructor: React.FC = () => {
   const {
     step, setStep,
     discipline, setDiscipline, goal, setGoal, level, setLevel, weeks, setWeeks, days, setDays,
-    weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions,
+    weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions, weighInType, setWeighInType, confirmedManipulation, setConfirmedManipulation, orsSodium, setOrsSodium,
     methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
     periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
     outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,
@@ -140,7 +140,7 @@ export const CombatConstructor: React.FC = () => {
         extra.labMrvMultiplier = typeof p.labs?.mrvMultiplier === 'number' ? p.labs.mrvMultiplier : undefined;
       }
     } catch {}
-    const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions } as any) : null;
+    const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline } as any) : null;
     const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
     let effectiveLoss: number | null = velocityLoss > 0 ? velocityLoss : null;
     if (vbtBest > 0 && vbtLast > 0) {
@@ -576,15 +576,32 @@ export const CombatConstructor: React.FC = () => {
             </Field>
             {weightCut > 0 && (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <CombatPopupSelect label="Взвешивание" value={weighInType} onChange={v=> setWeighInType(v as any)} options={[{id:'day_before_24h',label:'За 24ч (MMA/бокс)',desc:'8-12г/кг рефид'},{id:'same_day_2h',label:'В день (борьба)',desc:'≤3кг, без острой'}]} />
                   <CombatPopupSelect label="Вода" value={waterMode} onChange={v=> setWaterMode(v as any)} options={[{id:'stable',label:'Стабильно 35мл/кг'},{id:'load_cut',label:'Load 8л → 2л',desc:'пиковая неделя'}]} />
                   <CombatPopupSelect label="Натрий" value={sodiumMode} onChange={v=> setSodiumMode(v as any)} options={[{id:'stable',label:'Стабильно 5г'},{id:'moderate_cut',label:'5 → 3 → 1.5г',desc:'плавный срез'}]} />
                   <CombatPopupSelect label="Углеводы" value={carbMode} onChange={v=> setCarbMode(v as any)} options={[{id:'stable',label:'Стабильно 4-5г/кг'},{id:'deplete_reload',label:'1г → 8г рефид',desc:'загрузка'}]} />
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label={`ORS Na ${orsSodium} mmol/дл`} hint="ISSN 50-90">
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={90} step={5} value={orsSodium} onChange={e => setOrsSodium(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{orsSodium}</Highlight></div>
+                  </Field>
+                  <Field label="Клетчатка fight week" hint={'ISSN <10г ×4д =1-2% BM'}>
+                    <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — low fiber 4д</div>
+                  </Field>
+                </div>
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#fff', fontWeight: 700, background: 'rgba(255,255,255,0.04)', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={heatSessions} onChange={e => setHeatSessions(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#a855f7' }} /> Сауна 15-20′ ×3/нед — heat acclimation
+                  <input type="checkbox" checked={heatSessions} onChange={e => setHeatSessions(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#a855f7' }} /> Сауна 15-20′ ×3/нед — heat acclimation (≤4% BM/24ч)
                 </label>
-                <InfoBanner tone="warn">Регидратация после взвешивания: 125-150% от сгонки ({(weightCut * 1.25).toFixed(1)}–{(weightCut * 1.5).toFixed(1)} л) + Na 1г/л + угли 8г/кг за 12-24ч</InfoBanner>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: confirmedManipulation ? '#fff' : 'rgba(255,255,255,0.72)', fontWeight: 700, background: confirmedManipulation ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', padding: '9px 11px', borderRadius: 10, border: `1px solid ${confirmedManipulation ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={confirmedManipulation} onChange={e => setConfirmedManipulation(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#ef4444' }} /> Подтверждаю экстремальные манипуляции (load_cut/deplete) — требуется при &gt;5кг
+                </label>
+                {weighInType==='same_day_2h' ? (
+                  <InfoBanner tone="warn">Same-day 1-2ч: окно восстановления короткое — сгонка ≤3кг, упор на жир/lean mass, не на воду. После: 0.5-1л ORS + 30-40г углей, без тяжёлой еды.</InfoBanner>
+                ) : (
+                  <InfoBanner tone="warn">Регидратация 24-36ч: ORS {orsSodium} mmol/дл 1-1.5л/ч первые 1-2ч → ≤60г/ч углей → 8-12г/кг за 24ч, волокно &lt;10г, жиры исключить 6ч. Цель +10% BM, моча светло-жёлтая. ({(weightCut * 1.25).toFixed(1)}–{(weightCut * 1.5).toFixed(1)} л)</InfoBanner>
+                )}
+                {sex==='female' && weightCut > 2 && <InfoBanner tone="info">Женщины: консервативно ≤5% BM, учёт цикла — лютеиновая задержка +0.5-1кг. RED-S floor 1400ккал.</InfoBanner>}
               </>
             )}
           </div>
@@ -636,7 +653,7 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'outside' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SectionCard icon="🥋" title="Вне зала — спарринг декомпозиция" subtitle="Hard spar RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× кондиция зала = 0" accent>
+          <SectionCard icon="🥋" title="Вне зала — спарринг декомпозиция" subtitle="Hard RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× зал сохраняет 1× Zone2 30′ (77% aerobic — Boxing Science)" accent>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#fff', fontWeight: 800, background: outsideEnabled ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 12, border: `1px solid ${outsideEnabled ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
               <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#a855f7' }} />
               Учитывать нагрузку вне зала (ринг / татами)

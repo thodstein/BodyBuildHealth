@@ -35,6 +35,7 @@ describe('combat final polish PRO', () => {
     expect(meal).not.toBeNull();
     expect(meal!.kcal).toBeGreaterThan(1400);
     expect(meal!.protein).toBeGreaterThan(150);
-    expect(meal!.fiberMaxG).toBe(15);
+    // ISSN <10г fiber fight week (vs old 15) — P0-1
+    expect(meal!.fiberMaxG).toBe(10);
   });
 });

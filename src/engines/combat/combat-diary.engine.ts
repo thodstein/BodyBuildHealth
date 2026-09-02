@@ -47,8 +47,20 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
       const maxE1 = Math.max(...(e.sets as any[]).map((s: any) => {
         const w = Number(s.weight) || 0;
         const r = Number(s.reps) || 0;
-        // для bodyweight (pullup) вес 0 → считаем по reps как тоннаж? пропускаем
-        if (w === 0) return r; // условный объём
+        const hold = Number(s.holdSec ?? s.timeSec ?? s.durationSec ?? s.seconds ?? 0);
+        const effHold = hold > 0 ? hold : (typeof s.reps === 'string' && String(s.reps).includes('с') ? (Number(String(s.reps).replace(/\D/g,'')) || r) : r);
+        // грип/шея изометрия: вес может быть 0 — считаем по удержанию/времени
+        if (w === 0) {
+          if (g === 'grip' || g === 'neck') {
+            // pinch/farmer: вес = r/время ×10 как условный тоннаж; если есть hold, то hold*5
+            if (effHold > 60) return Math.round(effHold * 0.5); // секунды → очки
+            if (effHold > 0) return effHold * 10;
+            return r * 10;
+          }
+          return r; // pullup bodyweight условный
+        }
+        // для динамической шеи/грипа с весом — Epley с поправкой на время удержания
+        if ((g === 'grip' || g === 'neck') && effHold > 0 && hold > 0) return epley(w, Math.min(12, Math.round(hold/5)));
         return epley(w, r);
       }));
       if (!maxE1 || maxE1 <= 0) continue;
@@ -66,6 +78,16 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
     }
   }
   return out.length ? out : null;
+}
+
+export function gripIsometricVolume(ex: any): number {
+  // для carry/pinch: объём = вес × время (или reps×10)
+  const w = Number(ex.weight) || 0;
+  const r = Number(ex.reps) || 0;
+  const hold = Number(ex.holdSec ?? 0);
+  if (w > 0 && hold > 0) return Math.round(w * hold);
+  if (w > 0) return epley(w, r);
+  return r * 10;
 }
 
 export function loadDiaryLogsCB(): any[] {
