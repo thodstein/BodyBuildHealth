@@ -22,6 +22,7 @@ import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutriti
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
 import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-attempts.engine';
+import { buildWLMeetPlan } from './strength-sport-attempts.engine';
 import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, taperForWeekFromEnd, buildTaperRationale } from './strength-sport-taper.engine';
 import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
 import { VBT_SS_THRESHOLDS } from './strength-sport-vbt.engine';
@@ -983,6 +984,12 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
 
   const snap: any = { ...input };
   if (wcProto) snap.weightCutProtocolSS = wcProto;
+  // S-1: WL attempts 6 — если есть ПМ рывка и толчка
+  let wlMeetPlan: any = null;
+  if (mode === 'weightlifting' && (input.workMax as any)?.snatch && (input.workMax as any)?.cleanJerk) {
+    try { wlMeetPlan = buildWLMeetPlan((input.workMax as any).snatch, (input.workMax as any).cleanJerk, 'balanced', { bodyweight: input.bodyweight as any, sex: input.sex as any, age: input.age as any }); } catch {}
+    if (wlMeetPlan) snap.wlMeetPlan = wlMeetPlan;
+  }
   const plan: StrengthSportPlan = {
     id: `ss_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     mode,
@@ -996,6 +1003,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     validation: { ok: errors.length === 0, warnings, errors },
     rationale,
     inputSnapshot: snap,
+    wlMeetPlan: wlMeetPlan as any,
   } as any;
   if (wcProto) (plan as any).weightCutProtocol = wcProto;
   return plan;
