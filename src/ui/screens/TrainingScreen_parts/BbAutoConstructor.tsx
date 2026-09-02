@@ -643,6 +643,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [platePreset, setPlatePreset] = useState<string>('standard');
   // P1: женский цикл — день цикла для лютеиновой модуляции объёма.
   const [cycleDay, setCycleDay] = useState<number | undefined>(undefined);
+  // P2 D: дневные данные носимого (he_wearable_daily) — если есть, учитываются в recovery.
+  const wearableData = (() => { try { const raw = localStorage.getItem('he_wearable_daily'); return raw ? JSON.parse(raw) : null; } catch { return null; } })();
   // P1: VBT — ввод скорости лучшего/последнего повтора для рекомендации нагрузки.
   const [vbtInput, setVbtInput] = useState<{ lift: string; best: string; last: string }>({ lift: 'bench', best: '', last: '' });
   // PRO: mobility restrictions — biomechanics-based exercise filtering
@@ -1885,6 +1887,7 @@ export const BbAutoConstructor: React.FC = () => {
           rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
           availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
           cycleDay,
+          wearable: wearableData,
         }, pedAdapt);
     }
 

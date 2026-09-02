@@ -20,6 +20,7 @@ import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from 
 import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { cycleVolumeFactor } from './bb-cycle.engine';
+import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily } from './bb-wearable.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -229,6 +230,8 @@ export interface BBBuilderInput {
    *  модуляция объёма (×0.95) вне prep. */
   cycleDay?: number;
   cycleLength?: number;
+  /** P2 D: дневные данные носимого (he_wearable_daily). Перекрывают ручной HRV/сон в recovery. */
+  wearable?: WearableDaily | null;
 }
 
 /**
@@ -2811,13 +2814,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const mrvByMuscle: Record<string, number> = {};
   const volumeTargets: Record<string, BBVolumeTarget> = {};
   // Recovery/nutrition — единый источник из bb-volume.engine (fix F1: убираем дубли)
+  const wearableMerged = mergeWearableIntoRecovery({ hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel }, input.wearable ?? null);
   const recoveryMult = computeBBRecoveryMultiplier({
     bodyFat: input.bodyFat,
     leanMass: input.leanMass,
-    hrvMs: input.hrvMs,
-    sleepHours: input.sleepHours,
-    stressLevel: input.stressLevel,
-  }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex);
+    hrvMs: wearableMerged.hrvMs,
+    sleepHours: wearableMerged.sleepHours,
+    stressLevel: wearableMerged.stressLevel,
+  }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex) * wearableRecoveryFactor(input.wearable ?? null);
   const nutritionMult = computeBBNutritionMultiplier({
     calorieSurplus: input.calorieSurplus,
     proteinPerKg: input.proteinPerKg,
