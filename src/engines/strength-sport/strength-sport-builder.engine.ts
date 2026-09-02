@@ -24,31 +24,13 @@ import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recove
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
 import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-attempts.engine';
 import { buildWLMeetPlan } from './strength-sport-attempts.engine';
-import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, taperForWeekFromEnd, buildTaperRationale } from './strength-sport-taper.engine';
+import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER, taperForWLWeekFromEnd, taperForWeekFromEnd, buildTaperRationale, isAutoDeloadWeek, autoDeloadWeeks } from './strength-sport-taper.engine';
 import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
-import { VBT_SS_THRESHOLDS } from './strength-sport-vbt.engine';
+import { VBT_SS_THRESHOLDS, velocityWeightAdjustFactor, vbtEwma, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
+import { POOL_BY_TAG, OLY_IDS, STRONG_IDS, isOly, isStrong, STRONG_FALLBACK, filterPool, gentleFactor } from './strength-sport-pool.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
-/** Пул упражнений по тегу — кандидаты (id каталога) + замены — PRO: 35 ивентов */
-const POOL_BY_TAG: Record<string, string[]> = {
-  snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'high_hang_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
-  clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'pause_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
-  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'tempo_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'db_press', 'ohp', 'pin_press'],
-  technique_day: ['hang_snatch', 'hang_clean', 'high_hang_snatch', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean', 'pause_jerk'],
-  pull_day: ['snatch_pull', 'clean_pull', 'pause_pull', 'deficit_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
-  accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat', 'tempo_squat'],
-  overhead_day: ['log_press', 'axle_press', 'circus_db_press', 'circus_db_medley', 'viking_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'pause_jerk', 'jerk_recovery', 'behind_neck_jerk', 'pin_press'],
-  deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'car_deadlift_side', 'deadlift_max', 'rdl', 'deficit_pull', 'farmers_walk_heavy', 'yoke_walk', 'frame_carry', 'conan_wheel'],
-  squat_day: ['squat', 'front_squat', 'pause_squat', 'tempo_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2', 'duck_walk'],
-  event_day: ['farmers_walk_heavy', 'yoke_walk', 'frame_carry', 'husafell_carry', 'conan_wheel', 'shield_carry', 'duck_walk', 'atlas_stone_load', 'atlas_stone_over_bar', 'natural_stone_shoulder', 'sandbag_load', 'sandbag_over_bar', 'sandbag_shoulder', 'keg_toss', 'keg_over_bar', 'zercher_carry', 'tire_flip', 'sled_push_sprint', 'truck_pull', 'arm_over_arm', 'car_deadlift_18', 'car_deadlift_side', 'axle_press', 'viking_press', 'circus_db_medley'],
-  oly_day: ['snatch', 'clean_and_jerk', 'high_hang_snatch', 'snatch_pull', 'clean_pull', 'front_squat', 'pause_snatch', 'pause_clean', 'pause_jerk'],
-};
-
-const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','snatch_pull','clean_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2','jerk_dip','jerk_recovery','behind_neck_jerk','pause_squat','tempo_squat']);
-const STRONG_IDS = new Set(['log_press','axle_press','viking_press','yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry','duck_walk','atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','sandbag_shoulder','keg_toss','keg_over_bar','keg_load','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','circus_db_press','circus_db_medley','tire_flip','stone_lift','zercher_carry','sled_push_sprint','sandbag_carry','truck_pull','arm_over_arm']);
-
-function isOly(id: string): boolean { return OLY_IDS.has(id); }
-function isStrong(id: string): boolean { return STRONG_IDS.has(id); }
+// P0-6 pool → strength-sport-pool.engine.ts (вынесено, builder делегирует)
 function orderByMethod(exs: StrengthSportExercise[], method?: string): StrengthSportExercise[] {
   if (method === 'pre_exhaust') return [...exs].sort((a,b) => (a.role==='accessory'?-1:1) - (b.role==='accessory'?-1:1));
   if (method === 'post_exhaust') return [...exs].sort((a,b) => (a.role==='primary'?-1:1) - (b.role==='primary'?-1:1));
@@ -58,75 +40,7 @@ function orderByMethod(exs: StrengthSportExercise[], method?: string): StrengthS
 function clampWeeks(w: number): number { return Math.max(2, Math.min(16, Math.round(Number(w) || 8))); }
 function clampDays(d: number): number { return Math.max(2, Math.min(6, Math.round(Number(d) || 3))); }
 
-const STRONG_FALLBACK: Record<string,string> = {
-  log_press:'push_press', axle_press:'push_press', viking_press:'push_press', yoke_walk:'farmers_walk_heavy', frame_carry:'farmers_walk_heavy', husafell_carry:'sandbag_carry', conan_wheel:'sandbag_carry', shield_carry:'sandbag_carry', duck_walk:'farmers_walk_heavy', truck_pull:'sled_drag', arm_over_arm:'sled_drag', farmers_walk_heavy:'deadlift', atlas_stone_load:'sandbag_load', atlas_stone_over_bar:'sandbag_load', natural_stone_shoulder:'sandbag_shoulder', sandbag_load:'deadlift', sandbag_over_bar:'sandbag_load', sandbag_shoulder:'rdl', keg_toss:'sandbag_shoulder', keg_over_bar:'sandbag_shoulder', keg_load:'sandbag_shoulder', axle_deadlift:'deadlift', car_deadlift_18:'deadlift', car_deadlift_side:'deadlift', deadlift_max:'deadlift', circus_db_press:'db_press', circus_db_medley:'db_press', tire_flip:'deadlift', zercher_carry:'farmers_walk_heavy', sandbag_carry:'farmers_walk_heavy', sled_drag:'farmers_walk_heavy', sled_push:'farmers_walk_heavy'
-};
-function filterPool(ids: string[], input: StrengthSportInput): string[] {
-  let out = [...ids];
-  if (input.excludedExercises?.length) {
-    const excl = new Set(input.excludedExercises.map(s => s.toLowerCase()));
-    out = out.filter(id => !excl.has(id.toLowerCase()));
-  }
-  const eq = (input.equipment || []).map(s => String(s).toLowerCase());
-  const hasOther = eq.includes('other') || eq.includes('specialty') || eq.length === 0;
-  const beforeTier = [...out];
-  out = filterByTier(out, input.level, input.allowExotic, hasOther);
-  if (!hasOther) {
-    // BFS по цепочке STRONG_FALLBACK — ищем первый не-стронг, но для carries сохраняем carry (farmers) как базовый без снаряда
-    const strongSet = new Set(Object.keys(STRONG_FALLBACK));
-    const isCarryOrig = (id:string) => ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sandbag_carry','sled_push_sprint','conan_wheel','shield_carry','duck_walk','truck_pull','arm_over_arm','sled_drag','sled_push'].includes(id);
-    const resolveFallback = (id: string, visited = new Set<string>()): string | null => {
-      // для carries без спец-снаряда — даём базовый фермер как замену, а не deadlift
-      if (isCarryOrig(id)) return 'farmers_walk_heavy';
-      let cur = STRONG_FALLBACK[id];
-      while (cur && !visited.has(cur)) {
-        visited.add(cur);
-        if (!strongSet.has(cur)) return cur;
-        if (isCarryOrig(cur)) return 'farmers_walk_heavy';
-        const nxt = STRONG_FALLBACK[cur];
-        if (nxt && !visited.has(nxt)) cur = nxt; else return cur;
-      }
-      return cur || null;
-    };
-    // гарантируем хотя бы один carry без снаряда (farmers с гантелями/штанга) — базовый без exotic
-    const hadCarryBefore = beforeTier.some(isCarryOrig);
-    for (const orig of beforeTier) if (!out.includes(orig)) {
-      const fb = resolveFallback(orig);
-      if (fb && !out.includes(fb)) out.push(fb);
-    }
-    if (hadCarryBefore && !out.some(isCarryOrig)) {
-      if (!out.includes('farmers_walk_heavy')) out.push('farmers_walk_heavy');
-    }
-    if (out.length===0) out = ['back_squat','deadlift','ohp'].slice(0,3);
-  }
-  const beforeInjury = [...out];
-  out = filterByInjury(out, input.injuries as any);
-  if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
-  // mobility
-  const mob = (input as any).mobilityRestrictions as string[] | undefined;
-  out = filterByMobility(out, mob);
-  if (out.length===0 && mob && mob.length>0) out = beforeInjury.slice(0,2);
-  // P0-7 axial — щадящий как в BB 1.4
-  if ((input as any).avoidAxialLoad) {
-    const beforeAxial = [...out];
-    out = out.filter(id => !isAxialLoadExerciseSS(id));
-    if (out.length === 0 && beforeAxial.length) out = beforeAxial.slice(0,2);
-  }
-  return out;
-}
-function gentleFactor(id: string, injuries: any[]|undefined): number {
-  if (!injuries||injuries.length===0) return 1;
-  const txt = JSON.stringify(injuries).toLowerCase();
-  const knee = txt.includes('knee')||txt.includes('колен');
-  const back = txt.includes('back')||txt.includes('спин')||txt.includes('поясн');
-  const shoulder = txt.includes('shoulder')||txt.includes('плеч');
-  const wrist = txt.includes('wrist')||txt.includes('запяст');
-  if (knee && ['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance','car_deadlift_18','car_deadlift_side','conan_wheel','shield_carry','duck_walk','truck_pull'].includes(id)) return 0.6;
-  if (back && ['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','yoke_walk','frame_carry','husafell_carry','conan_wheel','shield_carry','truck_pull','arm_over_arm','atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','sandbag_shoulder','keg_toss','keg_over_bar','snatch_pull','clean_pull'].includes(id)) return 0.6;
-  if (shoulder && ['snatch','log_press','axle_press','viking_press','push_jerk','split_jerk','overhead_squat_v2','ohp','push_press','circus_db_press','circus_db_medley','keg_toss','conan_wheel'].includes(id)) return 0.65;
-  if (wrist && ['clean_and_jerk','front_squat_clean_grip','hang_clean','truck_pull','arm_over_arm'].includes(id)) return 0.7;
-  return 1;
-}
+// P0-6 pool delegated — см. strength-sport-pool.engine.ts (filterPool/gentleFactor/STRONG_FALLBACK)
 
 // P0-2: единый источник — делегируем в strength-sport-loading.ts (Prilepin зоны)
 function repsFor(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
@@ -317,6 +231,24 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     finalRir = Math.min(4, finalRir + 1);
     // щадящий: +2 повтора, меньше отказ
     finalReps = [reps[0]+1, reps[1]+2] as [number, number];
+  }
+  // P0-2 closed-loop: VBT EWMA weight adjust (k×0.6 эквивалент)
+  // histLoss уже посчитан из velocityHistory 3 точек; также пробуем EWMA
+  {
+    let ewmaLoss: number | null = null;
+    try {
+      const vHist2 = (input as any).velocityHistory as Record<string, number[]> | undefined;
+      const hArr = vHist2 ? (vHist2[id] || vHist2[String(id).toLowerCase()]) : null;
+      if (Array.isArray(hArr) && hArr.length >= 2) {
+        const diag = diagnoseVelocityLossEwma(hArr, histThreshLow as any);
+        if (diag && diag.lossPct > 0) ewmaLoss = diag.lossPct;
+      }
+    } catch {}
+    const effLoss = Math.max(histLoss || 0, ewmaLoss || 0, typeof vLoss === 'number' ? vLoss : 0);
+    const wFactor = velocityWeightAdjustFactor(effLoss, id);
+    if (wFactor < 1) {
+      finalWeight = Math.round(finalWeight * wFactor / 2.5) * 2.5;
+    }
   }
   let tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
   if (preConjugate === 'dynamic') tempo = 'X-0-X-0';
@@ -624,15 +556,21 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     rationale.push(weightCutRehydrationNotesSS(wcProto.targetLossKg)[0]);
   }
   if (effectiveDaysPerWeek !== daysPerWeek) rationale.push(`Частота скорректирована: внезальная высокая → зал ${daysPerWeek}× → ${effectiveDaysPerWeek}× (frequencyPenalty)`);
-  if (mode === 'strongman') {
+  if (mode === 'strongman' || mode === 'weightlifting') {
     rationale.push(...buildTaperRationale(weeks, input.competitionDate));
     const cond0 = buildConditioningRationale(1, weeks, mode);
     if (cond0.length) rationale.push(`Кондиция: ${cond0.join(' | ')}`);
   }
+  const autoDeloadWeeksArr = autoDeloadWeeks(weeks);
+  if (autoDeloadWeeksArr.length) rationale.push(`Авто-разгрузка: нед ${autoDeloadWeeksArr.join(', ')} (deload 60% vol, как StrongmanPlan)`);
 
+  // auto-deload 4,7,11 для длительных циклов (StrongmanPlan) — кроме уже deload последней недели
+  const autoDeloadSet = new Set(autoDeloadWeeks(weeks));
   for (let w = 1; w <= weeks; w++) {
-    const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
-    const deload = phase === 'deload';
+    const rawPhase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
+    const isAutoDeload = autoDeloadSet.has(w) && rawPhase !== 'deload' && rawPhase !== 'peaking';
+    const phase = isAutoDeload ? 'deload' as any : rawPhase;
+    const deload = phase === 'deload' || isAutoDeload;
     const sessions: StrengthSportSession[] = [];
     let absoluteDay = 0;
     // PRO: поддержка rolling (rotationDays 4) → modulo, иначе 7
@@ -765,21 +703,24 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         let finalWeight = built.weight;
         let finalRir = built.rir;
         const minSets = id === 'tire_flip' ? 1 : 2;
-        // Winwood precise: если контест + startDate известны, применяем daysOut логику для taper последней недели
+        // Winwood precise SM + Pritchard WL taper (10-14д, vol -40% int 88-92%)
         let winwoodTaper: any = null;
-        if (compDateAny && startDateAny && mode === 'strongman') {
+        if (compDateAny && startDateAny && (mode === 'strongman' || mode === 'weightlifting')) {
           try {
             const wkStart = new Date(startDateAny); wkStart.setDate(wkStart.getDate() + (w - 1) * 7);
             const daysOut = Math.round((new Date(compDateAny).getTime() - wkStart.getTime()) / 86400000);
             if (daysOut >= 0 && daysOut <= 14) {
-              const need = (TAPER_CESSATION_DAYS as any)[id] ?? 5;
+              const need = (mode === 'weightlifting') ? 4 : ((TAPER_CESSATION_DAYS as any)[id] ?? 5);
               if (daysOut < need && phase !== 'deload') {
-                // событие уже cessated — режем объём сильнее, assistance none
-                finalSets = Math.max(minSets, Math.round(built.sets * 0.45));
-                finalWeight = Math.round(built.weight * 0.50 / 2.5) * 2.5;
-                finalRir = 3;
-              } else if (daysOut <= 9 && daysOut >= 0) {
-                winwoodTaper = daysOut <= 3 ? WINWOOD_TAPER[1] : WINWOOD_TAPER[2];
+                finalSets = Math.max(minSets, Math.round(built.sets * (mode === 'weightlifting' ? 0.60 : 0.45)));
+                finalWeight = Math.round(built.weight * (mode === 'weightlifting' ? 0.90 : 0.50) / 2.5) * 2.5;
+                finalRir = mode === 'weightlifting' ? 2 : 3;
+              } else if (daysOut <= 14 && daysOut >= 0) {
+                if (mode === 'weightlifting') {
+                  winwoodTaper = daysOut <= 7 ? WL_TAPER[1] : WL_TAPER[2];
+                } else {
+                  winwoodTaper = daysOut <= 3 ? WINWOOD_TAPER[1] : WINWOOD_TAPER[2];
+                }
               }
             }
           } catch {}
@@ -942,6 +883,36 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       };
       sessions.push(sess);
       absoluteDay++;
+    }
+    // P1-5 conditioning day: strongman GPP без outside → отдельный день кондиции на чётных неделях накопления (не ломаем matrix - только если sessions<5)
+    if (mode === 'strongman' && !outsideMetrics && phase === 'accumulation' && sessions.length < 5 && w % 2 === 0) {
+      try {
+        const condArr = conditioningForWeek(w, weeks, mode, !!outsideMetrics);
+        if (condArr.length && (condArr[0].system !== 'aerobic' || w <= 4)) {
+          const cond = condArr[0];
+          const condExId = cond.system === 'alactic' ? 'sled_push_sprint' : cond.system === 'lactic' ? 'tire_flip' : 'sled_push_sprint';
+          const condMeta = getExerciseMeta(condExId) || { name: cond.protocol, group: 'legs', pattern: 'carry' };
+          const ws = { reps: 1, rir: 3, weight: 0, tempo: 'X-0-X-0', restSeconds: cond.restS } as any;
+          const condEx: StrengthSportExercise = {
+            id: condExId,
+            name: `${condMeta.name} · кондиция ${cond.system}`,
+            group: condMeta.group,
+            pattern: condMeta.pattern,
+            role: 'accessory',
+            character: 'лёг',
+            sets: 3,
+            reps: '1',
+            rir: 3,
+            weight: 0,
+            workSets: [ws, { ...ws }, { ...ws }],
+            warmupSets: [],
+            tempo: 'X-0-X-0',
+            restSeconds: cond.restS,
+            comment: `Кондиция ${cond.system}: ${cond.protocol} ${cond.durationMin}′ RPE${cond.rpe} · ${cond.note}`,
+          };
+          sessions.push({ day: 7, week: w, sessionTag: 'cond_day', character: 'лёг', focus: 'conditioning', exercises: [condEx], durationMin: cond.durationMin + 5 } as any);
+        }
+      } catch {}
     }
     // сортировка по дню
     sessions.sort((a, b) => a.day - b.day);

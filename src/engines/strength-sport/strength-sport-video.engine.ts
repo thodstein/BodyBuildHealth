@@ -27,55 +27,155 @@ export interface TrackingProvider {
   trackFromCSV(csvText: string): BarTrackingResult | null; // Kinovea CSV
 }
 
-// Kinovea CSV parser (упрощенный): ожидается заголовок time,x,y или t,x,y; x,y в см
+// Kinovea CSV parser — PRO: поддерживает Frame/Time(s)/X/Y, ; vs ,, mm/cm, TopLeft инверсия, 30/60fps
 export function parseKinoveaCSV(csv: string): BarPoint[] | null {
   if (!csv || typeof csv !== 'string') return null;
-  const lines = csv.trim().split(/\r?\n/).filter(Boolean);
+  const lines = csv.trim().split(/\r?\n/).map(s=> s.trim()).filter(Boolean);
   if (lines.length < 3) return null;
+  // авто-детект разделителя: ; преобладает → ; иначе ,
+  const semi = (lines[0].match(/;/g)||[]).length;
+  const comm = (lines[0].match(/,/g)||[]).length;
+  const delim = semi > comm ? ';' : ',';
   const header = lines[0].toLowerCase();
-  const hasT = header.includes('time') || header.includes('t,') || header.includes('t;');
+  // индексы колонок
+  const cols = header.split(delim).map(s=> s.trim().toLowerCase());
+  let idxFrame = cols.findIndex(c=> c.includes('frame'));
+  let idxTime = cols.findIndex(c=> c.includes('time') || c==='t' || c.includes(' t '));
+  let idxX = cols.findIndex(c=> c === 'x' || c.includes(' x ') || c.startsWith('x ') || c.endsWith(' x') || c.includes('x ('));
+  let idxY = cols.findIndex(c=> c === 'y' || c.includes(' y ') || c.startsWith('y ') || c.endsWith(' y') || c.includes('y ('));
+  // fallback если заголовок не распознан: предполагаем time,x,y или x,y
+  const hasHeader = cols.some(c=> c.includes('time')||c.includes('frame')||c==='x'||c==='y'||c.includes('x (')||c.includes('y ('));
+  if (!hasHeader || (idxX<0 && idxY<0)) {
+    idxTime = 0; idxX = 1; idxY = 2;
+    // если только 2 колонки — нет time
+    if (lines[1].split(delim).length===2) { idxTime = -1; idxX = 0; idxY = 1; }
+  } else {
+    if (idxX<0) idxX = 1;
+    if (idxY<0) idxY = 2;
+    if (idxTime<0 && idxFrame<0 && cols.length===2) { idxTime = -1; }
+  }
   const pts: BarPoint[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const parts = lines[i].split(/[,;]\s*/);
-    if (parts.length < 3 && !hasT) continue;
-    let t = 0, x = 0, y = 0;
-    if (parts.length >= 3) {
+  // fps эвристика: если есть frame → fps 30 или 60 (попробуем 30, можно 60 по dt)
+  // для детекта fps посчитаем dt из time если есть
+  let fps = 30;
+  // вторая фаза: парсим точки; также собираем raw для инверсии Y и mm детекта
+  const raw: Array<{ t:number; x:number; y:number }> = [];
+  for (let i = (hasHeader?1:0); i < lines.length; i++) {
+    const parts = lines[i].split(delim).map(s=> s.trim());
+    if (parts.length < 2) continue;
+    // пропуск строк с заголовком внутри
+    if (parts[0].toLowerCase().includes('frame') || parts[0].toLowerCase().includes('time')) continue;
+    let t: number, x: number, y: number;
+    if (idxTime >=0 && parts.length > Math.max(idxTime, idxX, idxY)) {
+      t = parseFloat(parts[idxTime]); x = parseFloat(parts[idxX]); y = parseFloat(parts[idxY]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (!Number.isFinite(t)) t = idxFrame>=0 && Number.isFinite(parseFloat(parts[idxFrame])) ? parseFloat(parts[idxFrame])/30 : i*0.033;
+      // если t кажется кадром (>100), делим на fps
+      if (t > 100 && idxTime===idxFrame) t = t/30;
+    } else if (parts.length===2) {
+      x = parseFloat(parts[0]); y = parseFloat(parts[1]); t = i*0.033;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    } else {
+      // generic 3-колонки без header
       t = parseFloat(parts[0]); x = parseFloat(parts[1]); y = parseFloat(parts[2]);
       if (!Number.isFinite(t) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-      // если t в кадрах, переводим в сек
-      if (t > 100) t = t / 30; // эвристика 30fps
-    } else if (parts.length === 2) {
-      x = parseFloat(parts[0]); y = parseFloat(parts[1]); t = i * 0.033;
+      if (t > 100) t = t/30;
     }
-    pts.push({ x, y, t });
+    raw.push({ t, x, y });
+  }
+  if (raw.length < 2) return null;
+  // mm vs cm: если медианный |x| >50 → мм, делим на 10
+  const xsAbs = raw.map(r=> Math.abs(r.x)).filter(v=> Number.isFinite(v));
+  const medianAbs = xsAbs.sort((a,b)=>a-b)[Math.floor(xsAbs.length/2)] || 0;
+  const isMm = medianAbs > 50 || Math.max(...raw.map(r=> Math.abs(r.y))) > 200;
+  if (isMm) raw.forEach(r=> { r.x/=10; r.y/=10; });
+  // Top-left инверсия: Kinovea Y вниз; инвертируем чтобы высота вверх. Детект: если Y уменьшается к концу (бар падает) — уже ок? Проще: инвертируем если maxY в начале меньше чем в конце? Kinovea Y растёт вниз, поэтому yMin=top, yMax=bottom. Нам нужно y=height, поэтому y' = -y или maxY - y.
+  // Применяем y' = -y (сохраняет xLoop), но для yMax корректируем: yHeight = -y + const. Проще: yHeight = -y
+  // Сначала найдём диапазон y
+  const rawYs = raw.map(r=> r.y);
+  const yMin = Math.min(...rawYs), yMaxR = Math.max(...rawYs);
+  // если y увеличивается со временем в первой половине (бар идёт вверх, но Kinovea y вниз) → инверсия уже? Проверим: первая точка y ~ high (t0), середина y ~ low (высокий полёт)?? У Kinovea Y вниз: внизу экрана y большой, вверху маленький. Бар внизу → y большой, вверху → y маленький — Y уменьшается при подъёме. У нас ожидается наоборот. Поэтому инвертируем: y' = (yMaxR - y) или -y.
+  // Используем y' = yMaxR - y + yMin  → чтобы min → 0
+  const needsInvert = (()=> {
+    // эвристика: если y в середине меньше чем в начале (подъём) — Kinovea mode, надо инвертировать
+    const mid = raw[Math.floor(raw.length/2)]?.y ?? rawYs[0];
+    return mid < rawYs[0] && rawYs[0] - mid > 5; // >5см разница
+  })();
+  for (const r of raw) {
+    let yHeight = r.y;
+    if (needsInvert) yHeight = (yMaxR - r.y);
+    pts.push({ x: r.x, y: yHeight, t: r.t });
+  }
+  // Сортируем по t и нормализуем t к 0
+  pts.sort((a,b)=> a.t - b.t);
+  const t0 = pts[0].t;
+  pts.forEach(p=> p.t -= t0);
+  // Уточняем fps по dt медиане
+  const dts = pts.slice(1).map((p,i)=> p.t - pts[i].t).filter(dt=> dt>0 && dt<0.2);
+  if (dts.length) {
+    const medDt = dts.sort((a,b)=>a-b)[Math.floor(dts.length/2)];
+    if (medDt>0.015 && medDt<0.04) fps = Math.round(1/medDt);
+    else if (medDt>0.05) fps = 30;
   }
   return pts.length >= 2 ? pts : null;
 }
 
+// 12Hz Butterworth low-pass (1st order, fs ~30-60) — single pole, щадящий чтобы не резать yMax >15% (PLOS 80см→68см было)
+function butterworth12Hz(points: BarPoint[], fps = 30): BarPoint[] {
+  if (!points || points.length < 3) return points;
+  const fc = 12; const dt = 1/fps;
+  const RC = 1/(2*Math.PI*fc);
+  const alpha = dt/(RC+dt); // ~0.71 при 30fps
+  const out: BarPoint[] = [];
+  let prevX = points[0].x, prevY = points[0].y;
+  for (let i=0;i<points.length;i++) {
+    const rawX = points[i].x, rawY = points[i].y;
+    const fX = prevX + alpha*(rawX - prevX);
+    const fY = prevY + alpha*(rawY - prevY);
+    out.push({ x: fX, y: fY, t: points[i].t });
+    prevX = fX; prevY = fY;
+  }
+  return out;
+}
+
 export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null {
   if (!points || points.length < 2) return null;
-  const xs = points.map(p => p.x);
-  const ys = points.map(p => p.y);
-  const yMax = Math.max(...ys);
+  const fps = (()=> {
+    const dts = points.slice(1).map((p,i)=> p.t - points[i].t).filter(dt=>dt>0&&dt<0.2);
+    if (!dts.length) return 30;
+    const med = dts.sort((a,b)=>a-b)[Math.floor(dts.length/2)];
+    return med>0? Math.round(1/med):30;
+  })();
+  const filtered = butterworth12Hz(points, fps);
+  const xs = filtered.map(p => p.x);
+  const ys = filtered.map(p => p.y);
+  const yMax = Math.max(...points.map(p=> p.y));
   const xLoop = Math.max(...xs) - Math.min(...xs);
-  // vmax: дифференцирование y по t, 12Hz Butterworth упрощенно — скользящее среднее 3
   let vmax = 0;
   let hAcc = yMax;
-  for (let i = 1; i < points.length; i++) {
-    const dt = points[i].t - points[i - 1].t;
+  // vmax: дифференцирование y по t, butterworth уже сгладил, затем MA3
+  const vels: number[] = [];
+  for (let i = 1; i < filtered.length; i++) {
+    const dt = filtered[i].t - filtered[i - 1].t;
     if (dt <= 0) continue;
-    const v = (points[i].y - points[i - 1].y) / dt / 100; // см/с → м/с
-    // скользящее по 3 уже есть в сырых, берем макс положительной
-    if (v > vmax) {
-      vmax = v;
-      hAcc = points[i].y / 100; // м
-    }
+    const v = (filtered[i].y - filtered[i - 1].y) / dt / 100; // см/с → м/с
+    vels.push(v);
+  }
+  // MA3
+  const smooth: number[] = [];
+  for (let i=0;i<vels.length;i++) {
+    const w = [vels[i-1], vels[i], vels[i+1]].filter(v=> Number.isFinite(v)) as number[];
+    smooth.push(w.reduce((a,b)=>a+b,0)/w.length);
+  }
+  for (let i=0;i<smooth.length;i++) {
+    const v = smooth[i];
+    if (v > vmax) { vmax = v; hAcc = filtered[i+1].y / 100; }
   }
   vmax = Math.round(vmax * 100) / 100;
-  const duration = points[points.length - 1].t - points[0].t;
+  const duration = filtered[filtered.length - 1].t - filtered[0].t;
   hAcc = Math.round(hAcc * 100) / 100;
-  if (hAcc <= 0.2) hAcc = 0.8; // fallback среднее Sandau
-  return { points, fps: 30, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100 };
+  if (hAcc <= 0.2) hAcc = 0.8;
+  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100 };
 }
 
 // Force provider abstraction (loadsol insoles, force plate)

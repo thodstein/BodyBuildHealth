@@ -41,12 +41,40 @@ export function livePoseStatus(angles: JointAnglesPose): { ok: boolean; faults: 
   return { ok: faults.length === 0, faults };
 }
 
-// CDN MediaPipe Pose (BlazePose) — parity с arm-motion-capture ensureHandsModel
+// CDN MediaPipe — parity с arm-motion-capture ensureHandsModel
+// Пытаемся загрузить Tasks Vision WASM (0.10+), fallback legacy pose@0.5
 export function hasPoseSupport(): boolean {
-  return typeof (globalThis as any).Pose !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined' || typeof (globalThis as any).pose !== 'undefined';
+  return typeof (globalThis as any).Pose !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined' || typeof (globalThis as any).pose !== 'undefined' || typeof (globalThis as any).TasksVision !== 'undefined' || typeof (globalThis as any).vision !== 'undefined';
+}
+export function hasTasksVisionSupport(): boolean {
+  return typeof (globalThis as any).TasksVision !== 'undefined' || typeof (globalThis as any).vision !== 'undefined' || typeof (globalThis as any).PoseLandmarker !== 'undefined';
+}
+export async function ensureTasksVision(): Promise<boolean> {
+  if (hasTasksVisionSupport()) return true;
+  if (typeof document === 'undefined') return false;
+  try {
+    const src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+    // пробуем dynamic import для mjs
+    try {
+      // @ts-ignore
+      const mod = await import(/* @vite-ignore */ src);
+      if (mod) (globalThis as any).TasksVision = mod;
+      return hasTasksVisionSupport();
+    } catch {}
+    // fallback script tag для wasm loader
+    const wasmSrc = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.js';
+    if (!document.querySelector(`script[src="${wasmSrc}"]`)) {
+      await new Promise<void>((resolve, reject)=> {
+        const s=document.createElement('script'); s.src=wasmSrc; s.async=true; s.onload=()=>resolve(); s.onerror=()=>reject(new Error('wasm load failed')); document.head.appendChild(s);
+      });
+    }
+    return hasTasksVisionSupport();
+  } catch { return false; }
 }
 export async function ensurePoseModel(): Promise<boolean> {
   if (hasPoseSupport()) return true;
+  // пробуем Tasks Vision первым
+  try { if (await ensureTasksVision()) return true; } catch {}
   try {
     const src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js';
     if (typeof document === 'undefined') return false;
@@ -64,7 +92,7 @@ export async function ensurePoseModel(): Promise<boolean> {
     return hasPoseSupport();
   } catch { return false; }
 }
-export function hasVideoSupport(): boolean { return hasPoseSupport(); }
+export function hasVideoSupport(): boolean { return hasPoseSupport() || hasTasksVisionSupport(); }
 export function detectPoseFromVideo(frame: unknown): JointAnglesPose | null {
   try {
     if (typeof frame === 'object' && frame !== null) {
@@ -75,6 +103,14 @@ export function detectPoseFromVideo(frame: unknown): JointAnglesPose | null {
       if (Array.isArray(f) && f.length >= 4) {
         const [hip, knee, ankle, shoulder] = f;
         if (hip && knee && ankle) return estimateAnglesFromLandmarks({ landmarks: { hip, knee, ankle, shoulder: shoulder || hip }, t: 0 });
+      }
+      // Tasks Vision result: { landmarks: [{x,y,z}] } array 33
+      if (Array.isArray(f.landmarks) && f.landmarks.length >= 23) {
+        // MediaPipe tasks: landmarks[23]=hip, 25=knee, 27=ankle, 11=shoulder
+        const arr = f.landmarks as any[];
+        const lm = (i:number)=> ({ x: arr[i]?.x ?? 0, y: arr[i]?.y ?? 0 });
+        const hip = lm(23), knee = lm(25), ankle = lm(27), shoulder = lm(11), elbow = lm(13), wrist = lm(15), foot = lm(31);
+        return estimateAnglesFromLandmarks({ landmarks: { hip, knee, ankle, shoulder, elbow, foot, wrist }, t: f.t ?? 0 });
       }
     }
     const mp = (globalThis as any).Pose || (globalThis as any).BlazePose;

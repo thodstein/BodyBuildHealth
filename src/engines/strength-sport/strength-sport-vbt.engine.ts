@@ -14,6 +14,7 @@ import {
   type VBTIntent,
   type VelocityLossResult,
 } from '../pro/vbt.engine';
+import { loadLVPProfile, velocityForLVP, pctForVelocityLVP, estimate1RMLVP } from './strength-sport-lvp-calibration.engine';
 
 export type SSLiftId = string; // snatch, clean_and_jerk, back_squat, deadlift, log_press, yoke_walk etc
 
@@ -127,6 +128,14 @@ export function optimalFvSlopeForPmax(Pmax: number): number {
 }
 
 function velocityForPctSSLocal(lift: string, pct: number): number {
+  // индивидуальный LVP приоритетнее population
+  try {
+    const indiv = loadLVPProfile(lift);
+    if (indiv && indiv.valid) {
+      const v = velocityForLVP(indiv, pct);
+      if (v != null) return v;
+    }
+  } catch {}
   const tbl = LOAD_VELOCITY_PROFILE_SS[lift] || LOAD_VELOCITY_PROFILE_SS.squat;
   const p = Math.max(0.5, Math.min(1, pct));
   if (p >= tbl[0][0]) return tbl[0][1];
@@ -138,6 +147,13 @@ function velocityForPctSSLocal(lift: string, pct: number): number {
   return 0.5;
 }
 function pctForVelocitySSLocal(lift: string, vel: number): number {
+  try {
+    const indiv = loadLVPProfile(lift);
+    if (indiv && indiv.valid) {
+      const pct = pctForVelocityLVP(indiv, vel);
+      if (pct != null) return pct;
+    }
+  } catch {}
   const tbl = LOAD_VELOCITY_PROFILE_SS[lift] || LOAD_VELOCITY_PROFILE_SS.squat;
   if (vel <= tbl[0][1]) return tbl[0][0];
   if (vel >= tbl[tbl.length - 1][1]) return tbl[tbl.length - 1][0];
@@ -183,6 +199,22 @@ export function velocityForSS(pct1RM: number, liftId?: string): number {
 }
 
 export function estimate1RMFromVelocitySS(weight: number, velocity: number, liftId?: string): number {
+  // индивидуальный LVP приоритетнее
+  try {
+    const local = mapSSLiftLocal(liftId || 'squat');
+    const indiv = loadLVPProfile(local);
+    if (indiv && indiv.valid) {
+      const e1 = estimate1RMLVP(indiv, weight, velocity);
+      if (e1 != null && e1 > 0) return e1;
+    }
+    if (liftId) {
+      const indiv2 = loadLVPProfile(String(liftId).toLowerCase());
+      if (indiv2 && indiv2.valid && indiv2.lift !== local) {
+        const e1c = estimate1RMLVP(indiv2, weight, velocity);
+        if (e1c != null && e1c > 0) return e1c;
+      }
+    }
+  } catch {}
   const local = mapSSLiftLocal(liftId || 'squat');
   if (local === 'snatch' || local === 'clean' || local === 'yoke_walk' || local === 'farmers_walk' || local === 'stone_load' || local === 'log_press') {
     if (velocity <= 0 || weight <= 0) return 0;
@@ -229,6 +261,78 @@ export function thresholdForTALift(liftId: string): 10 | 15 | 20 {
   if (low.includes('pull') || low.includes('squat')) return 15;
   if (low.includes('snatch') || low.includes('jerk') || low.includes('clean')) return 10;
   return 20;
+}
+
+// ── P0-2: EWMA per-lift VBT closed-loop + MPV/Peak badge ──
+export const LVP_VELOCITY_TYPE: Record<string, 'peak' | 'mpv'> = {
+  snatch: 'peak',
+  clean: 'peak',
+  yoke_walk: 'peak',
+  farmers_walk: 'peak',
+  stone_load: 'mpv',
+  log_press: 'mpv',
+  squat: 'mpv',
+  deadlift: 'mpv',
+  bench: 'mpv',
+  row: 'mpv',
+};
+
+export function velocityTypeForLift(lift: string): 'peak' | 'mpv' {
+  return (LVP_VELOCITY_TYPE[lift] ?? 'mpv') as any;
+}
+
+export function vbtEwma(values: number[], alpha = 0.25): number | null {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const clean = values.filter(v=> Number.isFinite(v) && v>0);
+  if (clean.length === 0) return null;
+  let ema = clean[0];
+  for (let i=1;i<clean.length;i++) ema = alpha*clean[i] + (1-alpha)*ema;
+  return Math.round(ema*100)/100;
+}
+
+export function vbtHistoryForLift(history: Record<string, number[]> | undefined, liftId: string): number[] | null {
+  if (!history || !liftId) return null;
+  const low = String(liftId).toLowerCase();
+  // точный → локальный маппинг → all
+  if (history[low] && Array.isArray(history[low])) return history[low];
+  const local = mapSSLiftLocal(low);
+  if (history[local] && Array.isArray(history[local])) return history[local];
+  if ((history as any)['all'] && Array.isArray((history as any)['all'])) return (history as any)['all'];
+  // fallback: поиск по includes
+  for (const k of Object.keys(history)) {
+    if (low.includes(k) || k.includes(low)) return history[k] as number[];
+  }
+  return null;
+}
+
+export function diagnoseVelocityLossEwma(history: number[], threshold: number = 20): { lossPct: number; ewma: number | null; exceeded: boolean; zone: string } | null {
+  if (!Array.isArray(history) || history.length < 2) return null;
+  const clean = history.filter(v=> Number.isFinite(v) && v>0);
+  if (clean.length < 2) return null;
+  const best = Math.max(...clean);
+  const last = clean[clean.length-1];
+  const ewmaVal = vbtEwma(clean);
+  if (best <=0) return null;
+  const lossPct = Math.round(((best - last)/best*100)*10)/10;
+  const ewmaLoss = ewmaVal != null && best>0 ? Math.round(((best - ewmaVal)/best*100)*10)/10 : 0;
+  // используем max(lossPct, ewmaLoss) для устойчивости
+  const effective = Math.max(lossPct, ewmaLoss);
+  const exceeded = effective > threshold;
+  const zone = baseZone(effective);
+  return { lossPct: effective, ewma: ewmaVal, exceeded, zone };
+}
+
+export function velocityWeightAdjustFactor(lossPct: number | null, liftId?: string): number {
+  if (lossPct == null || !Number.isFinite(lossPct)) return 1;
+  const isTA = liftId ? /snatch|jerk|clean/.test(liftId.toLowerCase()) : false;
+  const isCarry = liftId ? /yoke|farmers|carry|conan|shield/.test(liftId.toLowerCase()) : false;
+  // TA строже: >20 уже критично, carry 15/25
+  const crit = isTA ? 20 : isCarry ? 25 : 30;
+  const warn = isTA ? 10 : isCarry ? 15 : 20;
+  if (lossPct > crit) return 0.90; // -10% вес next week (k×0.6 эквивалент ~ -4% pm, вес -10% даёт deload)
+  if (lossPct > warn + 5) return 0.94;
+  if (lossPct > warn) return 0.97;
+  return 1;
 }
 
 export { thresholdForIntent };

@@ -71,6 +71,60 @@ export const CONTEST_PRESETS: Record<string, StrongmanContest> = {
     ],
     weightClass: '<80',
   },
+  arnold_uk: {
+    name: 'Arnold UK — 5 ивентов',
+    events: [
+      { id: 'axle_press', format: 'max', weight: 120 },
+      { id: 'yoke_walk', format: 'medley_distance', weight: 320, distanceM: 20, timeCapS: 60 },
+      { id: 'farmers_walk_heavy', format: 'carry', weight: 130, distanceM: 30, turn: true, timeCapS: 60 },
+      { id: 'deadlift_max', format: 'max', weight: 280 },
+      { id: 'atlas_stone_load', format: 'loading_race', weight: 140, heightCm: 150 },
+    ],
+    weightClass: '<105',
+  },
+  giants_light: {
+    name: 'Giants Light — 4 ивента',
+    events: [
+      { id: 'log_press', format: 'reps_60s', weight: 100 },
+      { id: 'yoke_walk', format: 'carry', weight: 250, distanceM: 20, timeCapS: 75 },
+      { id: 'sandbag_load', format: 'loading_race', weight: 100, heightCm: 130 },
+      { id: 'tire_flip', format: 'reps_60s', weight: 180, repsTarget: 6 },
+    ],
+    weightClass: '<90',
+  },
+  siberian_open: {
+    name: 'Siberian Open — 6 ивентов',
+    events: [
+      { id: 'log_press', format: 'max', weight: 110 },
+      { id: 'yoke_walk', format: 'medley_distance', weight: 300, distanceM: 20, timeCapS: 60 },
+      { id: 'farmers_walk_heavy', format: 'medley_distance', weight: 125, distanceM: 40, timeCapS: 75 },
+      { id: 'conan_wheel', format: 'max', weight: 180, distanceM: 30, timeCapS: 60 },
+      { id: 'truck_pull', format: 'medley_distance', weight: 6000, distanceM: 20, timeCapS: 90 },
+      { id: 'atlas_stone_over_bar', format: 'ladder', ladderWeights: [110, 120, 130, 140, 150], heightCm: 150 },
+    ],
+    weightClass: 'open',
+  },
+  europa_4: {
+    name: 'Europa 4 — 4 ивента (скорость)',
+    events: [
+      { id: 'viking_press', format: 'reps_75s', weight: 120 },
+      { id: 'farmers_walk_heavy', format: 'carry', weight: 110, distanceM: 40, timeCapS: 60 },
+      { id: 'sandbag_over_bar', format: 'loading_race', weight: 90, heightCm: 140 },
+      { id: 'arm_over_arm', format: 'medley_distance', weight: 200, distanceM: 20, timeCapS: 60 },
+    ],
+    weightClass: '<80',
+  },
+  masters_105: {
+    name: 'Masters 105 — 5 ивентов',
+    events: [
+      { id: 'axle_press', format: 'reps_60s', weight: 90 },
+      { id: 'frame_carry', format: 'carry', weight: 200, distanceM: 30, timeCapS: 60 },
+      { id: 'car_deadlift_18', format: 'reps_60s', weight: 220 },
+      { id: 'husafell_carry', format: 'carry', weight: 120, distanceM: 40, timeCapS: 75 },
+      { id: 'natural_stone_shoulder', format: 'loading_race', weight: 110, heightCm: 130 },
+    ],
+    weightClass: '105+',
+  },
 };
 
 export function validateContest(c: StrongmanContest | null | undefined): string[] {

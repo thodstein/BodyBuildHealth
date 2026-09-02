@@ -60,6 +60,27 @@ export const WINWOOD_TAPER: Record<number, TaperWeekPlan> = {
   2: { weekFromEnd: 2, volumeMult: 0.55, intensityPctMult: 0.75, assistance: 'reduced', heavyEvents: ['farmers_walk_heavy','log_press','tire_flip'] }, // предпоследняя: умеренно
 };
 
+// Pritchard IWF WL taper: vol -40% int 88-92% 10-14д (для ТА distinct от Winwood SM)
+export const WL_TAPER: Record<number, TaperWeekPlan> = {
+  1: { weekFromEnd: 1, volumeMult: 0.60, intensityPctMult: 0.90, assistance: 'reduced', heavyEvents: ['snatch','clean_and_jerk','front_squat'] },
+  2: { weekFromEnd: 2, volumeMult: 0.70, intensityPctMult: 0.92, assistance: 'reduced', heavyEvents: ['snatch','clean_and_jerk','back_squat','snatch_pull','clean_pull'] },
+};
+
+export function taperForWLWeekFromEnd(weekFromEnd: number): TaperWeekPlan {
+  if (weekFromEnd <= 1) return WL_TAPER[1];
+  if (weekFromEnd === 2) return WL_TAPER[2];
+  return { weekFromEnd, volumeMult: 1, intensityPctMult: 1, assistance: 'normal', heavyEvents: [] };
+}
+
+// Auto-deload weeks 4,7,11 (StrongmanPlan) — если totalWeeks≥8
+export function autoDeloadWeeks(totalWeeks: number): number[] {
+  const cand = [4,7,11];
+  return cand.filter(w=> w < totalWeeks && w >= 4);
+}
+export function isAutoDeloadWeek(week: number, totalWeeks: number): boolean {
+  return autoDeloadWeeks(totalWeeks).includes(week);
+}
+
 export function taperForWeekFromEnd(weekFromEnd: number): TaperWeekPlan {
   if (weekFromEnd <= 1) return WINWOOD_TAPER[1];
   if (weekFromEnd === 2) return WINWOOD_TAPER[2];

@@ -25,7 +25,18 @@ function isOlyLift(name: string): boolean {
   const n = name.toLowerCase();
   return n.includes('snatch') || n.includes('рывок') || n.includes('clean') || n.includes('толчок') || n.includes('jerk');
 }
-function epleyForLift(weight: number, reps: number, name: string): number {
+function epleyForLift(weight: number, reps: number, name: string, velocity?: number): number {
+  // P0-2: если есть velocity и лифт TA/carry — используем LVP e1RM (Wood 2026)
+  // carry камень трактуем как вес (не формула) — отдельно
+  if (typeof velocity === 'number' && Number.isFinite(velocity) && velocity > 0.2 && velocity < 4) {
+    try {
+      // динамический импорт чтобы избежать циклов — но VBT уже индивидуализирован
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { estimate1RMFromVelocitySS } = require('./strength-sport-vbt.engine') as any;
+      const byVel: number = estimate1RMFromVelocitySS(weight, velocity, name);
+      if (Number.isFinite(byVel) && byVel > 0) return byVel;
+    } catch {}
+  }
   // Oly: Brzycki с cap 3, силовые — Epley
   if (isOlyLift(name) && reps > 3) return brzycki(weight, 3);
   if (isOlyLift(name)) return brzycki(weight, reps);
@@ -66,7 +77,7 @@ export function buildDiaryTrendSS(logs: any[]): DiaryTrendSS[] | null {
       const d = String(e.date || '');
       const t = new Date(d).getTime();
       if (!Number.isFinite(t)) continue;
-      const maxE1 = Math.max(...workSets.map((s: any) => epleyForLift(Number(s.weight) || 0, Number(s.reps) || 0, n))).valueOf();
+      const maxE1 = Math.max(...workSets.map((s: any) => epleyForLift(Number(s.weight) || 0, Number(s.reps) || 0, n, typeof s.velocity === 'number' ? s.velocity : typeof s.v === 'number' ? s.v : undefined))).valueOf();
       if (!maxE1 || maxE1 <= 0) continue;
       const diff = now - t;
       if (diff >= 0 && diff <= 28 * dayMs) recentVals.push(maxE1);
@@ -128,7 +139,7 @@ export function acwrEwmaSS(dailyLoads: number[], alpha = 0.25): { acute: number;
   return { acute: Math.round(acute*10)/10, chronic: Math.round(chronic*10)/10, ratio: Math.round(ratio*100)/100, zone };
 }
 
-// Per-exercise last e1RM index как в bb-progression-feedback
+// Per-exercise last e1RM index как в bb-progression-feedback (P0-2: с velocity)
 export function buildLastE1RMIndexSS(logs: any[]): Record<string, number> {
   const idx: Record<string, number> = {};
   for (const e of logs) {
@@ -137,7 +148,8 @@ export function buildLastE1RMIndexSS(logs: any[]): Record<string, number> {
     let best = 0;
     for (const s of sets) {
       const w = Number(s.weight)||0; const r = Number(s.reps)||0;
-      if (w>0 && r>0) best = Math.max(best, epleyForLift(w,r,name));
+      const v = typeof (s as any).velocity === 'number' ? (s as any).velocity : typeof (s as any).v === 'number' ? (s as any).v : undefined;
+      if (w>0 && (r>0 || (v!=null && v>0))) best = Math.max(best, epleyForLift(w, r>0?r:1, name, v));
     }
     if (best>0) idx[name.toLowerCase()] = Math.max(idx[name.toLowerCase()]||0, best);
   }
