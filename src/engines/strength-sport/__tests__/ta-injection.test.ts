@@ -41,7 +41,7 @@ describe('TA injection PRO — MRV + dedup parity', () => {
   it('property: 48 combos injection weeklySets ≤ Budget + no NaN', () => {
     const levels: any[] = ['beginner', 'intermediate', 'advanced', 'enhanced'];
     const goals: any[] = ['strength', 'hypertrophy', 'peaking', 'technique'];
-    const days = [3, 4];
+    const days = [2, 3, 4];
     let checked = 0;
     for (const level of levels) for (const goal of goals) for (const d of days) {
       const p = buildStrengthSportPlan({ mode: 'weightlifting', goal, level, weeks: 4, daysPerWeek: d, workMax: { snatch: 70, backSquat: 120, deadlift: 150 } } as any);
@@ -52,6 +52,6 @@ describe('TA injection PRO — MRV + dedup parity', () => {
       expect(Number.isFinite(weeklySets)).toBe(true);
       checked++;
     }
-    expect(checked).toBe(32);
+    expect(checked).toBe(48);
   });
 });

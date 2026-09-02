@@ -5,6 +5,7 @@ import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity
 import { scoreTA } from '../strength-sport-scoring.engine';
 import { assessOHS, OHS_NORMS } from '../strength-sport-ohs.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../strength-sport-video.engine';
+import { estimateAnglesFromLandmarks, hasPoseSupport, livePoseStatus } from '../strength-sport-pose.engine';
 import { diagnoseVelocityLossSS } from '../strength-sport-vbt.engine';
 
 describe('TA biomechanics PRO — числовые углы', () => {
@@ -147,5 +148,22 @@ describe('Video Kinovea', () => {
     const r = analyzeBarTracking(pts);
     expect(r).not.toBeNull();
     expect(r!.vmax).toBeGreaterThan(0);
+  });
+});
+
+describe('Pose live MediaPipe', () => {
+  it('estimateAnglesFromLandmarks hip/knee', () => {
+    const ang = estimateAnglesFromLandmarks({ landmarks: { hip: { x: 0, y: 0 }, knee: { x: 0, y: -1 }, ankle: { x: 0, y: -2 }, shoulder: { x: 0, y: 1 }, elbow: { x: 0.5, y: 1 }, foot: { x: 0, y: -2.2 }, wrist: { x: 0.5, y: 1.5 } }, t: 0 });
+    expect(ang.knee).toBeGreaterThan(0);
+    expect(ang.hip).toBeGreaterThan(0);
+  });
+  it('hasPoseSupport boolean', () => {
+    expect(typeof hasPoseSupport()).toBe('boolean');
+  });
+  it('livePoseStatus ok vs faults', () => {
+    const ok = livePoseStatus({ hip: 120, knee: 110, ankle: 40, shoulder: 170, elbow: 180, trunk: 120, t: 0 });
+    expect(ok.ok).toBe(true);
+    const bad = livePoseStatus({ hip: 120, knee: 60, ankle: 20, shoulder: 120, elbow: 180, trunk: 120, t: 0 });
+    expect(bad.faults.length).toBeGreaterThan(0);
   });
 });
