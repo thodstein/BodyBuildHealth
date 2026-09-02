@@ -151,12 +151,23 @@ export const CombatConstructor: React.FC = () => {
     try {
       if (Array.isArray(vbtHistory) && vbtHistory.length >= 2) vbtHistToPass = vbtHistory;
       else {
-        // пробуем подтянуть из LS если wizard ещё не загрузил
         const { loadVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
         const hist = loadVbtHistoryCB();
         if (hist.length >= 2) vbtHistToPass = hist;
       }
     } catch {}
+    // сохраняем последний замер в историю (для EWMA тренда 7/14д)
+    if (vbtBest > 0 && vbtLast > 0) {
+      try {
+        const { loadVbtHistoryCB, saveVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
+        const hist = loadVbtHistoryCB();
+        // best + last как две точки одного дня (скалярный вход → map на bench_bar для теста)
+        hist.push({ liftId: 'bench_bar', velocity: vbtBest, date: new Date().toISOString().slice(0,10), weight: (workMax as any)?.bench || bodyweight });
+        hist.push({ liftId: 'bench_bar', velocity: vbtLast, date: new Date().toISOString().slice(0,10), weight: (workMax as any)?.bench || bodyweight });
+        saveVbtHistoryCB(hist);
+        setVbtHistory(hist.slice(-48));
+      } catch {}
+    }
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
