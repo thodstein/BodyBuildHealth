@@ -50,11 +50,11 @@ export const CombatConstructor: React.FC = () => {
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
-    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, hrvLine, setHrvLine,
+    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
-    annualWeeks, setAnnualWeeks, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     outsideMetrics,
   } = useCombatWizard();
 
@@ -146,6 +146,17 @@ export const CombatConstructor: React.FC = () => {
     if (vbtBest > 0 && vbtLast > 0) {
       try { const d = diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); effectiveLoss = d.lossPct; } catch {}
     }
+    // per-exercise EWMA history приоритетнее скаляра (P1-2)
+    let vbtHistToPass: any = null;
+    try {
+      if (Array.isArray(vbtHistory) && vbtHistory.length >= 2) vbtHistToPass = vbtHistory;
+      else {
+        // пробуем подтянуть из LS если wizard ещё не загрузил
+        const { loadVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
+        const hist = loadVbtHistoryCB();
+        if (hist.length >= 2) vbtHistToPass = hist;
+      }
+    } catch {}
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
@@ -154,7 +165,7 @@ export const CombatConstructor: React.FC = () => {
       bodyweight, sex, age,
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
-      acwr: acwr as any, velocityLossPct: effectiveLoss,
+      acwr: acwr as any, velocityLossPct: effectiveLoss, vbtHistory: vbtHistToPass as any,
       outsideLoad: outsideEnabled && !sparringEnabled ? outside : null,
       sparringLoad,
       fightStyle: fightStyle as any,
@@ -284,8 +295,8 @@ export const CombatConstructor: React.FC = () => {
   };
 
   const handleBuildATR = () => {
-    const ann = buildAnnualATR(discipline as any, annualWeeks, startDate || null);
-    saveAnnualCB(ann); setAnnual(ann); setMsg(`✦ Годовой ATR ${annualWeeks} нед построен`); setTimeout(() => setMsg(''), 2200);
+    const ann = buildAnnualATR(discipline as any, annualWeeks, startDate || null, { cycles: annualCycles } as any);
+    saveAnnualCB(ann); setAnnual(ann); setMsg(`✦ Годовой ATR ${annualWeeks} нед ×${annualCycles} цикла построен`); setTimeout(() => setMsg(''), 2200);
   };
   const handleAddCompetition = () => {
     if (!annual || !competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); setTimeout(() => setMsg(''), 1800); return; }
@@ -798,6 +809,8 @@ export const CombatConstructor: React.FC = () => {
           annual={annual}
           annualWeeks={annualWeeks}
           setAnnualWeeks={setAnnualWeeks}
+          annualCycles={annualCycles}
+          setAnnualCycles={setAnnualCycles}
           competitionName={competitionName}
           setCompetitionName={setCompetitionName}
           competitionDate={competitionDate}

@@ -8,6 +8,8 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { defaultOutsideLoadFor, computeOutsideMetrics } from '../../../engines/outside-load.engine';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
+import { loadVbtHistoryCB } from '../../../engines/combat/combat-vbt.engine';
+import type { VbtHistoryEntry } from '../../../engines/combat/combat-vbt.engine';
 import { loadAnnualCB } from '../../../engines/combat/combat-annual';
 import type { AnnualCB } from '../../../engines/combat/combat-annual';
 
@@ -56,6 +58,7 @@ export function useCombatWizard() {
   const [velocityLoss, setVelocityLoss] = useState(0);
   const [vbtBest, setVbtBest] = useState(0);
   const [vbtLast, setVbtLast] = useState(0);
+  const [vbtHistory, setVbtHistory] = useState<VbtHistoryEntry[] | null>(null);
   const [hrvLine, setHrvLine] = useState<string|null>(null);
   const [patternId, setPatternId] = useState('');
   const [workMax, setWorkMax] = useState<Record<string,number>>({ bench:80, squat:90, deadlift:100, chest:80, back:70, quads:90, hamstrings:80, shoulders:50 });
@@ -67,6 +70,7 @@ export function useCombatWizard() {
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
   const [annualWeeks, setAnnualWeeks] = useState(52);
+  const [annualCycles, setAnnualCycles] = useState(1);
   const [competitionName, setCompetitionName] = useState('');
   const [competitionDate, setCompetitionDate] = useState('');
   const [competitionWeight, setCompetitionWeight] = useState('');
@@ -97,6 +101,11 @@ export function useCombatWizard() {
         if(h) setHrvLine(`HRV ${h.last}мс (ср ${h.mean}±${h.sd}) — ${h.grade}: ${h.note}`);
         else setHrvLine(null);
       }catch{ setHrvLine(null); }
+      try{
+        const vbt = loadVbtHistoryCB();
+        if (vbt && vbt.length) setVbtHistory(vbt);
+        else setVbtHistory(null);
+      }catch{ setVbtHistory(null); }
     } catch {}
   }, [plan]);
 
@@ -112,11 +121,11 @@ export function useCombatWizard() {
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
-    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, hrvLine, setHrvLine,
+    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
-    annualWeeks, setAnnualWeeks, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     outsideMetrics,
   };
 }

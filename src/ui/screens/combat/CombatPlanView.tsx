@@ -9,6 +9,7 @@ import { buildCombatReport } from '../../../engines/combat/combat-finalize.engin
 import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider } from './CombatUI';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
+import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
 import { weightCutNutritionForWeek, combatWeightCutToMealInput } from '../../../engines/combat/combat-weight-cut.engine';
 
 type Props = {
@@ -22,6 +23,8 @@ type Props = {
   annual?: any;
   annualWeeks?: number;
   setAnnualWeeks?: (n: number) => void;
+  annualCycles?: number;
+  setAnnualCycles?: (n: number) => void;
   competitionName?: string;
   setCompetitionName?: (s: string) => void;
   competitionDate?: string;
@@ -44,7 +47,7 @@ type Props = {
 
 export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,
-  annual, annualWeeks, setAnnualWeeks, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+  annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
   startDate, outside, outsideMetrics, diaryLoad, acwr, msg, setMsg,
   onBuildATR, onAddCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
 }) => {
@@ -284,13 +287,19 @@ export const CombatPlanView: React.FC<Props> = ({
         <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
           <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед · ${annual.blocks.length} блоков`} subtitle={`${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`} accent />
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
-            <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед</button>
+            <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
             {setAnnualWeeks && (
               <select value={annualWeeks} onChange={e => setAnnualWeeks(Number(e.target.value))} style={{ ...INPUT, width: 100, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
                 <option value={12}>12 нед</option><option value={24}>24 нед</option><option value={36}>36 нед</option><option value={52}>52 нед</option>
               </select>
             )}
-            <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед</Badge>
+            {setAnnualCycles && (
+              <select value={annualCycles ?? 1} onChange={e => setAnnualCycles(Number(e.target.value))} style={{ ...INPUT, width: 90, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
+                <option value={1}>1 цикл</option><option value={2}>2 цикла</option><option value={3}>3 цикла</option><option value={4}>4 цикла</option>
+              </select>
+            )}
+            <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед{annualCycles && annualCycles>1 ? ` · ${annualCycles}ц` : ''}</Badge>
+            {annual?.blocks?.length>4 && <Badge color="#f59e0b" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">Issurin 8-13н ×{annualCycles}</Badge>}
           </div>
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -343,6 +352,7 @@ export const CombatPlanView: React.FC<Props> = ({
         <GroupHeading icon="📊" text="Файлы" desc="CSV для Excel · ICS для календаря" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
           <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={BTN}>📊 CSV</button>
+          <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={BTN}>📗 XLSX</button>
           <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={BTN}>📅 План .ics</button>
         </div>
         <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>

@@ -62,6 +62,8 @@ export interface CombatInput {
   // Мониторинг
   acwr?: { ratio: number; zone: 'optimal' | 'caution' | 'dangerous' | 'undertrained' } | null;
   velocityLossPct?: number | null;
+  vbtHistory?: import('./combat-vbt.engine').VbtHistoryEntry[] | null;
+  velocityLossPerLift?: Record<string, number> | null;
 }
 
 export interface CombatSet {

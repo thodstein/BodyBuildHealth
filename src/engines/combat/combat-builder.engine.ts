@@ -21,7 +21,8 @@ import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
-import { vbtRecommendationCombat } from './combat-vbt.engine';
+import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat } from './combat-vbt.engine';
+import type { VbtHistoryEntry } from './combat-vbt.engine';
 import { coreWeeklyPlan } from './combat-core.engine';
 import { neckWeeklyPlan, NECK_IDS } from './combat-neck.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet, CombatPhase } from './combat.types';
@@ -462,14 +463,29 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           const low = Math.min(reps[0], Math.max(5, cap - 4));
           reps = [low, cap] as any;
         }
-        // ACWR / velocity корректировка (VBT — через combat-vbt, вес тоже корректируем)
-        const vLoss = input.velocityLossPct as number | undefined;
+        // ACWR / velocity корректировка (VBT per-exercise EWMA приоритетнее скаляра)
+        const perLiftLoss = (input.velocityLossPerLift as Record<string,number> | undefined)?.[id];
+        const vbtHist = (input.vbtHistory as VbtHistoryEntry[] | undefined);
+        let vLossEffective: number | undefined = undefined;
+        if (typeof perLiftLoss === 'number' && Number.isFinite(perLiftLoss) && perLiftLoss > 0) {
+          vLossEffective = perLiftLoss;
+        } else if (Array.isArray(vbtHist) && vbtHist.length) {
+          try {
+            const vels = vbtHistoryForLift(vbtHist, id);
+            if (vels.length >= 2) {
+              const best = Math.max(...vels.slice(-7, -1));
+              const last = vels[vels.length-1];
+              const d = diagnoseVelocityLossCombat(best, last, 20, weight, id);
+              if (d.lossPct > 15) vLossEffective = d.lossPct;
+            }
+          } catch {}
+        }
+        const vLoss = vLossEffective ?? (input.velocityLossPct as number | undefined);
         if (input.acwr?.zone === 'dangerous') rir = Math.min(4, rir + 2);
         else if (input.acwr?.zone === 'caution') rir = Math.min(4, rir + 1);
         else if (typeof vLoss === 'number' && vLoss > 0) {
           const rec = vbtRecommendationCombat(vLoss);
           if (rec.rirAdd > 0) rir = Math.min(4, rir + rec.rirAdd);
-          // при потере >25% — вес -5%, при 20-25% — -3%
           if (rec.volumeMult < 1 && weight > 0) {
             const wMult = rec.volumeMult <= 0.85 ? 0.95 : 0.97;
             weight = Math.round(weight * wMult / 2.5) * 2.5;
@@ -549,6 +565,52 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         };
         target.exercises.push(coreEx);
         target.durationMin = (target.durationMin||0)+6;
+      }
+    }
+    // P0-3 Neck 2.0 auto — Collins + BJSM Delphi 4 плоскости, как core (если не делод/тапер и <4 сетов шеи или missing plane)
+    const neckSets = sessions.flatMap(s=> s.exercises).filter(e=> e.id.includes('neck')).reduce((a,e)=>a+e.sets,0);
+    const neckIds = sessions.flatMap(s=> s.exercises).filter(e=> e.id.includes('neck')).map(e=> e.id);
+    const hasFlex = neckIds.some(id=> ['neck_flexion','neck_isometric_front','neck_eccentric_flexion'].includes(id));
+    const hasExt = neckIds.some(id=> ['neck_harness_ext','neck_bridge_wrestler','neck_isometric_back'].includes(id));
+    const hasLat = neckIds.some(id=> ['neck_lateral_flex','neck_isometric_side'].includes(id));
+    const hasRot = neckIds.some(id=> ['neck_rotation','neck_harness_rotation','neck_band_rotation_isometric'].includes(id));
+    const neckNeed = neckSets < 4 || !hasFlex || !hasExt || !hasLat || !hasRot;
+    if (neckNeed && !deload && !taper) {
+      const targetNeck = sessions.find(s=> s.sessionTag.includes('neck_grip') || s.sessionTag.includes('full_conditioning') || s.sessionTag.includes('upper_power')) || sessions[0];
+      if (targetNeck && targetNeck.exercises.length < 8 && targetNeck.exercises.reduce((a,e)=>a+e.sets,0) < 22) {
+        const neckPlan = neckWeeklyPlan(level, w, phase);
+        // выбираем первую missing плоскость
+        let pick: string | null = null;
+        if (!hasFlex) pick = neckPlan.find(e=> ['neck_flexion','neck_isometric_front','neck_eccentric_flexion'].includes(e.id))?.id || 'neck_isometric_front';
+        else if (!hasExt) pick = neckPlan.find(e=> ['neck_harness_ext','neck_isometric_back'].includes(e.id))?.id || 'neck_harness_ext';
+        else if (!hasLat) pick = 'neck_isometric_side';
+        else if (!hasRot) pick = 'neck_band_rotation_isometric';
+        else pick = neckPlan[0]?.id || 'neck_isometric_front';
+        if (pick && !targetNeck.exercises.some(e=> e.id===pick)) {
+          const nm = getExerciseMeta(pick) || { name: pick, group: 'neck', pattern: 'isolation' };
+          const neckProg = neckPlan.find(p=> p.id===pick);
+          const setsN = neckProg ? neckProg.sets : 2;
+          const repsN = neckProg ? neckProg.reps : '15с/стор';
+          const isHoldN = repsN.includes('с');
+          const repsNumN = isHoldN ? 1 : parseInt(repsN) || 12;
+          targetNeck.exercises.push({
+            id: pick,
+            name: nm.name,
+            group: 'neck',
+            pattern: nm.pattern,
+            role: 'accessory' as const,
+            character: 'памп' as const,
+            sets: setsN,
+            reps: repsN,
+            rir: 3,
+            weight: 0,
+            workSets: Array.from({length: setsN}, ()=> ({ reps: repsNumN, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: 60 })),
+            tempo: '2-1-1-0',
+            restSeconds: 60,
+            comment: `Шея Collins 2.0: ${pick} — авто 4 плоскости (Iron Neck ${hasFlex?'':'flex '} ${hasExt?'':'ext '} ${hasLat?'':'lat '} ${hasRot?'':'rot '})`,
+          } as any);
+          targetNeck.durationMin = (targetNeck.durationMin||0)+5;
+        }
       }
     }
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
