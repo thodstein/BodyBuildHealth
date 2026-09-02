@@ -252,7 +252,20 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
   const [plRunOpen, setPlRunOpen] = useState(false);
   useEffect(() => { if (tab === 'runtime') { setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime'))); } }, [tab]);
-  useEffect(() => { if (linked.readiness) appendReadinessToday(linked.readiness.recovery ?? 70, linked.readiness.fatigue ?? 30); }, [linked.readiness]);
+  // Запись готовности — дросселировано, не дёргаем localStorage на каждый микро-ререндер (без урезания данных)
+  const lastReadinessRef = React.useRef<{ r: number; f: number } | null>(null);
+  useEffect(() => {
+    if (!linked.readiness) return;
+    const r = Math.round(linked.readiness.recovery ?? 70);
+    const f = Math.round(linked.readiness.fatigue ?? 30);
+    const prev = lastReadinessRef.current;
+    if (prev && prev.r === r && prev.f === f) return;
+    lastReadinessRef.current = { r, f };
+    // Откладываем на idle чтобы не блочить переключение вкладок
+    const cb = () => appendReadinessToday(r, f);
+    if (typeof (window as any).requestIdleCallback === 'function') (window as any).requestIdleCallback(cb, { timeout: 2000 });
+    else setTimeout(cb, 0);
+  }, [linked.readiness]);
   // Open diary tab directly when navigated from Profile → diaries → Тренировки
   useEffect(() => {
     try {

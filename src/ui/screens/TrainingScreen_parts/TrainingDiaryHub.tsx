@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue, useTransition } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { Sparkline } from './Sparkline';
 import { OneRmCalcTab } from './OneRmCalcTab';
@@ -154,6 +154,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [exSearch, setExSearch] = useState('');
   const [notesPickerOpen, setNotesPickerOpen] = useState(false);
   const [notesFilter, setNotesFilter] = useState('');
+  // Неблокирующий UI: фильтры не фризят ввод (декор сохранён, рендер отложен)
+  const deferredSearch = useDeferredValue(search);
+  const deferredFilterGroup = useDeferredValue(filterGroup);
+  const deferredNotesFilter = useDeferredValue(notesFilter);
+  const [isPending, startTransition] = useTransition();
+  const [historyVisibleCount, setHistoryVisibleCount] = useState(12);
   const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
   const [hubAnalyticsExpanded, setHubAnalyticsExpanded] = useState(false);
@@ -242,15 +248,20 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     onRefresh();
   };
 
-  // History exercise filter
+  // History exercise filter — deferred чтобы ввод не лагал на большой истории
   const [historyExerciseFilter, setHistoryExerciseFilter] = useState('');
   const [mesoFilter, setMesoFilter] = useState<string>('all');
+  const deferredHistoryExerciseFilter = useDeferredValue(historyExerciseFilter);
+  const deferredMesoFilter = useDeferredValue(mesoFilter);
+  const deferredExSearch = useDeferredValue(exSearch);
   // Санитизация на входе: legacy-записи без exercises или с exercises={} (не-массив)
   // приводим к [] — защищает ВСЕ подкомпоненты дневника (формы, историю, аналитику).
   const safeHistoryWorkouts = useMemo(
     () => (Array.isArray(historyWorkouts) ? historyWorkouts : []).map(w => ({ ...w, exercises: Array.isArray(w.exercises) ? w.exercises : [] })),
     [historyWorkouts],
   );
+  // deferred для тяжёлых аналитик — не блочит ввод/скролл на большой истории
+  const deferredSafeHistory = useDeferredValue(safeHistoryWorkouts);
   const mesoIds = useMemo(() => Array.from(new Set(safeHistoryWorkouts.map(w => (w as any).mesocycleId).filter((x): x is string => !!x))), [safeHistoryWorkouts]);
   const allExerciseNames = useMemo(() => {
     const names = new Set<string>();
@@ -258,14 +269,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     return Array.from(names).sort();
   }, [safeHistoryWorkouts]);
   const filteredHistoryWorkouts = useMemo(() => {
-    if (!historyExerciseFilter) return safeHistoryWorkouts;
+    if (!deferredHistoryExerciseFilter) return safeHistoryWorkouts;
     const safeExercises = (w: any): any[] => (Array.isArray(w.exercises) ? w.exercises : []);
+    const q = deferredHistoryExerciseFilter.toLowerCase();
     return safeHistoryWorkouts.map(w => ({
       ...w,
       // legacy-записи без exercises или с exercises={} не должны ронять фильтр истории
-      exercises: safeExercises(w).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(historyExerciseFilter.toLowerCase())),
+      exercises: safeExercises(w).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(q)),
     })).filter(w => safeExercises(w).length > 0);
-  }, [safeHistoryWorkouts, historyExerciseFilter]);
+  }, [safeHistoryWorkouts, deferredHistoryExerciseFilter]);
 
   useEffect(() => {
     const m = loadMeasurements();
@@ -316,11 +328,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     setMeasurements(updated);
   };
 
-  // Analytics
+  // Analytics — тяжёлые, считаем на deferred истории чтобы не фризить вкладку
   const analytics = useMemo(() => {
-    if (safeHistoryWorkouts.length === 0) return null;
+    if (deferredSafeHistory.length === 0) return null;
     try {
-      const mapped = safeHistoryWorkouts.map(w => ({
+      const mapped = deferredSafeHistory.map(w => ({
         sessionId: w.id, date: w.date, focus: w.split || 'fullbody', durationMin: w.duration || 60,
         sets: (w.exercises || []).flatMap((ex: any) => (ex.sets || []).map((s: any, i: number) => ({
           exerciseId: ex.exerciseId || ex.name || 'unknown', exerciseName: ex.name || 'Exercise',
@@ -330,9 +342,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       if (!mapped.some(m => m.sets.length > 0)) return null;
       return computeAnalytics({ sessions: mapped, weeks: 4 });
     } catch { return null; }
-  }, [safeHistoryWorkouts]);
+  }, [deferredSafeHistory]);
 
-  const wsg = useMemo(() => weeklySetsByGroup(safeHistoryWorkouts, 8), [safeHistoryWorkouts]);
+  const wsg = useMemo(() => weeklySetsByGroup(deferredSafeHistory, 8), [deferredSafeHistory]);
   const groups = useMemo(() => Object.keys(wsg).sort((a, b) => (wsg[b]?.reduce((s: number, x: number) => s + x, 0) || 0) - (wsg[a]?.reduce((s: number, x: number) => s + x, 0) || 0)), [wsg]);
   const totals = useMemo(() => Array.from({ length: 8 }, (_, i) => groups.reduce((s, g) => s + (wsg[g]?.[i] || 0), 0)), [wsg, groups]);
 
@@ -346,38 +358,40 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [safeHistoryWorkouts]);
   const filteredHistory = useMemo(() => {
-    let result = search ? groupedHistory.filter(([week]) => week.toLowerCase().includes(search.toLowerCase())) : groupedHistory;
-    if (filterGroup !== 'all') {
+    let result = deferredSearch ? groupedHistory.filter(([week]) => week.toLowerCase().includes(deferredSearch.toLowerCase())) : groupedHistory;
+    if (deferredFilterGroup !== 'all') {
       result = result.map(([week, workouts]) => [
         week,
         workouts.filter(w => (w.exercises || []).some((e: any) => {
           const cat = EXERCISE_CATALOG.find((c: any) => c.id === e.exerciseId);
-          return cat?.group === filterGroup;
+          return cat?.group === deferredFilterGroup;
         })),
       ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
     }
-    if (historyExerciseFilter) {
-      const q = historyExerciseFilter.toLowerCase();
+    if (deferredHistoryExerciseFilter) {
+      const q = deferredHistoryExerciseFilter.toLowerCase();
       result = result.map(([week, workouts]) => [
         week,
         workouts.filter(w => (w.exercises || []).some((e: any) => (e.exerciseName || e.exerciseId || '').toLowerCase().includes(q))),
       ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
     }
-    if (notesFilter) {
-      const q = notesFilter.toLowerCase();
+    if (deferredNotesFilter) {
+      const q = deferredNotesFilter.toLowerCase();
       result = result.map(([week, workouts]) => [
         week,
         workouts.filter(w => (w.notes || '').toLowerCase().includes(q) || (w.split || '').toLowerCase().includes(q)),
       ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
     }
-    if (mesoFilter !== 'all') {
+    if (deferredMesoFilter !== 'all') {
       result = result.map(([week, workouts]) => [
         week,
-        workouts.filter(w => (w as any).mesocycleId === mesoFilter),
+        workouts.filter(w => (w as any).mesocycleId === deferredMesoFilter),
       ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
     }
     return result;
-  }, [groupedHistory, search, filterGroup, historyExerciseFilter, notesFilter, mesoFilter]);
+  }, [groupedHistory, deferredSearch, deferredFilterGroup, deferredHistoryExerciseFilter, deferredNotesFilter, deferredMesoFilter]);
+  // Сброс пагинации при смене фильтров (не режет декор, только объём рендера)
+  useEffect(() => { setHistoryVisibleCount(10); }, [deferredSearch, deferredFilterGroup, deferredHistoryExerciseFilter, deferredNotesFilter, deferredMesoFilter]);
 
   const curPhase = useMemo(() => {
     if (!macrocycle) return null;
@@ -388,8 +402,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   }, [macrocycle, selectedWeek]);
   const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', recovery: 'Восстановление' };
 
-  // Visual analytics
-  const vizSessions: VizSessionData[] = useMemo(() => safeHistoryWorkouts.map((s: any) => ({
+  // Visual analytics — на deferred чтобы не блочить переключение вкладок
+  const vizSessions: VizSessionData[] = useMemo(() => deferredSafeHistory.map((s: any) => ({
     week: s.weekNumber || 1, date: s.date || '',
     exercises: (s.exercises || []).map((e: any) => ({
       name: e.exerciseName || e.name || '', sets: e.sets?.length || 0,
@@ -397,8 +411,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       weight: Math.max(...(e.sets || [{ weight: 0 }]).map((st: any) => st.weight || 0), 0),
       rpe: 7, volume: e.totalVolume || 0,
     })),
-  })), [safeHistoryWorkouts]);
-  const visDashboard = useMemo(() => { try { return safeHistoryWorkouts.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [vizSessions, safeHistoryWorkouts]);
+  })), [deferredSafeHistory]);
+  const visDashboard = useMemo(() => { try { return deferredSafeHistory.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [vizSessions, deferredSafeHistory]);
   const visWeekly = useMemo(() => { try { return computeWeeklyChart(vizSessions); } catch { return []; } }, [vizSessions]);
   const visMuscleVol = useMemo(() => { try { return computeMuscleVolume(vizSessions); } catch { return []; } }, [vizSessions]);
   const visProg = useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
@@ -409,7 +423,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertMono = useMemo(() => { try { return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0; } catch { return 0; } }, [expertSrpe]);
   const expertExercises = useMemo(() => {
     const exMap = new Map<string, { first: number; last: number }>();
-    for (const w of safeHistoryWorkouts) {
+    for (const w of deferredSafeHistory) {
       const exs: any[] = (w as any).exercises || [];
       for (const ex of exs) {
         const nm = ex.name || ex.exerciseId || '?';
@@ -422,8 +436,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     }
     return Array.from(exMap.entries()).filter(([, v]) => v.first > 0 && v.last > 0).slice(0, 10)
       .map(([name, v]) => ({ name, e1rmBefore: Math.round(v.first), e1rmAfter: Math.round(v.last) }));
-  }, [safeHistoryWorkouts]);
-  const expertRecentVol = useMemo(() => safeHistoryWorkouts.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [safeHistoryWorkouts]);
+  }, [deferredSafeHistory]);
+  const expertRecentVol = useMemo(() => deferredSafeHistory.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [deferredSafeHistory]);
   const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
   const clearTrimWarning = () => { clearStorageTrimWarning(); setTrimWarning(null); };
 
@@ -442,7 +456,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     hubAnalyticsExpanded, setHubAnalyticsExpanded, barTooltip, setBarTooltip,
     progressionAlerts, trimWarning, setTrimWarning, clearTrimWarning,
     mesoIds, mesoFilter, setMesoFilter, search, setSearch, filterGroup, setFilterGroup,
-    groupPickerOpen, setGroupPickerOpen, exPickerOpen, setExPickerOpen, exSearch, setExSearch,
+    groupPickerOpen, setGroupPickerOpen, exPickerOpen, setExPickerOpen, exSearch, setExSearch, deferredExSearch,
     notesPickerOpen, setNotesPickerOpen,
     historyExerciseFilter, setHistoryExerciseFilter, notesFilter, setNotesFilter,
     allExerciseNames, groupedHistory, filteredHistory, filteredHistoryWorkouts, historyExpanded, setHistoryExpanded,
@@ -451,6 +465,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     recordSub, setRecordSub, planToRecord, setPlanToRecord,
     reminderTime, scheduleReminder,
     dupes, setDupes, dupesBusy, setDupesBusy,
+    isPending, historyVisibleCount, setHistoryVisibleCount,
   };
 
   return (

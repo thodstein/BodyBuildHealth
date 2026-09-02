@@ -21,13 +21,49 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
     diaryProgress, historyWorkouts, level, tprofile, linked, trainingOutput,
     search, setSearch, filterGroup, setFilterGroup, groupPickerOpen, setGroupPickerOpen,
-    exPickerOpen, setExPickerOpen, exSearch, setExSearch, notesPickerOpen, setNotesPickerOpen,
+    exPickerOpen, setExPickerOpen, exSearch, setExSearch, deferredExSearch, notesPickerOpen, setNotesPickerOpen,
     notesFilter, setNotesFilter, historyExerciseFilter, setHistoryExerciseFilter,
     mesoIds, mesoFilter, setMesoFilter, allExerciseNames, groupedHistory, filteredHistory,
     filteredHistoryWorkouts, historyExpanded, setHistoryExpanded, trimWarning, setTrimWarning, progressionAlerts,
     handleEditWorkout, handleDeleteWorkout, confirmDeleteId, setConfirmDeleteId,
-    setMode, onGoRecord, onRefresh,
+    setMode, onGoRecord, onRefresh, isPending, historyVisibleCount, setHistoryVisibleCount,
   } = hub;
+  // Пагинация: не рендерим 200 недель сразу — только видимый срез (декор сохранён, DOM легче)
+  const visibleHistory = React.useMemo(() => filteredHistory.slice(0, historyVisibleCount), [filteredHistory, historyVisibleCount]);
+  const hasMoreHistory = filteredHistory.length > visibleHistory.length;
+  // Мемоизация тяжёлых локальных вычислений — перечитываем localStorage 1 раз, не на каждый ререндер
+  const mindsetSummary = React.useMemo(() => {
+    try {
+      const checks = loadCheckins();
+      if (checks.length === 0) return null;
+      return { checks, adh: protocolAdherence(30), trends: mindsetTrends(14), last: checks[checks.length - 1] };
+    } catch { return null; }
+  }, [historyWorkouts.length]);
+  const mobilitySummary = React.useMemo(() => {
+    try {
+      const checks = loadMobilityCheckins();
+      if (checks.length === 0) return null;
+      return { checks, adh: mobilityAdherence(30), trends: mobilityTrends(30), last: checks[checks.length - 1] };
+    } catch { return null; }
+  }, [historyWorkouts.length]);
+  const warmupSummary = React.useMemo(() => {
+    try {
+      const log = loadWarmupLog();
+      if (log.length === 0) return null;
+      return { log, adh: warmupAdherence(30), q: warmupQualityTrend(30), last: log[log.length - 1] };
+    } catch { return null; }
+  }, [historyWorkouts.length]);
+  const cooldownSummary = React.useMemo(() => {
+    try {
+      const log = loadCooldownLog();
+      if (log.length === 0) return null;
+      return { log, adh: cooldownAdherence(30), q: cooldownQualityTrend(30), last: log[log.length - 1] };
+    } catch { return null; }
+  }, [historyWorkouts.length]);
+  const e1rmSeriesAll = React.useMemo(() => {
+    const sorted = [...historyWorkouts].sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
+    return sorted.slice(-12).map((w: any) => Math.max(0, ...(Array.isArray(w.exercises) ? w.exercises : []).map((e: any) => e.estimated1RM || 0)));
+  }, [historyWorkouts]);
   return (
         <div>
           {/* Кнопка возврата к записи (История — подвкладка дневника) */}
@@ -532,9 +568,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               ))}
             </div>
           )}
-          {/* Search + group filter */}
+          {/* Search + group filter — неблокирующий ввод (deferred), декор без изменений */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2 }} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2, opacity: isPending ? 0.85 : 1, transition: 'opacity 0.15s' }} />
             <button onClick={() => setGroupPickerOpen(true)} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
               padding: '10px 12px', borderRadius: 10, cursor: 'pointer', minWidth: 0,
@@ -598,9 +634,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>🏋️ Фильтр по упражнению</div>
                       <button onClick={() => setExPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
                     </div>
-                    <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="🔍 Найти упражнение..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 10 }} />
+                    <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="🔍 Найти упражнение..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 10, opacity: isPending ? 0.85 : 1 }} />
                     <div style={{ maxHeight: '50vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {allExerciseNames.filter(n => !exSearch || n.toLowerCase().includes(exSearch.toLowerCase())).map(n => (
+                      {allExerciseNames.filter(n => !deferredExSearch || n.toLowerCase().includes(deferredExSearch.toLowerCase())).map(n => (
                         <button key={n} onClick={() => { setHistoryExerciseFilter(n); setExPickerOpen(false); }} style={{
                           width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                           border: historyExerciseFilter === n ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
@@ -700,11 +736,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {/* Психо-чек-ины: сводка (из вкладки «Психология») */}
-          {loadCheckins().length > 0 && (() => {            const adh = protocolAdherence(30);
-            const trends = mindsetTrends(14);
-            const checks = loadCheckins();
-            const last = checks[checks.length - 1];
+          {/* Психо-чек-ины: сводка (из вкладки «Психология») — мемоизировано, не дергает localStorage каждый рендер */}
+          {mindsetSummary && (() => {
+            const { checks, adh, trends, last } = mindsetSummary;
             const avg = (v: number) => v > 0 ? v.toFixed(1) : '—';
             return (
               <div style={{ ...style.card, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)' }}>
@@ -733,12 +767,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {/* Мобильность: сводка (из вкладки «Мобильность») */}
-          {loadMobilityCheckins().length > 0 && (() => {
-            const madh = mobilityAdherence(30);
-            const mtr = mobilityTrends(30);
-            const mchecks = loadMobilityCheckins();
-            const mlast = mchecks[mchecks.length - 1];
+          {/* Мобильность: сводка (из вкладки «Мобильность») — мемоизировано */}
+          {mobilitySummary && (() => {
+            const { adh: madh, trends: mtr, last: mlast } = mobilitySummary;
             return (
               <div style={{ ...style.card, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -768,11 +799,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {/* Разминка: сводка (дневник разминки) */}
-          {loadWarmupLog().length > 0 && (() => {
-            const wadh = warmupAdherence(30);
-            const wq = warmupQualityTrend(30);
-            const wlast = loadWarmupLog()[loadWarmupLog().length - 1];
+          {/* Разминка: сводка (дневник разминки) — мемоизировано */}
+          {warmupSummary && (() => {
+            const { adh: wadh, q: wq, last: wlast } = warmupSummary;
             return (
               <div style={{ ...style.card, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -802,11 +831,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {/* Заминка: сводка (дневник заминки) */}
-          {loadCooldownLog().length > 0 && (() => {
-            const cadh = cooldownAdherence(30);
-            const cq = cooldownQualityTrend(30);
-            const clast = loadCooldownLog()[loadCooldownLog().length - 1];
+          {/* Заминка: сводка (дневник заминки) — мемоизировано */}
+          {cooldownSummary && (() => {
+            const { adh: cadh, q: cq, last: clast } = cooldownSummary;
             return (
               <div style={{ ...style.card, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -836,17 +863,13 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {filteredHistory.map(([week, workouts], wi) => (
+          {visibleHistory.map(([week, workouts], wi) => (
             <WorkoutWeekCard
               key={week}
               weekLabel={week}
               workouts={workouts}
-              prevWorkouts={wi < filteredHistory.length - 1 ? filteredHistory[wi + 1][1] : undefined}
-              e1rmSeries={(() => {
-                // Тренд лучшего e1RM по последним 12 сессиям (для спарклайна)
-                const sorted = [...historyWorkouts].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-                return sorted.slice(-12).map(w => Math.max(0, ...(Array.isArray(w.exercises) ? w.exercises : []).map((e: any) => e.estimated1RM || 0)));
-              })()}
+              prevWorkouts={wi < visibleHistory.length - 1 ? visibleHistory[wi + 1][1] : undefined}
+              e1rmSeries={e1rmSeriesAll}
               expanded={historyExpanded === '__all__' || historyExpanded === week}
               onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
               onEdit={handleEditWorkout}
@@ -856,6 +879,11 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               onCancelDelete={() => setConfirmDeleteId(null)}
             />
           ))}
+                    {hasMoreHistory && (
+            <button onClick={() => setHistoryVisibleCount((v: number) => v + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+              Показать еще 10 · осталось {filteredHistory.length - visibleHistory.length}
+            </button>
+          )}
           {filteredHistory.length === 0 && (
             <DiaryEmptyState
               icon="📜"

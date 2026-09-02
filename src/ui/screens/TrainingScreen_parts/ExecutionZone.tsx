@@ -102,13 +102,38 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       try { lock?.release?.(); } catch {}
     };
   }, [runtimeStarted]);
-  // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
-  // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
-  const trainingDaysList: any[] = (() => {
+  // Безопасные производные: мемоизированы чтобы не пересчитывать и не фризить вкладку на каждом тике таймера
+  const trainingDaysList: any[] = React.useMemo(() => {
     try { return ((currentMicrocycle?.days || []) as any[]).filter((d: any) => d && d.isTraining); }
     catch { return []; }
-  })();
-  const safeRuntimeDay = trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1);
+  }, [currentMicrocycle]);
+  const safeRuntimeDay = React.useMemo(() => trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1), [trainingDaysList.length, runtimeDay]);
+  // Мемоизация разминки — тяжёлый generateWarmup не гоняем на каждый ререндер таймера
+  const warmupMemo = React.useMemo(() => {
+    const dayExercises: any[] = (trainingDaysList[safeRuntimeDay] as any)?.exercises || [];
+    if (!dayExercises.length) return { dayExercises: [] as any[], groups: [] as string[], blocks: [] as any[], total: 0, mins: 0 };
+    const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
+    const blocks = generateWarmup({
+      sessionFocus: 'fullbody',
+      primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
+      primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
+      targetGroups: groups.length > 0 ? groups : ['fullbody'],
+      riskFlags: {},
+      techniqueIssues: [],
+      fatigueLevel: 0.2,
+      equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
+      mode: execWarmupMode,
+    });
+    const total = blocks.reduce((s: number, b: any) => s + b.exercises.length, 0);
+    const mins = Math.round(blocks.reduce((s: number, b: any) => s + (b.durationSec || 0), 0) / 60 * 10) / 10;
+    return { dayExercises, groups, blocks, total, mins };
+  }, [trainingDaysList, safeRuntimeDay, execWarmupMode]);
+  const warmupBlocksExec = warmupMemo.blocks;
+  const warmupTotal = warmupMemo.total;
+  const warmupMins = warmupMemo.mins;
+  const warmupGroups = warmupMemo.groups;
+  const warmupDoneCount = React.useMemo(() => Object.values(execWarmupDone).filter(Boolean).length, [execWarmupDone]);
+  const warmupPct = React.useMemo(() => warmupTotal > 0 ? Math.round(warmupDoneCount / warmupTotal * 100) : 0, [warmupDoneCount, warmupTotal]);
   return (
     <>
       {tab === 'runtime' && (
@@ -298,26 +323,15 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       </div>
                     );
                   })()}
-                  {/* ── Красивая разминка дня — по группам, суставы+активация+подводящие ── */}
-                  {(() => {
-                    const dayExercises: any[] = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                    if (!dayExercises.length) return null;
-                    const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
-                    const warmupBlocksExec = generateWarmup({
-                      sessionFocus: 'fullbody',
-                      primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
-                      primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
-                      targetGroups: groups.length > 0 ? groups : ['fullbody'],
-                      riskFlags: {},
-                      techniqueIssues: [],
-                      fatigueLevel: 0.2,
-                      equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
-                      mode: execWarmupMode,
-                    });
-                    const total = warmupBlocksExec.reduce((s, b) => s + b.exercises.length, 0);
-                    const done = Object.values(execWarmupDone).filter(Boolean).length;
-                    const pct = total > 0 ? Math.round(done / total * 100) : 0;
-                    const mins = Math.round(warmupBlocksExec.reduce((s, b) => s + (b.durationSec || 0), 0) / 60 * 10) / 10;
+                  {/* ── Красивая разминка дня — по группам, суставы+активация+подводящие (мемоизировано, не пересоздаём на тиках) ── */}
+                  {warmupMemo.dayExercises.length > 0 && (() => {
+                    const dayExercises = warmupMemo.dayExercises;
+                    const groups = warmupMemo.groups;
+                    const warmupBlocksExec = warmupMemo.blocks;
+                    const total = warmupMemo.total;
+                    const done = warmupDoneCount;
+                    const pct = warmupPct;
+                    const mins = warmupMemo.mins;
                     return (
                       <div style={{
                         margin: '8px 0', borderRadius: 14, overflow: 'hidden',
@@ -371,7 +385,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                 : b.type === 'activation' ? { icon: '⚡', title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' }
                                 : { icon: '🏋️', title: 'Подводящие', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' };
                               const bTotal = b.exercises.length;
-                              const bDone = b.exercises.filter((_, j) => execWarmupDone[`ew_${bi}_${j}`]).length;
+                              const bDone = b.exercises.filter((_: any, j: number) => execWarmupDone[`ew_${bi}_${j}`]).length;
                               const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
                               return (
                                 <div key={bi} style={{ borderRadius: 10, padding: '8px 8px 6px', background: bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`, borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}` }}>
@@ -384,7 +398,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                     <div style={{ height: '100%', width: `${bPct}%`, background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
                                   </div>
                                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {b.exercises.map((ex, j) => {
+                                    {b.exercises.map((ex: any, j: number) => {
                                       const isDone = !!execWarmupDone[`ew_${bi}_${j}`];
                                       const isSpec = 'intensityPct' in ex && (ex as any).intensityPct;
                                       const elabel = isSpec ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId);

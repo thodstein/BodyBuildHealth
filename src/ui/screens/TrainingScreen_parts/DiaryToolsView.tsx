@@ -22,6 +22,22 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     trainingReportGenerated, setTrainingReportGenerated,
     measurements, setMeasurements, dupes, setDupes, dupesBusy, setDupesBusy, onRefresh,
   } = hub;
+  // Мемоизация чтений localStorage — не дёргаем парсер на каждый ререндер
+  const mindsetCount = React.useMemo(() => { try { return loadCheckins().length; } catch { return 0; } }, [historyWorkouts.length]);
+  const mobilityCount = React.useMemo(() => { try { return loadMobilityCheckins().length; } catch { return 0; } }, [historyWorkouts.length]);
+  const warmupCount = React.useMemo(() => { try { return loadWarmupLog().length; } catch { return 0; } }, [historyWorkouts.length]);
+  const cooldownCount = React.useMemo(() => { try { return loadCooldownLog().length; } catch { return 0; } }, [historyWorkouts.length]);
+  const templatesMemo = React.useMemo(() => {
+    if (historyWorkouts.length === 0) return [];
+    const recent = historyWorkouts.slice(-5).reverse();
+    const templateMap = new Map<string, { exercises: string[]; sets: number; date: string }>();
+    recent.forEach((w: any) => {
+      const exNames = (w.exercises || []).map((e: any) => e.exerciseName || e.exerciseId).join(' + ');
+      const totalSets = (w.exercises || []).reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
+      if (exNames && !templateMap.has(exNames)) templateMap.set(exNames, { exercises: exNames.split(' + '), sets: totalSets, date: (w.date || '').slice(0, 10) });
+    });
+    return [...templateMap.entries()].slice(0, 4) as [string, { exercises: string[]; sets: number; date: string }][];
+  }, [historyWorkouts]);
   return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CsvImportTab onDone={onRefresh} />
@@ -63,7 +79,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Mindset check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧠 Психо-чек-ины CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({loadCheckins().length} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({mindsetCount} записей)</div>
             <button onClick={() => {
               const csv = exportMindsetCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -80,7 +96,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Mobility check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧘 Мобильность CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({loadMobilityCheckins().length} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({mobilityCount} записей)</div>
             <button onClick={() => {
               const csv = exportMobilityCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -97,7 +113,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Warmup diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>🔥 Разминка CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {loadWarmupLog().length} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {warmupCount} записей</div>
             <button onClick={() => {
               const csv = exportWarmupCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -114,7 +130,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Cooldown diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>❄️ Заминка CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {loadCooldownLog().length} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {cooldownCount} записей</div>
             <button onClick={() => {
               const csv = exportCooldownCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -128,30 +144,19 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               ❄️ Скачать дневник заминки CSV
             </button>
           </div>
-          {/* Workout templates from history */}
-          {historyWorkouts.length > 0 && (() => {
-            const recent = historyWorkouts.slice(-5).reverse();
-            const templateMap = new Map<string, { exercises: string[]; sets: number; date: string }>();
-            recent.forEach((w: any) => {
-              const exNames = (w.exercises || []).map((e: any) => e.exerciseName || e.exerciseId).join(' + ');
-              const totalSets = (w.exercises || []).reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
-              if (exNames && !templateMap.has(exNames)) {
-                templateMap.set(exNames, { exercises: exNames.split(' + '), sets: totalSets, date: (w.date || '').slice(0, 10) });
-              }
-            });
-            const templates = [...templateMap.entries()].slice(0, 4);
-            if (templates.length === 0) return null;
-            return (
+          {/* Workout templates from history — мемоизировано (не пересобираем на каждый ввод) */}
+          {templatesMemo.length > 0 && (
               <div style={style.card}>
                 <div style={style.label}>📋 Шаблоны из дневника</div>
                 <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Повторить тренировку из прошлого</div>
-                {templates.map(([key, t], i) => (
+                {templatesMemo.map(([key, t], i) => (
                   <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{t.exercises.slice(0, 3).join(', ')}{t.exercises.length > 3 ? ` +${t.exercises.length - 3}` : ''}</div>
                       <div style={{ fontSize: 9, color: '#fff' }}>{t.sets} сетов · {t.date}</div>
                     </div>
                     <button onClick={() => {
+                      const recent = historyWorkouts.slice(-5).reverse();
                       const wo = recent.find((w: any) => {
                         const names = (w.exercises || []).map((e: any) => e.exerciseName || e.exerciseId).join(' + ');
                         return names === key;
@@ -161,8 +166,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                 ))}
               </div>
-            );
-          })()}
+            )}
           <div style={style.card}>
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>📄 Отчёты</div>
             <div style={{ display: 'flex', gap: 6 }}>

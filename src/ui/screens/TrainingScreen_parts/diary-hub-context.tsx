@@ -81,6 +81,7 @@ export interface DiaryHubCtx {
   setExPickerOpen: (b: boolean) => void;
   exSearch: string;
   setExSearch: (s: string) => void;
+  deferredExSearch: string;
   notesPickerOpen: boolean;
   setNotesPickerOpen: (b: boolean) => void;
   historyExerciseFilter: string;
@@ -92,6 +93,9 @@ export interface DiaryHubCtx {
   filteredHistory: [string, WorkoutLog[]][];
   historyExpanded: string | null;
   setHistoryExpanded: (s: any) => void;
+  isPending: boolean;
+  historyVisibleCount: number;
+  setHistoryVisibleCount: (n: number) => void;
 
   handleEditWorkout: (w: WorkoutLog) => void;
   handleDeleteWorkout: (id: string) => Promise<void>;
