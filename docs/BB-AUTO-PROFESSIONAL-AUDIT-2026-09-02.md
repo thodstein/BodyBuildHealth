@@ -1,6 +1,6 @@
 # ББ-авто — аудит vs профессиональный стандарт + план доведения (Sep 2 2026, ред. 2)
 
-> Статус: **выполнено (Sep 2 2026) — A, B', F, C, R1-R3 внедрены и закоммичены; P2-опции E/D отложены (осознанно).**
+> Статус: **выполнено полностью (Sep 2 2026) — A, B', F, C, R1-R3 + все P1 (микрозагрузка, суперсет-тайм, женский цикл, VBT) внедрены и закоммичены; P2-опции E/D отложены (осознанно).**
 > База: `src/engines/bb/*` 61 файл, `BbAutoConstructor.tsx:159` ~3.7k строк, `bb-contest-prep.engine.ts:92` 2.9k строк, `volume-landmarks.engine.ts:1`, 27 сплитов `bb-split-patterns.ts:1`. Предыдущие фазы 0–5 `docs/BB-AUTO-PROFESSIONAL-LEVEL-PLAN.md:5` — выполнены (1864/56 `bb` зелёных, `tsc 0`).
 >
 > **Ред. 2** — внесены правки по критическому разбору:
@@ -252,16 +252,21 @@
 | A. Personal MEV Finder | `bb-mev-calibration.engine.ts`, `bb-builder.engine.ts`, `BbAutoConstructor.tsx` | ✅ | b76d7e81, 05b90a22 |
 | B'. План vs факт | `bb-plan-fact.engine.ts`, `BbAutoConstructor.tsx` | ✅ | bf20b61e |
 | F. Единый отчёт качества | `bb-quality-report.engine.ts`, `BbAutoConstructor.tsx` | ✅ | 4c436d11 |
-| C. SFR-БД | `bb-sfr-db.ts`, `BbAutoConstructor.tsx` | ✅ | 778989f9 |
-| R1-R3. Rehab/тоннаж/overreaching | `bb-recovery.engine.ts` | ✅ | 3a28fc95 |
+| C. SFR-БД | `bb-sfr-db.ts`, `BbAutoConstructor.tsx` | ✅ | 778989f9, 0bd12944, 5d7fbc3b |
+| R1-R3. Rehab/тоннаж/overreaching | `bb-recovery.engine.ts` | ✅ | 3a28fc95, f55d41b0, ec7d1303 |
+| P1. Микрозагрузка (пластины) | `bb-plates.engine.ts` | ✅ | (поздний коммит) |
+| P1. Суперсет-тайм | `bb-fatigue.engine.ts` | ✅ | (поздний коммит) |
+| P1. Женский цикл | `bb-cycle.engine.ts` | ✅ | (поздний коммит) |
+| P1. VBT | `bb-vbt.engine.ts` | ✅ | (поздний коммит) |
 | P2 E (ATR/DUP) | — | ⏸ отложено (осознанно, §2.4) | — |
 | P2 D (wearable) | — | ⏸ отложено (осознанно, §2.4) | — |
 
-**Новые тесты:** bb-mev-calibration 14, bb-plan-fact 7, bb-quality-report 6, bb-sfr-db 6, bb-recovery 7 = **40 зелёных**.
+**Новые тесты:** 58 зелёных (mev 14, plan-fact 7, quality 6, sfr 6, recovery 9, plates 6, fatigue-superset 2, cycle 3, vbt 5).
 
-**Верификация:**
+**Верификация (финальная):**
 - `tsc --noEmit` — мои файлы чисты (0 ошибок).
-- Полный `vitest run src/engines/bb`: **1641 passed / 59 failed (1700)** — ровно равно прогону с pre-EpicA bb-builder (59 failed / 1641 passed), т.е. **0 новых регрессий** от всех эпиков; 59 падений — пред-существующие (кластер PPL/объём/специализация, задокументирован в §5).
-- Капы не изменены (см. §3): всё — персонализация/отчётность внутри frozen `sessionLimitsFor`.
+- Полный `vitest run src/engines/bb`: **1659 passed / 59 failed (1718)** — ровно pre-существующий кластер (59 = PPL/объём/специализация, задокументирован §5); все 58 новых тестов зелёные, **0 новых регрессий**.
+- SFR вшит в выбор БЕЗОПАСНО: как тай-брейк в strict-group замене изоляций (не в primary-компаратор — там SFR ломал прогрессию весов, исправлено).
+- Капы не изменены (см. §3) — всё персонализация/отчётность/реалистичность внутри frozen `sessionLimitsFor`.
 - Коммиты строго pathspec (только свои файлы); чужие изменения не откатывались.
 
