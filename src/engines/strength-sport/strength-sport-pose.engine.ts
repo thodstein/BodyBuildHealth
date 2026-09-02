@@ -41,10 +41,57 @@ export function livePoseStatus(angles: JointAnglesPose): { ok: boolean; faults: 
   return { ok: faults.length === 0, faults };
 }
 
+// CDN MediaPipe Pose (BlazePose) — parity с arm-motion-capture ensureHandsModel
+export function hasPoseSupport(): boolean {
+  return typeof (globalThis as any).Pose !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined' || typeof (globalThis as any).pose !== 'undefined';
+}
+export async function ensurePoseModel(): Promise<boolean> {
+  if (hasPoseSupport()) return true;
+  try {
+    const src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js';
+    if (typeof document === 'undefined') return false;
+    const existing = document.querySelector(`script[src="${src}"]`) as any;
+    if (existing) return hasPoseSupport();
+    await new Promise<void>((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('pose load failed'));
+      document.head.appendChild(s);
+    });
+    await new Promise(r => setTimeout(r, 500));
+    return hasPoseSupport();
+  } catch { return false; }
+}
+export function hasVideoSupport(): boolean { return hasPoseSupport(); }
+export function detectPoseFromVideo(frame: unknown): JointAnglesPose | null {
+  try {
+    if (typeof frame === 'object' && frame !== null) {
+      const f = frame as any;
+      if ('landmarks' in f && f.landmarks && typeof f.landmarks === 'object' && !Array.isArray(f.landmarks)) {
+        return estimateAnglesFromLandmarks(f as PoseFrame);
+      }
+      if (Array.isArray(f) && f.length >= 4) {
+        const [hip, knee, ankle, shoulder] = f;
+        if (hip && knee && ankle) return estimateAnglesFromLandmarks({ landmarks: { hip, knee, ankle, shoulder: shoulder || hip }, t: 0 });
+      }
+    }
+    const mp = (globalThis as any).Pose || (globalThis as any).BlazePose;
+    if (!mp || !frame) return null;
+    return null;
+  } catch { return null; }
+}
+
 // Stub для MediaPipe — возвращает моки, чтобы UI не падал без модели
 export function createMockPoseStream(): PoseFrame[] {
   return [
     { t: 0, landmarks: { hip: { x: 0, y: 0 }, knee: { x: 0, y: -1 }, ankle: { x: 0, y: -2 }, shoulder: { x: 0, y: 1 }, elbow: { x: 0.5, y: 1 }, foot: { x: 0, y: -2.2 }, wrist: { x: 0.5, y: 1.5 } } },
     { t: 0.1, landmarks: { hip: { x: 0, y: 0 }, knee: { x: 0.1, y: -0.9 }, ankle: { x: 0, y: -1.9 }, shoulder: { x: 0, y: 1 }, elbow: { x: 0.5, y: 1 }, foot: { x: 0, y: -2.2 }, wrist: { x: 0.5, y: 1.5 } } },
   ];
+}
+export function isPoseVerified(angles: JointAnglesPose | null): boolean {
+  if (!angles) return false;
+  const st = livePoseStatus(angles);
+  return st.ok;
 }

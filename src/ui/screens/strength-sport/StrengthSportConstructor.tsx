@@ -67,6 +67,7 @@ export const StrengthSportConstructor: React.FC = () => {
     { id:'atlas_stone_load', label:'Камень', distanceM:0, timeCapS:60 },
   ]);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  const [diagnosticLevel, setDiagnosticLevel] = useState<string>('');
   // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
   useEffect(() => {
     const apply = (payload: any) => {
@@ -74,6 +75,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const groups: string[] | undefined = payload.data?.groups || payload.data?.smWeakPoints || payload.data?.wlWeakPoints;
       if (Array.isArray(groups) && groups.length > 0) {
         setWeakPoints(groups.slice(0, 3).map((s: string) => String(s)));
+        if (payload.data?.level) setDiagnosticLevel(String(payload.data.level));
         if (payload.data?.smWeakPoints) setMode('strongman' as any);
         if (payload.data?.wlWeakPoints) setMode('weightlifting' as any);
       }
@@ -242,6 +244,10 @@ export const StrengthSportConstructor: React.FC = () => {
         // лог для отладки, не блокирует сборку
         try { console.info('[TA injection]', inj.notes.join(' | ')); } catch {}
       }
+    }
+    if (diagnosticLevel === 'critical') {
+      p.weeksData.forEach(w => { if (!w.deload) w.sessions.forEach(s => s.exercises.forEach(e => { const orig = e.workSets.length; const keep = Math.max(2, Math.round(orig * 0.85)); if (keep < orig) { e.workSets = e.workSets.slice(0, keep); e.sets = keep; e.workSets.forEach(ws => ws.rir = Math.min(4, (ws.rir ?? 2) + 1)); } })); });
+      p.rationale.push('CRITICAL gate: объём ×0.85 RIR+1 (score≤49)');
     }
     setPlan(p);
     saveStrengthSportPlan(p);

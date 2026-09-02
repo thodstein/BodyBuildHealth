@@ -48,9 +48,35 @@ ${diag}
 </body></html>`;
 }
 
+export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
+  const escCsv = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+  const rows = [
+    ['weakPoints', snap.weakPoints.join(';') || 'balance'],
+    ['score', String(snap.score)],
+    ['level', snap.level],
+    ['verification', String(snap.verification)],
+    ['barPath', snap.barPath || ''],
+    ['vbt', snap.vbt || ''],
+    ['ohs', snap.ohs ? `${snap.ohs.totalScore}/6` : ''],
+    ['asymmetry', snap.asymmetryPct != null ? String(snap.asymmetryPct) : ''],
+    ['findings', snap.findings.join('; ')],
+  ];
+  return rows.map(r => r.map(escCsv).join(',')).join('\n');
+}
+
 export function downloadWLHtml(html: string, filename = 'ta-report.html'): void {
   try {
     const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch {}
+}
+export function downloadWLCsv(snap: WLDiagnosticSnapshot, filename = 'ta-diagnostics.csv'): void {
+  try {
+    const csv = buildWLCsv(snap);
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();

@@ -19,7 +19,7 @@ import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/st
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
-import { buildWLDiagnosticsHtml, downloadWLHtml } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
+import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -307,6 +307,12 @@ export const WLDiagnosticsHub: React.FC = () => {
     setToast('✓ HTML экспорт');
     setTimeout(() => setToast(''), 2000);
   };
+  const handleExportCsv = () => {
+    const snap = { weakPoints, score, level, verification: scoring.verification, barPath: state.barPath || null, vbt: state.vbtVel || state.vbtBest || null, ohs: { totalScore: ohs.totalScore, failed: ohs.failed }, asymmetryPct: asymmetry?.diff ?? null, fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null, findings: scoring.findings.map(f => f.text) } as any;
+    downloadWLCsv(snap, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
+    setToast('✓ CSV экспорт');
+    setTimeout(() => setToast(''), 2000);
+  };
 
   const mockPose = useMemo(() => {
     const frames = createMockPoseStream();
@@ -557,6 +563,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
           <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
+          <button onClick={handleExportCsv} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
         </div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
       </div>
