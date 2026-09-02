@@ -110,6 +110,7 @@ import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../e
 import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
 import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
+import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -634,6 +635,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
   // R1: мышцы для реабилитации (прогрессивная рампа возврата). По умолчанию — щадящие травмы.
   const [rehabMuscles, setRehabMuscles] = useState<string[]>([]);
+  // P1: набор пластин зала для реалистичного округления весов.
+  const [platePreset, setPlatePreset] = useState<string>('standard');
   // PRO: mobility restrictions — biomechanics-based exercise filtering
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
 
@@ -1872,6 +1875,7 @@ export const BbAutoConstructor: React.FC = () => {
           blastWeeks,
           cruiseWeeks,
           rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
+          availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
         }, pedAdapt);
     }
 
@@ -2925,6 +2929,19 @@ export const BbAutoConstructor: React.FC = () => {
                         const on = bbEquipment.includes(id);
                         return <button key={id} onClick={() => setBbEquipment(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:38, border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'#fff' }}>{label}{on?' ✓':''}</button>;
                       })}
+                    </div>
+                  </div>
+                  {/* P1: набор пластин зала — реалистичные веса */}
+                  <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(147,197,253,0.04)', border:'1px solid rgba(147,197,253,0.14)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#93c5fd', marginBottom:4 }}>🏋️ Набор пластин (микрозагрузка)</div>
+                    <div style={{ fontSize:9, opacity:0.8, marginBottom:6 }}>Веса плана округляются к реально достижимым на вашем наборе пластин (стандарт / микрозагрузка / домашний / машины-шаг 1).</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {PLATE_SET_PRESETS.map(p => (
+                        <button key={p.id} onClick={() => setPlatePreset(p.id)} style={{ padding:'3px 8px', borderRadius:999, fontSize:9, fontWeight:700, cursor:'pointer', minHeight:28,
+                          background: platePreset === p.id ? 'rgba(147,197,253,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: platePreset === p.id ? '1px solid rgba(147,197,253,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                          color: platePreset === p.id ? '#93c5fd' : '#fff' }}>{p.label}</button>
+                      ))}
                     </div>
                   </div>
                   <div style={{ marginTop:8 }}>

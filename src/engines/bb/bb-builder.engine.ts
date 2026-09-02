@@ -19,6 +19,7 @@ import { getAllVolumeLandmarks, getVolumeLandmarks, normLevel, type TrainingLeve
 import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from './bb-mev-calibration.engine';
 import { sfrSelectionBonus } from './bb-sfr-db';
 import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
+import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -221,6 +222,9 @@ export interface BBBuilderInput {
    *  объём следующего мезо масштабируется фактическим ростом тоннажа (кап 0.9..1.15).
    *  ≥2 планов включают множитель; один/нет — без изменений. */
   previousPlans?: BBPlan[];
+  /** P1: набор пластин для реалистичного округления весов (микрозагрузка per-gym).
+   *  Если передан — все рабочие веса плана округляются к достижимым на этом наборе. */
+  availablePlates?: number[];
 }
 
 /**
@@ -3769,6 +3773,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       rationale.push(`🩹 Rehab-возврат: ${rehabResult.changes.slice(0, 6).join(' · ')}`);
       for (const m of input.rehabMuscles) rationale.push(rehabNotes(m, input.rehabWeekStart ?? 1));
     }
+  }
+  // P1: гимназическая микрозагрузка — округлить веса к достижимым на наборе пластин.
+  if (Array.isArray(input.availablePlates) && input.availablePlates.length > 0) {
+    const pl = applyPlateRoundingToPlan(finalPlan, input.availablePlates, 20);
+    if (pl.changed > 0) rationale.push(`🎯 Реалистичные веса: округлены к набору пластин зала (изменено ${pl.changed} подходов).`);
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
