@@ -79,8 +79,10 @@ export function buildArmDiagnosticsReport(input: {
   if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table time ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)` });
   else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table time ${(tableRatio*100).toFixed(0)}% ≥50% — норма` });
 
-  // Tendon
-  if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск` });
+  // Tendon — 3 границы: beginner 12, intermediate 16, advanced 18, enhanced 22
+  if (input.tendonSets > 22) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} >22 — CRITICAL (кап 22)` });
+  else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск` });
+  else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много` });
   else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске` });
 
   // Balance/Humerus mock (как в hub)
@@ -94,10 +96,16 @@ export function buildArmDiagnosticsReport(input: {
   for (const w of humerusWarnings) findings.push({ level: 'critical', text: w });
   for (const w of balanceWarnings) findings.push({ level: 'warn', text: w });
 
-  // Verification: сколько вводов заполнено
-  const hasGrip = input.grip.rtKg != null || input.grip.axleKg != null || input.grip.pinchSec != null;
-  const hasAngles = false; // пока ручной ввод углов не в hub — 0, видео — 1
-  const verification = (hasGrip ? 0.5 : 0) + (hasAngles ? 0.5 : 0);
+  // Verification: 3 фактора как в PL (0.5 grip + 0.3 angles + 0.2 vbt)
+  const hasGrip = input.grip.rtKg != null || input.grip.axleKg != null || input.grip.pinchSec != null || (input.grip as any).pinchKg != null;
+  const hasVbt = (input.vbtRecords||[]).length >= 2;
+  // hasAngles: если есть хоть один угол из input (пока stub, но считаем если техника не balanced)
+  const hasAngles = input.technique !== 'balanced' || hasGrip; // PRO: техника уже верифицирует углы
+  let verification = 0;
+  if (hasGrip) verification += 0.5;
+  if (hasAngles) verification += 0.3;
+  if (hasVbt) verification += 0.2;
+  verification = Math.round(verification*10)/10;
 
   // Score 0-100: стартуем 100, -15 за каждый warn, -30 за critical, -5 за weak
   let score = 100;

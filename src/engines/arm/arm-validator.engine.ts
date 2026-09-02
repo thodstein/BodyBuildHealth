@@ -3,7 +3,7 @@
  */
 import type { ArmPlan, ArmValidationResult } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
-import { checkHumerusGuard, checkWristBalance } from './arm-injury-guard.engine';
+import { checkHumerusGuard, checkWristBalance, checkUCLGuard, checkShoulderGuard, checkTendonGuard } from './arm-injury-guard.engine';
 
 export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationResult {
   const lvl = level || plan.level || 'intermediate';
@@ -44,14 +44,14 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   warnings.push(...humerusWarnings);
   const balanceWarnings = checkWristBalance(plan);
   warnings.push(...balanceWarnings);
-
-  const tendonWarnings: string[] = [];
-  for (const wk of plan.weeks) {
-    const tendonSets = wk.sessions.reduce((s, ss) => s + ss.exercises.filter(e => ['wrist_flexors','pronators','supinators'].includes(e.muscle)).reduce((a,e)=>a+e.sets,0),0);
-    if (tendonSets > 18) tendonWarnings.push(`Н${wk.week}: tendon сетов ${tendonSets} >18 — риск`);
-  }
+  const uclWarnings = checkUCLGuard(plan as any);
+  warnings.push(...uclWarnings);
+  const shoulderWarnings = checkShoulderGuard(plan as any);
+  warnings.push(...shoulderWarnings);
+  const tendonWarnings = checkTendonGuard(plan as any);
   warnings.push(...tendonWarnings);
-
-  const valid = errors.length === 0 && mrvOverflow.length === 0;
-  return { valid, errors, warnings, mrvOverflow, humerusWarnings, balanceWarnings, tendonWarnings };
+  // critical tendon >22 — делаем invalid
+  const hasCriticalTendon = tendonWarnings.some(w => w.includes('CRITICAL'));
+  const valid = errors.length === 0 && mrvOverflow.length === 0 && !hasCriticalTendon;
+  return { valid, errors, warnings, mrvOverflow, humerusWarnings, balanceWarnings, tendonWarnings: [...tendonWarnings, ...uclWarnings, ...shoulderWarnings] };
 }

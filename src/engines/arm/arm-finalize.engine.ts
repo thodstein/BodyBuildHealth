@@ -87,8 +87,21 @@ function ensureTableTime(plan: ArmPlan, targetRatio: number): void {
     const tableSess = wk.sessions.filter(s => s.tableTime).length;
     const ratio = tableSess / Math.max(1, wk.sessions.length);
     if (ratio < 0.3 && targetRatio >= 0.5) {
-      // пометить warning, не ломаем структуру
-      plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% при цели 50% — добавить стол`);
+      // PRO: не только warning, но и swap одной Support сессии на TableTech если есть место
+      const supportIdx = wk.sessions.findIndex(s => !s.tableTime && s.sessionTag === 'Support');
+      if (supportIdx >= 0 && wk.sessions[supportIdx].exercises.length < 6) {
+        wk.sessions[supportIdx].tableTime = true;
+        wk.sessions[supportIdx].sessionTag = 'TableTech';
+        wk.sessions[supportIdx].exercises.unshift({
+          muscle: 'pronators' as any, name: 'Пронация на блоке (90)', role: 'primary', character: 'техника' as any,
+          sets: 2, repsRange: [8,12], rir: 3,
+          workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
+          movementPattern: 'pronation' as any, substitutionGroup: 'pronation', isTable: true,
+        });
+        plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% — автозамена Support→TableTech (Кузнецов VIII ≥50%)`);
+      } else {
+        plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% при цели 50% — добавить стол`);
+      }
     }
   }
 }

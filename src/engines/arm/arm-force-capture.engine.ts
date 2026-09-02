@@ -31,11 +31,15 @@ export function recordGripForce(r: GripForceRecord): GripForceRecord {
   return { ...r, dateIso: r.dateIso || new Date().toISOString().slice(0, 10) };
 }
 
-export function estimateForceVector(r: GripForceRecord): ForceVector {
+export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number }): ForceVector {
   const gripSupport = r.rtKg != null ? Math.max(0, Math.min(100, ((r.rtKg - RT_AVG) / (RT_WORLD_CLASS - RT_AVG)) * 50 + 50)) : r.axleKg != null ? Math.max(0, Math.min(100, (r.axleKg / AXLE_WORLD_CLASS) * 100)) : 0;
-  const gripPinch = r.pinchSec != null ? Math.max(0, Math.min(100, (r.pinchSec / PINCH_GOOD_SEC) * 100)) : 0;
-  const sidePressure = r.sideKg != null ? Math.max(0, Math.min(100, (r.sideKg / 60) * 100)) : 0; // 60кг = 100% (оценка)
-  const backPressure = r.backKg != null ? Math.max(0, Math.min(100, (r.backKg / 80) * 100)) : 0;
+  const gripPinch = r.pinchSec != null ? Math.max(0, Math.min(100, (r.pinchSec / PINCH_GOOD_SEC) * 100)) : r.pinchKg != null ? Math.max(0, Math.min(100, (r.pinchKg / 30) * 100)) : 0;
+  // Side/back нормируем на bodyWeight *0.6 (PRO, как BB armProgression)
+  const bw = r.bodyWeightKg && r.bodyWeightKg > 30 ? r.bodyWeightKg : 80;
+  const sideRef = Math.max(30, bw * 0.6);
+  const backRef = Math.max(40, bw * 0.8);
+  const sidePressure = r.sideKg != null ? Math.max(0, Math.min(100, (r.sideKg / sideRef) * 100)) : 0;
+  const backPressure = r.backKg != null ? Math.max(0, Math.min(100, (r.backKg / backRef) * 100)) : 0;
   const vals = [gripSupport, gripPinch, sidePressure, backPressure].filter(v => v > 0);
   const totalScore = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
   return { gripSupport: Math.round(gripSupport), gripPinch: Math.round(gripPinch), sidePressure: Math.round(sidePressure), backPressure: Math.round(backPressure), totalScore };

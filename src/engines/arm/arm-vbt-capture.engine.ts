@@ -26,34 +26,39 @@ export function estimateVbtLoss(records: VbtRecord[]): number | null {
   return Math.round(((best - last) / best) * 100);
 }
 
-export function vbtZone(lossPct: number | null): 'ok' | 'warn' | 'stop' {
+export function vbtZone(lossPct: number | null, exerciseId?: string): 'ok' | 'warn' | 'stop' {
   if (lossPct == null) return 'ok';
-  if (lossPct >= 30) return 'stop';
-  if (lossPct >= 20) return 'warn';
+  const { warnPct, stopPct } = vbtForExercise(exerciseId || '');
+  if (lossPct >= stopPct) return 'stop';
+  if (lossPct >= warnPct) return 'warn';
   return 'ok';
 }
 
 export function diagnoseVbt(records: VbtRecord[]): VbtAdvice {
   const loss = estimateVbtLoss(records);
-  const zone = vbtZone(loss);
+  const exId = records.length ? records[records.length - 1].exerciseId || '' : '';
+  const zone = vbtZone(loss, exId);
   let e1RM: number | null = null;
   if (records.length > 0) {
     const last = records[records.length - 1];
     if (last.weight && last.reps) {
-      // Epley
       e1RM = Math.round(last.weight * (1 + last.reps / 30));
     }
   }
   let advice = '—';
-  if (zone === 'stop') advice = 'Потеря ≥30% — стоп, риск tendon, снизить вес';
-  else if (zone === 'warn') advice = 'Потеря 20–30% — на грани, добавить 1 день отдыха';
-  else if (loss != null) advice = `Потеря ${loss}% — в допуске`;
+  const { warnPct, stopPct } = vbtForExercise(exId);
+  if (zone === 'stop') advice = `Потеря ≥${stopPct}% — стоп, риск tendon, снизить вес`;
+  else if (zone === 'warn') advice = `Потеря ${warnPct}–${stopPct}% — на грани, +1 день отдыха`;
+  else if (loss != null) advice = `Потеря ${loss}% — в допуске (<${warnPct}%)`;
   else advice = 'Введите скорость (м/с) для двух подходов';
   return { velocityLossPct: loss, e1RM, zone, advice };
 }
 
 export function vbtForExercise(exerciseId: string): { warnPct: number; stopPct: number } {
-  if (exerciseId.includes('wrist')) return { warnPct: 20, stopPct: 30 };
-  if (exerciseId.includes('pronation') || exerciseId.includes('supination')) return { warnPct: 25, stopPct: 35 };
+  const low = (exerciseId || '').toLowerCase();
+  if (low.includes('wrist') || low.includes('cup')) return { warnPct: 20, stopPct: 30 };
+  if (low.includes('pronation') || low.includes('supination')) return { warnPct: 25, stopPct: 35 };
+  if (low.includes('grip') || low.includes('coc') || low.includes('pinch') || low.includes('rolling')) return { warnPct: 15, stopPct: 25 };
+  if (low.includes('side_press') || low.includes('side')) return { warnPct: 15, stopPct: 25 };
   return { warnPct: 20, stopPct: 30 };
 }
