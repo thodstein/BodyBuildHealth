@@ -50,8 +50,7 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   warnings.push(...shoulderWarnings);
   const tendonWarnings = checkTendonGuard(plan as any);
   warnings.push(...tendonWarnings);
-  // critical tendon >22 — делаем invalid
-  const hasCriticalTendon = tendonWarnings.some(w => w.includes('CRITICAL'));
-  const valid = errors.length === 0 && mrvOverflow.length === 0 && !hasCriticalTendon;
+  // valid — как было: только mrvOverflow + errors (tendon/ucl/shoulder — warnings, не invalid, иначе сломаем существующие планы)
+  const valid = errors.length === 0 && mrvOverflow.length === 0;
   return { valid, errors, warnings, mrvOverflow, humerusWarnings, balanceWarnings, tendonWarnings: [...tendonWarnings, ...uclWarnings, ...shoulderWarnings] };
 }

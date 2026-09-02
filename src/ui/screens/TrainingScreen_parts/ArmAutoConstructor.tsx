@@ -21,7 +21,7 @@ import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 
-type Step = 'params'|'grip'|'split'|'plan'|'quality';
+type Step = 'params'|'grip'|'split'|'plan'|'quality'|'weights';
 
 const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
 const GOALS = [
@@ -69,15 +69,21 @@ export function ArmAutoConstructor() {
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({});
   const [courseIntensity, setCourseIntensity] = useState<'mild'|'moderate'|'heavy'>('moderate');
   const [showPed, setShowPed] = useState(false);
+  const [workMaxEdit, setWorkMaxEdit] = useState<Record<string, string>>({});
 
   const workMax = useMemo(() => {
     try {
       const pm: any = linked?.profile?.personal ?? {};
       const wm: Record<string, number> = {};
       if (pm.weight) wm['default'] = Number(pm.weight) || 50;
+      // editable overrides
+      for (const [k,v] of Object.entries(workMaxEdit)) {
+        const n = parseFloat(v);
+        if (Number.isFinite(n) && n>0) wm[k] = n;
+      }
       return wm;
     } catch { return {}; }
-  }, [linked]);
+  }, [linked, workMaxEdit]);
 
   // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор)
   useEffect(() => {
@@ -176,9 +182,9 @@ export function ArmAutoConstructor() {
       <p style={SMALL}>Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard.</p>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {(['params','grip','split','plan','quality'] as Step[]).map(s => (
+        {(['params','grip','split','plan','quality','weights'] as Step[]).map(s => (
           <button key={s} onClick={()=>setStep(s)} style={{ ...STEP_PILL(step===s), background: step===s ? ACCENT : 'rgba(255,255,255,0.06)', color: step===s ? '#001' : '#fff' }}>
-            {s === 'params' ? '🎛 Параметры' : s === 'grip' ? '✊ Хват' : s === 'split' ? '🗓 Сплит' : s === 'plan' ? '📋 План' : '📊 Качество'}
+            {s === 'params' ? '🎛 Параметры' : s === 'grip' ? '✊ Хват' : s === 'split' ? '🗓 Сплит' : s === 'plan' ? '📋 План' : s === 'quality' ? '📊 Качество' : '🏋️ Веса'}
           </button>
         ))}
       </div>
@@ -287,6 +293,27 @@ export function ArmAutoConstructor() {
             <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           </div>
 
+          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🏋️ Рабочие максимумы (для прогрессии веса)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {[
+                ['wrist_flexors','Кисть (кг)'],
+                ['pronators','Пронация (кг)'],
+                ['supinators','Супинация (кг)'],
+                ['brachialis','Брахиалис (кг)'],
+                ['grip_support','Support RT/Axle (кг)'],
+                ['grip_pinch','Pinch (кг)'],
+                ['default','База (кг)'],
+              ].map(([k,label]) => (
+                <label key={k} style={{ ...SMALL }}>
+                  {label}<br/>
+                  <input value={workMaxEdit[k]||''} onChange={e=> setWorkMaxEdit(prev=> ({...prev, [k]: e.target.value}))} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} />
+                </label>
+              ))}
+            </div>
+            <div style={{ ...SMALL, marginTop:6, color:'#6a8a9a' }}>Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%).</div>
+          </div>
+
           <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop: 14 }}>⚡ Собрать план</button>
           <div style={{ ...SMALL, marginTop: 6 }}>Лучший сплит: <b style={{ color:ACCENT }}>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
         </div>
@@ -385,8 +412,8 @@ export function ArmAutoConstructor() {
               {builtPlan.validation && (
                 <div style={{ marginTop:8 }}>
                   {builtPlan.validation.errors.length>0 && <div style={{ color:'#ff6b6b', fontSize:12 }}>❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</div>}
-                  {builtPlan.validation.warnings.length>0 && <div style={{ color:'#e6a23c', fontSize:12, marginTop:4 }}>⚠ {builtPlan.validation.warnings.slice(0,6).join(' · ')}</div>}
-                  {builtPlan.validation.valid && <div style={{ color:ACCENT, fontSize:12 }}>✓ Валидация пройдена (MRV, humerus, баланс, tendon).</div>}
+                  {builtPlan.validation.warnings.length>0 && <div style={{ color:'#e6a23c', fontSize:12, marginTop:4 }}>⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</div>}
+                  {builtPlan.validation.valid && <div style={{ color:ACCENT, fontSize:12 }}>✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</div>}
                 </div>
               )}
               <div style={{ marginTop:8, color:'#9ab', fontSize:12 }}>
@@ -396,6 +423,33 @@ export function ArmAutoConstructor() {
               <div style={{ marginTop: 10 }}>
                 <ArmHeatmap plan={builtPlan} onToast={flash} />
               </div>
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.16)', fontSize: 11, color: '#e6a23c' }}>
+                <b style={{color:'#f59e0b'}}>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {step === 'weights' && (
+        <div style={CARD}>
+          <h3 style={H}>🏋️ Веса — детали</h3>
+          <p style={SMALL}>Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.</p>
+          {!builtPlan ? <div style={SMALL}>Сначала собери план в «Параметры».</div> : (
+            <>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {Object.entries(workMax).map(([k,v])=> (
+                  <div key={k} style={{ padding:'6px 8px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', fontSize:12, color:'#fff' }}>{k}: <b style={{color:ACCENT}}>{String(v)} кг</b></div>
+                ))}
+              </div>
+              <div style={{ marginTop:10, fontSize:12, color:'#9ab' }}>Пример веса в плане (неделя 1, тяж): {(() => {
+                try {
+                  const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];
+                  if (!ex) return '—';
+                  return `${ex.name} — ${ex.workSets[0]?.weight ?? 0} кг × ${ex.workSets[0]?.reps} RIR${ex.rir} (${ex.tempoSpec})`;
+                } catch { return '—'; }
+              })()}</div>
+              <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop:10 }}>🔄 Пересобрать с весами</button>
             </>
           )}
         </div>

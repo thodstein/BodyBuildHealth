@@ -59,6 +59,9 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
           ['supination','Хук проваливается'],
           ['side','Не дожимает боком'],
           ['back','Тяга на себя слабая'],
+          ['grip','Хват слабеет (pinch)'],
+          ['thumb','Большой палец уходит'],
+          ['ulnar','Ulnar/radial дисбаланс'],
         ].map(([k,label]) => (
           <button
             key={k}

@@ -8,7 +8,7 @@ import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engin
 import type { ArmPlan } from '../../../engines/arm/arm-types';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 
-const ARM_MUSCLES = ['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'] as const;
+const ARM_MUSCLES = ['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','grip_crush','thumb','side_pressure','back_pressure','shoulder_stab'] as const;
 
 export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => void }> = ({ plan, onToast }) => {
   const [hoverCell, setHoverCell] = useState<{ m: string; w: number } | null>(null);
@@ -62,7 +62,7 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weeks} нед × {ARM_MUSCLES.length} групп</span>
       </div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
-        🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus).
+        🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
       </div>
       <div style={{ overflowX: 'auto' }}>
         <svg width={svgW} height={svgH} style={{ display: 'block' }} viewBox={`0 0 ${svgW} ${svgH}`}>

@@ -9,16 +9,22 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
   const [rt, setRt] = useState<string>('');
   const [axle, setAxle] = useState<string>('');
   const [pinch, setPinch] = useState<string>('');
+  const [side, setSide] = useState<string>('');
+  const [back, setBack] = useState<string>('');
 
   const rtKg = parseFloat(rt);
   const axleKg = parseFloat(axle);
   const pinchSec = parseFloat(pinch);
+  const sideKg = parseFloat(side);
+  const backKg = parseFloat(back);
 
   const diag = diagnoseArmWeakPoint({
     weakTest: {
       gripSupportMaxKg: Number.isFinite(rtKg) ? rtKg : undefined,
       gripAxleMaxKg: Number.isFinite(axleKg) ? axleKg : undefined,
       pinchHoldSec: Number.isFinite(pinchSec) ? pinchSec : undefined,
+      sidePressureFails: Number.isFinite(sideKg) ? sideKg < 30 : undefined,
+      backPressureFails: Number.isFinite(backKg) ? backKg < 40 : undefined,
     },
   });
 
@@ -31,12 +37,14 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
     <div style={{ border: '1px solid #1f3a5f', borderRadius: 12, padding: 12, background: '#0f1e35' }}>
       <h3 style={{ margin: '0 0 8px', color: '#fff' }}>✊ Хват — диагностика</h3>
       <p style={{ color: '#9ab', fontSize: 13, margin: '0 0 8px' }}>Введи максимумы — увидишь слабые зоны хвата.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
         <label style={{ color: '#fff', fontSize: 12 }}>Rolling Thunder (кг)<input value={rt} onChange={e=>setRt(e.target.value)} placeholder="60" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px' }} /></label>
         <label style={{ color: '#fff', fontSize: 12 }}>Apollon Axle (кг)<input value={axle} onChange={e=>setAxle(e.target.value)} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px' }} /></label>
         <label style={{ color: '#fff', fontSize: 12 }}>Pinch hold (с)<input value={pinch} onChange={e=>setPinch(e.target.value)} placeholder="15" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px' }} /></label>
+        <label style={{ color: '#fff', fontSize: 12 }}>Side кг (блок)<input value={side} onChange={e=>setSide(e.target.value)} placeholder="30" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px' }} /></label>
+        <label style={{ color: '#fff', fontSize: 12 }}>Back кг (тяга)<input value={back} onChange={e=>setBack(e.target.value)} placeholder="50" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px' }} /></label>
       </div>
-      <div style={{ color: '#6a8a9a', fontSize: 12, marginBottom: 8 }}>Рекоменд объём: RT {volRT.sets}×{volRT.reps} · Axle {volAxle.sets}×{volAxle.reps}</div>
+      <div style={{ color: '#6a8a9a', fontSize: 12, marginBottom: 8 }}>Рекоменд объём: RT {volRT.sets}×{volRT.reps} · Axle {volAxle.sets}×{volAxle.reps} · Pinch/Side/Back — см. PRO-гейты (4 слоя)</div>
       {diag.priorities.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {diag.priorities.map((p,i)=> (
