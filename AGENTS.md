@@ -3181,3 +3181,13 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **Bar path:** Enode table ENODE_CORRECTION_TABLE + extractBfPCAPatterns Pattern1-3 (Kipp 0.42/-0.38)
 - **Diary phase:** candidateTAWeakPointsFromDiary phaseForReps в header
 - **Тесты:** 	a-injection 6/6 property 32 combos, strength-sport 421/421
+
+## ПЛ-авто: сезон по микроциклам + циклы между соревнованиями + экран по шагам (Sep 03 2026, ✅ ВЫПОЛНЕН)
+
+Полное выполнение плана `docs/PL-AUTO-MICROCYCLES-PLAN.md` (Sep 02 «любое изменение только по согласию» + Sep 03 дубль/fallback/сводка). Коммиты: cc99f146 (сезон), 8c4111b6 (comp-gap), eab1887c (PLSeasonBuilder+SRCBBScreen), финал (дубль/fallback/сводка+док).
+
+- **Движок сезона** `src/engines/lms/lms-season.engine.ts:63` — `FitResult {exact|proposed_extend|proposed_shrink|strict_skip, needsConsent}` + `fitCycleToWeeks` (explicit недели `sampleIndices` первая+последняя, week1 `correctionPctEff` кап 2×) + `applyFitConsent` → `strict_skip` без согласия; `candidateCyclesForSlot` (endurance/strength/peak через `rankCycles`, speed через `SPEED_CYCLE_IDS` + **fallback** на `strength` при пустом индексе); `planSeason {consents}` + `assembleSeasonPlan` + `seasonSegmentSummary` (теперь показывает `strict_skip` как `⛔ без согласия — пропущен`) + `createSeasonSlot(period)` для дубля. `src/data/lms-cycles/lms-speed-index.ts` 12 id.
+- **Движок пролётов** `src/engines/lms/lms-comp-gap.engine.ts:23` — окно `gap-taper-post` + `needsConsent` + `fittedCycle` + `buildPLSeasonPeaks` поверх, `skip` при окне<1, `strict_skip` при отказе.
+- **UI** `src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx:592` — карточка `🧩 Сезон по микроциклам` в `SRCBBScreen:settings` (переключатель `single|season` + 4 слота с `weeks/enabled/order` + **кнопка `＋ Добавить период` (дубль сила→скорость→сила, `removeSlot`)** + `auto|manual` + диалог согласия `[✓ Согласен 12→7][✕ Оставить 1:1][🔄 Другой]` + `hasBlockedSegments` блокирует сборку + сводка `нед 1-12 → …` + `he_pl_session.season` persist). `SRCBBScreen` — печать/сводка поддерживают `proposed_*` как `по согласию`.
+- **Тесты:** `lms-season 26/26` (дубль/пустой/speed-fallback/summary strict_skip), `lms-comp-gap 8/8` (с согласием/без), `lms-speed-index 5/5`, `pl-season-builder 11/11` (с согласием), `lms 888/888`, `SRCBBScreen_parts` зелёные, `tsc 0` (6GB).
+- **Источник immutable:** `LMS_CYCLES` не мутируется, `fit` всегда `derived` копия, одиночный цикл `faithful:true` всегда `exact`.
