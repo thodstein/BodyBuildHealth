@@ -97,6 +97,9 @@ import { SHEIKO_CMS_MS } from './sheiko-cms-ms';
 import { WENDLER_531 } from './wendler-531';
 import { NSUNS } from './nsuns';
 import { CUBE } from './cube';
+import { SHEIKO_37 } from './sheiko-37';
+import { CALGARY_8 } from './calgary-8';
+import { HATCH } from './hatch';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -190,6 +193,9 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     WENDLER_531,
     NSUNS,
     CUBE,
+    SHEIKO_37,
+    CALGARY_8,
+    HATCH,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
