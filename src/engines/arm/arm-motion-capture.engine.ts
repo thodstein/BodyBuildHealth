@@ -115,6 +115,26 @@ export function detectWristAngleFromVideo(videoFrame: unknown): ArmMotionFrame |
 export function hasVideoSupport(): boolean {
   return typeof (globalThis as any).MediaPipeHands !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined' || typeof (globalThis as any).Hands !== 'undefined';
 }
+export async function ensureHandsModel(): Promise<boolean> {
+  if (hasVideoSupport()) return true;
+  try {
+    const src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js';
+    if (typeof document === 'undefined') return false;
+    const existing = document.querySelector(`script[src="${src}"]`) as any;
+    if (existing) return hasVideoSupport();
+    await new Promise<void>((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('hands load failed'));
+      document.head.appendChild(s);
+    });
+    // дать время инициализации
+    await new Promise(r => setTimeout(r, 500));
+    return hasVideoSupport();
+  } catch { return false; }
+}
 export function isAnglesVerified(angles: ArmAngles | null): boolean {
   if (!angles) return false;
   const v = validateArmAngles(angles);

@@ -11,7 +11,7 @@ import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-vol
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
-import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, isAnglesVerified, angleBetween } from '../../../engines/arm/arm-motion-capture.engine';
+import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, isAnglesVerified, angleBetween } from '../../../engines/arm/arm-motion-capture.engine';
 import { recordGripForce, estimateForceVector, getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport, calcDynamicMetrics } from '../../../engines/arm/arm-dynamic-force.engine';
@@ -377,7 +377,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
-  // Camera: getUserMedia + overlay, PRO: если Hands модель загружена — real, иначе fallback ползунки (isAnglesVerified всё равно true для валидных)
+  // Camera: getUserMedia + overlay, PRO: пробует подгрузить Hands модель с CDN, иначе fallback ползунки
   useEffect(() => {
     if (!showCam) {
       if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
@@ -390,7 +390,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
         if (!stream || cancelled) return;
         streamRef.current = stream;
         if (videoRef.current) { (videoRef.current as any).srcObject = stream; try { await videoRef.current.play(); } catch {} }
-        setToast('📹 Камера включена — углы по estimateAnglesFromLandmarks (требует Hands модель, fallback — ползунки)');
+        const hasHands = await ensureHandsModel().catch(()=>false);
+        setToast(hasHands ? '📹 Камера + Hands модель загружена — углы автоматически' : '📹 Камера включена — Hands модель не загружена (CDN), fallback ползунки');
         setTimeout(()=>setToast(''),2500);
       } catch (e:any) {
         setToast(`⚠ Камера недоступна: ${e?.message || e}`);
