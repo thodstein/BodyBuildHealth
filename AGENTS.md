@@ -3158,3 +3158,17 @@ ull → default. Реальные значения лежат в UnifiedSettings
   - `trueMuscleOf` (movement-pattern): hinge-ветка += `|гакк.*бицепс|hack.*hamstring|колодец` → оба в hamstrings; ANGLE_CLASSES.hamstrings.rdl_bridge += те же маркеры; id-маппинг → bio 'romanian_deadlift' (exercise-lab); ham_hack ids += оба, re сужен до `гакк.*бицепс|hack.*(ham|бицепс)|колодец` (квадрицепсные гакки не захватываются).
   - Итог: bb-strict-groups 15/15, 10 ключевых файлов 147/147, полный bb-прогон 1431 passed / 59 failed = **все падения из baseline-18 (0 новых, 2 пред-существующих даже починились)**, tsc 0 по своим файлам.
 
+
+
+## ТА-диагностика — хаб движения PRO (Sep 02 2026, pushed 76054adb)
+
+Полный аудит и доработка ТА-хаба до профессионального уровня по литературе (internet-источники) и parity с PL 9-лифтов. Коммит 76054adb — 9 файлов, 1465++.
+
+- **A1 числовая биомеханика (strength-sport-biomechanics.engine.ts 180с):** NEW TA_BIOMECH 16 WLWeakPoint → angleRangeDeg [0,20]/[60,90] + keyJoint + weakMuscles + biomechanicalReason/loadCues/intensityPct/references (Gourgoulis 2000/2002, Garhammer 1985, Ang 2023). Функции diagnoseTAWeakPoint/isValidAngleForWeakPoint.
+- **A2 bar path PRO (strength-sport-barpath.engine.ts 160с):** Vorobyev 3 типа (Type1×2, Type2 backward, Type3×3 Hiskia), метрики xLoop/yMax/vMax, classifyTrajectoryType + computeBarPathMetrics (12Hz Butterworth), diagnoseBarPathFromMetrics SRD 4/6см (Frontiers 2023), correctEnodeHorizontal Intercept+Slope (Chavda 2024 r²0.99), isRealChange.
+- **A3 VBT PLOS 2026 + Sandau FvR2 (strength-sport-vbt.engine.ts +70с):** TA_PEAK_VELOCITY_ZONES снач absolute 1.30-1.75 м/с (все >80% >1.3 — Wood 2026 7 derivatives Perch peak), TA_VTHRES_NORMS снач 1.70-2.00, computeFvR2 (80%/110% vmax + hAcc + vThres → v0/F0/Pmax/snatchTh ±1.5кг), thresholdForTALift 10% power/15% тяга/20% сила, vbtRecommendationSS с ТА-порогами.
+- **A4 RSS-скоринг (strength-sport-scoring.engine.ts 120с):** scoreTA RSS √Σpen² (weak12/asym14-28/bar10-18/vbt10-20/mob8/imtp15) как arm-diagnostics 146, floors (asym12/loop/VBT20/ISPP<85% → ≤49), verification 0.35 video+0.35 VBT+0.30 mobility.
+- **B/C мобильность и видео:** strength-sport-ohs.engine.ts OHS 6 сегментов (FMS/NASM Cook, Rabin sens1.0, PoinT GO knee-to-wall ≥12 cutoff9) + heel-raise 2.5см retest; strength-sport-video.engine.ts parseKinoveaCSV/analyzeBarTracking + ForceProvider/PoseProvider абстракции (Ang loadsol + Kinovea free); strength-sport-diary-integration.engine.ts detectTAWeakFromDiary e1RM 28д.
+- **D UX (WLDiagnosticsHub.tsx 268→520с):** 6 табов снач/взятие/толчок/VBT-video/мобильность, числовые углы + биомеханика, bar path метрики + SRD бейдж + Vorobyev тип, VBT пиковые зоны + FvR2 6 полей, OHS 6 чеков + knee-to-wall + heel retest, IMTP/ISPP ≥85% (Essex 81% дисп), Kinovea CSV импорт, RSS gauge + verification, limiter подсказки, applyToPlanner с biomech/fvr/ohs. Сохраняет совместимость: 4 таба теста, deficit_snatch коррекции.
+- **Тесты:** NEW 	a-diagnostics-pro.test.ts 23/23 (биомеханика 16, barpath 6, VBT/FvR2, RSS floors, OHS, Kinovea) + strength-sport 412/412 + wl-diagnostics-hub 4/4. Чужая pl-deadpoints 3/26 — предсуществующий дубль заголовка, не тронут.
+- **Проверено:** tsc 0 по своим (worktree-времени 5.14с), vitest strength-sport 412, commit строго pathspec, push 76054adb.
