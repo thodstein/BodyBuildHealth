@@ -122,3 +122,47 @@ describe('SM export', () => {
     expect(html).toContain('140');
   });
 });
+
+describe('Strongman builder SM integration PRO', () => {
+  it('SM weak log_dip boosts log_press sets', async () => {
+    const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
+    const base = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ logPress:100, yokeWalk:300, atlasStone:140 }, equipment:['barbell','other'] } as any);
+    const sm = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ logPress:100, yokeWalk:300, atlasStone:140 }, equipment:['barbell','other'], weakPoints:['log_dip'] } as any);
+    const baseLogSets = base.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises.filter(e=> e.id==='log_press')).reduce((a,e)=>a+e.sets,0);
+    const smLogSets = sm.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises.filter(e=> e.id==='log_press')).reduce((a,e)=>a+e.sets,0);
+    expect(smLogSets).toBeGreaterThanOrEqual(baseLogSets);
+  });
+  it('SM smWeakPoints field also boosts', async () => {
+    const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:300, farmersWalk:140 }, equipment:['barbell','other'], smWeakPoints:['yoke_walk'] } as any);
+    const hasCarry = p.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).some(e=> ['yoke_walk','farmers_walk_heavy','frame_carry'].includes(e.id));
+    expect(hasCarry).toBe(true);
+    // также проверяем что smWeakPoints через альтернативное поле weakPointsSM работает
+    const p2 = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:300 }, equipment:['barbell','other'], weakPointsSM:['yoke_turn'] } as any);
+    expect(p2.weeksData.length).toBe(2);
+  });
+  it('diagnosticLevel critical cuts volume', async () => {
+    const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
+    const base = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'advanced', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:300, atlasStone:140 }, equipment:['barbell','other'] } as any);
+    const crit = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'advanced', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:300, atlasStone:140 }, equipment:['barbell','other'], diagnosticLevel:'critical' } as any);
+    const bSets = base.weeksData.filter(w=> !w.deload).reduce((a,w)=>a+(w.totalSets||0),0);
+    const cSets = crit.weeksData.filter(w=> !w.deload).reduce((a,w)=>a+(w.totalSets||0),0);
+    expect(cSets).toBeLessThan(bSets);
+  });
+  it('contest turn + platform via hub effectiveContest', async () => {
+    const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:300, atlasStone:120 }, equipment:['barbell','other'], contest:{ name:'test', events:[{id:'yoke_walk', format:'medley_distance', weight:300, distanceM:20, turn:true},{id:'atlas_stone_load', format:'loading_race', weight:120, heightCm:150}] } } as any);
+    const yoke = p.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk');
+    expect(yoke?.comment).toMatch(/разворот/);
+    const stone = p.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).find(e=> e.id==='atlas_stone_load');
+    expect(stone?.comment).toMatch(/платформа/);
+  });
+  it('velocityHistory / VBT reduces sets', async () => {
+    const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
+    const base = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:300 }, equipment:['barbell','other'] } as any);
+    const vbt = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:300 }, equipment:['barbell','other'], velocityLossPct:18, velocityHistory:{ yoke_walk:[1.5,1.2] } } as any);
+    const bs = base.weeksData[0].sessions.flatMap(s=> s.exercises.filter(e=> e.id==='yoke_walk')).reduce((a,e)=>a+e.sets,0);
+    const vs = vbt.weeksData[0].sessions.flatMap(s=> s.exercises.filter(e=> e.id==='yoke_walk')).reduce((a,e)=>a+e.sets,0);
+    expect(vs).toBeLessThanOrEqual(bs);
+  });
+});

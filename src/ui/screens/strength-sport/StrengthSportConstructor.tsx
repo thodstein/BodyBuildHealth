@@ -73,12 +73,36 @@ export const StrengthSportConstructor: React.FC = () => {
   useEffect(() => {
     const apply = (payload: any) => {
       if (!payload || payload.kind !== 'weakpoints') return;
-      const groups: string[] | undefined = payload.data?.groups || payload.data?.smWeakPoints || payload.data?.wlWeakPoints;
+      const merged: string[] = [
+        ...((payload.data?.smWeakPoints as string[]) || []),
+        ...((payload.data?.groups as string[]) || []),
+        ...((payload.data?.wlWeakPoints as string[]) || []),
+        ...((payload.data?.weakPoints as string[]) || []),
+      ];
+      const groups: string[] | undefined = merged.length ? Array.from(new Set(merged.map((s: any) => String(s)))) as string[] : undefined;
+      // Contest packet from SM hub
+      const incomingContest: any = payload.data?.contest || payload.data?.smContest || null;
+      if (incomingContest && typeof incomingContest === 'object' && Array.isArray(incomingContest.events)) {
+        setContest(incomingContest as any);
+        setMode('strongman' as any);
+      }
+      // Turn/platform synthetic via hub fields
+      if (payload.data?.turnNeeded || payload.data?.platformHeightCm != null) {
+        // will be handled via contest merge on next build; ensure mode strongman
+        setMode('strongman' as any);
+      }
       if (Array.isArray(groups) && groups.length > 0) {
-        setWeakPoints(groups.slice(0, 3).map((s: string) => String(s)));
+        setWeakPoints(groups.slice(0, 4).map((s: string) => String(s)));
         if (payload.data?.level) setDiagnosticLevel(String(payload.data.level));
+        else if (payload.data?.diagnosticLevel) setDiagnosticLevel(String(payload.data.diagnosticLevel));
         if (payload.data?.smWeakPoints) setMode('strongman' as any);
-        if (payload.data?.wlWeakPoints) setMode('weightlifting' as any);
+        else if (payload.data?.wlWeakPoints) setMode('weightlifting' as any);
+        // VBT history / sway from SM hub
+        if (payload.data?.velocityHistory && typeof payload.data.velocityHistory === 'object') {
+          try { setVbtMap(prev => ({ ...prev, ...payload.data.velocityHistory } as any)); } catch {}
+        }
+        if (payload.data?.velocityLossPct != null) setVelocityLoss(Number(payload.data.velocityLossPct) || 0);
+        else if (payload.data?.vbtLossPct != null) setVelocityLoss(Number(payload.data.vbtLossPct) || 0);
       }
     };
     try {
@@ -239,6 +263,7 @@ export const StrengthSportConstructor: React.FC = () => {
       weakPoints: weakPoints.length ? weakPoints : undefined,
       contest: mode==='strongman' ? contest : undefined,
       contestStrategy: mode==='strongman' ? contestStrategy : undefined,
+      diagnosticLevel: (diagnosticLevel as any) || undefined,
       ...extra,
     } as any;
     try {

@@ -12,6 +12,7 @@ import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-se
 import { volumeMultForExercise } from './strength-sport-specialization';
 import { tempoForSS, restForSS, pctForSS, repsForSS } from './strength-sport-loading';
 import { WL_WEAKPOINT_CORRECTION } from './strength-sport-weakpoint';
+import { SM_WEAKPOINT_CORRECTION } from './strength-sport-sm-biomechanics.engine';
 import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
 import { filterByMobility, isAxialLoadExerciseSS } from './strength-sport-mobility';
 import { lengthenedBonus } from './strength-sport-bonus';
@@ -211,31 +212,51 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     const f = volumeMultForExercise(id, input.focus);
     sets = Math.max(2, Math.min(6, Math.round(sets * f)));
   }
-  // PRO: weakPoints — спец-объём +1 на слабые лифты (generic + WLWeakPoint точечно)
-  if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) {
-    const wp = (input as any).weakPoints.map((s: any) => String(s).toLowerCase());
-    let weakMult = 1;
-    const isSn = id.includes('snatch');
-    const isCj = id.includes('clean') || id.includes('jerk');
-    const isSq = id.includes('squat');
-    const isOh = id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar';
-    const isDl = id.includes('deadlift') || id.includes('pull') || id === 'rdl';
-    const isCarry = id.includes('farmers') || id.includes('yoke') || id.includes('carry') || id.includes('sled');
-    const isStone = id.includes('stone') || id.includes('sandbag') || id.includes('tire');
-    // WLWeakPoint точечная коррекция: если id в списке коррекции для любого wp
-    const isWeakCorrection = wp.some((w: string) => {
-      const corr = (WL_WEAKPOINT_CORRECTION as any)[w];
-      return Array.isArray(corr) && corr.includes(id);
-    });
-    if (isWeakCorrection) weakMult = 1.15;
-    else if (wp.some((w: string) => w.includes('snatch') && isSn)) weakMult = 1.15;
-    else if (wp.some((w: string) => (w.includes('clean') || w.includes('jerk')) && isCj)) weakMult = 1.15;
-    else if (wp.some((w: string) => w.includes('squat') && isSq)) weakMult = 1.15;
-    else if (wp.some((w: string) => (w.includes('overhead') || w.includes('press') || w.includes('жим')) && isOh)) weakMult = 1.15;
-    else if (wp.some((w: string) => (w.includes('deadlift') || w.includes('тяг') || w.includes('pull')) && isDl)) weakMult = 1.15;
-    else if (wp.some((w: string) => w.includes('carry') && isCarry)) weakMult = 1.15;
-    else if (wp.some((w: string) => (w.includes('stone') || w.includes('кам')) && isStone)) weakMult = 1.15;
-    if (weakMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * weakMult)));
+  // PRO: weakPoints — спец-объём +1 на слабые лифты (WL + SM точечно)
+  {
+    const rawWeak: string[] = [
+      ...((Array.isArray((input as any).weakPoints) ? (input as any).weakPoints : []) as string[]),
+      ...((Array.isArray((input as any).smWeakPoints) ? (input as any).smWeakPoints : []) as string[]),
+      ...((Array.isArray((input as any).weakPointsSM) ? (input as any).weakPointsSM : []) as string[]),
+    ];
+    if (rawWeak.length) {
+      const wp = rawWeak.map((s: any) => String(s).toLowerCase());
+      let weakMult = 1;
+      const isSn = id.includes('snatch');
+      const isCj = id.includes('clean') || id.includes('jerk');
+      const isSq = id.includes('squat');
+      const isOh = id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar' || id.includes('axle') || id.includes('viking') || id.includes('circus');
+      const isDl = id.includes('deadlift') || id.includes('pull') || id === 'rdl' || id.includes('car_deadlift') || id.includes('axle_deadlift');
+      const isCarry = id.includes('farmers') || id.includes('yoke') || id.includes('carry') || id.includes('sled') || id.includes('frame') || id.includes('husafell') || id.includes('conan') || id.includes('duck') || id.includes('truck') || id.includes('arm_over');
+      const isStone = id.includes('stone') || id.includes('sandbag') || id.includes('tire') || id.includes('keg');
+      const isGrip = id.includes('farmers') || id.includes('pinch') || id.includes('axle') || id.includes('grip');
+      const isLogDip = wp.some(w => w === 'log_dip' || w.includes('log_dip')) && (id.includes('jerk_dip') || id.includes('front_squat') || id === 'pause_squat');
+      const isWeakCorrectionWL = wp.some((w: string) => {
+        const corr = (WL_WEAKPOINT_CORRECTION as any)[w];
+        return Array.isArray(corr) && corr.includes(id);
+      });
+      const isWeakCorrectionSM = wp.some((w: string) => {
+        const corr = (SM_WEAKPOINT_CORRECTION as any)[w];
+        return Array.isArray(corr) && (corr.includes(id) || corr.some((c: string) => id.includes(c) || c.includes(id)));
+      });
+      // SM точные: log_dip→дип, yoke_*→carry, stone_*→stone
+      const isSMLog = wp.some(w => ['log_dip','log_drive','log_lockout','log_clean'].includes(w)) && isOh;
+      const isSMYoke = wp.some(w => ['yoke_pickup','yoke_walk','yoke_turn'].includes(w)) && isCarry;
+      const isSMFarmers = wp.some(w => ['farmers_pickup','farmers_carry','farmers_grip'].includes(w)) && (isCarry || isGrip);
+      const isSMStone = wp.some(w => ['stone_off_floor','stone_lap','stone_load'].includes(w)) && isStone;
+      const isSMGrip = wp.some(w => ['grip_support','farmers_grip'].includes(w)) && isGrip;
+      const isSMCore = wp.some(w => w === 'core_brace') && (isCarry || isStone || id.includes('plank') || id.includes('carry'));
+      if (isWeakCorrectionWL || isWeakCorrectionSM || isLogDip) weakMult = 1.15;
+      else if (isSMLog || isSMYoke || isSMFarmers || isSMStone || isSMGrip || isSMCore) weakMult = 1.15;
+      else if (wp.some((w: string) => w.includes('snatch') && isSn)) weakMult = 1.15;
+      else if (wp.some((w: string) => (w.includes('clean') || w.includes('jerk')) && isCj)) weakMult = 1.15;
+      else if (wp.some((w: string) => w.includes('squat') && isSq)) weakMult = 1.15;
+      else if (wp.some((w: string) => (w.includes('overhead') || w.includes('press') || w.includes('жим') || w.includes('log_dip') || w.includes('log_drive')) && isOh)) weakMult = 1.15;
+      else if (wp.some((w: string) => (w.includes('deadlift') || w.includes('тяг') || w.includes('pull')) && isDl)) weakMult = 1.15;
+      else if (wp.some((w: string) => (w.includes('yoke') || w.includes('farmers') || w.includes('carry')) && isCarry)) weakMult = 1.15;
+      else if (wp.some((w: string) => (w.includes('stone') || w.includes('кам') || w.includes('lap')) && isStone)) weakMult = 1.15;
+      if (weakMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * weakMult)));
+    }
   }
   // Полный объём: outside × ACWR × VBT — мультипликативно
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;

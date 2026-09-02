@@ -17,6 +17,7 @@ import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength
 import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
+import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -244,6 +245,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const level = scoring.level;
   const sColor = smScoreColor(level);
 
+  const limiterForPhase = useMemo(() => {
+    const wp = smWeakPoints[0];
+    if (!wp) return [];
+    let cat = 'speed_strength';
+    if (['yoke_pickup','farmers_pickup','stone_off_floor','log_clean'].includes(wp)) cat = 'start_specific';
+    else if (['yoke_walk','farmers_carry','stone_load','log_lockout','yoke_turn'].includes(wp)) cat = 'stabilization';
+    else if (['log_dip','log_drive'].includes(wp)) cat = 'speed_strength';
+    else if (['farmers_grip','grip_support'].includes(wp)) cat = 'grip_stiffness';
+    else if (['core_brace'].includes(wp)) cat = 'stabilization';
+    else if (wp === 'conditioning') cat = 'endurance_profile';
+    return LIMITER_OPTIONS.filter(o => o.category === cat as any).slice(0, 2);
+  }, [smWeakPoints]);
+
   const contest = useMemo(() => {
     const id = state.contestId;
     if (!id) return null;
@@ -266,13 +280,36 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       return;
     }
     const biomechDetails = smWeakPoints.map(wp => diagnoseSMWeakPoint(wp as any)).filter(Boolean);
+    // synthetic contest wiring for platform/turn when no preset selected
+    let effectiveContest: any = contest;
+    if (!effectiveContest && (state.platformHeightCm || state.turnNeeded)) {
+      const h = state.platformHeightCm ? parseFloat(state.platformHeightCm) : 140;
+      effectiveContest = {
+        name: 'Кастом (платформа/разворот)',
+        events: [
+          { id: 'atlas_stone_load', format: 'loading_race', weight: parseFloat(state.stoneKg) || 120, heightCm: Number.isFinite(h) ? h : 140 },
+          { id: 'yoke_walk', format: 'medley_distance', weight: parseFloat(state.yokeKg) || 300, distanceM: 20, timeCapS: 60, turn: !!state.turnNeeded },
+          { id: 'farmers_walk_heavy', format: 'medley_distance', weight: parseFloat(state.farmersKg) || 120, distanceM: 40, timeCapS: 75, turn: !!state.turnNeeded },
+        ],
+      };
+    } else if (effectiveContest && state.turnNeeded) {
+      effectiveContest = { ...effectiveContest, events: effectiveContest.events.map((e: any) => ['yoke_walk','farmers_walk_heavy','frame_carry'].includes(e.id) ? { ...e, turn: true } : e) };
+    } else if (effectiveContest && state.platformHeightCm) {
+      const h = parseFloat(state.platformHeightCm);
+      if (Number.isFinite(h)) effectiveContest = { ...effectiveContest, events: effectiveContest.events.map((e: any) => ['atlas_stone_load','atlas_stone_over_bar','sandbag_over_bar'].includes(e.id) ? { ...e, heightCm: h } : e) };
+    }
+    // VBT history for builder (per-lift)
+    const velocityHistory: Record<string, number[]> = {};
+    if (state.vbtYokeBest && state.vbtYokeLast) velocityHistory['yoke_walk'] = [parseFloat(state.vbtYokeBest), parseFloat(state.vbtYokeLast)];
+    if (state.vbtStoneBest && state.vbtStoneLast) velocityHistory['atlas_stone_load'] = [parseFloat(state.vbtStoneBest), parseFloat(state.vbtStoneLast)];
+    if (state.vbtLogBest && state.vbtLogLast) velocityHistory['log_press'] = [parseFloat(state.vbtLogBest), parseFloat(state.vbtLogLast)];
     const data: any = {
       groups: weakPoints,
       smWeakPoints,
       weakPoints,
       wlWeakPoints: weakPoints,
-      smContest: contest || CONTEST_PRESETS[Object.keys(CONTEST_PRESETS)[0]],
-      contest,
+      smContest: effectiveContest || contest || (CONTEST_PRESETS as any)[Object.keys(CONTEST_PRESETS)[0]],
+      contest: effectiveContest || contest,
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tackyUsed: state.tackyUsed,
       turnNeeded: state.turnNeeded,
@@ -280,7 +317,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       sway: swayDiag?.text ?? null,
       vbt: vbtLoss ? `${vbtLoss.lossPct}%` : null,
       vbtLossPct: vbtLoss?.lossPct ?? null,
+      velocityLossPct: vbtLoss?.lossPct ?? null,
+      velocityHistory: Object.keys(velocityHistory).length ? velocityHistory : undefined,
       score, level, verification: scoring.verification,
+      diagnosticLevel: level,
       biomech: biomechDetails,
       smBiomech: biomechDetails,
       ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
@@ -416,6 +456,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика McGill/Harris) + sway (3/5см) + VBT 15% + grip tri-modal → RSS-скор. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Стронг-конструктор»</b> отправит с smBiomech + контест (mode:strongman).
         </div>
+        {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button onClick={handleExport} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>🖨 HTML</button>
