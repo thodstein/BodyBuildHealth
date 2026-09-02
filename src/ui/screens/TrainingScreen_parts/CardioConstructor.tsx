@@ -293,6 +293,9 @@ export const CardioConstructor: React.FC = () => {
   const [comparison, setComparison] = useState<string | null>(null);
   const [scenarios, setScenarios] = useState<CardioScenario[]>(() => loadCardioScenarios());
   const [annualCardioMap, setAnnualCardioMap] = useState<Record<string, string>>(() => loadAnnualCardioCycles());
+  const [combatCardio, setCombatCardio] = useState<any>(() => {
+    try { const raw = localStorage.getItem('he_combat_cardio_payload'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
 
   const readMacroLink = useCallback(() => {
     try {
@@ -317,6 +320,23 @@ export const CardioConstructor: React.FC = () => {
     setCycle(loadActiveCardioCycle());
     const un = subscribeCardioLink(l => setLink(l));
     return un;
+  }, []);
+  // Combat/Strength → Cardio: слушаем he-combat-updated / he-strength-updated, показываем подсказку
+  useEffect(() => {
+    const onCombatCardio = () => {
+      try {
+        const raw = localStorage.getItem('he_combat_cardio_payload') || localStorage.getItem('he_strength_cardio_payload');
+        if (raw) setCombatCardio(JSON.parse(raw));
+        else setCombatCardio(null);
+      } catch { setCombatCardio(null); }
+    };
+    onCombatCardio();
+    window.addEventListener('he-combat-updated' as any, onCombatCardio);
+    window.addEventListener('he-strength-updated' as any, onCombatCardio);
+    return () => {
+      window.removeEventListener('he-combat-updated' as any, onCombatCardio);
+      window.removeEventListener('he-strength-updated' as any, onCombatCardio);
+    };
   }, []);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
@@ -946,6 +966,15 @@ export const CardioConstructor: React.FC = () => {
           <button onClick={() => setWizardMode('simple')} style={wizardMode === 'simple' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>✨ Простой</button>
           <button onClick={() => setWizardMode('pro')} style={wizardMode === 'pro' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>🛠 Профи</button>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>{wizardMode === 'simple' ? 'Только главное: цель, недели, дни, вес' : 'Все настройки: фазы, оборудование, факторы'}</span>
+        </div>
+      )}
+      {step === 'params' && combatCardio && (
+        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)', display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+          <span style={{ fontSize:12, fontWeight:800, color:'#c4b5fd' }}>🥊 Единоборства → Кардио:</span>
+          <span style={{ fontSize:11, color:'#fff' }}>{combatCardio.zone2MinPerWeek ? `${combatCardio.zone2MinPerWeek} мин Zone2/нед` : ''} {combatCardio.hiitSessions ? `· ${combatCardio.hiitSessions} HIIT/нед` : ''} {combatCardio.totalConditioningMin ? `· всего ${combatCardio.totalConditioningMin} мин` : ''}</span>
+          {combatCardio.needsAerobicMaintenance && <span style={{ fontSize:10, color:'#fde68a', background:'rgba(245,158,11,0.12)', padding:'2px 6px', borderRadius:6 }}>нужен 1× Zone2 (кэмп 5×)</span>}
+          <button onClick={() => { setDaysAvailable(Math.max(2, Math.min(6, (combatCardio.zone2MinPerWeek ? 3 : daysAvailable)))) ; flashMsg('🥊 Zone2 из плана единоборств учтён — можно собрать'); }} style={{ marginLeft:'auto', padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.14)', color:'#d8b4fe', border:'1px solid rgba(168,85,247,0.28)', cursor:'pointer', fontSize:11, fontWeight:700 }}>Применить Zone2</button>
+          <button onClick={() => setCombatCardio(null)} style={{ padding:'4px 8px', borderRadius:8, background:'transparent', border:'none', color:'rgba(255,255,255,0.45)', cursor:'pointer', fontSize:11 }}>✕</button>
         </div>
       )}
       {step === 'params' && (
