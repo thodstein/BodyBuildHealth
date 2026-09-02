@@ -414,7 +414,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
           </div>
           <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: hasWeak ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border:`1px solid ${hasWeak ? 'rgba(245,158,11,0.22)' : 'rgba(34,197,94,0.22)'}` }}>
             <div style={{ fontSize:11, fontWeight:700, color: hasWeak? '#f59e0b' : '#22c55e' }}>{hasWeak ? report.weakMuscles.join(', ') : 'баланс'}</div>
-            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${report.priorities.length} приоритет · ${report.details.length} факта` : 'слабые зоны не выявлены'}</div>
+            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${report.priorities.length} приоритет · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
@@ -475,7 +475,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:8 }}>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector · WAF {weightClassAuto}</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%` : ''}</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%${forceVecPro.asymmetryPct>=12?' 🔴':forceVecPro.asymmetryPct>=7?' 🟠':' 🟢'}` : ''}</div>
                 <div style={{ fontSize:9, color:DIM, marginTop:4 }}>WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
@@ -571,9 +571,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Humerus (side) — инфо</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : 'side — факт, без оценки риска'}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background: mockGuard.humerus.length? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${mockGuard.humerus.length?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}>
+                <div style={{ fontSize:11, fontWeight:700, color: mockGuard.humerus.length?'#ef4444':'#22c55e' }}>Humerus (side)</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector PRO</div>
@@ -626,9 +626,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Асимметрия L/R</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}%` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}%` : 'Введи left/right хват или finger/hook обе руки')}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background: (dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.08)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${(dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.2)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
+                <div style={{ fontSize:11, fontWeight:700, color: (dynamicReport as any)?.asymmetry?.level==='critical'?'#ef4444': (dynamicReport as any)?.asymmetry?.level==='warn'?'#f59e0b':'#22c55e' }}>Асимметрия L/R</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}% — ${(dynamicReport as any).asymmetry.advice}` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}% ${forceVecPro.asymmetryPct>=12?'🔴':forceVecPro.asymmetryPct>=7?'🟠':'🟢'}` : 'Введи left/right хват или finger/hook обе руки')}</div>
               </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:8 }}>
@@ -704,10 +704,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
         )}
       </div>
 
-      {/* Diagnostics output */}
+      {/* Diagnostics output — механизм-ориентированная (сустав/сухожилие) */}
       <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — детали</div>
-        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.details.slice(0,3).map(f=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''}</div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — сустав/сухожилие (механизм)</div>
+        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''}</div>
+        {report.findings.length>3 && <div style={{ fontSize:10, color:DIM, marginTop:6, maxHeight:80, overflowY:'auto', padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)' }}>{report.findings.map((f:any,i:number)=><div key={i} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e', marginBottom:2 }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
         {diag.priorities.length===0 ? <div style={{ fontSize:11, color:DIM }}>Слабые зоны не выявлены — баланс. {dynamicReport && (dynamicReport as any).asymmetry ? `· ${(dynamicReport as any).tactic}` : ''}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {diag.priorities.map((p,i)=>(

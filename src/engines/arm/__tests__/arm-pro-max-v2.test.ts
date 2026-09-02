@@ -140,30 +140,32 @@ describe('arm PRO MAX v2 — force vector', () => {
   });
 });
 
-// ── Diagnostics hub (без рисков) ──
-describe('arm PRO MAX v2 — diagnostics hub (без рисков)', () => {
-  it('details без score/verification', () => {
+// ── Diagnostics hub (механизм-ориентированная, без общего score) ──
+describe('arm PRO MAX v2 — diagnostics hub (механизм)', () => {
+  it('findings с уровнями, без общего score', () => {
     const r1 = buildArmDiagnosticsReport({ weakTest:{cupFails:true}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     const r2 = buildArmDiagnosticsReport({ weakTest:{cupFails:true, pronationFails:true, sidePressureFails:true}, grip:{rtKg:30}, level:'beginner', technique:'hook', tableSessions:0, totalSessions:4, tendonSets:20 });
-    expect(r1.details.length).toBeGreaterThan(0);
-    expect(r2.details.length).toBeGreaterThan(r1.details.length);
+    expect(r1.findings.length).toBeGreaterThan(0);
+    expect(r2.findings.length).toBeGreaterThan(r1.findings.length);
+    expect(r2.findings.some(f=>f.level==='warn' || f.level==='critical')).toBe(true); // сустав/сухожилие
     expect((r1 as any).score).toBeUndefined();
     expect((r1 as any).verification).toBeUndefined();
   });
-  it('asymmetry detail added', () => {
+  it('асимметрия finding с уровнем', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{rtKg:60, leftKg:40, rightKg:50} as any, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     expect(r.asymmetryPct).toBe(20);
-    expect(r.details.some(f=>f.text.includes('Асимметрия'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('Асимметрия'))).toBe(true);
+    expect(r.findings.find(f=>f.text.includes('Асимметрия'))!.level).toBe('critical');
   });
-  it('info без humerusWarnings', () => {
+  it('humerusWarnings — суставной риск есть', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{sidePressureFails:true}, grip:{}, level:'intermediate', technique:'press', tableSessions:2, totalSessions:4, tendonSets:8 });
-    expect(r.info.some(t=>t.includes('Side pressure'))).toBe(true);
-    expect((r as any).humerusWarnings).toBeUndefined();
+    expect(r.humerusWarnings.length).toBeGreaterThan(0);
+    expect(r.findings.some(f=>f.text.includes('side_pressure') || f.text.includes('humerus'))).toBe(true);
   });
-  it('tableRatio факт', () => {
+  it('tableRatio факт + finding', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:0, totalSessions:4, tendonSets:8 });
     expect(r.tableRatio).toBe(0);
-    expect(r.details.some(f=>f.text.includes('Table time'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('Table time'))).toBe(true);
   });
 });
 

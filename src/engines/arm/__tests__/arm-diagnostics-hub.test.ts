@@ -4,48 +4,52 @@ import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique } fro
 import { recordGripForce, estimateForceVector } from '../arm-force-capture.engine';
 import { diagnoseVbt } from '../arm-vbt-capture.engine';
 
-describe('arm-diagnostics-hub PRO (без рисков)', () => {
+describe('arm-diagnostics-hub PRO (механизм-ориентированная, без общего score)', () => {
   it('weak cup → wrist_flexors', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{cupFails:true}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     expect(r.weakMuscles).toContain('wrist_flexors');
-    expect(r.details.some(f=>f.text.includes('Сгибание'))).toBe(false); // generic
+    expect(r.findings.some(f=>f.text.includes('Сгибание'))).toBe(false); // generic
   });
   it('grip RT 50 vs 100', () => {
     const low = buildArmDiagnosticsReport({ weakTest:{}, grip:{rtKg:50}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     const high = buildArmDiagnosticsReport({ weakTest:{}, grip:{rtKg:110}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     expect(high.forceVector!.gripSupport).toBeGreaterThan(low.forceVector!.gripSupport);
   });
-  it('table <30% → detail', () => {
+  it('table <30% → суставной finding warn', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:0, totalSessions:4, tendonSets:8 });
-    expect(r.details.some(f=>f.text.includes('Table time'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('Table time'))).toBe(true);
     expect(r.tableRatio).toBe(0);
+    expect(r.findings.find(f=>f.text.includes('Table time'))!.level).toBe('warn');
   });
-  it('tendon → detail', () => {
+  it('tendon → суставной finding', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:20 });
-    expect(r.details.some(f=>f.text.includes('Tendon'))).toBe(true);
+    const tf = r.findings.find(f=>f.text.includes('Tendon'));
+    expect(tf).toBeTruthy();
+    expect(['warn','critical']).toContain(tf!.level);
   });
-  it('details инфо без рисков', () => {
+  it('механизм-ориентированные риски есть, общего score нет', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{cupFails:true, pronationFails:true, sidePressureFails:true}, grip:{rtKg:30}, level:'beginner', technique:'hook', tableSessions:0, totalSessions:4, tendonSets:20 });
-    expect(r.details.length).toBeGreaterThan(0);
+    expect(r.findings.length).toBeGreaterThan(0);
+    expect(r.findings.some(f=>f.level==='warn' || f.level==='critical')).toBe(true); // сустав/сухожилие
+    expect(r.humerusWarnings.length).toBeGreaterThan(0);
     expect(r.info.length).toBeGreaterThan(0);
-    // нет score/verification/humerusWarnings как рисков
+    // нет общего score/verification
     expect((r as any).score).toBeUndefined();
     expect((r as any).verification).toBeUndefined();
-    expect((r as any).humerusWarnings).toBeUndefined();
   });
-  it('VBT stop — vbt zone stop и деталь', () => {
+  it('VBT stop — vbt zone stop и finding', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, vbtRecords:[{weight:50,reps:5,velocityMs:0.8},{weight:50,reps:5,velocityMs:0.4}], level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     expect(r.vbt?.zone).toBe('stop');
-    expect(r.details.some(f=>f.text.includes('VBT'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('VBT'))).toBe(true);
   });
-  it('info содержит данные без verification', () => {
+  it('info содержит данные', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{rtKg:60}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8 });
     expect(r.info).toBeDefined();
     expect(Array.isArray(r.info)).toBe(true);
   });
-  it('side fail → info', () => {
+  it('side fail → humerusWarnings', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{sidePressureFails:true}, grip:{}, level:'intermediate', technique:'press', tableSessions:2, totalSessions:4, tendonSets:8 });
-    expect(r.info.some(t=>t.includes('Side pressure'))).toBe(true);
+    expect(r.humerusWarnings.length).toBeGreaterThan(0);
   });
 });
 
