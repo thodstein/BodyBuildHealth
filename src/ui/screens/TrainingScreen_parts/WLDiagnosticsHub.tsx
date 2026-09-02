@@ -18,6 +18,8 @@ import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { buildWLDiagnosticsHtml, downloadWLHtml } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -286,6 +288,20 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
+  const handleExport = () => {
+    const snap = { weakPoints, score, level, verification: scoring.verification, barPath: state.barPath || null, vbt: state.vbtVel || state.vbtBest || null, ohs: { totalScore: ohs.totalScore, failed: ohs.failed }, asymmetryPct: asymmetry?.diff ?? null, fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null, findings: scoring.findings.map(f => f.text) } as any;
+    const html = buildWLDiagnosticsHtml(snap);
+    downloadWLHtml(html, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
+    setToast('✓ HTML экспорт');
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const mockPose = useMemo(() => {
+    const frames = createMockPoseStream();
+    const ang = estimateAnglesFromLandmarks(frames[0]);
+    return { angles: ang, status: livePoseStatus(ang) };
+  }, []);
+
   // Lifter limiter suggestions for selected phase (top 2)
   const limiterForPhase = useMemo(() => {
     const wp = weakPoints[0];
@@ -469,6 +485,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD turnover 4см catch 6см — {isRealChange(barMetrics.xLoop) ? 'реально >SRD' : 'в пределах шума'}</div></div>}
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — следующий шаг</div>
               <div style={{ marginTop: 6, width: '100%', height: 60, background: 'rgba(255,255,255,0.03)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIM, fontSize: 11, border: '1px solid rgba(255,255,255,0.04)' }}>video preview — PRO: углы hip/knee/ankle/shoulder в реальном времени</div>
@@ -523,7 +540,12 @@ export const WLDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 12, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)' }}>
         <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {weakPoints.length ? weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''} · score {score} · ver {scoring.verification} {scoring.floors.join(' · ')}</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{scoring.findings.map(f => f.text).join(' · ')}</div>
-        <button onClick={applyToConstructor} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
+        {level === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>⚠️ CRITICAL — план будет урезан (MRV gate) и требует коррекции до пика. Рекомендуется OHS + VBT retest.</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
+          <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
+        </div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
       </div>
     </div>
   );
