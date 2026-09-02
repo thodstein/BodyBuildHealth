@@ -111,6 +111,7 @@ import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '..
 import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
+import { estimateSessionTimeWithSupersets } from '../../../engines/bb/bb-fatigue.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -4234,6 +4235,17 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize: 9, opacity: 0.8, marginBottom: 8 }}>
               🧲 SFR-профиль: {Math.round(unilateralRatioOf(builtPlan as any) * 100)}% односторонних сетов · lengthened-покрытие учитывается при выборе (Maeo 2023)
             </div>
+            {(() => {
+              const w0 = (builtPlan as any).weeks?.[0]?.sessions?.[0];
+              if (!w0?.exercises?.length) return null;
+              const t = estimateSessionTimeWithSupersets(w0 as any);
+              if (t.pairs === 0) return null;
+              return (
+                <div style={{ fontSize: 9, opacity: 0.85, marginBottom: 6 }}>
+                  ⏱ Неделя 1: ~{Math.round(t.baseSeconds / 60)} мин → суперсеты экономят ~{Math.round(t.savedSeconds / 60)} мин ({t.pairs} пар) — итого ~{Math.round(t.supersetSeconds / 60)} мин.
+                </div>
+              );
+            })()}
             {(() => {
               const deloadWeeks = (builtPlan as any).weeks?.filter((w: any) => w.deload || w.phase === 'deload').map((w: any) => w.week) || [];
               if (!deloadWeeks.length) return null;

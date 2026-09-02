@@ -61,6 +61,47 @@ export function estimateBBSessionCost(session: BBSession): BBSessionCost {
   return total;
 }
 
+/** СУПЕРСЕТ-ОПТИМИЗАТОР (P1): оценка времени сессии с учётом суперсетов-антагонистов.
+ *  Пары (supersetGroup) выполняются A1/B1/A2/B2 — отдых идёт только ПОСЛЕ второго
+ *  упражнения пары, т.е. экономится время второго элемента пары. */
+export interface BBSupersetTimeEstimate {
+  baseSeconds: number;
+  supersetSeconds: number;
+  savedSeconds: number;
+  pairs: number;
+}
+
+export function estimateSessionTimeWithSupersets(session: BBSession): BBSupersetTimeEstimate {
+  const base = estimateBBSessionCost(session).timeSeconds;
+  // Группируем упражнения с общим supersetGroup (>0).
+  const groups = new Map<number, BBExercise[]>();
+  for (const ex of session.exercises) {
+    const g = Number((ex as any).supersetGroup ?? 0);
+    if (g > 0) {
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(ex);
+    }
+  }
+  let saved = 0;
+  let pairs = 0;
+  for (const [, exs] of groups) {
+    if (exs.length < 2) continue;
+    // Экономия = время отдыха второго элемента пары (первый идёт сразу на второй).
+    // Берём по одному набору сетов второго упражнения пары.
+    const second = exs[1];
+    const sets = Math.max(0, second.sets || second.workSets?.length || 0);
+    const rest = Number.isFinite(Number(second.restSeconds)) ? Number(second.restSeconds) : 60;
+    saved += sets * rest;
+    pairs += 1;
+  }
+  return {
+    baseSeconds: base,
+    supersetSeconds: Math.max(0, base - saved),
+    savedSeconds: saved,
+    pairs,
+  };
+}
+
 /**
  * Сокращает сессию до бюджета без потери primary или единственного стимула
  * мышцы. Сначала уменьшаются сеты вторичных pump/isolation движений, затем
