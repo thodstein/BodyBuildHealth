@@ -161,10 +161,10 @@ export function interferenceForCycle(
   const totalSessions = avgWeeks.reduce((s, w) => s + w.sessions.reduce((a, x) => a + x.weeklyFrequency, 0), 0) / Math.max(1, avgWeeks.length);
   const totalMin = avgWeeks.reduce((s, w) => s + w.sessions.reduce((a, x) => a + x.durationMin * x.weeklyFrequency, 0), 0) / Math.max(1, avgWeeks.length);
   const avgDur = totalSessions > 0 ? totalMin / totalSessions : 30;
-  const modalities: string[] = [];
+  const modalities: InterferenceModality[] = [];
   for (const w of avgWeeks) for (const s of w.sessions) {
-    if (s.equipment) modalities.push(s.equipment);
-    else modalities.push(s.type);
+    if (s.equipment) modalities.push(s.equipment as InterferenceModality);
+    else modalities.push(s.type as InterferenceModality);
   }
   const hiitCount = avgWeeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit').reduce((a, x) => a + x.weeklyFrequency, 0), 0) / Math.max(1, avgWeeks.length);
   const hiitRatio = totalSessions > 0 ? hiitCount / totalSessions : 0;
