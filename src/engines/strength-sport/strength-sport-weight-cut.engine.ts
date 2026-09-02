@@ -78,7 +78,7 @@ export function weightCutNutritionForWeekSS(week:number,totalWeeks:number,p:Weig
   const prot = Math.round(bw* (ph==='taper'||ph==='fight_week'?2.3:2.2));
   let carbs = Math.round(bw * (ph==='fight_week'?4: ph==='taper'?4.5:5)); // TA: не режем до 1г
   const fiber = weightCutFiberForWeekSS(week,totalWeeks,p);
-  let water = Math.round(bw*35);
+  let water = Math.round(bw * (sex==='female'?30:35));
   let sodium=5000;
   if (ph==='taper') {
     const raw=Math.round(bw*100);
@@ -91,7 +91,7 @@ export function weightCutNutritionForWeekSS(week:number,totalWeeks:number,p:Weig
     sodium = p.sodiumMode==='moderate_cut'?1500:2500;
     notes.push(`Fight week SS: вода ${water}мл Na ${sodium}мг угли ${carbs}г (TA стабильно) → рефид 4-7г/кг`);
   } else {
-    water=Math.round(bw*35);
+    water=Math.round(bw * (sex==='female'?30:35));
   }
   const fatPerKg = sex==='female'?0.8:0.6;
   let fat=Math.round(bw*fatPerKg);

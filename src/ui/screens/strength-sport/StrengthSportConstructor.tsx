@@ -58,6 +58,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [patternId, setPatternId] = useState<string>('');
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
+  const [vbtPerLift, setVbtPerLift] = useState<Record<string, {best:number,last:number}>>({ snatch:{best:0,last:0}, clean:{best:0,last:0}, squat:{best:0,last:0} });
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
   const [contest, setContest] = useState<StrongmanContest | null>(null);
   const [contestStrategy, setContestStrategy] = useState<'conservative'|'balanced'|'aggressive'>('balanced');

@@ -17,7 +17,7 @@ describe('P3 Sinclair/IWF/masters', () => {
   });
   it('IWF categories', () => {
     expect(getIWFCategory(80, 'male')).toBe('88');
-    expect(getIWFCategory(95, 'male')).toBe('98');
+    expect(getIWFCategory(95, 'male')).toBe('110');
     expect(getIWFCategory(45, 'female')).toBe('48');
     expect(getIWFCategory(90, 'female')).toBe('+86');
     expect(getIWFCategory(110, 'male')).toBe('110');
