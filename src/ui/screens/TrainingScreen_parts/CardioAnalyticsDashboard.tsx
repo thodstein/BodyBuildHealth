@@ -5,7 +5,7 @@
 import React, { useMemo } from 'react';
 import { CARD, ROW, LABEL, HINT_SM, Badge, StatTile } from './CardioUI';
 import { cardioLogStats, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift } from '../../../engines/lms/cardio.engine';
+import { cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift, interferenceForCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -90,6 +90,14 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     return drift.warn ? `HR drift ${drift.driftPct}% >5% — признак утомления/обезвоживания` : null;
   }, [log]);
 
+  const interference = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const legPerWeek = cycle.config?.legDays ? cycle.config.legDays.filter(d => d >= 0 && d <= 6).length || 2 : 2;
+      return interferenceForCycle(cycle as any, legPerWeek, cycle.config?.sex);
+    } catch { return null; }
+  }, [cycle]);
+
   return (
     <div style={CARD}>
       <div style={ROW}>
@@ -102,6 +110,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         <StatTile label="TRIMP 7Д" value={String(trimp7)} color="#a78bfa" sub="Banister/HR" />
         <StatTile label="HR в зоне" value={hr?.inZonePct != null ? hr.inZonePct + '%' : '—'} color={hr?.inZonePct != null && hr.inZonePct >= 70 ? '#4ade80' : '#fbbf24'} sub={hr?.avgDelta != null ? (hr.avgDelta > 0 ? '+' : '') + hr.avgDelta + ' уд' : ''} />
         {polarized && <StatTile label="80/20" value={polarized.pct + '%'} color={polarized.ok ? '#4ade80' : '#fbbf24'} sub={polarized.label} />}
+        {interference && <StatTile label="INTERF." value={String(interference.score)} color={interference.level === 'low' ? '#4ade80' : interference.level === 'mid' ? '#fbbf24' : '#f87171'} sub={interference.level} />}
       </div>
       {hr?.advice && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
       {polarized && !polarized.ok && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ Поляризация {polarized.pct}% интенсива — по Seiler держите ≤20% HIIT/MISS, остальное Zone2.</div>}
@@ -116,6 +125,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         </div>
       )}
       {hrDriftNote && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ {hrDriftNote}</div>}
+      {interference && interference.level !== 'low' && <div style={{ fontSize: 11, color: interference.level === 'high' ? '#f87171' : '#fbbf24', background: interference.level === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${interference.level === 'high' ? 'rgba(239,68,68,0.24)' : 'rgba(245,158,11,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>⚡ Interference {interference.score}/10 ({interference.level}) — {interference.advice}</div>}
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>🩸 При ferritin &lt;30 мкг/л — железо 18мг + витамин C, контроль Hb; RED-S &lt;30 ккал/кг FFM — объём не повышать.</div>
       <div style={HINT_SM}>TRIMP Banister (HRr×k·e^b·HRr) где есть HR, иначе фактор. Рост &gt;15% за неделю — риск перегруза. 80/20 — Seiler polarized.</div>
     </div>

@@ -2,12 +2,13 @@
  * CardioDiaryPanel.tsx — дневник выполнения кардио: запись сессии,
  * статистика 7/28 дней, adherence недели активного цикла, рекомендация.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
   cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
   saveCardioWellness, loadCardioWellness, wellnessReadiness,
+  migrateCardioLogToIdb,
   type CardioLogEntry, type CardioLogFieldWarnings,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -51,6 +52,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   // Undo: снимок журнала до последней операции (добавление/обновление/удаление).
   const [undoPrev, setUndoPrev] = useState<CardioLogEntry[] | null>(null);
+  useEffect(() => { void migrateCardioLogToIdb(); }, []);
   const [wellness, setWellness] = useState(() => {
     const w = loadCardioWellness().find(x => x.date === todayIso());
     return w ?? { sleep: 3, stress: 3, soreness: 3, mood: 3 };

@@ -8,7 +8,7 @@ import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  lthrZones, runningVdot, menstrualPhaseForDate, cardioCyclePeriodAware,
+  lthrZones, runningVdot, estimateLTHRFrom30Min, menstrualPhaseForDate, cardioCyclePeriodAware,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
@@ -42,6 +42,7 @@ export const CardioAutoTunePanel: React.FC<{
   const [age, setAge] = useState(() => String(cycle?.config?.age ?? 30));
   const [restHr, setRestHr] = useState(() => (cycle?.config?.restingHr != null && cycle.config.restingHr > 0 ? String(cycle.config.restingHr) : ''));
   const [lthr, setLthr] = useState('');
+  const [lthrLast20, setLthrLast20] = useState('');
   const [vdotKm, setVdotKm] = useState('');
   const [vdotMin, setVdotMin] = useState('');
   const [cooperKm, setCooperKm] = useState('');
@@ -256,6 +257,10 @@ export const CardioAutoTunePanel: React.FC<{
           <NumberInput value={restHr} onChange={setRestHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={90} suffix="уд/мин" />
           <NumberInput value={lthr} onChange={setLthr} min={80} max={220} step={1} placeholder="160" ariaLabel="LTHR (пороговый пульс)" width={100} suffix="уд/мин" />
         </div>
+        <div style={ROW}>
+          <NumberInput value={lthrLast20} onChange={setLthrLast20} min={80} max={220} step={1} placeholder="168" ariaLabel="Средн ЧСС последн 20′ (30-мин тест)" width={110} suffix="последн 20′" />
+          <button style={BTN_SMALL} onClick={() => { const v = estimateLTHRFrom30Min(Number(lthrLast20)); if (v) { setLthr(String(v)); flashMsg(`LTHR ${v} уд/мин из последн 20′ — применён`); } else flashMsg('⚠ Укажите ЧСС 80-220'); }} title="30-мин all-out: средняя ЧСС последних 20 мин → LTHR (Friel)">→ LTHR</button>
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {zones.map(z => (
             <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : '#fff', fontWeight: z.zone === 2 ? 800 : 500 }}>
@@ -263,7 +268,7 @@ export const CardioAutoTunePanel: React.FC<{
             </div>
           ))}
         </div>
-        <div style={HINT_SM}>Zone 2 — базовая выносливость. LTHR приоритетнее Karvonen.</div>
+        <div style={HINT_SM}>Zone 2 — базовая выносливость. LTHR приоритетнее Karvonen. 30-мин тест Friel: бегите all-out 30 мин, средняя ЧСС последних 20 мин = LTHR.</div>
       </Accordion>
 
       <Accordion title="VDOT — темпы по тесту" icon="🏃" defaultOpen={false}>

@@ -7,7 +7,7 @@ import React, { useMemo } from 'react';
 import {
   buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
   CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
-  cardioFitnessForecast,
+  cardioFitnessForecast, cardioTaperRecommendation,
   CARDIO_PERIODIZATION_LABELS,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment, type CardioPeriodizationModel, type CardioTaperModel,
 } from '../../../engines/lms/cardio.engine';
@@ -306,6 +306,13 @@ export const CardioParamsStep: React.FC<{
             ))}
           </div>
         )}
+        {taperEnabled && (() => {
+          const rec = cardioTaperRecommendation({ taperWeeks, taperModel, acwr: null, wellnessReadiness: previewFactors?.sleepHours != null && previewFactors.sleepHours < 6 ? 3 : null, sleepHours: previewFactors?.sleepHours });
+          if (rec.sleepHygiene && taperWeeks < 3) {
+            return <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 8, padding: '6px 8px' }} role="status">⚠ {rec.reason} Нажмите “3 нед + exponential”.</div>;
+          }
+          return null;
+        })()}
         {!phaseSplit.auto && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(['base', 'build', 'maintenance'] as const).map(k => (

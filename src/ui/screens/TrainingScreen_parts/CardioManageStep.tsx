@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
-  cardioToNutritionPayload, buildCardioTcx,
+  cardioToNutritionPayload, buildCardioTcx, buildCardioZwo,
   loadCardioCycles, cardioYearPlan, buildCardioYearText,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
@@ -132,6 +132,23 @@ export const CardioManageStep: React.FC<{
       const a = document.createElement('a');
       a.href = url;
       a.download = `${cycle.id}.tcx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setCopyFlash(true);
+      window.setTimeout(() => setCopyFlash(false), 2500);
+    } catch { /* ignore */ }
+  };
+
+  const downloadZwo = () => {
+    if (!cycle) return;
+    try {
+      const blob = new Blob([buildCardioZwo(cycle)], { type: 'application/xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cycle.id}.zwo`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -291,6 +308,7 @@ export const CardioManageStep: React.FC<{
                 <div style={ROW}>
                   <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
                   <button style={BTN} onClick={downloadTcx}>📤 Тренировка .tcx</button>
+                  <button style={BTN} onClick={downloadZwo}>🚴 Zwift .zwo</button>
                   <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
                 </div>
               </SectionCard>
