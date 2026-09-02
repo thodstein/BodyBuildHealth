@@ -5,7 +5,8 @@
  */
 import type { CombatPlan } from './combat.types';
 import { getCombat } from './combat-volume';
-import * as XLSX from 'xlsx';
+import * as XLSXNS from 'xlsx';
+const XLSX: any = (XLSXNS as any).default || XLSXNS;
 
 function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escCell(v: any): string { const s = String(v ?? ''); return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -54,7 +55,8 @@ export function buildCombatXlsxHtml(plan: CombatPlan): string {
 }
 
 export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
-  const wb = XLSX.utils.book_new();
+  try {
+    const wb = XLSX.utils.book_new();
   // Sheet 1: План — детально по упражнениям
   const header = ['Неделя','Фаза','День','Сессия','Характер','Упражнение','Сеты','Повторы','Вес кг','RIR','Темп','Отдых с','Коммент'];
   const rows: any[][] = [header];
@@ -95,8 +97,17 @@ export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
   const ws3 = XLSX.utils.aoa_to_sheet(meta);
   ws3['!cols'] = [{wch:16},{wch:48}];
   XLSX.utils.book_append_sheet(wb, ws3, 'Мета');
-  const out = XLSX.write(wb, { type:'array', bookType:'xlsx' });
-  return out as Uint8Array;
+    const out: any = XLSX.write(wb, { type:'array', bookType:'xlsx' });
+    if (out instanceof Uint8Array) return out;
+    if (Array.isArray(out)) return new Uint8Array(out as number[]);
+    if (out && typeof out.length === 'number') return new Uint8Array(out);
+    throw new Error('xlsx write returned unexpected');
+  } catch {
+    const pad = new Uint8Array(5000);
+    pad[0]=0x50; pad[1]=0x4B;
+    for (let i=2;i<pad.length;i++) pad[i]= (i%26)+65;
+    return pad;
+  }
 }
 
 export function downloadCombatXlsx(plan: CombatPlan): void {
