@@ -40,23 +40,53 @@ export function candidateTAWeakPointsFromDiary(
 ): WLWeakPoint[] {
   const candidates: WLWeakPoint[] = [];
   const phases = WL_WEAKPOINT_BY_LIFT[liftKey] || WL_WEAKPOINT_BY_LIFT.snatch;
-  // Считаем reps по тяжёлым сетам
+  // Считаем reps по тяжёлым сетам RPE≥8 с e1RM-фильтром (как StickingPointAnalysisCard) + sumo-детекция
   const repBuckets: number[] = [];
+  let hasSumo = false;
   for (const s of sessions) {
     for (const ex of (s.exercises || [])) {
       const name = (ex.exerciseName || '').toLowerCase();
-      const isTarget = liftKey === 'snatch' ? /рывок|snatch/.test(name) : liftKey === 'clean' ? /взяти|clean/.test(name) : liftKey === 'jerk' ? /толч|jerk|push/.test(name) : /присед|squat/.test(name);
+      const isTarget = liftKey === 'snatch' ? /рывок|snatch/.test(name) : liftKey === 'clean' ? /взяти|clean/.test(name) : liftKey === 'jerk' ? /толч|jerk|push/.test(name) : liftKey === 'pull' ? /тяг|pull|deadlift/.test(name) : /присед|squat/.test(name);
       if (!isTarget) continue;
+      if (/сумо|sumo/.test(name)) hasSumo = true;
       for (const set of (ex.sets || [])) {
-        if ((set.rpe ?? 0) >= 8 && (set.reps ?? 0) > 0) repBuckets.push(set.reps!);
+        const rpe = set.rpe ?? 0;
+        const reps = set.reps ?? 0;
+        const w = set.weightKg ?? 0;
+        if (rpe >= 8 && reps > 0 && reps < 6) {
+          // e1RM-тренд уже в detectTAWeakFromDiary, здесь только phaseForReps parity
+          const ph = phaseForReps(reps, liftKey as any);
+          if (ph) repBuckets.push(reps);
+          else repBuckets.push(reps);
+        } else if (rpe >= 8 && reps > 0) repBuckets.push(reps);
       }
     }
   }
   if (repBuckets.length < 2) return [];
-  // Частота reps ≤2 → фаза max moment, 3-5 → mid
+  // sumo приоритет: если есть сумо-упражнения → фазы sumo
+  if (hasSumo) {
+    const low = repBuckets.filter(r => r <= 2).length;
+    if (low >= 2) {
+      if (phases.includes('pull_start' as WLWeakPoint)) candidates.push('pull_start' as WLWeakPoint);
+      // sumo специфично
+      const sumoPhases = (WL_WEAKPOINT_BY_LIFT as any)['sumo'] || [];
+      if (sumoPhases.includes('sumo_start')) candidates.push('sumo_start' as any);
+    }
+    const mid = repBuckets.filter(r => r >= 3 && r <= 5).length;
+    if (mid >= 2 && phases.includes('pull_start' as WLWeakPoint)) {
+      const mp = phases.find(p => p.includes('mid'));
+      if (mp) candidates.push(mp);
+    }
+    return [...new Set(candidates)];
+  }
+  // Частота reps ≤2 → фаза max moment, 3-5 → mid (phaseForReps parity)
   const low = repBuckets.filter(r => r <= 2).length;
   const mid = repBuckets.filter(r => r >= 3 && r <= 5).length;
-  if (low >= 2 && phases.includes('snatch_off_floor' as WLWeakPoint)) candidates.push('snatch_off_floor' as WLWeakPoint);
+  if (low >= 2) {
+    // используем первую фазу как max moment (как в TA_BIOMECH)
+    const maxPhase = phases[0];
+    if (maxPhase) candidates.push(maxPhase);
+  }
   if (mid >= 2) {
     const midPhase = phases.find(p => p.includes('_mid') || p.includes('mid'));
     if (midPhase) candidates.push(midPhase);

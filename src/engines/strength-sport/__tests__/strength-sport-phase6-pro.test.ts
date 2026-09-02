@@ -75,12 +75,12 @@ describe('PRO Phase6 P0 fixes', () => {
 });
 
 describe('PRO VBT per-lift', () => {
-  it('snatch LVP 100% 0.85 vs squat 0.30', () => {
-    expect(LOAD_VELOCITY_PROFILE_SS.snatch[0][1]).toBe(0.85);
+  it('snatch peak 1.30 vs squat 0.30 (PLOS 2026 peak)', () => {
+    expect(LOAD_VELOCITY_PROFILE_SS.snatch[0][1]).toBe(1.30);
     expect(LOAD_VELOCITY_PROFILE_SS.squat[0][1]).toBe(0.30);
   });
-  it('velocityForSS snatch 100% 0.85', () => {
-    expect(velocityForSS(1.0, 'snatch')).toBeCloseTo(0.85, 1);
+  it('velocityForSS snatch 100% 1.30 peak', () => {
+    expect(velocityForSS(1.0, 'snatch')).toBeCloseTo(1.30, 1);
     expect(velocityForSS(1.0, 'back_squat')).toBeCloseTo(0.30, 1);
   });
   it('estimate1RM snatch vs squat differs', () => {

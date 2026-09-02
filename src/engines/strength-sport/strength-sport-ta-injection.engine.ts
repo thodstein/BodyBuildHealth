@@ -8,6 +8,7 @@
 import type { StrengthSportPlan, StrengthSportSession, StrengthSportExercise } from './strength-sport.types';
 import { WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from './strength-sport-weakpoint';
 import { TA_BIOMECH } from './strength-sport-biomechanics.engine';
+import '../../core/exercise-catalog-ta-supplement';
 
 function basePmForTA(id: string, wm: any): number {
   const low = id.toLowerCase();

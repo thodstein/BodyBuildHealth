@@ -58,6 +58,7 @@ export interface StrengthSportInput {
   avoidAxialLoad?: boolean;
   bodyweightCapability?: { pullUpsStrict?: number; dipsStrict?: number };
   weakPoints?: string[];
+  diagnosticLevel?: 'ok' | 'warn' | 'critical';
   focus?: 'snatch' | 'clean' | 'squat' | 'overhead' | 'carry' | 'stone' | null;
   dupMode?: 'off' | 'heavy_light' | 'wave';
   intensityTech?: 'none' | 'cluster';

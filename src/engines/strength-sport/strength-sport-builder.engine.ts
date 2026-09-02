@@ -970,6 +970,17 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
     }
   }
+  // Scoring gate: critical diagnostic → объём ×0.85 RIR+1 (PRO)
+  if ((input as any).diagnosticLevel === 'critical') {
+    for (const wk of weeksData) if (!wk.deload) {
+      for (const sess of wk.sessions) for (const ex of sess.exercises) {
+        if (ex.sets > 2) { const keep = Math.max(2, Math.round(ex.sets * 0.85)); if (keep < ex.sets) { ex.workSets = ex.workSets.slice(0, keep); ex.sets = keep; (ex.workSets as any[]).forEach((ws:any)=> ws.rir = Math.min(4, (ws.rir ?? 2) + 1)); } }
+      }
+      wk.totalSets = wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.sets,0),0);
+    }
+    warnings.push('CRITICAL diagnostic gate: объём ×0.85 RIR+1 (score≤49)');
+  }
+
   // Спец-снаряды без оборудования
   const hasSpecialty = (input.equipment || []).includes('other') || (input.equipment || []).length === 0;
   if (!hasSpecialty && mode !== 'weightlifting') {
