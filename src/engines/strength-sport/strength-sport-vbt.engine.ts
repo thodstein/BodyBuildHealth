@@ -41,6 +41,90 @@ export const VBT_SS_THRESHOLDS: Record<string, { optimalMin: number; stopMin: nu
   log_press: { optimalMin: 0.32, stopMin: 0.20 },
 };
 
+// ── PRO V2: Peak-velocity зоны для ТА (PLOS ONE 2026; peak velocity, не mean) ──
+// Все absolute strength (>80%) >1.3 м/с (generic startingStrength порог невалиден)
+// Источники: Wood et al. 2026 load-velocity profiles 7 derivatives, Perch peak velocity
+export interface TAVelocityZone { pct: [number, number]; velocity: [number, number]; label: string; }
+export const TA_PEAK_VELOCITY_ZONES: Record<string, TAVelocityZone[]> = {
+  snatch: [
+    { pct: [0, 0.25], velocity: [2.70, 3.20], label: 'starting_strength' },
+    { pct: [0.25, 0.45], velocity: [2.30, 2.70], label: 'speed_strength' },
+    { pct: [0.45, 0.65], velocity: [1.90, 2.30], label: 'strength_speed' },
+    { pct: [0.65, 0.80], velocity: [1.55, 1.90], label: 'accelerative_strength' },
+    { pct: [0.80, 1.00], velocity: [1.30, 1.75], label: 'absolute_strength' },
+  ],
+  clean: [
+    { pct: [0, 0.25], velocity: [2.40, 2.90], label: 'starting_strength' },
+    { pct: [0.25, 0.45], velocity: [2.00, 2.40], label: 'speed_strength' },
+    { pct: [0.45, 0.65], velocity: [1.70, 2.00], label: 'strength_speed' },
+    { pct: [0.65, 0.80], velocity: [1.45, 1.70], label: 'accelerative_strength' },
+    { pct: [0.80, 1.00], velocity: [1.30, 1.55], label: 'absolute_strength' },
+  ],
+  // ТА-тяги: ниже рывка, но выше приседа
+  snatch_pull: [
+    { pct: [0, 0.25], velocity: [2.20, 2.60], label: 'starting_strength' },
+    { pct: [0.25, 0.45], velocity: [1.90, 2.20], label: 'speed_strength' },
+    { pct: [0.45, 0.65], velocity: [1.60, 1.90], label: 'strength_speed' },
+    { pct: [0.65, 0.80], velocity: [1.35, 1.60], label: 'accelerative_strength' },
+    { pct: [0.80, 1.00], velocity: [1.10, 1.35], label: 'absolute_strength' },
+  ],
+};
+
+// VTHRES нормы (Sandau): snatch 1.70-2.00, clean 1.40-1.70
+export const TA_VTHRES_NORMS: Record<string, { min: number; max: number; optimal: number }> = {
+  snatch: { min: 1.70, max: 2.00, optimal: 1.85 },
+  clean: { min: 1.40, max: 1.70, optimal: 1.55 },
+  jerk: { min: 1.20, max: 1.50, optimal: 1.35 },
+};
+
+export function taZoneForVelocity(velocity: number, exercise: string): string {
+  const zones = TA_PEAK_VELOCITY_ZONES[exercise] || TA_PEAK_VELOCITY_ZONES.snatch;
+  for (const z of zones) if (velocity >= z.velocity[0] && velocity <= z.velocity[1]) return z.label;
+  if (velocity > zones[0].velocity[1]) return zones[0].label;
+  if (velocity < zones[zones.length - 1].velocity[0]) return zones[zones.length - 1].label;
+  return 'unknown';
+}
+
+export function taTargetVelocity(exercise: string, intensity: 'starting_strength' | 'speed_strength' | 'strength_speed' | 'accelerative_strength' | 'absolute_strength'): [number, number] | null {
+  const zones = TA_PEAK_VELOCITY_ZONES[exercise];
+  if (!zones) return null;
+  const z = zones.find(v => v.label === intensity);
+  return z ? z.velocity : null;
+}
+
+// ── FvR2 модель Sandau: snatch pull 80%/110% + vThres → snatchTh ±1.5кг ──
+export interface FvR2Input { load80: number; vmax80: number; load110: number; vmax110: number; hAcc: number; vThres: number; }
+export interface FvR2Result { v0: number; F0: number; Pmax: number; slope: number; Fthres: number; snatchTh: number; sFv: number; }
+
+export function computeFvR2(input: FvR2Input): FvR2Result | null {
+  const { load80, vmax80, load110, vmax110, hAcc, vThres } = input;
+  if (!load80 || !load110 || !vmax80 || !vmax110 || !hAcc || hAcc <= 0 || !vThres) return null;
+  if (vmax80 <= vmax110) return null; // при большем весе скорость должна падать
+  // Средние силы по Samozino-подобной оценке: F = m*g + m*v²/(2*h)
+  const g = 9.81;
+  const F80 = load80 * g + (load80 * vmax80 * vmax80) / (2 * hAcc);
+  const F110 = load110 * g + (load110 * vmax110 * vmax110) / (2 * hAcc);
+  const slope = (F110 - F80) / (vmax110 - vmax80); // отрицательный
+  if (!Number.isFinite(slope) || slope >= 0) return null;
+  const F0 = F80 - slope * vmax80;
+  const v0 = -F0 / slope;
+  const Pmax = (F0 * v0) / 4;
+  const Fthres = F0 + slope * vThres;
+  // snatchTh: решить Fthres = m*g + m*vThres²/(2*hAcc) => m = Fthres / (g + vThres²/(2*hAcc))
+  const denom = g + (vThres * vThres) / (2 * hAcc);
+  const snatchTh = denom > 0 ? Math.round((Fthres / denom) * 10) / 10 : 0;
+  const sFv = slope; // наклон FvR (оптимум ищется отдельно)
+  return { v0: Math.round(v0 * 100) / 100, F0: Math.round(F0), Pmax: Math.round(Pmax), slope: Math.round(slope * 100) / 100, Fthres: Math.round(Fthres), snatchTh, sFv: Math.round(sFv * 100) / 100 };
+}
+
+export function optimalFvSlopeForPmax(Pmax: number): number {
+  // Чем выше Pmax, тем более force-доминантный оптимум (Sandau Fig2)
+  // Эмпирическая: slope_opt ≈ -0.8 - Pmax/8000
+  if (Pmax < 2000) return -1.0;
+  if (Pmax < 3000) return -1.2;
+  return -1.5;
+}
+
 function velocityForPctSSLocal(lift: string, pct: number): number {
   const tbl = LOAD_VELOCITY_PROFILE_SS[lift] || LOAD_VELOCITY_PROFILE_SS.squat;
   const p = Math.max(0.5, Math.min(1, pct));
@@ -125,11 +209,25 @@ export function diagnoseVelocityLossSS(bestVel: number, lastVel: number, thresho
   return { lossPct, zone, exceeded, e1RMByVelocity, recommendation: rec };
 }
 
-export function vbtRecommendationSS(lossPct: number): { action: string; rirAdd: number; volumeMult: number } {
-  if (lossPct > 30) return { action: 'Стоп сет', rirAdd: 2, volumeMult: 0.6 };
-  if (lossPct > 25) return { action: 'RIR+1, объём ×0.85', rirAdd: 1, volumeMult: 0.85 };
-  if (lossPct > 20) return { action: 'RIR+1', rirAdd: 1, volumeMult: 0.9 };
+export function vbtRecommendationSS(lossPct: number, liftId?: string): { action: string; rirAdd: number; volumeMult: number } {
+  // Для ТА взрывные: пороги строже 10%/20% (power vs strength), для силы — 20%/30%
+  const isTA = liftId ? /snatch|jerk|clean|power/.test(liftId.toLowerCase()) : false;
+  const warn = isTA ? 10 : 20;
+  const crit = isTA ? 20 : 30;
+  if (lossPct > crit) return { action: 'Стоп сет', rirAdd: 2, volumeMult: 0.6 };
+  if (lossPct > warn + 5) return { action: 'RIR+1, объём ×0.85', rirAdd: 1, volumeMult: 0.85 };
+  if (lossPct > warn) return { action: 'RIR+1', rirAdd: 1, volumeMult: 0.9 };
   return { action: 'Оптимально', rirAdd: 0, volumeMult: 1 };
+}
+
+/**
+ * Порог потери для ТА: 10% для power (рывок/толчок), 15% для тяг
+ */
+export function thresholdForTALift(liftId: string): 10 | 15 | 20 {
+  const low = liftId.toLowerCase();
+  if (low.includes('pull') || low.includes('squat')) return 15;
+  if (low.includes('snatch') || low.includes('jerk') || low.includes('clean')) return 10;
+  return 20;
 }
 
 export { thresholdForIntent };

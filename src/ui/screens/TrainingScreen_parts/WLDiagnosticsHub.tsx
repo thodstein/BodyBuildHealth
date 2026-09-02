@@ -1,20 +1,28 @@
-/** WLDiagnosticsHub.tsx — ХАБ диагностики тяжёлой атлетики (PRO, уровень движения).
- *  Аналог DiagnosticsHub (9 лифтов) и ArmDiagnosticsHub (8 движений) — для ТА двоеборья.
- *  4 подвкладки: Рывок | Взятие | Толчок | Мобильность/VBT
- *  - 7 фаз рывка, 5 фаз толчка, углы (таз/колено/плечо), VBT, bar path, асимметрия
- *  - Вывод в конструктор Стронг+ТА via planner-bridge (weakpoints → StrengthSportConstructor mode:weightlifting)
+/** WLDiagnosticsHub.tsx — ТА-диагностика — хаб движения PRO (v2)
+ *  Рывок 5 фаз + взятие 3 + толчок 3 × числовые углы (биомеханика) + bar path PRO (Vorobyev типы + метрики + SRD)
+ *  + VBT peak zones (PLOS 2026) + FvR2 (Sandau) + OHS 6-сегментов + асимметрия + IMTP/ISPP + diary e1RM + RSS scoring
+ *  + LIMITER-коррекции + видео Kinovea/Enode + apply в StrengthSportConstructor (weightlifting)
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_ANGLE, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
+import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
+import { TA_BIOMECH, diagnoseTAWeakPoint } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
+import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
+import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
+import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
+import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { detectTAWeakFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
-type WLTab = 'snatch' | 'clean' | 'jerk' | 'mobility';
+type WLTab = 'snatch' | 'clean' | 'jerk' | 'mobility' | 'vbt' | 'video';
 
 type WLState = {
   snatchWeak: WLWeakPoint[];
@@ -26,23 +34,56 @@ type WLState = {
   rightMax: string;
   vbtWeight: string;
   vbtVel: string;
-  overheadSquat: string; // мобильность: см глубины
-  ankleDorsiflex: string;
+  vbtBest: string;
+  vbtLast: string;
+  vbtVthres: string;
+  fvrLoad80: string;
+  fvrVmax80: string;
+  fvrLoad110: string;
+  fvrVmax110: string;
+  fvrHAcc: string;
+  // OHS 6 segments
+  ohsHeelsFlat: boolean;
+  ohsKneeValgus: boolean;
+  ohsHipBelowParallel: boolean;
+  ohsTrunkUpright: boolean;
+  ohsArmsOverMidfoot: boolean;
+  ohsLumbarNeutral: boolean;
+  overheadSquat: string; // совместимость: старый ввод глубины (legacy)
+  ankleDorsiflex: string; // legacy deg
+  kneeToWallCm: string;
+  ankleDeg: string;
+  heelRetest: '' | 'better' | 'same';
+  // IMTP
+  imtpKg: string;
+  isppKg: string;
+  // Bar path metrics (ручной ввод)
+  xLoopCm: string;
+  yMaxCm: string;
+  peakVelMs: string;
 };
 
 const DEFAULT_STATE: WLState = {
   snatchWeak: [], cleanWeak: [], jerkWeak: [],
   barPath: '', barLift: 'snatch',
   leftMax: '', rightMax: '',
-  vbtWeight: '', vbtVel: '',
+  vbtWeight: '', vbtVel: '', vbtBest: '', vbtLast: '', vbtVthres: '',
+  fvrLoad80: '', fvrVmax80: '', fvrLoad110: '', fvrVmax110: '', fvrHAcc: '0.8',
+  ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   overheadSquat: '', ankleDorsiflex: '',
+  kneeToWallCm: '', ankleDeg: '',
+  heelRetest: '',
+  imtpKg: '', isppKg: '',
+  xLoopCm: '', yMaxCm: '', peakVelMs: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
-  { id: 'snatch', label: 'Рывок', icon: '🏋️', desc: '5 фаз + bar path' },
-  { id: 'clean', label: 'Взятие', icon: '🏋️‍♂️', desc: '3 фазы + тяга' },
-  { id: 'jerk', label: 'Толчок', icon: '🦾', desc: '3 фазы + VBT' },
-  { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'оверхед/голеностоп + асимметрия' },
+  { id: 'snatch', label: 'Рывок', icon: '🏋️', desc: '5 фаз + углы' },
+  { id: 'clean', label: 'Взятие', icon: '🏋️‍♂️', desc: '3 фазы + ISPP' },
+  { id: 'jerk', label: 'Толчок', icon: '🦾', desc: '3 фазы + drive' },
+  { id: 'vbt', label: 'VBT/FvR', icon: '⚡', desc: 'пик-зоны + FvR2' },
+  { id: 'video', label: 'Видео', icon: '📹', desc: 'Kinovea/Enode' },
+  { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'OHS 6 + асимметрия' },
 ];
 
 export const WLDiagnosticsHub: React.FC = () => {
@@ -55,6 +96,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   });
   const [tab, setTab] = useState<WLTab>('snatch');
   const [toast, setToast] = useState<string>('');
+  const [csvText, setCsvText] = useState<string>('');
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -68,6 +110,15 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, []);
 
+  const diaryWeaks = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log');
+      const logs = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(logs)) return [];
+      return detectTAWeakFromDiary(logs as any);
+    } catch { return []; }
+  }, []);
+
   const weakPoints = useMemo(() => {
     const all: WLWeakPoint[] = [...state.snatchWeak, ...state.cleanWeak, ...state.jerkWeak];
     return Array.from(new Set(all)).slice(0, 3);
@@ -78,25 +129,83 @@ export const WLDiagnosticsHub: React.FC = () => {
     return diagnoseBarPath(state.barLift, state.barPath as BarPathDeviation);
   }, [state.barPath, state.barLift]);
 
+  const barMetrics: BarPathMetrics | null = useMemo(() => {
+    const xLoop = parseFloat(state.xLoopCm);
+    const yMax = parseFloat(state.yMaxCm);
+    const vMax = parseFloat(state.peakVelMs);
+    if (!Number.isFinite(xLoop) && !Number.isFinite(yMax) && !Number.isFinite(vMax)) return null;
+    return {
+      xMin: -xLoop / 2 || 0,
+      xMax: xLoop / 2 || 0,
+      xLoop: Number.isFinite(xLoop) ? xLoop : 0,
+      yMax: Number.isFinite(yMax) ? yMax : 0,
+      vMax: Number.isFinite(vMax) ? vMax : 0,
+      trajectoryType: 'unknown',
+    };
+  }, [state.xLoopCm, state.yMaxCm, state.peakVelMs]);
+
+  const barMetricsDiag = useMemo(() => barMetrics ? diagnoseBarPathFromMetrics(barMetrics, state.barLift) : null, [barMetrics, state.barLift]);
+
   const asymmetry = useMemo(() => {
     const l = parseFloat(state.leftMax);
     const r = parseFloat(state.rightMax);
     if (!Number.isFinite(l) || !Number.isFinite(r) || !l || !r) return null;
     const diff = Math.abs(l - r) / Math.max(l, r) * 100;
-    return { diff: Math.round(diff * 10) / 10, isAsym: diff >= 10, weaker: l < r ? 'left' : 'right' };
+    return { diff: Math.round(diff * 10) / 10, isAsym: diff >= 7, isCrit: diff >= 12, weaker: l < r ? 'left' : 'right' };
   }, [state.leftMax, state.rightMax]);
 
-  const score = useMemo(() => {
-    let s = 100;
-    s -= weakPoints.length * 12;
-    if (asymmetry?.isAsym) s -= 15;
-    if (state.barPath) s -= 10;
-    if (state.vbtVel && parseFloat(state.vbtVel) < 0.5) s -= 10;
-    return Math.max(0, Math.min(100, Math.round(s)));
-  }, [weakPoints, asymmetry, state.barPath, state.vbtVel]);
+  const ohs = useMemo(() => assessOHS({
+    heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+    trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+    kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+    ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : state.ankleDorsiflex ? parseFloat(state.ankleDorsiflex) : null,
+    heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
+  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.ankleDorsiflex, state.heelRetest]);
 
-  const level: 'ok'|'warn'|'critical' = score >= 80 ? 'ok' : score >= 50 ? 'warn' : 'critical';
-  const scoreColor = level === 'ok' ? '#22c55e' : level === 'warn' ? '#f59e0b' : '#ef4444';
+  const vbtLoss = useMemo(() => {
+    const best = parseFloat(state.vbtBest);
+    const last = parseFloat(state.vbtLast);
+    if (!Number.isFinite(best) || !Number.isFinite(last) || !best) return null;
+    const lift = state.barLift || 'snatch';
+    const thr = thresholdForTALift(lift) as any;
+    const r = diagnoseVelocityLossSS(best, last, thr, state.vbtWeight ? parseFloat(state.vbtWeight) : undefined, lift);
+    return r;
+  }, [state.vbtBest, state.vbtLast, state.vbtWeight, state.barLift]);
+
+  const vbtZone = useMemo(() => {
+    const vel = parseFloat(state.vbtVel || state.peakVelMs);
+    if (!Number.isFinite(vel)) return null;
+    const lift = state.barLift.includes('clean') ? 'clean' : state.barLift.includes('jerk') ? 'jerk' : 'snatch';
+    return taZoneForVelocity(vel, lift);
+  }, [state.vbtVel, state.peakVelMs, state.barLift]);
+
+  const fvr = useMemo(() => {
+    const l80 = parseFloat(state.fvrLoad80), v80 = parseFloat(state.fvrVmax80), l110 = parseFloat(state.fvrLoad110), v110 = parseFloat(state.fvrVmax110), h = parseFloat(state.fvrHAcc), vt = parseFloat(state.vbtVthres);
+    if (![l80, v80, l110, v110, h, vt].every(Number.isFinite)) return null;
+    return computeFvR2({ load80: l80, vmax80: v80, load110: l110, vmax110: v110, hAcc: h || 0.8, vThres: vt });
+  }, [state.fvrLoad80, state.fvrVmax80, state.fvrLoad110, state.fvrVmax110, state.fvrHAcc, state.vbtVthres]);
+
+  const isppRatio = useMemo(() => {
+    const imtp = parseFloat(state.imtpKg), ispp = parseFloat(state.isppKg);
+    if (!Number.isFinite(imtp) || !Number.isFinite(ispp) || !imtp) return null;
+    return ispp / imtp;
+  }, [state.imtpKg, state.isppKg]);
+
+  const scoring = useMemo(() => scoreTA({
+    weakCount: weakPoints.length,
+    asymmetryPct: asymmetry?.diff ?? null,
+    barPathDeviation: state.barPath || null,
+    vbtLossPct: vbtLoss?.lossPct ?? (state.vbtVel ? (parseFloat(state.vbtVel) < 1.3 ? 12 : null) : null),
+    mobilityFails: ohs.failed,
+    imtpRatio: isppRatio,
+    hasVideo: !!barMetrics || !!csvText,
+    hasVbt: !!vbtLoss || !!state.vbtVel,
+    hasMobility: ohs.failed !== 6,
+  }), [weakPoints.length, asymmetry, state.barPath, vbtLoss, state.vbtVel, ohs.failed, isppRatio, barMetrics, csvText]);
+
+  const score = scoring.score;
+  const level = scoring.level;
+  const sColor = scoreColor(level);
 
   const toggleWeak = (group: 'snatch' | 'clean' | 'jerk', wp: WLWeakPoint) => {
     setState(s => {
@@ -114,21 +223,56 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
       return;
     }
+    // Include numeric biomech + scoring metadata for builder
+    const biomechDetails = weakPoints.map(wp => diagnoseTAWeakPoint(wp)).filter(Boolean);
     applyToPlanner({
       kind: 'weakpoints',
       label: `ТА диагностика: ${weakPoints.join(', ')}`,
-      data: { groups: weakPoints, plWeakPoints: weakPoints.map(wp => ({ lift: wp.split('_')[0], weakPoint: wp })), wlWeakPoints: weakPoints, barPath: state.barPath, vbt: state.vbtVel } as any,
+      data: {
+        groups: weakPoints,
+        plWeakPoints: weakPoints.map(wp => ({ lift: wp.split('_')[0], weakPoint: wp })),
+        wlWeakPoints: weakPoints,
+        barPath: state.barPath,
+        vbt: state.vbtVel || state.vbtBest,
+        score, level, verification: scoring.verification,
+        biomech: biomechDetails,
+        ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
+        asymmetry: asymmetry?.diff ?? null,
+        fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null,
+      } as any,
       source: 'intellectual',
     });
-    setToast(`✓ Применено в ТА-конструктор: ${weakPoints.map(w=>WL_WEAKPOINT_LABELS[w]||w).join(', ')}`);
+    setToast(`✓ Применено в ТА-конструктор: ${weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(', ')} (score ${score})`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'strength' } as any));
       localStorage.setItem('he_training_planning_track', 'strength');
-      // strength-sport mode hint
       localStorage.setItem('he_strength_sport_mode', 'weightlifting');
     } catch {}
   };
+
+  const handleCsvParse = () => {
+    const pts = parseKinoveaCSV(csvText);
+    if (!pts) { setToast('CSV не распознан'); setTimeout(()=>setToast(''),2000); return; }
+    const res = analyzeBarTracking(pts);
+    if (!res) { setToast('Нет точек'); return; }
+    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc) }));
+    setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
+    setTimeout(()=>setToast(''),3000);
+  };
+
+  // Lifter limiter suggestions for selected phase (top 2)
+  const limiterForPhase = useMemo(() => {
+    const wp = weakPoints[0];
+    if (!wp) return [];
+    // Map WL phase → limiter category: off_floor → start_specific, mid → speed_strength, catch → stabilization, overhead→ stabilization
+    let cat = 'speed_strength';
+    if (wp.includes('off_floor') || wp.includes('pull_start')) cat = 'start_specific';
+    else if (wp.includes('catch') || wp.includes('overhead')) cat = 'stabilization';
+    else if (wp.includes('mid')) cat = 'speed_strength';
+    const opts = LIMITER_OPTIONS.filter(o => o.category === cat as any).slice(0, 2);
+    return opts;
+  }, [weakPoints]);
 
   return (
     <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
@@ -139,127 +283,221 @@ export const WLDiagnosticsHub: React.FC = () => {
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ТА-диагностика — хаб движения PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 × углы + bar path + VBT + мобильность. Как диагностика 9 лифтов — с видео и коррекциями.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 × числовые углы + bar path PRO (Vorobyev типы, SRD) + VBT пиковые зоны + FvR2 + OHS 6 + видео Kinovea/Enode.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${scoreColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${scoreColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
-            <div style={{ fontSize: 9, color: scoreColor, fontWeight: 700, marginTop: 2 }}>{level === 'ok' ? 'ОК' : level === 'warn' ? 'WARN' : 'CRITICAL'}</div>
+            <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
+            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{level === 'ok' ? 'ОК' : level === 'warn' ? 'WARN' : 'CRITICAL'} · v{scoring.verification}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone==='dangerous'?'🔴': acwr.zone==='caution'?'🟠':'🟢') : ''}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{weakPoints.length? `${weakPoints.length} слабые фазы` : 'баланс'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{weakPoints.length ? `${weakPoints.length} слабые фазы` : 'баланс'}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{state.barPath ? BAR_PATH_LABELS[state.barPath as BarPathDeviation] : 'bar path —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtZone ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: vbtZone ? '#22c55e' : DIM }}>{vbtZone ? `VBT ${vbtZone}` : 'VBT —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
+          {scoring.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
+        {diaryWeaks.length > 0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 6 }}>📓 Дневник: слабые {diaryWeaks.map(w => `${w.label} ${w.deltaPct}%`).join(', ')}</div>}
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
-          Выбери слабые фазы + bar path + VBT → получи углы, коррекции и точечные упражнения. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в ТА-конструктор»</b> отправит фазы в планировщик (mode:weightlifting).
+          Выбери слабые фазы (числовые углы + биомеханика) + bar path с метриками (SRD 4/6см) + VBT/FvR2 → получи RSS-скор, verification и точечные коррекции. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в ТА-конструктор»</b> отправит фазы с biomech в планировщик (mode:weightlifting).
         </div>
+        {limiterForPhase.length > 0 && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>💡 Лимитеры для {WL_WEAKPOINT_LABELS[weakPoints[0]]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
 
       {/* Tabs */}
       <div style={{ ...CARD, padding: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-          {TAB_DEFS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id as any)} aria-pressed={tab===t.id} style={{ padding:'6px 12px', borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#3b82f6' : '#1f3a5f', background: tab===t.id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: tab===t.id ? '#3b82f6' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
+          {TAB_DEFS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id as any)} aria-pressed={tab === t.id} style={{ padding: '6px 12px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#3b82f6' : '#1f3a5f', background: tab === t.id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: tab === t.id ? '#3b82f6' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
               {t.icon} {t.label}
             </button>
           ))}
-          <button onClick={applyToConstructor} style={{ marginLeft:'auto', padding:'8px 14px', borderRadius:8, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:12, cursor:'pointer' }}>→ Применить в ТА-конструктор</button>
+          <button onClick={applyToConstructor} style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>→ Применить в ТА-конструктор</button>
         </div>
 
-        {tab==='snatch' && (
+        {tab === 'snatch' && (
           <div>
-            <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>Рывок — 5 фаз (углы + мышцы)</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              {(['snatch_off_floor','snatch_mid','snatch_pull_under','snatch_catch','snatch_overhead'] as WLWeakPoint[]).map(wp=>(
-                <button key={wp} onClick={()=>toggleWeak('snatch', wp)} aria-pressed={state.snatchWeak.includes(wp)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: state.snatchWeak.includes(wp) ? '#3b82f6' : '#1f3a5f', background: state.snatchWeak.includes(wp) ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.snatchWeak.includes(wp) ? '#3b82f6' : DIM, fontSize:11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Рывок — 5 фаз (числовые углы + биомеханика)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {(['snatch_off_floor', 'snatch_mid', 'snatch_pull_under', 'snatch_catch', 'snatch_overhead'] as WLWeakPoint[]).map(wp => (
+                <button key={wp} onClick={() => toggleWeak('snatch', wp)} aria-pressed={state.snatchWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.snatchWeak.includes(wp) ? '#3b82f6' : '#1f3a5f', background: state.snatchWeak.includes(wp) ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.snatchWeak.includes(wp) ? '#3b82f6' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
-            {state.snatchWeak.map(wp=>(
-              <div key={wp} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:6 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color:DIM }}>· {WL_WEAKPOINT_ANGLE[wp]?.joint} {WL_WEAKPOINT_ANGLE[wp]?.angle}</span></div>
-                <div style={{ fontSize:10, color:DIM }}>{WL_WEAKPOINT_ANGLE[wp]?.muscles.join(', ')}</div>
-                <div style={{ fontSize:11, color:'#5ee', marginTop:4 }}>{(WL_WEAKPOINT_CORRECTION[wp]||[]).join(' · ')}</div>
-              </div>
-            ))}
-            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Bar path — рывок</div>
-              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                <select value={state.barLift} onChange={e=>setState(s=>({...s, barLift:e.target.value}))} style={{ background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
+            {state.snatchWeak.map(wp => {
+              const bio = diagnoseTAWeakPoint(wp);
+              return (
+                <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
+                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
+                  <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
+                </div>
+              );
+            })}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Bar path — рывок (Vorobyev типы + метрики)</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                <select value={state.barLift} onChange={e => setState(s => ({ ...s, barLift: e.target.value }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
                   <option value="snatch">Рывок</option><option value="clean">Взятие</option><option value="jerk">Толчок</option><option value="squat">Присед</option>
                 </select>
-                <select value={state.barPath} onChange={e=>setState(s=>({...s, barPath:e.target.value as any}))} style={{ background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
+                <select value={state.barPath} onChange={e => setState(s => ({ ...s, barPath: e.target.value as any }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
                   <option value="">— нет отклонения</option>
                   <option value="forward">Уход вперёд</option><option value="backward">Уход назад</option><option value="loop">Петля</option><option value="early_pull">Ранняя тяга</option><option value="soft_lockout">Мягкий замок</option>
                 </select>
+                <input placeholder="xLoop см" value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} style={{ width: 70, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} />
+                <input placeholder="vmax м/с" value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} style={{ width: 70, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} />
               </div>
-              {barPathDiag?.weak && <div style={{ fontSize:11, color:'#f59e0b', marginTop:6 }}>→ {WL_WEAKPOINT_LABELS[barPathDiag.weak]} · {barPathDiag.corrections.join(' · ')}</div>}
+              {barPathDiag?.weak && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>→ {WL_WEAKPOINT_LABELS[barPathDiag.weak]} · {barPathDiag.corrections.join(' · ')}</div>}
+              {barMetricsDiag && <div style={{ fontSize: 10, color: barMetricsDiag.severity === 'ok' ? '#22c55e' : barMetricsDiag.severity === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 4 }}>{barMetricsDiag.text} {barMetrics?.xLoop ? `(SRD ${isRealChange(barMetrics.xLoop) ? 'реально' : 'в пределах шума'})` : ''}</div>}
+              {barMetrics && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Метрика: xLoop {barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
             </div>
           </div>
         )}
 
-        {tab==='clean' && (
+        {tab === 'clean' && (
           <div>
-            <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>Взятие — 3 фазы</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              {(['clean_off_floor','clean_mid','clean_catch'] as WLWeakPoint[]).map(wp=>(
-                <button key={wp} onClick={()=>toggleWeak('clean', wp)} aria-pressed={state.cleanWeak.includes(wp)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: state.cleanWeak.includes(wp) ? '#22c55e' : '#1f3a5f', background: state.cleanWeak.includes(wp) ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.cleanWeak.includes(wp) ? '#22c55e' : DIM, fontSize:11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Взятие — 3 фазы + ISPP (предиктор 81%)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {(['clean_off_floor', 'clean_mid', 'clean_catch'] as WLWeakPoint[]).map(wp => (
+                <button key={wp} onClick={() => toggleWeak('clean', wp)} aria-pressed={state.cleanWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.cleanWeak.includes(wp) ? '#22c55e' : '#1f3a5f', background: state.cleanWeak.includes(wp) ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.cleanWeak.includes(wp) ? '#22c55e' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
-            {state.cleanWeak.map(wp=>(
-              <div key={wp} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:6 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{WL_WEAKPOINT_LABELS[wp]}</div>
-                <div style={{ fontSize:11, color:'#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp]||[]).join(' · ')}</div>
-              </div>
-            ))}
+            {state.cleanWeak.map(wp => {
+              const bio = diagnoseTAWeakPoint(wp);
+              return (
+                <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}°</span></div>
+                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div>
+                  <div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>
+                </div>
+              );
+            })}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>IMTP кг<br /><input value={state.imtpKg} onChange={e => setState(s => ({ ...s, imtpKg: e.target.value }))} placeholder="250" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>ISPP кг<br /><input value={state.isppKg} onChange={e => setState(s => ({ ...s, isppKg: e.target.value }))} placeholder="220" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            </div>
+            {isppRatio != null && <div style={{ fontSize: 10, color: isppRatio < 0.85 ? '#f59e0b' : '#22c55e', marginTop: 4 }}>ISPP/IMTP {(isppRatio * 100).toFixed(0)}% {isppRatio < 0.85 ? '— слабый отрыв (приоритет дефицит)' : '— норма'}</div>}
+            <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>ISPP предиктор 81% дисп. рывка/толчка (Essex). Норма ISPP ≥85% IMTP.</div>
           </div>
         )}
 
-        {tab==='jerk' && (
+        {tab === 'jerk' && (
           <div>
-            <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>Толчок — 3 фазы + VBT</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              {(['jerk_dip','jerk_drive','jerk_lockout'] as WLWeakPoint[]).map(wp=>(
-                <button key={wp} onClick={()=>toggleWeak('jerk', wp)} aria-pressed={state.jerkWeak.includes(wp)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: state.jerkWeak.includes(wp) ? '#a855f7' : '#1f3a5f', background: state.jerkWeak.includes(wp) ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.jerkWeak.includes(wp) ? '#a855f7' : DIM, fontSize:11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Толчок — 3 фазы (dip 8-12см критичен)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {(['jerk_dip', 'jerk_drive', 'jerk_lockout'] as WLWeakPoint[]).map(wp => (
+                <button key={wp} onClick={() => toggleWeak('jerk', wp)} aria-pressed={state.jerkWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.jerkWeak.includes(wp) ? '#a855f7' : '#1f3a5f', background: state.jerkWeak.includes(wp) ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.jerkWeak.includes(wp) ? '#a855f7' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Вес штанги кг<br/><input value={state.vbtWeight} onChange={e=>setState(s=>({...s, vbtWeight:e.target.value}))} placeholder="100" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Скорость м/с<br/><input value={state.vbtVel} onChange={e=>setState(s=>({...s, vbtVel:e.target.value}))} placeholder="0.8" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-            </div>
-            <div style={{ fontSize:10, color:DIM, marginTop:6 }}>VBT: скорость толчка (0.5–1.2 м/с). Потеря ≥20% → warn.</div>
+            {state.jerkWeak.map(wp => {
+              const bio = diagnoseTAWeakPoint(wp);
+              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div></div>;
+            })}
           </div>
         )}
 
-        {tab==='mobility' && (
+        {tab === 'vbt' && (
           <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Оверхед присед (см глубины)<br/><input value={state.overheadSquat} onChange={e=>setState(s=>({...s, overheadSquat:e.target.value}))} placeholder="5" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Голеностоп дорсифлексия (°)<br/><input value={state.ankleDorsiflex} onChange={e=>setState(s=>({...s, ankleDorsiflex:e.target.value}))} placeholder="35" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>VBT — пиковые зоны (PLOS 2026) + FvR2 (Sandau)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>Вес штанги кг<br /><input value={state.vbtWeight} onChange={e => setState(s => ({ ...s, vbtWeight: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Пиковая скорость м/с<br /><input value={state.vbtVel} onChange={e => setState(s => ({ ...s, vbtVel: e.target.value }))} placeholder="1.75" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Левая макс кг<br/><input value={state.leftMax} onChange={e=>setState(s=>({...s, leftMax:e.target.value}))} placeholder="100" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Правая макс кг<br/><input value={state.rightMax} onChange={e=>setState(s=>({...s, rightMax:e.target.value}))} placeholder="102" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            {vbtZone && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Зона {vbtZone} (все &gt;80% &gt;1.3 м/с — PLOS 2026). Для рывка absolute 1.3-1.75 м/с.</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>Best м/с<br /><input value={state.vbtBest} onChange={e => setState(s => ({ ...s, vbtBest: e.target.value }))} placeholder="1.90" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Last м/с<br /><input value={state.vbtLast} onChange={e => setState(s => ({ ...s, vbtLast: e.target.value }))} placeholder="1.55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            </div>
+            {vbtLoss && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: vbtLoss.exceeded ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${vbtLoss.exceeded ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: vbtLoss.exceeded ? '#ef4444' : '#22c55e' }}>Потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} {vbtLoss.e1RMByVelocity ? `· e1RM ${vbtLoss.e1RMByVelocity}кг` : ''}</div><div style={{ fontSize: 10, color: DIM }}>Порог {thresholdForTALift(state.barLift)}% для ТА-power (vs 20% для силы). {vbtRecommendationSS(vbtLoss.lossPct, state.barLift).action}</div></div>}
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>FvR2 — прогноз рывка ±1.5кг (Sandau)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 10, color: DIM }}>Нагр80 кг<br /><input value={state.fvrLoad80} onChange={e => setState(s => ({ ...s, fvrLoad80: e.target.value }))} placeholder="80" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Vmax80 м/с<br /><input value={state.fvrVmax80} onChange={e => setState(s => ({ ...s, fvrVmax80: e.target.value }))} placeholder="1.95" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>hAcc м<br /><input value={state.fvrHAcc} onChange={e => setState(s => ({ ...s, fvrHAcc: e.target.value }))} placeholder="0.8" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Нагр110 кг<br /><input value={state.fvrLoad110} onChange={e => setState(s => ({ ...s, fvrLoad110: e.target.value }))} placeholder="110" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Vmax110 м/с<br /><input value={state.fvrVmax110} onChange={e => setState(s => ({ ...s, fvrVmax110: e.target.value }))} placeholder="1.45" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Vthres м/с<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              </div>
+              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres snatch {TA_VTHRES_NORMS.snatch.min}-{TA_VTHRES_NORMS.snatch.max} (opt {TA_VTHRES_NORMS.snatch.optimal}), clean {TA_VTHRES_NORMS.clean.min}-{TA_VTHRES_NORMS.clean.max}</div>}
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
+          </div>
+        )}
+
+        {tab === 'video' && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Видео / Bar tracking — Kinovea + Enode</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Полевая методика Ang 2023 (loadsol + Kinovea free). Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
+            <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см" style={{ width: '100%', height: 80, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button onClick={handleCsvParse} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
+              <span style={{ fontSize: 10, color: DIM, alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>xLoop см<br /><input value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} placeholder="3.2" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>yMax см<br /><input value={state.yMaxCm} onChange={e => setState(s => ({ ...s, yMaxCm: e.target.value }))} placeholder="85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>vMax м/с<br /><input value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} placeholder="1.85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            </div>
+            {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD turnover 4см catch 6см — {isRealChange(barMetrics.xLoop) ? 'реально >SRD' : 'в пределах шума'}</div></div>}
+            {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — следующий шаг</div>
+              <div style={{ marginTop: 6, width: '100%', height: 60, background: 'rgba(255,255,255,0.03)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIM, fontSize: 11, border: '1px solid rgba(255,255,255,0.04)' }}>video preview — PRO: углы hip/knee/ankle/shoulder в реальном времени</div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'mobility' && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Мобильность — OHS 6 сегментов (FMS/NASM + PoinT GO)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHeelsFlat} onChange={e => setState(s => ({ ...s, ohsHeelsFlat: e.target.checked }))} /> Пятки плоско</label>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={!state.ohsKneeValgus} onChange={e => setState(s => ({ ...s, ohsKneeValgus: !e.target.checked }))} /> Колени без вальгуса</label>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHipBelowParallel} onChange={e => setState(s => ({ ...s, ohsHipBelowParallel: e.target.checked }))} /> Таз ниже параллели</label>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsTrunkUpright} onChange={e => setState(s => ({ ...s, ohsTrunkUpright: e.target.checked }))} /> Корпус upright</label>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsArmsOverMidfoot} onChange={e => setState(s => ({ ...s, ohsArmsOverMidfoot: e.target.checked }))} /> Руки над стопой</label>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsLumbarNeutral} onChange={e => setState(s => ({ ...s, ohsLumbarNeutral: e.target.checked }))} /> Нейтраль поясницы</label>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ohs.level === 'ok' ? '#22c55e' : ohs.level === 'warn' ? '#f59e0b' : '#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver ? `· драйвер ${ohs.primaryDriver}` : ''}</div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>{ohs.recommendation} {ohs.needsPhysio ? '· нужен физио' : ''}</div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Нормы OHS_NORMS knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}, hip {OHS_NORMS.hipFlexion}°/IR {OHS_NORMS.hipIR}°, shoulder {OHS_NORMS.shoulderFlexion}°</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>Knee-to-wall см<br /><input value={state.kneeToWallCm} onChange={e => setState(s => ({ ...s, kneeToWallCm: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Голеностоп °<br /><input value={state.ankleDeg} onChange={e => setState(s => ({ ...s, ankleDeg: e.target.value }))} placeholder="35" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: DIM }}>Heel-raise retest 2.5см</span>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : '#1f3a5f', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.heelRetest === 'better' ? '#22c55e' : DIM, fontSize: 11 }}>Лучше</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : '#1f3a5f', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.heelRetest === 'same' ? '#f59e0b' : DIM, fontSize: 11 }}>Без изменений</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid #1f3a5f', background: '#0a1629', color: DIM, fontSize: 11 }}>Сброс</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <label style={{ fontSize: 11, color: DIM }}>Левая макс кг<br /><input value={state.leftMax} onChange={e => setState(s => ({ ...s, leftMax: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Правая макс кг<br /><input value={state.rightMax} onChange={e => setState(s => ({ ...s, rightMax: e.target.value }))} placeholder="102" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             </div>
             {asymmetry && (
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: asymmetry.isAsym ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${asymmetry.isAsym?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: asymmetry.isAsym ? '#ef4444' : '#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isAsym ? `→ слабее ${asymmetry.weaker}` : '— в допуске'}</div>
-                <div style={{ fontSize:10, color:DIM }}>Порог 10% (как в strength-sport-diagnostics).</div>
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: asymmetry.isCrit ? 'rgba(239,68,68,0.08)' : asymmetry.isAsym ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${asymmetry.isCrit ? 'rgba(239,68,68,0.2)' : asymmetry.isAsym ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: asymmetry.isCrit ? '#ef4444' : asymmetry.isAsym ? '#f59e0b' : '#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit ? 'CRITICAL ≥12%' : asymmetry.isAsym ? 'WARN ≥7%' : '— норма <7%'} {asymmetry.isAsym ? `→ слабее ${asymmetry.weaker}` : ''}</div>
+                <div style={{ fontSize: 10, color: DIM }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
               </div>
             )}
-            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
-              <div style={{ fontSize:11, color:DIM }}>📹 Видео (BlazePose) — опционально</div>
-              <div style={{ marginTop:6, width:'100%', height:80, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)' }}>video preview — PRO TODO: BlazePose</div>
-            </div>
+            {/* Legacy compat fields hidden but synced */}
+            <div style={{ display: 'none' }}><input value={state.overheadSquat} readOnly /><input value={state.ankleDorsiflex} readOnly /></div>
           </div>
         )}
       </div>
 
       {/* Summary */}
-      <div style={{ ...CARD, padding: 12, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.16)' }}>
-        <div style={{ fontSize:11, color:DIM, marginBottom:6 }}>Выбрано: {weakPoints.length? weakPoints.map(w=>WL_WEAKPOINT_LABELS[w]||w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''}</div>
-        <button onClick={applyToConstructor} style={{ width:'100%', padding:'10px 14px', borderRadius:8, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
+      <div style={{ ...CARD, padding: 12, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)' }}>
+        <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {weakPoints.length ? weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''} · score {score} · ver {scoring.verification} {scoring.floors.join(' · ')}</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{scoring.findings.map(f => f.text).join(' · ')}</div>
+        <button onClick={applyToConstructor} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
       </div>
     </div>
   );
