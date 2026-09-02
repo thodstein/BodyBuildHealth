@@ -109,6 +109,7 @@ import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
 import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
+import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -631,6 +632,8 @@ export const BbAutoConstructor: React.FC = () => {
   // weakPoints — зеркало specTargets (единый источник выбора в UI).
   useEffect(() => { setWeakPoints(specTargets); }, [specTargets]);
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
+  // R1: мышцы для реабилитации (прогрессивная рампа возврата). По умолчанию — щадящие травмы.
+  const [rehabMuscles, setRehabMuscles] = useState<string[]>([]);
   // PRO: mobility restrictions — biomechanics-based exercise filtering
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
 
@@ -1868,6 +1871,7 @@ export const BbAutoConstructor: React.FC = () => {
           blastCruiseEnabled,
           blastWeeks,
           cruiseWeeks,
+          rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
         }, pedAdapt);
     }
 
@@ -2925,6 +2929,25 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   <div style={{ marginTop:8 }}>
                     <InjurySelectCard injuries={injuries} onChange={setInjuries} />
+                  </div>
+                  {/* R1: реабилитация — прогрессивная рампа возврата мышцы */}
+                  <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(16,185,129,0.04)', border:'1px solid rgba(16,185,129,0.15)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#34d399', marginBottom:4 }}>🩹 Реабилитация (возврат мышцы)</div>
+                    <div style={{ fontSize:9, opacity:0.8, marginBottom:6 }}>Выберите мышцы для прогрессивной рампы возврата: нед 1-2 ×50% объёма/×70% вес, далее ramp к полному (не пересекается со щадящими травмами).</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {WEAK_GROUPS.map(([id, l]) => {
+                        const on = rehabMuscles.includes(id);
+                        return (
+                          <button key={id} onClick={() => setRehabMuscles(on ? rehabMuscles.filter(x => x !== id) : [...rehabMuscles, id])}
+                            style={{ padding:'3px 8px', borderRadius:999, fontSize:9, fontWeight:700, cursor:'pointer', minHeight:28,
+                              background:on?'rgba(16,185,129,0.15)':'rgba(255,255,255,0.03)',
+                              border:on?'1px solid rgba(16,185,129,0.4)':'1px solid rgba(255,255,255,0.08)',
+                              color:on?'#34d399':'#fff' }}>
+                            {on ? '✓ ' : ''}{l}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.18)' }}>
                     <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🦴 Ограничения мобильности</div>
@@ -4194,6 +4217,17 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize: 9, opacity: 0.8, marginBottom: 8 }}>
               🧲 SFR-профиль: {Math.round(unilateralRatioOf(builtPlan as any) * 100)}% односторонних сетов · lengthened-покрытие учитывается при выборе (Maeo 2023)
             </div>
+            {(() => {
+              const deloadWeeks = (builtPlan as any).weeks?.filter((w: any) => w.deload || w.phase === 'deload').map((w: any) => w.week) || [];
+              if (!deloadWeeks.length) return null;
+              const readiness = linked?.readiness?.score ?? linked?.profile?.settings?.lifestyle?.morningHRV ? 65 : null;
+              const o = overreachingCheck(Number.isFinite(readiness) ? readiness - 8 : 60, Number.isFinite(readiness) ? readiness : 68);
+              return (
+                <div style={{ fontSize: 9, padding: '5px 7px', borderRadius: 6, background: o.cleared ? 'rgba(0,230,138,0.08)' : 'rgba(251,191,36,0.08)', color: o.cleared ? '#6ee7b7' : '#fcd34d', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }}>
+                  📉 Deload нед {deloadWeeks.join(', ')}: после разгрузки проверьте готовность — {o.recommendation}
+                </div>
+              );
+            })()}
             {qualityReport.issues.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
                 {qualityReport.issues.map((iss, i) => (
