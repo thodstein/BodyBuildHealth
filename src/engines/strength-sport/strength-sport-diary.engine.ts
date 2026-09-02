@@ -4,6 +4,8 @@
  * Читает логи дневника (he_workout_log / he_training_log) и считает epley тренд 28д.
  */
 
+import { estimate1RMFromVelocitySS } from './strength-sport-vbt.engine';
+
 export interface DiaryTrendSS {
   lift: string; // snatch | clean | squat | deadlift (канон)
   changePct: number;
@@ -26,13 +28,9 @@ function isOlyLift(name: string): boolean {
   return n.includes('snatch') || n.includes('рывок') || n.includes('clean') || n.includes('толчок') || n.includes('jerk');
 }
 function epleyForLift(weight: number, reps: number, name: string, velocity?: number): number {
-  // P0-2: если есть velocity и лифт TA/carry — используем LVP e1RM (Wood 2026)
-  // carry камень трактуем как вес (не формула) — отдельно
+  // P0-2: если есть velocity и лифт TA/carry — используем LVP e1RM (Wood 2026) — чистый импорт, без require
   if (typeof velocity === 'number' && Number.isFinite(velocity) && velocity > 0.2 && velocity < 4) {
     try {
-      // динамический импорт чтобы избежать циклов — но VBT уже индивидуализирован
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { estimate1RMFromVelocitySS } = require('./strength-sport-vbt.engine') as any;
       const byVel: number = estimate1RMFromVelocitySS(weight, velocity, name);
       if (Number.isFinite(byVel) && byVel > 0) return byVel;
     } catch {}

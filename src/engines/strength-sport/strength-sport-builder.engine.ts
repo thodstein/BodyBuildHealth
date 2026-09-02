@@ -28,6 +28,9 @@ import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER, taperForWLWeekFromEnd, t
 import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
 import { VBT_SS_THRESHOLDS, velocityWeightAdjustFactor, vbtEwma, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
 import { POOL_BY_TAG, OLY_IDS, STRONG_IDS, isOly, isStrong, STRONG_FALLBACK, filterPool, gentleFactor } from './strength-sport-pool.engine';
+import { hrvReport } from './strength-sport-hrv.engine';
+import { carryPhysics, dynamicCarryDistance } from './strength-sport-carry-physics.engine';
+import { stoneMoment } from './strength-sport-stone-moment.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 // P0-6 pool → strength-sport-pool.engine.ts (вынесено, builder делегирует)
@@ -266,6 +269,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     if (evMeta?.defaultDistanceM) (ws as any).distanceM = evMeta.defaultDistanceM;
     if (evMeta?.defaultTimeCapS) (ws as any).timeCapS = evMeta.defaultTimeCapS;
     if (isCarryEvent(id)) ws.reps = 1;
+    // P1: stone moment — аннотация в tempo если высокий момент (>250)
+    if (['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar'].includes(id)) {
+      try {
+        const sm = stoneMoment({ loadKg: finalWeight, diameterCm: 40, torsoAngleDeg: 45 });
+        if (sm && sm.risk !== 'ok') wsTempo += ` · moment ${sm.momentNm}Н·м ${sm.risk}`;
+      } catch {}
+    }
     workSets.push(ws);
   }
   // H1: если VBT loss >30% — дополнительный VBT маркер на первый сет
@@ -509,7 +519,21 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   }
 
   const outsideMetrics = computeOutsideMetrics(input.outsideLoad as OutsideLoad);
-  const recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
+  let recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
+  // P1: HRV EWMA интеграция (если есть история, корректируем recovery)
+  try {
+    const rawHrv = typeof localStorage !== 'undefined' ? localStorage.getItem('he_hrv_log') : null;
+    if (rawHrv) {
+      const arr = JSON.parse(rawHrv);
+      const vals = Array.isArray(arr) ? arr.map((s:any)=> s.hrvMs ?? s.hrv ?? s.value).filter((v:any)=> Number.isFinite(v) && v>0) : [];
+      if (vals.length >= 7) {
+        const rep = hrvReport(vals);
+        if (rep) {
+          recoveryMult = Math.round(recoveryMult * rep.readinessMult * 100)/100;
+        }
+      }
+    }
+  } catch {}
   const nutritionMult = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   // P0-4 весогонка (лайт): строим протокол если передан weightCutKg / weightCutProtocolSS
@@ -884,8 +908,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       sessions.push(sess);
       absoluteDay++;
     }
-    // P1-5 conditioning day: strongman GPP без outside → отдельный день кондиции на чётных неделях накопления (не ломаем matrix - только если sessions<5)
-    if (mode === 'strongman' && !outsideMetrics && phase === 'accumulation' && sessions.length < 5 && w % 2 === 0) {
+    // P1-5 conditioning day: strongman GPP без outside → отдельный день кондиции на чётных неделях накопления (только intermediate+ чтобы не ломать beginner matrix)
+    if (mode === 'strongman' && !outsideMetrics && phase === 'accumulation' && sessions.length < 5 && w % 2 === 0 && level !== 'beginner') {
       try {
         const condArr = conditioningForWeek(w, weeks, mode, !!outsideMetrics);
         if (condArr.length && (condArr[0].system !== 'aerobic' || w <= 4)) {

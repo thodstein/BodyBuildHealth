@@ -102,6 +102,37 @@ export function weeksUntilCompetition(annual: AnnualSS, competitionDate: string,
   }catch{ return null; }
 }
 
+// P1: Gantt drag — перемещение блоков (как MacrocyclePanel moveMacroBlock)
+export function moveAnnualBlock(annual: AnnualSS, fromIdx: number, toIdx: number): AnnualSS | null {
+  if (!annual || !Array.isArray(annual.blocks)) return null;
+  if (fromIdx < 0 || fromIdx >= annual.blocks.length || toIdx < 0 || toIdx >= annual.blocks.length) return null;
+  if (fromIdx === toIdx) return annual;
+  const blocks = [...annual.blocks];
+  const [moved] = blocks.splice(fromIdx, 1);
+  blocks.splice(toIdx, 0, moved);
+  // пересчитать startWeek последовательно
+  let w = 1;
+  for (const b of blocks) { b.startWeek = w; w += b.weeks; }
+  return { ...annual, blocks, totalWeeks: w - 1, updatedAt: new Date().toISOString() };
+}
+
+export function updateAnnualBlockWeeks(annual: AnnualSS, blockId: string, weeks: number): AnnualSS | null {
+  if (!annual || weeks < 1 || weeks > 16) return null;
+  const blocks = annual.blocks.map(b=> b.id === blockId ? { ...b, weeks: Math.max(1, Math.min(16, Math.round(weeks))) } : b);
+  let w = 1;
+  for (const b of blocks) { b.startWeek = w; w += b.weeks; }
+  return { ...annual, blocks, totalWeeks: w - 1, updatedAt: new Date().toISOString() };
+}
+
+export function removeAnnualBlock(annual: AnnualSS, blockId: string): AnnualSS | null {
+  if (!annual) return null;
+  const blocks = annual.blocks.filter(b=> b.id !== blockId);
+  if (blocks.length === annual.blocks.length) return null;
+  let w = 1;
+  for (const b of blocks) { b.startWeek = w; w += b.weeks; }
+  return { ...annual, blocks, totalWeeks: w - 1, updatedAt: new Date().toISOString() };
+}
+
 // PRO multi-peak: сезон 2-3 пика (GPP 6w + camp 8-12w ×2 + transition)
 export interface MultiPeakOpts { competitions: { date: string; taperWeeks?: number }[]; gppWeeks?: number; transitionWeeks?: number }
 export function buildAnnualMultiPeak(plans: StrengthSportPlan[], opts: MultiPeakOpts): AnnualSS {
