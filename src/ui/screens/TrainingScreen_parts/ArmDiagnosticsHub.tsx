@@ -325,7 +325,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     applyToPlanner({
       kind: 'weakpoints',
       label: `Арм диагностика: ${toApply.join(', ')}`,
-      data: { groups: toApply, armTechnique: state.technique, armDiag: state, armAngles: angles, armForce: forceVecPro, armVbt: vbt, armDynamic: dynamicReport, armBench: benchRes, armTendon: derivedTendon } as any,
+      data: { groups: toApply, armTechnique: state.technique, armDiag: state, armAngles: angles, armForce: forceVecPro, armVbt: vbt, armDynamic: dynamicReport, armBench: benchRes, armTendon: derivedTendon, armFindings: report.findings, armHumerus: report.humerusWarnings, armBalance: report.balanceWarnings, armAsymmetry: report.asymmetryPct, armInfo: report.info } as any,
       source: 'intellectual',
     });
     setToast(`✓ Применено в Арм-конструктор: ${toApply.map(g=>ARM_MUSCLE_RU[g as any]||g).join(', ')}`);

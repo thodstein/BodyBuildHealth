@@ -119,14 +119,18 @@ export function ArmAutoConstructor() {
         setLevel(lvl);
         try { localStorage.setItem('he_arm_last_bench_level', bench.level); } catch {}
       }
-      // сохраняем диагностику для печати
+      // сохраняем диагностику для печати — механизм-ориентированная (сустав/сухожилие)
       try {
-        const diagSnap = {
-          score: payload.data?.armForce ? undefined : undefined, // score в отдельном Report, но bench/fatigue прокидываем
+        const diagSnap: any = {
           benchLevel: bench?.level,
           armDynamic: payload.data?.armDynamic,
           armAngles: payload.data?.armAngles,
           armForce: payload.data?.armForce,
+          findings: payload.data?.armFindings,
+          humerusWarnings: payload.data?.armHumerus,
+          balanceWarnings: payload.data?.armBalance,
+          asymmetryPct: payload.data?.armAsymmetry,
+          info: payload.data?.armInfo,
         };
         localStorage.setItem('he_arm_last_diagnostics', JSON.stringify(diagSnap));
       } catch {}
@@ -420,8 +424,7 @@ export function ArmAutoConstructor() {
                     const tr = forceTrend(stats);
                     if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
                   } catch {}
-                  const benchLevel = diag?.benchLevel;
-                  const html = buildArmPrintHtml(builtPlan, { benchLevel, fatigue: diag?.fatigue, trend: diag?.trend });
+                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info });
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }} style={BTN_GHOST as any}>🖨 Печать</button>
