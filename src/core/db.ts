@@ -1,12 +1,13 @@
 const DB_NAME = 'HealthEngineDB_v3';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 export const STORES = ['users',
   'profile', 'readiness_log', 'risk_log', 'fertility_log', 'settings',
   'labs_log', 'diagnostics_log', 'phase_schedule', 'diary', 'articles',
   'gamification', 'marketplace_cart', 'food_diary', 'sync_queue',
   'course_log', 'doctor_notes', 'progress_photos', 'injuries_log',
-  'training_log', 'workout_log', 'food_cache'
+  'training_log', 'workout_log', 'food_cache',
+  'cardio_sessions'
 ] as const;
 
 type StoreNames = typeof STORES[number] | string;
@@ -35,6 +36,7 @@ const INDEXES: Record<string, { name: string; keyPath: string }[]> = {
   gamification: [{ name: 'date', keyPath: 'date' }],
   training_log: [{ name: 'date', keyPath: 'date' }, { name: 'exerciseId', keyPath: 'exerciseId' }],
   workout_log: [{ name: 'date', keyPath: 'date' }],
+  cardio_sessions: [{ name: 'date', keyPath: 'date' }],
 };
 
 class HealthDB {

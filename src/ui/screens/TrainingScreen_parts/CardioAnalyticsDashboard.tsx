@@ -5,7 +5,7 @@
 import React, { useMemo } from 'react';
 import { CARD, ROW, LABEL, HINT_SM, Badge, StatTile } from './CardioUI';
 import { cardioLogStats, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { cardioMonotonyStrain } from '../../../engines/lms/cardio.engine';
+import { cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift } from '../../../engines/lms/cardio.engine';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -63,6 +63,33 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     return { ...m, warn: m.monotony > 2 || m.strain > 6000 };
   }, [log]);
 
+  const factCtl = useMemo(() => {
+    if (log.length < 7) return null;
+    try {
+      const now = new Date();
+      const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const series = cardioFactCtlSeries(log, {
+        restHr: cycle?.config?.restingHr,
+        maxHr: cycle?.config?.age ? (cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age) : undefined,
+        sex: cycle?.config?.sex,
+        referenceIso: ref,
+        days: 42,
+      });
+      if (series.length === 0) return null;
+      return series[series.length - 1];
+    } catch { return null; }
+  }, [log, cycle]);
+
+  const hrDriftNote = useMemo(() => {
+    if (log.length < 2) return null;
+    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0).slice(0, 10);
+    if (withHr.length < 2) return null;
+    const first = withHr[0].avgHr!;
+    const second = withHr[1].avgHr!;
+    const drift = cardioHrDrift(first, second);
+    return drift.warn ? `HR drift ${drift.driftPct}% >5% — признак утомления/обезвоживания` : null;
+  }, [log]);
+
   return (
     <div style={CARD}>
       <div style={ROW}>
@@ -83,6 +110,12 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
           {monotony.warn ? '⚠' : '✓'} Monotony {monotony.monotony} · Strain {monotony.strain} {monotony.warn ? '— варьируйте нагрузку (Foster)' : '— вариативность в норме'}
         </div>
       )}
+      {factCtl && (
+        <div style={{ fontSize: 11, color: Math.abs(factCtl.tsb) > 10 ? '#f87171' : factCtl.tsb > 5 ? '#4ade80' : '#fff', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.24)', borderRadius: 8, padding: '6px 8px' }}>
+          📈 Факт CTL {factCtl.ctl} · ATL {factCtl.atl} · TSB {factCtl.tsb > 0 ? '+' : ''}{factCtl.tsb} {factCtl.tsb > 15 ? '— пик формы, снизьте объём' : factCtl.tsb < -10 ? '— перегруз, восстановитесь' : '— баланс'}
+        </div>
+      )}
+      {hrDriftNote && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ {hrDriftNote}</div>}
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>🩸 При ferritin &lt;30 мкг/л — железо 18мг + витамин C, контроль Hb; RED-S &lt;30 ккал/кг FFM — объём не повышать.</div>
       <div style={HINT_SM}>TRIMP Banister (HRr×k·e^b·HRr) где есть HR, иначе фактор. Рост &gt;15% за неделю — риск перегруза. 80/20 — Seiler polarized.</div>
     </div>

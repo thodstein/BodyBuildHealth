@@ -11,7 +11,13 @@ import { newId } from '../user-program/user-program.types';
 import type { HeartZone, VdotResult, CardioCtlPoint } from './cardio-physiology.engine';
 import {
   cardioHeartZones,
+  maxHrClassic,
+  maxHrTanaka,
+  maxHrGulati,
   lthrZones,
+  estimateLTHRFrom30Min,
+  estimateZonesFromFieldTests,
+  cyclingPowerZones,
   runningVdot,
   banisterTrimp,
   CARDIO_TRIMP_FACTOR,
@@ -20,13 +26,23 @@ import {
   cardioCtlSeries,
   cardioMonotonyStrain,
   cardioAcwrEwma,
+  dailyTrimpFromLogEntry,
+  dailyTrimpMap,
+  cardioFactCtlSeries,
+  cardioHrDrift,
 } from './cardio-physiology.engine';
 import { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
-export type { HeartZone, VdotResult, CardioCtlPoint } from './cardio-physiology.engine';
+export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 export {
   cardioHeartZones,
+  maxHrClassic,
+  maxHrTanaka,
+  maxHrGulati,
   lthrZones,
+  estimateLTHRFrom30Min,
+  estimateZonesFromFieldTests,
+  cyclingPowerZones,
   runningVdot,
   banisterTrimp,
   CARDIO_TRIMP_FACTOR,
@@ -35,6 +51,10 @@ export {
   cardioCtlSeries,
   cardioMonotonyStrain,
   cardioAcwrEwma,
+  dailyTrimpFromLogEntry,
+  dailyTrimpMap,
+  cardioFactCtlSeries,
+  cardioHrDrift,
 } from './cardio-physiology.engine';
 
 // ─── Базовые типы (обратно-совместимо с T7) ───
@@ -100,6 +120,14 @@ export interface CardioPlan {
 
 export type CardioGoal = 'health' | 'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery' | 'bb_prep' | 'pl_prep' | 'bb_taper';
 
+export type CardioPeriodizationModel = 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized';
+export const CARDIO_PERIODIZATION_LABELS: Record<CardioPeriodizationModel, string> = {
+  linear: 'Линейная',
+  polarized: 'Поляризованная (80/20)',
+  pyramidal: 'Пирамидальная',
+  pyramidal_polarized: 'Пирамида→Поляр. (Seiler 2026)',
+};
+
 export type CardioPhase =
   | 'base'
   | 'build'
@@ -161,6 +189,8 @@ export interface CardioCycleInput {
   phaseSplit?: { base?: number; build?: number; maintenance?: number };
   /** Длина taper-окна перед стартом (1-4, по умолчанию 2). */
   taperWeeks?: number;
+  /** Модель taper: step (постоянный срез) vs exponential (прогрессивный, Thomas 2009, эффективнее) */
+  taperModel?: 'step' | 'exponential';
   /** Строить taper перед стартами (по умолчанию true; false → старт без taper-кривой). */
   taper?: boolean;
   /** Строить пик-неделю старта (по умолчанию true; false → неделя старта лёгкая taper). */
@@ -195,6 +225,10 @@ export interface CardioCycleInput {
   enhanced?: boolean;
   /** Авто-учёт суставов из профиля (chronicConditions) → lowImpact. */
   autoLowImpact?: boolean;
+  /** Формула ЧССмакс: classic 220/226-age, tanaka 208-0.7×age (точнее), gulati 206-0.88×age (жен) */
+  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
+  /** Модель периодизации (Seiler 2026): linear / polarized 80/20 / pyramidal / pyramidal→polarized */
+  periodizationModel?: CardioPeriodizationModel;
   /** Снапшот параметров сборки (для «⚙️ Изменить параметры»). Заполняется в buildCardioCycle. */
   config?: CardioCycleInput;
   id?: string;
@@ -534,11 +568,12 @@ interface RampProfile {
   taperMult: number;
 }
 
-function profileForGoal(goal: CardioGoal): RampProfile {
+function profileForGoal(goal: CardioGoal, model?: CardioPeriodizationModel): RampProfile {
+  let prof: RampProfile;
   switch (goal) {
     case 'cut':
     case 'bb_prep':
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Вход в аэробную базу, щадящий старт сушки/подготовки' }],
         build: [
           { type: 'zone2', dur: 40, freq: 3, purpose: 'Рост липолитического объёма, восстановление' },
@@ -552,8 +587,9 @@ function profileForGoal(goal: CardioGoal): RampProfile {
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'pl_prep':
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 20, freq: 2, purpose: 'Лёгкая аэробная база без утомления (подготовка ПЛ)' }],
         build: [
           { type: 'zone2', dur: 25, freq: 3, purpose: 'Умеренный объём, поддержание выносливости' },
@@ -563,24 +599,27 @@ function profileForGoal(goal: CardioGoal): RampProfile {
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'bb_taper':
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Вход в тапер: лёгкий объём без утомления' }],
         build: [{ type: 'zone2', dur: 25, freq: 2, purpose: 'Снижение объёма, сохранение привычки движения' }],
         maintenance: [{ type: 'recovery', dur: 20, freq: 2, purpose: 'Лёгкая активность, кровоток' }],
         deloadMult: 0.6,
         taperMult: 0.4,
       };
+      break;
     case 'mass':
-      return {
+      prof = {
         base: [{ type: 'recovery', dur: 20, freq: 1, purpose: 'Активное восстановление, кровоток' }],
         build: [{ type: 'recovery', dur: 20, freq: 1, purpose: 'Активное восстановление, не мешает росту' }],
         maintenance: [{ type: 'recovery', dur: 20, freq: 1, purpose: 'Минимум кардио на массонаборе' }],
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'recomp':
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 25, freq: 2, purpose: 'Здоровье ССС, восстановление' }],
         build: [
           { type: 'zone2', dur: 30, freq: 2, purpose: 'Умеренная аэробная работа' },
@@ -591,25 +630,28 @@ function profileForGoal(goal: CardioGoal): RampProfile {
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'maintenance':
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 25, freq: 2, purpose: 'Здоровье ССС, восстановление' }],
         build: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Умеренная аэробная работа' }],
         maintenance: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Поддержание ССС и восстановления' }],
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'recovery':
-      return {
+      prof = {
         base: [{ type: 'recovery', dur: 25, freq: 2, purpose: 'Лёгкое кардио, кровоток' }],
         build: [{ type: 'recovery', dur: 30, freq: 3, purpose: 'Активное восстановление, мобильность' }],
         maintenance: [{ type: 'recovery', dur: 30, freq: 3, purpose: 'Поддержание восстановления' }],
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
     case 'health':
     default:
-      return {
+      prof = {
         base: [{ type: 'zone2', dur: 25, freq: 3, purpose: 'База для здоровья ССС (3×)' }],
         build: [
           { type: 'zone2', dur: 30, freq: 4, purpose: 'Наращивание аэробной выносливости (4×)' },
@@ -619,7 +661,37 @@ function profileForGoal(goal: CardioGoal): RampProfile {
         deloadMult: 0.6,
         taperMult: 0.6,
       };
+      break;
   }
+  // ─── Применение модели периодизации Seiler 2026 ───
+  if (model === 'polarized') {
+    // Поляризованная: только low (zone2/recovery) + high (hiit), без умеренной (miss)
+    for (const key of ['base', 'build', 'maintenance'] as const) {
+      prof[key] = prof[key].filter(e => e.type !== 'miss');
+      // если build потерял intensiveness полностью (cut без hiit из-за recoveryLow позже) — оставим как есть, hiit добавит quality
+    }
+  } else if (model === 'pyramidal') {
+    // Пирамидальная: обеспечивает miss в базе и build (больше умеренной)
+    for (const key of ['base', 'build'] as const) {
+      const hasMiss = prof[key].some(e => e.type === 'miss');
+      if (!hasMiss && (goal === 'cut' || goal === 'bb_prep' || goal === 'health' || goal === 'recomp')) {
+        prof[key].push({ type: 'miss', dur: 20, freq: 1, purpose: 'MISS пирамидальная: умеренная мощность (pyramidal)', alt: key === 'build' });
+      }
+    }
+  } else if (model === 'pyramidal_polarized') {
+    // Seiler 2026: база pyramidal (больше Miss), build polarized (Miss→HIIT)
+    const hasMissBase = prof.base.some(e => e.type === 'miss');
+    if (!hasMissBase && (goal === 'cut' || goal === 'bb_prep' || goal === 'health' || goal === 'recomp')) {
+      prof.base.push({ type: 'miss', dur: 20, freq: 1, purpose: 'MISS база pyramidal → polarized (Seiler)', alt: false });
+    }
+    // build делает polarized: убираем miss, оставляем hiit
+    prof.build = prof.build.filter(e => e.type !== 'miss');
+    // если в build не осталось hiit (health mass), оставляем как есть
+    if (goal === 'health' && !prof.build.some(e => e.type === 'hiit')) {
+      prof.build.push({ type: 'hiit', dur: 15, freq: 1, purpose: 'HIIT поляризация build-фазы', alt: true });
+    }
+  }
+  return prof;
 }
 
 function buildWeekSessions(
@@ -694,8 +766,8 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const recoveryLow = !!input.recoveryLow || stressHigh;
   const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
-  const zones = input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex) : undefined;
-  const profile = profileForGoal(input.goal);
+  const zones = input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex, (input as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) : undefined;
+  const profile = profileForGoal(input.goal, input.periodizationModel);
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
   let totalMinutes = 0;
@@ -708,11 +780,11 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     // и bb_taper (4 нед снижения 0.9→0.6, BB_CARDIO_TAPER_CURVE) — без прогрессии.
     let volumeMult = 1;
     if (input.goal === 'bb_taper') {
-      volumeMult = bbCardioTaperMult(totalWeeks - w + 1); // 1→0.6, 2→0.7, 3→0.85, 4→0.9
+      volumeMult = bbCardioTaperMult(totalWeeks - w + 1, input.taperModel); // 1→0.6, 2→0.7, 3→0.85, 4→0.9 (или exponential 0.5/0.65/0.82/0.88)
     } else if (phase === 'taper') {
       const nextComp = competitions.find(c => c.week > w);
       const dist = nextComp ? nextComp.week - w : taperWeeks; // 1..taperWeeks
-      volumeMult = bbCardioTaperMult(dist); // 1→0.6, 2→0.7, 3→0.85, 4→0.9
+      volumeMult = bbCardioTaperMult(dist, input.taperModel);
     } else if (phase === 'transition') {
       volumeMult = profile.taperMult;
     } else if (!deload && phase !== 'peak' && ['cut', 'recomp', 'health', 'maintenance', 'bb_prep', 'pl_prep'].includes(input.goal)) {
@@ -809,6 +881,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       enhanced: input.enhanced,
       autoLowImpact: input.autoLowImpact,
       jointIssues: input.jointIssues,
+      maxHrFormula: (input as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula,
+      periodizationModel: input.periodizationModel,
+      taperModel: input.taperModel,
     };
   }
   if (ffmKg != null) cycle.rationale.push(`FFM ${ffmKg} кг (жир ${input.bodyFatPct}%) — расход по безжировой массе.`);
@@ -892,10 +967,34 @@ export const PREP_PEAK_STEPS_BY_DAY: Record<number, number> = { 1: 12000, 2: 120
  *  Кривая плавная: 0.9 → 0.85 → 0.7 → 0.6 (Bosquet 2005; в пик-неделю кардио
  *  режется сильнее силовой prep-кривой — ради гликогена и внешнего вида). */
 export const BB_CARDIO_TAPER_CURVE: Record<number, number> = { 1: 0.6, 2: 0.7, 3: 0.85, 4: 0.9 };
+export const BB_CARDIO_TAPER_CURVE_EXPONENTIAL: Record<number, number> = { 1: 0.5, 2: 0.65, 3: 0.82, 4: 0.88 };
+export type CardioTaperModel = 'step' | 'exponential';
 
 /** Множитель объёма кардио за `dist` недель до шоу (1 = ближайшая к пику неделя). */
-export function bbCardioTaperMult(dist: number): number {
-  return BB_CARDIO_TAPER_CURVE[clamp(Math.round(dist), 1, 4)] ?? 0.6;
+export function bbCardioTaperMult(dist: number, model?: CardioTaperModel): number {
+  const curve = model === 'exponential' ? BB_CARDIO_TAPER_CURVE_EXPONENTIAL : BB_CARDIO_TAPER_CURVE;
+  return curve[clamp(Math.round(dist), 1, 4)] ?? 0.6;
+}
+
+/** Рекомендация по taper с учётом pre-fatigue (Bosquet 2024: F-OR нужен 3 нед + сон). */
+export function cardioTaperRecommendation(input: {
+  taperWeeks?: number;
+  taperModel?: CardioTaperModel;
+  acwr?: number | null;
+  wellnessReadiness?: number | null;
+  sleepHours?: number | null;
+}): { weeks: number; model: CardioTaperModel; reason: string; sleepHygiene: boolean } {
+  let weeks = clamp(Math.round(input.taperWeeks ?? 2), 1, 4);
+  let model: CardioTaperModel = input.taperModel ?? 'step';
+  const highFatigue = (input.acwr != null && input.acwr >= 1.3) || (input.wellnessReadiness != null && input.wellnessReadiness < 4) || (input.sleepHours != null && input.sleepHours < 6);
+  const sleepHygiene = !!highFatigue;
+  if (highFatigue && weeks < 3) {
+    weeks = 3;
+    model = 'exponential';
+  }
+  let reason = `Taper ${weeks} нед, модель ${model === 'exponential' ? 'exponential (прогрессивный, Thomas 2009)' : 'step'}.`;
+  if (sleepHygiene) reason += ' F-OR/высокая усталость → 3 нед exponential + гигиена сна (Bosquet F-OR 2024).';
+  return { weeks, model, reason, sleepHygiene };
 }
 
 /* addDaysIso / todayLocalIso теперь из cardio-date-utils.engine.ts */
@@ -2245,6 +2344,44 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
   return lines.join('\r\n');
 }
 
+/** Экспорт первой недели цикла в Zwift .zwo (structured workout, bike/run). */
+export function buildCardioZwo(cycle: CardioCycle, referenceIso?: string): string {
+  const w = cycle.weeks[0];
+  if (!w) return '<?xml version="1.0" encoding="UTF-8"?><workout_file><workout></workout></workout_file>';
+  const sport = w.sessions.some(s => s.equipment === 'running') ? 'run' : 'bike';
+  const lines: string[] = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<workout_file>',
+    `  <author>BodyBuildHealth</author>`,
+    `  <name>${escXml(cycle.name)}</name>`,
+    `  <description>${escXml(`Кардио ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · ${cycle.weeks[0].totalMinutes} мин/нед`)}</description>`,
+    `  <sportType>${sport}</sportType>`,
+    '  <workout>',
+  ];
+  for (const s of w.sessions) {
+    if (s.structured && s.structured.length > 0) {
+      for (const blk of s.structured) {
+        const pwr = blk.target === 'power' ? blk.targetHr?.max ?? 65 : s.type === 'hiit' ? 95 : s.type === 'miss' ? 80 : 65;
+        lines.push(`    <Warmup Duration="${blk.workSec}" PowerLow="${Math.max(0.3, pwr/100-0.1).toFixed(2)}" PowerHigh="${(pwr/100).toFixed(2)}" pace="0"/>`);
+        if (blk.restSec > 0) lines.push(`    <SteadyState Duration="${blk.restSec}" Power="${(0.5).toFixed(2)}" pace="0"/>`);
+      }
+    } else {
+      const pwrMap: Record<string, number> = { zone2: 0.65, miss: 0.8, hiit: 0.95, recovery: 0.5 };
+      const pwr = pwrMap[s.type] ?? 0.65;
+      if (s.type === 'hiit') {
+        // 60/90 ×4 минимум
+        const reps = Math.max(4, Math.round((s.durationMin * 60) / 150));
+        lines.push(`    <IntervalsT Repeat="${reps}" OnDuration="60" OffDuration="90" OnPower="${pwr.toFixed(2)}" OffPower="0.45" pace="0"/>`);
+      } else {
+        lines.push(`    <SteadyState Duration="${s.durationMin * 60}" Power="${pwr.toFixed(2)}" pace="0"/>`);
+      }
+    }
+  }
+  lines.push('  </workout>');
+  lines.push('</workout_file>');
+  return lines.join('\r\n');
+}
+
 // ─── Следующая сессия ───
 
 export interface CardioNextSession {
@@ -3129,6 +3266,8 @@ export function interferenceScore(legDays: number[], cardioDay: number): 'ok' | 
   return 'ok';
 }
 
+export { cardioInterferenceScoreDetailed, interferenceForCycle, simpleInterferenceScore } from './cardio-interference.engine';
+
 // ─── Год кардио: последовательность циклов (этап 6) ───
 
 export interface CardioYearBlock {
@@ -3183,6 +3322,36 @@ export function buildCardioYearText(plan: CardioYearPlan): string {
   }
   lines.push(`Итого: ${plan.totalWeeks} нед · в среднем ${plan.avgMinutesPerWeek} мин/нед · ${plan.avgKcalPerWeek} ккал/нед`);
   return lines.join('\n');
+}
+
+/** Переместить сессию внутри недели на другой день (drag-and-drop, dayOfWeek 0-6). */
+export function moveCardioSessionInWeek(cycle: CardioCycle, weekNo: number, sessionIdx: number, newDayOfWeek: number): CardioCycle | null {
+  if (newDayOfWeek < 0 || newDayOfWeek > 6) return null;
+  const w = cycle.weeks.find(x => x.week === weekNo);
+  if (!w) return null;
+  if (sessionIdx < 0 || sessionIdx >= w.sessions.length) return null;
+  const weeks = cycle.weeks.map(ww => {
+    if (ww.week !== weekNo) return ww;
+    const sessions = ww.sessions.map((s, i) => (i === sessionIdx ? { ...s, dayOfWeek: newDayOfWeek } : s));
+    return { ...ww, sessions };
+  });
+  return { ...cycle, weeks };
+}
+
+/** Годовая CTL-серия факта (склейка по датам через cardioFactCtlSeries каждого цикла). */
+export function cardioYearFactCtlSeries(
+  year: CardioYearPlan | null,
+  log: { date: string; type: CardioType; durationMin: number; avgHr?: number; completed?: boolean }[],
+  opts: { restHr?: number; maxHr?: number; sex?: 'male' | 'female'; referenceIso?: string } = {},
+): ReturnType<typeof cardioFactCtlSeries> {
+  if (!year || !log || log.length === 0) return [];
+  // используем общий лог, но режем по датам года (первая неделя года → последняя)
+  const firstStart = year.blocks[0]?.cycle.startDate;
+  if (!firstStart) return cardioFactCtlSeries(log, opts);
+  // сдвигаем reference к концу года
+  const totalWeeks = year.totalWeeks;
+  const endIso = addDaysIso(firstStart, totalWeeks * 7 - 1);
+  return cardioFactCtlSeries(log, { ...opts, referenceIso: endIso, days: totalWeeks * 7 });
 }
 
 // ─── Проф-инструменты: прогноз адаптации и подсказки недель ───

@@ -8,7 +8,8 @@ import {
   buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
   CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
   cardioFitnessForecast,
-  type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
+  CARDIO_PERIODIZATION_LABELS,
+  type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment, type CardioPeriodizationModel, type CardioTaperModel,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
@@ -108,7 +109,13 @@ export const CardioParamsStep: React.FC<{
   onFromDiaryHr: () => void;
   onReset: () => void;
   wizardMode?: 'simple' | 'pro';
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro' }) => {
+  periodizationModel?: CardioPeriodizationModel;
+  setPeriodizationModel?: (m: CardioPeriodizationModel) => void;
+  taperModel?: CardioTaperModel;
+  setTaperModel?: (m: CardioTaperModel) => void;
+  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
+  setMaxHrFormula?: (f: 'classic' | 'tanaka' | 'gulati') => void;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -137,6 +144,7 @@ export const CardioParamsStep: React.FC<{
         bodyWeight,
         competitions: comps,
         taperWeeks,
+        taperModel,
         taper: taperEnabled,
         peakWeek,
         level,
@@ -148,6 +156,8 @@ export const CardioParamsStep: React.FC<{
         legDays,
         ...previewFactors,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+        periodizationModel,
+        maxHrFormula,
         source: 'auto',
       });
       if (daysAvailable > 0 && daysAvailable < 7) {
@@ -158,7 +168,7 @@ export const CardioParamsStep: React.FC<{
       }
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -267,6 +277,33 @@ export const CardioParamsStep: React.FC<{
         {taperEnabled && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             <Stepper label="Недель taper" value={taperWeeks} min={1} max={4} step={1} onChange={setTaperWeeks} ariaPrefix="Недель taper" suffix="нед" width={50} />
+            {setTaperModel && (
+              <div style={ROW}>
+                <span style={LABEL}>Модель</span>
+                {(['step', 'exponential'] as const).map(m => (
+                  <button key={m} style={taperModel === m ? CHIP_ACTIVE : CHIP} onClick={() => setTaperModel(m)}>{m === 'step' ? 'Step' : 'Exponential'}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {wizardMode === 'pro' && setPeriodizationModel && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={ROW}>
+              <span style={LABEL}>Периодизация</span>
+              {(Object.keys(CARDIO_PERIODIZATION_LABELS) as CardioPeriodizationModel[]).map(m => (
+                <button key={m} style={periodizationModel === m ? CHIP_ACTIVE : CHIP} onClick={() => setPeriodizationModel(m)} title={CARDIO_PERIODIZATION_LABELS[m]}>{CARDIO_PERIODIZATION_LABELS[m]}</button>
+              ))}
+            </div>
+            <div style={HINT_SM}>Seiler 2026: база pyramidal (больше умеренной) → build polarized (80/20) для элиты.</div>
+          </div>
+        )}
+        {wizardMode === 'pro' && setMaxHrFormula && (
+          <div style={ROW}>
+            <span style={LABEL}>Формула ЧССмакс</span>
+            {(['classic', 'tanaka', 'gulati'] as const).map(f => (
+              <button key={f} style={maxHrFormula === f ? CHIP_ACTIVE : CHIP} onClick={() => setMaxHrFormula(f)}>{f === 'classic' ? '220-age' : f === 'tanaka' ? 'Tanaka 208-0.7×age' : 'Gulati'}</button>
+            ))}
           </div>
         )}
         {!phaseSplit.auto && (

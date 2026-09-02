@@ -34,7 +34,7 @@ export const META_KEY = 'he_sync_meta_v1';
 const CONFLICT_WINDOW_MS = 500;
 
 /** IndexedDB-хранилища с реальными пользовательскими данными (анализы, курс, дневник силы). */
-export const IDB_STORES = ['labs_log', 'course_log', 'workout_log', 'training_log'] as const;
+export const IDB_STORES = ['labs_log', 'course_log', 'workout_log', 'training_log', 'cardio_sessions'] as const;
 const IDB_META_KEY = 'he_sync_meta_idb_v1';
 const IDB_KV_PREFIX = 'idb:';
 

@@ -74,6 +74,7 @@ interface WizardState {
   recoveryLow: boolean;
   bodyWeight: number;
   taperWeeks: number;
+  taperModel?: 'step' | 'exponential';
   taperEnabled: boolean;
   peakWeek: boolean;
   phaseAuto: boolean;
@@ -96,6 +97,8 @@ interface WizardState {
   comps: CardioCompetitionRef[];
   wizardMode?: 'simple' | 'pro';
   bodyFatPct?: number;
+  periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized';
+  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -215,6 +218,9 @@ export const CardioConstructor: React.FC = () => {
     maintenance: wizard.phaseMaint ?? 0,
   });
   const [taperWeeks, setTaperWeeks] = useState(wizard.taperWeeks ?? 2);
+  const [taperModel, setTaperModel] = useState<'step' | 'exponential'>((wizard as WizardState).taperModel ?? 'step');
+  const [periodizationModel, setPeriodizationModel] = useState<'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized'>((wizard as WizardState).periodizationModel ?? 'linear');
+  const [maxHrFormula, setMaxHrFormula] = useState<'classic' | 'tanaka' | 'gulati'>((wizard as WizardState).maxHrFormula ?? 'classic');
   const [taperEnabled, setTaperEnabled] = useState(wizard.taperEnabled ?? true);
   const [peakWeek, setPeakWeek] = useState(wizard.peakWeek ?? true);
   const [level, setLevel] = useState<CardioLevel>(wizard.level ?? 'intermediate');
@@ -327,10 +333,10 @@ export const CardioConstructor: React.FC = () => {
       bodyFatPct: bf,
       competitions: comps,
       taperWeeks,
+      taperModel,
       taper: taperEnabled,
       peakWeek,
       level,
-      recoveryLow,
       equipment,
       lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
@@ -339,6 +345,8 @@ export const CardioConstructor: React.FC = () => {
       legDays,
       ...previewFactors,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+      periodizationModel,
+      maxHrFormula,
     };
     const vOpts = variant === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -369,6 +377,7 @@ export const CardioConstructor: React.FC = () => {
       bodyFatPct: bf2,
       competitions: comps,
       taperWeeks,
+      taperModel,
       taper: taperEnabled,
       peakWeek,
       level,
@@ -381,6 +390,8 @@ export const CardioConstructor: React.FC = () => {
       legDays,
       ...previewFactors,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+      periodizationModel,
+      maxHrFormula,
     };
     const vOpts = v === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -406,6 +417,9 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.bodyWeight != null) setBodyWeight(cfg.bodyWeight);
     setComps(cfg.competitions ? cfg.competitions.map(c => ({ ...c })) : []);
     setTaperWeeks(cfg.taperWeeks ?? taperWeeks);
+    if ((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel) setTaperModel((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel!);
+    if ((cfg as unknown as { periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized' }).periodizationModel) setPeriodizationModel((cfg as unknown as { periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized' }).periodizationModel!);
+    if ((cfg as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) setMaxHrFormula((cfg as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula!);
     setTaperEnabled(cfg.taper ?? taperEnabled);
     setPeakWeek(cfg.peakWeek ?? peakWeek);
     setLevel(cfg.level ?? level);
@@ -637,7 +651,7 @@ export const CardioConstructor: React.FC = () => {
   useEffect(() => {
     try {
       const s: WizardState = {
-        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek,
+        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
@@ -645,7 +659,7 @@ export const CardioConstructor: React.FC = () => {
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -742,6 +756,9 @@ export const CardioConstructor: React.FC = () => {
     setBodyWeight(profileWeight() ?? 80);
     setPhaseSplit({ auto: true, base: 0, build: 0, maintenance: 0 });
     setTaperWeeks(2);
+    setTaperModel('step');
+    setPeriodizationModel('linear');
+    setMaxHrFormula('classic');
     setTaperEnabled(true);
     setPeakWeek(true);
     setVariant('base');
@@ -954,6 +971,9 @@ export const CardioConstructor: React.FC = () => {
           onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr}
           onReset={resetParams}
           wizardMode={wizardMode}
+          periodizationModel={periodizationModel} setPeriodizationModel={setPeriodizationModel}
+          taperModel={taperModel} setTaperModel={setTaperModel}
+          maxHrFormula={maxHrFormula} setMaxHrFormula={setMaxHrFormula}
         />
       )}
       {step === 'comps' && (

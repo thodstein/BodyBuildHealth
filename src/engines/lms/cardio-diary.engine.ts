@@ -8,6 +8,8 @@ import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardi
 
 export const CARDIO_LOG_KEY = 'he_cardio_sessions';
 export const CARDIO_LOG_CAP = 500;
+export const CARDIO_IDB_STORE = 'cardio_sessions';
+const CARDIO_IDB_MIGRATED_KEY = 'he_cardio_idb_migrated_v1';
 
 export interface CardioLogEntry {
   id: string;
@@ -55,7 +57,87 @@ export function replaceCardioLog(entries: CardioLogEntry[]): CardioLogEntry[] {
     .filter((e): e is CardioLogEntry => !!e && typeof e === 'object' && typeof e.date === 'string' && typeof e.durationMin === 'number')
     .slice(0, CARDIO_LOG_CAP);
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  // best-effort IDB mirror (не ждём)
+  try { void replaceCardioLogIdb(list); } catch { /* ignore */ }
   return list;
+}
+
+// ─── IndexedDB mirror (профессиональный уровень: cap ∞, синк через cloud-kv) ───
+
+async function replaceCardioLogIdb(entries: CardioLogEntry[]): Promise<void> {
+  try {
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch { /* IDB not available in test/jsdom */ return; }
+    // очистка и перезапись (простая стратегия для undo)
+    const existing = await db.getAll<CardioLogEntry>(CARDIO_IDB_STORE).catch(() => []);
+    for (const e of existing) {
+      try { await db.delete(CARDIO_IDB_STORE, e.id); } catch { /* */ }
+    }
+    for (const e of entries) {
+      try { await db.put(CARDIO_IDB_STORE, e); } catch { /* */ }
+    }
+    try { localStorage.setItem(CARDIO_IDB_MIGRATED_KEY, '1'); } catch { /* */ }
+  } catch { /* ignore */ }
+}
+
+export async function loadCardioLogAsync(): Promise<CardioLogEntry[]> {
+  try {
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch { return loadCardioLog(); }
+    const migrated = (() => { try { return localStorage.getItem(CARDIO_IDB_MIGRATED_KEY) === '1'; } catch { return false; } })();
+    if (!migrated) {
+      await migrateCardioLogToIdb();
+    }
+    const all = await db.getAll<CardioLogEntry>(CARDIO_IDB_STORE).catch(() => [] as CardioLogEntry[]);
+    if (all && all.length > 0) {
+      return all
+        .filter((e): e is CardioLogEntry => !!e && typeof e === 'object' && typeof e.date === 'string' && typeof e.durationMin === 'number')
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    }
+  } catch { /* fallback */ }
+  return loadCardioLog();
+}
+
+export async function saveCardioLogEntryAsync(entry: CardioLogEntry): Promise<CardioLogEntry[]> {
+  const list = saveCardioLogEntry(entry);
+  try {
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch { return list; }
+    await db.put(CARDIO_IDB_STORE, entry);
+    try { localStorage.setItem(CARDIO_IDB_MIGRATED_KEY, '1'); } catch { /* */ }
+  } catch { /* ignore */ }
+  return list;
+}
+
+export async function migrateCardioLogToIdb(): Promise<number> {
+  try {
+    const ls = loadCardioLog();
+    if (ls.length === 0) {
+      try { localStorage.setItem(CARDIO_IDB_MIGRATED_KEY, '1'); } catch { /* */ }
+      return 0;
+    }
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch { return 0; }
+    const existing = await db.getAll<CardioLogEntry>(CARDIO_IDB_STORE).catch(() => [] as CardioLogEntry[]);
+    const existingIds = new Set(existing.map(e => e.id));
+    let migrated = 0;
+    for (const e of ls) {
+      if (!existingIds.has(e.id)) {
+        try { await db.put(CARDIO_IDB_STORE, e); migrated++; } catch { /* */ }
+      }
+    }
+    try { localStorage.setItem(CARDIO_IDB_MIGRATED_KEY, '1'); } catch { /* */ }
+    return migrated;
+  } catch { return 0; }
+}
+
+export async function clearCardioLogAsync(): Promise<void> {
+  clearCardioLog();
+  try {
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch { return; }
+    await db.clear(CARDIO_IDB_STORE).catch(() => {});
+  } catch { /* ignore */ }
 }
 
 /**

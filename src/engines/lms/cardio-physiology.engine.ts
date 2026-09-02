@@ -15,10 +15,34 @@ export interface HeartZone {
   purpose: string;
 }
 
-/** Пульс-зоны (Karvonen с резервом при restingHr; иначе % от ЧССмакс). */
-export function cardioHeartZones(age: number, restingHr?: number, maxHr?: number, sex?: 'male' | 'female'): HeartZone[] {
+/** Формула ЧССмакс: classic (220/226-age) vs Tanaka 208-0.7×age (точнее по мета-анализу 351 исследования, 2024 Compendium). */
+export function maxHrClassic(age: number, sex?: 'male' | 'female'): number {
   const a = Math.max(12, Math.min(90, age));
-  const hrmax = maxHr && maxHr > 0 ? maxHr : sex === 'female' ? 226 - a : 220 - a;
+  return sex === 'female' ? 226 - a : 220 - a;
+}
+export function maxHrTanaka(age: number): number {
+  const a = Math.max(12, Math.min(90, age));
+  return Math.round(208 - 0.7 * a);
+}
+export function maxHrGulati(age: number): number {
+  const a = Math.max(12, Math.min(90, age));
+  return Math.round(206 - 0.88 * a);
+}
+
+/** Пульс-зоны (Karvonen с резервом при restingHr; иначе % от ЧССмакс). Поддерживает Tanaka/Gulati. */
+export function cardioHeartZones(
+  age: number,
+  restingHr?: number,
+  maxHr?: number,
+  sex?: 'male' | 'female',
+  formula?: 'classic' | 'tanaka' | 'gulati',
+): HeartZone[] {
+  const a = Math.max(12, Math.min(90, age));
+  let hrmax: number;
+  if (maxHr && maxHr > 0) hrmax = maxHr;
+  else if (formula === 'tanaka') hrmax = maxHrTanaka(a);
+  else if (formula === 'gulati') hrmax = maxHrGulati(a);
+  else hrmax = maxHrClassic(a, sex);
   const rest = restingHr && restingHr > 0 ? Math.max(30, Math.min(100, restingHr)) : undefined;
   const ranges: { zone: number; label: string; min: number; max: number; purpose: string }[] = [
     { zone: 1, label: 'Z1 Recovery', min: 50, max: 60, purpose: 'Восстановление, разминка' },
@@ -57,6 +81,56 @@ export function lthrZones(lthr: number): HeartZone[] {
     bpmMin: Math.round(l * r.min / 100),
     bpmMax: Math.round(l * r.max / 100),
     purpose: r.purpose,
+  }));
+}
+
+/** Полевой тест LTHR: средняя ЧСС последних 20 мин 30-мин all-out (Friel). */
+export function estimateLTHRFrom30Min(avgHrLast20: number): number | null {
+  const v = Math.round(avgHrLast20);
+  if (!Number.isFinite(v) || v < 80 || v > 220) return null;
+  return v;
+}
+
+/** Оценка зон по полевым тестам: приоритет LTHR → VDOT → возраст/ЧССпокоя. */
+export function estimateZonesFromFieldTests(input: {
+  lthr?: number;
+  vdot?: number;
+  age?: number;
+  restingHr?: number;
+  sex?: 'male' | 'female';
+  formula?: 'classic' | 'tanaka' | 'gulati';
+}): { source: 'lthr' | 'vdot' | 'age'; zones: HeartZone[] } | null {
+  if (input.lthr && input.lthr >= 80 && input.lthr <= 220) {
+    return { source: 'lthr', zones: lthrZones(input.lthr) };
+  }
+  if (input.vdot && input.vdot >= 20 && input.vdot <= 85) {
+    // VDOT → pace, не HR, но для совместимости даём возрастные зоны
+    const zones = cardioHeartZones(input.age ?? 30, input.restingHr, undefined, input.sex, input.formula);
+    return { source: 'vdot', zones };
+  }
+  if (input.age) {
+    return { source: 'age', zones: cardioHeartZones(input.age, input.restingHr, undefined, input.sex, input.formula) };
+  }
+  return null;
+}
+
+export interface PowerZone { zone: number; label: string; pctMin: number; pctMax: number; wattsMin: number; wattsMax: number; purpose: string }
+/** Ватт-зоны для вело по FTP (Coggan). */
+export function cyclingPowerZones(ftpWatts: number): PowerZone[] {
+  const ftp = Math.max(50, Math.min(800, Math.round(ftpWatts)));
+  const ranges = [
+    { zone: 1, label: 'Z1 Active Recovery', pctMin: 0, pctMax: 55, purpose: 'Восстановление' },
+    { zone: 2, label: 'Z2 Endurance', pctMin: 56, pctMax: 75, purpose: 'Аэробная база' },
+    { zone: 3, label: 'Z3 Tempo', pctMin: 76, pctMax: 90, purpose: 'Темпо' },
+    { zone: 4, label: 'Z4 Threshold', pctMin: 91, pctMax: 105, purpose: 'Порог' },
+    { zone: 5, label: 'Z5 VO2max', pctMin: 106, pctMax: 120, purpose: 'VO2max' },
+    { zone: 6, label: 'Z6 Anaerobic', pctMin: 121, pctMax: 150, purpose: 'Анаэроб' },
+    { zone: 7, label: 'Z7 Neuromuscular', pctMin: 151, pctMax: 300, purpose: 'Нейромышечная' },
+  ];
+  return ranges.map(r => ({
+    ...r,
+    wattsMin: Math.round(ftp * r.pctMin / 100),
+    wattsMax: r.zone === 7 ? Math.round(ftp * 2) : Math.round(ftp * r.pctMax / 100),
   }));
 }
 
@@ -175,4 +249,102 @@ export function cardioAcwrEwma(dailyTrimp: { date: string; load: number }[], ref
   const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
   const zone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
   return { ratio: Math.round(ratio * 100) / 100, zone, acute: Math.round(acute), chronic: Math.round(chronic) };
+}
+
+// ─── Фактическая нагрузка из дневника (daily TRIMP факта) ───
+
+export interface CardioFactCtlPoint { date: string; ctl: number; atl: number; tsb: number; trimp: number }
+
+function toLocalIsoFromDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function addDaysLocal(iso: string, days: number): string {
+  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
+  const nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+  return toLocalIsoFromDate(nd);
+}
+
+/** TRIMP одной записи дневника (Banister если есть avgHr+rest/max, иначе фактор). */
+export function dailyTrimpFromLogEntry(
+  entry: { type: CardioType; durationMin: number; avgHr?: number },
+  restHr?: number,
+  maxHr?: number,
+  sex: 'male' | 'female' = 'male',
+): number {
+  const avgHr = (entry as { avgHr?: number }).avgHr;
+  if (avgHr && restHr && maxHr) {
+    const t = banisterTrimp(entry.durationMin, avgHr, restHr, maxHr, sex);
+    if (t > 0) return t;
+  }
+  return sessionTrimpEstimate(entry.type, entry.durationMin);
+}
+
+/** Агрегированный daily TRIMP из лога (completed=true, дата → суммарный TRIMP). */
+export function dailyTrimpMap(
+  log: { date: string; type: CardioType; durationMin: number; avgHr?: number; completed?: boolean }[],
+  restHr?: number,
+  maxHr?: number,
+  sex: 'male' | 'female' = 'male',
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const e of log) {
+    if (e.completed === false) continue;
+    if (!e.date || !(e.durationMin > 0)) continue;
+    const trimp = dailyTrimpFromLogEntry(e as { type: CardioType; durationMin: number; avgHr?: number }, restHr, maxHr, sex);
+    map.set(e.date, (map.get(e.date) ?? 0) + trimp);
+  }
+  return map;
+}
+
+/**
+ * Фактическая CTL/ATL/TSB серия из дневника (daily EWMA 42/7, как TrainingPeaks).
+ * Возвращает точки по датам от первой записи (или 42 дня до reference) до reference включительно.
+ * Если лога нет — возвращает пустой массив (не 0-линия).
+ */
+export function cardioFactCtlSeries(
+  log: { date: string; type: CardioType; durationMin: number; avgHr?: number; completed?: boolean }[],
+  opts: { restHr?: number; maxHr?: number; sex?: 'male' | 'female'; referenceIso?: string; days?: number } = {},
+): CardioFactCtlPoint[] {
+  if (!log || log.length === 0) return [];
+  const restHr = opts.restHr;
+  const maxHr = opts.maxHr;
+  const sex = opts.sex ?? 'male';
+  const refIso = opts.referenceIso ?? toLocalIsoFromDate(new Date());
+  const map = dailyTrimpMap(log, restHr, maxHr, sex);
+  // диапазон: от min(log date, ref- days+1) до ref
+  const days = Math.max(7, Math.min(365, Math.round(opts.days ?? 90)));
+  const startIso = addDaysLocal(refIso, -(days - 1));
+  // находим самую раннюю дату лога не позже ref, но не раньше startIso
+  const sortedDates = [...map.keys()].sort();
+  const effectiveStart = sortedDates.length > 0 && sortedDates[0] < startIso ? sortedDates[0] : startIso;
+  // если лог начинается позже startIso, заполняем 0 до первой записи (CTL стартует с 0)
+  const alphaCtl = 2 / (42 + 1);
+  const alphaAtl = 2 / (7 + 1);
+  let ctl = 0;
+  let atl = 0;
+  const out: CardioFactCtlPoint[] = [];
+  let cur = effectiveStart;
+  // идем по календарю день-за-днем до ref
+  while (cur <= refIso) {
+    const trimp = map.get(cur) ?? 0;
+    ctl = ctl + alphaCtl * (trimp - ctl);
+    atl = atl + alphaAtl * (trimp - atl);
+    const tsb = Math.round((ctl - atl) * 10) / 10;
+    out.push({ date: cur, ctl: Math.round(ctl * 10) / 10, atl: Math.round(atl * 10) / 10, tsb, trimp });
+    if (cur === refIso) break;
+    cur = addDaysLocal(cur, 1);
+    // защита от бесконечности
+    if (out.length > 400) break;
+  }
+  return out;
+}
+
+/** HR drift (decoupling) за сессию: если avgHr растёт >5% при стабильном темпе/мощности — warning. */
+export function cardioHrDrift(
+  firstHalfAvgHr: number,
+  secondHalfAvgHr: number,
+): { driftPct: number; warn: boolean } {
+  if (!(firstHalfAvgHr > 0) || !(secondHalfAvgHr > 0)) return { driftPct: 0, warn: false };
+  const driftPct = ((secondHalfAvgHr - firstHalfAvgHr) / firstHalfAvgHr) * 100;
+  return { driftPct: Math.round(driftPct * 10) / 10, warn: driftPct > 5 };
 }
