@@ -106,6 +106,7 @@ import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
+import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -5223,6 +5224,56 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ fontSize: 11, color: '#fff' }}>⚡ Прогноз утомления fitness–fatigue (Banister):</div>
               <FFChart series={buildBBFitnessFatigue(plan, { startDate: startDateInput || undefined })} />
             </div>;
+          })()}
+        </CollapsibleCard>
+        <CollapsibleCard title="📊 План vs факт (по дневнику)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))', color: '#00e68a' }} badge="сеты · тоннаж · RIR">
+          {(() => {
+            const diary = (() => { try { return loadSessions(); } catch { return []; } })();
+            const fact = buildBBPlanFact(plan as any, diary as any, startDateInput || undefined);
+            if (!fact.weeks.length) return <div style={{ fontSize: 11, opacity: 0.7 }}>Нет плана для сравнения.</div>;
+            return (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: '#fff' }}>{bbPlanFactSummary(fact)}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 16, background: 'rgba(0,230,138,0.12)', color: fact.overallAdherence >= 0.9 ? '#00e68a' : fact.overallAdherence >= 0.6 ? '#fbbf24' : '#f87171', border: '1px solid rgba(0,230,138,0.3)' }}>
+                    общая adherence {Math.round(fact.overallAdherence * 100)}%
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {fact.weeks.map(w => {
+                    const b = bbAdherenceBadge(w.actual.adherence);
+                    return (
+                      <div key={w.weekNumber} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', width: 62 }}>нед {w.weekNumber}</span>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', width: 108 }}>{w.startDate?.slice(5)}–{w.endDate?.slice(5)}</span>
+                        <span style={{ flex: 1, fontSize: 10, color: '#fff' }}>
+                          план {w.planned.sets} с. · {Math.round(w.planned.tonnage)} кг
+                          {w.actual.sessions > 0 ? ` → факт ${w.actual.sets} с. · ${Math.round(w.actual.tonnage)} кг · RIR ${w.actual.avgRir.toFixed(1)}` : ''}
+                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: b.color, whiteSpace: 'nowrap' }}>{b.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {Object.keys(fact.byMuscle).length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>По мышцам:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {Object.entries(fact.byMuscle).map(([m, v]) => (
+                        <span key={m} style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: v.adherence >= 0.9 ? 'rgba(0,230,138,0.12)' : v.adherence >= 0.6 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)', color: v.adherence >= 0.9 ? '#00e68a' : v.adherence >= 0.6 ? '#fbbf24' : '#f87171', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          {MUSCLE_LABEL_RU[m] || m}: {v.actualSets}/{v.plannedSets}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {fact.unmatchedSessions.length > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+                    {fact.unmatchedSessions.length} сессий вне диапазона плана (даты не совпадают с неделями мезо).
+                  </div>
+                )}
+              </div>
+            );
           })()}
         </CollapsibleCard>
         <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="объём · вес · пик · сравнение">
