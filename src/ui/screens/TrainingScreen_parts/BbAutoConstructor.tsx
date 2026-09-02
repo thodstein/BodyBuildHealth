@@ -107,6 +107,7 @@ import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../..
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
+import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -1439,6 +1440,21 @@ export const BbAutoConstructor: React.FC = () => {
     } catch { return null; }
   }, [builtPlan]);
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, 1) : null, [builtPlan]);
+  // Epic F: единый отчёт качества (агрегирует validation/balance/rotation/safety, дедуп).
+  const qualityReport = useMemo(() => {
+    if (!builtPlan) return null;
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    return buildBBQualityReport(builtPlan as any, {
+      acwrRatio: acwrData ?? undefined,
+      bodyFat: personal?.bodyFat,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
+      mobilityRestrictions,
+    });
+  }, [builtPlan, linked.profile, acwrData, injuries, mobilityRestrictions]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!builtPlan) return null;
     const personal = linked.profile?.settings?.personal;
@@ -4165,6 +4181,26 @@ export const BbAutoConstructor: React.FC = () => {
     const ratio = acwrData;
     return (
       <div>
+        {/* 🛡 Единое качество — агрегат validation/balance/rotation/safety (Epic F) */}
+        {qualityReport && (
+          <CollapsibleCard title="🛡 Единое качество плана" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.14), rgba(16,185,129,0.04))', color: '#34d399' }} badge={bbQualityBadge(qualityReport.riskLevel).label}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, color: qualityReport.score >= 75 ? '#00e68a' : qualityReport.score >= 60 ? '#fbbf24' : '#f87171', border: `3px solid ${qualityReport.score >= 75 ? '#00e68a' : qualityReport.score >= 60 ? '#fbbf24' : '#f87171'}` }}>
+                {qualityReport.score}
+              </div>
+              <div style={{ flex: 1, fontSize: 11, color: '#fff' }}>{bbQualityReportSummary(qualityReport)}</div>
+            </div>
+            {qualityReport.issues.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
+                {qualityReport.issues.map((iss, i) => (
+                  <div key={i} style={{ fontSize: 9, padding: '4px 6px', borderRadius: 6, background: iss.level === 'error' ? 'rgba(248,113,113,0.10)' : 'rgba(251,191,36,0.08)', color: iss.level === 'error' ? '#fca5a5' : '#fcd34d', border: `1px solid ${iss.level === 'error' ? 'rgba(248,113,113,0.25)' : 'rgba(251,191,36,0.2)'}` }}>
+                    <b>[{iss.source}]</b>{iss.week ? ` нед ${iss.week}` : ''} · {iss.message}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CollapsibleCard>
+        )}
         {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}
         {(() => {
           const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
