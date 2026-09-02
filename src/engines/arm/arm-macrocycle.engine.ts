@@ -102,3 +102,14 @@ export function armMacroPhaseForWeek(macro: ArmMacrocycle, week: number): ArmMac
   }
   return null;
 }
+
+/** Маппинг ARM макро-фазы → UserWeek Phase (как bbMacroPhaseToUserPhase/macroPhaseToUserPhase). */
+export function armMacroPhaseToUserPhase(phase: ArmMacroPhase): 'accumulation' | 'intensification' | 'peaking' | 'deload' {
+  switch (phase) {
+    case 'hypertrophy': return 'accumulation';
+    case 'strength': return 'intensification';
+    case 'peaking': return 'peaking';
+    case 'transition': return 'deload';
+    default: return 'accumulation';
+  }
+}

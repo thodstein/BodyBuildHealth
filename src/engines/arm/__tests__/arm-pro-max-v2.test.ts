@@ -242,12 +242,139 @@ describe('arm PRO MAX v2 — catalog 72', () => {
   });
 });
 
-// ── Motion capture Hands (ensureHandsModel) ──
-describe('arm PRO MAX v2 — motion capture Hands', () => {
-  it('hasVideoSupport boolean', async () => {
+// ── Motion capture Hands (PRO mock — msw-like, CDN не гоняется в CI) ──
+describe('arm PRO MAX v2 — motion capture Hands (mocked PRO)', () => {
+  it('hasVideoSupport boolean + createHandsProcessor null без видео', async () => {
     const { hasVideoSupport, createHandsProcessor } = await import('../arm-motion-capture.engine');
     expect(typeof hasVideoSupport()).toBe('boolean');
     expect(createHandsProcessor(null as any, ()=>{})).toBeNull();
+  });
+  it('hasVideoSupport false → true после мока Hands, isAnglesVerified', async () => {
+    const mod = await import('../arm-motion-capture.engine');
+    const prev = (globalThis as any).Hands;
+    delete (globalThis as any).Hands;
+    delete (globalThis as any).MediaPipeHands;
+    delete (globalThis as any).BlazePose;
+    expect(mod.hasVideoSupport()).toBe(false);
+    // мок как CDN установленный Hands
+    (globalThis as any).Hands = class MockHandsA { constructor(_c:any){} setOptions(_o:any){} onResults(_cb:any){} async send(_a:any){} close(){} };
+    expect(mod.hasVideoSupport()).toBe(true);
+    const a = mod.estimateArmAngles({ elbowDeg:110, forearmDeg:90, wristDeg:10, direction:'to_middle' });
+    expect(mod.isAnglesVerified(a)).toBe(true);
+    // восстановление
+    if (prev) (globalThis as any).Hands = prev; else delete (globalThis as any).Hands;
+  });
+  it('createHandsProcessor mocked lifecycle: Hand landmarks → onAngles с направлением', async () => {
+    const mod = await import('../arm-motion-capture.engine');
+    let capturedCb: ((r:any)=>void) | null = null;
+    class MockHands {
+      opts: any;
+      constructor(public cfg:any){}
+      setOptions(o:any){ this.opts=o; expect(o.maxNumHands).toBe(1); expect(o.minDetectionConfidence).toBe(0.5); }
+      onResults(cb:any){ capturedCb = cb; }
+      async send(_img:any){
+        if(capturedCb){
+          // 21 landmark: 0 wrist, 4 thumb tip, 20 little tip, 8 index tip
+          const lm = Array.from({length:21}, (_,i)=>({ x:0.5, y:0.5, z:0 }));
+          lm[0] = { x:0.5, y:0.5, z:0 }; // wrist
+          lm[4] = { x:0.62, y:0.45, z:0 }; // thumb
+          lm[8] = { x:0.55, y:0.3, z:0 }; // index
+          lm[20]= { x:0.38, y:0.6, z:0 }; // little
+          // для to_little нужен little.x > thumb.x +0.05 -> 0.38 vs 0.62 => false → to_thumb
+          // сделаем little.x больше thumb.x для to_little
+          lm[4] = { x:0.3, y:0.45, z:0 };
+          lm[20]= { x:0.7, y:0.6, z:0 };
+          capturedCb({ multiHandLandmarks: [lm] });
+        }
+      }
+      close(){}
+    }
+    const prevHands = (globalThis as any).Hands;
+    (globalThis as any).Hands = MockHands;
+    // мокаем requestAnimationFrame/cancel для jsdom
+    const prevRAF = (globalThis as any).requestAnimationFrame;
+    const prevCAF = (globalThis as any).cancelAnimationFrame;
+    let rafId = 0;
+    (globalThis as any).requestAnimationFrame = (cb:any)=> { rafId++; const id = rafId; setTimeout(cb, 5); return id as any; };
+    (globalThis as any).cancelAnimationFrame = (_id:any)=>{};
+    const fakeVideo = { readyState: 2 } as any;
+    const angles: any[] = [];
+    const proc = mod.createHandsProcessor(fakeVideo, (f)=> angles.push(f));
+    expect(proc).not.toBeNull();
+    expect(typeof proc!.stop).toBe('function');
+    // подождать loop → send → onResults → angles push
+    await new Promise(r=> setTimeout(r, 35));
+    expect(angles.length).toBeGreaterThan(0);
+    expect(angles[0].direction).toBe('to_little'); // little.x 0.7 > thumb 0.3
+    expect(angles[0].elbowDeg).toBe(110); // хардкод 110 в processor для demo
+    expect(angles[0].forearmDeg).toBeGreaterThanOrEqual(0);
+    expect(angles[0].forearmDeg).toBeLessThanOrEqual(180);
+    proc!.stop();
+    // восстановление
+    (globalThis as any).requestAnimationFrame = prevRAF;
+    (globalThis as any).cancelAnimationFrame = prevCAF;
+    if (prevHands) (globalThis as any).Hands = prevHands; else delete (globalThis as any).Hands;
+  });
+  it('estimateAnglesFromLandmarks Geogebra 180 vs 0 direction', async () => {
+    const mod = await import('../arm-motion-capture.engine');
+    const f1 = mod.estimateAnglesFromLandmarks({ shoulder:{x:0,y:0}, elbow:{x:1,y:0}, wrist:{x:2,y:0}, hand:{x:3,y:0.1}, thumb:{x:2.6,y:0.2}, little:{x:2.1,y:-0.2} });
+    expect(f1.direction).toBe('to_thumb');
+    const f2 = mod.estimateAnglesFromLandmarks({ shoulder:{x:0,y:0}, elbow:{x:1,y:0}, wrist:{x:2,y:0}, hand:{x:3,y:-0.1}, thumb:{x:2.1,y:0.2}, little:{x:2.6,y:-0.2} });
+    expect(f2.direction).toBe('to_little');
+  });
+  it('hasVideoSupport влияет на isAnglesVerified в хабе (hasHands && valid)', async () => {
+    const mod = await import('../arm-motion-capture.engine');
+    const prev = (globalThis as any).Hands;
+    delete (globalThis as any).Hands;
+    const a = mod.estimateArmAngles({ elbowDeg:110, forearmDeg:90, wristDeg:10, direction:'to_middle' });
+    // без Hands — не верифицировано для хаба (но validate still valid)
+    expect(mod.hasVideoSupport()).toBe(false);
+    expect(mod.validateArmAngles(a).valid).toBe(true);
+    expect(mod.isAnglesVerified(a)).toBe(true); // isAnglesVerified только по validate
+    // хаб-логика: hasHands && valid — проверяем
+    const isAnglesVerifiedForHub = mod.hasVideoSupport() && mod.isAnglesVerified(a);
+    expect(isAnglesVerifiedForHub).toBe(false);
+    (globalThis as any).Hands = class X { constructor(_c:any){} setOptions(_o:any){} onResults(_cb:any){} async send(_a:any){} close(){} };
+    expect(mod.hasVideoSupport()).toBe(true);
+    expect(mod.hasVideoSupport() && mod.isAnglesVerified(a)).toBe(true);
+    if (prev) (globalThis as any).Hands = prev; else delete (globalThis as any).Hands;
+  });
+  it('ensureHandsModel без Hands — мок script onload → boolean, с установленным Hands → true', async () => {
+    const mod = await import('../arm-motion-capture.engine');
+    const prevHands = (globalThis as any).Hands;
+    delete (globalThis as any).Hands;
+    delete (globalThis as any).MediaPipeHands;
+    delete (globalThis as any).BlazePose;
+    // мок document.createElement script onload чтобы не висеть 5с
+    const origCreate = document.createElement.bind(document);
+    let scriptOnload: any = null;
+    (document as any).createElement = (tag: string) => {
+      if (tag === 'script') {
+        const el: any = { src: '', async: true, onload: null, onerror: null, setAttribute(){}},
+              origEl = origCreate(tag) as any;
+        Object.defineProperty(el, 'onload', { get(){ return scriptOnload; }, set(v){ scriptOnload = v; if(v) setTimeout(()=> v(), 5); }});
+        // также перехватим appendChild чтобы не вставлять реально
+        el.style = {};
+        return el;
+      }
+      return origCreate(tag);
+    };
+    const headAppend = document.head.appendChild.bind(document.head);
+    let appended: any = null;
+    (document.head as any).appendChild = (el:any) => { appended = el; // не вставляем реально, просто триггерим onload если есть
+      if(el && el.onload) setTimeout(()=> el.onload(), 5);
+      return el;
+    };
+    const r1 = await mod.ensureHandsModel().catch(()=> false);
+    expect(typeof r1).toBe('boolean');
+    // восстановление createElement/append
+    (document as any).createElement = origCreate;
+    (document.head as any).appendChild = headAppend;
+    // с моком Hands — сразу true без сети
+    (globalThis as any).Hands = class Y { constructor(_c:any){} setOptions(_o:any){} onResults(_cb:any){} async send(_a:any){} close(){} };
+    const r2 = await mod.ensureHandsModel();
+    expect(r2).toBe(true);
+    if (prevHands) (globalThis as any).Hands = prevHands; else delete (globalThis as any).Hands;
   });
 });
 

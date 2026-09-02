@@ -42,6 +42,8 @@ export interface AnnualBlockRef {
   cycleId?: string;
   /** Человекочитаемое описание блока. */
   description?: string;
+  /** WAF весовая категория (ARM) — влияет на sideRef, configHash. */
+  weightClass?: string;
 }
 
 /** Пользовательская конфигурация сборки блока (выбранный цикл/сплит/taper/peak). */
@@ -101,6 +103,8 @@ export interface AnnualBlockConfig {
   peakConfig?: Record<string, unknown>;
   /** MANUAL: скопировать структуру другого собранного блока по blockKey. */
   templateFromBlockKey?: string;
+  /** ARM: WAF весовая категория (−55..+110) — side/back нормализация. */
+  weightClass?: string;
   /** Заметки пользователя к блоку. */
   notes?: string;
 }

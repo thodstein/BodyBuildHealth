@@ -736,7 +736,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
               </div>
             </div>
             <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
-              <b style={{ color:'#fff' }}>Рекомендация ACWR:</b> {acwr && acwr.zone==='dangerous' ? 'снизь объём ×0.65, RIR+2, делод + tendon ×0.55' : acwr && acwr.zone==='caution' ? '×0.85, RIR+1 + extensor band' : 'оптимум — держи курс (taper 0.65/0.45)'} {tendonAcwr && tendonAcwr.zone==='dangerous' ? ' · Tendon danger — side×0.5!' : ''}
+              <b style={{ color:'#fff' }}>ACWR — факт:</b> ACWR {acwr ? acwr.ratio : '—'} — факт {acwr ? '' : '(нужен дневник sRPE ≥2 сесс.)'} {tendonAcwr ? `· Tendon ACWR ${tendonAcwr.ratio} — факт` : ''}
             </div>
             {forceHistory.stats.length>0 && (
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>

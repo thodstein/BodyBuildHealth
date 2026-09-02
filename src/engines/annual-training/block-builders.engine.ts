@@ -32,6 +32,7 @@ import {
   macroPhaseToUserPhase,
   bbMacroPhaseToUserPhase,
 } from '../periodization/phase-bridge';
+import { armMacroPhaseToUserPhase } from '../arm/arm-macrocycle.engine';
 import { makeEmptySessionsForWeek } from '../periodization/designer-to-program';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
@@ -57,10 +58,11 @@ export function stableHash(input: unknown): string {
   return (h >>> 0).toString(36);
 }
 
-/** Стабильный ключ макро-блока: layout-поля + цикл. Изменение любого поля → новый ключ → stale. */
+/** Стабильный ключ макро-блока: layout-поля + цикл/вес. Изменение любого поля → новый ключ → stale. */
 export function macroBlockKey(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number): string {
   const cycleId = (block as MacroBlock).cycleId;
-  return `blk${idx}-${block.phase}-${block.weekOffset}-${block.weeks}${cycleId ? '-' + cycleId : ''}`;
+  const wc = (block as ArmMacroBlock).weightClass || (block as any).weightClass;
+  return `blk${idx}-${block.phase}-${block.weekOffset}-${block.weeks}${cycleId ? '-' + cycleId : ''}${wc ? '-wc' + wc : ''}`;
 }
 
 /** Тип конструктора из макро-блока. */
@@ -126,6 +128,7 @@ function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: num
       weeks: (block as ArmMacroBlock).weeks,
       competitionId: (block as ArmMacroBlock).competitionId,
       description: (block as ArmMacroBlock).description,
+      weightClass: (block as ArmMacroBlock).weightClass || (block as any).weightClass,
     };
   }
   const rawKind = (block as MacroBlock).kind;
@@ -254,6 +257,14 @@ const PL_PHASE_MOD: Record<string, { compound: number; accessory: number; rir: [
   transition:  { compound: 0.5, accessory: 0.45, rir: [3, 5] },
 };
 
+/** Объём/RIR фаз АРМ-макроцикла (Kuznetsov, Schoenfeld) — parity с арм-бай. */
+const ARM_PHASE_MOD: Record<string, { compound: number; accessory: number; rir: [number, number] }> = {
+  hypertrophy: { compound: 1.0, accessory: 1.0, rir: [2, 3] },
+  strength:    { compound: 0.85, accessory: 0.8, rir: [1, 2] },
+  peaking:     { compound: 0.65, accessory: 0.6, rir: [1, 2] },
+  transition:  { compound: 0.5, accessory: 0.45, rir: [3, 5] },
+};
+
 const clampRir = (r: number): number => Math.max(0, Math.min(5, Math.round(r)));
 
 /**
@@ -268,10 +279,12 @@ export function applyBlockPhaseToWeeks(
 ): UserWeek[] {
   const bbMod = BB_PHASE_MOD[phase];
   const plMod = PL_PHASE_MOD[phase];
+  const armMod = ARM_PHASE_MOD[phase];
   const useBB = (kind === 'BB' || kind === 'MANUAL') && !!bbMod;
-  const mod = useBB ? bbMod : plMod;
+  const useARM = kind === 'ARM' && !!armMod;
+  const mod = useBB ? bbMod : useARM ? armMod : plMod;
   const deload = phase === 'transition';
-  const userPhase = useBB ? bbMacroPhaseToUserPhase(phase as any) : macroPhaseToUserPhase(phase as any);
+  const userPhase = useBB ? bbMacroPhaseToUserPhase(phase as any) : useARM ? armMacroPhaseToUserPhase(phase as any) : macroPhaseToUserPhase(phase as any);
   if (!mod) return weeks.map(w => ({ ...w, phase: userPhase }));
   return weeks.map((w, wi) => {
     // Пик-неделя применяется поверх (после) фазовой модуляции — финал блока не урезается дважды.
@@ -790,7 +803,7 @@ function buildManualBlock(
 }
 
 function configHashOf(config: AnnualBlockConfig, ref: AnnualBlockRef): string {
-  return stableHash({ config, kind: ref.kind, phase: ref.phase, weeks: ref.weeks, cycleId: ref.cycleId });
+  return stableHash({ config, kind: ref.kind, phase: ref.phase, weeks: ref.weeks, cycleId: ref.cycleId, weightClass: ref.weightClass || (config as any).weightClass });
 }
 
 /**
@@ -809,7 +822,10 @@ export function buildAnnualBlock(
       case 'PL': result = buildPLBlock(state, macro, opts); break;
       case 'BB': result = buildBBBlock(state, macro, opts); break;
       case 'ARM': {
-        const armRes: any = buildArmBlockInternal({ blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase }, { ...state.config as any, level: (state.config.level || opts.level) as any }, { level: opts.level });
+        const wc = (state.config as any).weightClass || (state.ref as any).weightClass || (state.ref as any).weightClass;
+        const armRes: any = buildArmBlockInternal({ blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase, weightClass: wc } as any, { ...state.config as any, weightClass: wc, level: (state.config.level || opts.level) as any }, { level: opts.level });
+        // configHash должен учитывать weightClass как stale-триггер (как PL cycleId)
+        const armHash = configHashOf({ ...(state.config as any), weightClass: wc }, { ...state.ref, weightClass: wc } as any);
         result = {
           blockKey: armRes.blockKey,
           kind: 'ARM' as any,
@@ -819,7 +835,7 @@ export function buildAnnualBlock(
           warnings: armRes.warnings,
           taperApplied: armRes.taperApplied,
           peakApplied: armRes.peakApplied,
-          configHash: armRes.configHash,
+          configHash: armHash,
         } as any;
         break;
       }
