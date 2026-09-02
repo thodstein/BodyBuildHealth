@@ -113,33 +113,49 @@ export function speedOrientationOf(cycle: SRCycleTemplate): SpeedOrientation[]; 
 `speed` без кандидатов получает честный warning «нет циклов скорости в базе» и предложение
 использовать `strength`-циклы с акцентом на скорость (метка в плане).
 
-### 2.3 Подгонка цикла под окно недель — `fitCycleToWeeks`
+### 2.3 Подгонка цикла под окно недель — `fitCycleToWeeks` + переключатель «Строго по источнику»
 
 ```ts
 export interface FitResult {
   cycle: SRCycleTemplate;
   weeks: number;                    // фактическая длина после подгонки
-  mode: 'exact' | 'extend' | 'shrink';
+  mode: 'exact' | 'extend' | 'shrink' | 'strict_skip';
   correctionPctEff?: number;        // пересчитанный темп прогрессии (для shrink)
+  strict?: boolean;                 // true если сработал строгий режим
   notes: string[];
 }
-export function fitCycleToWeeks(cycle: SRCycleTemplate, targetWeeks: number, opts?): FitResult;
+export interface FitOptions {
+  minCycleFloor?: number;           // default 4
+  strict?: boolean;                 // === true → запрещено менять раскладку источника
+}
+export function fitCycleToWeeks(cycle: SRCycleTemplate, targetWeeks: number, opts?: FitOptions): FitResult;
 ```
 
-- `targetWeeks >= originalCycleWeeks(cycle)` → **extend**: `weeksOverride=targetWeeks`
-  (существующая механика buildLMSPlan). Логика цикла (раскладка week1, correctionPct) сохраняется.
-- `targetWeeks < originalCycleWeeks(cycle)` → **shrink**, логика НЕ теряется:
-  - **если у цикла есть `weeks` (явная многонедельная раскладка):** делим недели на группы по
-    `ceil(original/target)` и берём из каждой группы представителя (первая неделя группы +
-    обязательно последняя неделя цикла в конец) — получаем target недель, сохраняющих фазовую
-    структуру источника (разгон/тяж/разгрузка).
-  - **иначе (одна неделя-шаблон + correctionPct):** target недель с той же раскладкой week1;
-    PM-прогрессия пересчитывается так, чтобы СУММАРНЫЙ прирост ПМ за target недель был равен
-    приросту за оригинальный срок: `correctionPctEff = correctionPct * original / target`
-    (кап ≤ 2× оригинала, чтобы не «взрывать» недельный темп). Итог: цикл «ужался», а его общий
-    эффект по ПМ сохранён.
-- Возврат `notes` для rationale UI («цикл сжат с 12 до 8 нед: фазы сохранены, темп прогрессии 0.5%→0.75%»).
-- Минимальная граница: `weeksMin = 4` (иначе `{ mode:'shrink', weeks:0, notes:['окно слишком мало'] }`).
+**Источник никогда не перезаписывается:** `LMS_CYCLES` и файлы `src/data/lms-cycles/*.ts` — immutable канон. `fitCycleToWeeks` всегда возвращает **производную копию** `derived = { ...cycle, weeks: ... , meta:{...} }`, оригинал не мутируется.
+
+- **Обычный режим (`strict=false`, default):**
+  - `targetWeeks >= originalCycleWeeks(cycle)` → **extend**: `weeksOverride=targetWeeks`
+    (существующая механика buildLMSPlan). Логика цикла (раскладка week1, correctionPct) сохраняется.
+  - `targetWeeks < originalCycleWeeks(cycle)` → **shrink**, логика НЕ теряется:
+    - **если у цикла есть `weeks` (явная многонедельная раскладка):** делим недели на группы по
+      `ceil(original/target)` и берём из каждой группы представителя (первая неделя группы +
+      обязательно последняя неделя цикла в конец) — получаем target недель, сохраняющих фазовую
+      структуру источника (разгон/тяж/разгрузка).
+    - **иначе (одна неделя-шаблон + correctionPct):** target недель с той же раскладкой week1;
+      PM-прогрессия пересчитывается так, чтобы СУММАРНЫЙ прирост ПМ за target недель был равен
+      приросту за оригинальный срок: `correctionPctEff = correctionPct * original / target`
+      (кап ≤ 2× оригинала, чтобы не «взрывать» недельный темп). Итог: цикл «ужался», а его общий
+      эффект по ПМ сохранён.
+  - Возврат `notes` для rationale UI («цикл сжат с 12 до 8 нед: фазы сохранены, темп прогрессии 0.5%→0.75%»).
+  - Минимальная граница: `weeksMin = 4` (иначе `{ mode:'shrink', weeks:0, notes:['окно слишком мало'] }`).
+
+- **Строгий режим (`strict=true` — переключатель «📖 Строго по источнику»):**
+  - Любая попытка `targetWeeks !== originalCycleWeeks(cycle)` → **отказ от подгонки**:
+    `{ weeks:0, mode:'strict_skip', strict:true, notes:['⚠️ Строгий режим: цикл «X» 12 нед не влезает в окно 7 нед — раскладка не изменена'] }`.
+  - UI вместо растяжения/сжатия показывает `⚠️ Не влезает: выберите слот = 12 нед или другой цикл` и блокирует кнопку «Собрать» для этого сегмента.
+  - Одиночный цикл (`buildSrc` в `SRCBBScreen.tsx:405` `faithful:true`) уже строгий по определению — всегда 1:1.
+
+Переключатель `strict` пробрасывается из `PLSeasonBuilder` (чекбокс в шапке карточки сезона) через `PLSeasonInput.strict` / `CompGapOptions.strict` в каждый вызов `fitCycleToWeeks`. Сохраняется в `he_pl_session.season.strict` (default `false` — обратно-совместимо).
 
 ### 2.4 Кандидаты под слот — `candidateCyclesForSlot`
 
@@ -165,6 +181,7 @@ export interface PLSeasonInput {
   selector: LMSSelectorInput;          // уровень/направление/вес/дни/режим
   mode: 'auto' | 'manual';             // режим выбора (жалоба №1)
   selections?: Record<number, string>; // manual: id цикла на слот по индексу
+  strict?: boolean;                    // true → fitCycleToWeeks в строгом режиме (без изменения раскладки)
   taper?: MacroTaperOpts;              // тапер-настройки (пробрасываются наверх)
   meets?: PLSeasonMeet[];              // соревнования (для пиков и окон, Фаза 2)
 }
@@ -190,17 +207,18 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan;
 ```
 
 - `mode:'auto'` → для каждого слота `candidateCyclesForSlot(...)[0]`, затем
-  `fitCycleToWeeks(candidate, slotWeeks)`. Рекомендация показана с rationale (`explainSelection`).
+  `fitCycleToWeeks(candidate, slotWeeks, { strict: input.strict })`. Рекомендация показана с rationale (`explainSelection`).
 - `mode:'manual'` → `selections` задаёт id; выбранный цикл проверяется через
-  `candidateCyclesForSlot` (валидность выбора) + `fitCycleToWeeks`.
+  `candidateCyclesForSlot` (валидность выбора) + `fitCycleToWeeks(..., { strict })`.
 - `assembleSeasonPlan(plan, opts: { pmMap, fallbackPm, mode, courseIntensity, peds, pedDoses,
   nutrition, autoReg, pmAutoReg, athleteMode, athleteContext, recovery }): LMSBuildOutput` —
   последовательный проход: для каждого сегмента `buildLMSPlan({ template, weeksOverride: seg.weeks,
   ...общие параметры })`, склейка недель с перенумерацией (паттерн `buildSrcMacrocycle` в
   SRCBBScreen.tsx), `macroPhase: seg.slot.period` на неделях сегмента. Опционально
   `buildPLSeasonPeaks(...)` поверх (Фаза 2), если переданы `meets`.
-- Сохранение выбора в сессию: ключи `he_pl_session.season = { slots, mode, selections, cycleIds }`
-  (обратно-совместимо: отсутствие season → старое поведение одиночного цикла).
+- При `strict=true` и `fit.mode==='strict_skip'` сегмент не собирается — в `notes` предупреждение, в UI карточке слота красный бейдж `⛔ Не влезает` + подсказка увеличить слот.
+- Сохранение выбора в сессию: ключи `he_pl_session.season = { slots, mode, selections, strict, cycleIds }`
+  (обратно-совместимо: отсутствие season → старое поведение одиночного цикла, `strict` default `false`).
 
 ---
 
@@ -236,6 +254,7 @@ export function planBetweenCompetitions(
     selector: LMSSelectorInput;                // уровень/направление/вес/дни/режим
     mode: 'auto' | 'manual';                   // режим выбора цикла на каждый пролёт
     selections?: Record<number, string>;       // manual: id цикла на индекс пролёта
+    strict?: boolean;                          // true → без изменения раскладки (как в Фазе 1)
     taper?: MacroTaperOpts;
     minCycleFloor?: number;
   },
@@ -251,12 +270,12 @@ export function planBetweenCompetitions(
     desc: период · уровень · недели · «можно сжать»), пользователь выбирает id из `selections`;
     невалидный id → warning + fallback на авто.
   - `candidates` заполняется в ОБОИХ режимах (авто тоже показывает, что выбрано и почему).
-- `fitWeeks = fitCycleToWeeks(cycle, availableWeeks).weeks`:
+- `fitWeeks = fitCycleToWeeks(cycle, availableWeeks, { strict: opts.strict }).weeks`:
   - влезает → exact/extend;
-  - не влезает → shrink (Фаза 1.3) до окна, логика цикла сохранена, темп прогрессии пересчитан;
+  - не влезает + `strict=false` → shrink (Фаза 1.3) до окна, логика цикла сохранена, темп прогрессии пересчитан;
+  - не влезает + `strict=true` → `fitWeeks=null`, `mode='strict_skip'` — раскладка не тронута, в сегменте warning `⛔ Строгий режим`, время не простаивает только за счёт пик-блока;
   - окно < 4 → `fitWeeks=null` + предупреждение «окно между стартами слишком мало (N нед) — полный
-    цикл пропущен, только поддерживающий объём (повтор последней недели цикла)», время не
-    простаивает (паттерн `buildPLSeasonPeaks`, продление последней неделей).
+    цикл пропущен, только поддерживающий объём (повтор последней недели цикла)» (в `strict` — то же, но без попытки shrink).
 - Верхний слой: собранные недели сезона прогоняем через **`buildPLSeasonPeaks`** — под каждый старт
   автоматически встаёт пик-блок (вход в пик/ramp → mock → глубокий тапер → старт → пост). Итог:
   у каждого соревнования есть и сжатый под окно цикл, и корректный taper/пик, и ни одной «пустой»
@@ -299,13 +318,15 @@ export function planBetweenCompetitions(
 
 NEW: **`src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx`**.
 
+- Переключатель **«📖 Строго по источнику»** (чекбокс в шапке карточки, `strict: boolean`, сохраняется в `he_pl_session.season.strict`, default `false`). Вкл → `fitCycleToWeeks(..., {strict:true})` — раскладка источника никогда не меняется, несовместимые слоты получают `⛔ Не влезает` и блокируют сборку сегмента.
 - Режим-переключатель: **«🎯 Одиночный цикл» / «🧩 Сезон по микроциклам»** (состояние
-  `seasonMode`, сохраняется в `he_pl_session`). Одиночный — текущее поведение без изменений.
+  `seasonMode`, сохраняется в `he_pl_session`). Одиночный — текущее поведение без изменений (фактически `strict=true`).
 - В сезонном режиме: список слотов (`buildDefaultSeasonSlots`, редактируемые недели + порядок +
   вкл/выкл), переключатель **авто / ручной**:
   - авто: под каждым слотом «🏆 Рекомендован: {cycleTitle}» + rationale + «✅ Применить в сезон»;
   - ручной: под каждым слотом `PopupSelect` из `candidateCyclesForSlot` (подходящие в базе,
     desc: период · уровень · недели · «можно сжать» при неделях > слота) + «ℹ️ Почему подходит».
+- Переключатель «Строго по источнику» действует и на пролёты между стартами (проброс `strict` в `planBetweenCompetitions`).
 - Карточка **«🏁 Циклы между соревнованиями»** (в сезонном режиме, при `meetList.length ≥ 2`):
   для каждого пролёта (нед N1→N2, N2→N3, …) строка с окном «доступно N нед (минус тапер/старт/пост)»
   и тем же переключателем **авто/ручной**:
@@ -335,6 +356,7 @@ NEW: **`src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx`**.
   - `fitCycleToWeeks`: exact (равно), extend (растяжение), shrink по явным неделям (сохранение
     первой/последней недели), shrink по коррекции (correctionPctEff = orig×orig/target, кап 2×),
     окно < 4 → null + warning, некорректные недели (0/NaN) → guard;
+  - `fitCycleToWeeks` strict: `strict=true` + несовпадение недель → `strict_skip` без изменения раскладки, `strict=false` — прежнее поведение;
   - `candidateCyclesForSlot`: endurance/strength/peak через rankCycles, speed через speed-индекс
     (пусто → пустой список), фильтр влезаемости, peak-слоты показывают «можно сжать»;
   - `planSeason`: авто (лучший кандидат на каждый слот), manual (selections, невалидный id →
@@ -346,6 +368,7 @@ NEW: **`src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx`**.
 - **`lms-comp-gap.test.ts`** (движок окна между стартами):
   - окно точное (цикл влезает), окно меньше цикла (shrink без потери логики: 12-нед цикл в
     7-нед окно с тапером → fitWeeks=7, темп пересчитан, последняя неделя сохранена);
+  - strict: `strict=true` + невлезающий цикл → `strict_skip`, без shrink;
   - окно < 4 → fitWeeks=null + поддерживающий повтор, время не простаивает (все недели заполнены);
   - несколько стартов подряд (A→B→C) — каждое окно своё, пик-блоки не накладываются;
   - **выбор на пролёт: авто (лучший из candidateCyclesForSlot по окну), ручной (selections по
@@ -354,6 +377,7 @@ NEW: **`src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx`**.
   - сезон с пиками: `buildPLSeasonPeaks` применён, у каждого старта taper/meet/post на месте;
   - деградация: план одиночного цикла без season не изменился.
 - **`pl-season-builder.test.tsx`** (UI карточки сезона, SSR/рендер):
+  - переключатель «📖 Строго по источнику» сохраняет `strict` в сессию (default false), при `true` несовместимый слот показывает `⛔ Не влезает`,
   - переключатель одиночный/сезон, слоты отображаются с неделями,
   - авто-режим показывает «🏆 Рекомендован» на каждый слот,
   - ручной режим показывает PopupSelect из подходящих + бейдж «⬇ сжат 12→8»,
