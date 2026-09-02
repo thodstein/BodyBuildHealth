@@ -8,7 +8,7 @@ import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  lthrZones, runningVdot, estimateLTHRFrom30Min, menstrualPhaseForDate, cardioCyclePeriodAware,
+  lthrZones, runningVdot, estimateLTHRFrom30Min, cyclingPowerZones, menstrualPhaseForDate, cardioCyclePeriodAware,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
@@ -46,6 +46,7 @@ export const CardioAutoTunePanel: React.FC<{
   const [vdotKm, setVdotKm] = useState('');
   const [vdotMin, setVdotMin] = useState('');
   const [cooperKm, setCooperKm] = useState('');
+  const [ftpWatts, setFtpWatts] = useState('');
   const [periodStart, setPeriodStart] = useState(() => {
     try { return getProfile()?.settings?.lifestyle?.lastPeriodStart ?? ''; } catch { return ''; }
   });
@@ -298,6 +299,23 @@ export const CardioAutoTunePanel: React.FC<{
         </div>
         {cooperVdot && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
         <div style={HINT_SM}>Cooper: 12 мин максимально → VDOT.</div>
+      </Accordion>
+
+      <Accordion title="Ватт-зоны (FTP)" icon="⚡" defaultOpen={false}>
+        <div style={ROW}>
+          <NumberInput value={ftpWatts} onChange={setFtpWatts} min={80} max={600} step={5} placeholder="250" ariaLabel="FTP ватт" width={90} suffix="Вт FTP" />
+          {ftpWatts && Number(ftpWatts) > 0 && <Badge bg="rgba(250,204,21,0.13)" border="rgba(250,204,21,0.28)" color="#facc15">FTP {ftpWatts} Вт</Badge>}
+        </div>
+        {ftpWatts && Number(ftpWatts) > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {cyclingPowerZones(Number(ftpWatts)).slice(0, 5).map(z => (
+              <div key={z.zone} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(250,204,21,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(250,204,21,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#facc15' : '#fff' }}>
+                Z{z.zone} {z.wattsMin}-{z.wattsMax}Вт · {z.purpose}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={HINT_SM}>Coggan: Z2 56-75% FTP — база, Z4 91-105% — порог. Вело-интервалы держите в зонах.</div>
       </Accordion>
 
       <Accordion title="Менструальный цикл" icon="🌸" defaultOpen={false}>

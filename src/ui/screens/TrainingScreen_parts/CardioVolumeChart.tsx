@@ -4,8 +4,9 @@
  * выполнения прошедших недель. Inline, без внешних библиотек.
  */
 import React, { useMemo, useState } from 'react';
-import { cardioVolumeSeries, CARDIO_PHASE_LABELS, cardioWeekForDate, cardioCtlSeries, type CardioCycle } from '../../../engines/lms/cardio.engine';
+import { cardioVolumeSeries, CARDIO_PHASE_LABELS, cardioWeekForDate, cardioCtlSeries, cardioFactCtlSeries, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { cardioWeekFact, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { addDaysIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { CARD, BTN, BTN_SMALL, PHASE_COLOR, HINT_SM } from './CardioUI';
 
 function todayIso(): string {
@@ -61,8 +62,27 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
     };
   }, [cycle, log]);
 
+  const factCtlWeekly = useMemo(() => {
+    if (metric !== 'ctl' || !cycle || log.length === 0 || !cycle.startDate) return [] as number[];
+    try {
+      const daily = cardioFactCtlSeries(log, {
+        restHr: cycle.config?.restingHr ?? undefined,
+        maxHr: cycle.config?.age ? (cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age) : undefined,
+        sex: cycle.config?.sex,
+        referenceIso: todayIso(),
+        days: cycle.totalWeeks * 7 + 7,
+      });
+      const map = new Map(daily.map(d => [d.date, d.ctl]));
+      return cycle.weeks.map(w => {
+        const endIso = addDaysIso(cycle.startDate!, w.week * 7 - 1);
+        return map.get(endIso) ?? 0;
+      });
+    } catch { return [] as number[]; }
+  }, [cycle, log, metric]);
+
   if (!cycle || series.length === 0) return null;
 
+  const factCtlWeeklyForMax = factCtlWeekly.length > 0 ? factCtlWeekly : [];
   const values = series.map(s => (s as unknown as Record<string, number>)[metric] ?? 0);
   // Точный TRIMP факта — по датам недели, а не хак 2.2
   const factValues = fact
@@ -90,7 +110,7 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
         return weekLog.reduce((sum, e) => sum + e.durationMin * (TRIMP_FACTOR[e.type] ?? 2), 0);
       })
     : [];
-  const max = Math.max(1, ...values, ...factValues);
+  const max = Math.max(1, ...values, ...factValues, ...(metric === 'ctl' ? factCtlWeeklyForMax : []));
   const label = metric === 'minutes' ? 'мин' : metric === 'kcal' ? 'ккал' : metric === 'trimp' ? 'TRIMP' : 'CTL';
   const peak = Math.max(...values);
   const peakWeek = values.indexOf(peak) + 1;
@@ -123,13 +143,16 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
                 const hAtl = Math.max(2, Math.round((atl / max) * 70));
                 const hTsb = Math.max(1, Math.round((Math.abs(tsb) / max) * 40));
                 const tsbPos = tsb >= 0 ? 'top' : 'bottom';
+                const factCtl = factCtlWeeklyForMax[i] ?? 0;
+                const hFact = factCtl > 0 ? Math.max(2, Math.round((factCtl / max) * 70)) : 0;
                 return (
-                  <div key={s.week} title={`Нед ${s.week}: CTL ${ctl} · ATL ${atl} · TSB ${tsb}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <div key={s.week} title={`Нед ${s.week}: CTL ${ctl} · ATL ${atl} · TSB ${tsb}${factCtl > 0 ? ` · факт CTL ${factCtl}` : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                     <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', justifyContent: 'center', height: 82 }}>
                       <div style={{ flex: 1, borderRadius: '2px 2px 0 0', height: hCtl, background: '#60a5fa', opacity: 0.9 }} title={`CTL ${ctl}`} />
                       <div style={{ flex: 1, borderRadius: '2px 2px 0 0', height: hAtl, background: '#f87171', opacity: 0.9 }} title={`ATL ${atl}`} />
                       <div style={{ flex: 1, borderRadius: 2, height: hTsb, background: tsb >= 0 ? '#4ade80' : '#fbbf24', opacity: 0.9, alignSelf: tsbPos === 'top' ? 'flex-start' : 'flex-end' }} title={`TSB ${tsb}`} />
                     </div>
+                    {hFact > 0 && <div style={{ width: '100%', height: 3, borderRadius: 1, background: '#f8fafc', opacity: 0.9, marginTop: 1 }} title={`факт CTL ${factCtl}`} />}
                   </div>
                 );
               }

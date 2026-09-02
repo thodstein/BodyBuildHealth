@@ -8,7 +8,7 @@ import {
   cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
   spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
-  cardioFitnessForecast, cardioCoachHints, cardioWeekLegConflicts,
+  cardioFitnessForecast, cardioCoachHints, cardioWeekLegConflicts, interferenceForCycle,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -152,6 +152,14 @@ export const CardioPreviewStep: React.FC<{
     setImprove(null);
   };
 
+  const interference = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const legPerWeek = cycle.config?.legDays ? cycle.config.legDays.filter(d => d >= 0 && d <= 6).length || 2 : 2;
+      return interferenceForCycle(cycle as any, legPerWeek, cycle.config?.sex);
+    } catch { return null; }
+  }, [cycle]);
+
   const SUB_TABS = [
     { id: 'overview', label: 'Обзор', icon: '📊' },
     { id: 'variants', label: 'Варианты', icon: '⇄' },
@@ -170,13 +178,13 @@ export const CardioPreviewStep: React.FC<{
       </div>
     );
   }
-
   const metrics = [
     { label: 'Недель', value: String(cycle.totalWeeks), color: '#22c55e' },
     { label: 'Мин/нед', value: String(summary.avgMinutesPerWeek), color: '#3b82f6' },
     { label: 'Ккал/нед', value: String(summary.avgKcalPerWeek), color: '#f59e0b' },
     { label: 'HIIT-нед', value: String(summary.hiitWeeks), color: '#a78bfa' },
     { label: 'Цель', value: CARDIO_GOAL_LABELS[cycle.goal], color: '#94a3b8' },
+    ...(interference ? [{ label: 'Interf.', value: `${interference.score}`, color: interference.level === 'low' ? '#4ade80' : interference.level === 'mid' ? '#fbbf24' : '#f87171' }] : []),
   ];
 
   return (
@@ -270,6 +278,13 @@ export const CardioPreviewStep: React.FC<{
                   )}
                 </div>
               )}
+            </div>
+          )}
+          {interference && interference.level !== 'low' && (
+            <div style={{ ...CARD, borderColor: interference.level === 'high' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.28)', background: interference.level === 'high' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)' }}>
+              <div style={LABEL}>⚡ Совместимость с силовой (Interference)</div>
+              <div style={{ fontSize: 12, color: interference.level === 'high' ? '#f87171' : '#fbbf24', fontWeight: 700 }}>{interference.level === 'high' ? 'Высокий риск' : 'Умеренный риск'} · {interference.score}/10</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>{interference.advice}</div>
             </div>
           )}
           {(() => {
