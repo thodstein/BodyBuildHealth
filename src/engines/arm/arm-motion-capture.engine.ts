@@ -36,24 +36,89 @@ export function estimateArmAngles(input: {
   return { elbowDeg: elbow, forearmDeg: forearm, wristDeg: wrist, direction: input.direction, pronDeg, supDeg };
 }
 
+export interface ArmLandmarks {
+  shoulder: { x: number; y: number };
+  elbow: { x: number; y: number };
+  wrist: { x: number; y: number };
+  hand?: { x: number; y: number };
+  thumb?: { x: number; y: number };
+  little?: { x: number; y: number };
+}
+
+/** Геометрия: угол между тремя точками A-B-C (B — вершина) в градусах 0..180 */
+export function angleBetween(a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }): number {
+  const abx = a.x - b.x, aby = a.y - b.y;
+  const cbx = c.x - b.x, cby = c.y - b.y;
+  const dot = abx * cbx + aby * cby;
+  const magAB = Math.sqrt(abx * abx + aby * aby);
+  const magCB = Math.sqrt(cbx * cbx + cby * cby);
+  if (magAB === 0 || magCB === 0) return 90;
+  const cos = Math.max(-1, Math.min(1, dot / (magAB * magCB)));
+  return Math.round((Math.acos(cos) * 180) / Math.PI);
+}
+
+export function estimateAnglesFromLandmarks(lm: ArmLandmarks): ArmMotionFrame {
+  const elbowDeg = angleBetween(lm.shoulder, lm.elbow, lm.wrist);
+  // forearmDeg — ориентация предплечья относительно горизонтали (0=sup, 90=neutral, 180=pron)
+  let forearmDeg = 90;
+  if (lm.hand && lm.elbow && lm.wrist) {
+    const dx = lm.hand.x - lm.wrist.x;
+    const dy = lm.hand.y - lm.wrist.y;
+    // грубая оценка pron через вектор кисти: dx>0 при pron
+    forearmDeg = 90 + Math.round(dx * 180);
+    forearmDeg = Math.max(0, Math.min(180, forearmDeg));
+  }
+  // wristDeg — угол кисти (отклонение от прямой линии elbow-wrist-hand)
+  let wristDeg = 10;
+  if (lm.hand) {
+    const w = angleBetween(lm.elbow, lm.wrist, lm.hand);
+    wristDeg = Math.round(180 - w); // флекс положительный
+    wristDeg = Math.max(-30, Math.min(60, wristDeg));
+  }
+  // direction по thumb/little
+  let direction: ArmWorkingDirection = 'to_middle';
+  if (lm.thumb && lm.little) {
+    const tx = lm.thumb.x - lm.wrist.x;
+    const lx = lm.little.x - lm.wrist.x;
+    if (tx > lx + 0.02) direction = 'to_thumb';
+    else if (lx > tx + 0.02) direction = 'to_little';
+  }
+  return { elbowDeg, forearmDeg, wristDeg, direction };
+}
+
 /** PRO: попытка детекции через MediaPipe Hands/BlazePose — если загружен, возвращает угол, иначе null фолбэк. */
 export function detectWristAngleFromVideo(videoFrame: unknown): ArmMotionFrame | null {
   try {
     // Если в глобальном есть MediaPipe (подключён как в DiagnosticsHub), пробуем
-    const mp = (globalThis as any).MediaPipeHands || (globalThis as any).BlazePose;
-    if (!mp || !videoFrame) return null;
-    // Заглушка: реальная интеграция требует canvas+model, оставляем фолбэк с попыткой парса
-    // Если videoFrame — уже распарсенный объект с elbowDeg/wristDeg — вернём его
-    if (typeof videoFrame === 'object' && videoFrame !== null && 'elbowDeg' in (videoFrame as any)) {
+    const mp = (globalThis as any).MediaPipeHands || (globalThis as any).BlazePose || (globalThis as any).Hands;
+    // Если videoFrame — landmarks объект — считаем геометрию
+    if (typeof videoFrame === 'object' && videoFrame !== null) {
       const f = videoFrame as any;
-      return { elbowDeg: Number(f.elbowDeg), forearmDeg: Number(f.forearmDeg), wristDeg: Number(f.wristDeg), direction: f.direction };
+      if ('shoulder' in f && 'elbow' in f && 'wrist' in f) {
+        return estimateAnglesFromLandmarks(f as ArmLandmarks);
+      }
+      if ('elbowDeg' in f) {
+        return { elbowDeg: Number(f.elbowDeg), forearmDeg: Number(f.forearmDeg), wristDeg: Number(f.wristDeg), direction: f.direction };
+      }
+      // MediaPipe result format: { landmarks: [...] } — пробуем первый
+      if (Array.isArray(f.landmarks) && f.landmarks.length >= 3) {
+        // ожидаем [shoulder, elbow, wrist, hand]
+        const [s, e, w, h] = f.landmarks;
+        if (s && e && w) return estimateAnglesFromLandmarks({ shoulder: s, elbow: e, wrist: w, hand: h });
+      }
     }
+    if (!mp || !videoFrame) return null;
     return null;
   } catch { return null; }
 }
 
 export function hasVideoSupport(): boolean {
-  return typeof (globalThis as any).MediaPipeHands !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined';
+  return typeof (globalThis as any).MediaPipeHands !== 'undefined' || typeof (globalThis as any).BlazePose !== 'undefined' || typeof (globalThis as any).Hands !== 'undefined';
+}
+export function isAnglesVerified(angles: ArmAngles | null): boolean {
+  if (!angles) return false;
+  const v = validateArmAngles(angles);
+  return v.valid;
 }
 
 /** Проверка РУ в рабочем диапазоне (90° ±10, wrist flex 0–30, pron 20–60 для toproll). */
@@ -61,9 +126,12 @@ export function validateArmAngles(a: ArmAngles): { valid: boolean; warnings: str
   const warnings: string[] = [];
   if (a.elbowDeg !== 90 && a.elbowDeg !== 110 && a.elbowDeg !== 120) warnings.push(`Угол локтя ${a.elbowDeg}° вне 90/110/120`);
   if (a.wristDeg < -10 || a.wristDeg > 40) warnings.push(`Wrist ${a.wristDeg}° вне -10…40`);
+  if (a.forearmDeg < 0 || a.forearmDeg > 180) warnings.push(`Предплечье ${a.forearmDeg}° вне 0..180`);
+  if (a.pronDeg < 0 || a.pronDeg > 90 || a.supDeg < 0 || a.supDeg > 90) warnings.push(`Pron/Sup вне 0..90`);
   if (a.direction === 'to_little' && a.pronDeg < 10) warnings.push('Для направления к мизинцу нужен pron ≥10°');
   if (a.direction === 'to_thumb' && a.supDeg > 30) warnings.push('To_thumb с sup >30° — риск (press: neutral предпочтительно)');
   if (a.elbowDeg === 120 && a.wristDeg > 20) warnings.push('120° + wrist >20° — перерастяжение, ограничить РА (Kuznetsov IV)');
+  if (a.elbowDeg === 90 && a.forearmDeg > 160) warnings.push('90° + pron 70° — перегруз UCL, снизить pron');
   return { valid: warnings.length === 0, warnings };
 }
 

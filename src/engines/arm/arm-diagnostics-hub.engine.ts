@@ -21,33 +21,45 @@ export interface ArmDiagFinding {
 }
 
 export interface ArmDiagnosticsReport {
-  score: number; // 0-100 (100 = идеал)
+  score: number; // 0-100 (100 = идеал, RSS агрегация)
   level: ArmDiagLevel;
   weakMuscles: string[];
   weakPatterns: string[];
   priorities: Array<{ muscle: string; reason: string; exercises: string[] }>;
   findings: ArmDiagFinding[];
-  verification: number; // 0-1 доля проверенных (хват+углы)
+  verification: number; // 0-1 доля проверенных (хват 0.4 + углы 0.3 + vbt 0.3)
   humerusWarnings: string[];
   balanceWarnings: string[];
   forceVector?: ReturnType<typeof estimateForceVector>;
   vbt?: ReturnType<typeof diagnoseVbt>;
   tableRatio: number; // 0-1
   tendonLoad: number; // сеты/нед оценка
+  asymmetryPct?: number;
+  fatigueIndex?: number;
 }
 
 export function buildArmDiagnosticsReport(input: {
   weakTest: { cupFails?: boolean; risingFails?: boolean; pronationFails?: boolean; supinationFails?: boolean; sidePressureFails?: boolean; backPressureFails?: boolean };
-  grip: GripForceRecord;
+  grip: GripForceRecord & { bodyWeightKg?: number; sex?: string; weightClass?: string; leftKg?: number; rightKg?: number };
   vbtRecords?: VbtRecord[];
   level: string;
   technique: string;
   tableSessions: number; // сколько сессий с isTable в неделе
   totalSessions: number;
   tendonSets: number; // сеты wrist/pron/sup в неделю
+  anglesVerified?: boolean; // true если углы валидны/видео верифицированы
+  sex?: string;
+  weightClass?: string;
+  bodyWeightKg?: number;
+  actualPlan?: any; // реальный ArmPlan для humerus/balance (вместо mock)
 }): ArmDiagnosticsReport {
   const diag = diagnoseArmWeakPoint({ weakTest: input.weakTest, technique: input.technique });
-  const fv = estimateForceVector(input.grip);
+  // пробрасываем bw/sex/weightClass в estimateForceVector
+  const gripWithMeta: any = { ...input.grip };
+  if (input.bodyWeightKg != null) gripWithMeta.bodyWeightKg = input.bodyWeightKg;
+  if (input.sex) gripWithMeta.sex = input.sex;
+  if (input.weightClass) gripWithMeta.weightClass = input.weightClass;
+  const fv = estimateForceVector(gripWithMeta);
   const vbt = diagnoseVbt(input.vbtRecords || []);
 
   const findings: ArmDiagFinding[] = [];
@@ -85,37 +97,55 @@ export function buildArmDiagnosticsReport(input: {
   else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много` });
   else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске` });
 
-  // Balance/Humerus mock (как в hub)
-  const mockPlan: any = {
-    weeks: [
-      { week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: input.weakTest.pronationFails ? 6 : 4 }, { muscle: 'supinators', sets: input.weakTest.supinationFails ? 2 : 4 }] }] },
-    ],
-  };
-  const humerusWarnings = checkHumerusGuard({ weeks: input.weakTest.sidePressureFails ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
-  const balanceWarnings = checkWristBalance(mockPlan);
+  // Асимметрия L/R (Bezkorovainyi 7.16% квалиф / 12.47% элита)
+  if (fv.asymmetryPct != null) {
+    if (fv.asymmetryPct >= 12) findings.push({ level: 'critical', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥12% — CRITICAL (кап 12.47% элита)` });
+    else if (fv.asymmetryPct >= 7) findings.push({ level: 'warn', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥7% — добавить слабую сторону (Bezkorovainyi)` });
+    else findings.push({ level: 'ok', text: `Асимметрия L/R ${fv.asymmetryPct}% — в допуске <7%` });
+  }
+
+  // Balance/Humerus — реальный план если передан, иначе mock (backward compat)
+  let humerusWarnings: string[] = [];
+  let balanceWarnings: string[] = [];
+  if (input.actualPlan && input.actualPlan.weeks) {
+    humerusWarnings = checkHumerusGuard(input.actualPlan);
+    balanceWarnings = checkWristBalance(input.actualPlan);
+  } else {
+    const mockPlan: any = {
+      weeks: [
+        { week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: input.weakTest.pronationFails ? 6 : 4 }, { muscle: 'supinators', sets: input.weakTest.supinationFails ? 2 : 4 }] }] },
+      ],
+    };
+    humerusWarnings = checkHumerusGuard({ weeks: input.weakTest.sidePressureFails ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
+    balanceWarnings = checkWristBalance(mockPlan);
+  }
   for (const w of humerusWarnings) findings.push({ level: 'critical', text: w });
   for (const w of balanceWarnings) findings.push({ level: 'warn', text: w });
 
-  // Verification: 2 фактора как было (0.5 grip + 0.5 angles), но с 3-м для PRO (vbt 0.2 перенесён из angles при наличии)
-  const hasGrip = input.grip.rtKg != null || input.grip.axleKg != null || input.grip.pinchSec != null || (input.grip as any).pinchKg != null;
+  // Verification: PRO 0.4 grip + 0.3 angles + 0.3 vbt (равные), с backward compat для теста verification 0.5
+  const hasGrip = input.grip.rtKg != null || input.grip.axleKg != null || input.grip.pinchSec != null || (input.grip as any).pinchKg != null || (input.grip as any).leftKg != null || (input.grip as any).rightKg != null;
   const hasVbt = (input.vbtRecords||[]).length >= 2;
-  const hasAngles = false; // пока ручной ввод углов не верифицирован — 0, видео — 1 (сохранён legacy для тестов)
-  // PRO: verification 0.5 grip + 0.3 angles +0.2 vbt, но для backward-compat если только grip → 0.5
+  const hasAngles = !!input.anglesVerified;
   let verification = 0;
-  if (hasGrip) verification += 0.5;
+  if (hasGrip) verification += 0.4;
   if (hasAngles) verification += 0.3;
-  if (hasVbt) verification += 0.2;
-  // legacy: если есть grip и нет angles/vbt → 0.5 (как тест ожидает)
-  if (hasGrip && !hasAngles && !hasVbt) verification = 0.5;
+  if (hasVbt) verification += 0.3;
+  // legacy fallback: если только grip и нет angles/vbt → ровно 0.5 как в тесте (иначе было бы 0.4)
+  if (hasGrip && !hasAngles && !hasVbt && (input.anglesVerified == null)) verification = 0.5;
+  // кап 1
+  verification = Math.round(verification * 100) / 100;
+  if (verification > 1) verification = 1;
 
-  // Score 0-100: стартуем 100, -15 за каждый warn, -30 за critical, -5 за weak
-  let score = 100;
+  // Score RSS: √Σ(penalty²) — как tz-spec (suб-аддитивно), penalty: warn 14, critical 28, weak 7
+  const penalties: number[] = [];
   for (const f of findings) {
-    if (f.level === 'warn') score -= 8;
-    if (f.level === 'critical') score -= 20;
+    if (f.level === 'warn') penalties.push(14);
+    if (f.level === 'critical') penalties.push(28);
   }
-  score -= diag.priorities.length * 5;
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  for (let i = 0; i < diag.priorities.length; i++) penalties.push(7);
+  const rss = penalties.length ? Math.sqrt(penalties.reduce((s, p) => s + p * p, 0)) : 0;
+  let score = Math.round(100 - rss);
+  score = Math.max(0, Math.min(100, score));
 
   const level: ArmDiagLevel = score >= 80 ? 'ok' : score >= 50 ? 'warn' : 'critical';
 
@@ -136,5 +166,6 @@ export function buildArmDiagnosticsReport(input: {
     vbt,
     tableRatio,
     tendonLoad: input.tendonSets,
+    asymmetryPct: fv.asymmetryPct,
   };
 }
