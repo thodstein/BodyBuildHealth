@@ -318,6 +318,11 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
       if (maxStone > bwAny * 1.2) warnings.push(`Нед ${wk.week}: камень ${maxStone}кг >1.2×BW — поясница, используйте пояс и технику.`);
       // Biceps distal tear risk: mixed grip deadlift, stone lap, tire flip (Winwood 11% biceps) auto-inject hammer
       const hasBicepsRisk = wk.sessions.some(s=> s.exercises.some(e=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','tire_flip'].includes(e.id)));
+      // P2: mixed grip deadlift → hook/straps (Heazlewood 2025) — если есть тяга + камень/покрышка
+      const hasDeadlift = wk.sessions.some(s=> s.exercises.some(e=> ['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max'].includes(e.id)));
+      if (hasDeadlift && hasBicepsRisk) {
+        warnings.push(`Нед ${wk.week}: mixed grip тяга — используйте hook grip / лямки (Heazlewood 2025 distal biceps, supination → разрыв).`);
+      }
       if (hasBicepsRisk) {
         warnings.push(`Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — добавлен hammer curl 3×12, без супинации, lap 2с.`);
         const hasHammer = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('hammer') || e.id.includes('bicep') ));

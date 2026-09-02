@@ -281,3 +281,23 @@ export function isValidAngleForWeakPoint(wp: WLWeakPoint, angleDeg: number): boo
   const [lo, hi] = b.angleRangeDeg;
   return angleDeg >= lo && angleDeg <= hi;
 }
+
+// P2: Jerk dip detail (Zhang 2022 dip 0.20с, dipVel, drivePower)
+export interface JerkDipMetrics { dipCm: number; dipTimeMs: number; dipVelocityMs?: number; drivePowerW?: number; isOptimal: boolean; recommendation: string; }
+export function diagnoseJerkDip(dipCm: number, dipTimeMs: number, bodyweightKg?: number): JerkDipMetrics | null {
+  if (!Number.isFinite(dipCm) || !Number.isFinite(dipTimeMs) || dipTimeMs <= 0) return null;
+  const dipVelocityMs = dipCm / 100 / (dipTimeMs / 1000); // м/с
+  const isOptimal = dipCm >= 8 && dipCm <= 12 && dipTimeMs >= 150 && dipTimeMs <= 250;
+  let rec = '';
+  if (dipCm < 8) rec = 'Мелкий dip — увеличьте до 8-12см для упругости';
+  else if (dipCm > 12) rec = 'Глубокий dip — теряете упругость, контроль 10см';
+  else if (dipTimeMs < 150) rec = 'Слишком быстрый dip — контроль, без рывка';
+  else if (dipTimeMs > 250) rec = 'Медленный dip — взрыв быстрее 0.20с';
+  else rec = 'Dip оптимален 8-12см за 0.15-0.25с — сохраняйте';
+  let drivePowerW: number | undefined;
+  if (bodyweightKg && bodyweightKg > 0) {
+    // упрощённо: power = m*g*v (вертикальная)
+    drivePowerW = Math.round(bodyweightKg * 9.81 * dipVelocityMs);
+  }
+  return { dipCm, dipTimeMs, dipVelocityMs: Math.round(dipVelocityMs*100)/100, drivePowerW, isOptimal, recommendation: rec };
+}
