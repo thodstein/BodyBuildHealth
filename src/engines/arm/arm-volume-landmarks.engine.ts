@@ -97,14 +97,33 @@ export const ARM_VOLUME_LANDMARKS_DB: Record<TrainingLevel, Record<string, Muscl
   },
 };
 
-/** Сухожильные группы — tendonCap 1.2× (медленнее восстанавливаются, Helms 2022). */
+/** Сухожильные группы — tendonCap 1.2× vs muscle 1.7× (Helms 2022, Kemp 2024, Schoenfeld 2016). */
 export const TENDON_MUSCLES: ReadonlySet<string> = new Set([
   'wrist_flexors','wrist_extensors','pronators','supinators','risers',
   'ulnar_deviators','radial_deviators','thumb',
 ]);
 
+export const TENDON_CAP = 1.2;
+export const MUSCLE_CAP = 1.7;
+
 export function isTendonMuscle(muscle: string): boolean {
   return TENDON_MUSCLES.has(muscle);
+}
+
+/** MRV с учётом tendonCap для сухожильных групп (PRO: отдельный бюджет). */
+export function tendonAdjustedMrv(baseMrv: number, muscle: string, pedMult: number): number {
+  const cap = isTendonMuscle(muscle) ? TENDON_CAP : MUSCLE_CAP;
+  const clampedPed = Math.min(pedMult, cap);
+  return Math.round(baseMrv * clampedPed);
+}
+
+/** Лимит tendonSets на неделю по уровню (PRO-гейт: beginner 12, intermediate 16, advanced 18, enhanced 22). */
+export function tendonWeeklyLimit(level: string): number {
+  const lvl = normLevel(level) as TrainingLevel;
+  if (lvl === 'beginner') return 12;
+  if (lvl === 'intermediate') return 16;
+  if (lvl === 'advanced') return 18;
+  return 22;
 }
 
 export function getArmLandmarks(level: string, muscle: string): MuscleVolumeLandmarks {

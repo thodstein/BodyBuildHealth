@@ -6,11 +6,12 @@ import type { ArmBuilderInput, ArmPlan, ArmWeek, ArmSession, ArmExercise, ArmSet
 import { ARM_MUSCLES } from './arm-types';
 import { TAG_MUSCLES_ARM } from './arm-day-types';
 import { ARM_SPLIT_PATTERNS, getArmPattern } from './arm-split-patterns';
-import { getArmLandmarks } from './arm-volume-landmarks.engine';
-import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult } from './arm-volume.engine';
+import { getArmLandmarks, isTendonMuscle, TENDON_CAP, MUSCLE_CAP, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
+import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult, tendonBudgetForLevel } from './arm-volume.engine';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
 import { buildArmSchedule, specializationMrvFactor, specForWeek } from './arm-specialization.engine';
 import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
+import { tableWeekKind, tableWeekParams } from './arm-table.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -36,66 +37,156 @@ function distributeArmPhases(totalWeeks: number, goal: string): Record<number, s
   return map;
 }
 
-function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>): typeof ARM_EXERCISES[number] | null {
+// ARM_ANGLE_CLASSES — строгие классы углов как в BB ANGLE_CLASSES
+export const ARM_ANGLE_CLASSES: Record<string, { muscles: string[]; elbow: Array<90|110|120>; direction: Array<'to_little'|'to_middle'|'to_thumb'>; forearm: Array<'pronated'|'neutral'|'supinated'> }> = {
+  cup_pronated: { muscles: ['wrist_flexors'], elbow: [90,110], direction: ['to_little','to_middle'], forearm: ['pronated'] },
+  cup_supinated: { muscles: ['wrist_flexors','supinators'], elbow: [90,110], direction: ['to_thumb','to_middle'], forearm: ['supinated'] },
+  rising_iso: { muscles: ['risers','thumb'], elbow: [90,110,120], direction: ['to_little','to_middle'], forearm: ['neutral'] },
+  pron_high: { muscles: ['pronators','brachioradialis'], elbow: [90,110], direction: ['to_little'], forearm: ['pronated'] },
+  pron_low: { muscles: ['pronators'], elbow: [110,120], direction: ['to_little','to_middle'], forearm: ['pronated'] },
+  sup_hook: { muscles: ['supinators','brachialis','biceps_long'], elbow: [90,110], direction: ['to_middle','to_thumb'], forearm: ['supinated'] },
+  sup_neutral: { muscles: ['supinators'], elbow: [90,110,120], direction: ['to_middle'], forearm: ['neutral'] },
+  hammer_neutral: { muscles: ['brachialis','brachioradialis'], elbow: [90,110,120], direction: ['to_middle'], forearm: ['neutral'] },
+  side_press_heavy: { muscles: ['side_pressure'], elbow: [110,120], direction: ['to_thumb'], forearm: ['neutral'] },
+  back_drag_heavy: { muscles: ['back_pressure'], elbow: [90,110], direction: ['to_middle'], forearm: ['pronated','neutral'] },
+  grip_support: { muscles: ['grip_support'], elbow: [90,110], direction: ['to_little','to_middle'], forearm: ['neutral'] },
+  grip_pinch: { muscles: ['grip_pinch','thumb'], elbow: [90,110], direction: ['to_thumb','to_middle'], forearm: ['neutral'] },
+  grip_crush: { muscles: ['grip_crush'], elbow: [90,110], direction: ['to_middle'], forearm: ['neutral'] },
+};
+
+function seededRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xFFFFFFFF;
+  };
+}
+
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string): typeof ARM_EXERCISES[number] | null {
+  const mLow = muscle.toLowerCase();
+  // Техника-специфичные приоритеты
+  const techniqueBoost = (e: typeof ARM_EXERCISES[number]): number => {
+    const sg = (e.substitutionGroup || '').toLowerCase();
+    const mp = String(e.movementPattern || '').toLowerCase();
+    if (!technique) return 0;
+    const t = technique.toLowerCase();
+    if (t === 'hook' && (sg === 'supination' || mp.includes('supination') || sg === 'hammer')) return 2;
+    if (t === 'toproll' && (sg === 'pronation' || mp.includes('pronation') || sg === 'rising')) return 2;
+    if (t === 'press' && (sg === 'side_press' || mp.includes('side_press'))) return 2;
+    if (t === 'hook' && mLow === 'brachialis' && sg === 'hammer') return 1;
+    if (t === 'toproll' && mLow === 'risers' && sg === 'rising') return 1;
+    return 0;
+  };
   const pool = ARM_EXERCISES.filter(e => {
     const effMuscle = (e.targetMuscle || '').toLowerCase();
     const sg = (e.substitutionGroup || '').toLowerCase();
     const mp = (e.movementPattern as any || '').toString().toLowerCase();
-    const mLow = muscle.toLowerCase();
-    // Матчим по substitutionGroup или targetMuscle или movementPattern
-    const matches =
-      effMuscle.includes(mLow.replace('_',' ')) ||
-      sg.includes(mLow.split('_')[0]) ||
-      mp.includes(mLow.split('_')[0]) ||
-      // Прямые маппинги
-      (mLow === 'wrist_flexors' && sg === 'cup_iso') ||
-      (mLow === 'pronators' && sg === 'pronation') ||
-      (mLow === 'supinators' && sg === 'supination') ||
-      (mLow === 'brachialis' && sg === 'hammer') ||
-      (mLow === 'grip_support' && sg === 'grip_support') ||
-      (mLow === 'grip_pinch' && sg === 'grip_pinch') ||
-      (mLow === 'grip_crush' && sg === 'grip_crush') ||
-      (mLow === 'risers' && sg === 'rising') ||
-      (mLow === 'side_pressure' && sg === 'side_press') ||
-      (mLow === 'back_pressure' && sg === 'back_drag') ||
-      (mLow === 'thumb' && sg === 'grip_pinch') ||
-      (mLow === 'shoulder_stab' && sg.startsWith('shoulder')) ||
-      (mLow === 'core_anchor' && sg === 'core_anti') ||
-      (mLow === 'wrist_extensors' && sg === 'wrist_ext');
+    // Строгий матчинг: сначала точные маппинги, затем фолбэк
+    const exactMap: Record<string, string[]> = {
+      'wrist_flexors': ['cup_iso'],
+      'wrist_extensors': ['wrist_ext'],
+      'pronators': ['pronation'],
+      'supinators': ['supination'],
+      'brachialis': ['hammer'],
+      'grip_support': ['grip_support'],
+      'grip_pinch': ['grip_pinch'],
+      'grip_crush': ['grip_crush'],
+      'risers': ['rising'],
+      'side_pressure': ['side_press'],
+      'back_pressure': ['back_drag'],
+      'thumb': ['grip_pinch','thumb_iso'],
+      'shoulder_stab': ['shoulder_int','shoulder_ext'],
+      'core_anchor': ['core_anti'],
+      'ulnar_deviators': ['ulnar_iso'],
+      'radial_deviators': ['radial_iso'],
+      'biceps_long': ['bicep_curl','hammer'],
+      'biceps_short': ['bicep_curl','hammer'],
+      'brachioradialis': ['hammer','reverse_curl'],
+    };
+    const allowedSg = exactMap[mLow];
+    let matches = false;
+    if (allowedSg) {
+      matches = allowedSg.some(s => sg === s || sg.includes(s));
+      // также проверяем movementPattern для гранулярности
+      if (!matches) {
+        if (mLow === 'wrist_flexors' && mp.includes('cupping')) matches = true;
+        if (mLow === 'pronators' && mp.includes('pronation')) matches = true;
+        if (mLow === 'supinators' && mp.includes('supination')) matches = true;
+        if (mLow === 'risers' && mp.includes('rising')) matches = true;
+        if (mLow === 'thumb' && mp.includes('grip_pinch')) matches = true;
+      }
+    } else {
+      // фолбэк по подстроке для неизвестных
+      matches = effMuscle.includes(mLow.replace('_',' ')) || sg.includes(mLow.split('_')[0]) || mp.includes(mLow.split('_')[0]);
+    }
     if (!matches) return false;
     if (excluded.includes(e.id)) return false;
     if (usedIds.has(e.id)) return false;
     if (equipment.length > 0) {
       const eq = e.equipment.toLowerCase();
-      // grip_tool требует наличия grip_tool или cable
-      if (eq === 'grip_tool' && !equipment.some(x => /grip|хват/i.test(x))) return false;
-    }
-    if (role === 'primary' && e.type !== 'compound' && !['wrist_curl_belt','pronation_cable','supination_cable','hammer_curl_thick','side_press_cable','rolling_thunder','apollon_axle'].includes(e.id)) {
-      // Допускаем isolation как primary для арм-мышц (специфика)
+      if (eq === 'grip_tool' && !equipment.some(x => /grip|хват|hub|pinch/i.test(x))) return false;
+      if (eq === 'band' && equipment.length > 0 && !equipment.some(x => /band|резина|лента|cable|блок/i.test(x)) && !equipment.includes('band')) {
+        // band доступен если есть cable/band
+      }
     }
     return true;
   });
   if (pool.length === 0) {
-    // fallback — любой из группы arms
     const fb = ARM_EXERCISES.filter(e => !excluded.includes(e.id) && !usedIds.has(e.id)).slice(0, 5);
     return fb[0] || ARM_EXERCISES[0] || null;
   }
-  // favorite first
   for (const fav of favorite) {
     const f = pool.find(p => p.id === fav || p.name === fav);
     if (f) return f;
   }
-  // sort by fatigueCost (lower for accessory)
-  pool.sort((a,b) => (role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost));
+  pool.sort((a,b) => {
+    const boostA = techniqueBoost(a);
+    const boostB = techniqueBoost(b);
+    if (boostB !== boostA) return boostB - boostA;
+    return (role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost);
+  });
   return pool[0];
 }
 
-function workingAngleFor(muscle: string, week: number, sessionIdx: number): ArmWorkingAngle {
+function workingAngleFor(muscle: string, week: number, sessionIdx: number, technique?: string, history?: Record<string, ArmWorkingAngle[]>): ArmWorkingAngle {
+  // Техника-специфичные РУ (Kuznetsov I+II, TAWF Hook/Toproll/Press)
+  if (technique === 'hook' && ['supinators','brachialis','biceps_long','biceps_short','wrist_flexors'].includes(muscle)) {
+    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_middle','to_thumb','to_middle'];
+    const elbows: Array<90|110|120> = [90,90,110];
+    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['supinated','supinated','neutral'];
+    const idx = (week + sessionIdx) % 3;
+    return { elbowDeg: elbows[idx], wrist: 'flexed' as const, forearm: forearms[idx], direction: dirs[idx] };
+  }
+  if (technique === 'toproll' && ['pronators','risers','brachioradialis','wrist_flexors'].includes(muscle)) {
+    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_little','to_little','to_middle'];
+    const elbows: Array<90|110|120> = [110,110,120];
+    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['pronated','pronated','neutral'];
+    const idx = (week + sessionIdx) % 3;
+    return { elbowDeg: elbows[idx], wrist: 'flexed' as const, forearm: forearms[idx], direction: dirs[idx] };
+  }
+  if (technique === 'press' && ['side_pressure','shoulder_stab','core_anchor'].includes(muscle)) {
+    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_thumb','to_thumb','to_middle'];
+    const elbows: Array<90|110|120> = [120,110,120];
+    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['neutral','neutral','neutral'];
+    const idx = (week + sessionIdx) % 3;
+    return { elbowDeg: elbows[idx], wrist: 'neutral' as const, forearm: forearms[idx], direction: dirs[idx] };
+  }
   const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_little','to_middle','to_thumb'];
   const wrists: Array<'flexed'|'neutral'|'extended'> = ['flexed','neutral','extended'];
   const forearms: Array<'pronated'|'supinated'|'neutral'> = ['pronated','neutral','supinated'];
   const elbows: Array<90|110|120> = [90,110,120];
-  const idx = (week + sessionIdx) % 3;
+  // Ротация с учётом истории чтобы не повторять 2 дня подряд
+  let idx = (week + sessionIdx) % 3;
+  if (history && history[muscle] && history[muscle].length > 0) {
+    const last = history[muscle][history[muscle].length - 1];
+    if (last.direction === dirs[idx]) idx = (idx + 1) % 3;
+  }
   return {
     elbowDeg: elbows[idx % 3],
     wrist: wrists[idx % 3],
@@ -130,13 +221,31 @@ function repsFor(muscle: string, character: string, phase: string): [number, num
   return [10,15];
 }
 
-function rirFor(character: string, phase: string, week: number): number {
+function rirFor(character: string, phase: string, week: number, technique?: string): number {
   if (phase === 'deload') return 4;
   if (phase === 'peaking') return character === 'тяж' ? 2 : 3;
-  if (character === 'тяж') return 1 + Math.floor(((week - 1) % 4) / 2); // 1,1,2,2
-  if (character === 'техника') return 3;
+  // Drift по фазе: intensification −1 каждые 2 недели (как BB FOCUS_RIR_TABLE)
+  let drift = 0;
+  if (phase === 'intensification') drift = Math.floor(((week - 1) % 6) / 2); // 0,0,1,1,2,2 → но кап 1
+  drift = Math.min(1, drift);
+  const baseTяж = 1 + Math.floor(((week - 1) % 4) / 2); // 1,1,2,2
+  if (character === 'тяж') return Math.max(1, Math.min(4, baseTяж + (phase === 'intensification' ? -drift : 0)));
+  if (character === 'техника') return 3 - (phase === 'intensification' ? drift : 0);
   if (character === 'памп') return 2;
   return 3;
+}
+
+function weightForMuscle(muscle: string, workMax: Record<string, number>, pct: number): number {
+  const low = muscle.toLowerCase();
+  let max = workMax[low];
+  if (max == null) {
+    if (workMax['wrist'] != null && low.includes('wrist')) max = workMax['wrist'];
+    else if (workMax['grip'] != null && low.includes('grip')) max = workMax['grip'];
+    else if (workMax['pron'] != null && low.includes('pron')) max = workMax['pron'];
+    else if (workMax['sup'] != null && low.includes('sup')) max = workMax['sup'];
+    else max = workMax['default'] || 30;
+  }
+  return Math.round(max * pct * 2) / 2;
 }
 
 export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
@@ -152,40 +261,77 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
 
-  // MRV multipliers — дозо-зависимый PED (tendonCap 1.5× + diminishing)
+  // MRV multipliers — теперь через adaptForPEDs с tendonCap 1.5× (PRO) + честный fallback
   let pedMult = 1;
   let pedAdapt: any = null;
   if (input.pedDoses && Object.keys(input.pedDoses).length > 0) {
-    let doseSum = 0;
-    for (const v of Object.values(input.pedDoses)) {
-      const d = Number(v);
-      if (Number.isFinite(d) && d > 0) doseSum += d;
+    const pedsKeys = Object.keys(input.pedDoses);
+    // используем канонический adaptForPEDs (BB) — он учитывает tEq и cap, но для арм сухожилия медленнее → tendonCap 1.5
+    try {
+      const fakePeds = pedsKeys.map(k => ({ id: k, dose: Number(input.pedDoses![k]) }));
+      const adapt = adaptForPEDs(fakePeds as any, 10, input.pedDoses as any, input.courseIntensity as any);
+      // clamp по tendonCap
+      let raw = adapt.combinedMrvMultiplier || 1;
+      const tendonCap = 1.5;
+      pedMult = raw <= tendonCap ? raw : tendonCap + (raw - tendonCap) * 0.4;
+      pedMult = Math.max(1, Math.min(1.7, pedMult));
+      pedAdapt = { combinedMrvMultiplier: pedMult };
+    } catch {
+      // fallback старый расчёт
+      let doseSum = 0;
+      for (const v of Object.values(input.pedDoses)) { const d = Number(v); if (Number.isFinite(d) && d>0) doseSum+=d; }
+      const doseMult = Math.min(0.5, doseSum/1000*0.4);
+      const intensityAdj = input.courseIntensity === 'heavy' ? 0.08 : input.courseIntensity === 'mild' ? -0.05 : 0;
+      const raw = 1 + doseMult + intensityAdj + (pedsKeys.length>1?0.05:0);
+      pedMult = raw <= 1.5 ? raw : 1.5 + (raw-1.5)*0.4;
+      pedMult = Math.max(1, Math.min(1.7, pedMult));
+      pedAdapt = { combinedMrvMultiplier: pedMult };
     }
-    // 500мг тест ≈ 0.5г → +0.2, 1000мг → +0.4, кап 0.5
-    const doseMult = Math.min(0.5, doseSum / 1000 * 0.4);
-    const intensityAdj = input.courseIntensity === 'heavy' ? 0.08 : input.courseIntensity === 'mild' ? -0.05 : 0;
-    const raw = 1 + doseMult + intensityAdj + (Object.keys(input.pedDoses).length > 1 ? 0.05 : 0);
-    // tendonCap 1.5× с diminishing
-    pedMult = raw <= 1.5 ? raw : 1.5 + (raw - 1.5) * 0.4;
-    pedMult = Math.max(1, Math.min(1.7, pedMult));
-    pedAdapt = { combinedMrvMultiplier: pedMult };
   }
   const recoveryMult = computeArmRecoveryMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const labMult = input.labMrvMultiplier ? Math.max(0.6, Math.min(1.4, input.labMrvMultiplier)) : 1;
   const nutritionMult = computeNutritionMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
-  const tendonMult = level === 'beginner' ? 0.7 : 1;
+  // Tendon: beginner 0.7 первые 4 недели, intermediate 0.85, иначе 1 — как GripStrength F1
+  const tendonMultGlobal = level === 'beginner' ? 0.7 : level === 'intermediate' ? 0.85 : 1;
+  // Seeded RNG для детерминизма (как BB planner-carb-periodization he_planner_gen_salt)
+  const seedBase = hashString(`${discipline}|${technique}|${level}|${goal}|${pattern.id}|${weeks}|${(input.weakPoints||[]).join(',')}|${focusGroup||''}`);
+  const rng = seededRng(seedBase);
+  // ACWR-мультипликатор (если есть данные дневника — режет объём при danger)
+  let acwrMult = 1;
+  // labWarnings уже учтены в labMult, но tendonWarnings отдельно
 
   // Build specialization schedule
   const specSchedule = buildArmSchedule({ focusGroup, weakPoints, specialization: !!input.specialization, totalWeeks: weeks, explicitBlocks: input.specializationSchedule });
 
-  // MRV per muscle
+  // MRV per muscle — с tendonCap раздельно + техника-спец + humerus
   const mrvByMuscle: Record<string, number> = {};
   for (const m of ARM_MUSCLES) {
     const base = getArmLandmarks(level, m).mrv;
     const specFactor = specializationMrvFactor(m, specSchedule.blocks.flatMap(b => b.targets), weakPoints, focusGroup);
-    let mrv = base * pedMult * recoveryMult * labMult * nutritionMult * tendonMult * specFactor;
+    // Техника-спец ×1.3 (hook/toproll/press) — доминирующие мышцы получают +30%
+    let techFactor = 1;
+    const tLow = technique.toLowerCase();
+    if (tLow === 'hook' && ['supinators','brachialis','wrist_flexors','back_pressure','biceps_long'].includes(m)) techFactor = 1.3;
+    else if (tLow === 'toproll' && ['pronators','risers','brachioradialis','wrist_flexors','back_pressure'].includes(m)) techFactor = 1.3;
+    else if (tLow === 'press' && ['side_pressure','shoulder_stab','core_anchor'].includes(m)) techFactor = 1.3;
+    // Tendon-мульт: для сухожильных — отдельный tendonMultGlobal, для остальных 1
+    const tendonFactor = isTendonMuscle(m) ? tendonMultGlobal : 1;
+    let mrv = base * pedMult * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor * acwrMult;
+    // TendonCap 1.2× жёстко ограничивает pedMult для сухожилий
+    if (isTendonMuscle(m)) {
+      const tendonCapMrv = Math.round(base * TENDON_CAP * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor);
+      mrv = Math.min(mrv, tendonCapMrv);
+    }
     if (m === 'side_pressure' && input.enableHumerusGuard !== false) {
       mrv = Math.min(mrv, base * 1.2); // humerus cap
+    }
+    // Grip раздельно: support/pinch/crush не взаимозаменяемы — cap по gripFocus
+    if (m.startsWith('grip_') && input.gripFocus) {
+      const gf = (input.gripFocus as string).toLowerCase();
+      if (gf === 'support' && m === 'grip_support') mrv = Math.round(mrv * 1.15);
+      else if (gf === 'pinch' && m === 'grip_pinch') mrv = Math.round(mrv * 1.15);
+      else if (gf === 'crush' && m === 'grip_crush') mrv = Math.round(mrv * 1.15);
+      else if (gf !== 'support' && m === 'grip_support' && input.discipline !== 'hybrid') mrv = Math.round(mrv * 0.85);
     }
     mrvByMuscle[m] = Math.max(3, Math.round(mrv));
   }
@@ -224,7 +370,18 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const isDeload = phase === 'deload';
     const isPeaking = phase === 'peaking';
     const weekSpecs = specForWeek(specSchedule, w);
-    const weekMult = isDeload ? 0.6 : isPeaking ? 0.45 : w <= 3 ? 0.9 : 1;
+    // Table 3/2/1 периодизация Kuznetsov внутри микроцикла
+    const kind = tableWeekKind(w, weeks);
+    const tableParams = tableWeekParams(kind);
+    // weekMult: moderate 1.0, heavy 0.85, stress 0.55 + deload 0.6 + peaking 0.45
+    let weekMult: number;
+    if (isDeload) weekMult = 0.6;
+    else if (isPeaking) weekMult = 0.45;
+    else if (kind === 'stress') weekMult = 0.55;
+    else if (kind === 'heavy') weekMult = 0.85;
+    else weekMult = w <= 3 ? 0.9 : 1;
+    // tendon deload первые 4 недели для beginner — ещё ×0.85 сверху уже учтённого tendonMult, но тут дополнительно для объёма
+    if (level === 'beginner' && w <= 4) weekMult *= 0.92;
     const taper = isPeaking;
 
     const sessions: ArmSession[] = [];
@@ -246,36 +403,44 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       });
 
       for (const mus of filteredMuscles) {
-        // spec filter: if specialization active and muscle not in targets + not core — reduce
+        // spec filter: if specialization active and muscle not in targets + not core — accessory
+        let role: 'primary'|'accessory' = 'primary';
         if (specSchedule.active && weekSpecs.length > 0 && !weekSpecs.includes(mus) && !['shoulder_stab','core_anchor'].includes(mus)) {
-          // still include but accessory
+          role = 'accessory';
         }
         const target = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult) : 6;
         const freq = muscleFreq[mus] || 1;
         const sets = setsFor(mus, ch, w, target, freq);
         const reps = repsFor(mus, ch, phase);
-        const rir = rirFor(ch, phase, w);
-        const exTpl = pickExerciseForMuscle(mus, 'primary', equipment, favorite, excluded, usedInSession);
+        const rir = rirFor(ch, phase, w, technique);
+        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique);
         if (!exTpl) continue;
         usedInSession.add(exTpl.id);
         usedIdsGlobal.add(exTpl.id);
 
         const sgTpl = (exTpl.substitutionGroup || '').toString();
-        const isTable = exTpl.equipment === 'band' || sgTpl.includes('pronation') || sgTpl.includes('supination') || sgTpl === 'cup_iso' || exTpl.id.includes('hook') || exTpl.id.includes('lat_drag');
-        const angle = workingAngleFor(mus, w, sessionIdx);
+        const isTable = exTpl.equipment === 'band' || sgTpl.includes('pronation') || sgTpl.includes('supination') || sgTpl === 'cup_iso' || exTpl.id.includes('hook') || exTpl.id.includes('lat_drag') || sgTpl === 'rising' || exTpl.id.includes('table');
+        const angle = workingAngleFor(mus, w, sessionIdx, technique, angleHistory);
         if (!angleHistory[mus]) angleHistory[mus] = [];
         angleHistory[mus].push(angle);
 
+        // Вес: теперь через workMax (PRO), а не 0; tempo зависит от kind
+        const tempoForKind = mus === 'side_pressure' ? '3-1-1-0' : kind === 'stress' ? '2-0-1-0' : kind === 'heavy' ? '2-1-1-0' : '3-1-1-0';
         const workSets: ArmSet[] = [];
         for (let s = 0; s < sets; s++) {
+          const repVal = reps[0] + Math.floor(rng() * (reps[1] - reps[0] + 1));
+          // Вес по workMax: тяж 80-85%, техника 60%, памп 65-70%
+          const pct = ch === 'тяж' ? 0.82 : ch === 'техника' ? 0.6 : ch === 'памп' ? 0.68 : 0.65;
+          const wgt = weightForMuscle(mus, input.workMax || {}, pct);
+          const hold = exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (ch === 'техника' ? 15 : 10) : undefined;
           workSets.push({
-            reps: reps[0] + Math.floor(Math.random() * (reps[1] - reps[0] + 1)),
+            reps: repVal,
             rir,
-            weight: 0, // заполняется progression
-            restSeconds: mus === 'side_pressure' ? 180 : mus.includes('grip') ? 120 : ch === 'тяж' ? 120 : 90,
-            tempo: mus === 'side_pressure' ? '3-1-1-0' : '2-0-1-0',
-            technique: mus === 'side_pressure' && ch === 'тяж' ? 'none' : ch === 'техника' ? 'isometric' : 'none',
-            holdSeconds: exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' ? 10 : undefined,
+            weight: wgt,
+            restSeconds: mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : ch === 'тяж' ? 120 : 90,
+            tempo: tempoForKind,
+            technique: mus === 'side_pressure' && ch === 'тяж' ? 'none' : ch === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
+            holdSeconds: hold,
           });
         }
 
@@ -301,10 +466,26 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         });
       }
 
-      // Enforce session limits
-      const limits = sessionLimitsForArm({ level, onCourse: !!pedAdapt });
+      // Enforce session limits — с учётом дисциплины
+      const limits = sessionLimitsForArm({ level, onCourse: !!pedAdapt, discipline });
       if (exercises.length > limits.maxExercises) {
-        exercises.splice(limits.maxExercises);
+        // Удаляем accessory последними, primary не трогаем
+        const priCount = exercises.filter(e => e.role === 'primary').length;
+        const toRemove = exercises.length - limits.maxExercises;
+        // сортируем по приоритету удаления: accessory с конца
+        let removed = 0;
+        for (let i = exercises.length - 1; i >= 0 && removed < toRemove; i--) {
+          if (exercises[i].role === 'accessory' || priCount + (exercises.length - removed - priCount) > limits.maxExercises) {
+            // не удаляем единственный primary мышцы если есть
+            const mus = exercises[i].muscle;
+            const othersSameMus = exercises.filter((e, idx) => e.muscle === mus && idx !== i).length;
+            if (exercises[i].role === 'primary' && othersSameMus === 0) continue;
+            exercises.splice(i, 1);
+            removed++;
+          }
+        }
+        // fallback обрезка если не хватило
+        if (exercises.length > limits.maxExercises) exercises.splice(limits.maxExercises);
       }
 
       const isTableSession = tag.toLowerCase().includes('table') || exercises.some(e => e.isTable);
@@ -329,14 +510,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     });
   }
 
-  // Rationale
+  // Rationale — расширено table 3/2/1 и tendon
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
   rationale.push(`Сплит: ${pattern.name} (${pattern.sessionsPerRotation}x/${pattern.rotationDays}дн)`);
   rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
-  rationale.push(`Table time: ${(tableRatio * 100).toFixed(0)}% (цель), факт ~${(planWeeks[0]?.tableRatio || 0 * 100).toFixed(0)}%`);
-  rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)}`);
+  const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');
+  rationale.push(`Table 3/2/1: ${tableKinds} (moderate 50-75% 1-3мин / heavy 75-100% 10с-1мин / stress 100-125% 5-10с)`);
+  rationale.push(`Table time: ${(tableRatio * 100).toFixed(0)}% (цель), факт ~${(planWeeks[0]?.tableRatio || 0 * 100).toFixed(0)}% (Кузнецов VIII ≥50%)`);
+  rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
+  if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
 
   // Weekly volume
   const weeklyVolume: Record<number, Record<string, any>> = {};

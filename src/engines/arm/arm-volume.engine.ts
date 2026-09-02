@@ -51,24 +51,46 @@ export function computeArmBudget(input: {
   labMult?: number;
   nutritionMult?: number;
   level?: string;
+  tendonLoad?: number;
 }): number {
   const base = input.level === 'enhanced' ? 22 : input.level === 'advanced' ? 18 : input.level === 'intermediate' ? 15 : 12;
   let mult = 1;
   if (input.recoveryMult) mult *= input.recoveryMult;
   if (input.labMult) mult *= Math.max(0.6, Math.min(1.4, input.labMult));
   if (input.nutritionMult) mult *= Math.max(0.85, Math.min(1.15, input.nutritionMult));
+  // Tendon load штрафует бюджет при перегрузе (PRO: tendon адаптируется 3× медленнее)
+  if (input.tendonLoad != null && input.tendonLoad > 18) mult *= 0.92;
+  if (input.tendonLoad != null && input.tendonLoad > 22) mult *= 0.88;
   return Math.round(base * mult);
+}
+
+export function tendonBudgetForLevel(level: string): number {
+  const lvl = (level || '').toLowerCase();
+  if (lvl === 'beginner') return 12;
+  if (lvl === 'intermediate') return 16;
+  if (lvl === 'advanced') return 18;
+  return 22;
 }
 
 export function sessionLimitsForArm(input: {
   level?: string;
   onCourse?: boolean;
   recoveryMult?: number;
+  discipline?: string;
 }): { maxExercises: number; maxSets: number } {
   const lvl = (input.level || '').toLowerCase();
   const enhanced = lvl === 'enhanced';
+  const disc = (input.discipline || 'armwrestling').toLowerCase();
+  // armlifting — тяжёлый CNS (хват), лимиты жёстче чем armwrestling
   let maxEx = enhanced ? 8 : 6;
   let maxSets = enhanced ? 14 : 10;
+  if (disc === 'armlifting') {
+    maxEx = enhanced ? 6 : 5;
+    maxSets = enhanced ? 12 : 8;
+  } else if (disc === 'hybrid') {
+    maxEx = enhanced ? 7 : 6;
+    maxSets = enhanced ? 13 : 9;
+  }
   if (input.recoveryMult && input.recoveryMult < 0.8) {
     maxEx = Math.max(4, maxEx - 1);
     maxSets = Math.max(6, maxSets - 2);
@@ -79,19 +101,31 @@ export function sessionLimitsForArm(input: {
 export function perExerciseCap(muscle: string, level?: string): number {
   if (muscle === 'side_pressure') return 3; // humerus guard
   if (muscle === 'thumb' || muscle === 'risers') return 4;
+  if (muscle === 'grip_pinch' || muscle === 'grip_crush' || muscle === 'grip_support') {
+    // хват — отдельные капы: support 5, pinch/crush 4 (hub отдельно)
+    if (muscle === 'grip_support') return (level || '').toLowerCase() === 'enhanced' ? 6 : 5;
+    return 4;
+  }
+  if (muscle === 'grip_pinch' && (level || '').toLowerCase() === 'enhanced') return 5;
   const lvl = (level || '').toLowerCase();
   if (lvl === 'enhanced') return 6;
   return 5;
 }
 
-/** Indirect вклады (консервативные, как bb). */
+/** Indirect вклады (расширены до 12, как BB 15). */
 export const ARM_INDIRECT: Record<string, Array<{ muscle: string; factor: number }>> = {
   hammer_curl: [{ muscle: 'wrist_flexors', factor: 0.3 }, { muscle: 'brachioradialis', factor: 0.2 }],
-  reverse_curl: [{ muscle: 'wrist_extensors', factor: 0.25 }],
-  pronation: [{ muscle: 'wrist_flexors', factor: 0.2 }],
-  supination: [{ muscle: 'biceps_long', factor: 0.2 }],
+  reverse_curl: [{ muscle: 'wrist_extensors', factor: 0.25 }, { muscle: 'brachialis', factor: 0.15 }],
+  pronation: [{ muscle: 'wrist_flexors', factor: 0.2 }, { muscle: 'brachioradialis', factor: 0.3 }],
+  supination: [{ muscle: 'biceps_long', factor: 0.2 }, { muscle: 'brachialis', factor: 0.25 }],
   back_drag: [{ muscle: 'biceps_long', factor: 0.3 }, { muscle: 'brachialis', factor: 0.2 }],
-  side_press: [{ muscle: 'shoulder_stab', factor: 0.3 }],
+  side_press: [{ muscle: 'shoulder_stab', factor: 0.3 }, { muscle: 'core_anchor', factor: 0.2 }],
+  cupping: [{ muscle: 'risers', factor: 0.2 }, { muscle: 'thumb', factor: 0.15 }],
+  rising: [{ muscle: 'wrist_flexors', factor: 0.15 }, { muscle: 'thumb', factor: 0.25 }],
+  grip_support: [{ muscle: 'wrist_flexors', factor: 0.2 }, { muscle: 'thumb', factor: 0.1 }],
+  grip_pinch: [{ muscle: 'thumb', factor: 0.3 }, { muscle: 'risers', factor: 0.2 }],
+  grip_crush: [{ muscle: 'brachioradialis', factor: 0.15 }],
+  ulnar_deviation: [{ muscle: 'wrist_flexors', factor: 0.15 }],
 };
 
 export function indirectForExercise(pattern: string): Array<{ muscle: string; factor: number }> {
@@ -132,10 +166,14 @@ export function computeNutritionMult(input: { calorieSurplus?: number; proteinPe
   let m = 1;
   if (input.calorieSurplus != null) {
     if (input.calorieSurplus < -500) m *= 0.9;
+    else if (input.calorieSurplus < -300) m *= 0.93;
     else if (input.calorieSurplus > 300) m *= 1.05;
   }
   if (input.proteinPerKg != null) {
-    if (input.proteinPerKg < 1.4) m *= 0.92;
+    // Для арм: белок <1.6 уже штраф (коллаген синтез), <1.4 сильнее
+    if (input.proteinPerKg < 1.4) m *= 0.9;
+    else if (input.proteinPerKg < 1.6) m *= 0.94;
+    else if (input.proteinPerKg >= 2.2) m *= 1.04;
     else if (input.proteinPerKg >= 2.0) m *= 1.03;
   }
   return m;

@@ -199,17 +199,40 @@ function dedupeAngles(plan: ArmPlan): void {
 }
 
 function injectTendonConditioning(plan: ArmPlan, level: string): void {
-  if (level !== 'beginner') return;
+  // PRO: tendon conditioning для всех уровней первые 2 недели (beginner — обязательно 3с eccentric)
+  const isBeginner = level === 'beginner';
+  const limitWeek = isBeginner ? 4 : 2;
   for (const wk of plan.weeks) {
-    if (wk.week > 2) continue;
+    if (wk.week > limitWeek) continue;
     for (const sess of wk.sessions) {
-      const hasTendon = sess.exercises.some(e => ['wrist_flexors','pronators'].includes(e.muscle));
+      const hasTendon = sess.exercises.some(e => ['wrist_flexors','pronators','supinators','risers'].includes(e.muscle));
       if (!hasTendon) continue;
       for (const ex of sess.exercises) {
-        if (['wrist_flexors','pronators','supinators'].includes(ex.muscle) && ex.sets < 4) {
-          // tendon high-rep
-          ex.repsRange = [15,20];
-          ex.workSets.forEach(ws => ws.reps = 15);
+        if (['wrist_flexors','pronators','supinators','risers','thumb','wrist_extensors'].includes(ex.muscle)) {
+          // GripStrength F1: 3с negative для tendon, high-rep 15-20, RPE 5-6
+          if (ex.sets <= 4) {
+            ex.repsRange = [15,20];
+            ex.workSets.forEach(ws => {
+              ws.reps = 15;
+              if (isBeginner) ws.tempo = '3-1-1-0';
+            });
+          }
+          // extensor band — обязателен как антагонист (3×20-25)
+          if (ex.muscle === 'wrist_flexors' && isBeginner) {
+            ex.comment = (ex.comment || '') + ' | 3с эксцентрик — tendon remodeling (GripStrength F1)';
+          }
+        }
+      }
+    }
+  }
+  // Новички: 3 месяца без 100% спарринга — предупреждение если side_pressure в первые 4н >0
+  if (isBeginner) {
+    for (const wk of plan.weeks.slice(0,4)) {
+      for (const sess of wk.sessions) {
+        for (const ex of sess.exercises) {
+          if (ex.muscle === 'side_pressure' && ex.sets > 2) {
+            plan.rationale.push(`Н${wk.week}: новичкам side_pressure ≤2 первые 4н (humerus, 3 мес без 100% спарринга)`);
+          }
         }
       }
     }
