@@ -48,11 +48,14 @@ function armPlanToUserWeeks(plan: any): UserWeek[] {
 }
 
 export function buildArmBlock(
-  block: { blockKey: string; weeks: number; phase: string; competitionId?: string },
-  config: Partial<ArmBuilderInput> & { taperWeeks?: number; taperEnabled?: boolean },
+  block: { blockKey: string; weeks: number; phase: string; competitionId?: string; weightClass?: string },
+  config: Partial<ArmBuilderInput> & { taperWeeks?: number; taperEnabled?: boolean; competitionPriority?: 'A'|'B'|'C' },
   opts?: { level?: string },
 ): ArmAnnualBuildResult {
   const weeks = Math.max(1, Math.min(52, block.weeks || 4));
+  // WAF-приоритет: A → peaking + taper 3н, B → 2н, C → без taper (встроен)
+  const prio = (config as any).competitionPriority || (block.phase === 'peaking' ? 'A' : 'B');
+  const defaultTaper = prio === 'A' ? 3 : prio === 'B' ? 2 : 0;
   const input: ArmBuilderInput = {
     discipline: (config.discipline as any) || 'armwrestling',
     patternId: config.patternId || (config.discipline === 'armlifting' ? 'grip_3_support' : 'arm_4_upper_lower'),
@@ -70,15 +73,17 @@ export function buildArmBlock(
     injuries: config.injuries,
     planStartWeek: config.planStartWeek,
     sex: config.sex as any,
+    weightClass: (config as any).weightClass || (block as any).weightClass,
   } as ArmBuilderInput;
 
   let plan: any = buildArmPlan(input);
   plan = finalizeArmPlan(plan, { level: input.level });
 
-  // taper
+  // taper — WAF-специфичный: A 3н 0.85/0.65/0.45 side×0.7/0.5/0.3, B 2н, C 0
   let taperApplied = false;
-  if (config.taperEnabled && (config.taperWeeks || 0) > 0) {
-    const curve = buildArmTaperCurve({ taperWeeks: config.taperWeeks || 2 });
+  const taperWeeksEff = config.taperEnabled ? (config.taperWeeks ?? defaultTaper) : 0;
+  if (taperWeeksEff > 0) {
+    const curve = buildArmTaperCurve({ taperWeeks: taperWeeksEff, gripFocus: config.gripFocus as any });
     applyArmTaperToWeeks(plan.weeks, curve);
     taperApplied = true;
   }
