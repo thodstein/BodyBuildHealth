@@ -93,6 +93,7 @@ import { GOLOVINSKY_8 } from './golovinsky-8';
 import { SHEIKO_AML_20 } from './sheiko-aml-20';
 import { CALGARY_16 } from './calgary-16';
 import { RTS_9 } from './rts-9';
+import { SHEIKO_CMS_MS } from './sheiko-cms-ms';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -182,6 +183,7 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     SHEIKO_AML_20,
     CALGARY_16,
     RTS_9,
+    SHEIKO_CMS_MS,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
