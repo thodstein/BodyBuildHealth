@@ -117,12 +117,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [state]);
 
-  // ACWR from diary
+  // ACWR from diary — факт без зон
   const acwr = useMemo(() => {
     try {
       const srpe = loadSRPESessions();
       if (srpe.length < 2) return null;
-      return acuteChronicRatio(toDailyLoads(srpe as any));
+      const r = acuteChronicRatio(toDailyLoads(srpe as any));
+      return { ratio: Math.round(r.ratio*100)/100 };
     } catch { return null; }
   }, []);
 
@@ -139,10 +140,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const dl = toDailyLoads(tendonOnly as any);
       if (dl.length < 5) return null;
       const r = acuteChronicRatio(dl as any);
-      let zone: 'optimal'|'caution'|'dangerous' = 'optimal';
-      if (r.ratio > 1.5) zone = 'dangerous';
-      else if (r.ratio > 1.3) zone = 'caution';
-      return { ratio: Math.round(r.ratio*100)/100, zone };
+      return { ratio: Math.round(r.ratio*100)/100 };
     } catch { return null; }
   }, []);
 
@@ -255,23 +253,52 @@ export const ArmDiagnosticsHub: React.FC = () => {
   }, [forceHistoryTick]);
 
   // Tendon sets + table ratio now from derived estimates (not hardcoded 2/4)
-  // estimate via weak flags + dynamic + level tendon limit
+  // tendon/table из реального builtPlan (he_arm_last_plan) — факт, иначе оценка
   const derivedTendon = useMemo(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_last_plan') : null;
+      if (raw) {
+        const plan = JSON.parse(raw);
+        if (plan?.weeks?.length) {
+          let total = 0;
+          for (const wk of plan.weeks) for (const sess of wk.sessions) for (const ex of sess.exercises) if (['wrist_flexors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators','wrist_extensors'].includes(ex.muscle)) total += ex.sets;
+          const avg = Math.round(total / plan.weeks.length);
+          if (Number.isFinite(avg) && avg>0) return Math.min(22, avg);
+        }
+      }
+    } catch {}
     let base = 8;
     if (state.cup) base += 4;
     if (state.pron) base += 6;
     if (state.sup) base += 4;
-    // add benchmark-derived
     if (benchRes.level === 'advanced' || benchRes.level === 'competitive') base += 2;
     return Math.min(22, base);
-  }, [state.cup, state.pron, state.sup, benchRes.level]);
+  }, [state.cup, state.pron, state.sup, benchRes.level, forceHistoryTick]);
 
   const derivedTable = useMemo(() => {
-    // if acwr has table? else estimate from level technique
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_last_plan') : null;
+      if (raw) {
+        const plan = JSON.parse(raw);
+        if (plan?.weeks?.length) {
+          let totalTable = 0, totalSess = 0;
+          for (const wk of plan.weeks) {
+            totalTable += wk.sessions.filter((s:any)=> s.tableTime).length;
+            totalSess += wk.sessions.length;
+          }
+          if (totalSess>0) {
+            const ratio = totalTable / totalSess;
+            const total = 4;
+            const table = Math.round(ratio * total);
+            return { table: Math.max(0, Math.min(total, table)), total };
+          }
+        }
+      }
+    } catch {}
     if (state.technique === 'press') return { table: 2, total: 4 };
     if (state.level === 'beginner') return { table: 1, total: 3 };
     return { table: 2, total: 4 };
-  }, [state.technique, state.level]);
+  }, [state.technique, state.level, forceHistoryTick]);
 
   const report = useMemo(() => buildArmDiagnosticsReport({
     weakTest: {

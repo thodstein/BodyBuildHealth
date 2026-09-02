@@ -206,9 +206,10 @@ describe('arm PRO MAX v2 — tendon ACWR', () => {
     expect(r.tendon).not.toBeNull();
     expect(r.tablePct).toBeGreaterThanOrEqual(40);
   });
-  it('empty → optimal', () => {
+  it('empty → ratio 1', () => {
     const r = buildArmAcwr({ sessions: [] });
-    expect(r.overall.zone).toBe('optimal');
+    expect(r.overall.ratio).toBe(1);
+    expect(r.advice.length).toBeGreaterThan(0);
   });
 });
 

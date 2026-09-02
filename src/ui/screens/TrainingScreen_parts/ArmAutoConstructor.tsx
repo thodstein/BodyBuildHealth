@@ -198,6 +198,7 @@ export function ArmAutoConstructor() {
       plan.report = buildArmReport(plan);
       plan.metrics = calcArmMetrics(plan);
       setBuiltPlan(plan);
+      try { localStorage.setItem('he_arm_last_plan', JSON.stringify(plan)); } catch {}
       setWeekSel(1);
       setStep('plan');
       flash(`✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед`);
