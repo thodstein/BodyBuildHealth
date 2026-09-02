@@ -456,8 +456,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           {vbtLoss && <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtLoss.exceeded?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT {vbtLoss.lossPct}%</span>}
           <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>OHS {ohs.totalScore}/6</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: gripFails>0?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: axialOverload?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: axialOverload?'#ef4444':DIM }}>axial {axialOverload?'HIGH':'ok'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: state.conditioningFail?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: state.conditioningFail?'#ef4444':DIM }}>cond {state.conditioningFail?'FAIL':'ok'}</span>
           {scoring.floors.length>0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
+        {contest && <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4 }}>🏆 Контест: {contest.name} · taper cess йок/камень 7д · лог/фермер 5д · броски 4д · axial {axialOverload?'HIGH': 'ok'}</div>}
         {diaryWeaks.length>0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 4 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</div>}
         {diaryPhases.length>0 && <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 6 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</div>}
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
