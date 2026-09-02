@@ -1,9 +1,9 @@
-/** ArmDiagnosticsHub.tsx — ХАБ диагностики армрестлинга/армлифтинга PRO MAX.
+/** ArmDiagnosticsHub.tsx — ХАБ диагностики армрестлинга/армлифтинга PRO MAX (без рисков).
  * 5 подвкладок: Grip | Wrist/Rotation | Pressure | Strength(Dynamic+Bench) | Recovery(Tendon/ACWR)
- * - Углы РУ/РА/РН (motion-capture) + VBT + Force + Dynamic F/t F100/F500 + asymmetry + benchmarks + fatigue + ACWR
- * - Score RSS 0-100 + findings (ok/warn/critical) + verification 0.4/0.3/0.3 + humerus/balance + table 3/2/1 + tendon-ACWR
- * - Видео BlazePose реальный (estimateAnglesFromLandmarks) + canvas preview
- * - Вывод в Арм-конструктор via planner-bridge (weakpoints, diagnostics_v2)
+ * - Углы РУ/РА/РН (motion-capture) + VBT + Force + Dynamic F/t F100/F500 + asymmetry + benchmarks + fatigue + ACWR (факт, без оценок риска)
+ * - Детали + info (без score/verification/уровней) + table 3/2/1 + tendon факт
+ * - Видео BlazePose (estimateAnglesFromLandmarks) + canvas preview
+ * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
@@ -355,9 +355,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return { wk, kind };
   });
 
-  // Score color
-  const scoreColor = report.score >= 80 ? '#22c55e' : report.score >= 50 ? '#f59e0b' : '#ef4444';
-  const verText = report.verification >= 0.9 ? 'верифицировано' : report.verification >= 0.5 ? 'частично' : 'не верифицировано';
+  // нейтральный заголовок — без рисков
+  const hasWeak = report.weakMuscles.length > 0;
 
   // Video handler stub — при загрузке файла парсим как landmarks
   const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,17 +412,15 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Арм-диагностика — PRO MAX хаб</div>
             <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>5 таба × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${scoreColor} ${report.score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${scoreColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{report.score}</div>
-            <div style={{ fontSize: 9, color: scoreColor, fontWeight: 700, marginTop: 2 }}>{report.level === 'ok' ? 'ОК' : report.level === 'warn' ? 'WARN' : 'CRITICAL'}</div>
+          <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: hasWeak ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border:`1px solid ${hasWeak ? 'rgba(245,158,11,0.22)' : 'rgba(34,197,94,0.22)'}` }}>
+            <div style={{ fontSize:11, fontWeight:700, color: hasWeak? '#f59e0b' : '#22c55e' }}>{hasWeak ? report.weakMuscles.join(', ') : 'баланс'}</div>
+            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${report.priorities.length} приоритет · ${report.details.length} факта` : 'слабые зоны не выявлены'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: report.verification>=0.7?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border:`1px solid ${report.verification>=0.7?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}`, color: report.verification>=0.7?'#22c55e':'#ef4444' }}>{verText} · {Math.round(report.verification*100)}% (хват 0.4 + углы 0.3 + VBT 0.3)</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone==='dangerous'?'🔴': acwr.zone==='caution'?'🟠':'🟢') : ''} {tendonAcwr ? `· Tendon ${tendonAcwr.ratio.toFixed(2)}${tendonAcwr.zone==='dangerous'?'🔴':tendonAcwr.zone==='caution'?'🟠':'🟢'}` : ''}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Table {(report.tableRatio*100).toFixed(0)}% (3/2/1)</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: benchRes.level==='competitive'?'rgba(34,197,94,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: benchRes.level==='competitive'?'#22c55e':DIM }}>{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} ({forceVecPro.totalScore})</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: benchRes.level==='competitive'?'rgba(34,197,94,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: benchRes.level==='competitive'?'#22c55e':DIM }}>{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.totalScore})</span>
+          {report.asymmetryPct!=null && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Асимметрия {report.asymmetryPct}%</span>}
         </div>
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери провалы + хват + углы + <b style={{color:'#f59e0b'}}>4 теста силы (кг+мс)</b> + VBT → получи F/t F100/F500, асимметрию, bench-уровень. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Арм-конструктор»</b> отправит слабые зоны + динамику в планировщик. Видео — опционально (BlazePose/HANDS → <code>isAnglesVerified</code>).
@@ -478,7 +475,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:8 }}>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector · WAF {weightClassAuto}</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%${forceVecPro.asymmetryPct>=12?' 🔴':forceVecPro.asymmetryPct>=7?' 🟠':' 🟢'}` : ''}</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%` : ''}</div>
                 <div style={{ fontSize:9, color:DIM, marginTop:4 }}>WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
@@ -574,9 +571,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: mockGuard.humerus.length? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${mockGuard.humerus.length?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: mockGuard.humerus.length?'#ef4444':'#22c55e' }}>Humerus (side)</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Humerus (side) — инфо</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : 'side — факт, без оценки риска'}</div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector PRO</div>
@@ -629,9 +626,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: (dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.08)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${(dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.2)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: (dynamicReport as any)?.asymmetry?.level==='critical'?'#ef4444': (dynamicReport as any)?.asymmetry?.level==='warn'?'#f59e0b':'#22c55e' }}>Асимметрия L/R</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}% — ${(dynamicReport as any).asymmetry.advice}` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}% ${forceVecPro.asymmetryPct>=12?'🔴':forceVecPro.asymmetryPct>=7?'🟠':'🟢'}` : 'Введи left/right хват или finger/hook обе руки')}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Асимметрия L/R</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}%` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}%` : 'Введи left/right хват или finger/hook обе руки')}</div>
               </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:8 }}>
@@ -673,25 +670,25 @@ export const ArmDiagnosticsHub: React.FC = () => {
         {tab==='recovery' && (
           <div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: acwr && acwr.zone==='dangerous' ? 'rgba(239,68,68,0.08)' : acwr && acwr.zone==='caution' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${acwr && acwr.zone==='dangerous'?'rgba(239,68,68,0.2)': acwr && acwr.zone==='caution'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: acwr && acwr.zone==='dangerous'?'#ef4444': acwr && acwr.zone==='caution'?'#f59e0b':'#22c55e' }}>ACWR {acwr? acwr.ratio.toFixed(2) : '—'} {acwr? `· ${acwr.zone}` : ''}</div>
-                <div style={{ fontSize:10, color:DIM }}>{acwr? `${acwr.zone==='dangerous'?'Снизь ×0.65, RIR+2': acwr.zone==='caution'?'×0.85, RIR+1':'Оптимум'}` : 'нет данных (нужен дневник sRPE)'}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>ACWR {acwr? acwr.ratio.toFixed(2) : '—'}</div>
+                <div style={{ fontSize:10, color:DIM }}>{acwr? `Острая/хроническая — факт` : 'нет данных (нужен дневник sRPE)'}</div>
               </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: tendonAcwr && tendonAcwr.zone==='dangerous' ? 'rgba(239,68,68,0.08)' : tendonAcwr && tendonAcwr.zone==='caution' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${tendonAcwr && tendonAcwr.zone==='dangerous'?'rgba(239,68,68,0.2)': tendonAcwr && tendonAcwr.zone==='caution'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: tendonAcwr && tendonAcwr.zone==='dangerous'?'#ef4444': tendonAcwr && tendonAcwr.zone==='caution'?'#f59e0b':'#22c55e' }}>Tendon ACWR {tendonAcwr? tendonAcwr.ratio.toFixed(2) : '—'} {tendonAcwr? `· ${tendonAcwr.zone}` : ''}</div>
-                <div style={{ fontSize:10, color:DIM }}>{tendonAcwr? (tendonAcwr.zone==='dangerous'?'Сухожилия перегруз — side×0.5, pron/sup 15-20':tendonAcwr.zone==='caution'?'Добавить 48ч, extensor band':'Tendon в допуске (3× медленнее)'): 'нет tendon-данных'}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Tendon ACWR {tendonAcwr? tendonAcwr.ratio.toFixed(2) : '—'}</div>
+                <div style={{ fontSize:10, color:DIM }}>{tendonAcwr? `Tendon — факт` : 'нет tendon-данных'}</div>
               </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Tendon Load · лимит {tendonWeeklyLimit(state.level)}</div>
-                <div style={{ fontSize:10, color:DIM }}>{report.tendonLoad} сетов/нед {report.tendonLoad>18?'⚠ >18': report.tendonLoad>22?' 🔴 CRITICAL':''} · Side MRV {landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
+                <div style={{ fontSize:10, color:DIM }}>{report.tendonLoad} сетов/нед · Side MRV {landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
                 <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Beginner 12 / Inter 16 / Adv 18 / Enh 22 — GripStrength F1 3с эксцентрик</div>
               </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: report.verification>=0.7?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)', border:`1px solid ${report.verification>=0.7?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: report.verification>=0.7?'#22c55e':'#ef4444' }}>Верификация {Math.round(report.verification*100)}% — {verText}</div>
-                <div style={{ fontSize:10, color:DIM }}>Хват 0.4 + углы 0.3 + VBT 0.3: чем больше вводов, тем точнее. 0% = по опросам, 100% = по видео+датчикам.</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>HasVideoSupport: {hasVideoSupport()?'да':'нет'} · anglesVerified: {anglesVerified?'да':'нет (ручной)'}</div>
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Дополнительно</div>
+                <div style={{ fontSize:10, color:DIM }}>Техника: {state.technique} · Уровень: {state.level} · Направление: {state.direction} · Углы: {angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Видео: {hasVideoSupport()?'поддерживается':'—'} · Ввод: {anglesVerified?'углы в допуске':'ручной'}</div>
               </div>
             </div>
             <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
@@ -709,11 +706,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
       {/* Diagnostics output */}
       <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — слабые звенья + score RSS</div>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-          <div style={{ width:44, height:44, borderRadius:22, background: `conic-gradient(${scoreColor} ${report.score}%, rgba(255,255,255,0.06) 0)`, display:'flex', alignItems:'center', justifyContent:'center', border:`2px solid ${scoreColor}`, fontWeight:900, color:'#fff', fontSize:13 }}>{report.score}</div>
-          <div style={{ fontSize:11, color:DIM }}>Уровень <b style={{color:scoreColor}}>{report.level}</b> · {report.findings.slice(0,3).map(f=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''}</div>
-        </div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — детали</div>
+        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.details.slice(0,3).map(f=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''}</div>
         {diag.priorities.length===0 ? <div style={{ fontSize:11, color:DIM }}>Слабые зоны не выявлены — баланс. {dynamicReport && (dynamicReport as any).asymmetry ? `· ${(dynamicReport as any).tactic}` : ''}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {diag.priorities.map((p,i)=>(

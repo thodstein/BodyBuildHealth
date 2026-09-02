@@ -44,7 +44,7 @@ describe('ArmDiagnosticsHub PRO', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.click(screen.getByText(/Кисть\/Ротация/));
     fireEvent.click(screen.getByText(/Кисть открывается/));
-    expect(await screen.findByText(/wrist_flexors/)).toBeTruthy();
+    expect(document.body.textContent).toContain('wrist_flexors');
     // подождать обновления diag
     await new Promise(r => setTimeout(r, 50));
     const btns = screen.getAllByText(/Применить в Арм-конструктор/);
