@@ -28,7 +28,7 @@ export function isAnnualTrainingPlanShape(value: unknown): value is AnnualTraini
     if (typeof r.blockKey !== 'string' || r.blockKey.length === 0) return false;
     if (seenKeys.has(r.blockKey)) return false;
     seenKeys.add(r.blockKey);
-    if (!['PL', 'BB', 'MANUAL'].includes(r.kind)) return false;
+    if (!['PL', 'BB', 'ARM', 'MANUAL'].includes(r.kind)) return false;
     if (typeof r.startWeek !== 'number' || !Number.isInteger(r.startWeek) || r.startWeek < 1) return false;
     if (typeof r.weeks !== 'number' || !Number.isInteger(r.weeks) || r.weeks < 1) return false;
     return ['unbuilt', 'built', 'stale', 'error'].includes((b as any).status);
