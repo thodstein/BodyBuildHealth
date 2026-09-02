@@ -18,6 +18,7 @@ import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, t
 import { getAllVolumeLandmarks, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from './bb-mev-calibration.engine';
 import { sfrSelectionBonus } from './bb-sfr-db';
+import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -210,6 +211,16 @@ export interface BBBuilderInput {
    *  популяционных landmarks внутри существующих капов (потолок MRV не растёт выше +30%).
    *  Если не передан — buildBBPlan автоматически читает из хранилища he_bb_mev_calibration. */
   mevCalibration?: MEVCalibration | null;
+  /** R1: явный rehab-возврат мышц (прогрессивная рампа объёма/веса/RIR по неделям).
+   *  Отдельно от graded-травм (те уже имеют date-рампу getInjuryVolumeFactor) —
+   *  применяется ТОЛЬКО к перечисленным мышцам, не стекаясь с ними. */
+  rehabMuscles?: string[];
+  /** Неделя старта rehab-рампы (по умолчанию 1). */
+  rehabWeekStart?: number;
+  /** R2: серия предыдущих мезо для тоннаж-прогрессии (Fitbod-парадигма): целевой
+   *  объём следующего мезо масштабируется фактическим ростом тоннажа (кап 0.9..1.15).
+   *  ≥2 планов включают множитель; один/нет — без изменений. */
+  previousPlans?: BBPlan[];
 }
 
 /**
@@ -2822,6 +2833,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (mesoProgression) {
       v = applyVolumeProgression(m, v, mesoProgression);
     }
+    // R2: тоннаж-прогрессия между мезо (фактический рост тоннажа за серию прошлых планов)
+    if (Array.isArray(input.previousPlans) && input.previousPlans.length >= 2) {
+      v = Math.round(v * tonnageProgression(input.previousPlans as any));
+    }
     // Объёмный тренинг — +25-35% даже для макс опыта (ранее high только ставил volumeGoal=mrv, для max опыта mrv уже был — эффекта 0)
     if (input.trainingVolumeMode === 'high') {
       const boost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.35 : level === 'enhanced' ? 1.30 : 1.25;
@@ -3745,6 +3760,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (report.removedSets > 0 || report.transferredSets > 0) {
         rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
       }
+    }
+  }
+  // R1: явный rehab-возврат мышц (прогрессивная рампа). Не стекается с graded-травмами.
+  if (input.rehabMuscles?.length) {
+    const rehabResult = applyRehabToPlan(finalPlan, input.rehabMuscles, input.rehabWeekStart ?? 1);
+    if (rehabResult.changes.length) {
+      rationale.push(`🩹 Rehab-возврат: ${rehabResult.changes.slice(0, 6).join(' · ')}`);
+      for (const m of input.rehabMuscles) rationale.push(rehabNotes(m, input.rehabWeekStart ?? 1));
     }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);

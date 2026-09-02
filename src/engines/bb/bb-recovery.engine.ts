@@ -65,6 +65,45 @@ export function rehabNotes(muscle: string, weekStart = 1): string {
   return `🩹 Возврат «${muscle}»: ${phases.map(p => `нед ${p.week} ×${Math.round(p.volumePct * 100)}% об. / ×${Math.round(p.weightPct * 100)}% вес / RIR+${p.rirShift}`).join(' → ')}`;
 }
 
+type RehabWorkSet = { weight?: number; reps?: number; rir?: number };
+type RehabExercise = { muscle?: string; sets?: number; workSets?: RehabWorkSet[]; rir?: number; comment?: string; rationale?: string };
+type RehabSession = { exercises: RehabExercise[] };
+type RehabWeek = { week: number; sessions: RehabSession[] };
+type RehabPlanLike = { weeks?: RehabWeek[] };
+
+/**
+ * Применить rehab-протокол к реальному плану: для травмированных (щадящий режим) мышц
+ * в недели возврата снизить рабочий объём (workSets/sets) и вес, поднять RIR.
+ * Аддитивно: затрагивает ТОЛЬКО injuredMuscles; без травм — no-op. Не меняет капы.
+ */
+export function applyRehabToPlan(plan: RehabPlanLike, injuredMuscles: string[], weekStart = 1): { changes: string[] } {
+  const changes: string[] = [];
+  if (!injuredMuscles?.length || !plan?.weeks?.length) return { changes };
+  const normSet = new Set(injuredMuscles.map(normMuscle));
+  for (const wk of plan.weeks) {
+    const phase = rehabWeekForWeek(wk.week, weekStart);
+    if (!phase) continue;
+    for (const s of wk.sessions || []) for (const ex of s.exercises || []) {
+      const m = normMuscle(ex.muscle || '');
+      if (!normSet.has(m)) continue;
+      if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
+        const newCount = Math.max(1, Math.round(ex.workSets.length * phase.volumePct));
+        ex.workSets = ex.workSets.slice(0, newCount).map(st => ({
+          ...st,
+          weight: Number(st.weight ?? 0) * phase.weightPct,
+          rir: (Number(st.rir ?? 2)) + phase.rirShift,
+        }));
+        ex.sets = newCount;
+      }
+      if (typeof ex.rir === 'number') ex.rir = ex.rir + phase.rirShift;
+      if (!changes.includes(ex.muscle as string)) {
+        changes.push(`🩹 rehab «${ex.muscle}» нед ${wk.week}: объём ×${Math.round(phase.volumePct * 100)}%, вес ×${Math.round(phase.weightPct * 100)}%, RIR+${phase.rirShift}`);
+      }
+    }
+  }
+  return { changes };
+}
+
 // ── R2: Тоннаж-прогрессия между мезо ─────────────────────────────────────
 
 type TonnagePlanLike = { weeks?: Array<{ sessions: Array<{ exercises: Array<{ workSets?: Array<{ weight?: number; reps?: number }>; sets?: number; muscle?: string }> }> }> };
