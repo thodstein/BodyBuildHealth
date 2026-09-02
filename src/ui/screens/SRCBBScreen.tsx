@@ -63,6 +63,8 @@ import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarP
 import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
+import { BlockView } from './SRCBBScreen_parts/BlockView';
+import { PLToolsCard } from './SRCBBScreen_parts/PLToolsCard';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
 import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 import { loadSessions } from '../../engines/workout-logger.engine';
@@ -1680,6 +1682,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo, methodHints,
           }} />
+          <BlockView plan={builtSrc} />
+          <PLToolsCard level={level} days={days} totalSets={{ chest: 12, back: 10, legs: 14, shoulders: 8, arms: 6, core: 4 }} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} />
           {plSeasonMode === 'season' && (
             <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
               {seasonNotes.length > 0 ? (
