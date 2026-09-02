@@ -7,6 +7,7 @@ import { getWL, getStrong } from './strength-sport-volume';
 import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
 import { outsideVolumeMultiplier } from '../outside-load.engine';
+import { validateContestPassports } from './strength-sport-passport.engine';
 
 // Sinclair 2024 (IWF 01.06.2025) — обновлённые коэффициенты, fallback 2017 для сравнения
 export const SINCLAIR_2024 = {
@@ -116,6 +117,14 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
   }
   const syncErrs = validateSync(plan);
   for (const e of syncErrs) warnings.push(e);
+  // passport validation for strongman contest (implement weight/step, height, tacky)
+  if (plan.mode === 'strongman' && (plan.inputSnapshot as any)?.contest) {
+    try {
+      const pr = validateContestPassports((plan.inputSnapshot as any).contest);
+      for (const w of pr.warnings) warnings.push(`Паспорт: ${w}`);
+      for (const e of pr.errors) errors.push(`Паспорт: ${e}`);
+    } catch {}
+  }
 
   // outside highDays конфликт: тяж ноги накануне high вне зала → soft warning (+ P0-8: учитываем squat_day/deadlift_day/strength_day/event_day тяж)
   const out = opts?.outsideLoad || plan.inputSnapshot?.outsideLoad;

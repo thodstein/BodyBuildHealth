@@ -19,6 +19,9 @@ import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary } from '../../../
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { validatePassport, validateContestPassports } from '../../../engines/strength-sport/strength-sport-passport.engine';
+import { correctEnodeByVariable } from '../../../engines/strength-sport/strength-sport-barpath.engine';
+import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -271,6 +274,30 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     return { angles: ang, status: livePoseStatus(ang) };
   }, []);
 
+  const passportResult = useMemo(() => {
+    const h = parseFloat(state.platformHeightCm);
+    const yW = parseFloat(state.yokeKg);
+    const sW = parseFloat(state.stoneKg);
+    const fW = parseFloat(state.farmersKg);
+    const errs: string[] = [];
+    const warns: string[] = [];
+    if (Number.isFinite(yW) && yW) { const r = validatePassport('yoke_walk', { weight: yW, distanceM: 20, timeCapS: 60, turn: state.turnNeeded }); errs.push(...r.errors); warns.push(...r.warnings); }
+    if (Number.isFinite(sW) && sW) { const r = validatePassport('atlas_stone_load', { weight: sW, heightCm: Number.isFinite(h) ? h : 140, tacky: state.tackyUsed }); errs.push(...r.errors); warns.push(...r.warnings); }
+    if (Number.isFinite(fW) && fW) { const r = validatePassport('farmers_walk_heavy', { weight: fW, distanceM: 40 }); errs.push(...r.errors); warns.push(...r.warnings); }
+    if (contest && contest.events?.length) { const cr = validateContestPassports(contest as any); errs.push(...cr.errors); warns.push(...cr.warnings); }
+    return { errors: errs.slice(0,3), warnings: warns.slice(0,3) };
+  }, [state.yokeKg, state.stoneKg, state.farmersKg, state.platformHeightCm, state.tackyUsed, state.turnNeeded, contest]);
+
+  const axialProgress = useMemo(() => {
+    const lm = getStrong('intermediate', 'carry');
+    const mrv = lm?.mrv ?? 380;
+    const curM = (parseFloat(state.yokeKg) > 0 ? 20 : 0) + (parseFloat(state.farmersKg) > 0 ? 40 : 0);
+    const pct = mrv ? Math.min(100, Math.round((curM / mrv) * 100)) : 0;
+    return { curM, mrv, pct };
+  }, [state.yokeKg, state.farmersKg]);
+
+  const enodeCorrected = useMemo(() => swayCm != null ? correctEnodeByVariable(swayCm, 'xLoop') : null, [swayCm]);
+
   const toggle = (key: keyof Pick<SMState, 'pressWeak'|'carryWeak'|'loadWeak'|'gripWeak'>, id: string) => {
     setState(s => {
       const arr = (s as any)[key] as string[];
@@ -456,17 +483,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           {vbtLoss && <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtLoss.exceeded?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT {vbtLoss.lossPct}%</span>}
           <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>OHS {ohs.totalScore}/6</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: gripFails>0?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: axialOverload?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: axialOverload?'#ef4444':DIM }}>axial {axialOverload?'HIGH':'ok'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: state.conditioningFail?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: state.conditioningFail?'#ef4444':DIM }}>cond {state.conditioningFail?'FAIL':'ok'}</span>
           {scoring.floors.length>0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
-        {contest && <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4 }}>🏆 Контест: {contest.name} · taper cess йок/камень 7д · лог/фермер 5д · броски 4д · axial {axialOverload?'HIGH': 'ok'}</div>}
         {diaryWeaks.length>0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 4 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</div>}
         {diaryPhases.length>0 && <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 6 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</div>}
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика McGill/Harris) + sway (3/5см) + VBT 15% + grip tri-modal → RSS-скор. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Стронг-конструктор»</b> отправит с smBiomech + контест (mode:strongman).
         </div>
         {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
+        {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 10, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
+        {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 10, color: '#60a5fa' }}>Enode xLoop {swayCm}см → {enodeCorrected}см (Chavda 2024 bias) · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin}</div>}
+        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM }}>Axial {axialProgress.curM}м / {axialProgress.mrv}м MRV ({axialProgress.pct}%) · cond {state.conditioningFail? 'FAIL — prowler 10×100ft' : 'ok — alactic 8×10с/50с'} · {swayDiag? `sway ${swayDiag.swayCm}см` : 'sway —'}</div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button onClick={handleExport} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>🖨 HTML</button>
@@ -685,6 +712,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {swayDiag && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:10, color:DIM }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
             {vbtLoss && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:10, color:DIM }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
+            <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
             <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>

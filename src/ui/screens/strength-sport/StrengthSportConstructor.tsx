@@ -21,6 +21,7 @@ import { estimate1RMFromVelocitySS, VBT_SS_THRESHOLDS } from '../../../engines/s
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
 import { injectTAWeakPoints } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
+import { injectSMWeakPoints } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -272,14 +273,25 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch {}
     let p = buildStrengthSportPlan(input);
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
-    // ТА-диагностика: инъекция коррекций с MRV-бюджетом (аналогично PL diagnosticExerciseMap)
+    // Диагностика: инъекция коррекций с MRV-бюджетом (TA vs SM)
     if (weakPoints.length) {
-      const inj = injectTAWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
-      if (inj.injected > 0) p.rationale = inj.plan.rationale;
-      p = inj.plan;
-      if (inj.notes.length) {
-        // лог для отладки, не блокирует сборку
-        try { console.info('[TA injection]', inj.notes.join(' | ')); } catch {}
+      const isSM = weakPoints.some((wp: string) => /^(log_|yoke_|farmers_|stone_|grip_|core_|conditioning)/.test(String(wp)));
+      if (isSM || mode === 'strongman') {
+        const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
+        if (inj.injected > 0) p.rationale = inj.plan.rationale;
+        p = inj.plan;
+        if (inj.notes.length) { try { console.info('[SM injection]', inj.notes.join(' | ')); } catch {} }
+        // fallback TA if SM injected 0 and weakPoints look like WL
+        if (inj.injected === 0 && weakPoints.some((w: string) => /snatch|clean|jerk|squat|pull|press/.test(String(w).toLowerCase()))) {
+          const inj2 = injectTAWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
+          if (inj2.injected > 0) p.rationale = inj2.plan.rationale;
+          p = inj2.plan;
+        }
+      } else {
+        const inj = injectTAWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
+        if (inj.injected > 0) p.rationale = inj.plan.rationale;
+        p = inj.plan;
+        if (inj.notes.length) { try { console.info('[TA injection]', inj.notes.join(' | ')); } catch {} }
       }
     }
     if (diagnosticLevel === 'critical') {
