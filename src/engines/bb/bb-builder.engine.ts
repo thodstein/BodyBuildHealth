@@ -21,6 +21,7 @@ import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { cycleVolumeFactor } from './bb-cycle.engine';
 import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily } from './bb-wearable.engine';
+import { bodyCompVolumeFactor } from './bb-bodycomp.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -232,6 +233,8 @@ export interface BBBuilderInput {
   cycleLength?: number;
   /** P2 D: дневные данные носимого (he_wearable_daily). Перекрывают ручной HRV/сон в recovery. */
   wearable?: WearableDaily | null;
+  /** P1: целевой % жира — уточняет агрессивность cut/recomp (далеко от цели → объём ближе к MEV). */
+  targetBodyFat?: number;
 }
 
 /**
@@ -2836,6 +2839,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     else if (input.goal === 'maintenance') v = Math.round(v * 0.80);
     else if (input.goal === 'mass') v = Math.round(v * 1.05);
     else if (input.goal === 'strength_mass') v = Math.round(v * 1.03);
+    // P1: targetBodyFat — уточнение агрессивности cut/recomp по составу тела (далеко → объём к MEV).
+    if (input.goal === 'cut' || input.goal === 'recomp') {
+      const bcf = bodyCompVolumeFactor(input.bodyFat, input.targetBodyFat, input.goal);
+      if (bcf !== 1.0) v = Math.round(v * bcf);
+    }
     // Единый множитель режима (ПЕД/курс): ×2 на главные мышцы, ОДНО применение.
     // Заменяет стэкинг pedAdapt.combinedMrvMultiplier × backProfile/legProfile/torsoProfile.
     v = Math.round(v * regimeMrvMultFor(m, regimeMult));

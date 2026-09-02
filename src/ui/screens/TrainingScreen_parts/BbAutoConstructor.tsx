@@ -112,6 +112,7 @@ import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
 import { estimateSessionTimeWithSupersets } from '../../../engines/bb/bb-fatigue.engine';
+import { suggestSupersetPairs } from '../../../engines/bb/bb-fatigue.engine';
 import { bbVbtRecommendation, bbVbtZoneLabel } from '../../../engines/bb/bb-vbt.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
@@ -643,6 +644,15 @@ export const BbAutoConstructor: React.FC = () => {
   const [platePreset, setPlatePreset] = useState<string>('standard');
   // P1: женский цикл — день цикла для лютеиновой модуляции объёма.
   const [cycleDay, setCycleDay] = useState<number | undefined>(undefined);
+  // P1: целевой % жира (уточняет cut/recomp) — дефолт из defaultTargetBodyFat.
+  const [targetBodyFat, setTargetBodyFat] = useState<number | undefined>(() => {
+    const sex = linked?.profile?.settings?.personal?.sex;
+    const def = sex === 'female' ? 18 : 10;
+    try {
+      const g = (linked?.profile?.settings?.goals as any)?.targetBodyFat;
+      return Number.isFinite(g) ? Number(g) : undefined;
+    } catch { return undefined; }
+  });
   // P2 D: дневные данные носимого (he_wearable_daily) — если есть, учитываются в recovery.
   const wearableData = (() => { try { const raw = localStorage.getItem('he_wearable_daily'); return raw ? JSON.parse(raw) : null; } catch { return null; } })();
   // P1: VBT — ввод скорости лучшего/последнего повтора для рекомендации нагрузки.
@@ -1888,6 +1898,7 @@ export const BbAutoConstructor: React.FC = () => {
           availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
           cycleDay,
           wearable: wearableData,
+          targetBodyFat,
         }, pedAdapt);
     }
 
@@ -2984,6 +2995,26 @@ export const BbAutoConstructor: React.FC = () => {
                         style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:90 }} />
                     </div>
                   )}
+                  {/* P1: целевой % жира — уточнение cut/recomp */}
+                  {(bbGoal === 'cut' || bbGoal === 'recomp') && (
+                    <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.14)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#f87171', marginBottom:4 }}>🎯 Целевой % жира</div>
+                      <div style={{ fontSize:9, opacity:0.8, marginBottom:4 }}>Далеко от цели → объём ближе к MEV (сохранение мышц); близко → полный объём.</div>
+                      <input type="number" min={3} max={50} step={0.5} value={targetBodyFat ?? ''} placeholder="%" onChange={e => setTargetBodyFat(e.target.value ? Number(e.target.value) : undefined)}
+                        style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:80 }} />
+                    </div>
+                  )}
+                  {/* P2 D: ручной ввод wearable-данных (слой-слияние реально используем) */}
+                  <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.14)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#93c5fd', marginBottom:4 }}>📱 Восстановление (носимое / ручной)</div>
+                    <div style={{ fontSize:9, opacity:0.8, marginBottom:6 }}>Утренний HRV и сон перекрывают профиль в recovery (или введите вручную — пишется в he_wearable_daily).</div>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                      <input type="number" placeholder="утр. HRV (мс)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, morningHRV: v })); } catch { /* noop */ } }}
+                        style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:110 }} />
+                      <input type="number" step="0.5" placeholder="сон (ч)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, sleepHours: v })); } catch { /* noop */ } }}
+                        style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:90 }} />
+                    </div>
+                  </div>
                   <div style={{ marginTop:8 }}>
                     <InjurySelectCard injuries={injuries} onChange={setInjuries} />
                   </div>
@@ -4290,6 +4321,17 @@ export const BbAutoConstructor: React.FC = () => {
               return (
                 <div style={{ fontSize: 9, opacity: 0.85, marginBottom: 6 }}>
                   ⏱ Неделя 1: ~{Math.round(t.baseSeconds / 60)} мин → суперсеты экономят ~{Math.round(t.savedSeconds / 60)} мин ({t.pairs} пар) — итого ~{Math.round(t.supersetSeconds / 60)} мин.
+                </div>
+              );
+            })()}
+            {(() => {
+              const w0 = (builtPlan as any).weeks?.[0]?.sessions?.[0];
+              if (!w0?.exercises?.length) return null;
+              const sug = suggestSupersetPairs(w0 as any, 60);
+              if (sug.pairs.length === 0) return null;
+              return (
+                <div style={{ fontSize: 9, padding: '5px 7px', borderRadius: 6, background: 'rgba(147,197,253,0.05)', color: '#bfdbfe', border: '1px solid rgba(147,197,253,0.18)', marginBottom: 6 }}>
+                  🔁 Рекомендуемые суперсет-пары для экономии времени: {sug.pairs.map(p => `${p.aExercise} ↔ ${p.bExercise}`).join(' · ')} (экономия ~{Math.round(sug.totalSavedSeconds / 60)} мин).
                 </div>
               );
             })()}

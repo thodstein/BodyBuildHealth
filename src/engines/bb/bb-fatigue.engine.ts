@@ -102,6 +102,57 @@ export function estimateSessionTimeWithSupersets(session: BBSession): BBSuperset
   };
 }
 
+/** СУПЕРСЕТ-ОПТИМИЗАТОР (P1): авто-предложение пар-антагонистов, чтобы уложить
+ *  сессию в лимит времени. Возвращает пары (мышечные антагонисты) + экономию.
+ *  Не мутирует сессию — рекомендация (в отличие от applyDUPOverlay). */
+export interface BBSupersetSuggestion {
+  pairs: Array<{ a: string; b: string; aExercise?: string; bExercise?: string; savedSeconds: number }>;
+  totalSavedSeconds: number;
+  estimatedMinutes: number;
+}
+
+/** Классические антагонистские пары по мышцам. */
+const ANTAGONIST_PAIRS: Array<[string, string]> = [
+  ['chest', 'back'],
+  ['biceps', 'triceps'],
+  ['quads', 'hamstrings'],
+  ['shoulders', 'back'],
+];
+
+export function suggestSupersetPairs(session: BBSession, maxMinutes: number): BBSupersetSuggestion {
+  const estimate = estimateBBSessionCost(session);
+  const overSeconds = Math.max(0, estimate.timeSeconds - maxMinutes * 60);
+  if (overSeconds <= 0) return { pairs: [], totalSavedSeconds: 0, estimatedMinutes: Math.round(estimate.timeSeconds / 60) };
+
+  const byMuscle = new Map<string, BBExercise[]>();
+  for (const ex of session.exercises) {
+    if ((ex as any).warmupActivator || (ex as any).supersetGroup) continue; // уже в паре/разминка
+    if (!byMuscle.has(ex.muscle)) byMuscle.set(ex.muscle, []);
+    byMuscle.get(ex.muscle)!.push(ex);
+  }
+
+  const pairs: BBSupersetSuggestion['pairs'] = [];
+  let saved = 0;
+  for (const [m1, m2] of ANTAGONIST_PAIRS) {
+    if (saved >= overSeconds) break;
+    const exs1 = byMuscle.get(m1) || [], exs2 = byMuscle.get(m2) || [];
+    if (!exs1.length || !exs2.length) continue;
+    // Берём последнее (обычно изоляция) упражнение каждой мышцы — лучше кандидат для пары.
+    const a = exs1[exs1.length - 1];
+    const b = exs2[exs2.length - 1];
+    const sets = Math.max(a.sets || a.workSets?.length || 0, b.sets || b.workSets?.length || 0);
+    const rest = Number.isFinite(Number(b.restSeconds)) ? Number(b.restSeconds) : 60;
+    const s = sets * rest;
+    pairs.push({ a: m1, b: m2, aExercise: a.name, bExercise: b.name, savedSeconds: s });
+    saved += s;
+  }
+  return {
+    pairs,
+    totalSavedSeconds: saved,
+    estimatedMinutes: Math.max(1, Math.round((estimate.timeSeconds - saved) / 60)),
+  };
+}
+
 /**
  * Сокращает сессию до бюджета без потери primary или единственного стимула
  * мышцы. Сначала уменьшаются сеты вторичных pump/isolation движений, затем
