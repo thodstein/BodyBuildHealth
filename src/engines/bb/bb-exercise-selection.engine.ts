@@ -19,6 +19,7 @@
 import type { Exercise } from '../../core/types';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { sfrSelectionBonus } from './bb-sfr-db';
 
 export interface AngleClass {
   name: string;
@@ -327,7 +328,13 @@ export function ensureStrictGroupCoverage(
     // Fallback: если в том же классе кандидатов нет — берём любого члена группы (любой угол), чтобы группа всё же появилась
     const candidates = sameClass.length > 0 ? sameClass : poolMembers.filter(m => !exDatas.some(d => d.id === m.id));
     if (candidates.length === 0) continue;
-    const best = candidates.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
+    // P1: SFR-тай-брейк среди равных по _score (высокий SFR предпочтителен для
+    // изоляций/машин — это группы strict-замены: разводки/сгибания и т.п.).
+    const best = candidates.slice().sort((a, b) => {
+      const sa = (a._score ?? 0), sb = (b._score ?? 0);
+      if (sa !== sb) return sb - sa;
+      return sfrSelectionBonus(b, 'accumulation') - sfrSelectionBonus(a, 'accumulation');
+    })[0];
     if (!best) continue;
     exDatas[idx] = best;
     const iId = sessionSelectedIds.indexOf(replaced.id);

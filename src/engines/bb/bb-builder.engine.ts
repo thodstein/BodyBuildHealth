@@ -17,7 +17,6 @@ import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type Schedul
 import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from './bb-mev-calibration.engine';
-import { sfrSelectionBonus } from './bb-sfr-db';
 import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { cycleVolumeFactor } from './bb-cycle.engine';
@@ -2078,8 +2077,8 @@ function buildSession(
           candidates = candidates.sort((a, b) => {
             const sa = (a as any)._score ?? 0;
             const sb = (b as any)._score ?? 0;
-            const la = lengthenedBonus(a.name || '', trainingFocus) + sfrSelectionBonus(a, phase);
-            const lb = lengthenedBonus(b.name || '', trainingFocus) + sfrSelectionBonus(b, phase);
+            const la = lengthenedBonus(a.name || '', trainingFocus);
+            const lb = lengthenedBonus(b.name || '', trainingFocus);
             const saTotal = sa + la;
             const sbTotal = sb + lb;
             if (saTotal !== sbTotal) return sbTotal - saTotal;
@@ -2111,8 +2110,8 @@ function buildSession(
           if (usedClassIdx.has(ci)) continue;
            let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           candidates = candidates.sort((a, b) => {
-            const sa = ((a as any)._score ?? 0) + sfrSelectionBonus(a, phase);
-            const sb = ((b as any)._score ?? 0) + sfrSelectionBonus(b, phase);
+            const sa = (a as any)._score ?? 0;
+            const sb = (b as any)._score ?? 0;
             if (sa !== sb) return sb - sa;
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
