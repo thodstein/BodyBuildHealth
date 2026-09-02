@@ -18,6 +18,7 @@ import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../..
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
+import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -263,6 +264,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!id) return null;
     return (CONTEST_PRESETS as any)[id] || null;
   }, [state.contestId]);
+
+  const mockPose = useMemo(() => {
+    const frames = createMockPoseStream();
+    const ang = estimateAnglesFromLandmarks(frames[0]);
+    return { angles: ang, status: livePoseStatus(ang) };
+  }, []);
 
   const toggle = (key: keyof Pick<SMState, 'pressWeak'|'carryWeak'|'loadWeak'|'gripWeak'>, id: string) => {
     setState(s => {
@@ -675,6 +682,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {swayDiag && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:10, color:DIM }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
             {vbtLoss && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:10, color:DIM }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
+            <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>
               <div style={{ marginTop:6, width:'100%', height:60, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)' }}>preview — sway 3см норма, &gt;5см критично (McGill lateral bend)</div>
