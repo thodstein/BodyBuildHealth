@@ -53,6 +53,29 @@ export function vblLoad(velocity: number, loadKg: number, reps: number): number 
   return Math.max(0, velocity) * Math.max(0, loadKg) * Math.max(0, reps);
 }
 
+/** RPE+VBT гибрид: калибровка RPE по скорости. Возвращает скорректированный RPE. */
+export function rpeFromVelocity(lift: VBTLift, velocity: number, reps: number): number {
+  const pct = pctForVelocity(lift, velocity);
+  // Epley-обратная: RPE 10 ≈ 1пм, RPE 8 ≈ 2пвт, RPE 9 ≈1пвт
+  // Упрощённо: маппим pct → RPE через таблицу (чем выше pct, тем выше RPE при тех же повторах)
+  const e1RMpct = 1 / (1 + reps / 30); // вес для reps до отказа
+  const ratio = pct / e1RMpct;
+  if (ratio >= 0.98) return 10;
+  if (ratio >= 0.93) return 9;
+  if (ratio >= 0.88) return 8;
+  if (ratio >= 0.83) return 7;
+  return 6;
+}
+
+/** Гибридная оценка: если RPE и velocity расходятся >1, сигнал скрытой усталости */
+export function rpeVbtDiscrepancy(rpe: number, velocity: number, lift: VBTLift, reps: number): { rpeByVelocity: number; delta: number; flag: 'ok'|'hidden-fatigue'|'calibrate' } {
+  const rpeByV = rpeFromVelocity(lift, velocity, reps);
+  const delta = Math.round((rpe - rpeByV) * 10)/10;
+  if (Math.abs(delta) >= 1.5) return { rpeByVelocity: rpeByV, delta, flag: 'hidden-fatigue' };
+  if (Math.abs(delta) >= 1) return { rpeByVelocity: rpeByV, delta, flag: 'calibrate' };
+  return { rpeByVelocity: rpeByV, delta, flag: 'ok' };
+}
+
 function round2(v: number): number { return Math.round(v * 100) / 100; }
 function round1(v: number): number { return Math.round(v * 10) / 10; }
 

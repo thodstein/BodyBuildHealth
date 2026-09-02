@@ -72,6 +72,23 @@ export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string,
   return { acute, chronic, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays };
 }
 
+/** Гибридная нагрузка: sRPE×duration + VBL (velocity×load×reps) для штанги */
+export function hybridLoad(srpeLoad: number, vbl: number, weight: number = 0.5): number {
+  return srpeLoad * (1 - weight) + vbl * weight;
+}
+
+/** Traffic Light по HRV + ACWR + RPE дрейфу */
+export function trafficLight(hrvRatio: number | null, acwr: number, rpeDelta: number): 'green' | 'yellow' | 'red' {
+  let score = 0;
+  if (hrvRatio != null) { if (hrvRatio < 0.85) score += 2; else if (hrvRatio < 0.95) score += 1; }
+  if (acwr > 1.5) score += 2; else if (acwr > 1.3) score += 1;
+  if (rpeDelta >= 1) score += 1;
+  if (rpeDelta >= 1.5) score += 1;
+  if (score >= 3) return 'red';
+  if (score >= 1) return 'yellow';
+  return 'green';
+}
+
 /** Monotony = среднедневная нагрузка / СТД дневной нагрузки за неделю; strain = monotony × суммарная. */
 export function weeklyMonotony(dailyLoads: DayLoad[], weekEnd?: string): MonotonyResult {
   if (dailyLoads.length === 0) return { meanDailyLoad: 0, stdev: 0, monotony: 0, weeklyLoad: 0, strain: 0 };
