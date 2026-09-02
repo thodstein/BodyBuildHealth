@@ -75,6 +75,21 @@ import { SRC2_SHEIKO_COMP } from './src2/src2-sheiko-comp';
 import { SRC2_COAN_PL } from './src2/src2-coan-pl';
 import { SRC2_PETRUSHIN_SQUAT } from './src2/src2-petrushin-squat';
 
+// Западные и Smolov/Candito/Sheiko 29-32 (Sep 2026)
+import { SMOLOV } from './smolov';
+import { SMOLOV_JR } from './smolov-jr';
+import { CANDITO_6 } from './candito-6';
+import { SHEIKO_29 } from './sheiko-29';
+import { SHEIKO_30 } from './sheiko-30';
+import { SHEIKO_31 } from './sheiko-31';
+import { SHEIKO_32 } from './sheiko-32';
+import { GZCLP } from './gzclp';
+import { JUGGERNAUT_2 } from './juggernaut-2';
+import { TEXAS_METHOD } from './texas-method';
+import { MADCOW } from './madcow';
+import { WESTSIDE } from './westside';
+import { KORTE_3X3 } from './korte';
+
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
  CYCLE_02,
@@ -140,11 +155,25 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
    SRC2_BUTENKO_BASE,
    SRC2_BUTENKO_PEAK,
    SRC2_RUSSIAN_CYCLE,
-   SRC2_SHEIKO_SHORT_16,
-   SRC2_SHEIKO_PREP,
-   SRC2_SHEIKO_COMP,
-   SRC2_COAN_PL,
-   SRC2_PETRUSHIN_SQUAT,
+    SRC2_SHEIKO_SHORT_16,
+    SRC2_SHEIKO_PREP,
+    SRC2_SHEIKO_COMP,
+    SRC2_COAN_PL,
+    SRC2_PETRUSHIN_SQUAT,
+    // Западные + Smolov/Sheiko 29-32
+    SMOLOV,
+    SMOLOV_JR,
+    CANDITO_6,
+    SHEIKO_29,
+    SHEIKO_30,
+    SHEIKO_31,
+    SHEIKO_32,
+    GZCLP,
+    JUGGERNAUT_2,
+    TEXAS_METHOD,
+    MADCOW,
+    WESTSIDE,
+    KORTE_3X3,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {

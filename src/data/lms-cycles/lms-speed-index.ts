@@ -44,6 +44,12 @@ export const SPEED_CYCLE_IDS: Record<string, SpeedOrientation[]> = {
   'cycle-09k': ['tempo', 'speed_strength'],
   // Смешанный (тяга+жим, сумо): то же для сумо-тяги.
   'cycle-09s': ['tempo', 'speed_strength'],
+  // Западные + новые: Westside — динамические усилия 50-60% с цепями
+  'westside': ['explosive', 'speed_strength', 'coordination'],
+  'korte-3x3': ['tempo', 'coordination'],
+  'gzclp': ['tempo', 'technique'],
+  'juggernaut-2': ['tempo'],
+  'texas-method': ['tempo'],
 };
 
 /** Скоростные ориентации цикла; [] если цикл не помечен как скоростной. */
