@@ -365,6 +365,18 @@ export function correctDayToTargets(
         if (maxAdd < 5) continue;
         const needG = Math.ceil(need / cand.per100 * 100);
         let addG = Math.min(maxAdd, Math.max(10, Math.min(needG, 80)));
+        // «Комфортные»/концентраты (сухофрукты, мёд, хлеб, удовольствия) — дегустационный
+        // потолок ОТНОСИТЕЛЬНО текущей порции: иначе корректор наращивал самый плотный
+        // источник (Финик Меджул → 150 г ×2 за день — жалоба «финики по 200 грам»).
+        const COMFORT_TOTAL_CAP: Record<string, number> = {
+          honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60, fruit_date_medjool: 60,
+          pryaniki: 50, jam: 35, zefir: 50, pastila: 45, sushki: 40, sugar_cookies: 40, marmalade: 35,
+          bread_white: 110, bread_rye: 110, bread_borodinsky: 110, bread_fitness: 110, whole_grain_bread: 110,
+        };
+        if (COMFORT_TOTAL_CAP[cand.it.id] !== undefined) {
+          addG = Math.min(addG, Math.max(0, COMFORT_TOTAL_CAP[cand.it.id] - cand.it.amount));
+          if (addG < 10) continue;
+        }
         // кап орехов/семян 85г и клетчатки 85г — не превышаем
         const fam = stapleFamilyOf(cand.it.id) || '';
         if ((fam === 'nuts' || fam === 'seeds') && currentNutGrams(meals) + addG > 85) {

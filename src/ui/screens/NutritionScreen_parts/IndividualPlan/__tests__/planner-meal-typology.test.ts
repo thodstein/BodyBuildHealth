@@ -55,17 +55,19 @@ describe('E4: предупреждение перегрузки приёма п�
   });
 });
 
-describe('E5: углеводная добивка фруктом, когда крупяная порция упёрлась в кап', () => {
-  it('в перегруженном углеводами приёме появляется фруктовая добивка поверх каши', () => {
-    // Максимальная углеводная нагрузка на завтрак → каша упирается в 280г, остаток закрываем фруктом.
+describe('E5: углеводная добивка (фрукт/комфорт-источник), когда крупяная порция упёрлась в кап', () => {
+  it('в перегруженном углеводами приёме появляется комфорт-добивка поверх каши', () => {
+    // Максимальная углеводная нагрузка на завтрак → каша упирается в кап, остаток
+    // закрываем комфорт-источником: фрукт, сухофрукты, хлеб, мёд или «удовольствие» (80/20).
     const plan = buildDayPlan(base({ mealsCount: 3, goalCarbsG: 560, goalKcal: 3800, goalProteinG: 190, goalFatG: 90 }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
-    const fruitItems = breakfast.items.filter(it => it.role === 'fruit');
-    // В условиях крупного углеводного завтрака добавляется вторая фруктовая/сухофруктовая позиция.
-    expect(fruitItems.length).toBeGreaterThanOrEqual(1);
+    const comfortItems = breakfast.items.filter(it =>
+      it.role === 'fruit' || ['honey','bread_white','bread_rye','bread_borodinsky','whole_grain_bread','raisins','dates_dried','dates','dried_apricots','bread_fitness','pryaniki','jam','zefir','pastila','sushki','sugar_cookies'].includes(it.id));
+    expect(comfortItems.length).toBeGreaterThanOrEqual(1);
     const carbItems = breakfast.items.filter(it => it.role === 'carb_slow');
-    // Каша не превышает разумный потолок (280г).
-    carbItems.forEach(it => expect(it.amount || 0).toBeLessThanOrEqual(300));
+    // Каша (варёная) не превышает разумный потолок: 320 г варёной ≈ 100-110 г сухой —
+    // комфортная порция (сухая крупа капируется 115-170 г).
+    carbItems.forEach(it => expect(it.amount || 0).toBeLessThanOrEqual(320));
   });
 });
 

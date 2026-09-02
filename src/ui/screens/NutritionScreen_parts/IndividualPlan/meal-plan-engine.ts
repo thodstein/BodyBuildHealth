@@ -1,4 +1,4 @@
-/**
+﻿/**
  * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
  *
  * Принципы (на основе клинической спортивной диетологии):
@@ -266,6 +266,9 @@ const CONCENTRATE_CAP_G = 50;
 // global maxGramPerItem ceiling (budget-aware). Threshold: <30g carbs/100g = "cooked starch" bowl.
 function carbPortionCap(food: FoodItem, scale = 1): number {
   const carbPer100 = food.carbs || 0;
+  // Концентраты (сухофрукты/мёд/«удовольствия») — дегустационная порция ≤60 г, НЕ «сухая
+  // крупа»: иначе финик-меджул ловил кап 150-170 г сухой крупы (112 г углей разом).
+  if (CONCENTRATE_IDS.includes(food.id)) return Math.min(60, maxDryGrainPerMeal('max', scale));
   // D-18 + D-21: grains/pasta are now tracked DRY (bodybuilding rule) — carb density
   // ~64-83g/100g. A realistic dry portion is ~150g (~400g cooked bowl), so cap dense
   // dry cereals at 150g. Low-density cooked starches that are still cooked-weight
@@ -298,7 +301,18 @@ const isMeatId = (id: string): boolean => {
 // ─── Р-2.1 (Aug 28): Реалистичность состава приёма («18 г каши и 100 г сухофруктов») ──
 // «Концентраты» — углеводные носители с плотностью ≥55 г углей/100 г (сухофрукты/джем):
 // ДОБАВКА, а не основа — кап 50 г на приём (100 г изюма = 65 г сахаров одним пунктом).
-const CONCENTRATE_IDS = ['dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey'];
+const CONCENTRATE_IDS = ['dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey', 'fruit_date_medjool', 'pryaniki', 'jam', 'zefir', 'pastila', 'sushki', 'sugar_cookies', 'marmalade'];
+
+// ─── Порционные «дегустационные» потолки для концентратов/хлеба/удовольствий ──
+// Единая карта для ВСЕХ путей добора (F1-комфорт, догон недобора): «Финик Меджул 150 г»
+// или «Курага 110 г» — абсурд; 40-60 г сухофруктов/мёда и ~100-110 г хлеба — реальная
+// «доборка к каше» (80/20, гибкая диета), а «пряники/джем/зефир» — та самая 20% свободы.
+const COMFORT_PORTION_LIMITS: Record<string, number> = {
+  honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60, fruit_date_medjool: 60, dried_apple_rings: 50,
+  pryaniki: 50, jam: 35, zefir: 50, pastila: 45, sushki: 40, sugar_cookies: 40, marmalade: 35,
+  bread_white: 110, bread_rye: 110, bread_borodinsky: 110, bread_fitness: 110, whole_grain_bread: 110,
+};
+
 export function isConcentrateFood(food: FoodItem): boolean {
   if (CONCENTRATE_IDS.includes(food.id)) return true;
   return (food.category === 'veg_fruit' || food.category === 'carb') && (food.carbs || 0) >= 55 && (food.fiber || 0) <= 15;
@@ -583,7 +597,7 @@ const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_b
 // как сухая крупа упёрлась в комфортный кап 150 г (жалоба «ещё одна порция каши —
 // не вариант»). Хлеб+мёд/варенье, сухофрукты, дыня — плотные по углям и куда легче
 // для ЖКТ, чем вторая тарелка риса. Используются вторым источником углей на массе.
-const COMFORT_CARB_IDS = ['honey','bread_white','bread_rye','bread_borodinsky','whole_grain_bread','raisins','dates_dried','dates','dried_apricots','bread_fitness'];
+const COMFORT_CARB_IDS = ['honey','bread_white','bread_rye','bread_borodinsky','whole_grain_bread','raisins','dates_dried','dates','dried_apricots','bread_fitness','pryaniki','jam','zefir','pastila','sushki','sugar_cookies'];
 
 // Эпик B: овощи, «притворяющиеся» фруктами по макросам (лук/чеснок/порей/кабачок и т.п.)
 // не должны попадать во фруктовые/быстрые углеводные пулы («лук 70 г в полднике»).
@@ -1599,17 +1613,13 @@ function buildWholeMeal(
       if (!breakfast && remC > 40) {
         const usedIds2 = new Set(items.map(i => i.id));
         const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
-        const COMFORT_PORTION_CAP: Record<string, number> = {
-          honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60,
-          bread_white: 100, bread_rye: 100, bread_borodinsky: 100, bread_fitness: 100, whole_grain_bread: 100,
-        };
         const comfortPool = COMFORT_CARB_IDS
           .map(id => FOOD_DB.find(f => f.id === id))
           .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
         const src2 = comfortPool.length > 0 ? pickPriority(comfortPool, seed + 27, { lockedIds, recentIds, hardRecentIds })
           : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam)[0];
         if (src2) {
-          const portionCap = COMFORT_PORTION_CAP[src2.id] ?? 100;
+          const portionCap = COMFORT_PORTION_LIMITS[src2.id] ?? 100;
           const g2 = Math.min(portionCap, Math.floor(Math.min(gramsForMacro(src2, Math.min(remC, 80), 'carbs', carbPortionCap(src2)), 250) / 10) * 10);
           if (g2 >= 30) {
             const it2 = makeItem(src2, g2, 'carb_slow');
@@ -3521,10 +3531,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (item.role === 'carb_slow' || item.role === 'carb_fast') {
           const fd = FOOD_DB.find(f => f.id === item.id);
           if (fd) upCap = carbPortionCap(fd, _ms);
+          // Концентраты/удовольствия (медджул, финики, курага, хлеб) — дегустационный кап
+          // по единой карте поверх капа категории; обычные крупы растут своим капом.
+          const _comfortLimitCarb = COMFORT_PORTION_LIMITS[item.id];
+          if (_comfortLimitCarb !== undefined) upCap = Math.min(upCap, _comfortLimitCarb);
         }
         // D-28+ fix (жалоба «500 г клюквы»): фрукт — это порция-«добавка», а не углеводный
-        // носитель; коррекция макросов не должна раздувать его выше реалистичных 150 г.
-        if (item.role === 'fruit') upCap = FRUIT_PORTION_CAP_G;
+        // носитель; коррекция макросов не должна раздувать его выше реалистичных 150 г
+        // (концентраты-сухофрукты — жёстче, по карте 40-60 г).
+        if (item.role === 'fruit') upCap = COMFORT_PORTION_LIMITS[item.id] ?? FRUIT_PORTION_CAP_G;
         // D-28+ fix: цельный белок (курица/рыба/творог) тоже не раздувается коррекцией за 300 г
         // на приём — иначе прецизионная подгонка давала «лосось 316 г». Эпик B: кап ровно 300 г
         // (тест d28 «порция белка ≤300 г»; ×1.25 допускал 375 г).
@@ -4279,7 +4294,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // Aug 28: добавка не раздувает макрос за цель ×1.03 (kcal-недобор мапится в макро —
         // раньше «догон ккал» жиром вылетал за пол жиров ×1.1 → разбег КБЖУ). Флор 10 г —
         // чтобы цикл не выходил раньше времени (перебор side-эффектов режет ветка need<0).
-        let grams = Math.max(10, Math.min(150, Math.round(Math.max(0, _needG) / per100 * 100 / 10) * 10));
+        // Дегустационный потолок: концентраты/хлеб/удовольствия — по карте (медджул ≤60 г,
+        // хлеб ≤110 г), остальное ≤150 г. Иначе догон недобора наливал «Финик Меджул 150 г».
+        const _portionCeiling = COMFORT_PORTION_LIMITS[best.id] ?? 150;
+        let grams = Math.max(10, Math.min(_portionCeiling, Math.round(Math.max(0, _needG) / per100 * 100 / 10) * 10));
         const r = grams/100;
         const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
         const it:any = { id: best.id, name: best.name, amount: grams, role: effWorst==='p'?'protein':effWorst==='c'?'carb_slow':'fat', kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r), leucine_mg: 0 };
