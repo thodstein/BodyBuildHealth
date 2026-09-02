@@ -916,4 +916,55 @@ export function calcRefeedNeed(weeksInDeficit:number, bodyFat?:number, ea?:numbe
   return { needed, carbBoostPct:boost, note: needed ? `Refeed 1×/нед +${boost}% углей (лептин/T3 Trexler)` : 'Refeed не нужен' };
 }
 
+// ——— Carb / Sodium loading (Breno Melo / peak week) ———
+export function calcCarbLoading(weightKg:number, days:number, gPerKg?:number): { totalCarbG:number; dailyG:number; note:string } {
+  const d = clamp(days,1,3);
+  const gpk = gPerKg ?? (d===3 ? 10 : d===2 ? 8 : 6);
+  const dailyG = Math.round(weightKg * clamp(gpk,5,12));
+  const totalCarbG = dailyG * d;
+  const note = `${d}д × ${gpk}г/кг → ${dailyG}г/сут, всего ${totalCarbG}г (Breno Melo 10-12г/кг 1-3д taper)`;
+  return { totalCarbG, dailyG, note };
+}
+export function calcSodiumLoading(weightKg:number, days:number, sodiumGPerDay?:number): { totalSodiumG:number; dailyG:number; note:string } {
+  const d = clamp(days,1,3);
+  const dailyG = sodiumGPerDay ?? 5;
+  const totalSodiumG = Math.round(dailyG * d *10)/10;
+  return { totalSodiumG, dailyG, note: `Na ${dailyG}г/сут ×${d}д = ${totalSodiumG}г (проверь АД, не >6г/сут при гипертонии)` };
+}
+// ——— Body comp projection + sensitivity (theontho) ———
+export function calcBodyCompProjection(input:{ weight:number; height:number; bodyFat:number; years:number; mode:'hold_bf'|'hold_weight'|'hold_ffmi' }): Array<{ year:number; weight:number; bodyFat:number; ffmi:number }> {
+  const hM=input.height/100;
+  const ffm0=input.weight*(1-input.bodyFat/100);
+  const ffmi0=ffm0/(hM*hM)+6.1*(1.80-hM);
+  const out: Array<{year:number; weight:number; bodyFat:number; ffmi:number}>=[];
+  for(let y=0;y<=input.years;y++){
+    // simple model: +0.4 FFMI/year first 2y then +0.15 (Morton), bf varies by mode
+    const prog = y<=2 ? y*0.4 : 0.8 + (y-2)*0.15;
+    const ffmi = Math.min(ffmi0+prog, 26.2);
+    const ffm = (ffmi -6.1*(1.80-hM)) * hM*hM;
+    let weight:number, bf:number;
+    if(input.mode==='hold_bf'){ bf=input.bodyFat; weight=ffm/(1-bf/100); }
+    else if(input.mode==='hold_weight'){ weight=input.weight; bf=Math.max(5, (1-ffm/weight)*100); }
+    else { weight=ffm/(1-input.bodyFat/100); bf=input.bodyFat; } // hold_ffmi same as hold_bf for now
+    out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:Math.round(bf*10)/10, ffmi:Math.round(ffmi*10)/10 });
+  }
+  return out;
+}
+export function calcBeverageRank(totalLossMl:number, sodiumLossMg:number): Array<{ name:string; score:number; note:string }> {
+  // rank by hydration index (Maughan) + Na
+  const lossL=totalLossMl/1000;
+  const list=[
+    { name:'Вода', score: 1.0, note:`${Math.round(lossL*1000)}мл, Na 0 — только <60мин` },
+    { name:'Изотоник 500мг/л', score: lossL>1? 1.3:1.1, note:`Na ${Math.round(sodiumLossMg)}мг, 500мг/л — 1-2ч` },
+    { name:'Изотоник 700мг/л', score: lossL>1.5? 1.5:1.2, note:'700мг/л — жарко/ >90мин' },
+    { name:'ORS 900мг/л', score: lossL>2? 1.6:1.0, note:'900мг/л — гипонатриемия риск' },
+  ];
+  return list.sort((a,b)=>b.score-a.score);
+}
+export function calcLeafScore(answers: boolean[]): { score:number; risk:'low'|'moderate'|'high'; note:string } {
+  const score=answers.filter(Boolean).length;
+  const risk=score>=8?'high':score>=4?'moderate':'low';
+  const note=risk==='high'?'LEAF ≥8 — высокий RED-S (Mountjoy)':risk==='moderate'?'LEAF 4-7 — умеренный':'LEAF <4 — низкий';
+  return { score, risk, note };
+}
 // ——— TyG / FIB-4 wrappers already via calcTyG etc — exported above ———
