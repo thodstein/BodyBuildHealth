@@ -35,6 +35,7 @@ import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SUMMARY_SUBGROUP_LABEL_RU } from '../../../engines/bb/bb-summary.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
+import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
@@ -602,6 +603,23 @@ export const BbAutoConstructor: React.FC = () => {
     ...(prof.workMax || {}),
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
+  // Epic A: персональная калибровка MEV (личный минимум объёма). Хранится в he_bb_mev_calibration.
+  const [mevCal, setMevCal] = useState<MEVCalibration | null>(() => loadMEVCalibration());
+  const [mevDraft, setMevDraft] = useState<MEVSignal>({ pump: 4, soreness: 2, performance: 4 });
+  const startMEVCalibration = () => {
+    const cal = buildMEVCalibration(bbLevel, ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'biceps', 'triceps', 'glutes', 'calves', 'abs']);
+    saveMEVCalibration(cal);
+    setMevCal(cal);
+    flash('🧪 Калибровка MEV запущена — старт MEV−2, после каждой недели вводите сигнал');
+  };
+  const commitMEVWeek = () => {
+    if (!mevCal) return;
+    const next = recordMEVCalibrationWeek(mevCal, mevDraft);
+    saveMEVCalibration(next);
+    setMevCal(next);
+    flash(isMEVCalibrationComplete(next) ? '✅ MEV калиброван — личный минимум зафиксирован' : `📈 Неделя ${next.weeks.length} записана`);
+  };
+  const resetMEVCalibration = () => { clearMEVCalibration(); setMevCal(null); flash('🧪 Калибровка MEV сброшена'); };
   // Шаг «Реальные веса»: фактический ввод весов по упражнениям плана + число применённых
   const [weightEntries, setWeightEntries] = useState<PlanWeightEntry[]>([]);
   const [weightsApplied, setWeightsApplied] = useState(0);
@@ -2573,6 +2591,52 @@ export const BbAutoConstructor: React.FC = () => {
        </div>
 
       {renderSpecializationSelection()}
+
+      {/* Epic A: калибровка личного MEV */}
+      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.18)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, flexWrap:'wrap' }}>
+          <span style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>🧪 Личный MEV (калибровка)</span>
+          {mevCal && (
+            <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20, background:'rgba(96,165,250,0.15)', color:'#93c5fd', border:'1px solid rgba(96,165,250,0.3)' }}>
+              {isMEVCalibrationComplete(mevCal) ? '✅ калиброван' : `📈 нед ${mevCalibrationProgress(mevCal).weeksDone}`}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize:9, opacity:0.8, marginBottom:8 }}>
+          Протокол RP: старт с MEV−2, +1 сет/нед, пока крепатура ≤2 и производительность не падает; 2 подряд недели деградации → фикс личного MEV. Применяется вместо таблицы (внутри капов).
+        </div>
+        {!mevCal ? (
+          <button style={{ ...BTN, width:'100%' }} onClick={startMEVCalibration}>🧪 Запустить калибровку MEV</button>
+        ) : (
+          <>
+            {isMEVCalibrationComplete(mevCal) && mevCal.userMevByMuscle && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                {Object.entries(mevCal.userMevByMuscle).map(([m, v]) => (
+                  <span key={m} style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:999, background:'rgba(96,165,250,0.12)', color:'#bfdbfe', border:'1px solid rgba(96,165,250,0.25)' }}>{MUSCLE_LABEL_RU[m] || m}: {v}</span>
+                ))}
+              </div>
+            )}
+            {!isMEVCalibrationComplete(mevCal) && (
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:9, fontWeight:700, color:'#93c5fd', marginBottom:4 }}>Сигнал этой недели (после недели №{mevCal.weeks.length + 1}):</div>
+                {([['pump', 'Накачка 0-5'], ['soreness', 'Крепатура 0-5'], ['performance', 'Производительность 0-5']] as const).map(([k, label]) => (
+                  <div key={k} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                    <span style={{ fontSize:9, width:120, opacity:0.85 }}>{label}</span>
+                    <input type="range" min={0} max={5} step={1} value={mevDraft[k]} onChange={e => setMevDraft({ ...mevDraft, [k]: Number(e.target.value) })} style={{ flex:1, accentColor:'#60a5fa' }} />
+                    <span style={{ fontSize:9, fontWeight:800, width:16 }}>{mevDraft[k]}</span>
+                  </div>
+                ))}
+                {mevSignalDegradation(mevDraft) && <div style={{ fontSize:9, color:'#fbbf24', marginBottom:4 }}>⚠ Сигнал деградации — MEV зафиксируется на прошлой неделе (если это 2-я подряд).</div>}
+                <button style={{ ...BTN, width:'100%' }} onClick={commitMEVWeek}>📈 Записать неделю</button>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:6, marginTop:4 }}>
+              {!isMEVCalibrationComplete(mevCal) && <button style={{ ...BTN_GHOST, flex:1, fontSize:9 }} onClick={() => { const r = resolveMEVAfterCalibration(mevCal); saveMEVCalibration(r); setMevCal(r); flash('🧪 MEV зафиксирован вручную'); }}>✅ Завершить сейчас</button>}
+              <button style={{ ...BTN_GHOST, flex:1, fontSize:9 }} onClick={resetMEVCalibration}>🗑 Сбросить</button>
+            </div>
+          </>
+        )}
+      </div>
 
       {planMode === 'programs' && (
         <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
