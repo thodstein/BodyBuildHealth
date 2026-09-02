@@ -156,14 +156,18 @@ export const CombatConstructor: React.FC = () => {
         if (hist.length >= 2) vbtHistToPass = hist;
       }
     } catch {}
-    // сохраняем последний замер в историю (для EWMA тренда 7/14д)
+    // сохраняем последний замер в историю (для EWMA 7/14д) — per-exercise: bench + squat + pull
     if (vbtBest > 0 && vbtLast > 0) {
       try {
         const { loadVbtHistoryCB, saveVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
         const hist = loadVbtHistoryCB();
-        // best + last как две точки одного дня (скалярный вход → map на bench_bar для теста)
-        hist.push({ liftId: 'bench_bar', velocity: vbtBest, date: new Date().toISOString().slice(0,10), weight: (workMax as any)?.bench || bodyweight });
-        hist.push({ liftId: 'bench_bar', velocity: vbtLast, date: new Date().toISOString().slice(0,10), weight: (workMax as any)?.bench || bodyweight });
+        const today = new Date().toISOString().slice(0,10);
+        const lifts = ['bench_bar','squat','row_bar'];
+        for (const lift of lifts) {
+          const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
+          hist.push({ liftId: lift, velocity: vbtBest, date: today, weight: w });
+          hist.push({ liftId: lift, velocity: vbtLast, date: today, weight: w });
+        }
         saveVbtHistoryCB(hist);
         setVbtHistory(hist.slice(-48));
       } catch {}
