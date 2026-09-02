@@ -1,10 +1,11 @@
 /**
  * lms-comp-gap.test.ts — ПЛ-циклы между соревнованиями (Фаза 2): окна пролётов,
  * сжатие цикла без потери логики, taper/пик у каждого старта, авто/ручной выбор.
+ * Обновлён под «любое изменение — только по согласию».
  */
 import { describe, expect, it } from 'vitest';
 import { planBetweenCompetitions, buildSeasonWithCompWindow } from '../lms-comp-gap.engine';
-import { fitCycleToWeeks, buildDefaultSeasonSlots } from '../lms-season.engine';
+import { fitCycleToWeeks, applyFitConsent, buildDefaultSeasonSlots } from '../lms-season.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { CYCLE_03 } from '../../../data/lms-cycles/cycle-03';
 import { CYCLE_15 } from '../../../data/lms-cycles/cycle-15';
@@ -28,13 +29,13 @@ const opts = {
 };
 
 describe('planBetweenCompetitions', () => {
-  it('8-нед цикл в 12-нед окне с тапером: цикл сжат (7 нед), пик/старт/пост на месте, нет пустых недель', () => {
+  it('8-нед цикл в 12-нед окне с тапером: цикл сжат (7 нед), пик/старт/пост на месте, нет пустых недель (с согласием)', () => {
     const res = planBetweenCompetitions(
       [
         { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
         { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
       ],
-      { ...opts, cycleForGap: (j) => j === 1 ? CYCLE_01 : CYCLE_01, mode: 'auto' } as never,
+      { ...opts, cycleForGap: (j) => j === 1 ? CYCLE_01 : CYCLE_01, mode: 'auto', consents: { 0: true, 1: true } } as never,
     );
     // 20 нед до второго старта + 1 пост = 21 неделя плана + филлерная 22-я (паттерн buildPLSeasonPeaks).
     expect(res.totalPlanWeeks).toBe(22);
@@ -43,8 +44,9 @@ describe('planBetweenCompetitions', () => {
     const seg1 = res.segments[1];
     expect(seg1.availableWeeks).toBe(8);
     expect(seg1.cycleId).toBe('cycle-01');
-    expect(seg1.fitMode).toBe('shrink');
+    expect(seg1.fitMode).toBe('proposed_shrink');
     expect(seg1.fitWeeks).toBe(8);
+    expect(seg1.needsConsent).toBe(false);
     expect(seg1.notes.some(n => n.includes('сжат'))).toBe(true);
     // У обоих стартов есть неделя соревнований и пик-блок.
     const meets = res.weeks.filter(w => w.meetWeek);
@@ -57,13 +59,27 @@ describe('planBetweenCompetitions', () => {
     }
   });
 
+  it('без согласия: пролёт требует согласия — strict_skip', () => {
+    const res = planBetweenCompetitions(
+      [
+        { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
+        { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
+      ],
+      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto' } as never,
+    );
+    const seg1 = res.segments[1];
+    expect(seg1.fitMode).toBe('strict_skip');
+    expect(seg1.fitWeeks).toBe(null);
+    expect(seg1.needsConsent).toBe(true);
+  });
+
   it('окно меньше минимального (4 нед): fitWeeks null, поддерживающий повтор, время не простаивает', () => {
     const res = planBetweenCompetitions(
       [
         { id: 'm1', name: 'Старт 1', weeksToStart: 4 },
         { id: 'm2', name: 'Старт 2', weeksToStart: 8 },
       ],
-      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto' } as never,
+      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto', consents: { 0: true, 1: true } } as never,
     );
     // Окно второго пролёта = 8-4-1-2-1 = 0 нед → skip.
     const seg1 = res.segments[1];
@@ -75,14 +91,14 @@ describe('planBetweenCompetitions', () => {
     expect(res.weeks.length).toBe(10);
   });
 
-  it('несколько стартов подряд: окна не накладываются, у каждого старта пик-блок', () => {
+  it('несколько стартов подряд: окна не накладываются, у каждого старта пик-блок (с согласием)', () => {
     const res = planBetweenCompetitions(
       [
         { id: 'm1', name: 'A', weeksToStart: 6 },
         { id: 'm2', name: 'B', weeksToStart: 12 },
         { id: 'm3', name: 'C', weeksToStart: 20 },
       ],
-      { ...opts, cycleForGap: (j) => [CYCLE_01, CYCLE_03, CYCLE_15][j], mode: 'auto' } as never,
+      { ...opts, cycleForGap: (j) => [CYCLE_01, CYCLE_03, CYCLE_15][j], mode: 'auto', consents: { 0: true, 1: true, 2: true } } as never,
     );
     expect(res.segments).toHaveLength(3);
     expect(res.segments[0].cycleId).toBe('cycle-01');
@@ -92,13 +108,13 @@ describe('planBetweenCompetitions', () => {
     expect(meets.length).toBe(3);
   });
 
-  it('ручной выбор на каждый пролёт из подходящих в базе', () => {
+  it('ручной выбор на каждый пролёт из подходящих в базе (с согласием)', () => {
     const res = planBetweenCompetitions(
       [
         { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
         { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
       ],
-      { ...opts, mode: 'manual', selections: { 0: 'cycle-01', 1: 'cycle-15' } } as never,
+      { ...opts, mode: 'manual', selections: { 0: 'cycle-01', 1: 'cycle-15' }, consents: { 0: true, 1: true } } as never,
     );
     expect(res.segments[0].cycleId).toBe('cycle-01');
     expect(res.segments[1].cycleId).toBe('cycle-15');
@@ -112,29 +128,33 @@ describe('planBetweenCompetitions', () => {
         { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
         { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
       ],
-      { ...opts, mode: 'manual', selections: { 1: 'not-a-cycle' } } as never,
+      { ...opts, mode: 'manual', selections: { 1: 'not-a-cycle' }, consents: { 0: true, 1: true } } as never,
     );
     expect(res.notes.some(n => n.includes('не подходит'))).toBe(true);
     expect(res.segments[1].cycleId).toBeTruthy();
   });
 
-  it('buildSeasonWithCompWindow — обёртка возвращает и сегменты, и недели', () => {
+  it('buildSeasonWithCompWindow — обёртка возвращает и сегменты, и недели (с согласием)', () => {
     const res = buildSeasonWithCompWindow(
       [{ id: 'm1', name: 'Старт', weeksToStart: 10 }],
-      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto' } as never,
+      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto', consents: { 0: true } } as never,
     );
     expect(res.segments.length).toBe(1);
     expect(res.weeks.length).toBeGreaterThan(0);
     expect(res.totalPlanWeeks).toBe(res.weeks.length);
   });
 
-  it('сжатие через fitCycleToWeeks сохраняет темп прогрессии (4→3 для week1-цикла)', () => {
+  it('сжатие через fitCycleToWeeks сохраняет темп прогрессии (4→3 для week1-цикла) и требует согласия', () => {
     const fit = fitCycleToWeeks(WEEK1_ONLY, 3, { minCycleFloor: 1 }); // оригинал 4 нед
-    expect(fit.mode).toBe('shrink');
+    expect(fit.mode).toBe('proposed_shrink');
     expect(fit.weeks).toBe(3);
+    expect(fit.needsConsent).toBe(true);
     expect(fit.correctionPctEff).toBeGreaterThan(0);
     const base = 0.005; // fallback для correctionPct=0
     const expected = Math.min(base * (4 / 3), base * 2);
     expect(fit.correctionPctEff).toBeCloseTo(expected, 5);
+    const applied = applyFitConsent(fit, true);
+    expect(applied.needsConsent).toBe(false);
+    expect(applyFitConsent(fit, false).mode).toBe('strict_skip');
   });
 });

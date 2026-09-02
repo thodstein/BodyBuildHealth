@@ -9,12 +9,13 @@
  *
  * Цикл на каждый пролёт можно АВТО-подобрать (лучший из candidateCyclesForSlot)
  * или ВЫБРАТЬ ВРУЧНУЮ из подходящих в базе (mode:'manual' + selections).
+ * ЛЮБОЕ ИЗМЕНЕНИЕ РАСКЛАДКИ — ТОЛЬКО ПО СОГЛАСИЮ (consents + applyFitConsent).
  *
  * Аддитивный: buildPLSeasonPeaks / appendPLTaperWeeks НЕ меняются — используются как есть.
  */
 import { buildLMSPlan, originalCycleWeeks, type LMSBuildInput, type LMSPlanWeek } from './lms-builder.engine';
 import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lms-macro-taper.engine';
-import { candidateCyclesForSlot, fitCycleToWeeks, type PLSeasonPeriod, type PLSeasonSlot } from './lms-season.engine';
+import { candidateCyclesForSlot, fitCycleToWeeks, applyFitConsent, type PLSeasonPeriod, type PLSeasonSlot } from './lms-season.engine';
 import type { LMSRankedCycle, LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
@@ -29,8 +30,9 @@ export interface GapSegment {
   cycleId: string;
   cycleTitle: string;
   cycleWeeks: number;      // исходная длина выбранного цикла
-  fitWeeks: number | null; // ужатая/растянутая длина (null = окно слишком мало)
-  fitMode: 'exact' | 'extend' | 'shrink' | 'skip';
+  fitWeeks: number | null; // ужатая/растянутая длина (null = окно слишком мало или без согласия)
+  fitMode: 'exact' | 'proposed_extend' | 'proposed_shrink' | 'strict_skip' | 'skip';
+  needsConsent: boolean;   // true → требует согласия
   fittedCycle: SRCycleTemplate | null; // производный шаблон (сжатый/растянутый)
   taperWeeks: number;
   candidates: LMSRankedCycle[];
@@ -48,6 +50,7 @@ export interface CompGapOptions {
   selector: LMSSelectorInput;
   mode?: 'auto' | 'manual';
   selections?: Record<number, string>;   // manual: id цикла на индекс пролёта
+  consents?: Record<number, boolean>;    // согласие на изменение каждого пролёта
   cycleForGap?: (gapIndex: number) => SRCycleTemplate | undefined; // прямой выбор (без кандидатов)
   slotForGap?: (gapIndex: number) => GapSlotInput;                 // переопределение фазы окна
   taper?: MacroTaperOpts;
@@ -163,28 +166,64 @@ export function planBetweenCompetitions(
         meetId: meet.id, meetName: meet.name, meetWeek: meet.weeksToStart,
         startWeek, endWeek, availableWeeks: available,
         cycleId: '', cycleTitle: 'Нет подходящего цикла', cycleWeeks: 0,
-        fitWeeks: null, fitMode: 'skip', fittedCycle: null, taperWeeks: taperW, candidates, notes,
+        fitWeeks: null, fitMode: 'skip', needsConsent: false, fittedCycle: null, taperWeeks: taperW, candidates, notes,
       });
       return;
     }
 
-    const fit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: 1 });
+    const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: 1 });
     // Окна нет вовсе (до старта 0 недель) — только стартовая неделя с прикидами.
     const noWindow = available < 1;
-    const fitWeeks = fit.weeks > 0 ? fit.weeks : (noWindow ? 1 : null);
-    const fitMode = noWindow ? ('skip' as const) : fit.weeks === 0 ? ('skip' as const) : (fit.mode as GapSegment['fitMode']);
+    let fitWeeks: number | null;
+    let fitMode: GapSegment['fitMode'];
+    let needsConsent = false;
+    let fittedCycle: SRCycleTemplate | null = rawFit.cycle;
+    let fitNotes: string[] = [...rawFit.notes];
+    if (noWindow) {
+      fitWeeks = 1;
+      fitMode = 'skip';
+      needsConsent = false;
+      fittedCycle = null;
+      fitNotes = ['окно между стартами слишком мало — только стартовая неделя с прикидами (время не простаивает)'];
+    } else if (rawFit.needsConsent) {
+      needsConsent = true;
+      const consent = opts.consents?.[j] === true;
+      const applied = applyFitConsent(rawFit, consent);
+      if (applied.mode === 'strict_skip') {
+        fitWeeks = null;
+        fitMode = 'strict_skip';
+        fittedCycle = null;
+        fitNotes = [...rawFit.notes, '⛔ Требует согласия на изменение раскладки — сегмент пропущен'];
+      } else {
+        fitWeeks = applied.weeks;
+        fitMode = applied.mode as GapSegment['fitMode'];
+        fittedCycle = applied.cycle;
+        needsConsent = false;
+        fitNotes = applied.notes;
+      }
+    } else {
+      // exact или strict_skip без согласия (окно < floor)
+      if (rawFit.weeks === 0) {
+        fitWeeks = null;
+        fitMode = 'skip';
+        fittedCycle = null;
+      } else {
+        fitWeeks = rawFit.weeks;
+        fitMode = rawFit.mode as GapSegment['fitMode'];
+      }
+      fitNotes = rawFit.notes;
+    }
     const segNotes = [
       `Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): окно ${available} нед, тапер ${taperW} нед${postW ? ' + пост' : ''}, цикл «${chosen.cycle.meta.title}» (${originalCycleWeeks(chosen.cycle)} нед)`,
-      ...fit.notes,
+      ...fitNotes,
     ];
-    if (noWindow) segNotes.push('окно между стартами слишком мало — только стартовая неделя с прикидами (время не простаивает)');
-    else if (available < floor) segNotes.push(`окно меньше комфортного минимума (${floor} нед) — цикл ужат до ${fitWeeks} нед`);
+    if (!noWindow && available < floor && fitWeeks != null) segNotes.push(`окно меньше комфортного минимума (${floor} нед) — цикл ужат до ${fitWeeks} нед`);
     segments.push({
       meetId: meet.id, meetName: meet.name, meetWeek: meet.weeksToStart,
       startWeek, endWeek, availableWeeks: available,
       cycleId: chosen.cycle.meta.id, cycleTitle: chosen.cycle.meta.title,
       cycleWeeks: originalCycleWeeks(chosen.cycle), fitWeeks, fitMode,
-      fittedCycle: fit.cycle, taperWeeks: taperW, candidates, notes: segNotes,
+      needsConsent, fittedCycle, taperWeeks: taperW, candidates, notes: segNotes,
     });
   });
 
@@ -252,6 +291,12 @@ export function planBetweenCompetitions(
     const res = buildPLSeasonPeaks(baseWeeks, sorted, opts.taper ?? {});
     weeks = res.weeks;
     notes.push(...res.notes);
+  }
+
+  // Итоговое предупреждение о требующих согласия сегментах
+  const blocked = segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent);
+  if (blocked.length > 0) {
+    notes.push(`⛔ ${blocked.length} пролёт(ов) требуют согласия на изменение раскладки — сборка заблокирована до решения`);
   }
 
   return { segments, totalPlanWeeks: weeks.length, weeks, notes };
