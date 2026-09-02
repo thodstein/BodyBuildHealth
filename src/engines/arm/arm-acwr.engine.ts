@@ -21,12 +21,13 @@ export function isTendonSession(exercises: Array<{ muscle: string }>): boolean {
   return exercises.some(e => TENDON_MUSCLES.has(e.muscle));
 }
 
-export function calcTendonAcwr(plan?: ArmPlan, srpeSessions?: Array<{ date: string; sRpe: number; minutes: number; exercises?: any[] }>): { ratio: number; zone: string } | null {
+export function calcTendonAcwr(plan?: ArmPlan, srpeSessions?: Array<{ date: string; sRpe: number; minutes?: number; durationMin?: number; exercises?: any[] }>): { ratio: number; zone: string } | null {
   if (!srpeSessions || srpeSessions.length < 3) return null;
-  // tendon-only daily loads
-  const tendonLoads = toDailyLoads(srpeSessions.filter(s => {
-    if (!s.exercises) return true; // если нет разметки — считаем tendon
-    return isTendonSession(s.exercises);
+  // нормализуем durationMin/minutes для backward compat
+  const norm = srpeSessions.map(s => ({ ...s, durationMin: (s as any).durationMin ?? (s as any).minutes ?? 60, sRPE: (s as any).sRpe ?? (s as any).sRPE }));
+  const tendonLoads = toDailyLoads(norm.filter(s => {
+    if (!(s as any).exercises) return true; // если нет разметки — считаем tendon
+    return isTendonSession((s as any).exercises);
   }) as any);
   if (tendonLoads.length < 5) return null;
   // для сухожилий — более длинное окно: используем тот же acuteChronicRatio но с порогами мягче (tendon адаптируется медленнее)
