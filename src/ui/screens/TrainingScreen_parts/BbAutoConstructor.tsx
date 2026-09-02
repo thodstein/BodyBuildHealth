@@ -112,6 +112,7 @@ import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
 import { estimateSessionTimeWithSupersets } from '../../../engines/bb/bb-fatigue.engine';
+import { bbVbtRecommendation, bbVbtZoneLabel } from '../../../engines/bb/bb-vbt.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -638,6 +639,10 @@ export const BbAutoConstructor: React.FC = () => {
   const [rehabMuscles, setRehabMuscles] = useState<string[]>([]);
   // P1: набор пластин зала для реалистичного округления весов.
   const [platePreset, setPlatePreset] = useState<string>('standard');
+  // P1: женский цикл — день цикла для лютеиновой модуляции объёма.
+  const [cycleDay, setCycleDay] = useState<number | undefined>(undefined);
+  // P1: VBT — ввод скорости лучшего/последнего повтора для рекомендации нагрузки.
+  const [vbtInput, setVbtInput] = useState<{ lift: string; best: string; last: string }>({ lift: 'bench', best: '', last: '' });
   // PRO: mobility restrictions — biomechanics-based exercise filtering
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
 
@@ -1877,6 +1882,7 @@ export const BbAutoConstructor: React.FC = () => {
           cruiseWeeks,
           rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
           availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
+          cycleDay,
         }, pedAdapt);
     }
 
@@ -2945,6 +2951,15 @@ export const BbAutoConstructor: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  {/* P1: женский цикл */}
+                  {linked?.profile?.settings?.personal?.sex === 'female' && (
+                    <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.14)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🌸 Женский цикл</div>
+                      <div style={{ fontSize:9, opacity:0.8, marginBottom:4 }}>День цикла (1-28): в лютеиновую фазу объём −5%.</div>
+                      <input type="number" min={1} max={60} value={cycleDay ?? ''} placeholder="день цикла" onChange={e => setCycleDay(e.target.value ? Number(e.target.value) : undefined)}
+                        style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:90 }} />
+                    </div>
+                  )}
                   <div style={{ marginTop:8 }}>
                     <InjurySelectCard injuries={injuries} onChange={setInjuries} />
                   </div>
@@ -4235,6 +4250,14 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize: 9, opacity: 0.8, marginBottom: 8 }}>
               🧲 SFR-профиль: {Math.round(unilateralRatioOf(builtPlan as any) * 100)}% односторонних сетов · lengthened-покрытие учитывается при выборе (Maeo 2023)
             </div>
+            <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:8 }}>
+              <span style={{ fontSize:9, opacity:0.8 }}>⚡ VBT скорость (м/с):</span>
+              <select value={vbtInput.lift} onChange={e => setVbtInput({ ...vbtInput, lift: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px' }}>
+                {['bench','squat','deadlift','ohp','row','pulldown'].map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <input type="number" step="0.01" placeholder="лучший" value={vbtInput.best} onChange={e => setVbtInput({ ...vbtInput, best: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:64 }} />
+              <input type="number" step="0.01" placeholder="последний" value={vbtInput.last} onChange={e => setVbtInput({ ...vbtInput, last: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:76 }} />
+            </div>
             {(() => {
               const w0 = (builtPlan as any).weeks?.[0]?.sessions?.[0];
               if (!w0?.exercises?.length) return null;
@@ -4243,6 +4266,17 @@ export const BbAutoConstructor: React.FC = () => {
               return (
                 <div style={{ fontSize: 9, opacity: 0.85, marginBottom: 6 }}>
                   ⏱ Неделя 1: ~{Math.round(t.baseSeconds / 60)} мин → суперсеты экономят ~{Math.round(t.savedSeconds / 60)} мин ({t.pairs} пар) — итого ~{Math.round(t.supersetSeconds / 60)} мин.
+                </div>
+              );
+            })()}
+            {(() => {
+              const b = Number(vbtInput.best), l = Number(vbtInput.last);
+              if (!(b > 0) || !(l > 0)) return null;
+              const r = bbVbtRecommendation(vbtInput.lift, b, l);
+              const z = bbVbtZoneLabel(r.lossPct);
+              return (
+                <div style={{ fontSize: 9, padding: '5px 7px', borderRadius: 6, background: 'rgba(56,189,248,0.06)', color: '#bfdbfe', border: '1px solid rgba(56,189,248,0.2)', marginBottom: 6 }}>
+                  ⚡ VBT ({vbtInput.lift}, {b.toFixed(2)}→{l.toFixed(2)} м/с): <b style={{ color: z.color }}>{z.label}</b> · {r.recommendation}
                 </div>
               );
             })()}

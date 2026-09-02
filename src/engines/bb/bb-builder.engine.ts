@@ -20,6 +20,7 @@ import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from 
 import { sfrSelectionBonus } from './bb-sfr-db';
 import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
+import { cycleVolumeFactor } from './bb-cycle.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -225,6 +226,10 @@ export interface BBBuilderInput {
   /** P1: набор пластин для реалистичного округления весов (микрозагрузка per-gym).
    *  Если передан — все рабочие веса плана округляются к достижимым на этом наборе. */
   availablePlates?: number[];
+  /** P1: женский цикл — день цикла (1-based). В лютеиновую фазу для женщин — лёгкая
+   *  модуляция объёма (×0.95) вне prep. */
+  cycleDay?: number;
+  cycleLength?: number;
 }
 
 /**
@@ -2813,7 +2818,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     hrvMs: input.hrvMs,
     sleepHours: input.sleepHours,
     stressLevel: input.stressLevel,
-  });
+  }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex);
   const nutritionMult = computeBBNutritionMultiplier({
     calorieSurplus: input.calorieSurplus,
     proteinPerKg: input.proteinPerKg,
