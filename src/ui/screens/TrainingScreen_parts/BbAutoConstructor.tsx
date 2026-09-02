@@ -580,6 +580,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
   // Проф-методики (Библиотека → Методики): DUP, суперсеты-антагонисты, схемы объёма памп-дней
   const [dupMode, setDupMode] = useState<DUPMode>('none');
+  // P2 E: per-muscle DUP — мышцы, для которых DUP применяется (пусто = ко всем primary).
+  const [dupMuscles, setDupMuscles] = useState<string[]>([]);
   const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist' | 'same_muscle' | 'giant'>('none');
   const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
 
@@ -1894,7 +1896,7 @@ export const BbAutoConstructor: React.FC = () => {
 
     // Проф-методики: DUP поверх плана (все ветки). Суперсеты и схемы объёма для всех веток теперь обрабатываются внутри движка (finalize) через BBBuilderInput/CycleToPlanInput — единый путь.
     if (dupMode !== 'none') {
-      plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2 });
+      plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
     }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 
@@ -2834,6 +2836,25 @@ export const BbAutoConstructor: React.FC = () => {
                         { id: 'full_dup', label: 'Полный DUP (3 дня)', desc:'Сила/гипер/выносл.' },
                       ]}
                     />
+                    {dupMode !== 'none' && (
+                      <div style={{ marginTop:6 }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:'#22d3ee', marginBottom:4 }}>🎯 Per-muscle DUP (пусто = ко всем primary):</div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                          {WEAK_GROUPS.map(([id, l]) => {
+                            const on = dupMuscles.includes(id);
+                            return (
+                              <button key={id} onClick={() => setDupMuscles(on ? dupMuscles.filter(x => x !== id) : [...dupMuscles, id])}
+                                style={{ padding:'3px 7px', borderRadius:999, fontSize:9, fontWeight:700, cursor:'pointer', minHeight:26,
+                                  background:on?'rgba(34,211,238,0.15)':'rgba(255,255,255,0.03)',
+                                  border:on?'1px solid rgba(34,211,238,0.4)':'1px solid rgba(255,255,255,0.08)',
+                                  color:on?'#22d3ee':'#fff' }}>
+                                {on ? '✓ ' : ''}{l}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <PopupSelect
                       label='🔗 Суперсеты'
                       value={supersetMode}

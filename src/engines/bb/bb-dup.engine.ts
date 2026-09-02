@@ -20,6 +20,9 @@ export interface DUPConfig {
   mode: DUPMode;
   /** Цикл ротации (3 = Пн/Ср/Пт, 5 = 5-дневный цикл). */
   cycleDays: number;
+  /** P2 E: per-muscle DUP — применять DUP ТОЛЬКО к primary этих мышц.
+   *  Пусто/не задано = DUP ко всем primary (поведение по умолчанию). */
+  muscles?: string[];
 }
 
 export interface DUPDayCharacter {
@@ -66,6 +69,11 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
   const preset = DUP_PRESETS[config.mode];
   if (!preset) return plan;
 
+  // P2 E: per-muscle DUP — если задан список мышц, DUP применяется только к ним.
+  const dupMuscles: Set<string> | null = Array.isArray(config.muscles) && config.muscles.length > 0
+    ? new Set(config.muscles)
+    : null;
+
   // Глубокая копия плана — deep clone workSets объекты (fix P0: shallow copy мутировал оригинал)
   const newPlan: BBPlan = {
     ...plan,
@@ -87,6 +95,8 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
       // Применяем DUP только к primary упражнениям (accessory остаются как есть)
       for (const ex of s.exercises) {
         if (ex.role !== 'primary') continue;
+        // P2 E: per-muscle гейт — если заданы мышцы, применяем только к ним.
+        if (dupMuscles && !dupMuscles.has(ex.muscle)) continue;
 
         // Изменяем character
         ex.character = dupDay.character;
@@ -113,8 +123,11 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
         }
       }
 
-      // Обновляем character сессии
-      s.character = dupDay.character;
+      // Обновляем character сессии — только если DUP ко ВСЕМ primary (не per-muscle),
+      // иначе характер дня задаёт смесь DUP и block-фаз по мышцам.
+      if (!dupMuscles) {
+        s.character = dupDay.character;
+      }
     }
   }
 
