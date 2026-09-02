@@ -15,6 +15,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildDefaultSeasonSlots,
+  createSeasonSlot,
   planSeason,
   assembleSeasonPlan,
   seasonSegmentSummary,
@@ -23,6 +24,7 @@ import {
   fitCycleToWeeks,
   applyFitConsent,
   type PLSeasonSlot,
+  type PLSeasonPeriod,
   type PLSeasonPlan,
 } from '../../../engines/lms/lms-season.engine';
 import {
@@ -221,6 +223,26 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
       const tmp = next[idx]; next[idx] = next[j]; next[j] = tmp;
       return next;
     });
+  };
+
+  const addSlot = (period: PLSeasonPeriod) => {
+    const next = [...slots, createSeasonSlot(period)];
+    setSlots(next);
+    // сброс consents/selections чтобы не съехали индексы
+    const clearedConsents: Record<number, boolean> = {};
+    const clearedSelections: Record<number, string> = {};
+    setConsents(clearedConsents);
+    setSelections(clearedSelections);
+    saveSeasonStateValue(seasonMode, next, undefined, clearedSelections, clearedConsents);
+  };
+
+  const removeSlot = (idx: number) => {
+    if (slots.length <= 1) return;
+    const next = slots.filter((_, i) => i !== idx);
+    setSlots(next);
+    setConsents({});
+    setSelections({});
+    saveSeasonStateValue(seasonMode, next, undefined, {}, {});
   };
 
   const saveSeasonStateValue = (
@@ -422,6 +444,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
             <button onClick={() => moveSlot(idx, -1)} title="Переместить раньше" aria-label="Переместить слот раньше" style={{ ...btnMini }}>◀</button>
             <button onClick={() => moveSlot(idx, 1)} title="Переместить позже" aria-label="Переместить слот позже" style={{ ...btnMini }}>▶</button>
             <button onClick={() => toggleSlot(idx)} title={slot.enabled ? 'Отключить период' : 'Включить период'} aria-label={slot.enabled ? 'Отключить период' : 'Включить период'} style={{ ...btnMini, border: slot.enabled ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.2)', color: slot.enabled ? '#00e68a' : '#fff' }}>{slot.enabled ? '✓' : '○'}</button>
+            {slots.length > 1 && <button onClick={() => removeSlot(idx)} title="Удалить слот" aria-label="Удалить слот" style={{ ...btnMini, color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>✕</button>}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, alignItems: 'center' }}>
@@ -607,6 +630,14 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, marginBottom: 8 }}>
             {slots.map((slot, idx) => renderSlot(slot, idx))}
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: '#fff', alignSelf: 'center' }}>＋ Добавить период:</span>
+            <button onClick={() => addSlot('endurance')} style={btnMini}>🏃 Выносливость</button>
+            <button onClick={() => addSlot('strength')} style={btnMini}>💪 Сила</button>
+            <button onClick={() => addSlot('speed')} style={btnMini}>⚡ Скорость</button>
+            <button onClick={() => addSlot('peak')} style={btnMini}>🎯 Пик</button>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>(дубль — напр. сила→скорость→сила)</span>
           </div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
             <button onClick={() => { setPickMode('auto'); saveSeasonStateValue(seasonMode, undefined, 'auto'); }} style={segBtn(pickMode === 'auto')}>🤖 Авто-подбор циклов</button>

@@ -215,14 +215,51 @@ describe('planSeason (авто/ручной)', () => {
     expect(plan.segments).toHaveLength(3);
   });
 
-  it('нет подходящих циклов — слот пропущен с предупреждением', () => {
+  it('нет подходящих циклов — speed fallback даёт strength с пометкой (слот не пропускается)', () => {
     const plan = planSeason({
       slots: [{ period: 'speed', label: 'Скорость', weeks: 6, weeksMin: 6, weeksMax: 10, defaultWeeks: 6, enabled: true }],
       selector: { goal: 'strength', level: 'novice', direction: 'bodybuilding' } as never,
       mode: 'auto',
+      consents: { 0: true },
     });
+    // speed с bodybuilding + пустой индекс → fallback на strength, слот собирается
+    expect(plan.segments).toHaveLength(1);
+    expect(plan.segments[0].rationale.some(r => r.includes('strength') || r.includes('Скорость'))).toBe(true);
+  });
+
+  it('дубль слота: сила→скорость→сила — порядок и недели сохраняются, можно собрать сезон', () => {
+    const base = buildDefaultSeasonSlots();
+    const dup = [...base, { ...base[1], period: 'strength' as const, label: 'Сила (дубль)' }];
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true, 4: true };
+    const plan = planSeason({ slots: dup, selector: selector as never, mode: 'auto', consents });
+    expect(plan.segments).toHaveLength(5);
+    expect(plan.segments[1].slot.period).toBe('strength');
+    expect(plan.segments[4].slot.period).toBe('strength');
+    expect(seasonSegmentSummary(plan.segments)).toContain('→');
+  });
+
+  it('пустой slots: план пустой, summary — нет активных слотов', () => {
+    const plan = planSeason({ slots: [], selector: selector as never, mode: 'auto' });
     expect(plan.segments).toHaveLength(0);
-    expect(plan.notes.some(n => n.includes('нет подходящих'))).toBe(true);
+    expect(plan.totalWeeks).toBe(0);
+    expect(seasonSegmentSummary(plan.segments)).toContain('нет активных');
+  });
+
+  it('speed fallback: при пустом индексе под фильтр используется strength с пометкой', () => {
+    const slot = { period: 'speed' as const, weeks: 6, weeksMin: 6, weeksMax: 10 };
+    const list = candidateCyclesForSlot(slot, { goal: 'strength', level: 'II-KMS', direction: 'armwrestling', bodyWeight: 90, daysPerWeek: 4, mode: 'natural' } as never);
+    // armwrestling + speed индекс пуст → fallback на strength
+    expect(list.length).toBeGreaterThan(0);
+    expect(list[0].cycle.meta.period).not.toBe('bodybuilding');
+    expect(list.some(r => r.warnings.some(w => w.includes('strength')) || r.rationale.some(ch => ch.includes('strength')))).toBe(true);
+  });
+
+  it('seasonSegmentSummary показывает strict_skip как «⛔ без согласия — пропущен»', () => {
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto' });
+    const blocked = plan.segments.filter(s => s.fit.mode === 'strict_skip');
+    expect(blocked.length).toBeGreaterThan(0);
+    const summary = seasonSegmentSummary(plan.segments);
+    expect(summary).toContain('без согласия');
   });
 });
 

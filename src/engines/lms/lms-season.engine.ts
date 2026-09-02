@@ -52,6 +52,14 @@ export function buildDefaultSeasonSlots(): PLSeasonSlot[] {
   ];
 }
 
+/** Фабрика слота по периоду (для «+ Добавить период» — дубль). */
+export function createSeasonSlot(period: PLSeasonPeriod): PLSeasonSlot {
+  const base = buildDefaultSeasonSlots().find(s => s.period === period);
+  if (base) return { ...base };
+  // fallback
+  return { period, label: PL_SEASON_PERIOD_LABEL[period] ?? period, weeks: 8, weeksMin: 6, weeksMax: 12, defaultWeeks: 8, enabled: true };
+}
+
 export function clampSlotWeeks(slot: PLSeasonSlot, weeks: number): number {
   const v = Number(weeks);
   if (!Number.isFinite(v)) return slot.defaultWeeks;
@@ -218,8 +226,17 @@ export function candidateCyclesForSlot(
         const fitNote = speedFitNote(cycle, slot);
         if (fitNote) rationale.push(fitNote);
         return { cycle, score, rationale, warnings };
-      });
-    return scored.sort((a, b) => b.score - a.score);
+      }).sort((a, b) => b.score - a.score);
+    if (scored.length > 0) return scored;
+    // Fallback: нет скоростных циклов под фильтр → используем strength с пометкой (план 2.2)
+    const fallback = rankCycles({ ...input, goal: 'strength' as const }).filter(
+      (r) => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding',
+    ).map(r => ({
+      ...r,
+      rationale: [...r.rationale, '⚠ нет скоростных циклов под фильтр — показан strength с акцентом на скорость (метка плана)'],
+      warnings: [...r.warnings, 'слот «Скорость» пуст в индексе — используйте strength-цикл с акцентом на скорость'],
+    }));
+    return fallback.sort((a, b) => b.score - a.score);
   }
   const goalMap: Record<'endurance' | 'strength' | 'peak', LMSSelectorInput['goal']> = {
     endurance: 'endurance',
@@ -453,16 +470,25 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
 // ─── Сегменты недель для UI (компактная сводка «нед X–Y: цикл (N нед)») ─────────
 
 export function seasonSegmentSummary(segments: PLSeasonSegment[]): string {
-  return segments
-    .filter(s => s.weeks > 0)
-    .map((seg, _i, arr) => {
-      const idx = segments.indexOf(seg);
-      const range = weekRangeOf(segments, idx);
-      const consentTag = seg.fit.needsConsent ? '' : (seg.fit.mode === 'proposed_shrink' || seg.fit.mode === 'proposed_extend' ? ' по согласию' : '');
-      const modeTag = seg.fit.mode === 'proposed_shrink' ? ', предлагается сжать' : seg.fit.mode === 'proposed_extend' ? ', предлагается растянуть' : seg.fit.mode === 'strict_skip' ? ', ⛔ без согласия' : '';
-      return `${range}: ${seg.cycleTitle} (${seg.weeks} нед${consentTag}${modeTag})`;
-    })
-    .join(' → ') || '— нет активных слотов —';
+  if (segments.length === 0) return '— нет активных слотов —';
+  const hasBlocked = segments.some(s => s.fit.mode === 'strict_skip');
+  const active = segments.filter(s => s.weeks > 0);
+  const parts: string[] = [];
+  // Активные
+  for (const seg of active) {
+    const idx = segments.indexOf(seg);
+    const range = weekRangeOf(segments, idx);
+    const consentTag = seg.fit.needsConsent ? '' : (seg.fit.mode === 'proposed_shrink' || seg.fit.mode === 'proposed_extend' ? ' по согласию' : '');
+    const modeTag = seg.fit.mode === 'proposed_shrink' ? ', предлагается сжать' : seg.fit.mode === 'proposed_extend' ? ', предлагается растянуть' : '';
+    parts.push(`${range}: ${seg.cycleTitle} (${seg.weeks} нед${consentTag}${modeTag})`);
+  }
+  // Заблокированные — отдельной строкой, чтобы не терялись
+  for (const seg of segments.filter(s => s.fit.mode === 'strict_skip')) {
+    const idx = segments.indexOf(seg);
+    const range = weekRangeOf(segments, idx);
+    parts.push(`${range}: ${seg.cycleTitle} (⛔ без согласия — пропущен)`);
+  }
+  return parts.join(' → ') || '— нет активных слотов —';
 }
 
 /** Тип-гард для SRCycleTemplate с явной многонедельной раскладкой. */
