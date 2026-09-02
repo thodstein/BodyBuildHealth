@@ -108,6 +108,7 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
+import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -4189,6 +4190,9 @@ export const BbAutoConstructor: React.FC = () => {
                 {qualityReport.score}
               </div>
               <div style={{ flex: 1, fontSize: 11, color: '#fff' }}>{bbQualityReportSummary(qualityReport)}</div>
+            </div>
+            <div style={{ fontSize: 9, opacity: 0.8, marginBottom: 8 }}>
+              🧲 SFR-профиль: {Math.round(unilateralRatioOf(builtPlan as any) * 100)}% односторонних сетов · lengthened-покрытие учитывается при выборе (Maeo 2023)
             </div>
             {qualityReport.issues.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
