@@ -74,30 +74,31 @@ export function buildArmDiagnosticsReport(input: {
   }
 
   // VBT — сустав/сухожилие риск (механизм)
-  if (vbt.zone === 'stop') findings.push({ level: 'critical', text: `VBT стоп: потеря ${vbt.velocityLossPct}%` });
-  else if (vbt.zone === 'warn') findings.push({ level: 'warn', text: `VBT warn: потеря ${vbt.velocityLossPct}%` });
-  else if (vbt.velocityLossPct != null) findings.push({ level: 'ok', text: `VBT ок: ${vbt.velocityLossPct}%` });
+  const vbtEx = (input.vbtRecords && input.vbtRecords[0]?.exerciseId) || 'wrist_curl_belt';
+  if (vbt.zone === 'stop') findings.push({ level: 'critical', text: `VBT стоп: потеря ${vbt.velocityLossPct}%`, exercise: vbtEx });
+  else if (vbt.zone === 'warn') findings.push({ level: 'warn', text: `VBT warn: потеря ${vbt.velocityLossPct}%`, exercise: vbtEx });
+  else if (vbt.velocityLossPct != null) findings.push({ level: 'ok', text: `VBT ок: ${vbt.velocityLossPct}%`, exercise: vbtEx });
 
   // Side humerus — сустав
   const sideLm = getArmLandmarks(input.level, 'side_pressure');
-  if (sideLm.mrv <= 9) findings.push({ level: 'ok', text: `Side MRV ${sideLm.mrv} — низкий (humerus), кап 3/нед первые 4 нед` });
+  if (sideLm.mrv <= 9) findings.push({ level: 'ok', text: `Side MRV ${sideLm.mrv} — низкий (humerus), кап 3/нед первые 4 нед`, exercise: 'side_press_table' });
 
   // Table — факт
   const tableRatio = input.totalSessions ? input.tableSessions / input.totalSessions : 0;
-  if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table time ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)` });
-  else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table time ${(tableRatio*100).toFixed(0)}% ≥50% — норма` });
+  if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table time ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
+  else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table time ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
 
   // Tendon — сустав/сухожилие риск
-  if (input.tendonSets > 22) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} >22 — CRITICAL (кап 22)` });
-  else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск` });
-  else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много` });
-  else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске` });
+  if (input.tendonSets > 22) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} >22 — CRITICAL (кап 22)`, exercise: 'wrist_ext_bb' });
+  else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск`, exercise: 'pronation_pulses' });
+  else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много`, exercise: 'wrist_ext_bb' });
+  else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске`, exercise: 'wrist_ext_bb' });
 
   // Асимметрия — сустав/механизм
   if (fv.asymmetryPct != null) {
-    if (fv.asymmetryPct >= 12) findings.push({ level: 'critical', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥12% — CRITICAL (кап 12.47% элита)` });
-    else if (fv.asymmetryPct >= 7) findings.push({ level: 'warn', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥7% — добавить слабую сторону (Bezkorovainyi)` });
-    else findings.push({ level: 'ok', text: `Асимметрия L/R ${fv.asymmetryPct}% — в допуске <7%` });
+    if (fv.asymmetryPct >= 12) findings.push({ level: 'critical', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥12% — CRITICAL (кап 12.47% элита)`, exercise: 'hammer_curl_thick' });
+    else if (fv.asymmetryPct >= 7) findings.push({ level: 'warn', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥7% — добавить слабую сторону (Bezkorovainyi)`, exercise: 'hammer_curl_thick' });
+    else findings.push({ level: 'ok', text: `Асимметрия L/R ${fv.asymmetryPct}% — в допуске <7%`, exercise: 'hammer_curl_thick' });
   }
 
   // Humerus / Balance — суставные риски (механизм-ориентированы)
@@ -115,8 +116,8 @@ export function buildArmDiagnosticsReport(input: {
     humerusWarnings = checkHumerusGuard({ weeks: input.weakTest.sidePressureFails ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
     balanceWarnings = checkWristBalance(mockPlan);
   }
-  for (const w of humerusWarnings) findings.push({ level: 'critical', text: w });
-  for (const w of balanceWarnings) findings.push({ level: 'warn', text: w });
+  for (const w of humerusWarnings) findings.push({ level: 'critical', text: w, exercise: 'side_press_table' });
+  for (const w of balanceWarnings) findings.push({ level: 'warn', text: w, exercise: 'pronation_cable' });
 
   info.push('Механизм-ориентированная модель: сустав/сухожилие/баланс — с уровнями, без общего score');
 

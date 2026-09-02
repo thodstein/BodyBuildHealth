@@ -206,7 +206,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return diagnoseVbt([{ weight: w, reps: r, velocityMs: v + 0.2 }, { weight: w, reps: r, velocityMs: v }]);
   }, [state.vbtWeight, state.vbtReps, state.vbtVel]);
 
-  const anglesVerified = isAnglesVerified(angles);
+  const anglesVerified = hasVideoSupport() && isAnglesVerified(angles);
 
   // Dynamic trials (Bezkorovainyi 4 теста)
   const dynamicTrials = useMemo(() => {

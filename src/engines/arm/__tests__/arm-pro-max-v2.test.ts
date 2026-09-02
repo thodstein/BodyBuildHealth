@@ -242,6 +242,15 @@ describe('arm PRO MAX v2 — catalog 72', () => {
   });
 });
 
+// ── Motion capture Hands (ensureHandsModel) ──
+describe('arm PRO MAX v2 — motion capture Hands', () => {
+  it('hasVideoSupport boolean', async () => {
+    const { hasVideoSupport, createHandsProcessor } = await import('../arm-motion-capture.engine');
+    expect(typeof hasVideoSupport()).toBe('boolean');
+    expect(createHandsProcessor(null as any, ()=>{})).toBeNull();
+  });
+});
+
 // ── Builder still PRO ──
 describe('arm PRO MAX v2 — builder integration', () => {
   it('72 catalog does not break builder', () => {
