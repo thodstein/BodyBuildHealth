@@ -85,19 +85,51 @@ export function ArmAutoConstructor() {
     } catch { return {}; }
   }, [linked, workMaxEdit]);
 
-  // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор)
+  // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор) — PRO MAX v2
   useEffect(() => {
     const apply = (payload: any) => {
       if (!payload || payload.kind !== 'weakpoints') return;
       const groups: string[] | undefined = payload.data?.groups;
+      let appliedWeak: string[] | null = null;
       if (Array.isArray(groups) && groups.length > 0) {
-        setWeakPoints(groups.slice(0, 2).map((s: string) => String(s).toLowerCase()));
+        appliedWeak = groups.slice(0, 2).map((s: string) => String(s).toLowerCase());
+        setWeakPoints(appliedWeak);
         setSpecialization(true);
         setStep('params');
         flash(`↩ Из диагностики: ${groups.join(', ')}`);
       }
+      // dynamicWeak fallback if groups empty but armDynamic present
+      if ((!appliedWeak || appliedWeak.length===0) && payload.data?.armDynamic) {
+        try {
+          const dyn = payload.data.armDynamic;
+          const weak: string[] = [];
+          if (dyn?.metrics?.finger_flex && dyn.metrics.finger_flex.f100 < 20) weak.push('risers');
+          if (dyn?.metrics?.hammer && dyn.metrics.hammer.ftIndex < 30) weak.push('brachialis');
+          if (dyn?.metrics?.hook && dyn.metrics.hook.fMax < 30) weak.push('supinators');
+          if (dyn?.metrics?.cup && dyn.metrics.cup.f500 < 25) weak.push('wrist_flexors');
+          if (weak.length) { setWeakPoints(weak.slice(0,2)); setSpecialization(true); flash(`↩ Динамика: ${weak.slice(0,2).join(', ')}`); }
+        } catch {}
+      }
       const tech = payload.data?.armTechnique;
       if (tech) setTechnique(String(tech));
+      const bench = payload.data?.armBench;
+      if (bench?.level) {
+        const map: Record<string,string> = { beginner:'beginner', intermediate:'intermediate', advanced:'advanced', competitive:'advanced', elite:'enhanced' };
+        const lvl = map[String(bench.level)] || 'intermediate';
+        setLevel(lvl);
+        try { localStorage.setItem('he_arm_last_bench_level', bench.level); } catch {}
+      }
+      // сохраняем диагностику для печати
+      try {
+        const diagSnap = {
+          score: payload.data?.armForce ? undefined : undefined, // score в отдельном Report, но bench/fatigue прокидываем
+          benchLevel: bench?.level,
+          armDynamic: payload.data?.armDynamic,
+          armAngles: payload.data?.armAngles,
+          armForce: payload.data?.armForce,
+        };
+        localStorage.setItem('he_arm_last_diagnostics', JSON.stringify(diagSnap));
+      } catch {}
     };
     // начальный снимок (если хаб уже отправил до монтирования)
     try {
@@ -377,7 +409,19 @@ export function ArmAutoConstructor() {
               )}
               <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
                 <button onClick={()=>{
-                  const html = buildArmPrintHtml(builtPlan);
+                  let diag: any = null;
+                  try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
+                  // fatigue/trend из force-history если есть
+                  try {
+                    const { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } = require('../../../engines/arm/arm-force-history.store');
+                    const trials = loadForceTrials();
+                    const stats = buildWeeklyStats(trials, 12);
+                    const ft = fatigueTrend(stats);
+                    const tr = forceTrend(stats);
+                    if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
+                  } catch {}
+                  const benchLevel = diag?.benchLevel;
+                  const html = buildArmPrintHtml(builtPlan, { benchLevel, fatigue: diag?.fatigue, trend: diag?.trend });
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }} style={BTN_GHOST as any}>🖨 Печать</button>

@@ -5,7 +5,7 @@
  * - Видео BlazePose реальный (estimateAnglesFromLandmarks) + canvas preview
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints, diagnostics_v2)
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
@@ -108,6 +108,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [tab, setTab] = useState<HubTab>('grip');
   const [toast, setToast] = useState<string>('');
   const [forceHistoryTick, setForceHistoryTick] = useState(0);
+  const [showCam, setShowCam] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -375,6 +378,30 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
+  // Camera: getUserMedia + overlay, PRO: если Hands модель загружена — real, иначе fallback ползунки (isAnglesVerified всё равно true для валидных)
+  useEffect(() => {
+    if (!showCam) {
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const stream = await (navigator.mediaDevices as any)?.getUserMedia?.({ video: { facingMode: 'user' } });
+        if (!stream || cancelled) return;
+        streamRef.current = stream;
+        if (videoRef.current) { (videoRef.current as any).srcObject = stream; try { await videoRef.current.play(); } catch {} }
+        setToast('📹 Камера включена — углы по estimateAnglesFromLandmarks (требует Hands модель, fallback — ползунки)');
+        setTimeout(()=>setToast(''),2500);
+      } catch (e:any) {
+        setToast(`⚠ Камера недоступна: ${e?.message || e}`);
+        setTimeout(()=>setToast(''),3000);
+        setShowCam(false);
+      }
+    })();
+    return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } };
+  }, [showCam]);
+
   return (
     <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       {/* Header score */}
@@ -492,11 +519,27 @@ export const ArmDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео (BlazePose/HANDS) — опционально</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Загрузи видео спарринга — углы посчитаются автоматически (estimateAnglesFromLandmarks). Сейчас — ручной ввод + landmarks JSON.</div>
-              <input type="file" accept="video/*,.json" onChange={handleVideoFile} style={{ marginTop:6, fontSize:11, color:DIM }} />
-              <div style={{ marginTop:6, width:'100%', height:80, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)', flexDirection:'column', gap:4 }}>
-                <div>video preview — PRO: BlazePose + angleBetween()</div>
-                <div style={{ fontSize:10 }}>Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}°</div>
+              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки.</div>
+              <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' }}>
+                <button onClick={()=> setShowCam(v=>!v)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid', borderColor: showCam?'#22c55e':'#1f3a5f', background: showCam?'rgba(34,197,94,0.14)':'#0a1629', color: showCam?'#22c55e':DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</button>
+                <label style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:11 }}>📁 JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
+              </div>
+              <div style={{ marginTop:6, width:'100%', minHeight:90, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)', flexDirection:'column', gap:4, position:'relative', overflow:'hidden' }}>
+                {showCam ? (
+                  <>
+                    <video ref={videoRef} autoPlay muted playsInline style={{ width:'100%', maxHeight:140, borderRadius:8, background:'#000' }} />
+                    <div style={{ position:'absolute', bottom:4, left:4, right:4, display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
+                      <span style={{ padding:'2px 6px', borderRadius:999, background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:10 }}>Элбоу {angles.elbowDeg}°</span>
+                      <span style={{ padding:'2px 6px', borderRadius:999, background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:10 }}>{angles.direction}</span>
+                      <span style={{ padding:'2px 6px', borderRadius:999, background: angleValid.valid?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)', color:'#fff', fontSize:10 }}>{angleValid.valid?'✓':'⚠'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>video preview — PRO: BlazePose + angleBetween()</div>
+                    <div style={{ fontSize:10 }}>Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {hasVideoSupport()?'Hands ready':'нужен Hands'}</div>
+                  </>
+                )}
               </div>
             </div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
