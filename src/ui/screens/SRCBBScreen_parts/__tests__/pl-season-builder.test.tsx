@@ -68,11 +68,14 @@ describe('PLSeasonBuilder', () => {
     expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(4);
   });
 
-  it('«Собрать сезон» → onBuilt с планом + переход к плану', () => {
+  it('«Собрать сезон» → onBuilt с планом + переход к плану (с согласием на изменения)', () => {
     let built: LMSBuildOutput | null = null;
     let navigated = false;
     seedSeasonMode('season');
     render(<PLSeasonBuilder {...props({ onBuilt: (o) => { built = o; }, onNavigatePlan: () => { navigated = true; } })} />);
+    // Даём согласие на все предложения изменения раскладки
+    const consentBtns = screen.queryAllByText(/Согласен, применить/);
+    consentBtns.forEach(btn => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(Array.isArray(built!.weeks) && built!.weeks.length > 0).toBe(true);
@@ -83,12 +86,13 @@ describe('PLSeasonBuilder', () => {
     seedSeasonMode('single');
     render(<PLSeasonBuilder {...props()} />);
     fireEvent.click(screen.getByText('🧩 Сезон'));
+    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     const saved = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
     expect(saved.season && saved.season.mode).toBe('season');
   });
 
-  it('карточка «Циклы между соревнованиями» появляется при ≥2 соревнованиях и собирает сезон с пиками', () => {
+  it('карточка «Циклы между соревнованиями» появляется при ≥2 соревнованиях и собирает сезон с пиками (с согласием)', () => {
     let built: LMSBuildOutput | null = null;
     let segments: import('../PLSeasonBuilder').SeasonBuildInfo[] = [];
     seedSeasonMode('season');
@@ -103,13 +107,17 @@ describe('PLSeasonBuilder', () => {
     expect(screen.queryByText(/Циклы между соревнованиями/)).not.toBeNull();
     expect(screen.queryByText(/Старт 1 \(нед 8\)/)).not.toBeNull();
     expect(screen.queryByText(/Старт 2 \(нед 20\)/)).not.toBeNull();
+    // Даём согласие на все слоты и пролёты
+    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
     // Ручной выбор цикла на пролёт (второй «👆 Выбрать вручную» — карточка пролётов),
-    // выбираем 12-нед цикл в 8-нед окно → бейдж «⬇ сжат».
+    // выбираем 12-нед цикл в 8-нед окно → бейдж «⬇ предлагается сжать» → после согласия «⬇ сжат по согласию».
     const manualBtns = screen.getAllByText('👆 Выбрать вручную');
     fireEvent.click(manualBtns[manualBtns.length - 1]);
     const gapSelect = screen.getByLabelText(/пролёта к «Старт 2»/);
     fireEvent.change(gapSelect, { target: { value: 'cycle-01' } });
-    expect(screen.getAllByText(/⬇ сжат/).length).toBeGreaterThan(0);
+    // После смены цикла появляется новое предложение — даём согласие снова
+    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
+    expect(screen.getAllByText(/сжат по согласию|предлагается сжать/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(Array.isArray(built!.weeks) && built!.weeks.length > 20).toBe(true);
@@ -118,7 +126,7 @@ describe('PLSeasonBuilder', () => {
     expect(built!.cycleMetrics.tonnage).toBeGreaterThan(0);
     // Сводка сегментов сезона передана в родителя (для вкладки «План» и печати).
     expect(segments.length).toBeGreaterThanOrEqual(2);
-    expect(segments.some(s => s.fitMode === 'shrink' && s.cycleWeeks > s.weeks)).toBe(true);
+    expect(segments.some(s => (s.fitMode === 'proposed_shrink' || s.fitMode === 'shrink') && s.cycleWeeks > s.weeks)).toBe(true);
   });
 
   it('SSR-рендер карточки не падает', () => {
@@ -135,7 +143,7 @@ describe('PLSeasonBuilder', () => {
     expect(changes).toEqual(['single']);
   });
 
-  it('один старт в сезоне — пик/тапер применяется поверх (buildPLSeasonPeaks через assembleSeasonPlan)', () => {
+  it('один старт в сезоне — пик/тапер применяется поверх (buildPLSeasonPeaks через assembleSeasonPlan) с согласием', () => {
     let built: LMSBuildOutput | null = null;
     seedSeasonMode('season');
     render(<PLSeasonBuilder {...props({
@@ -143,6 +151,7 @@ describe('PLSeasonBuilder', () => {
       taper: { mode: 'classic' as const, mockMeet: true, meetWeek: true, postMeet: true, windowWeeks: 2 },
       onBuilt: (o) => { built = o; },
     })} />);
+    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(built!.weeks.some(w => w.meetWeek)).toBe(true);

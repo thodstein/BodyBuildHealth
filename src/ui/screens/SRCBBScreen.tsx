@@ -1409,8 +1409,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     ];
     if (plSeasonMode === 'season' && seasonSegments.length > 0) {
       seasonSegments.forEach(s => {
-        if (s.fitMode === 'shrink') rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬇ сжат ${s.cycleWeeks}→${s.weeks} нед` });
-        else if (s.fitMode === 'extend') rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬆ растянут → ${s.weeks} нед` });
+        const isShrink = s.fitMode === 'shrink' || s.fitMode === 'proposed_shrink';
+        const isExtend = s.fitMode === 'extend' || s.fitMode === 'proposed_extend';
+        const isBlocked = s.fitMode === 'strict_skip';
+        if (isBlocked) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⛔ без согласия — пропущен` });
+        else if (isShrink) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬇ сжат по согласию ${s.cycleWeeks}→${s.weeks} нед` });
+        else if (isExtend) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬆ растянут по согласию → ${s.weeks} нед` });
         else rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `${s.weeks} нед` });
       });
     }
@@ -1683,14 +1687,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                   <div style={{ fontWeight: 800, marginBottom: 4 }}>🧩 Сезон по микроциклам</div>
                   {seasonSegments.length > 0 && (
                     <div style={{ display: 'grid', gap: 4, marginBottom: 6 }}>
-                      {seasonSegments.map((s, i) => (
+                      {seasonSegments.map((s, i) => {
+                        const isShrink = s.fitMode === 'shrink' || s.fitMode === 'proposed_shrink';
+                        const isExtend = s.fitMode === 'extend' || s.fitMode === 'proposed_extend';
+                        const isBlocked = s.fitMode === 'strict_skip';
+                        return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span style={{ color: 'rgba(196,181,253,0.85)' }}>{s.periodLabel ? `${s.periodLabel}: ` : ''}{s.cycleTitle} · {s.weeks} нед</span>
-                          {s.fitMode === 'shrink' && <span style={{ color: '#fb923c', fontWeight: 700, fontSize: 10 }}>⬇ сжат {s.cycleWeeks}→{s.weeks}</span>}
-                          {s.fitMode === 'extend' && <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: 10 }}>⬆ растянут</span>}
+                          {isShrink && <span style={{ color: '#fb923c', fontWeight: 700, fontSize: 10 }}>⬇ сжат по согласию {s.cycleWeeks}→{s.weeks}</span>}
+                          {isExtend && <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: 10 }}>⬆ растянут по согласию</span>}
                           {s.fitMode === 'skip' && <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10 }}>только старт</span>}
+                          {isBlocked && <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 10 }}>⛔ без согласия — пропущен</span>}
                         </div>
-                      ))}
+                      );})}
                     </div>
                   )}
                   {seasonNotes.slice(0, 8).map((n, i) => <div key={i} style={{ color: 'rgba(196,181,253,0.6)', fontSize: 10 }}>{n}</div>)}
