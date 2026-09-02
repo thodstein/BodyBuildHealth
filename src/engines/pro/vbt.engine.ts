@@ -33,6 +33,26 @@ export const VL_THRESHOLDS: Record<string, VelocityLossThreshold> = {
   power: 10, strength: 20, hypertrophy: 25, metabolic: 40,
 };
 
+/** Минимальная скорость порога (MVT) — скорость на 1ПМ (Gonzalez-Badillo). */
+export const MVT: Record<VBTLift, number> = {
+  squat: 0.25, bench: 0.15, deadlift: 0.16, ohp: 0.15, row: 0.20,
+};
+export function mvtForLift(lift: VBTLift): number { return MVT[lift] ?? 0.20; }
+
+/** Daily Readiness: warm-up 60% vs профиль. Снижение >8% → volume -20% (PoinT GO). */
+export function dailyReadinessCheck(expectedVelocity: number, actualVelocity: number): { dropPct: number; action: 'as-planned' | 'reduce-volume-20' | 'deload' } {
+  if (expectedVelocity <= 0 || actualVelocity <= 0) return { dropPct: 0, action: 'as-planned' };
+  const dropPct = Math.round(((expectedVelocity - actualVelocity) / expectedVelocity) * 1000) / 10;
+  if (dropPct > 15) return { dropPct, action: 'deload' };
+  if (dropPct > 8) return { dropPct, action: 'reduce-volume-20' };
+  return { dropPct: Math.max(0, dropPct), action: 'as-planned' };
+}
+
+/** Velocity-Based Load (VBL) для ACWR гибрида: velocity×load×reps */
+export function vblLoad(velocity: number, loadKg: number, reps: number): number {
+  return Math.max(0, velocity) * Math.max(0, loadKg) * Math.max(0, reps);
+}
+
 function round2(v: number): number { return Math.round(v * 100) / 100; }
 function round1(v: number): number { return Math.round(v * 10) / 10; }
 

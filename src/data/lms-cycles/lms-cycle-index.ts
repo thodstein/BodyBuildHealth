@@ -89,6 +89,10 @@ import { TEXAS_METHOD } from './texas-method';
 import { MADCOW } from './madcow';
 import { WESTSIDE } from './westside';
 import { KORTE_3X3 } from './korte';
+import { GOLOVINSKY_8 } from './golovinsky-8';
+import { SHEIKO_AML_20 } from './sheiko-aml-20';
+import { CALGARY_16 } from './calgary-16';
+import { RTS_9 } from './rts-9';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -160,7 +164,7 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     SRC2_SHEIKO_COMP,
     SRC2_COAN_PL,
     SRC2_PETRUSHIN_SQUAT,
-    // Западные + Smolov/Sheiko 29-32
+    // Западные + Smolov/Sheiko 29-32 + МС+
     SMOLOV,
     SMOLOV_JR,
     CANDITO_6,
@@ -174,6 +178,10 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     MADCOW,
     WESTSIDE,
     KORTE_3X3,
+    GOLOVINSKY_8,
+    SHEIKO_AML_20,
+    CALGARY_16,
+    RTS_9,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
