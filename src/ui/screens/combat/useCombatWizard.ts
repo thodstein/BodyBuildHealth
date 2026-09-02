@@ -59,6 +59,7 @@ export function useCombatWizard() {
   const [vbtBest, setVbtBest] = useState(0);
   const [vbtLast, setVbtLast] = useState(0);
   const [vbtHistory, setVbtHistory] = useState<VbtHistoryEntry[] | null>(null);
+  const [vbtPerLift, setVbtPerLift] = useState<Record<string, {best:number,last:number}>>({ squat:{best:0,last:0}, bench_bar:{best:0,last:0}, row_bar:{best:0,last:0} });
   const [hrvLine, setHrvLine] = useState<string|null>(null);
   const [patternId, setPatternId] = useState('');
   const [workMax, setWorkMax] = useState<Record<string,number>>({ bench:80, squat:90, deadlift:100, chest:80, back:70, quads:90, hamstrings:80, shoulders:50 });
@@ -121,7 +122,7 @@ export function useCombatWizard() {
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
-    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, hrvLine, setHrvLine,
+    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, vbtPerLift, setVbtPerLift, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,

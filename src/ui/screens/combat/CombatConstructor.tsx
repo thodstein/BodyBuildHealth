@@ -50,7 +50,7 @@ export const CombatConstructor: React.FC = () => {
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
-    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, hrvLine, setHrvLine,
+    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, vbtPerLift, setVbtPerLift, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
@@ -146,6 +146,19 @@ export const CombatConstructor: React.FC = () => {
     if (vbtBest > 0 && vbtLast > 0) {
       try { const d = diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); effectiveLoss = d.lossPct; } catch {}
     }
+    // per-lift VBT map приоритетнее скаляра (P1-2 per-lift UI)
+    let velocityLossPerLift: Record<string, number> | null = null;
+    try {
+      const perLift = vbtPerLift as Record<string, {best:number,last:number}>;
+      const map: Record<string, number> = {};
+      for (const [lift, vals] of Object.entries(perLift || {})) {
+        if (vals && vals.best>0 && vals.last>0) {
+          const d = diagnoseVelocityLossCombat(vals.best, vals.last, 20);
+          if (d.lossPct>5) map[lift] = Math.round(d.lossPct);
+        }
+      }
+      if (Object.keys(map).length) velocityLossPerLift = map;
+    } catch {}
     // per-exercise EWMA history приоритетнее скаляра (P1-2)
     let vbtHistToPass: any = null;
     try {
@@ -156,17 +169,27 @@ export const CombatConstructor: React.FC = () => {
         if (hist.length >= 2) vbtHistToPass = hist;
       }
     } catch {}
-    // сохраняем последний замер в историю (для EWMA 7/14д) — per-exercise: bench + squat + pull
-    if (vbtBest > 0 && vbtLast > 0) {
+    // сохраняем в историю per-lift + скаляр fallback (для EWMA 7/14д)
+    if ((vbtBest > 0 && vbtLast > 0) || velocityLossPerLift) {
       try {
         const { loadVbtHistoryCB, saveVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
         const hist = loadVbtHistoryCB();
         const today = new Date().toISOString().slice(0,10);
-        const lifts = ['bench_bar','squat','row_bar'];
-        for (const lift of lifts) {
-          const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
-          hist.push({ liftId: lift, velocity: vbtBest, date: today, weight: w });
-          hist.push({ liftId: lift, velocity: vbtLast, date: today, weight: w });
+        if (velocityLossPerLift) {
+          for (const [lift, vals] of Object.entries(vbtPerLift as any)) {
+            if (vals.best>0 && vals.last>0) {
+              const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
+              hist.push({ liftId: lift, velocity: vals.best, date: today, weight: w });
+              hist.push({ liftId: lift, velocity: vals.last, date: today, weight: w });
+            }
+          }
+        } else if (vbtBest>0 && vbtLast>0) {
+          const lifts = ['bench_bar','squat','row_bar'];
+          for (const lift of lifts) {
+            const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
+            hist.push({ liftId: lift, velocity: vbtBest, date: today, weight: w });
+            hist.push({ liftId: lift, velocity: vbtLast, date: today, weight: w });
+          }
         }
         saveVbtHistoryCB(hist);
         setVbtHistory(hist.slice(-48));
@@ -180,7 +203,7 @@ export const CombatConstructor: React.FC = () => {
       bodyweight, sex, age,
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
-      acwr: acwr as any, velocityLossPct: effectiveLoss, vbtHistory: vbtHistToPass as any,
+      acwr: acwr as any, velocityLossPct: effectiveLoss, vbtHistory: vbtHistToPass as any, velocityLossPerLift: velocityLossPerLift as any,
       outsideLoad: outsideEnabled && !sparringEnabled ? outside : null,
       sparringLoad,
       fightStyle: fightStyle as any,
@@ -527,6 +550,24 @@ export const CombatConstructor: React.FC = () => {
                 {d.lossPct}% · {d.zone} · {d.recommendation} {d.exceeded ? '⚠️' : '✅'}
               </div>
             ); })()}
+            {/* Per-lift VBT — bench/squat/row */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8, marginTop:4 }}>
+              {(['squat','bench_bar','row_bar'] as const).map(lift => {
+                const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
+                const d = vals.best>0 && vals.last>0 ? diagnoseVelocityLossCombat(vals.best, vals.last, 20) : null;
+                return (
+                  <div key={lift} style={{ background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:0.5 }}>{lift === 'squat' ? '🦵 Присед' : lift === 'bench_bar' ? '🏋️ Жим' : '💪 Тяга'} · {lift}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <Field label="Best м/с"><input type="number" step={0.05} value={vals.best || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="0.80" /></Field>
+                      <Field label="Last м/с"><input type="number" step={0.05} value={vals.last || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="0.60" /></Field>
+                    </div>
+                    {d && <div style={{ fontSize:10, fontWeight:700, color: d.lossPct>25?'#f87171': d.lossPct>15?'#fbbf24':'#4ade80' }}>{d.lossPct}% · {d.zone} {d.exceeded?'⚠️':'✅'}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра: если заполнен хотя бы один lift (squat/bench/row) — builder режет вес/RIR индивидуально (иначе скаляр Best/Last).</div>
           </SectionCard>
 
           {/* WorkMax */}
