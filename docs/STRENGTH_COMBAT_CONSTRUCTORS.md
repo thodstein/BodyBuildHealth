@@ -16,7 +16,7 @@
 - Builder `src/engines/strength-sport/strength-sport-builder.engine.ts` — RIR `rirForWeek` drift, `pmForWeek`, `filterPool` fallback `STRONG_FALLBACK`, `gentleFactor` ×0.6, `orderByMethod`, DUP `src/engines/strength-sport/strength-sport-dup.ts` + intensity `src/engines/strength-sport/strength-sport-intensity.ts`
 - UI `src/ui/screens/strength-sport/StrengthSportConstructor.tsx` — params/outside/split/plan, focus/methodology/DUP/intensity, equipment/mobility/injury, heatmap `getWL/getStrong`, **VBT per-lift snatch/clean/squat 10/15%** `vbtPerLift`, **WL попытки 6** `buildWLMeetPlan` Sinclair, **StrengthUI** `StrengthUI.tsx` Apple токены, diary 7д, годовой, редактирование вес/репы/RIR + ↑↓, копирование недели, печать, экспорт `he_last_strength_program`
 
-**Единоборства — PRO MAX (Sep 02 2026) — 360 тестов:**
+**Единоборства — PRO MAX (Sep 02 2026) — 375 тестов + strength 430 (805/805 combat+strength):**
 - Типы `combat.types.ts` — `discipline` 5, `goal` 5 + `periodizationModel atr_10/linear/conjugate`, `conditioningMode alactic/lactic/aerobic`, `fightStyle striker/grappler/hybrid`, `fightDate/taperWeeks`, `workMax/workMaxByExercise`, `acwr/velocityLossPct`
 - Сплиты `combat-split-patterns.ts` 5 шт (2a/2b/3/3b/4) + ATR-autoselect
 - Объём `combat-volume.ts` — neck 4-16, grip 4-22, rotational 4-18, legs/push/pull 6-24 (per level)
@@ -49,4 +49,4 @@
 
 **Интеграция в планировщик:** `src/ui/screens/TrainingScreen_parts/nav.ts:86` `PLANNER_MODES` strength/combat, `src/ui/screens/TrainingScreen.tsx:612` рендер, `src/ui/screens/TrainingScreen_parts/shared.ts:126` `PlanningTrack`.
 
-**Тесты:** 498 → **~628** (outside 10 + strength 228 + combat **375** = matrix 245 + builder 7 + pro 16 + p2-polish 12 + balance 4 + dup 3 + issn-pro-max 31 + extra 8 + v2-polar 7 + integration 3 + strength-weight-cut 5 + **strength-vbt-per-lift 2 + IWF 94 fix** — детерминизм 240, ATR multi-cycle, VBT per-lift EWMA (bench/squat/row + snatch/clean/squat), neck auto, XLSX binary, weightCut ISSN fiber/ORS/window/confirmed, conditioning Jamieson + outside≥5 Zone2, neck 2.0 Collins, graded, diary grip, fightStyle, annual 2-4, PED cap 1.18, print). Запуск `npx vitest run src/engines/combat src/engines/strength-sport --run` — **394/394** (combat 375 + strength 19).
+**Тесты:** 498 → **~640** (outside 10 + strength 430 + combat **375** = matrix 245 + builder 7 + pro 16 + p2-polish 12 + balance 4 + dup 3 + issn-pro-max 31 + extra 8 + v2-polar 7 + integration 3 + strength-weight-cut 5 + strength-vbt-per-lift 2 + IWF 94 + polish-final 6 — детерминизм 240, ATR multi-cycle, VBT per-lift EWMA (bench/squat/row + snatch/clean/squat), neck auto, XLSX binary `PK 0x50 0x4B`, weightCut ISSN, conditioning Jamieson, neck Collins, graded, diary grip, fightStyle, annual 2-4). Запуск `npx vitest run src/engines/combat src/engines/strength-sport --run` — **805/805** (34 файла).
