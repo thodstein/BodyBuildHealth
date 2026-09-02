@@ -268,6 +268,18 @@ export const MetabolicHub: React.FC = () => {
       trySet(setFerritin, ferritin, ferrLab);
       const gfrLab = labs['eGFR'] || labs['GFR'];
       trySet(setGfr, gfr, gfrLab);
+      const hdlLab = labs['HDL'] || labs['hdl'] || labs['HDLc'];
+      trySet(setHdlMgDl, hdlMgDl, hdlLab);
+      const astLab = labs['AST'] || labs['ast'] || labs['АСТ'];
+      trySet(setAst, ast, astLab);
+      const altLab = labs['ALT'] || labs['alt'] || labs['АЛТ'];
+      trySet(setAlt, alt, altLab);
+      const pltLab = labs['PLT'] || labs['plt'] || labs['platelets'] || labs['Тромбоциты'];
+      trySet(setPlt, plt, pltLab);
+      const tgLab = labs['TG'] || labs['triglycerides'] || labs['ТГ'];
+      trySet(setTgMgDl2, tgMgDl2, tgLab);
+      const gluLab = labs['GLUCOSE'] || labs['glucose'] || labs['Глюкоза'];
+      trySet(setGlucoseMgDl, glucoseMgDl, gluLab);
       const ph = p.pharma;
       if(Array.isArray(ph?.currentSubstances) && ph.currentSubstances.length>0){
         // если в профиле есть курс, а тумблер выключен — включаем (не наоборот)
@@ -615,13 +627,23 @@ export const MetabolicHub: React.FC = () => {
           const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else showToast('Всплывающие окна заблокированы');
         }} style={{ padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer' }}>🖨 PDF</button>
         <button onClick={()=>{
-          const tdee=oneAnswer.tdee;
-          const full=`Метаболика PRO — полный отчёт ${new Date().toLocaleString('ru-RU')}
-TDEE ${tdee} (${oneAnswer.low}-${oneAnswer.high}) · Вода ${oneAnswer.water}мл · EA ${oneAnswer.ea ?? '—'} (${ea?.zoneLabel ?? ''}) · HCT ${hematology.hct ?? '—'}% · WHtR ${whtr?.toFixed(2) ?? '—'}
-BMR ${kbju.nat.bmr} PAL ${kbju.nat.pal} · КБЖУ ${kbju.nat.kcal} Б${kbju.nat.p} Ж${kbju.nat.f} У${kbju.nat.c}
-FFMI ${fat.ffmiNorm} · LEAF ${leafCalc.score}/16 · MetS ${mets.score}/5 · TyG ${tyg ?? '—'} · FIB-4 ${fib4 ?? '—'}
-Adaptive TDEE ${adaptiveTDEE?.tdee ?? '—'} R²${adaptiveTDEE?.r2 ?? '—'} · Пот ${sweatTest?.rateLPerH?.toFixed(2) ?? '—'}л/ч`;
-          const html2=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — полный отчёт</title><style>body{font-family:system-ui;padding:24px;color:#111;white-space:pre-wrap}h1{font-size:18px}</style></head><body><h1>⚖️ Метаболика PRO — полный отчёт</h1><pre>${full.replace(/</g,'&lt;')}</pre><script>window.print()</`+`script></body></html>`;
+          const rows=[
+            ['TDEE', `${oneAnswer.tdee} (${oneAnswer.low}-${oneAnswer.high})`],
+            ['Вода', `${oneAnswer.water}мл IOM ${water.iomPerKg}мл/кг`],
+            ['EA', `${oneAnswer.ea ?? '—'} ${ea?.zoneLabel ?? ''}`],
+            ['HCT', `${hematology.hct ?? '—'}% ${hematology.zoneLabel}`],
+            ['WHtR', `${whtr?.toFixed(2) ?? '—'}`],
+            ['BMR/PAL', `${kbju.nat.bmr} / ${kbju.nat.pal}`],
+            ['КБЖУ', `${kbju.nat.kcal} Б${kbju.nat.p} Ж${kbju.nat.f} У${kbju.nat.c}`],
+            ['FFMI', `${fat.ffmiNorm}`],
+            ['LEAF', `${leafCalc.score}/16 ${leafCalc.note}`],
+            ['MetS', `${mets.score}/5 ${mets.note}`],
+            ['TyG', `${tyg ?? '—'}`],
+            ['FIB-4', `${fib4 ?? '—'}`],
+            ['Adaptive TDEE', `${adaptiveTDEE?.tdee ?? '—'} R²${adaptiveTDEE?.r2 ?? '—'}`],
+            ['Пот', `${sweatTest?.rateLPerH?.toFixed(2) ?? '—'} л/ч Na ${sweatTest?.elect.sodiumMg ?? '—'}мг`],
+          ];
+          const html2=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — полный отчёт</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5}</style></head><body><h1>⚖️ Метаболика PRO — полный отчёт ${new Date().toLocaleString('ru-RU')}</h1><table><tr><th>Показатель</th><th>Значение</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table><script>window.print()</`+`script></body></html>`;
           const w2=window.open('','_blank'); if(w2){ w2.document.write(html2); w2.document.close(); } else showToast('Всплывающие окна заблокированы');
         }} style={{ padding:'8px 8px', borderRadius:8, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:9, fontWeight:700, cursor:'pointer' }}>📄 Всё PDF</button>
       </div>

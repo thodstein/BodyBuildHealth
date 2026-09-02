@@ -661,7 +661,7 @@ describe('metabolic-hub v3 — Adaptive TDEE v2, MET, RED-S, Sweat, WHtR, MetS',
     const { calcBeverageRank } = await import('../metabolic-hub.engine');
     const r=calcBeverageRank(1500, 1350);
     expect(r[0].score).toBeGreaterThanOrEqual(r[1].score);
-    expect(r.length).toBe(4);
+    expect(r.length).toBe(6);
   });
   it('scheduleMetHours integration', async () => {
     const { calcSteps } = await import('../metabolic-hub.engine');

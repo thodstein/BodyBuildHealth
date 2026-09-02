@@ -52,6 +52,10 @@ import {
 import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
 
 export type WeightPoint = WeightPointBase;
+// Доменные типы — декомпозиция монстра MetabolicInput (backward compat: MetabolicInput = пересечение всех)
+export type WaterInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'climate'|'humidity'|'sweatRate'|'sweatSodiumMgPerL'|'trainingHours'|'trainingDays'|'cardioMin'|'standingHours'|'creatineUse'>;
+export type StepsInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'steps'|'activityLevel'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'>;
+export type KBJUInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'activityLevel'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'|'goal'|'onAAS'|'aasDose'|'menstrualPhase'|'tsh'|'ft4'>;
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
@@ -801,12 +805,6 @@ export function calcABSIWrapper(w:number,h:number,weight:number){ return calcABS
 export interface AdaptiveTDEEResult { tdee:number; tdeeNoAT:number; trend:number; r2:number; days:number; n:number; density:number; atKcal:number; confidence:'low'|'medium'|'high'; plateau:boolean; targets:{ maintain:number; cut:number; bulk:number }; note:string; weeklySeries: Array<{days:number; trend:number; r2:number}> }
 export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntakeKcal:number; bodyFatPct?:number; goal?:'cut'|'maintain'|'bulk'|'health'; intakeHistory?: Array<{date:string;kcal:number}> }): AdaptiveTDEEResult | null {
   const wh=params.weightHistory; if(!wh||wh.length<7) return null;
-  let intake=params.avgIntakeKcal;
-  if(Array.isArray(params.intakeHistory) && params.intakeHistory.length>=7){
-    const last7=params.intakeHistory.slice(-7).filter(p=> typeof p.kcal==='number' && p.kcal>500 && p.kcal<8000);
-    if(last7.length>=5) intake=Math.round(last7.reduce((s,p)=>s+p.kcal,0)/last7.length);
-  }
-  if(!intake) return null;
   const density=energyDensityPerKg(params.bodyFatPct, undefined);
   const win = (n:number)=>{
     const pts=wh.slice(-n);
@@ -823,6 +821,20 @@ export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntake
   if(good.length) best=good[0];
   else if(w7 && w7.r2>0.5) best=w7;
   if(!best) best=w14!;
+  // date-join: если есть intakeHistory, берём среднее за окно best.days, фильтруя по датам wh
+  let intake=params.avgIntakeKcal;
+  if(Array.isArray(params.intakeHistory) && params.intakeHistory.length>=5){
+    const needDays=best.days || 7;
+    let lastN=(params.intakeHistory as any[]).slice(-needDays);
+    if(lastN[0] && typeof (lastN[0] as any).date==='string' && wh[0]?.date){
+      const whStart=wh[0].date, whEnd=wh[wh.length-1].date;
+      const filtered=lastN.filter((p:any)=> typeof p.date==='string' && p.date>=whStart && p.date<=whEnd);
+      if(filtered.length>=3) lastN=filtered;
+    }
+    const filt=lastN.filter((p:any)=> typeof p.kcal==='number' && p.kcal>500 && p.kcal<8000);
+    if(filt.length>=Math.min(5,needDays-1)) intake=Math.round(filt.reduce((s:number,p:any)=>s+p.kcal,0)/filt.length);
+  }
+  if(!intake) return null;
   const trend=best.trend; const r2=best.r2; const days=best.days; const n=best.n;
   const atKcal = trend < -0.15 ? estimateAdaptiveThermogenesis({ deficitKcal: Math.round(Math.abs(trend)*density/7), weeksInDeficit: Math.round(days/7) }) : 0;
   const tdeeNoAT = Math.round(intake - (trend*density/7));
@@ -955,12 +967,12 @@ export function calcBodyCompProjection(input:{ weight:number; height:number; bod
   const out: Array<{year:number; weight:number; bodyFat:number; ffmi:number}>=[];
   for(let y=0;y<=input.years;y++){
     if(input.mode==='hold_ffmi'){
-      // hold FFMI constant — рекомп: BF снижается, вес = FFM/(1-BF)
       const ffmi=ffmi0;
       const ffm=(ffmi -6.1*(1.80-hM))*hM*hM;
       const bf=Math.max(5, Math.round((input.bodyFat - y*0.5)*10)/10);
       const weight=ffm/(1-bf/100);
-      out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:bf, ffmi:Math.round(ffmi*10)/10 });
+      const wLow=Math.round(weight*0.95*10)/10, wHigh=Math.round(weight*1.05*10)/10;
+      out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:bf, ffmi:Math.round(ffmi*10)/10, weightLow:wLow, weightHigh:wHigh, ffmiLow:Math.round((ffmi-0.6)*10)/10, ffmiHigh:Math.round((ffmi+0.6)*10)/10 } as any);
       continue;
     }
     const prog = y<=2 ? y*0.4 : 0.8 + (y-2)*0.15;
@@ -968,19 +980,22 @@ export function calcBodyCompProjection(input:{ weight:number; height:number; bod
     const ffm = (ffmi -6.1*(1.80-hM)) * hM*hM;
     let weight:number, bf:number;
     if(input.mode==='hold_bf'){ bf=input.bodyFat; weight=ffm/(1-bf/100); }
-    else { weight=input.weight; bf=Math.max(5, (1-ffm/weight)*100); } // hold_weight
-    out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:Math.round(bf*10)/10, ffmi:Math.round(ffmi*10)/10 });
+    else { weight=input.weight; bf=Math.max(5, (1-ffm/weight)*100); }
+    const wLow=Math.round(weight*0.9*10)/10, wHigh=Math.round(weight*1.1*10)/10;
+    out.push({ year:y, weight:Math.round(weight*10)/10, bodyFat:Math.round(bf*10)/10, ffmi:Math.round(ffmi*10)/10, weightLow:wLow, weightHigh:wHigh, ffmiLow:Math.round((ffmi-0.6)*10)/10, ffmiHigh:Math.round((ffmi+0.6)*10)/10 } as any);
   }
-  return out;
+  return out as any;
 }
 export function calcBeverageRank(totalLossMl:number, sodiumLossMg:number): Array<{ name:string; score:number; note:string }> {
-  // rank by hydration index (Maughan) + Na
+  // rank by hydration index Maughan 2016 + Na
   const lossL=totalLossMl/1000;
   const list=[
-    { name:'Вода', score: 1.0, note:`${Math.round(lossL*1000)}мл, Na 0 — только <60мин` },
-    { name:'Изотоник 500мг/л', score: lossL>1? 1.3:1.1, note:`Na ${Math.round(sodiumLossMg)}мг, 500мг/л — 1-2ч` },
-    { name:'Изотоник 700мг/л', score: lossL>1.5? 1.5:1.2, note:'700мг/л — жарко/ >90мин' },
-    { name:'ORS 900мг/л', score: lossL>2? 1.6:1.0, note:'900мг/л — гипонатриемия риск' },
+    { name:'Вода', score: 1.0, note:`${Math.round(lossL*1000)}мл, Na 0 — BHI 1.0 <60мин` },
+    { name:'Изотоник 500мг/л', score: lossL>1? 1.3:1.1, note:`Na ${Math.round(sodiumLossMg)}мг, 500мг/л — BHI 1.1` },
+    { name:'Изотоник 700мг/л', score: lossL>1.5? 1.5:1.2, note:'700мг/л — BHI 1.3 жарко`' },
+    { name:'ORS 900мг/л', score: lossL>2? 1.6:1.0, note:'900мг/л — BHI 1.5 риск' },
+    { name:'Молоко', score: 1.5, note:'BHI 1.5 — казеин + Na' },
+    { name:'Кола', score: 0.9, note:'BHI 0.9 — кофеин диурез' },
   ];
   return list.sort((a,b)=>b.score-a.score);
 }
