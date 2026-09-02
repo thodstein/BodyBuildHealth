@@ -212,6 +212,17 @@ export const StrengthSportConstructor: React.FC = () => {
       }
       if (Object.keys(grouped).length) velocityHistory = grouped;
     } catch {}
+    // per-lift VBT 3× → velocityHistory (приоритет)
+    try {
+      for (const [lift, vals] of Object.entries(vbtPerLift as any)) {
+        if (vals.best>0 && vals.last>0) {
+          if (!velocityHistory) velocityHistory = {};
+          if (!velocityHistory[lift]) velocityHistory[lift] = [];
+          // best/last как 2 точки истории для EWMA
+          velocityHistory[lift] = [...(velocityHistory[lift]||[]), vals.best, vals.last].slice(-3);
+        }
+      }
+    } catch {}
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -470,6 +481,27 @@ export const StrengthSportConstructor: React.FC = () => {
               if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте');
               return warns.length ? <InfoBanner tone="warn">{warns.join(' · ')}</InfoBanner> : null;
             })()}
+          </SectionCard>
+
+          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026) + EWMA 7/14д" accent>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8 }}>
+              {(['snatch','clean','squat'] as const).map(lift => {
+                const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
+                const loss = vals.best>0 && vals.last>0 ? Math.round((vals.best - vals.last)/vals.best*100) : 0;
+                const col = loss>20 ? '#ef4444' : loss>10 ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={lift} style={{ background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:'#86efac', textTransform:'uppercase', letterSpacing:0.5 }}>{lift==='snatch'?'🏋️ Рывок':lift==='clean'?'🏋️ Толчок':'🦵 Присед'} · {lift}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <Field label="Best м/с"><input type="number" step={0.05} value={vals.best||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="1.60" /></Field>
+                      <Field label="Last м/с"><input type="number" step={0.05} value={vals.last||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="1.40" /></Field>
+                    </div>
+                    {loss>0 && <div style={{ fontSize:10, fontWeight:700, color:col }}>{loss}% · {loss>20?'⚠️ стоп':loss>10?'контроль':'✅'} · порог {lift==='snatch'||lift==='clean'?10:15}%</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS).</div>
           </SectionCard>
 
           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса">
