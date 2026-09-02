@@ -135,6 +135,36 @@ export async function ensureHandsModel(): Promise<boolean> {
     return hasVideoSupport();
   } catch { return false; }
 }
+export function createHandsProcessor(video: HTMLVideoElement, onAngles: (f: ArmMotionFrame) => void): { stop: () => void } | null {
+  const Hands = (globalThis as any).Hands || (globalThis as any).MediaPipeHands;
+  if (!Hands || !video) return null;
+  try {
+    const hands = new Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    hands.onResults((results: any) => {
+      try {
+        const lm = results.multiHandLandmarks?.[0];
+        if (!lm) return;
+        // lm: 21 точек, 0 wrist, 4 thumb, 8 index, 20 little
+        const wrist = lm[0], thumb = lm[4], little = lm[20], index = lm[8];
+        const dx = (little.x - thumb.x);
+        const forearmDeg = 90 + Math.round(dx * 90);
+        const wristAngle = Math.round((index.y - wrist.y) * 60);
+        const direction: ArmWorkingDirection = dx > 0.05 ? 'to_little' : dx < -0.05 ? 'to_thumb' : 'to_middle';
+        onAngles({ elbowDeg: 110, forearmDeg: Math.max(0, Math.min(180, forearmDeg)), wristDeg: Math.max(-30, Math.min(60, wristAngle)), direction });
+      } catch {}
+    });
+    let raf = 0;
+    const loop = async () => {
+      if (video.readyState >= 2) {
+        try { await hands.send({ image: video }); } catch {}
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    return { stop: () => { cancelAnimationFrame(raf); try { hands.close(); } catch {} } };
+  } catch { return null; }
+}
 export function isAnglesVerified(angles: ArmAngles | null): boolean {
   if (!angles) return false;
   const v = validateArmAngles(angles);

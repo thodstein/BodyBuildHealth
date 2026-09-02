@@ -11,7 +11,7 @@ import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-vol
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
-import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, isAnglesVerified, angleBetween } from '../../../engines/arm/arm-motion-capture.engine';
+import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, createHandsProcessor, isAnglesVerified, angleBetween } from '../../../engines/arm/arm-motion-capture.engine';
 import { recordGripForce, estimateForceVector, getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport, calcDynamicMetrics } from '../../../engines/arm/arm-dynamic-force.engine';
@@ -111,6 +111,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [showCam, setShowCam] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const handsRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -377,10 +378,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
-  // Camera: getUserMedia + overlay, PRO: пробует подгрузить Hands модель с CDN, иначе fallback ползунки
+  // Camera: getUserMedia + Hands pipeline (механизм-ориентированная)
   useEffect(() => {
     if (!showCam) {
       if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
+      if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; }
       return;
     }
     let cancelled = false;
@@ -391,7 +393,21 @@ export const ArmDiagnosticsHub: React.FC = () => {
         streamRef.current = stream;
         if (videoRef.current) { (videoRef.current as any).srcObject = stream; try { await videoRef.current.play(); } catch {} }
         const hasHands = await ensureHandsModel().catch(()=>false);
-        setToast(hasHands ? '📹 Камера + Hands модель загружена — углы автоматически' : '📹 Камера включена — Hands модель не загружена (CDN), fallback ползунки');
+        if (!cancelled && hasHands && videoRef.current) {
+          // запуск Hands loop — углы обновляются live
+          const proc = createHandsProcessor(videoRef.current, (frame) => {
+            if (cancelled) return;
+            // обновляем ползунки live (факт, без риска)
+            setState(s => ({ ...s,
+              elbowDeg: String(frame.elbowDeg ?? s.elbowDeg),
+              forearmDeg: String(frame.forearmDeg ?? s.forearmDeg),
+              wristDeg: String(frame.wristDeg ?? s.wristDeg),
+              direction: (frame.direction as any) ?? s.direction,
+            }));
+          });
+          if (proc) handsRef.current = proc;
+        }
+        setToast(hasHands ? '📹 Камера + Hands модель загружена — углы live' : '📹 Камера включена — Hands CDN не загружен, fallback ползунки');
         setTimeout(()=>setToast(''),2500);
       } catch (e:any) {
         setToast(`⚠ Камера недоступна: ${e?.message || e}`);
@@ -399,7 +415,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
         setShowCam(false);
       }
     })();
-    return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } };
+    return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; } };
   }, [showCam]);
 
   return (

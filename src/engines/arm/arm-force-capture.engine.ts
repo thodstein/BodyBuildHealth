@@ -78,12 +78,17 @@ export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number
 
 export function forceAdvice(v: ForceVector): string[] {
   const adv: string[] = [];
-  if (v.gripSupport < 30) adv.push('Support слаб (<30) — Rolling Thunder 3×/нед, 60мм, DOH');
-  else if (v.gripSupport < 60) adv.push('Support средний — добавить Axle 58мм, 1×/нед тяж');
-  if (v.gripPinch < 30) adv.push('Pinch слаб — Saxon 76мм, hub, 15с hold');
-  if (v.sidePressure < 30) adv.push('Side слаб — боковое на подушке RIR≥2, ≤10%/нед (humerus)');
-  if (v.backPressure < 30) adv.push('Back слаб — lat drag ремнём к запястью, 5×5');
-  if (adv.length === 0) adv.push('✓ Силовой профиль сбалансирован');
+  // факт без оценки слаб/средний — механизм-ориентированно
+  adv.push(`Support ${v.gripSupport}/100 — факт (RT ${v.gripSupport} vs WR)`);
+  adv.push(`Pinch ${v.gripPinch}/100 — факт`);
+  adv.push(`Side ${v.sidePressure}/100 — факт (WAF)`);
+  adv.push(`Back ${v.backPressure}/100 — факт`);
+  if (v.asymmetryPct != null) adv.push(`Асимметрия ${v.asymmetryPct}% — факт`);
+  // нейтральные рекомендации по технике (без уровня)
+  if (v.gripSupport < 60) adv.push('→ Rolling Thunder/Axle — техника хвата');
+  if (v.gripPinch < 60) adv.push('→ Saxon/Hub pinch — удержание');
+  if (v.sidePressure < 60) adv.push('→ Боковое на подушке — техника');
+  if (v.backPressure < 60) adv.push('→ Lat drag — тяга на себя');
   return adv;
 }
 
