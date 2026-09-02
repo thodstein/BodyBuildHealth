@@ -1323,8 +1323,8 @@ export const BbAutoConstructor: React.FC = () => {
         setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
         setTimeout(() => setBridgeMsg(''), 5000);
         setStep('params');
-      } else if (payload.kind === 'weakpoints' && Array.isArray((payload.data as any).groups)) {
-        const groups = (payload.data as any).groups as string[];
+      } else if (payload.kind === 'weakpoints' && (Array.isArray((payload.data as any).weakZonesGranular) || Array.isArray((payload.data as any).groups))) {
+        const groups = ((payload.data as any).weakZonesGranular as string[] | undefined) ?? (payload.data as any).groups as string[];
         const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
         if (normalized.length > 0) {
           setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: normalized, tradeoffMode: 'none' as const, donors: [] }]);

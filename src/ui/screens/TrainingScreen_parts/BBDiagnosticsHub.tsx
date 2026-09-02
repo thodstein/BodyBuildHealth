@@ -17,6 +17,7 @@ import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
 import { isSpecializationTargetConflict } from '../../../engines/bb/bb-specialization.engine';
 
@@ -159,6 +160,14 @@ export const BBDiagnosticsHub: React.FC = () => {
     return bbVbtRecommendation('squat', best, last, w);
   }, [state.vbtBest, state.vbtLast, state.vbtWeight]);
 
+  const mockPose = useMemo(() => {
+    try {
+      const frames = createMockPoseStream();
+      const ang = estimateAnglesFromLandmarks(frames[0] as any);
+      return { angles: ang, status: livePoseStatus(ang as any) };
+    } catch { return { angles: { hip: 0, knee: 0, ankle: 0, shoulder: 0 } as any, status: { faults: [] } as any }; }
+  }, []);
+
   const measNum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
     for (const [k, v] of Object.entries(state.circ)) {
@@ -215,11 +224,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
     applyToPlanner({
       kind: 'weakpoints',
-      label: `ББ диагностика: ${report.weakMusclesCanonical.join(', ')}`,
+      label: `ББ диагностика: ${report.weakZonesGranular.join(', ')}`,
       data: {
-        groups: report.weakMusclesCanonical,
-        weakPoints: report.weakMusclesCanonical,
+        groups: report.weakZonesGranular,
+        weakPoints: report.weakZonesGranular,
         weakZonesGranular: report.weakZonesGranular,
+        weakMusclesCanonical: report.weakMusclesCanonical,
         bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
         symmetry: report.symmetry, stimulus: report.stimulus, perMuscleAcwr,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
@@ -453,6 +463,7 @@ export const BBDiagnosticsHub: React.FC = () => {
               <button onClick={handleCsvParse} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.14)', border: '1px solid #1f3a5f', color: '#00e68a', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
               <button onClick={applyMobilityToProfile} style={{ padding: '6px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(OK)'}</button>
             </div>
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {(mockPose.status as any).faults?.join(' · ') || 'OK (mock)'}</div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>OHS из <code>strength-sport-ohs</code> (канон WL) · VBT 20-25% гипертрофия (Wood 2026) · Enode/BlazePose reuse из WL. <span style={{ color: '#60a5fa' }}>→ Суставы и ортопедия</span> · <span style={{ color: '#a78bfa' }}>→ Анализ силы → VBT</span></div>
           </div>
         )}
