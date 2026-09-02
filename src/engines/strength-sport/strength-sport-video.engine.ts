@@ -95,6 +95,24 @@ export interface PoseProvider {
   getOHSScore(): number | null;
 }
 
+// Carry sway diagnosis for strongman (lateral displacement из видео сбоку)
+export interface CarrySwayResult {
+  swayCm: number;
+  severity: 'ok' | 'warn' | 'critical';
+  isReal: boolean;
+  text: string;
+}
+export function diagnoseCarrySway(swayCm: number): CarrySwayResult {
+  if (swayCm > 5) return { swayCm, severity: 'critical', isReal: true, text: `Sway ${swayCm}см >5см — критично` };
+  if (swayCm > 3) return { swayCm, severity: 'warn', isReal: true, text: `Sway ${swayCm}см >3см — внимание` };
+  return { swayCm, severity: 'ok', isReal: false, text: `Sway ${swayCm}см — норма` };
+}
+export function carrySwayFromPoints(points: BarPoint[]): number {
+  if (!points || points.length < 2) return 0;
+  const xs = points.map(p => p.x);
+  return Math.round((Math.max(...xs) - Math.min(...xs)) * 10) / 10;
+}
+
 // Simple local storage for tracking results (для трендов)
 const LS_KEY_BAR = 'he_ta_bar_tracking_v1';
 
