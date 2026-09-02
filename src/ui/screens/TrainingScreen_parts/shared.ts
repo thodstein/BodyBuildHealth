@@ -48,6 +48,7 @@ export type TrainingTab =
     | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub' | 'tempo_hub'
     | 'arm_diagnostics' | 'arm_diagnostics_hub'
     | 'wl_diagnostics' | 'wl_diagnostics_hub' | 'strongman_diagnostics' | 'strongman_diagnostics_hub'
+    | 'bb_diagnostics' | 'bb_diagnostics_hub'
     | 'rituals' | 'tools';
 export type TrainingPage = 'hero' | 'planning' | 'constructor' | 'tabs';
 
@@ -126,8 +127,10 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
    arm_diagnostics_hub: '🤝 Арм-диагностика',
    wl_diagnostics: '🏋️ ТА-диагностика',
    wl_diagnostics_hub: '🏋️ ТА-диагностика',
-   strongman_diagnostics: '🏋️‍♂️ Стронг-диагностика',
-   strongman_diagnostics_hub: '🏋️‍♂️ Стронг-диагностика',
+    strongman_diagnostics: '🏋️‍♂️ Стронг-диагностика',
+    strongman_diagnostics_hub: '🏋️‍♂️ Стронг-диагностика',
+    bb_diagnostics: '💪 ББ-диагностика',
+    bb_diagnostics_hub: '💪 ББ-диагностика',
 
 };
 

@@ -64,6 +64,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
         { icon: '🤝', label: 'Арм-диагностика', desc: 'PRO арм: 8 движений × РУ/РА, хват, tendon, humerus → в Арм-конструктор', tab: 'arm_diagnostics_hub' as any },
         { icon: '🏋️', label: 'ТА-диагностика', desc: 'PRO ТА: рывок/взятие/толчок × фазы/углы/VBT/бар path → в ТА', tab: 'wl_diagnostics_hub' as any },
         { icon: '🏋️‍♂️', label: 'Стронг-диагностика', desc: 'PRO стронг: лог/йок/фермер/камни × хват/кор → в Стронг', tab: 'strongman_diagnostics_hub' as any },
+        { icon: '💪', label: 'ББ-диагностика', desc: 'PRO ББ: слабые/симметрия/стимул × MEV/ACWR/OHS/VBT → в ББ-авто', tab: 'bb_diagnostics_hub' as any },
       ],
     },
     {
