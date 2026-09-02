@@ -60,7 +60,7 @@ export const CHIP: React.CSSProperties = {
 export const CHIP_ACTIVE: React.CSSProperties = { ...CHIP, border: `0.5px solid ${ACCENT}`, background: ACCENT, color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.20)' };
 export const CHIP_STRONG_ACTIVE: React.CSSProperties = { ...CHIP, border: `0.5px solid ${ACCENT_STRONG}`, background: ACCENT_STRONG, color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.18)' };
 
-export const PHASE_COLOR: Record<string, string> = { accumulation: '#0A84FF', intensification: '#FF9F0A', peaking: '#FF3B30', deload: '#8E8E93', transition: '#636366', taper: '#FF9F0A' };
+export const PHASE_COLOR: Record<string, string> = { accumulation: '#0A84FF', intensification: '#FF9F0A', integration: '#7C3AED', peaking: '#FF3B30', deload: '#8E8E93', transition: '#636366', taper: '#30D158' };
 export const MODE_COLOR: Record<string, string> = { weightlifting: ACCENT, strongman: ACCENT_STRONG, hybrid: ACCENT_TA };
 export const MODE_RU: Record<string, string> = { weightlifting: 'Тяжёлая атлетика', strongman: 'Силовой экстрим', hybrid: 'Гибрид' };
 export const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'На курсе' };
