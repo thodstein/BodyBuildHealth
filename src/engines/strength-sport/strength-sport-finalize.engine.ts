@@ -248,8 +248,21 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const maxYokeAll = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['yoke_walk','frame_carry','conan_wheel','shield_carry'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
     const maxStoneAll = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','stone_lift'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
     const axialSets = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['yoke_walk','frame_carry','conan_wheel','shield_carry','atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','back_squat','deadlift','car_deadlift_18','car_deadlift_side','truck_pull'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    if (axialSets >= 12 && (carryMeters > 300 || stoneLifts > 18)) {
-      const axWarn = `Нед ${wk.week}: осевая недельная ${axialSets} сетов + ${carryMeters}м + ${stoneLifts} камней — высокая компрессия, добавьте кор 2× и +1 отдых.`;
+    // P2: дифференцированная компрессия — yoke 1.5×, stone 1.3×, squat 1.2×, farmers 1.0× (показывает разницу yoke 350×2 vs farmers 140×6)
+    let axialLoad = 0;
+    for (const sess of wk.sessions) for (const ex of sess.exercises) {
+      const w = ex.workSets[0]?.weight || ex.weight || 0;
+      const s = ex.sets;
+      let k = 1;
+      if (['yoke_walk','frame_carry','conan_wheel'].includes(ex.id)) k = 1.5;
+      else if (['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','stone_lift'].includes(ex.id)) k = 1.3;
+      else if (['back_squat','front_squat','squat'].includes(ex.id)) k = 1.2;
+      else if (['farmers_walk_heavy','husafell_carry','sandbag_carry'].includes(ex.id)) k = 1.0;
+      axialLoad += w * s * k;
+    }
+    axialLoad = Math.round(axialLoad);
+    if (axialSets >= 12 && (carryMeters > 300 || stoneLifts > 18 || axialLoad > 3500)) {
+      const axWarn = `Нед ${wk.week}: осевая ${axialSets} сетов + ${carryMeters}м + ${stoneLifts} камней · load ${axialLoad} (yoke 1.5×) — высокая компрессия, добавьте кор 2× и +1 отдых.`;
       if (!warnings.includes(axWarn)) warnings.push(axWarn);
     }
     // Grip prehab auto — резка accessory как combat face_pull, без maxSets блока

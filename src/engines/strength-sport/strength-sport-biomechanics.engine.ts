@@ -282,6 +282,43 @@ export function isValidAngleForWeakPoint(wp: WLWeakPoint, angleDeg: number): boo
   return angleDeg >= lo && angleDeg <= hi;
 }
 
+// P2: auto-validate from Pose angles (hip/knee/ankle/shoulder) — joint-by-joint
+export interface JointAnglesInput { hip?: number; knee?: number; ankle?: number; shoulder?: number; elbow?: number; trunk?: number; }
+export function autoValidateAnglesFromPose(angles: JointAnglesInput, weakPoints?: WLWeakPoint[]): Array<{ weakPoint: WLWeakPoint; angle: number; valid: boolean; recommendation: string }> {
+  const out: Array<{ weakPoint: WLWeakPoint; angle: number; valid: boolean; recommendation: string }> = [];
+  const wps = weakPoints && weakPoints.length ? weakPoints : (Object.keys(TA_BIOMECH) as WLWeakPoint[]);
+  for (const wp of wps) {
+    const bio = TA_BIOMECH[wp];
+    if (!bio) continue;
+    // маппим keyJoint к углу: таз→hip, колено→knee, голеностоп→ankle, плечо→shoulder, локоть→elbow
+    const key = bio.keyJoint.toLowerCase();
+    let angleVal: number | undefined;
+    if (key.includes('таз') || key.includes('hip') || key.includes('тазобед')) angleVal = angles.hip;
+    else if (key.includes('колен')) angleVal = angles.knee;
+    else if (key.includes('голеностоп') || key.includes('ankle')) angleVal = angles.ankle;
+    else if (key.includes('плеч') || key.includes('shoulder')) angleVal = angles.shoulder;
+    else if (key.includes('локт')) angleVal = angles.elbow;
+    else angleVal = angles.knee ?? angles.hip;
+    if (angleVal == null || !Number.isFinite(angleVal)) continue;
+    const valid = isValidAngleForWeakPoint(wp, angleVal);
+    out.push({ weakPoint: wp, angle: angleVal, valid, recommendation: valid ? `${bio.label}: угол ${angleVal}° в диапазоне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° ✅` : `${bio.label}: ${angleVal}° вне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.loadCues}` });
+  }
+  return out;
+}
+
+// OHS auto from pose — если hip<90 и knee<70 и ankle<35 → OHS fail
+export function autoOHSFromPose(angles: JointAnglesInput): { score: number; failed: number; level: 'ok'|'warn'|'critical' } {
+  let failed = 0;
+  if ((angles.hip ?? 999) < 90) failed++;
+  if ((angles.knee ?? 999) < 70) failed++;
+  if ((angles.ankle ?? 999) < 35) failed++;
+  if ((angles.shoulder ?? 999) < 150) failed++;
+  // упрощённо 4 сегмента, маппим на 6-сегментов
+  const totalFailed = Math.min(6, failed * 1.5);
+  const level = totalFailed >= 4 ? 'critical' : totalFailed >= 2 ? 'warn' : 'ok';
+  return { score: 6 - totalFailed, failed: totalFailed, level };
+}
+
 // P2: Jerk dip detail (Zhang 2022 dip 0.20с, dipVel, drivePower)
 export interface JerkDipMetrics { dipCm: number; dipTimeMs: number; dipVelocityMs?: number; drivePowerW?: number; isOptimal: boolean; recommendation: string; }
 export function diagnoseJerkDip(dipCm: number, dipTimeMs: number, bodyweightKg?: number): JerkDipMetrics | null {

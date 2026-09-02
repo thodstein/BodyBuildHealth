@@ -260,12 +260,16 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   const finalRest = gentle < 1 ? rest + 30 : rest;
   // Carry / loading — дистанция и timeCap из EVENT_META
   const evMeta = EVENT_META[id] as any;
+  const rpe = 10 - finalRir; // RPE 6-8 для technique (RIR 4→RPE6)
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
     const rep = Math.round((finalReps[0] + finalReps[1]) / 2);
     let wsTempo = tempo;
     if (histLoss > 20) wsTempo = tempo + ` VBT ${Math.round(histLoss)}%`;
+    // Техника: добавляем RPE badge в tempo для ТА (RPE 6-8)
+    if (isOly(id) && (wsTempo && !wsTempo.includes('RPE'))) wsTempo += ` · RPE ${rpe}`;
     const ws: StrengthSportSet = { reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo: wsTempo, restSeconds: finalRest } as StrengthSportSet;
+    (ws as any).rpe = rpe;
     if (evMeta?.defaultDistanceM) (ws as any).distanceM = evMeta.defaultDistanceM;
     if (evMeta?.defaultTimeCapS) (ws as any).timeCapS = evMeta.defaultTimeCapS;
     if (isCarryEvent(id)) ws.reps = 1;

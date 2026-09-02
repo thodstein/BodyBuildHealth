@@ -98,16 +98,39 @@ export function pmForWeek(pm0: number, week: number, input: StrengthSportInput, 
   return Math.round(capped * outsidePenalty * 2) / 2; // шаг 0.5 кг
 }
 
+/** RPE для ТА — 6-8 для technique, маппинг VBT→RPE (RPE=10-RIR) */
+export function rpeForWeek(week: number, totalWeeks: number, goal: string, isOly?: boolean): number {
+  return 10 - rirForWeek(week, totalWeeks, goal, isOly);
+}
+export function velocityLossToRpe(lossPct: number, isTA?: boolean): number {
+  if (isTA) {
+    if (lossPct >= 20) return 9;
+    if (lossPct >= 15) return 8;
+    if (lossPct >= 10) return 7;
+    if (lossPct >= 5) return 6.5;
+    return 6;
+  }
+  if (lossPct >= 30) return 9.5;
+  if (lossPct >= 25) return 9;
+  if (lossPct >= 20) return 8.5;
+  if (lossPct >= 15) return 8;
+  return 7;
+}
+export function rpeToRir(rpe: number): number {
+  const rir = 10 - rpe;
+  return Math.max(0, Math.min(4, Math.round(rir)));
+}
+
 /** RIR по фазе/неделе для ТА/стронга — P0-2: для oly используем % шкалу, RIR вторичен */
 export function rirForWeek(week: number, totalWeeks: number, goal: string, isOly?: boolean): number {
   const phase = phaseForWeek(week, totalWeeks, goal);
-  if (goal === 'technique') return 4;
+  if (goal === 'technique') return 4; // RPE 6
   if (isOly) {
-    // ТА: RIR высокий (техника), только peaking синглы RIR 1
+    // ТА: RIR высокий (техника), только peaking синглы RIR 1 (RPE 9)
     if (phase === 'peaking') return 1;
-    if (phase === 'deload') return 4;
-    if (phase === 'accumulation') return 3;
-    if (phase === 'integration') return 2;
+    if (phase === 'deload') return 4; // RPE 6
+    if (phase === 'accumulation') return 3; // RPE 7
+    if (phase === 'integration') return 2; // RPE 8
     return 2;
   }
   if (goal === 'peaking' && phase === 'peaking') return 0;
