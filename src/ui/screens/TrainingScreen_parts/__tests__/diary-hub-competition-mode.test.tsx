@@ -38,7 +38,7 @@ describe('Дневник тренировок — режим «Соревнов�
   it('SSR: mode record рендерится с переключателем подвкладок', () => {
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
     expect(html).toContain('Запись');
-    expect(html).toContain('Соревнования');
+    expect(html).toContain('Соревн');
     expect(html).toContain('Сегодня');
   });
 
@@ -49,8 +49,8 @@ describe('Дневник тренировок — режим «Соревнов�
 
   it('CSR: открытие подвкладки «Соревнования» не роняет дневник', async () => {
     render(<TrainingDiaryHub {...baseProps} initialMode="record" />);
-    expect(screen.getByText(/Запись/)).toBeTruthy();
-    const btn = screen.getByRole('button', { name: /Соревнования/ });
+    expect(screen.getAllByText(/Запись/).length).toBeGreaterThan(0);
+    const btn = screen.getByRole('button', { name: /Соревн/ });
     fireEvent.click(btn);
     expect(await screen.findByText(/Пока нет сохранённых соревновательных циклов/)).toBeTruthy();
   });

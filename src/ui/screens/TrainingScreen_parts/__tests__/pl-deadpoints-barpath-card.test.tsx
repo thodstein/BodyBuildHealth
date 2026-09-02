@@ -275,7 +275,7 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
 
   it('VBT: ручной ввод скоростей даёт потерю/фазу и коррекции', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    expect(screen.getByText(/3.5 · ⚡ VBT/)).toBeTruthy();
+    expect(screen.getByText(/Срывы — VBT скорость/)).toBeTruthy();
     // Ввод: лучший 0.75, последний 0.45 → 40% потери → exceeded → фаза
     fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.75' } });
     fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.45' } });

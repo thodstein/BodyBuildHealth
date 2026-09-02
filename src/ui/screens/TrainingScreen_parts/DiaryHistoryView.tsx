@@ -880,7 +880,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             />
           ))}
                     {hasMoreHistory && (
-            <button onClick={() => setHistoryVisibleCount((v: number) => v + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+            <button onClick={() => setHistoryVisibleCount(historyVisibleCount + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
               Показать еще 10 · осталось {filteredHistory.length - visibleHistory.length}
             </button>
           )}

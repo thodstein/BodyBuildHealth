@@ -23,7 +23,7 @@ export function cyclePhaseForDay(cycleDay: number, cycleLength = 28): CyclePhase
 /** Множитель объёма по фазе: лютеиновая — лёгкое снижение (×0.95), остальные ×1.0. */
 export function cycleVolumeFactor(cycleDay: number | undefined, cycleLength = 28, sex: string = 'male'): number {
   if (sex !== 'female' || !Number.isFinite(cycleDay)) return 1.0;
-  const phase = cyclePhaseForDay(cycleDay, cycleLength);
+  const phase = cyclePhaseForDay(cycleDay as number, cycleLength);
   return phase === 'luteal' ? 0.95 : 1.0;
 }
 

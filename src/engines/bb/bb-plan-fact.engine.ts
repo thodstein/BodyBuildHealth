@@ -114,8 +114,8 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
           if (Number.isFinite(rir) && rir > 0) { sRirSum += rir; sRirN += 1; }
         }
       }
-      if (Number.isFinite(sess.totalSets) && sess.totalSets > 0) sSets = sess.totalSets;
-      if (Number.isFinite(sess.totalVolume) && sess.totalVolume > 0) sTonn = sess.totalVolume;
+      if (Number.isFinite(sess.totalSets) && (sess.totalSets as number) > 0) sSets = sess.totalSets as number;
+      if (Number.isFinite(sess.totalVolume) && (sess.totalVolume as number) > 0) sTonn = sess.totalVolume as number;
       aSets += sSets; aTonn += sTonn; aRirSum += sRirSum; aRirN += sRirN;
     }
     const adherence = pSets > 0 ? Math.min(1.5, aSets / pSets) : (aSets > 0 ? 1 : 0);

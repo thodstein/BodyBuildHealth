@@ -14,6 +14,9 @@ const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const openWeeksStep = async () => {
   render(<ProgramManagerPanelWithProvider />);
   fireEvent.click(screen.getAllByText('ББ')[0]);
+  // unified 3 шага ББ: Профиль → Параметры → Недели
+  await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 20000 });
+  fireEvent.click(screen.getByText('Далее: Параметры →'));
   await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 20000 });
   fireEvent.click(screen.getByText('Далее: Недели →'));
   await waitFor(() => expect(screen.getByText('🗓 Неделя — расписание')).toBeTruthy(), { timeout: 20000 });
@@ -48,7 +51,7 @@ describe('Ручной конструктор ББ — карточка «🗓 �
     expect(screen.getAllByText(/⭐/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Нажмите на день, чтобы перенести тренировку/)).toBeTruthy();
     expect(screen.getAllByLabelText(/Сменить день:/).length).toBeGreaterThan(0);
-  });
+  }, 60000);
 
   it('смена дня через попап: свободный день выбирается, сессия переносится во все недели (пикер недели 1 обновился)', async () => {
     await openWeeksStep();
@@ -65,7 +68,7 @@ describe('Ручной конструктор ББ — карточка «🗓 �
     const pickers = dayPickers();
     expect(pickers.length).toBeGreaterThan(0);
     expect(pickers.some(p => p.textContent === dayName)).toBe(true);
-  });
+  }, 60000);
 
   it('назначение на свободный день: попап списка сессий → перенос', async () => {
     await openWeeksStep();
@@ -86,7 +89,7 @@ describe('Ручной конструктор ББ — карточка «🗓 �
     const after = dayPickers().map(p => p.textContent);
     expect(after).not.toEqual(before);
     expect(after.some(t => t === targetDay)).toBe(true);
-  });
+  }, 60000);
 
   it('«⟳ По рекомендации» возвращает рекомендованные дни после переноса', async () => {
     await openWeeksStep();
@@ -106,5 +109,5 @@ describe('Ручной конструктор ББ — карточка «🗓 �
         expect(p.textContent).toBe(DAY_ORDER_RU[n - 1]);
       });
     }, { timeout: 5000 });
-  });
+  }, 60000);
 });

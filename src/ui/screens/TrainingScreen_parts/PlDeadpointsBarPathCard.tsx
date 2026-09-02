@@ -807,7 +807,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         {!collapsed['sec-barpath'] && <div style={{ padding:12 }}>
         {applicableIssues.length > 0 ? (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>Отклонения траектории:</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
             {applicableIssues.map(issue => {
               const on = issues.includes(issue);

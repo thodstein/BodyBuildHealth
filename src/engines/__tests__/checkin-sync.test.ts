@@ -57,9 +57,9 @@ describe('pullFromProfileDiaries', () => {
 });
 
 describe('pushToProfileDiaries', () => {
-  it('вес → he_weight_log (upsert по дате, без дублей)', () => {
+  it('вес → he_weight_log (upsert по дате, без дублей)', async () => {
     localStorage.setItem(WEIGHT_KEY, JSON.stringify([{ date: '2026-08-12', weight: 81 }]));
-    const out = pushToProfileDiaries({ ...baseMetric(), weightKg: 82 });
+    const out = await pushToProfileDiaries({ ...baseMetric(), weightKg: 82 });
     expect(out.weight).toBe(true);
     const log = JSON.parse(localStorage.getItem(WEIGHT_KEY) || '[]');
     expect(log).toHaveLength(2);
@@ -67,18 +67,18 @@ describe('pushToProfileDiaries', () => {
     expect(today.weight).toBe(82);
   });
 
-  it('вес обновляет существующую запись за ту же дату', () => {
+  it('вес обновляет существующую запись за ту же дату', async () => {
     localStorage.setItem(WEIGHT_KEY, JSON.stringify([{ date: '2026-08-13', weight: 80, waistCm: 85 }]));
-    pushToProfileDiaries({ ...baseMetric(), weightKg: 79.4 });
+    await pushToProfileDiaries({ ...baseMetric(), weightKg: 79.4 });
     const log = JSON.parse(localStorage.getItem(WEIGHT_KEY) || '[]');
     expect(log).toHaveLength(1);
     expect(log[0].weight).toBe(79.4);
     expect(log[0].waistCm).toBe(85);
   });
 
-  it('сон → he_sleep_diary, сохраняя существующие поля (пробуждения)', () => {
+  it('сон → he_sleep_diary, сохраняя существующие поля (пробуждения)', async () => {
     localStorage.setItem(SLEEP_KEY, JSON.stringify([{ date: '2026-08-13', hours: 6, quality: 3, awakenings: 2 }]));
-    const out = pushToProfileDiaries({ ...baseMetric(), sleepHours: 7.5, sleepQuality: 4 });
+    const out = await pushToProfileDiaries({ ...baseMetric(), sleepHours: 7.5, sleepQuality: 4 });
     expect(out.sleep).toBe(true);
     const diary = JSON.parse(localStorage.getItem(SLEEP_KEY) || '[]');
     expect(diary).toHaveLength(1);
@@ -87,8 +87,8 @@ describe('pushToProfileDiaries', () => {
     expect(diary[0].awakenings).toBe(2);
   });
 
-  it('пульс → he_bp_diary без выдумывания АД', () => {
-    const out = pushToProfileDiaries({ ...baseMetric(), restingHR: 55 });
+  it('пульс → he_bp_diary без выдумывания АД', async () => {
+    const out = await pushToProfileDiaries({ ...baseMetric(), restingHR: 55 });
     expect(out.bp).toBe(true);
     const bp = JSON.parse(localStorage.getItem(BP_KEY) || '[]');
     expect(bp).toHaveLength(1);
@@ -96,8 +96,8 @@ describe('pushToProfileDiaries', () => {
     expect(bp[0].systolic).toBeUndefined();
   });
 
-  it('нулевые значения не пишутся (вес 0 / сон 0 / пульс 0)', () => {
-    const out = pushToProfileDiaries({ ...baseMetric(), weightKg: 0, sleepHours: 0, restingHR: 0 });
+  it('нулевые значения не пишутся (вес 0 / сон 0 / пульс 0)', async () => {
+    const out = await pushToProfileDiaries({ ...baseMetric(), weightKg: 0, sleepHours: 0, restingHR: 0 });
     expect(out.weight).toBe(false);
     expect(out.sleep).toBe(false);
     expect(out.bp).toBe(false);
@@ -106,9 +106,9 @@ describe('pushToProfileDiaries', () => {
     expect(localStorage.getItem(BP_KEY)).toBeNull();
   });
 
-  it('пульс обновляет существующую запись АД за дату, не затирая АД', () => {
+  it('пульс обновляет существующую запись АД за дату, не затирая АД', async () => {
     localStorage.setItem(BP_KEY, JSON.stringify([{ date: '2026-08-13', systolic: 130, diastolic: 85, pulse: 70 }]));
-    pushToProfileDiaries({ ...baseMetric(), restingHR: 62 });
+    await pushToProfileDiaries({ ...baseMetric(), restingHR: 62 });
     const bp = JSON.parse(localStorage.getItem(BP_KEY) || '[]');
     expect(bp).toHaveLength(1);
     expect(bp[0].pulse).toBe(62);

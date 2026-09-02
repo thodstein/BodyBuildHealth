@@ -76,8 +76,8 @@ describe('MindsetTab (SSR-смок)', () => {
     expect(html).toContain('Протокол ещё не собран');
   });
 
-  it('tabToHubMode маппит вкладку mindset', () => {
-    expect(tabToHubMode('mindset')).toBe('mindset');
+  it('tabToHubMode маппит вкладку mindset в объединённую rituals', () => {
+    expect(tabToHubMode('mindset')).toBe('rituals');
   });
 
   it('рендерит карточки «Настроение дня» и «Фаза мотивации»', () => {
@@ -322,12 +322,11 @@ describe('Разминка в блоке «Сегодня»', () => {
     expect(html).not.toContain('Разминка сегодня не отмечена');
   });
 
-  it('TrainingDiaryHub с mode warmup рендерит вкладку разминки', () => {
-    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="warmup" />);
+  it('TrainingDiaryHub с mode rituals рендерит подвкладки практик (Психология/Разминка)', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="rituals" />);
+    expect(html).toContain('🧠 Психология');
     expect(html).toContain('🔥 Разминка');
-    expect(html).toContain('Сводка · 30 дней');
-    expect(html).toContain('Персональные инсайты');
-    expect(html).toContain('Разминочная рампа');
+    expect(html).toContain('🧘 Мобильность');
   });
 });
 
@@ -398,16 +397,16 @@ describe('Заминка (чек-ин, бейджи, вкладка)', () => {
     expect(html).toContain('Фоам-роллинг ног');
   });
 
-  it('TrainingDiaryHub с mode cooldown рендерит вкладку заминки', () => {
+  it('TrainingDiaryHub с mode rituals рендерит подвкладку заминки и чек-ин', () => {
     upsertCooldownLog({ date: today, done: true, quality: 4 });
     const html = renderToStaticMarkup(<TrainingDiaryHub
       diary={{} as any} diaryStats={[]} diaryProgress={[]} historyWorkouts={[]} macrocycle={null} selectedWeek={1}
       level="intermediate" onRefresh={() => {}} trainingOutput={null} goal="bulk" daysPerWeek={4} splitType="auto"
-      periodizationType="auto" mesoLength={12} tprofile={{} as any} linked={{}} initialMode="cooldown"
+      periodizationType="auto" mesoLength={12} tprofile={{} as any} linked={{}} initialMode="rituals"
     />);
     expect(html).toContain('❄️ Заминка');
-    expect(html).toContain('Приверженность');
-    expect(html).toContain('CSV');
+    expect(html).toContain('🧠 Психология');
+    expect(html).toContain('📋 Чек-ин');
   });
 });
 
@@ -444,8 +443,8 @@ describe('MobilityTab (SSR-смок)', () => {
     expect(html).toContain('Протокол мобильности ещё не собран');
   });
 
-  it('tabToHubMode маппит вкладку mobility', () => {
-    expect(tabToHubMode('mobility')).toBe('mobility');
+  it('tabToHubMode маппит вкладку mobility в объединённую rituals', () => {
+    expect(tabToHubMode('mobility')).toBe('rituals');
   });
 });
 
@@ -902,22 +901,25 @@ describe('Визуальные улучшения (степпер, кольца,
     expect(cats).toBeTruthy();
     expect(cats!.length).toBe(4);
     const all = cats!.flatMap(c => c.tabs);
-    expect(all).toContain('mindset');
-    expect(all).toContain('mobility');
-    expect(all).toContain('warmup');
+    // практики объединены в одну вкладку rituals (вместо mindset/mobility/warmup/cooldown)
+    expect(all).toContain('rituals');
+    expect(all).not.toContain('mindset');
+    expect(all).not.toContain('mobility');
+    expect(all).not.toContain('warmup');
   });
 
-  it('tabToHubMode маппит вкладку warmup', () => {
-    expect(tabToHubMode('warmup')).toBe('warmup');
+  it('tabToHubMode маппит вкладку warmup в объединённую rituals', () => {
+    expect(tabToHubMode('warmup')).toBe('rituals');
   });
 
-  it('tabToHubMode маппит вкладку cooldown', () => {
-    expect(tabToHubMode('cooldown')).toBe('cooldown');
+  it('tabToHubMode маппит вкладку cooldown в объединённую rituals', () => {
+    expect(tabToHubMode('cooldown')).toBe('rituals');
   });
 
-  it('nav: зона diary включает cooldown', () => {
+  it('nav: зона diary включает rituals (объединённые практики)', () => {
     const all = ZONES.diary.categories!.flatMap(c => c.tabs);
-    expect(all).toContain('cooldown');
+    expect(all).toContain('rituals');
+    expect(all).not.toContain('cooldown');
   });
 
   it('WarmupDiaryView (SSR): рендерит сводку, инсайты и пустое состояние', () => {

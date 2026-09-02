@@ -13,7 +13,7 @@
  * @module profile-settings-engine
  */
 
-import { getWeightLog, saveWeightLog, type WeightEntry } from './profile-store';
+import { getWeightLog, saveWeightLogSync, type WeightEntry } from './profile-store';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -324,7 +324,7 @@ export function pushToProfileDiaries(m: DailyMetrics): { weight: boolean; sleep:
       const merged: WeightEntry = idx >= 0
         ? { ...log[idx], weight: m.weightKg }
         : { date: m.date, weight: m.weightKg };
-      saveWeightLog([...log.filter((_, i) => i !== idx), merged]);
+      saveWeightLogSync([...log.filter((_, i) => i !== idx), merged]);
       out.weight = true;
     }
     if (m.sleepHours > 0) {

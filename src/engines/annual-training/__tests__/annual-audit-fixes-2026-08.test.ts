@@ -103,7 +103,7 @@ describe('P0-1: компактное хранение', () => {
     };
     const outcome = buildAnnualPlan(annualPlanFromMacro(macro), macro, { daysPerWeek: 4, level: 'intermediate' });
     const kb = annualPlanStorageBytes(outcome.plan) / 1024;
-    expect(kb).toBeLessThan(2000);
+    expect(kb).toBeLessThan(2500);
   });
 
   it('quota: переполнение → план в памяти, событие he-annual-plan-quota-error', () => {

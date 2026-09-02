@@ -37,6 +37,7 @@ describe('FrequentFoodsPanel', () => {
     (useFrequentFoods as jest.Mock).mockReturnValue(mockFoods);
     
     render(<FrequentFoodsPanel diary={{}} onAddFood={mockOnAddFood} />);
+    fireEvent.click(screen.getByText('▼'));
     
     expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
     expect(screen.getByText('Eggs')).toBeInTheDocument();
@@ -49,6 +50,7 @@ describe('FrequentFoodsPanel', () => {
     (useFrequentFoods as jest.Mock).mockReturnValue(mockFoods);
     
     render(<FrequentFoodsPanel diary={{}} onAddFood={mockOnAddFood} />);
+    fireEvent.click(screen.getByText('▼'));
     
     const foodButton = screen.getByText('Chicken Breast');
     fireEvent.click(foodButton);
@@ -66,6 +68,7 @@ describe('FrequentFoodsPanel', () => {
     (useFrequentFoods as jest.Mock).mockReturnValue(mockFoods);
     
     render(<FrequentFoodsPanel diary={{}} onAddFood={mockOnAddFood} />);
+    fireEvent.click(screen.getByText('▼'));
     
     // Click on "Обед" meal type
     const obedButton = screen.getByText('Обед');
@@ -93,15 +96,16 @@ describe('FrequentFoodsPanel', () => {
     (useFrequentFoods as jest.Mock).mockReturnValue(mockFoods);
     
     render(<FrequentFoodsPanel diary={{}} onAddFood={mockOnAddFood} maxItems={10} />);
+    fireEvent.click(screen.getByText('▼'));
     
-    // Should show "Показать все" button
-    expect(screen.getByText('Показать все')).toBeInTheDocument();
+    // Should show "Ещё" button
+    expect(screen.getByText('Ещё')).toBeInTheDocument();
     
     // Click to show all
-    fireEvent.click(screen.getByText('Показать все'));
+    fireEvent.click(screen.getByText('Ещё'));
     
-    // Should now show "Скрыть"
-    expect(screen.getByText('Скрыть')).toBeInTheDocument();
+    // Should now show "▲ Скрыть"
+    expect(screen.getByText('▲ Скрыть')).toBeInTheDocument();
   });
   
   it('should display food nutrition info', () => {
@@ -111,8 +115,11 @@ describe('FrequentFoodsPanel', () => {
     (useFrequentFoods as jest.Mock).mockReturnValue(mockFoods);
     
     render(<FrequentFoodsPanel diary={{}} onAddFood={mockOnAddFood} />);
+    fireEvent.click(screen.getByText('▼'));
     
     expect(screen.getByText('165 ккал')).toBeInTheDocument();
-    expect(screen.getByText('Б31 Ж3.6 У0')).toBeInTheDocument();
+    expect(screen.getByText('Б31')).toBeInTheDocument();
+    expect(screen.getByText('Ж3.6')).toBeInTheDocument();
+    expect(screen.getByText('У0')).toBeInTheDocument();
   });
 });

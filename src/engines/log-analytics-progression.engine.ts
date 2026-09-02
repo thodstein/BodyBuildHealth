@@ -9,7 +9,7 @@
  *
  * @module log-analytics-progression-engine
  */
-import { saveWeightLog } from './profile-store';
+import { saveWeightLogSync } from './profile-store';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -360,11 +360,12 @@ export function saveMeasurement(m: BodyMeasurement): BodyMeasurement[] {
     };
     if (idx >= 0) {
       log[idx] = { ...log[idx], ...patch };
-      saveWeightLog(log);
     } else if (weight || Object.keys(patch).some((k: string) => k !== 'weight' && k !== 'notes' && patch[k as keyof typeof patch])) {
       log.push({ date: m.date, ...patch });
-      saveWeightLog(log);
+    } else {
+      return loadMeasurements();
     }
+    saveWeightLogSync(log);
   } catch { /* quota — silent */ }
   return loadMeasurements();
 }

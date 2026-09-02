@@ -311,9 +311,9 @@ export function annualBlockCtxToPrepPatch(
     prepShowDate: cfg.showDate ?? isoAddDays(isoToday(), 8 * 7),
     prepTaperWeeks: Number.isFinite(cfg.weeksOut) ? Math.min(4, Math.max(1, Math.round(cfg.weeksOut!))) : 2,
     prepWeeks: ctx.weeks && ctx.weeks > 0 ? Math.min(52, Math.max(1, Math.round(ctx.weeks))) : 12,
-    prepWaterMode: (cfg.waterStrategy as WaterStrategy) || 'stable',
-    prepSodiumMode: (cfg.sodiumStrategy as SodiumStrategy) || 'stable',
-    prepCarbMode: (cfg.carbLoadStrategy as CarbLoadStrategy) || 'moderate',
+    prepWaterMode: (cfg.waterStrategy === 'moderate' ? 'moderate' : 'stable') as unknown as WaterStrategy,
+    prepSodiumMode: (cfg.sodiumStrategy === 'cut_2d' || cfg.sodiumStrategy === 'cut_3d' ? 'moderate' : 'stable') as unknown as SodiumStrategy,
+    prepCarbMode: (cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate') as unknown as CarbLoadStrategy,
     prepConfirmedManip: !!cfg.confirmedManipulation,
   };
 }
@@ -1473,7 +1473,7 @@ export const BbAutoConstructor: React.FC = () => {
     const personal = linked.profile?.settings?.personal;
     const lifestyle = linked.profile?.settings?.lifestyle;
     return buildBBQualityReport(builtPlan as any, {
-      acwrRatio: acwrData ?? undefined,
+      acwrRatio: acwrData ? acwrData.ratio : undefined,
       bodyFat: personal?.bodyFat,
       hrvMs: lifestyle?.morningHRV,
       sleepHours: lifestyle?.sleepHours,
@@ -4349,8 +4349,8 @@ export const BbAutoConstructor: React.FC = () => {
             {(() => {
               const deloadWeeks = (builtPlan as any).weeks?.filter((w: any) => w.deload || w.phase === 'deload').map((w: any) => w.week) || [];
               if (!deloadWeeks.length) return null;
-              const readiness = linked?.readiness?.score ?? linked?.profile?.settings?.lifestyle?.morningHRV ? 65 : null;
-              const o = overreachingCheck(Number.isFinite(readiness) ? readiness - 8 : 60, Number.isFinite(readiness) ? readiness : 68);
+              const readiness = (linked?.readiness?.recovery ?? linked?.profile?.settings?.lifestyle?.morningHRV) ? 65 : null;
+              const o = overreachingCheck(readiness != null && Number.isFinite(readiness) ? readiness - 8 : 60, readiness != null && Number.isFinite(readiness) ? readiness : 68);
               return (
                 <div style={{ fontSize: 9, padding: '5px 7px', borderRadius: 6, background: o.cleared ? 'rgba(0,230,138,0.08)' : 'rgba(251,191,36,0.08)', color: o.cleared ? '#6ee7b7' : '#fcd34d', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }}>
                   📉 Deload нед {deloadWeeks.join(', ')}: после разгрузки проверьте готовность — {o.recommendation}
@@ -5432,7 +5432,7 @@ export const BbAutoConstructor: React.FC = () => {
         <CollapsibleCard title="📊 План vs факт (по дневнику)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))', color: '#00e68a' }} badge="сеты · тоннаж · RIR">
           {(() => {
             const diary = (() => { try { return loadSessions(); } catch { return []; } })();
-            const fact = buildBBPlanFact(plan as any, diary as any, startDateInput || undefined);
+            const fact = buildBBPlanFact(applyEditsToPlan(builtPlan) as any, diary as any, startDateInput || undefined);
             if (!fact.weeks.length) return <div style={{ fontSize: 11, opacity: 0.7 }}>Нет плана для сравнения.</div>;
             return (
               <div>

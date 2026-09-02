@@ -108,7 +108,7 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
 } = {}): BBQualityReport {
   const safety = calculatePlanSafetyScore(plan as never, {
     ...opts,
-    balanceReport: plan.balanceReport ?? null,
+    balanceReport: (plan.balanceReport as unknown as import('./bb-balance.engine').BBBalanceReport) ?? null,
   });
 
   const issues: BBQualityIssue[] = [];

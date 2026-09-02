@@ -134,7 +134,7 @@ import {
      expect(stats).not.toBeNull();
      expect(stats!.avg).toBe(8);
      expect(stats!.max).toBe(8);
-     expect(stats!.zoneStats).toHaveLength(7);
+      expect(stats!.zoneStats).toHaveLength(9);
    });
 
    it('symptoms stats computes correctly', () => {

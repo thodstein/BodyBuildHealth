@@ -64,7 +64,9 @@ const clampOpt = (v: number | undefined, min: number, max: number): number | und
 /** Нормализация одной записи: числа, фильтр NaN-веса, строка даты. Кламует диапазоны к правдоподобным (P0). */
 export function normalizeWeightEntry(e: any): WeightEntry | null {
   if (!e || typeof e.date !== 'string' || !e.date) return null;
-  const weight = clampOpt(num(e.weight), 20, 400);
+  const rawW = num(e.weight);
+  if (rawW === undefined || rawW <= 0) return null;
+  const weight = clampOpt(rawW, 20, 400);
   if (weight === undefined || weight <= 0) return null;
   return {
     date: e.date,
@@ -164,6 +166,35 @@ export function getWeightLogArchived(): WeightEntry[] {
     const raw = JSON.parse(localStorage.getItem(KEYS.weightArchive) || '[]');
     return Array.isArray(raw) ? raw.map(normalizeWeightEntry).filter((e): e is WeightEntry => e !== null) : [];
   } catch { return []; }
+}
+
+/**
+ * Синхронная каноническая запись: дедуп по дате, сортировка asc, обрезка до 365
+ * (старшие в архив). Без IndexedDB-фото — для точечных апдейтов (чек-ин, замеры),
+ * где важно гарантировать персистентность до возврата.
+ */
+export function saveWeightLogSync(log: WeightEntry[]): void {
+  const byDate = new Map<string, WeightEntry>();
+  for (const e of log) {
+    const n = normalizeWeightEntry(e);
+    if (n) byDate.set(n.date, n);
+  }
+  const deduped = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const trimmed = deduped.slice(-365);
+  if (trimmed.length < deduped.length) {
+    const overflow = deduped.slice(0, deduped.length - 365);
+    try {
+      const archive = getWeightLogArchived();
+      const arcByDate = new Map<string, WeightEntry>();
+      for (const e of [...archive, ...overflow]) if (e && e.date) arcByDate.set(e.date, e);
+      localStorage.setItem(KEYS.weightArchive, JSON.stringify([...arcByDate.values()]));
+    } catch { /* quota — silent */ }
+  }
+  const forStorage = trimmed.map(e => {
+    const { photos, ...rest } = e;
+    return rest;
+  });
+  localStorage.setItem(KEYS.weight, JSON.stringify(forStorage));
 }
 
 /* ── Однократная миграция legacy-дублей веса/замеров в канонический лог ── */

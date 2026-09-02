@@ -214,7 +214,7 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch {}
     // per-lift VBT 3× → velocityHistory (приоритет)
     try {
-      for (const [lift, vals] of Object.entries(vbtPerLift as any)) {
+      for (const [lift, vals] of Object.entries(vbtPerLift as Record<string, { best: number; last: number }>)) {
         if (vals.best>0 && vals.last>0) {
           if (!velocityHistory) velocityHistory = {};
           if (!velocityHistory[lift]) velocityHistory[lift] = [];

@@ -10,7 +10,7 @@ import React from 'react';
 import { IndividualPlan } from '../index';
 
 const TAPER_CFG = JSON.stringify({
-  sex: 'male', category: 'mens_physique', weightKg: 80, showDate: '2026-09-01',
+  sex: 'male', category: 'mens_physique', weightKg: 80, showDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
   weeksOut: 2, trainingProtocol: 'bb', carbLoadStrategy: 'moderate',
   waterStrategy: 'minimal', sodiumStrategy: 'constant',
 });
@@ -26,7 +26,8 @@ describe('D-28 settings smoke', () => {
         settings: { goals: { bbPeakConfig: TAPER_CFG, peakWeek: true } },
       }));
     } catch {}
-    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    const profile = { settings: { goals: { bbPeakConfig: TAPER_CFG, peakWeek: true } } } as any;
+    render(<IndividualPlan profile={profile} course={[]} labs={[]} labAnalysis={null} />);
     const offBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Отключить тапер'));
     expect(offBtn).toBeTruthy();
     if (offBtn) {

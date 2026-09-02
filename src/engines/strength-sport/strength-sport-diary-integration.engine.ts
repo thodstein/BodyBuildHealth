@@ -14,7 +14,7 @@ export interface DiaryTAWeak {
   group: string;
   label: string;
   deltaPct: number;
-  status: 'weak' | 'plateau';
+  status: 'weak' | 'plateau' | 'ok';
   sessions: number;
 }
 

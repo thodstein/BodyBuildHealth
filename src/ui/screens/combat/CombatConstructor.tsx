@@ -176,7 +176,7 @@ export const CombatConstructor: React.FC = () => {
         const hist = loadVbtHistoryCB();
         const today = new Date().toISOString().slice(0,10);
         if (velocityLossPerLift) {
-          for (const [lift, vals] of Object.entries(vbtPerLift as any)) {
+          for (const [lift, vals] of Object.entries(vbtPerLift as Record<string, { best: number; last: number }>)) {
             if (vals.best>0 && vals.last>0) {
               const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
               hist.push({ liftId: lift, velocity: vals.best, date: today, weight: w });

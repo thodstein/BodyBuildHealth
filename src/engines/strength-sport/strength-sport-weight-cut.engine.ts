@@ -103,6 +103,20 @@ export function weightCutNutritionForWeekSS(week:number,totalWeeks:number,p:Weig
   return {kcal,proteinG:prot,carbsG:carbs,waterMl:water,sodiumMg:sodium,fiberG:fiber,notes};
 }
 
+export function weightCutVolumeMultiplierSS(week:number,totalWeeks:number,p:WeightCutProtocolSS|null): number {
+  if (!p) return 1;
+  const ph=weightCutPhaseForWeekSS(week,totalWeeks,p);
+  if (ph==='fight_week') return 0.7;
+  if (ph==='taper') return 0.85;
+  return 1;
+}
+
+export function weightCutRehydrationNotesSS(lossKg:number): string[] {
+  const notes=[`Регидратация после взвешивания: ${Math.max(1, Math.round(lossKg*0.75))}л электролитного раствора + 1-2г/кг углей (тапер ТА стабильно)`];
+  notes.push('ORS 65 ммоль/л Na — постепенно, за 2-4ч до старта');
+  return notes;
+}
+
 export function validateWeightCutProtocolSS(p:WeightCutProtocolSS, opts?:{bodyweightKg?:number; sex?:'male'|'female'}): string[] {
   const e:string[]=[];
   if (p.targetLossKg>8) e.push('>8кг — врач');
