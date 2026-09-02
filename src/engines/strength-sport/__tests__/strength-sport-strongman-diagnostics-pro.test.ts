@@ -182,18 +182,18 @@ describe('Strongman builder SM integration PRO', () => {
     expect(inj.injected).toBeGreaterThan(0);
     expect(inj.plan.weeksData[0].sessions.some(s=> s.exercises.some(e=> ['sandbag_carry','front_squat','jerk_dip'].includes(e.id)))).toBe(true);
   });
-  it('property: SM 192 combos weeklySets ≤ budget', async () => {
+  it('property: SM 192 combos weeklySets ≤ budget (strict)', async () => {
     const { buildStrengthSportPlan } = await import('../strength-sport-builder.engine');
     const levels:any[] = ['beginner','intermediate','advanced','enhanced'];
     const goals:any[] = ['strength','hypertrophy','peaking','technique'];
     let combos = 0;
-    for (const lvl of levels) for (const gl of goals) for (const d of [2,3,4]) {
-      const p = buildStrengthSportPlan({ mode:'strongman', goal:gl, level:lvl, weeks:4, daysPerWeek:d, workMax:{ yokeWalk:250, farmersWalk:140, atlasStone:120, logPress:90 }, equipment:['barbell','other'] } as any);
+    for (const lvl of levels) for (const gl of goals) for (const d of [2,3,4,5]) for (const wks of [4,8,12]) {
+      const p = buildStrengthSportPlan({ mode:'strongman', goal:gl, level:lvl, weeks:wks, daysPerWeek:d, workMax:{ yokeWalk:250, farmersWalk:140, atlasStone:120, logPress:90 }, equipment:['barbell','other'] } as any);
       const budgetMap: Record<string, number> = { beginner:60, intermediate:85, advanced:110, enhanced:135 };
       const budget = budgetMap[lvl];
-      for (const wk of p.weeksData) if (!wk.deload) expect(wk.totalSets as number).toBeLessThanOrEqual(budget + 15); // +15 tolerance for SM extra carries
+      for (const wk of p.weeksData) if (!wk.deload) expect(wk.totalSets as number).toBeLessThanOrEqual(budget);
       combos++;
     }
-    expect(combos).toBe(48);
+    expect(combos).toBe(192);
   });
 });

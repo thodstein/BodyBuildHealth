@@ -47,6 +47,8 @@ type SMState = {
   corePlankSec: string;
   platformHeightCm: string;
   tackyUsed: boolean;
+  diameterCm: string;
+  surface: string;
   swayCm: string;
   yokeSwayCm: string;
   vbtYokeBest: string;
@@ -75,7 +77,7 @@ const DEFAULT_STATE: SMState = {
   pressWeak: [], carryWeak: [], loadWeak: [], gripWeak: [],
   yokeKg: '', farmersKg: '', stoneKg: '', logKg: '', axleKg: '',
   gripHoldSec: '', pinchHoldSec: '', axleHoldSec: '', corePlankSec: '',
-  platformHeightCm: '', tackyUsed: false, swayCm: '', yokeSwayCm: '',
+  platformHeightCm: '', tackyUsed: false, diameterCm: '', surface: '', swayCm: '', yokeSwayCm: '',
   vbtYokeBest: '', vbtYokeLast: '', vbtStoneBest: '', vbtStoneLast: '', vbtLogBest: '', vbtLogLast: '',
   leftMax: '', rightMax: '',
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
@@ -279,14 +281,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const yW = parseFloat(state.yokeKg);
     const sW = parseFloat(state.stoneKg);
     const fW = parseFloat(state.farmersKg);
+    const lW = parseFloat(state.logKg);
+    const diam = parseFloat(state.diameterCm);
     const errs: string[] = [];
     const warns: string[] = [];
     if (Number.isFinite(yW) && yW) { const r = validatePassport('yoke_walk', { weight: yW, distanceM: 20, timeCapS: 60, turn: state.turnNeeded }); errs.push(...r.errors); warns.push(...r.warnings); }
     if (Number.isFinite(sW) && sW) { const r = validatePassport('atlas_stone_load', { weight: sW, heightCm: Number.isFinite(h) ? h : 140, tacky: state.tackyUsed }); errs.push(...r.errors); warns.push(...r.warnings); }
     if (Number.isFinite(fW) && fW) { const r = validatePassport('farmers_walk_heavy', { weight: fW, distanceM: 40 }); errs.push(...r.errors); warns.push(...r.warnings); }
+    if (Number.isFinite(lW) && lW) { const r = validatePassport('log_press', { weight: lW, diameterCm: Number.isFinite(diam) ? diam : undefined }); errs.push(...r.errors); warns.push(...r.warnings); }
+    if (state.surface && state.surface !== 'не выбрано') warns.push(`покрытие: ${state.surface}`);
     if (contest && contest.events?.length) { const cr = validateContestPassports(contest as any); errs.push(...cr.errors); warns.push(...cr.warnings); }
     return { errors: errs.slice(0,3), warnings: warns.slice(0,3) };
-  }, [state.yokeKg, state.stoneKg, state.farmersKg, state.platformHeightCm, state.tackyUsed, state.turnNeeded, contest]);
+  }, [state.yokeKg, state.stoneKg, state.farmersKg, state.logKg, state.diameterCm, state.surface, state.platformHeightCm, state.tackyUsed, state.turnNeeded, contest]);
 
   const axialProgress = useMemo(() => {
     const lm = getStrong('intermediate', 'carry');
@@ -552,6 +558,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize:11, color:DIM }}>Платформа см<br/><input value={state.platformHeightCm} onChange={e=>setState(s=>({...s, platformHeightCm:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
                 <label style={{ fontSize:11, color:DIM, display:'flex', alignItems:'center', gap:6, marginTop:16 }}><input type="checkbox" checked={state.tackyUsed} onChange={e=>setState(s=>({...s, tackyUsed:e.target.checked}))}/> Tacky есть</label>
               </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Диаметр лога см<br/><input value={state.diameterCm} onChange={e=>setState(s=>({...s, diameterCm:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Покрытие<br/><select value={state.surface} onChange={e=>setState(s=>({...s, surface:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="">—</option><option value="резина">резина</option><option value="трава">трава</option><option value="асфальт">асфальт</option><option value="песок">песок</option></select></label>
+              </div>
             </div>
           </div>
         )}
@@ -713,6 +723,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {swayDiag && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:10, color:DIM }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
             {vbtLoss && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:11, fontWeight:700, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:10, color:DIM }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
             <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
+            <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              <div style={{ padding:'6px 8px', borderRadius:8, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:10, color:DIM }}>Enode: raw {swayCm ?? '—'}см → {enodeCorrected ?? '—'}см (xLoop bias Chavda 2024)<br/><span style={{ fontSize:9, color:'#60a5fa' }}>raw {swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
+            </div>
             <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>
