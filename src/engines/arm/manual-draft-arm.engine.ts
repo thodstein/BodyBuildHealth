@@ -26,6 +26,7 @@ export interface AutoDraftArmOptions {
   workMax?: Record<string, number>;
   injuries?: Array<{ muscle: string; exclude?: boolean }>;
   sex?: 'male' | 'female';
+  previousPlan?: any;
 }
 
 export function autodraftArmPlan(opts: AutoDraftArmOptions): any {
@@ -62,6 +63,7 @@ export function autodraftArmPlan(opts: AutoDraftArmOptions): any {
     excludedExercises: opts.excludedExercises,
     injuries: opts.injuries as any,
     sex: opts.sex as any,
+    previousPlan: opts.previousPlan as any,
   };
 
   let plan = buildArmPlan(input);

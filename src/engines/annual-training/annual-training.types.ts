@@ -138,8 +138,8 @@ export interface AnnualTrainingPlan {
   version: number;
   totalWeeks: number;
   direction: AnnualPlanDirection;
-  /** Ссылка на макро-разметку (сериализованный Macrocycle | BBMacrocycle). */
-  macroRef: { source: 'pl' | 'bb'; serialized: string } | null;
+  /** Ссылка на макро-разметку (сериализованный Macrocycle | BBMacrocycle | ArmMacrocycle). */
+  macroRef: { source: 'pl' | 'bb' | 'arm'; serialized: string } | null;
   blocks: AnnualBlockState[];
   status: 'draft' | 'partial' | 'built' | 'stale';
   createdAt: string;

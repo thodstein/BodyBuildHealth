@@ -307,6 +307,29 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   let acwrMult = 1;
   // labWarnings уже учтены в labMult, но tendonWarnings отдельно
 
+  // Cross-mesocycle continuity: если есть previousPlan — используем его финальные веса как базу для прогрессии (+2.5%/мезоцикл, как BB)
+  let crossMesoWorkMax: Record<string, number> | null = null;
+  if (input.previousPlan && (input.previousPlan as any).weeks && Array.isArray((input.previousPlan as any).weeks)) {
+    try {
+      const prev = input.previousPlan as any;
+      const lastWeek = prev.weeks[prev.weeks.length - 1];
+      if (lastWeek && lastWeek.sessions) {
+        crossMesoWorkMax = {};
+        for (const sess of lastWeek.sessions) {
+          for (const ex of (sess.exercises||[])) {
+            const mus = (ex.muscle||'').toString().toLowerCase();
+            const w = ex.workSets && ex.workSets[0] ? Number(ex.workSets[0].weight) : 0;
+            if (mus && Number.isFinite(w) && w>0) {
+              // +2.5% прогрессия за мезоцикл (Schoenfeld 2016, Kemp 2024)
+              const progressed = Math.round(w * 1.025 * 2)/2;
+              if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
   // Build specialization schedule
   const specSchedule = buildArmSchedule({ focusGroup, weakPoints, specialization: !!input.specialization, totalWeeks: weeks, explicitBlocks: input.specializationSchedule });
 
@@ -436,9 +459,19 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const workSets: ArmSet[] = [];
         for (let s = 0; s < sets; s++) {
           const repVal = reps[0] + Math.floor(rng() * (reps[1] - reps[0] + 1));
-          // Вес по workMax: тяж 80-85%, техника 60%, памп 65-70%
+          // Вес по workMax + cross-meso прогрессия: тяж 82%, техника 60%, памп 68%
           const pct = ch === 'тяж' ? 0.82 : ch === 'техника' ? 0.6 : ch === 'памп' ? 0.68 : 0.65;
-          const wgt = weightForMuscle(mus, input.workMax || {}, pct);
+          // cross-meso: если есть предыдущий план — его финальный вес +2.5% как база
+          let effectiveWorkMax = input.workMax || {};
+          if (crossMesoWorkMax && crossMesoWorkMax[mus] != null) {
+            const baseFromPrev = crossMesoWorkMax[mus];
+            const curMax = weightForMuscle(mus, effectiveWorkMax, 1);
+            // берём максимум из текущего workMax и предыдущего прогрессированного
+            if (baseFromPrev > curMax) {
+              effectiveWorkMax = { ...effectiveWorkMax, [mus]: baseFromPrev };
+            }
+          }
+          const wgt = weightForMuscle(mus, effectiveWorkMax, pct);
           const hold = exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (ch === 'техника' ? 15 : 10) : undefined;
           workSets.push({
             reps: repVal,
@@ -528,6 +561,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Table time: ${(tableRatio * 100).toFixed(0)}% (цель), факт ~${(planWeeks[0]?.tableRatio || 0 * 100).toFixed(0)}% (Кузнецов VIII ≥50%)`);
   rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
   if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
+  if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
 
   // Weekly volume
   const weeklyVolume: Record<number, Record<string, any>> = {};
