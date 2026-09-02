@@ -34,8 +34,8 @@ export function calcRobi(total: number, bw: number, sex: string): number {
   return Math.round((c.A * total) / denom);
 }
 export function getIWFCategory(bw: number, sex: string): string {
-  // IWF 2025 новые категории (с 01.06.2025): M 60/65/71/79/88/98/110/110+, W 48/53/58/63/69/77/86/86+
-  const catsM = [60, 65, 71, 79, 88, 98, 110];
+  // IWF 2025 новые категории (с 01.06.2025): M 60/65/71/79/88/94/110/110+, W 48/53/58/63/69/77/86/86+ (бюллетень IWF 2025)
+  const catsM = [60, 65, 71, 79, 88, 94, 110];
   const catsF = [48, 53, 58, 63, 69, 77, 86];
   const cats = sex === 'female' ? catsF : catsM;
   for (const c of cats) if (bw <= c) return `${c}`;
