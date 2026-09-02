@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
-  cardioToNutritionPayload, buildCardioTcx, buildCardioZwo,
+  cardioToNutritionPayload, buildCardioTcx, buildCardioZwo, cardioCtlSeries,
   loadCardioCycles, cardioYearPlan, buildCardioYearText,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
@@ -280,6 +280,15 @@ export const CardioManageStep: React.FC<{
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>
                   Итого: {yearPlan.totalWeeks} нед · {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
                 </div>
+                {(() => {
+                  try {
+                    const pseudo = { weeks: yearPlan.blocks.flatMap(b => b.cycle.weeks), totalWeeks: yearPlan.totalWeeks } as unknown as import('../../../engines/lms/cardio.engine').CardioCycle;
+                    const ctl = cardioCtlSeries(pseudo);
+                    const last = ctl[ctl.length - 1];
+                    if (!last) return null;
+                    return <div style={{ fontSize: 11, color: last.tsb > 5 && last.tsb < 15 ? '#4ade80' : last.tsb < -10 ? '#f87171' : '#fbbf24' }}>📈 Год CTL {last.ctl} · ATL {last.atl} · TSB {last.tsb > 0 ? '+' : ''}{last.tsb}</div>;
+                  } catch { return null; }
+                })()}
                 <button style={BTN_SMALL} onClick={copyYear}>{yearFlash ? '✅ Год в буфере' : '📋 Сводка года в буфер'}</button>
               </div>
             ) : (
