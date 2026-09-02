@@ -117,11 +117,12 @@ export function downloadStrengthCsv(plan: StrengthSportPlan){
 export function buildStrengthXlsxHtml(plan: StrengthSportPlan): string {
   const rows = strengthExportRows(plan);
   const esc = escHtml;
+  const title = `Стронг+ТА ${esc(plan.mode)} ${plan.weeks}нед ${esc(plan.level)} — ${new Date().toLocaleDateString('ru-RU')}`;
   const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Дист','ВремяCap','Комментарий'];
-  const th = header.map(h=> `<th>${esc(h)}</th>`).join('');
-  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, r.distanceM||'', r.timeCapS||'', esc(r.comment)].map(v=> `<td>${v}</td>`).join('')}</tr>`).join('');
-  // Excel-compatible HTML with BOM and meta
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Strength</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1"><tr>${th}</tr>${tr}</table></body></html>`;
+  const th = header.map(h=> `<th style="background:#0A84FF;color:#fff;font-weight:700;padding:6px;border:1px solid #1e40af">${esc(h)}</th>`).join('');
+  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, r.distanceM||'', r.timeCapS||'', esc(r.comment)].map((v,i)=> `<td style="padding:4px 6px;border:1px solid #d1d5db;${i===5?'font-weight:600':''}">${v}</td>`).join('')}</tr>`).join('');
+  // Excel-compatible HTML with BOM, meta, column widths and header styles (proper Excel header)
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Strength</x:Name><x:WorksheetOptions><x:DisplayGridlines/><x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex></x:Print></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><style>table{border-collapse:collapse} th{background:#0A84FF;color:#fff} td{vertical-align:top}</style></head><body><h2 style="font-family:Arial">${title}</h2><table border="1"><colgroup><col width="50"><col width="80"><col width="50"><col width="90"><col width="60"><col width="180"><col width="40"><col width="60"><col width="60"><col width="50"><col width="40"><col width="80"><col width="60"><col width="50"><col width="60"><col width="220"></colgroup><tr>${th}</tr>${tr}</table><p style="font-size:9px;color:#6b7280">BodyBuildHealth · ${esc(plan.patternId)} · ${plan.weeksData.length} нед · ${rows.length} строк</p></body></html>`;
 }
 export function downloadStrengthXlsx(plan: StrengthSportPlan): void {
   try {
