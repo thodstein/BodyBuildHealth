@@ -5,7 +5,7 @@ import { trafficLight } from '../../../engines/pro/training-load.engine';
 import { fetchOPLHistory } from '../../../engines/openpowerlifting-import.engine';
 import type { VBTLift } from '../../../engines/pro/vbt.engine';
 
-export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta }) => {
+export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, onApplyFrequency }) => {
   const freqs = useMemo(() => Object.keys(totalSets).map(m => planFrequency(m, totalSets[m], days, level)), [totalSets, days, level]);
   const [lift, setLift] = useState<VBTLift>('squat');
   const attempts = useMemo(() => {
@@ -21,11 +21,14 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>🏋️ OpenPowerlifting импорт</span>
         <input value={oplName} onChange={e=>setOplName(e.target.value)} placeholder="Имя атлета" style={{ flex: 1, minWidth: 120, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '4px 8px', fontSize: 10 }} />
-        <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); setOplRes(r.length?`Найдено ${r.length} стартов`:`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
+        <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов → сохранено в профиль, график DOTS обновится`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
         {oplRes && <span style={{ fontSize: 10, color: '#fff' }}>{oplRes}</span>}
       </div>
       <div style={{ padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📊 Frequency Planner (MEV/MRV)</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>📊 Frequency Planner (MEV/MRV)</div>
+          <button onClick={() => onApplyFrequency?.(freqs)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#60a5fa', color: '#000', border: 'none', cursor: 'pointer' }}>Применить в план</button>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 6 }}>
           {freqs.map(f => (
             <div key={f.muscle} style={{ padding: 6, background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 10 }}>
