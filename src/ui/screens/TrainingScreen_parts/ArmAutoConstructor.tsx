@@ -19,6 +19,8 @@ import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
+import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
+import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -475,6 +477,16 @@ export function ArmAutoConstructor() {
               const sm = buildSupermatchPlan({ level });
               return <div style={{ ...SMALL, marginTop: 6, color: '#e6a23c' }}>Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с · TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.</div>;
             })()}
+            {(proLeft && proRight) && (()=>{ try {
+              const b = planBilateralVolume({ leftKg: parseFloat(proLeft), rightKg: parseFloat(proRight), baseSets: 10, mrvSets: 16 });
+              if (b.asymmetryPct == null) return null;
+              return <div style={{ ...SMALL, marginTop: 6, color: b.asymmetryPct >= 12 ? '#f87171' : ACCENT }}>L/R: асимметрия {b.asymmetryPct}% — {b.note}</div>;
+            } catch { return null; } })()}
+            {(proBw && proTargetW && proDate) && (()=>{ try {
+              const weeksOut = weeksUntilStart(undefined, proDate);
+              const cut = planWeightCut({ startKg: parseFloat(proBw), targetKg: parseFloat(proTargetW), weeksOut, sex: linked?.profile?.personal?.sex });
+              return <div style={{ ...SMALL, marginTop: 6, color: cut.status === 'too_fast' ? '#f87171' : ACCENT }}>Сгонка: {cut.note}</div>;
+            } catch { return null; } })()}
             <div style={{ marginTop: 8 }}>
               <div style={{ ...SMALL, marginBottom: 4 }}>WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
