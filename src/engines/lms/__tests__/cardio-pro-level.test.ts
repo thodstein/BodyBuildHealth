@@ -6,11 +6,14 @@ import { describe, it, expect } from 'vitest';
 import {
   ftpFrom20MinTest,
   criticalPowerFrom3And12,
+  criticalPowerFromEfforts,
   talkTestZone2Ceiling,
   zonesFromTalkTest,
   personalZones,
   recommendFieldTest,
   validateFieldTestInput,
+  appendFieldTestLog,
+  responderFromLog,
 } from '../cardio-field-tests.engine';
 import {
   dailyPmcSeries,
@@ -43,6 +46,7 @@ import {
   recommendTaperDecay,
   individualizedTaperPlan,
   performanceGainEstimate,
+  taperCutFromCycle,
 } from '../cardio-taper-pro.engine';
 import {
   heatAltitudeHrAdd,
@@ -50,8 +54,8 @@ import {
   cardioTimingPenalty,
   cardioInterferenceV2,
 } from '../cardio-safety.engine';
-import { fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop } from '../../cardio-import.engine';
-import { buildCardioCycle } from '../cardio.engine';
+import { fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop, extractFitRecords } from '../../cardio-import.engine';
+import { buildCardioCycle, applyIndividualizedTaperToCycle } from '../cardio.engine';
 
 // ─── A: field-tests ───
 describe('PRO A field-tests', () => {
@@ -279,5 +283,102 @@ describe('PRO C fit details', () => {
     expect(fitHrZoneHistogram(recs, [140, 160]).length).toBe(3);
     const drop = fitSecondHalfDrop(Array.from({ length: 20 }, (_, i) => ({ hr: 150, powerWatts: i < 10 ? 220 : 200 })));
     expect(drop.dropPct).not.toBeNull();
+  });
+  it('extractFitRecords из распарсенного объекта', () => {
+    const parsed = {
+      records: [
+        { heart_rate: 150, power: 200, speed: 3.5, cadence: 90 },
+        { heartRate: 152, watts: 195 },
+        { hr: 300, power: 200 },
+        { foo: 'bar' },
+      ],
+    };
+    const recs = extractFitRecords(parsed);
+    // 3-я запись: HR 300 отброшен, но мощность валидна → запись остаётся без HR
+    expect(recs.length).toBe(3);
+    expect(recs[0].hr).toBe(150);
+    expect(recs[0].powerWatts).toBe(200);
+    expect(recs[0].speedKmh).toBeCloseTo(12.6, 1);
+    expect(recs[2].hr).toBeUndefined();
+    expect(recs[2].powerWatts).toBe(200);
+    expect(extractFitRecords({})).toEqual([]);
+    expect(extractFitRecords(null)).toEqual([]);
+  });
+});
+
+// ─── F2: применение taper-плана + срез из цикла ───
+describe('PRO F2 apply taper + cut', () => {
+  it('applyIndividualizedTaperToCycle режет окно и чистит HIIT', () => {
+    const c = buildCardioCycle({
+      goal: 'cut', totalWeeks: 8,
+      competitions: [{ id: 's1', name: 'Старт', week: 8 }],
+      taperWeeks: 2, taper: false, peakWeek: false,
+    });
+    // без taper в конфиге недели 6-7 — рабочие (чётная 6 с HIIT)
+    expect(c.weeks.find(w => w.week === 6)!.sessions.some(s => s.type === 'hiit')).toBe(true);
+    const plan = individualizedTaperPlan({});
+    const { cycle: c2, changes } = applyIndividualizedTaperToCycle(c, plan, { showWeek: 8 });
+    expect(changes.length).toBeGreaterThan(0);
+    const w6 = c2.weeks.find(w => w.week === 6)!;
+    const w7 = c2.weeks.find(w => w.week === 7)!;
+    expect(w6.phase).toBe('taper');
+    expect(w7.phase).toBe('taper');
+    expect(w6.sessions.some(s => s.type === 'hiit')).toBe(false);
+    expect(w7.sessions.some(s => s.type === 'hiit' || s.type === 'miss')).toBe(false);
+    expect(w6.totalMinutes).toBeLessThan(c.weeks.find(w => w.week === 6)!.totalMinutes);
+    expect(w7.totalMinutes).toBeLessThan(c.weeks.find(w => w.week === 7)!.totalMinutes);
+    // идемпотентность: повтор не меняет
+    const again = applyIndividualizedTaperToCycle(c2, plan, { showWeek: 8 });
+    expect(again.changes.length).toBe(0);
+  });
+  it('taperCutFromCycle считает срез и прогноз', () => {
+    const c = buildCardioCycle({
+      goal: 'cut', totalWeeks: 8,
+      competitions: [{ id: 's1', name: 'Старт', week: 8 }],
+      taperWeeks: 2, taper: true, peakWeek: true,
+    });
+    const cut = taperCutFromCycle(c);
+    expect(cut).not.toBeNull();
+    expect(cut!.reductionPct).toBeGreaterThan(0);
+    expect(cut!.gainPct).toBeGreaterThan(0);
+    expect(taperCutFromCycle(buildCardioCycle({ goal: 'health', totalWeeks: 4 }))).toBeNull();
+    expect(taperCutFromCycle(null)).toBeNull();
+  });
+});
+
+// ─── A2: CP по N усилиям + журнал тестов ───
+describe('PRO A2 cp-fit + log', () => {
+  it('criticalPowerFromEfforts МНК (3 усилия)', () => {
+    const fit = criticalPowerFromEfforts([
+      { seconds: 180, watts: 350 },
+      { seconds: 420, watts: 310 },
+      { seconds: 720, watts: 285 },
+    ]);
+    expect(fit).not.toBeNull();
+    expect(fit!.cp).toBeGreaterThan(200);
+    expect(fit!.cp).toBeLessThan(285);
+    expect(fit!.wPrimeKj).toBeGreaterThan(0);
+    expect(fit!.r2).toBeGreaterThan(0.9);
+    expect(fit!.n).toBe(3);
+  });
+  it('CP отбраковывает мусор', () => {
+    expect(criticalPowerFromEfforts([{ seconds: 180, watts: 300 }])).toBeNull();
+    expect(criticalPowerFromEfforts([
+      { seconds: 180, watts: 280 },
+      { seconds: 720, watts: 300 },
+    ])).toBeNull();
+    expect(criticalPowerFromEfforts([])).toBeNull();
+  });
+  it('appendFieldTestLog + responderFromLog', () => {
+    let log = appendFieldTestLog([], { date: '2026-01-01', kind: 'aet60', driftPct: 8, decouplingPct: 9 });
+    log = appendFieldTestLog(log, { date: '2026-02-01', kind: 'aet60', driftPct: 4, decouplingPct: 3 });
+    expect(log.length).toBe(2);
+    expect(responderFromLog(log).responder).toBe(true);
+    expect(responderFromLog([]).responder).toBeNull();
+    // битая дата игнорируется, кап 24
+    expect(appendFieldTestLog(log, { date: 'bad', kind: 'aet60' }).length).toBe(2);
+    let big = log;
+    for (let i = 0; i < 30; i++) big = appendFieldTestLog(big, { date: `2026-03-${String((i % 28) + 1).padStart(2, '0')}`, kind: 'talk' });
+    expect(big.length).toBeLessThanOrEqual(24);
   });
 });

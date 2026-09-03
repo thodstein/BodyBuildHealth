@@ -148,3 +148,89 @@ export function validateFieldTestInput(input: FieldTestInput): string[] {
   if (input.age != null && (input.age < 12 || input.age > 90)) w.push('Возраст вне 12-90.');
   return w;
 }
+
+// ─── CP по N усилиям (Morton, линейная модель P = CP + W'/t) ───
+
+export interface CpEffort {
+  seconds: number;
+  watts: number;
+}
+
+export interface CpFit {
+  cp: number;
+  wPrimeKj: number;
+  r2: number;
+  n: number;
+}
+
+/**
+ * Critical Power по 2+ усилиям (рекомендуются 3: 3'/7'/12').
+ * МНК-регрессия P от 1/t: CP — пересечение, W' — наклон.
+ * Возвращает null при <2 валидных усилий или вырожденных данных.
+ */
+export function criticalPowerFromEfforts(efforts: CpEffort[]): CpFit | null {
+  const valid = (efforts ?? []).filter(e => Number.isFinite(e.seconds) && Number.isFinite(e.watts) && e.seconds >= 60 && e.seconds <= 3600 && e.watts >= 30 && e.watts <= 1500);
+  if (valid.length < 2) return null;
+  const xs = valid.map(e => 1 / e.seconds);
+  const ys = valid.map(e => e.watts);
+  const n = valid.length;
+  // при 2 усилиях требуем убывание мощности с длительностью (иначе max-усилия некорректны)
+  if (n === 2) {
+    const [a, b] = [...valid].sort((p, q) => p.seconds - q.seconds);
+    if (a.watts <= b.watts) return null;
+  }
+  const meanX = xs.reduce((s, x) => s + x, 0) / n;
+  const meanY = ys.reduce((s, y) => s + y, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - meanX) * (ys[i] - meanY); den += (xs[i] - meanX) ** 2; }
+  if (!(den > 0)) return null;
+  const wPrime = num / den; // Дж (Вт×с)
+  const cp = meanY - wPrime * meanX;
+  if (!Number.isFinite(cp) || !Number.isFinite(wPrime) || cp < 30 || cp > 800 || wPrime <= 0) return null;
+  // R²
+  let ssTot = 0;
+  let ssRes = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = cp + wPrime * xs[i];
+    ssTot += (ys[i] - meanY) ** 2;
+    ssRes += (ys[i] - pred) ** 2;
+  }
+  const r2 = ssTot > 0 ? Math.round(Math.max(0, 1 - ssRes / ssTot) * 100) / 100 : 1;
+  return { cp: Math.round(cp), wPrimeKj: Math.round((wPrime / 1000) * 10) / 10, r2, n };
+}
+
+// ─── Журнал полевых тестов (monthly AeT-контроль, Barsumyan responder) ───
+
+export interface FieldTestLogEntry {
+  date: string; // YYYY-MM-DD
+  kind: 'lthr30' | 'ftp20' | 'aet60' | 'talk';
+  driftPct?: number;
+  decouplingPct?: number;
+  lthr?: number;
+  ftpWatts?: number;
+}
+
+export const FIELD_TEST_LOG_CAP = 24;
+
+/** Чистое добавление замера в журнал (кап 24, сортировка по дате, дедуп по дате+kind). */
+export function appendFieldTestLog(log: FieldTestLogEntry[], entry: FieldTestLogEntry): FieldTestLogEntry[] {
+  if (!entry || typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return log;
+  const next = [...(Array.isArray(log) ? log : []).filter(e => !!e && typeof e.date === 'string'), entry]
+    .filter((e, i, arr) => arr.findIndex(x => x.date === e.date && x.kind === e.kind) === i)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  return next.slice(-FIELD_TEST_LOG_CAP);
+}
+
+/** Responder по двум последним AeT-замерам с drift+decoupling (делегирует в durability). */
+export function responderFromLog(log: FieldTestLogEntry[]): { responder: boolean | null; note: string } {
+  const withMetrics = (Array.isArray(log) ? log : []).filter(e => Number.isFinite(e.driftPct) && Number.isFinite(e.decouplingPct));
+  if (withMetrics.length < 2) return { responder: null, note: 'Нужно ≥2 AeT-замеров 60\' с drift+decoupling для классификации.' };
+  const prev = withMetrics[withMetrics.length - 2];
+  const curr = withMetrics[withMetrics.length - 1];
+  const driftBetter = (curr.driftPct as number) < (prev.driftPct as number);
+  const decBetter = (curr.decouplingPct as number) < (prev.decouplingPct as number);
+  if (driftBetter && decBetter) return { responder: true, note: `Responder (${prev.date} → ${curr.date}): drift и decoupling улучшились.` };
+  if (!driftBetter && !decBetter) return { responder: false, note: `Non-responder (${prev.date} → ${curr.date}): проверьте восстановление/объём/железо.` };
+  return { responder: false, note: 'Частичный отклик: повторите AeT-тест через 4 нед.' };
+}

@@ -880,6 +880,48 @@ export function fitSecondHalfDrop(records: FitRecordPoint[]): { dropPct: number 
   };
 }
 
+/** Извлечь посекундные/точечные записи из уже распарсенного FIT-объекта (чистая функция, тестируема без бинарника).
+ *  fit-file-parser кладёт точки в `records` (snake_case): heart_rate, power, speed (м/с), cadence. */
+export function extractFitRecords(parsed: unknown, cap = 20000): FitRecordPoint[] {
+  const recs = (parsed as { records?: unknown })?.records;
+  if (!Array.isArray(recs) || recs.length === 0) return [];
+  const out: FitRecordPoint[] = [];
+  for (const r of recs.slice(0, Math.max(1, cap))) {
+    if (!r || typeof r !== 'object') continue;
+    const o = r as Record<string, unknown>;
+    const num = (v: unknown): number | undefined => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    };
+    const hrRaw = num(o.heart_rate ?? o.heartRate ?? o.hr);
+    const hr = hrRaw != null && hrRaw >= 20 && hrRaw <= 260 ? Math.round(hrRaw) : undefined;
+    const powerWatts = num(o.power ?? o.Power ?? o.watts);
+    // speed: fit отдаёт м/с — конвертим в км/ч; если уже км/ч (>50 м/с невозможно), оставляем
+    const speedRaw = num(o.speed ?? o.enhanced_speed ?? o.enhancedSpeed);
+    const speedKmh = speedRaw != null ? Math.round((speedRaw > 50 ? speedRaw / 1000 : speedRaw * 3.6) * 10) / 10 : undefined;
+    const cadence = num(o.cadence ?? o.cycling_cadence);
+    if (hr == null && powerWatts == null && speedKmh == null) continue;
+    out.push({ hr, powerWatts, speedKmh, cadence });
+  }
+  return out;
+}
+
+/** Полный разбор FIT-буфера: сводка + записи для decoupling/durability (cap записей). */
+export function parseCardioFitRecords(buffer: ArrayBuffer, cap = 20000): { result: CardioImportResult; records: FitRecordPoint[] } {
+  const result = parseCardioFit(buffer);
+  let records: FitRecordPoint[] = [];
+  try {
+    const Parser: any = (FitParser as any)?.default ? (FitParser as any).default : FitParser;
+    if (Parser) {
+      const parser = new Parser({ force: true, speedUnit: 'km/h', lengthUnit: 'km', temperatureUnit: 'celsius' });
+      let out: any = null;
+      parser.parse(new Uint8Array(buffer), (_e: any, data: any) => { out = data; });
+      if (out) records = extractFitRecords(out, cap);
+    }
+  } catch { /* записи опциональны — сводка уже есть */ }
+  return { result, records };
+}
+
 // ── Инструкции по часам ──────────────────────────────────────────────────
 export const CARDIO_IMPORT_INSTRUCTIONS: { brand: string; steps: string[]; formats: string[] }[] = [
   {

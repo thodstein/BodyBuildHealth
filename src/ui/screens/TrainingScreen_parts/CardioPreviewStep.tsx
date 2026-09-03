@@ -9,7 +9,7 @@ import {
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
   spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
   cardioFitnessForecast, cardioCoachHints, cardioWeekLegConflicts, interferenceForCycle,
-  timeInZones, polarizationIndex, classifyTid,
+  timeInZones, polarizationIndex, classifyTid, taperCutFromCycle,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -88,6 +88,12 @@ export const CardioPreviewStep: React.FC<{
     return cycle.weeks.filter(w => w.phase === 'taper' || w.phase === 'peak').map(w => ({
       week: w.week, phase: w.phase, minutes: w.totalMinutes, hiit: w.sessions.some(s => s.type === 'hiit'), sessions: w.sessions.length,
     }));
+  }, [cycle]);
+
+  // PRO: фактический срез taper в цикле → ожидаемый прирост (Bosquet/Wang)
+  const taperCut = useMemo(() => {
+    if (!cycle) return null;
+    try { return taperCutFromCycle(cycle); } catch { return null; }
   }, [cycle]);
 
   const weekDays = useMemo(() => {
@@ -373,6 +379,11 @@ export const CardioPreviewStep: React.FC<{
           {taperPlan.length > 0 && (
             <div style={{ ...CARD, borderColor: 'rgba(234,179,8,0.24)' }}>
               <div style={LABEL}>{cycle.config?.taper === false ? '🏔 Пик-неделя (без taper)' : '📉 Taper-план перед стартом'}</div>
+              {taperCut && (
+                <div style={{ fontSize: 11, color: '#eab308', background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.22)', borderRadius: 8, padding: '6px 8px' }}>
+                  Срез −{taperCut.reductionPct}% за {taperCut.taperDays}д → прогноз +{taperCut.gainPct}% результата (Bosquet/Wang: оптимум 41-60% за 8-21д, интенсивность сохранить).
+                </div>
+              )}
               {taperPlan.map(w => (
                 <div key={w.week} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, flexWrap: 'wrap' }}>
                   <span style={{ width: 52, fontWeight: 800, color: PHASE_COLOR[w.phase] }}>нед {w.week}</span>

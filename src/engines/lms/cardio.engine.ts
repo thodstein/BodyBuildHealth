@@ -35,8 +35,9 @@ import { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engin
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 // PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
-export type { FieldTestSource, FieldTestInput, PersonalZones } from './cardio-field-tests.engine';
-export { ftpFrom20MinTest, criticalPowerFrom3And12, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput } from './cardio-field-tests.engine';
+import type { IndividualTaperPlan } from './cardio-taper-pro.engine';
+export type { FieldTestSource, FieldTestInput, PersonalZones, CpEffort, CpFit, FieldTestLogEntry } from './cardio-field-tests.engine';
+export { ftpFrom20MinTest, criticalPowerFrom3And12, criticalPowerFromEfforts, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput, appendFieldTestLog, responderFromLog } from './cardio-field-tests.engine';
 export type { DailyLoad, PmcPoint, HrDriftContext } from './cardio-pmc.engine';
 export { dailyPmcSeries, hrTss, powerTss, runTss, correctHrForDrift, driftCorrectedTss, tssRampRate, interpretTsb } from './cardio-pmc.engine';
 export type { TidModel, TimeInZones, SeasonPhase } from './cardio-tid.engine';
@@ -44,7 +45,7 @@ export { tidZoneOf, timeInZones, polarizationIndex, classifyTid, tidAdvice, phas
 export type { DecouplingLevel, DecouplingResult, DurabilityPoint } from './cardio-durability.engine';
 export { aerobicDecoupling, efficiencyPowerHr, efficiencyPaceHr, durabilityTrend, responderClassification, durabilityDurationTarget } from './cardio-durability.engine';
 export type { TaperDecay, FatigueClass, PreTaperState, IndividualTaperPlan } from './cardio-taper-pro.engine';
-export { exponentialTaperMult, stepTaperMult, recommendTaperDecay, individualizedTaperPlan, performanceGainEstimate } from './cardio-taper-pro.engine';
+export { exponentialTaperMult, stepTaperMult, recommendTaperDecay, individualizedTaperPlan, performanceGainEstimate, taperCutFromCycle } from './cardio-taper-pro.engine';
 export type { HeatContext, SessionGap, TimingInput, InterferenceV2Input, InterferenceV2Result } from './cardio-safety.engine';
 export { heatAltitudeHrAdd, hydrationAdvice, cardioTimingPenalty, cardioInterferenceV2 } from './cardio-safety.engine';
 export {
@@ -2255,6 +2256,54 @@ export function applyBBCardioTaper(cycle: CardioCycle, opts: { showWeek: number;
 export function applyCardioTaperBySport(cycle: CardioCycle, sport: 'pl' | 'bb', opts: { competitionWeek: number; peakWeek?: boolean }): CardioCycle {
   if (sport === 'pl') return applyPLCardioTaper(cycle, { competitionWeek: opts.competitionWeek });
   return applyBBCardioTaper(cycle, { showWeek: opts.competitionWeek, peakWeek: opts.peakWeek });
+}
+
+/**
+ * Применить индивидуальный taper-план (Эпик F, individualizedTaperPlan) к циклу.
+ * Окно: последние taperWeeks = round(durationDays/7) недель перед showWeek (кламп 1-4).
+ * Множитель недели — непрерывный exponential (tauDays плана), а не ступенчатая
+ * BB_CARDIO_TAPER_CURVE: N-1 — только zone2/recovery, остальные — без HIIT.
+ * Идемпотентен: недели уже taper/peak/deload не режутся повторно.
+ * Возвращает копию цикла + изменения (показывать пользователю на подтверждение).
+ */
+export function applyIndividualizedTaperToCycle(
+  cycle: CardioCycle,
+  plan: IndividualTaperPlan,
+  opts: { showWeek: number },
+): { cycle: CardioCycle; changes: CardioTuneChange[] } {
+  const changes: CardioTuneChange[] = [];
+  const showWeek = Math.round(opts.showWeek);
+  const taperWeeks = Math.max(1, Math.min(4, Math.round(plan.durationDays / 7)));
+  const totalDays = Math.max(7, plan.durationDays);
+  const bw = cycleBodyWeight(cycle);
+  const ffm = cycleFfmKg(cycle);
+  const sex = cycle.config?.sex;
+  const weeks = cycle.weeks.map(w => {
+    const delta = showWeek - w.week; // 1 = ближайшая к шоу
+    if (delta < 1 || delta > taperWeeks || w.taper || w.deload || w.phase === 'peak') return w;
+    // день от старта taper-окна: дальняя неделя → 0, ближайшая → totalDays
+    const dayFromStart = (taperWeeks - delta) * 7;
+    const tau = Math.max(1, plan.tauDays);
+    const r = Math.max(0, Math.min(0.9, plan.reductionPct / 100));
+    const prog = 1 - Math.exp(-dayFromStart / tau);
+    const full = 1 - Math.exp(-totalDays / tau);
+    const mult = Math.round((1 - r * (full > 0 ? prog / full : 1)) * 1000) / 1000;
+    const before = w.totalMinutes;
+    let sessions = w.sessions.filter(s => s.type !== 'hiit' && (delta === 1 ? s.type !== 'miss' : true));
+    sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)) }, bw, sex, ffm));
+    const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+    changes.push({
+      week: w.week,
+      label: delta === 1 ? `Индивид. taper N-1 (exp τ=${tau}д): только лёгкое` : `Индивид. taper N-${delta} (exp τ=${tau}д, ×${mult})`,
+      from: `${before} мин`,
+      to: `${after} мин`,
+    });
+    return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`Индивид. taper N-${delta}: ×${mult} (план −${plan.reductionPct}% за ${plan.durationDays}д, прогноз +${plan.expectedGainPct}%).`]);
+  });
+  return {
+    cycle: { ...cycle, weeks, rationale: [...cycle.rationale, `Индивид. taper к неделе ${showWeek}: −${plan.reductionPct}% за ${plan.durationDays}д (exp τ=${plan.tauDays}д, прогноз +${plan.expectedGainPct}%).`] },
+    changes,
+  };
 }
 
 // ─── Экспорт .ics ───

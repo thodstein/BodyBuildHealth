@@ -114,3 +114,27 @@ export function performanceGainEstimate(reductionPct: number, durationDays: numb
   const gainPct = inOpt ? 1.9 + Math.min(1.1, Math.max(0, (r - 41) / 19)) : Math.max(0.2, 1.9 - Math.abs(r - 50) / 25 - Math.abs(d - 14) / 20);
   return { gainPct: Math.round(gainPct * 10) / 10, note: inOpt ? 'Оптимум Wang/Bosquet: 41-60% 8-21д progressive.' : 'Вне оптимума 41-60% 8-21д — эффект ниже.' };
 }
+
+interface TaperCycleLike {
+  weeks: { week: number; phase: string; totalMinutes: number; deload?: boolean; taper?: boolean }[];
+}
+
+/**
+ * Фактический срез taper в готовом цикле: средняя taper-недель против
+ * последних 4 рабочих недель. Для UI-подписи «срез −X% за N дн → +Y%».
+ */
+export function taperCutFromCycle(cycle: TaperCycleLike | null | undefined): { reductionPct: number; taperDays: number; gainPct: number } | null {
+  if (!cycle || !Array.isArray(cycle.weeks) || cycle.weeks.length === 0) return null;
+  const taperWeeks = cycle.weeks.filter(w => w.taper || w.phase === 'taper' || w.phase === 'peak');
+  if (taperWeeks.length === 0) return null;
+  const work = cycle.weeks.filter(w => !w.taper && !w.deload && w.phase !== 'peak' && w.phase !== 'transition').slice(-4);
+  if (work.length === 0) return null;
+  const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const workAvg = avg(work.map(w => w.totalMinutes));
+  const taperAvg = avg(taperWeeks.map(w => w.totalMinutes));
+  if (!(workAvg > 0)) return null;
+  const reductionPct = Math.round(Math.max(0, (1 - taperAvg / workAvg)) * 1000) / 10;
+  const taperDays = taperWeeks.length * 7;
+  const { gainPct } = performanceGainEstimate(reductionPct, taperDays);
+  return { reductionPct, taperDays, gainPct };
+}

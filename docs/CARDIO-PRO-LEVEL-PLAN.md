@@ -81,10 +81,25 @@ UI: DECOUPL-блок в дашборде.
 
 ## Тесты
 
-`cardio-pro-level.test.ts` 26/26: FTP/CP/talk/personalZones/build LTHR+жара;
+`cardio-pro-level.test.ts` 32/32: FTP/CP/talk/personalZones/build LTHR+жара;
 PMC/drift/TSS/ramp/TSB; TID/PI/advice/phased; decoupling/trend/responder;
-taper exp/step/decay/individual/gain; safety heat/timing/interference v2; FIT decoupling/hist/drop.
-Полная кардио-область 540+26 зелёные, tsc 0 по своим файлам.
+taper exp/step/decay/individual/gain; safety heat/timing/interference v2; FIT decoupling/hist/drop;
+apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
+Полная кардио-область 566+6 зелёные, tsc 0 по своим файлам (фильтр cardio).
+
+## Продолжение — раунд 2 (остатки закрыты)
+
+- **Taper-pro применяется**: `applyIndividualizedTaperToCycle(cycle, plan, {showWeek})`
+  в `cardio.engine.ts` — окно round(days/7) нед перед шоу, непрерывный exp-множитель
+  (τ плана), N-1 только zone2/recovery, идемпотентен, возвращает changes на подтверждение.
+  UI: `taperCutFromCycle` считает фактический срез цикла → строка прогноза
+  «−X% за Nд → +Y%» в taper-карточке `CardioPreviewStep`.
+- **FIT-записи**: `extractFitRecords(parsed, cap)` (snake/camelCase, м/с→км/ч, кап 20000) +
+  `parseCardioFitRecords(buffer)` (сводка + записи для decoupling/durability).
+- **CP МНК**: `criticalPowerFromEfforts` (P = CP + W'/t по 2+ усилиям, R², W' кДж) +
+  `appendFieldTestLog` (кап 24, дедуп) + `responderFromLog` (два последних AeT-замера).
+- Остаётся осознанно: ML-VGP обучение на истории (нужен бэкенд/IDB-датасет),
+  посекундный FIT-стрим (память 50Мб export.zip), авто-пересборка taper без подтверждения.
 
 ## Осознанные остатки (не баги)
 
