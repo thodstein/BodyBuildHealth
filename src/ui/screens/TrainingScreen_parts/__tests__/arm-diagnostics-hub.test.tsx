@@ -41,6 +41,14 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('wrist_flexors');
   });
 
+  it('чип side_pin зажигает humerus-превью (mockGuard, без legacy)', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    fireEvent.click(screen.getByText(/Side pin/));
+    const box = screen.getByText('Humerus (side)').parentElement!;
+    expect(box.textContent).toContain('humerus risk');
+  });
+
   it('legacy cup зеркалится в чипы 12 точек', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);

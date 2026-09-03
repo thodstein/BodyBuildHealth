@@ -345,17 +345,21 @@ export const ArmDiagnosticsHub: React.FC = () => {
   } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
 
   const mockGuard = useMemo(() => {
+    // превью гвардов учитывает и чипы 12 точек, а не только legacy-чекбоксы (паритет с движком отчёта)
+    const sideOn = state.side || state.weakPoints.some(wp => wp === 'side_mid' || wp === 'side_pin');
+    const pronOn = state.pron || state.weakPoints.some(wp => wp === 'pron_open' || wp === 'pron_lock');
+    const supOn = state.sup || state.weakPoints.some(wp => wp === 'sup_cup' || wp === 'sup_drag');
     const mockPlan: any = {
       weeks: [
-        { week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: state.side ? 8 : 3 }] }] },
-        { week: 2, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: state.side ? 8 : 3 }] }] },
+        { week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: sideOn ? 8 : 3 }] }] },
+        { week: 2, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: sideOn ? 8 : 3 }] }] },
       ],
     };
     return {
       humerus: checkHumerusGuard(mockPlan),
-      balance: checkWristBalance({ weeks: [{ sessions: [{ exercises: [{ muscle: 'pronators', sets: state.pron ? 6 : 4 }, { muscle: 'supinators', sets: state.sup ? 2 : 4 }] }] }] } as any),
+      balance: checkWristBalance({ weeks: [{ sessions: [{ exercises: [{ muscle: 'pronators', sets: pronOn ? 6 : 4 }, { muscle: 'supinators', sets: supOn ? 2 : 4 }] }] }] } as any),
     };
-  }, [state.side, state.pron, state.sup]);
+  }, [state.side, state.pron, state.sup, state.weakPoints]);
 
   const landmarks = useMemo(() => {
     const lvl = state.level as any;

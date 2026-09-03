@@ -300,6 +300,10 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - Хаб передаёт `benchRes.level` (deps memo обновлены). Чужие `arm-benchmarks`/`arm-vbt-capture` не тронуты.
 - Тесты: grip warn при beginner+2, тишина при advanced/1 точке, сквозной passthrough через detailed-отчёт.
 
+### 8.9 Раунд 7 — превью гвардов учитывает чипы
+- Баг: превью-боксы Humerus/Balance в табе «Давление» (`mockGuard`) смотрели только на legacy-чекбоксы — чип `side_pin` в одиночку не зажигал превью (движок отчёта уже учитывал). Фикс: `sideOn/pronOn/supOn` включают и чипы (`side_mid/side_pin`, `pron_*`, `sup_*`), паритет с движком.
+- Тест: чип `side_pin` → бокс `Humerus (side)` содержит `humerus risk` (изолирован от движковых файндингов через parentElement).
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).
