@@ -14,6 +14,8 @@ import { buildArmReport } from '../../../engines/arm/arm-report.engine';
 import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.engine';
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
+import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
+import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
@@ -59,6 +61,7 @@ export function ArmAutoConstructor() {
   const [weeks, setWeeks] = useState<number>(8);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
   const [focusGroup, setFocusGroup] = useState<string>('');
   const [specialization, setSpecialization] = useState<boolean>(false);
   const [patternId, setPatternId] = useState<string>('');
@@ -85,11 +88,12 @@ export function ArmAutoConstructor() {
     } catch { return {}; }
   }, [linked, workMaxEdit]);
 
-  // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор) — PRO MAX v2
+  // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор) — PRO MAX v3 (12 мёртвых точек)
   useEffect(() => {
     const apply = (payload: any) => {
       if (!payload || payload.kind !== 'weakpoints') return;
       const groups: string[] | undefined = payload.data?.groups;
+      const wp: string[] | undefined = payload.data?.armWeakPoints;
       let appliedWeak: string[] | null = null;
       if (Array.isArray(groups) && groups.length > 0) {
         appliedWeak = groups.slice(0, 2).map((s: string) => String(s).toLowerCase());
@@ -97,6 +101,16 @@ export function ArmAutoConstructor() {
         setSpecialization(true);
         setStep('params');
         flash(`↩ Из диагностики: ${groups.join(', ')}`);
+      }
+      if (Array.isArray(wp) && wp.length > 0) {
+        const clean = (wp as string[]).slice(0,3) as ArmWeakPoint[];
+        setDiagWeakPoints(clean);
+        setSpecialization(true);
+        setStep('params');
+        flash(`↩ Мёртвые точки: ${clean.join(', ')}`);
+      } else if (Array.isArray(payload.data?.armBiomechCards) && payload.data.armBiomechCards.length) {
+        const fromCards = (payload.data.armBiomechCards as any[]).map((c:any)=> String(c.weakPoint)).slice(0,3) as ArmWeakPoint[];
+        if (fromCards.length) setDiagWeakPoints(fromCards);
       }
       // dynamicWeak fallback if groups empty but armDynamic present
       if ((!appliedWeak || appliedWeak.length===0) && payload.data?.armDynamic) {
@@ -119,10 +133,14 @@ export function ArmAutoConstructor() {
         setLevel(lvl);
         try { localStorage.setItem('he_arm_last_bench_level', bench.level); } catch {}
       }
-      // сохраняем диагностику для печати — механизм-ориентированная (сустав/сухожилие)
+      // сохраняем диагностику для печати — механизм-ориентированная + 12 точек
       try {
         const diagSnap: any = {
           benchLevel: bench?.level,
+          armWeakPoints: payload.data?.armWeakPoints,
+          armBiomechCards: payload.data?.armBiomechCards,
+          armCorrections: payload.data?.armCorrections,
+          armScoring: payload.data?.armScoring,
           armDynamic: payload.data?.armDynamic,
           armAngles: payload.data?.armAngles,
           armForce: payload.data?.armForce,
@@ -133,6 +151,7 @@ export function ArmAutoConstructor() {
           info: payload.data?.armInfo,
         };
         localStorage.setItem('he_arm_last_diagnostics', JSON.stringify(diagSnap));
+        if (payload.data?.armWeakPoints) localStorage.setItem('he_arm_last_weakpoints', JSON.stringify(payload.data.armWeakPoints));
       } catch {}
     };
     // начальный снимок (если хаб уже отправил до монтирования)
@@ -193,6 +212,15 @@ export function ArmAutoConstructor() {
         stressLevel: recovery.stressLevel,
       });
       plan = finalizeArmPlan(plan, { level });
+      // PRO инъекция 12 мёртвых точек (если пришли из хаба) — parity с TA
+      try {
+        const toInject: ArmWeakPoint[] = diagWeakPoints.length ? diagWeakPoints : (()=>{ try{ const raw=localStorage.getItem('he_arm_last_weakpoints'); if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[]; } } catch{} return []; })();
+        if (toInject.length) {
+          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax });
+          plan = inj.plan;
+          if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
+        }
+      } catch {}
       const v = validateArmPlan(plan, level);
       plan.validation = v;
       plan.report = buildArmReport(plan);
@@ -201,7 +229,8 @@ export function ArmAutoConstructor() {
       try { localStorage.setItem('he_arm_last_plan', JSON.stringify(plan)); } catch {}
       setWeekSel(1);
       setStep('plan');
-      flash(`✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед`);
+      const injInfo = diagWeakPoints.length ? ` + ${diagWeakPoints.join(', ')} инъекция` : '';
+      flash(`✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед${injInfo}`);
     } catch (e: any) {
       flash(`❌ Ошибка: ${e?.message || e}`);
     }
@@ -273,7 +302,7 @@ export function ArmAutoConstructor() {
           )}
 
           <div style={{ marginTop: 12 }}>
-            <div style={SMALL}>Слабые зоны (1–2, специализация ×1.3)</div>
+            <div style={SMALL}>Слабые зоны (1–2, специализация ×1.3) — мышцы</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <button key={m} onClick={()=>toggleWeak(m)} aria-pressed={weakPoints.includes(m)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: weakPoints.includes(m) ? ACCENT : '#1f3a5f', background: weakPoints.includes(m) ? 'rgba(0,230,138,0.15)' : '#0a1629', color: weakPoints.includes(m) ? ACCENT : '#9ab', cursor:'pointer', fontSize:12 }}>{ARM_MUSCLE_RU[m] || m}</button>
@@ -284,6 +313,20 @@ export function ArmAutoConstructor() {
               {specialization && <span style={{ color: ACCENT, fontSize:12 }}>{specPreview.rationale}</span>}
             </div>
           </div>
+          {diagWeakPoints.length>0 && (
+            <div style={{ marginTop: 10, padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🎯 Мёртвые точки из диагностики (инъекция 3× @% в план)</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+                {diagWeakPoints.map(wp=> (
+                  <span key={wp} style={{ padding:'4px 8px', borderRadius:999, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b', fontSize:11 }}>{wp}</span>
+                ))}
+              </div>
+              <div style={{ marginTop:6 }}>
+                <button onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); } catch{} }} style={{ padding:'4px 8px', borderRadius:6, background:'#0a1629', border:'1px solid #1f3a5f', color:'#9ab', cursor:'pointer', fontSize:11 }}>✕ Сбросить мёртвые точки</button>
+                <span style={{ ...SMALL, marginLeft:8 }}>Инъекция: per-day dedup, budget 85, humerus guard</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ marginTop: 12, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>

@@ -11,15 +11,16 @@ describe('ArmDiagnosticsHub PRO', () => {
   it('рендерит заголовок и 4 подвкладки', () => {
     const { container } = render(<ArmDiagnosticsHub />);
     expect(container.textContent).toContain('Арм-диагностика');
-    expect(screen.getByText(/Хват/)).toBeTruthy();
-    expect(screen.getByText(/Кисть\/Ротация/)).toBeTruthy();
-    expect(screen.getByText(/Давление/)).toBeTruthy();
-    expect(screen.getByText(/Сухожилие/)).toBeTruthy();
+    // use buttons to avoid duplicate text in description
+    expect(screen.getByRole('button', { name: /Хват/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Кисть\/Ротация/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Давление/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Сухожилие/ })).toBeTruthy();
   });
 
   it('переключение вкладок', () => {
     render(<ArmDiagnosticsHub />);
-    const wristBtn = screen.getByText(/Кисть\/Ротация/);
+    const wristBtn = screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON') || screen.getAllByText(/Кисть\/Ротация/)[0];
     fireEvent.click(wristBtn);
     expect(document.body.textContent).toContain('Локоть');
   });
@@ -34,7 +35,7 @@ describe('ArmDiagnosticsHub PRO', () => {
   it('выбор cup → слабые зоны', () => {
     render(<ArmDiagnosticsHub />);
     // switch to wrist tab
-    fireEvent.click(screen.getByText(/Кисть\/Ротация/));
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
     const cupBtn = screen.getByText(/Кисть открывается/);
     fireEvent.click(cupBtn);
     expect(document.body.textContent).toContain('wrist_flexors');
@@ -42,7 +43,7 @@ describe('ArmDiagnosticsHub PRO', () => {
 
   it('кнопка применить отправляет в planner-bridge', async () => {
     render(<ArmDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Кисть\/Ротация/));
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
     fireEvent.click(screen.getByText(/Кисть открывается/));
     expect(document.body.textContent).toContain('wrist_flexors');
     // подождать обновления diag
@@ -50,5 +51,29 @@ describe('ArmDiagnosticsHub PRO', () => {
     const btns = screen.getAllByText(/Применить в Арм-конструктор/);
     fireEvent.click(btns[btns.length - 1]);
     expect(await screen.findByText(/Применено/)).toBeTruthy();
+  });
+
+  it('12 мёртвых точек — выбор pron_open и карточка биомеханики', async () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    // выбираем Pron откр (label с точкой ● — используем regex)
+    const pronOpenBtn = screen.getByText(/Pron откр/);
+    fireEvent.click(pronOpenBtn);
+    expect(document.body.textContent).toContain('Пронация — вход');
+    expect(document.body.textContent).toContain('Коррекции');
+    expect(pronOpenBtn.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByText(/Sup cup/));
+    expect(screen.getByText(/Sup cup/).getAttribute('aria-pressed')).toBe('true');
+    expect(document.body.textContent).toContain('Выбрано:');
+  });
+
+  it('давление — side_pin humerus guard', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    expect(document.body.textContent).toContain('Side pin');
+    const sidePinBtn = screen.getByText(/Side pin/);
+    fireEvent.click(sidePinBtn);
+    expect(sidePinBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(document.body.textContent.toLowerCase()).toContain('humerus');
   });
 });

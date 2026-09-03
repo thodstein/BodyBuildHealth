@@ -1,15 +1,18 @@
 /**
- * arm-diagnostics-hub.engine.ts — оркестратор диагностики (механизм-ориентированная модель, без общего score).
- * Собирает weak/grip/force/vbt/table/tendon + суставные риски (humerus/tendon/balance/асимметрия) с уровнями.
- * Общий score/verification убраны — только механизм-ориентированные риски по суставам.
+ * arm-diagnostics-hub.engine.ts — оркестратор диагностики (механизм-ориентированная модель + detailed 12 точек).
+ * Собирает weak/grip/force/vbt/table/tendon + суставные риски + 12 мёртвых точек (ARM_BIOMECH) + коррекции.
+ * Общий score опционален (arm-scoring PRO оверлей), основной путь — механизм-уровни.
  */
-import { diagnoseArmWeakPoint } from './arm-weakpoint.engine';
-import { getArmLandmarks } from './arm-volume-landmarks.engine';
+import { diagnoseArmWeakPoint, diagnoseArmWeakDetailed } from './arm-weakpoint.engine';
+import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from './arm-injury-guard.engine';
 import { estimateForceVector, forceAdvice } from './arm-force-capture.engine';
 import { diagnoseVbt } from './arm-vbt-capture.engine';
 import type { GripForceRecord } from './arm-force-capture.engine';
 import type { VbtRecord } from './arm-vbt-capture.engine';
+import { ARM_BIOMECH, type ArmWeakPoint } from './arm-biomechanics.engine';
+import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
+import { scoreArm } from './arm-scoring.engine';
 
 export type ArmDiagLevel = 'ok' | 'warn' | 'critical';
 
@@ -33,6 +36,22 @@ export interface ArmDiagnosticsReport {
   tendonLoad: number;
   asymmetryPct?: number;
   info: string[]; // доп. инфо без уровня
+  // PRO detailed (12 мёртвых точек)
+  weakPoints?: ArmWeakPoint[];
+  biomechCards?: Array<{
+    weakPoint: ArmWeakPoint;
+    label: string;
+    angleRangeDeg: [number, number];
+    keyJoint: string;
+    weakMuscles: string[];
+    reason: string;
+    corrections: string[];
+    intensityPct: number;
+    loadCues: string;
+    technique: string[];
+  }>;
+  corrections?: Array<{ weakPoint: ArmWeakPoint; exercises: string[]; intensityPct: number; dayTags: string[] }>;
+  scoring?: ReturnType<typeof scoreArm>;
 }
 
 export function buildArmDiagnosticsReport(input: {
@@ -48,8 +67,16 @@ export function buildArmDiagnosticsReport(input: {
   weightClass?: string;
   bodyWeightKg?: number;
   actualPlan?: any;
+  weakPoints?: ArmWeakPoint[];
+  angles?: { elbowDeg?: number; wristDeg?: number; forearmDeg?: number };
+  hasVideo?: boolean;
+  hasVbt?: boolean;
+  hasGripHistory?: boolean;
 }): ArmDiagnosticsReport {
-  const diag = diagnoseArmWeakPoint({ weakTest: input.weakTest, technique: input.technique });
+  const detailed = diagnoseArmWeakDetailed({ weakTest: input.weakTest, weakPoints: input.weakPoints, technique: input.technique });
+  const diag = detailed; // для совместимости — detailed расширяет base
+  // также сохраним легкую диагностику для backward compat
+  const legacyDiag = diagnoseArmWeakPoint({ weakTest: input.weakTest, technique: input.technique });
   const gripWithMeta: any = { ...input.grip };
   if (input.bodyWeightKg != null) gripWithMeta.bodyWeightKg = input.bodyWeightKg;
   if (input.sex) gripWithMeta.sex = input.sex;
@@ -120,6 +147,54 @@ export function buildArmDiagnosticsReport(input: {
   for (const w of balanceWarnings) findings.push({ level: 'warn', text: w, exercise: 'pronation_cable' });
 
   info.push('Механизм-ориентированная модель: сустав/сухожилие/баланс — с уровнями, без общего score');
+  // PRO detailed — 12 мёртвых точек + коррекции + scoring оверлей (выкл. по умолчанию, только для gauge)
+  const weakPoints = detailed.weakPoints || [];
+  const biomechCards = (detailed as any).biomechCards || [];
+  const corrections = weakPoints.map((wp: ArmWeakPoint) => {
+    const c = ARM_CORRECTIONS[wp];
+    return c ? { weakPoint: wp, exercises: c.exercises, intensityPct: c.intensityPct, dayTags: c.dayTags } : null;
+  }).filter(Boolean) as Array<{ weakPoint: ArmWeakPoint; exercises: string[]; intensityPct: number; dayTags: string[] }>;
+  // detailed findings для каждой точки
+  for (const card of biomechCards) {
+    findings.push({ level: 'warn', muscle: card.weakMuscles[0], text: `${card.label}: ${card.angleRangeDeg[0]}-${card.angleRangeDeg[1]}° ${card.keyJoint} → ${card.corrections[0]} @${Math.round(card.intensityPct*100)}%`, exercise: card.corrections[0] });
+  }
+  // scoring оверлей (вычисляем всегда, показываем только если есть видео/VBT/история)
+  let scoring: ReturnType<typeof scoreArm> | undefined;
+  try {
+    const hasVideo = !!input.hasVideo;
+    const hasVbt = !!input.hasVbt || (input.vbtRecords && input.vbtRecords.length>0);
+    const hasGripHistory = !!input.hasGripHistory;
+    if (hasVideo || hasVbt || hasGripHistory || corrections.length>0) {
+      const sideSets = (input.actualPlan?.weeks?.[0]?.sessions || []).reduce((a: number, s: any) => a + s.exercises.filter((e: any)=> e.muscle==='side_pressure').reduce((aa:number,e:any)=>aa+(e.sets||0),0),0);
+      scoring = scoreArm({
+        weakCount: weakPoints.length,
+        asymmetryPct: fv.asymmetryPct ?? null,
+        sideSetsWeek1: sideSets || (input.weakTest.sidePressureFails ? 8 : 0),
+        tendonSets: input.tendonSets,
+        tendonLimit: tendonWeeklyLimit(input.level),
+        gripLevel: undefined,
+        hasVideo, hasVbt, hasGripHistory,
+        level: input.level,
+      });
+    }
+  } catch {}
+  // angle validation для detailed
+  if (input.angles) {
+    const vals = Object.values(ARM_BIOMECH);
+    for (const card of biomechCards) {
+      const bio = vals.find(v => v.weakPoint === card.weakPoint);
+      if (!bio || !input.angles) continue;
+      // уже в biomechCards есть, но добавим cue если вне диапазона
+      const key = bio.keyJoint.toLowerCase();
+      let av: number | undefined;
+      if (key.includes('лучезапяст') || key.includes('кист')) av = input.angles.wristDeg;
+      else if (key.includes('локт')) av = input.angles.elbowDeg;
+      else if (key.includes('предплеч') || key.includes('прона') || key.includes('супи')) av = input.angles.forearmDeg;
+      if (av != null && (av < bio.angleRangeDeg[0] || av > bio.angleRangeDeg[1])) {
+        findings.push({ level: 'warn', text: `${bio.label}: твой ${av}° вне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.loadCues}`, exercise: bio.corrections[0] });
+      }
+    }
+  }
 
   return {
     weakMuscles: diag.weakMuscles,
@@ -134,5 +209,13 @@ export function buildArmDiagnosticsReport(input: {
     tendonLoad: input.tendonSets,
     asymmetryPct: fv.asymmetryPct,
     info,
+    weakPoints,
+    biomechCards,
+    corrections,
+    scoring,
   };
+}
+
+export function buildArmDiagnosticsDetailedReport(input: Parameters<typeof buildArmDiagnosticsReport>[0]): ReturnType<typeof buildArmDiagnosticsReport> {
+  return buildArmDiagnosticsReport(input);
 }

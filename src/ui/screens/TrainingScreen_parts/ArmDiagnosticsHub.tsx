@@ -6,7 +6,7 @@
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
+import { diagnoseArmWeakPoint, diagnoseArmWeakDetailed, expandLegacyWeakPoints } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
@@ -21,10 +21,13 @@ import { buildArmAcwr } from '../../../engines/arm/arm-acwr.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
+import { ARM_BIOMECH, type ArmWeakPoint, weakPointsForTechnique, isValidAngleForArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
+import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
+import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 
-const STORAGE_KEY = 'he_arm_diagnostics_hub_v3';
+const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
 type HubTab = 'grip' | 'wrist' | 'pressure' | 'strength' | 'recovery';
 
@@ -45,6 +48,7 @@ type ArmDiagState = {
   sup: boolean;
   side: boolean;
   back: boolean;
+  weakPoints: ArmWeakPoint[]; // 12 мёртвых точек
   technique: string;
   level: string;
   elbowDeg: string;
@@ -71,7 +75,7 @@ type ArmDiagState = {
 
 const DEFAULT_STATE: ArmDiagState = {
   rtKg: '', axleKg: '', pinchSec: '', sideKg: '', backKg: '', leftKg: '', rightKg: '', bwKg: '80', sex: 'male', weightClass: '',
-  cup: false, rising: false, pron: false, sup: false, side: false, back: false,
+  cup: false, rising: false, pron: false, sup: false, side: false, back: false, weakPoints: [],
   technique: 'balanced', level: 'intermediate',
   elbowDeg: '110', forearmDeg: '90', wristDeg: '10', direction: 'to_middle',
   vbtWeight: '', vbtReps: '', vbtVel: '',
@@ -88,20 +92,46 @@ const LEVEL_OPTS = [
 
 const TAB_DEFS: Array<{ id: HubTab; label: string; icon: string; desc: string }> = [
   { id: 'grip', label: 'Хват', icon: '✊', desc: 'RT/Axle/Pinch + WR 130.5/77.2' },
-  { id: 'wrist', label: 'Кисть/Ротация', icon: '🤚', desc: 'Cup/Rising/Pron/Sup + РУ/РА + VBT' },
+  { id: 'wrist', label: 'Кисть/Ротация', icon: '🤚', desc: '12 мёртвых точек + РУ/РА + VBT' },
   { id: 'pressure', label: 'Давление', icon: '💥', desc: 'Side/Back + humerus + table 3/2/1' },
   { id: 'strength', label: 'Сила', icon: '⚡', desc: 'F/t F100/F500 + асимметрия + бенчмарки' },
   { id: 'recovery', label: 'Сухожилие/Восстановление', icon: '🛡️', desc: 'Tendon + ACWR + fatigue' },
 ];
 
+const WEAK_GROUPS: Array<{ title: string; points: ArmWeakPoint[] }> = [
+  { title: 'Кисть', points: ['cup_start','cup_hold','rising_top','contain_fingers'] },
+  { title: 'Ротация', points: ['pron_open','pron_lock','sup_cup','sup_drag'] },
+  { title: 'Давление', points: ['side_mid','side_pin','back_start','back_drag'] },
+];
+
+const WP_LABEL_SHORT: Record<ArmWeakPoint,string> = {
+  cup_start: 'Cup старт', cup_hold: 'Cup hold', rising_top: 'Rising', pron_open: 'Pron откр', pron_lock: 'Pron lock',
+  sup_cup: 'Sup cup', sup_drag: 'Sup drag', side_mid: 'Side mid', side_pin: 'Side pin', back_start: 'Back старт', back_drag: 'Back drag', contain_fingers: 'Пальцы',
+};
+
 export const ArmDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<ArmDiagState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULT_STATE, ...JSON.parse(raw) };
-      // миграция v2
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // миграция: гарантируем weakPoints массив
+        if (!Array.isArray(parsed.weakPoints)) parsed.weakPoints = [];
+        return { ...DEFAULT_STATE, ...parsed };
+      }
+      const v3 = localStorage.getItem('he_arm_diagnostics_hub_v3');
+      if (v3) {
+        const parsed = JSON.parse(v3);
+        // v3 → v4: развернуть legacy booleans в weakPoints
+        const legacy: string[] = [];
+        if (parsed.cup) legacy.push('cup'); if (parsed.rising) legacy.push('rising');
+        if (parsed.pron) legacy.push('pronation'); if (parsed.sup) legacy.push('supination');
+        if (parsed.side) legacy.push('side'); if (parsed.back) legacy.push('back');
+        const expanded = expandLegacyWeakPoints(legacy);
+        return { ...DEFAULT_STATE, ...parsed, weakPoints: expanded.slice(0,3) };
+      }
       const v2 = localStorage.getItem('he_arm_diagnostics_hub_v2');
-      if (v2) return { ...DEFAULT_STATE, ...JSON.parse(v2) };
+      if (v2) return { ...DEFAULT_STATE, ...JSON.parse(v2), weakPoints: [] };
     } catch {}
     return DEFAULT_STATE;
   });
@@ -144,7 +174,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, []);
 
-  const diag = useMemo(() => diagnoseArmWeakPoint({
+  const diag = useMemo(() => diagnoseArmWeakDetailed({
     weakTest: {
       cupFails: state.cup,
       risingFails: state.rising,
@@ -156,8 +186,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
       gripAxleMaxKg: state.axleKg ? parseFloat(state.axleKg) : undefined,
       pinchHoldSec: state.pinchSec ? parseFloat(state.pinchSec) : undefined,
     },
+    weakPoints: state.weakPoints,
     technique: state.technique,
-  }), [state]);
+  }), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.rtKg, state.axleKg, state.pinchSec, state.technique, state.weakPoints]);
 
   const bwNum = parseFloat(state.bwKg) || 80;
   const weightClassAuto = state.weightClass || wafWeightClassFor(bwNum);
@@ -304,6 +335,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
     weakTest: {
       cupFails: state.cup, risingFails: state.rising, pronationFails: state.pron, supinationFails: state.sup, sidePressureFails: state.side, backPressureFails: state.back,
     },
+    weakPoints: state.weakPoints as any,
+    angles: { elbowDeg: parseFloat(state.elbowDeg) || 110, wristDeg: parseFloat(state.wristDeg) || 10, forearmDeg: parseFloat(state.forearmDeg) || 90 },
+    hasVideo: hasVideoSupport(),
+    hasVbt: !!(state.vbtWeight && state.vbtVel),
+    hasGripHistory: (()=>{ try{ return loadForceTrials().length>0; } catch{ return false; } })(),
     grip: { rtKg: state.rtKg ? parseFloat(state.rtKg) : undefined, axleKg: state.axleKg ? parseFloat(state.axleKg) : undefined, pinchSec: state.pinchSec ? parseFloat(state.pinchSec) : undefined, sideKg: state.sideKg ? parseFloat(state.sideKg) : undefined, backKg: state.backKg ? parseFloat(state.backKg) : undefined, leftKg: state.leftKg ? parseFloat(state.leftKg) : undefined, rightKg: state.rightKg ? parseFloat(state.rightKg) : undefined } as any,
     vbtRecords: (state.vbtWeight && state.vbtVel) ? [{ weight: parseFloat(state.vbtWeight), reps: parseInt(state.vbtReps||'5',10), velocityMs: parseFloat(state.vbtVel) }, { weight: parseFloat(state.vbtWeight), reps: parseInt(state.vbtReps||'5',10), velocityMs: parseFloat(state.vbtVel)+0.2 }] : [],
     level: state.level,
@@ -313,7 +349,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     sex: state.sex,
     weightClass: weightClassAuto,
     bodyWeightKg: bwNum,
-  } as any), [state, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum]);
+  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, forceHistoryTick]);
 
   const mockGuard = useMemo(() => {
     const mockPlan: any = {
@@ -338,25 +374,57 @@ export const ArmDiagnosticsHub: React.FC = () => {
     };
   }, [state.level]);
 
+  const toggleWeakPoint = (wp: ArmWeakPoint) => {
+    setState(s => {
+      const has = s.weakPoints.includes(wp);
+      let next = has ? s.weakPoints.filter(x=>x!==wp) : [...s.weakPoints, wp].slice(0,3) as ArmWeakPoint[];
+      // keep 3 max (parity TA/BB)
+      if (!has && next.length>3) next = next.slice(0,3);
+      return { ...s, weakPoints: next };
+    });
+  };
+  const clearWeakPoints = () => setState(s=> ({...s, weakPoints: []}));
+
   const applyToConstructor = () => {
     const groups = diag.weakMuscles.slice(0, 2);
-    // если слабые не выявлены — пробуем dynamicWeak
-    const dynWeak = dynamicReport ? (dynamicReport as any).asymmetry ? [] : [] : [];
     const extra = (dynamicReport as any)?.metrics ? Object.entries((dynamicReport as any).metrics).filter(([_, v]: any)=> v && v.fMax < 30).map(([k])=> k==='finger_flex'?'risers': k==='hammer'?'brachialis':k==='hook'?'supinators':'wrist_flexors') : [];
     const finalGroups = groups.length ? groups : extra.slice(0,2);
-    if (finalGroups.length === 0 && groups.length===0) {
-      setToast('Слабые зоны не выявлены — нечего применять (введи провалы или 4 теста силы)');
+    const weakPoints = (diag as any).weakPoints as ArmWeakPoint[] | undefined;
+    const hasPoints = weakPoints && weakPoints.length>0;
+    if (finalGroups.length === 0 && !hasPoints) {
+      setToast('Слабые зоны не выявлены — выбери мёртвые точки или провалы/4 теста силы');
       setTimeout(() => setToast(''), 2500);
       return;
     }
     const toApply = finalGroups.length ? finalGroups : groups;
+    const payload: any = {
+      groups: toApply,
+      armTechnique: state.technique,
+      armWeakPoints: weakPoints || [],
+      armBiomechCards: (diag as any).biomechCards || [],
+      armCorrections: (report as any).corrections || [],
+      armScoring: (report as any).scoring,
+      armDiag: state,
+      armAngles: angles,
+      armForce: forceVecPro,
+      armVbt: vbt,
+      armDynamic: dynamicReport,
+      armBench: benchRes,
+      armTendon: derivedTendon,
+      armFindings: report.findings,
+      armHumerus: report.humerusWarnings,
+      armBalance: report.balanceWarnings,
+      armAsymmetry: report.asymmetryPct,
+      armInfo: report.info,
+    };
     applyToPlanner({
       kind: 'weakpoints',
-      label: `Арм диагностика: ${toApply.join(', ')}`,
-      data: { groups: toApply, armTechnique: state.technique, armDiag: state, armAngles: angles, armForce: forceVecPro, armVbt: vbt, armDynamic: dynamicReport, armBench: benchRes, armTendon: derivedTendon, armFindings: report.findings, armHumerus: report.humerusWarnings, armBalance: report.balanceWarnings, armAsymmetry: report.asymmetryPct, armInfo: report.info } as any,
+      label: `Арм диагностика: ${(weakPoints && weakPoints.length? weakPoints.join(',') : toApply.join(','))}`,
+      data: payload,
       source: 'intellectual',
     });
-    setToast(`✓ Применено в Арм-конструктор: ${toApply.map(g=>ARM_MUSCLE_RU[g as any]||g).join(', ')}`);
+    const label = hasPoints ? weakPoints!.join(', ') : toApply.map((g:any)=> ARM_MUSCLE_RU[g as any]||g).join(', ');
+    setToast(`✓ Применено в Арм-конструктор: ${label} ${hasPoints? `(${(diag as any).biomechCards?.length||0} коррекций)` : ''}`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'arm' } as any));
@@ -383,8 +451,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return { wk, kind };
   });
 
-  // нейтральный заголовок — без рисков
-  const hasWeak = report.weakMuscles.length > 0;
+   // нейтральный заголовок + scoring оверлей (PRO, как TA)
+  const hasWeak = report.weakMuscles.length > 0 || (state.weakPoints.length>0);
+  const scoring = (report as any).scoring as ReturnType<typeof scoreArm> | undefined;
+  const showScoring = !!scoring && (scoring.verification>0 || scoring.floors.length>0);
 
   // Video handler stub — при загрузке файла парсим как landmarks
   const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -457,9 +527,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>5 таба × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR</div>
           </div>
           <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: hasWeak ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border:`1px solid ${hasWeak ? 'rgba(245,158,11,0.22)' : 'rgba(34,197,94,0.22)'}` }}>
-            <div style={{ fontSize:11, fontWeight:700, color: hasWeak? '#f59e0b' : '#22c55e' }}>{hasWeak ? report.weakMuscles.join(', ') : 'баланс'}</div>
-            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${report.priorities.length} приоритет · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
+            <div style={{ fontSize:11, fontWeight:700, color: hasWeak? '#f59e0b' : '#22c55e' }}>{hasWeak ? ((state.weakPoints.length? state.weakPoints.join(', ') : report.weakMuscles.join(', '))) : 'баланс'}</div>
+            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${(report as any).weakPoints?.length||0} мёртвых точек · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
           </div>
+          {showScoring && scoring && (
+            <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: `rgba(${scoring.level==='ok'?'34,197,94': scoring.level==='warn'?'245,158,11':'239,68,68'},0.12)`, border:'1px solid rgba(255,255,255,0.12)', minWidth:70 }}>
+              <div style={{ fontSize:18, fontWeight:900, color: scoreColor(scoring.level), lineHeight:1 }}>{scoring.score}</div>
+              <div style={{ fontSize:9, color: DIM }}>{scoreLabel(scoring.score)} · v{Math.round(scoring.verification*100)}%</div>
+              {scoring.floors.length>0 && <div style={{ fontSize:8, color:'#ef4444' }}>{scoring.floors[0]}</div>}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
@@ -467,8 +544,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
           {report.asymmetryPct!=null && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Асимметрия {report.asymmetryPct}%</span>}
         </div>
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
-          Выбери провалы + хват + углы + <b style={{color:'#f59e0b'}}>4 теста силы (кг+мс)</b> + VBT → получи F/t F100/F500, асимметрию, bench-уровень. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Арм-конструктор»</b> отправит слабые зоны + динамику в планировщик. Видео — опционально (BlazePose/HANDS → <code>isAnglesVerified</code>).
+           Выбери <b style={{color:'#f59e0b'}}>12 мёртвых точек</b> (группы Кисть/Ротация/Давление) + провалы + хват + углы + 4 теста силы (кг+мс) + VBT → получи биомех-карточки (угол {`{0-20°при 110°}`}) + коррекции из каталога. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Арм-конструктор»</b> отправит мёртвые точки + динамику. RSS оверлей — только при видео/VBT/истории. Видео — опционально (BlazePose/HANDS).
         </div>
+        {showScoring && scoring && <div style={{ marginTop:6, fontSize:10, color:DIM, padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)' }}>{scoring.findings.slice(0,3).map(f=>f.text).join(' · ')} {scoring.floors.length? `· floor: ${scoring.floors.join(', ')}` : ''} · v{Math.round(scoring.verification*100)}% (видео 0.35+VBT 0.35+история 0.30)</div>}
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
 
@@ -583,14 +661,66 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 )}
               </div>
             </div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+            {/* 12 мёртвых точек — группы Кисть/Ротация/Давление (PRO) */}
+            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginTop:8 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🎯 12 мёртвых точек — выбери 1-3 (как WLDiagnosticsHub) · техника {state.technique} · до 3</div>
+              <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                {WEAK_GROUPS.map(g=> (
+                  <div key={g.title} style={{ flex:'1 1 160px', minWidth:160 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:DIM, marginBottom:4 }}>{g.title} {g.title==='Кисть'?'🤚' : g.title==='Ротация'?'🔄':'💥'}</div>
+                    <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                      {g.points.map(wp=>{
+                        const sel = state.weakPoints.includes(wp);
+                        const bio = ARM_BIOMECH[wp];
+                        const isForTech = bio.technique.includes(state.technique) || bio.technique.includes('all') || state.technique==='balanced';
+                        // подсвечиваем релевантные технике
+                        return (
+                          <button key={wp} onClick={()=>toggleWeakPoint(wp)} aria-pressed={sel} title={`${bio.label} ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° ${bio.keyJoint} → ${bio.corrections[0]}`}
+                            style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: sel ? '#f59e0b' : isForTech ? '#1f3a5f' : 'rgba(255,255,255,0.08)', background: sel ? 'rgba(245,158,11,0.16)' : isForTech ? '#0a1629' : 'rgba(255,255,255,0.02)', color: sel ? '#f59e0b' : isForTech ? DIM : 'rgba(255,255,255,0.4)', cursor:'pointer', fontSize:10, fontWeight:600, opacity: isForTech?1:0.6 }}>
+                            {WP_LABEL_SHORT[wp]} {isForTech? '●':''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ fontSize:10, color:DIM }}>Выбрано: {state.weakPoints.length? state.weakPoints.join(', ') : '—'} {state.weakPoints.length>=3? '(макс 3)' : ''}</span>
+                {state.weakPoints.length>0 && <button onClick={clearWeakPoints} style={{ padding:'4px 8px', borderRadius:999, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>✕ Сбросить</button>}
+                <span style={{ marginLeft:'auto', fontSize:9, color:DIM }}>Фильтр ● = для техники {state.technique}</span>
+              </div>
+              {/* Биомех-карточки выбранных */}
+              {state.weakPoints.length>0 && (
+                <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
+                  {(diag as any).biomechCards?.map((c:any)=> {
+                    const valid = isValidAngleForArmWeakPoint(c.weakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? parseFloat(state.wristDeg)||10 : c.keyJoint.toLowerCase().includes('локт')? parseFloat(state.elbowDeg)||110 : parseFloat(state.forearmDeg)||90);
+                    const corr = ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint];
+                    return (
+                      <div key={c.weakPoint} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:`1px solid ${valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{c.label}</span>
+                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: valid?'rgba(34,197,94,0.14)':'rgba(239,68,68,0.14)', color: valid?'#22c55e':'#ef4444', border:`1px solid ${valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid?'✅':'⚠ вне'}</span>
+                          <span style={{ fontSize:10, color:DIM }}>{c.technique.join('/')} · {c.weakMuscles.join('/')}</span>
+                        </div>
+                        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{c.reason}</div>
+                        <div style={{ fontSize:10, color:'#5ee', marginTop:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i></div>
+                        {corr && <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Сеты {corr.sets}×{corr.repsRange[0]}-{corr.repsRange[1]} RIR{corr.rir}{corr.holdSeconds?` hold ${corr.holdSeconds}с`:''} → день {corr.dayTags[0]} · группа {corr.substitutionGroup}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8, opacity:0.7 }}>
+              <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>Legacy провалы (совместимость):</span>
               {[
                 ['cup','Кисть открывается (cup)'],
                 ['rising','Пальцы уходят (rising)'],
                 ['pron','Топролл не держит (pron)'],
                 ['sup','Хук проваливается (sup)'],
               ].map(([k,label]) => (
-                <button key={k} onClick={()=>toggle(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor:(state as any)[k] ? '#f59e0b' : '#1f3a5f', background:(state as any)[k] ? 'rgba(245,158,11,0.14)' : '#0a1629', color:(state as any)[k] ? '#f59e0b' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
+                <button key={k} onClick={()=>toggle(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'5px 8px', borderRadius:999, border:'1px dashed', borderColor:(state as any)[k] ? '#f59e0b' : '#1f3a5f', background:(state as any)[k] ? 'rgba(245,158,11,0.10)' : '#0a1629', color:(state as any)[k] ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:500 }}>
                   {label}
                 </button>
               ))}
@@ -613,6 +743,28 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   {label}
                 </button>
               ))}
+            </div>
+            {/* Быстрый выбор 4 точек давления */}
+            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', marginBottom:8 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:6 }}>Мёртвые точки давления (быстрый выбор) · side/back — humerus guard</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {(['side_mid','side_pin','back_start','back_drag'] as ArmWeakPoint[]).map(wp=>{
+                  const sel = state.weakPoints.includes(wp);
+                  const bio = ARM_BIOMECH[wp];
+                  return (
+                    <button key={wp} onClick={()=>toggleWeakPoint(wp)} aria-pressed={sel} title={`${bio.label} ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.corrections[0]}`}
+                      style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: sel ? '#ef4444' : '#1f3a5f', background: sel ? 'rgba(239,68,68,0.14)' : '#0a1629', color: sel ? '#ef4444' : DIM, cursor:'pointer', fontSize:10, fontWeight:600 }}>
+                      {WP_LABEL_SHORT[wp]} {bio.intensityPct*100===60?'60%':'70%'}
+                    </button>
+                  );
+                })}
+              </div>
+              {state.weakPoints.filter(wp=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).length>0 && (
+                <div style={{ marginTop:6, fontSize:10, color:DIM }}>
+                  Выбрано давления: {state.weakPoints.filter(wp=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).join(', ')}
+                  <span style={{ color:'#ef4444', marginLeft:8 }}>⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
+                </div>
+              )}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <div style={{ padding:'8px 10px', borderRadius:8, background: mockGuard.humerus.length? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${mockGuard.humerus.length?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}>
@@ -690,6 +842,29 @@ export const ArmDiagnosticsHub: React.FC = () => {
               <button onClick={handleAddTrialsToHistory} style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.2)', color:'#22c55e', fontWeight:700, cursor:'pointer', fontSize:11 }}>💾 Сохранить 4 теста в историю (12-нед avg/max/min)</button>
               <button onClick={()=> { const s = { fingerKg:'',fingerMs:'',hammerKg:'',hammerMs:'',hookKg:'',hookMs:'',cupKg:'',cupMs:'' }; setState(prev=> ({...prev, ...s})); }} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', color:DIM, cursor:'pointer', fontSize:11 }}>🗑 Сброс динамик</button>
             </div>
+            {/* F/t → мёртвые точки (авто) */}
+            {dynamicReport && (dynamicReport as any).metrics && (
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginTop:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>F/t → мёртвые точки (авто-подсказка)</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
+                  {(dynamicReport as any).metrics.finger_flex && (dynamicReport as any).metrics.finger_flex.ftIndex < 30 ? 'finger_flex низкая → contain_fingers (pinch) · ' : ''}
+                  {(dynamicReport as any).metrics.hammer && (dynamicReport as any).metrics.hammer.ftIndex < 30 ? 'hammer низкая → sup_drag/back_drag · ' : ''}
+                  {(dynamicReport as any).metrics.hook && (dynamicReport as any).metrics.hook.fMax < 30 ? 'hook низкая → sup_cup/sup_drag · ' : ''}
+                  {(dynamicReport as any).metrics.cup && (dynamicReport as any).metrics.cup.f500 < 25 ? 'cup низкая → cup_start/hold · ' : ''}
+                  {!((dynamicReport as any).metrics.finger_flex?.ftIndex<30 || (dynamicReport as any).metrics.hammer?.ftIndex<30 || (dynamicReport as any).metrics.hook?.fMax<30 || (dynamicReport as any).metrics.cup?.f500<25) ? 'Все F/t в допуске — баланс' : ''}
+                </div>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+                  {[
+                    { id:'contain_fingers', need: (dynamicReport as any).metrics.finger_flex?.ftIndex<30 },
+                    { id:'sup_drag', need: (dynamicReport as any).metrics.hammer?.ftIndex<30 },
+                    { id:'sup_cup', need: (dynamicReport as any).metrics.hook?.fMax<30 },
+                    { id:'cup_start', need: (dynamicReport as any).metrics.cup?.f500<25 },
+                  ].filter(x=>x.need).map(x=> (
+                    <button key={x.id} onClick={()=>toggleWeakPoint(x.id as ArmWeakPoint)} style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: state.weakPoints.includes(x.id as ArmWeakPoint)? '#f59e0b':'#1f3a5f', background: state.weakPoints.includes(x.id as ArmWeakPoint)? 'rgba(245,158,11,0.14)':'#0a1629', color: state.weakPoints.includes(x.id as ArmWeakPoint)? '#f59e0b':DIM, cursor:'pointer', fontSize:10 }}>{x.id} {state.weakPoints.includes(x.id as ArmWeakPoint)?'✓':'+'}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             {forceHistory.stats.length>0 && (
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>История 12 нед — avg/max/min + fatigue</div>
@@ -748,13 +923,30 @@ export const ArmDiagnosticsHub: React.FC = () => {
         )}
       </div>
 
-      {/* Diagnostics output — механизм-ориентированная (сустав/сухожилие) */}
+      {/* Diagnostics output — механизм-ориентированная + 12 мёртвых точек */}
       <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — сустав/сухожилие (механизм)</div>
-        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''}</div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — мёртвые точки (12) + сустав/сухожилие</div>
+        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''} {(report as any).weakPoints?.length? `· точек ${(report as any).weakPoints.join(', ')}` : ''}</div>
         {report.findings.length>3 && <div style={{ fontSize:10, color:DIM, marginTop:6, maxHeight:80, overflowY:'auto', padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)' }}>{report.findings.map((f:any,i:number)=><div key={i} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e', marginBottom:2 }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
-        {diag.priorities.length===0 ? <div style={{ fontSize:11, color:DIM }}>Слабые зоны не выявлены — баланс. {dynamicReport && (dynamicReport as any).asymmetry ? `· ${(dynamicReport as any).tactic}` : ''}</div> : (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {/* 12 точек карточки */}
+        {(diag as any).biomechCards?.length ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
+            {(diag as any).biomechCards.map((c:any)=>(
+              <div key={c.weakPoint} style={{ padding:'10px 12px', borderRadius:10, background:'#0a1629', border:'1px solid rgba(245,158,11,0.18)' }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:4 }}>
+                  <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{c.label}</span>
+                  <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(245,158,11,0.12)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.18)' }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint}</span>
+                  <span style={{ fontSize:10, color:DIM }}>{c.weakMuscles.join('/')}</span>
+                  <span style={{ marginLeft:'auto', fontSize:10, color: isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? angles.wristDeg : c.keyJoint.toLowerCase().includes('локт')? 110 : angles.forearmDeg) ? '#22c55e' : '#ef4444' }}>{isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? angles.wristDeg : c.keyJoint.toLowerCase().includes('локт')? 110 : angles.forearmDeg) ? '✅' : '⚠ вне диапазона'}</span>
+                </div>
+                <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{c.reason}</div>
+                <div style={{ fontSize:11, color:'#5ee', marginBottom:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i></div>
+                <div style={{ fontSize:10, color:DIM }}>День {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.dayTags[0] || '—'} · {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.sets}×{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.repsRange.join('-')} RIR{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.rir} {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds?`hold ${ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds}с`:''} · {c.technique.join('/')}</div>
+              </div>
+            ))}
+          </div>
+        ) : diag.priorities.length===0 ? <div style={{ fontSize:11, color:DIM, marginTop:8 }}>Слабые зоны не выявлены — баланс. {dynamicReport && (dynamicReport as any).asymmetry ? `· ${(dynamicReport as any).tactic}` : ''}</div> : (
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
             {diag.priorities.map((p,i)=>(
               <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
@@ -767,9 +959,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
             ))}
           </div>
         )}
+        {(report as any).corrections?.length ? (
+          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.12)', fontSize:10, color:DIM }}>
+            <b style={{color:'#00e68a'}}>Инъекция в план (предпросмотр):</b> {(report as any).corrections.map((c:any)=> `${c.weakPoint}→${c.exercises[0]} @${Math.round(c.intensityPct*100)}% в ${c.dayTags[0]}`).join(' · ')}
+            <div style={{ marginTop:4, color:DIM }}>Дней инъекции: {Array.from(new Set((report as any).corrections.map((c:any)=>c.dayTags[0]))).join(', ')} · per-day dedup, budget {(report as any).scoring ? `RSS ${(report as any).scoring.score}` : ''}</div>
+          </div>
+        ) : null}
         {dynamicReport && (dynamicReport as any).metrics && (
           <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)', fontSize:10, color:DIM }}>
-            <b style={{color:'#f59e0b'}}>Динамика F/t:</b> avgFt {(dynamicReport as any).avgFt ?? '—'} кг/с · total {(dynamicReport as any).totalF ?? '—'}кг · tactic {(dynamicReport as any).tactic}
+            <b style={{color:'#f59e0b'}}>Динамика F/t:</b> avgFt {(dynamicReport as any).avgFt ?? '—'} кг/с · total {(dynamicReport as any).totalF ?? '—'}кг · tactic {(dynamicReport as any).tactic} · {Object.entries((dynamicReport as any).metrics).map(([k,v]:any)=> v? `${k}:${v.ftIndex}`:'' ).filter(Boolean).join(' · ') || ''}
+          </div>
+        )}
+        {showScoring && scoring && (
+          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>
+            <b style={{color: scoreColor(scoring.level)}}>RSS {scoring.score} {scoreLabel(scoring.score)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.map(f=>f.text).join(' · ')} {scoring.floors.length? `· floor ${scoring.floors.join(', ')}` : ''}
           </div>
         )}
       </div>
@@ -789,8 +992,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
       {/* Action */}
       <div style={{ ...CARD, padding: 12, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)' }}>
-        <button onClick={applyToConstructor} style={{ width:'100%', padding:'10px 14px', borderRadius:8, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Арм-конструктор ({diag.weakMuscles.slice(0,2).join(', ') || (dynamicReport && Object.keys((dynamicReport as any).metrics||{}).length ? 'динамика' : 'баланс')})</button>
-        <div style={{ fontSize:10, color:DIM, marginTop:6, textAlign:'center' }}>Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · также <code>armDynamic</code>+<code>armBench</code> в payload</div>
+        <button onClick={applyToConstructor} style={{ width:'100%', padding:'10px 14px', borderRadius:8, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Арм-конструктор ({(state.weakPoints.length? state.weakPoints.join(', ') : diag.weakMuscles.slice(0,2).join(', ')) || (dynamicReport && Object.keys((dynamicReport as any).metrics||{}).length ? 'динамика' : 'баланс')} · {(state.weakPoints.length? `${state.weakPoints.length} точек` : `${diag.weakMuscles.length} мышц`)})</button>
+        <div style={{ fontSize:10, color:DIM, marginTop:6, textAlign:'center' }}>Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
+        {(diag as any).biomechCards?.length ? <div style={{ fontSize:10, color:DIM, marginTop:4, textAlign:'center' }}>Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}
       </div>
     </div>
   );
