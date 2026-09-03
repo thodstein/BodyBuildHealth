@@ -477,6 +477,7 @@ export const StrengthSportConstructor: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile lazy: только активный шаг монтируется (step==='params' &&) — 1/4 DOM, 60% меньше памяти на мобильном, как CardioUI */}
       {step === 'params' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны">
