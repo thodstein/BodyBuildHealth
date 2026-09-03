@@ -16,6 +16,7 @@ import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
+import { PLATFORM_WR, planAttempts, platformWrFor } from '../../../engines/arm/arm-platform.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -93,6 +94,8 @@ export function ArmAutoConstructor() {
   const [proSparDelta, setProSparDelta] = useState<string>('0');
   const [proSupermatch, setProSupermatch] = useState<boolean>(false);
   const [proStrap, setProStrap] = useState<boolean>(false);
+  const [proPlatImpl, setProPlatImpl] = useState<string>('rolling_thunder');
+  const [proPlatTarget, setProPlatTarget] = useState<string>('');
 
   const workMax = useMemo(() => {
     try {
@@ -613,6 +616,27 @@ export function ArmAutoConstructor() {
                   return `${ex.name} — ${ex.workSets[0]?.weight ?? 0} кг × ${ex.workSets[0]?.reps} RIR${ex.rir} (${ex.tempoSpec})`;
                 } catch { return '—'; }
               })()}</div>
+              {discipline === 'armlifting' && (
+                <div style={{ marginTop:10, border:'1px solid #1f3a5f', borderRadius:10, padding:8, background:'#0a1629' }}>
+                  <div style={{ color:'#fff', fontWeight:700, fontSize:12, marginBottom:6 }}>🏟 Помост: план попыток (опенер 90 / 96 / 102%)</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <label style={{ ...SMALL }}>Снаряд<br/>
+                      <select value={proPlatImpl} onChange={e=>setProPlatImpl(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                        {Object.entries(PLATFORM_WR).map(([id, r])=><option key={id} value={id}>{r.name}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ ...SMALL }}>Цель, кг<br/><input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+                  </div>
+                  <div style={{ ...SMALL, marginTop:6 }}>{(()=>{
+                    const t = parseFloat(proPlatTarget);
+                    if (!(t > 0)) return 'Введите цель — покажем раскладку попыток и %WR.';
+                    const att = planAttempts(t);
+                    const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
+                    const pct = Math.round((t / wr) * 1000) / 10;
+                    return `Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`;
+                  })()}</div>
+                </div>
+              )}
               <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop:10 }}>🔄 Пересобрать с весами</button>
             </>
           )}

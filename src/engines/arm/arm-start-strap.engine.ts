@@ -53,3 +53,50 @@ export function startReadiness(input: { reactionMs?: number; falseStarts?: numbe
   if (r <= 350) return { ready: true, note: `Реакция ${r}мс — готов к старту.` };
   return { ready: false, note: `Реакция ${r}мс >350мс — добавить reaction_go 2×/нед.` };
 }
+
+// ── WAF-фолы и судейская процедура (WAF 2025 Rules, раздел Fouls) ──
+
+export interface WafFoul {
+  id: string;
+  name: string;
+  what: string; // что фиксирует рефери
+  prevention: string; // чем отрабатывать
+  drillId: string; // дрилл из START_DRILLS
+}
+
+export const WAF_FOULS: WafFoul[] = [
+  { id: 'elbow_lift', name: 'Отрыв локтя', what: 'Локоть оторвался от подушки во время борьбы.', prevention: 'Давление через подушку, локоть — якорь. Изометрия у стола.', drillId: 'foul_freeze' },
+  { id: 'false_start', name: 'Фальстарт', what: 'Движение до команды Go.', prevention: 'Старт только по Go, пауза Ready…Go 1-3с на тренировках.', drillId: 'reaction_go' },
+  { id: 'shoulder_foul', name: 'Провал плеча', what: 'Плечо/корпус ушли ниже допустимого уровня, потеря позиции.', prevention: 'Кор-якорь + широчайшие, грудь раскрыта, тяга на себя.', drillId: 'referee_grip_drill' },
+  { id: 'slip_grip', name: 'Срыв хвата', what: 'Ладони разошлись — судейский хват, при повторе — ремень.', prevention: 'Containment пальцев + cup, ремень-сессии заранее.', drillId: 'strap_start' },
+  { id: 'strap_refusal', name: 'Отказ от ремня', what: 'Отказ вязаться после назначения ремня.', prevention: 'Ремень — штатный сценарий: 1 strap-сессия в неделю.', drillId: 'strap_start' },
+  { id: 'misconduct', name: 'Неспортивное поведение', what: 'Споры, затяжки, опасные действия по решению рефери.', prevention: 'Дисциплина процедуры: set → Ready → Go → Stop.', drillId: 'foul_freeze' },
+];
+
+/** Два фола = поражение в матче (стандарт WAF). */
+export const WAF_FOULS_OUT_AFTER = 2;
+
+export function wafFoulById(id: string): WafFoul | undefined {
+  return WAF_FOULS.find((f) => f.id === id);
+}
+
+/** Судейская процедура матча по шагам. */
+export function refereeProcedure(): string[] {
+  return [
+    'Set grip: ладони закрыты, большие видны, запястья прямые.',
+    'Ready… (пауза) …Go — старт только по Go.',
+    'Срыв хвата → судейский хват; повторный срыв → ремень.',
+    'Stop — мгновенное замирание, локоть на подушке.',
+    `Два фола (${WAF_FOULS_OUT_AFTER}) — поражение в матче.`,
+  ];
+}
+
+/** Профилактика по фолам атлета: фол → дрилл. */
+export function foulPreventionFor(foulIds: string[]): Array<{ foul: WafFoul; drillId: string }> {
+  const out: Array<{ foul: WafFoul; drillId: string }> = [];
+  for (const id of foulIds) {
+    const foul = wafFoulById(id);
+    if (foul) out.push({ foul, drillId: foul.drillId });
+  }
+  return out;
+}
