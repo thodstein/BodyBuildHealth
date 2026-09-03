@@ -39,6 +39,26 @@ export const MVT: Record<VBTLift, number> = {
 };
 export function mvtForLift(lift: VBTLift): number { return MVT[lift] ?? 0.20; }
 
+/** LVP калибровка: по 3-4 точкам (вес/скорость) строит персональный LVP (линейная регрессия) */
+export function calibrateLVP(points: Array<{ pct: number; velocity: number }>): { slope: number; intercept: number; r2: number } | null {
+  if (points.length < 3) return null;
+  const n = points.length;
+  const sumX = points.reduce((a,p)=>a+p.pct,0);
+  const sumY = points.reduce((a,p)=>a+p.velocity,0);
+  const sumXY = points.reduce((a,p)=>a+p.pct*p.velocity,0);
+  const sumX2 = points.reduce((a,p)=>a+p.pct*p.pct,0);
+  const sumY2 = points.reduce((a,p)=>a+p.velocity*p.velocity,0);
+  const denom = n*sumX2 - sumX*sumX;
+  if (Math.abs(denom) < 1e-9) return null;
+  const slope = (n*sumXY - sumX*sumY)/denom;
+  const intercept = (sumY - slope*sumX)/n;
+  const r = (n*sumXY - sumX*sumY)/Math.sqrt((n*sumX2 - sumX*sumX)*(n*sumY2 - sumY*sumY));
+  return { slope, intercept, r2: r*r };
+}
+
+/** Training Max 90-92% как у Шейко (буфер для скорости) */
+export function trainingMax(compMax: number, pct: number = 0.90): number { return Math.round(compMax * pct * 10)/10; }
+
 /** Daily Readiness: warm-up 60% vs профиль. Снижение >8% → volume -20% (PoinT GO). */
 export function dailyReadinessCheck(expectedVelocity: number, actualVelocity: number): { dropPct: number; action: 'as-planned' | 'reduce-volume-20' | 'deload' } {
   if (expectedVelocity <= 0 || actualVelocity <= 0) return { dropPct: 0, action: 'as-planned' };
