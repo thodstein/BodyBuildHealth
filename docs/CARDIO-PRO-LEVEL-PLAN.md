@@ -143,6 +143,16 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
   Встроенные циклы — pyramidal (штрафов не добавляется, проверено существующими тестами).
 - **Тесты**: talk-паритет + threshold-warn/pyramidal-ok в `cardio-pro-level.test.ts` (37/37).
 
+## Продолжение — раунд 7 (prep-консистентность)
+
+- **Расхождение закрыто**: `buildCardioCycleFromPrep` игнорировал полевые тесты и среду —
+  теперь тот же приоритет LTHR > talk-test > age и сдвиг жара/высота, что в `buildCardioCycle`.
+  Новые поля `CardioPrepBuildOptions`: `lthr/talkZone2Hr/tempC/altitudeM` (+ конфиг-снапшот и rationale).
+- **Честность**: `explainCardioChoice` называет источник зон (LTHR/talk/возраст);
+  `CardioConstructor.fromPrepPlan` пробрасывает калибровку мастера в prep-сборку.
+- **Тесты**: prep LTHR-приоритет / Karvonen-фолбэк / talk-потолок / жара+высота +10 / explanation
+  в `cardio-pro-level.test.ts` (42/42).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.

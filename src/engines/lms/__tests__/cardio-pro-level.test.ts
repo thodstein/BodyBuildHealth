@@ -56,7 +56,10 @@ import {
   cardioInterferenceV2,
 } from '../cardio-safety.engine';
 import { fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop, extractFitRecords } from '../../cardio-import.engine';
-import { buildCardioCycle, applyIndividualizedTaperToCycle, cardioQualityReport, zonesFromTalkTest } from '../cardio.engine';
+import {
+  buildCardioCycle, applyIndividualizedTaperToCycle, cardioQualityReport, zonesFromTalkTest,
+  buildCardioCycleFromPrep, explainCardioChoice, type CardioPrepPlanLike,
+} from '../cardio.engine';
 
 // ─── A: field-tests ───
 describe('PRO A field-tests', () => {
@@ -448,5 +451,64 @@ describe('PRO A3 field-test storage', () => {
     expect(r.findings.some(f => f.level === 'warn' && f.text.includes('TID threshold'))).toBe(true);
     const ok = cardioQualityReport(buildCardioCycle({ goal: 'health', totalWeeks: 6 }), 7);
     expect(ok.findings.some(f => f.level === 'ok' && f.text.includes('TID pyramidal'))).toBe(true);
+  });
+});
+
+// ─── Раунд 7: prep-калибровка зон ───
+describe('PRO prep calibration', () => {
+  const prepBase: CardioPrepPlanLike = {
+    id: 'prep-cal',
+    showDate: '2026-09-15',
+    category: 'mens_physique',
+    sex: 'male',
+    preparation: {
+      startDate: '2026-06-01',
+      weeks: 8,
+      finalWeeks: 0,
+      targetRatePctPerWeek: 0.5,
+      startingWeightKg: 80,
+      currentCalories: 2500,
+      stepsPerDay: 8000,
+      cardioMinutesPerWeek: 100,
+    },
+    taper: { enabled: true, weeks: 2 },
+    peakWeek: { enabled: true },
+  };
+  const z2Of = (cycle: { weeks: { sessions: { type: string; targetHr?: { min?: number; max?: number } }[] }[] }) =>
+    cycle.weeks[0].sessions.find(s => s.type === 'zone2')?.targetHr;
+
+  it('lthr приоритетнее возраста', () => {
+    const c = buildCardioCycleFromPrep(prepBase, { age: 30, lthr: 170 });
+    const z2 = z2Of(c as unknown as Parameters<typeof z2Of>[0]);
+    // lthrZones(170): Z2 = 82-88% → 139-150
+    expect(z2?.min).toBe(139);
+    expect(z2?.max).toBe(150);
+    expect(c!.rationale.join(' ')).toMatch(/LTHR 170/);
+  });
+  it('без lthr — возрастные зоны Karvonen', () => {
+    const c = buildCardioCycleFromPrep(prepBase, { age: 30 });
+    const z2 = z2Of(c as unknown as Parameters<typeof z2Of>[0]);
+    // 220-30=190: Z2 60-70% → 114-133
+    expect(z2?.min).toBe(114);
+    expect(z2?.max).toBe(133);
+  });
+  it('talk-test даёт потолок Z2', () => {
+    const c = buildCardioCycleFromPrep(prepBase, { age: 30, talkZone2Hr: 145 });
+    expect(z2Of(c as unknown as Parameters<typeof z2Of>[0])?.max).toBe(145);
+  });
+  it('жара сдвигает prep-зоны вверх', () => {
+    const cold = buildCardioCycleFromPrep(prepBase, { age: 30 });
+    const hot = buildCardioCycleFromPrep(prepBase, { age: 30, tempC: 32, altitudeM: 1900 });
+    const zc = z2Of(cold as unknown as Parameters<typeof z2Of>[0])!;
+    const zh = z2Of(hot as unknown as Parameters<typeof z2Of>[0])!;
+    expect(zh.min).toBe(zc.min + 7 + 3);
+    expect(hot!.rationale.join(' ')).toMatch(/Жара/);
+  });
+  it('explainCardioChoice честно называет источник зон', () => {
+    const input = { goal: 'cut' as const, totalWeeks: 8, age: 30, lthr: 170 };
+    const lines = explainCardioChoice(input, buildCardioCycle(input));
+    expect(lines.join(' ')).toMatch(/LTHR 170/);
+    const lines2 = explainCardioChoice({ goal: 'cut', totalWeeks: 8, age: 30 }, buildCardioCycle({ goal: 'cut', totalWeeks: 8, age: 30 }));
+    expect(lines2.join(' ')).toMatch(/Возраст 30/);
   });
 });

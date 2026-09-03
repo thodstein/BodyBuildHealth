@@ -1002,6 +1002,12 @@ export interface CardioPrepBuildOptions {
   enhanced?: boolean;
   bodyFatPct?: number;
   startDate?: string;
+  /** PRO-калибровка зон (раунд 7): LTHR > talk-test > age — как в buildCardioCycle. */
+  lthr?: number;
+  talkZone2Hr?: number;
+  /** Среда (раунд 7): жара/высота сдвигают зоны вверх. */
+  tempC?: number;
+  altitudeM?: number;
 }
 
 /** Шаги пик-недели prep по дням (зеркало STEPS_BY_DAY bb-contest-prep.engine). */
@@ -1127,7 +1133,17 @@ export function buildCardioCycleFromPrep(
   const lowImpact = !!opts.lowImpact || (!!opts.autoLowImpact && !!opts.jointIssues);
   const equipmentPool = (opts.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
-  const zones = opts.age != null ? cardioHeartZones(opts.age, opts.restingHr, undefined, sex) : undefined;
+  // PRO-калибровка зон (раунд 7): тот же приоритет LTHR > talk-test > age, что в buildCardioCycle.
+  const heatAddPrep = (opts.tempC != null && opts.tempC > 25 ? Math.min(10, Math.round(opts.tempC - 25)) : 0)
+    + (opts.altitudeM != null && opts.altitudeM > 1000 ? Math.min(15, Math.round((opts.altitudeM - 1000) / 300)) : 0);
+  const zones = (() => {
+    if (opts.lthr != null && opts.lthr >= 80 && opts.lthr <= 220) return lthrZones(Math.round(opts.lthr));
+    if (opts.talkZone2Hr != null && opts.talkZone2Hr >= 80 && opts.talkZone2Hr <= 200) {
+      return talkZonesFromTest(opts.talkZone2Hr) ?? undefined;
+    }
+    return opts.age != null ? cardioHeartZones(opts.age, opts.restingHr, undefined, sex) : undefined;
+  })();
+  const zonesPrep = zones && heatAddPrep > 0 ? zones.map(z => ({ ...z, bpmMin: z.bpmMin + heatAddPrep, bpmMax: z.bpmMax + heatAddPrep })) : zones;
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
   let totalMinutes = 0;
@@ -1178,7 +1194,7 @@ export function buildCardioCycleFromPrep(
     sessions = sessions.map(s => {
       const dur = Math.max(10, Math.round(s.durationMin * levelMult));
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
-      const zone = s.type === 'hiit' ? zones?.[3] : s.type === 'miss' ? zones?.[2] : zones?.[1];
+      const zone = s.type === 'hiit' ? zonesPrep?.[3] : s.type === 'miss' ? zonesPrep?.[2] : zonesPrep?.[1];
       return {
         ...s,
         durationMin: dur,
@@ -1233,6 +1249,10 @@ export function buildCardioCycleFromPrep(
       jointIssues: opts.jointIssues,
       taperWeeks,
       peakWeek: peakEnabled,
+      lthr: opts.lthr,
+      talkZone2Hr: opts.talkZone2Hr,
+      tempC: opts.tempC,
+      altitudeM: opts.altitudeM,
     },
     rationale: [
       `Цель: подготовка ББ по prep-плану (${prep.category || 'категория не задана'}, ${sex === 'female' ? 'жен.' : 'муж.'}), ${totalWeeks} нед.`,
@@ -1243,6 +1263,9 @@ export function buildCardioCycleFromPrep(
     ],
   };
   if (opts.age != null) cycle.rationale.push(`Возраст ${opts.age}${sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы.`);
+  if (opts.lthr != null && opts.lthr >= 80 && opts.lthr <= 220) cycle.rationale.push(`LTHR ${Math.round(opts.lthr)} уд/мин (Friel 30') — зоны точные; HIIT контролируйте по мощности/темпу.`);
+  else if (opts.talkZone2Hr != null && opts.talkZone2Hr >= 80 && opts.talkZone2Hr <= 200) cycle.rationale.push(`Talk-test: потолок Z2 ${Math.round(opts.talkZone2Hr)} уд/мин — зоны оценочные.`);
+  if (heatAddPrep > 0) cycle.rationale.push(`Жара/высота: зоны +${heatAddPrep} уд/мин — пейте 500-750 мл/ч, >90' электролиты.`);
   return cycle;
 }
 
@@ -3237,7 +3260,12 @@ export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle)
   } else if (input.lowImpact) {
     lines.push('Низкоударный режим: высокоударный бег заменён на ходьбу/вело/эллипс.');
   }
-  if (input.age != null) {
+  if (input.lthr != null && input.lthr >= 80 && input.lthr <= 220) {
+    const zones = lthrZones(Math.round(input.lthr));
+    lines.push(`LTHR ${Math.round(input.lthr)} уд/мин (Friel 30'): зона Z2 = ${zones[1].bpmMin}-${zones[1].bpmMax} уд/мин — точные зоны; HIIT по мощности/темпу.`);
+  } else if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) {
+    lines.push(`Talk-test: потолок Z2 ${Math.round(input.talkZone2Hr)} уд/мин — зоны оценочные, перепроверьте LTHR-тестом.`);
+  } else if (input.age != null) {
     const zones = cardioHeartZones(input.age, input.restingHr, undefined, input.sex);
     lines.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''}${input.restingHr != null && input.restingHr > 0 ? `, ЧСС покоя ${input.restingHr}` : ''}: зона Z2 = ${zones[1].bpmMin}-${zones[1].bpmMax} уд/мин.`);
   }

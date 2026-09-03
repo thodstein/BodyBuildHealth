@@ -684,6 +684,10 @@ export const CardioConstructor: React.FC = () => {
       legDays,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
+      talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
+      tempC: tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined,
+      altitudeM: altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined,
     });
     if (!c) { flashMsg('⚠ Не удалось собрать кардио из prep-плана'); return; }
     setGoal('bb_prep');
