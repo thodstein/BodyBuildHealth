@@ -36,8 +36,8 @@ export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engin
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 // PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
 import type { IndividualTaperPlan } from './cardio-taper-pro.engine';
-export type { FieldTestSource, FieldTestInput, PersonalZones, CpEffort, CpFit, FieldTestLogEntry } from './cardio-field-tests.engine';
-export { ftpFrom20MinTest, criticalPowerFrom3And12, criticalPowerFromEfforts, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput, appendFieldTestLog, responderFromLog, loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, clearFieldTestLog, FIELD_TEST_LOG_KEY } from './cardio-field-tests.engine';
+export type { FieldTestSource, FieldTestInput, PersonalZones, CpEffort, CpFit, FieldTestLogEntry, LatestFieldTestMetrics } from './cardio-field-tests.engine';
+export { ftpFrom20MinTest, criticalPowerFrom3And12, criticalPowerFromEfforts, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput, appendFieldTestLog, responderFromLog, loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, clearFieldTestLog, latestFieldTestMetrics, FIELD_TEST_LOG_KEY } from './cardio-field-tests.engine';
 export type { DailyLoad, PmcPoint, HrDriftContext } from './cardio-pmc.engine';
 export { dailyPmcSeries, hrTss, powerTss, runTss, correctHrForDrift, driftCorrectedTss, tssRampRate, interpretTsb } from './cardio-pmc.engine';
 export type { TidModel, TimeInZones, SeasonPhase } from './cardio-tid.engine';

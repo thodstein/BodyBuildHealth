@@ -14,6 +14,7 @@ import {
   validateFieldTestInput,
   appendFieldTestLog,
   responderFromLog,
+  latestFieldTestMetrics,
 } from '../cardio-field-tests.engine';
 import {
   dailyPmcSeries,
@@ -412,5 +413,18 @@ describe('PRO A3 field-test storage', () => {
     expect(log.length).toBe(1);
     expect(log[0].kind).toBe('aet60');
     mod.clearFieldTestLog();
+  });
+  it('latestFieldTestMetrics: последние по видам, мусор игнорируется', () => {
+    expect(latestFieldTestMetrics([])).toEqual({});
+    const m = latestFieldTestMetrics([
+      { date: '2026-01-01', kind: 'lthr30', lthr: 165 },
+      { date: '2026-02-01', kind: 'lthr30', lthr: 172 },
+      { date: '2026-01-15', kind: 'ftp20', ftpWatts: 240 },
+      { date: '2026-03-01', kind: 'talk', talkHr: 300 },
+      { date: '2026-03-02', kind: 'talk', talkHr: 144 },
+    ]);
+    expect(m.lthr).toBe(172);
+    expect(m.ftpWatts).toBe(240);
+    expect(m.talkHr).toBe(144);
   });
 });

@@ -17,6 +17,7 @@ import {
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
   cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
+  latestFieldTestMetrics,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
@@ -129,6 +130,13 @@ function profileBodyFat(): number | undefined {
   } catch { return undefined; }
 }
 
+/** Последние замеры из журнала полевых тестов (раунд 5: wizard > журнал > ''). */
+function fieldTestDefaults(): { lthr?: number; ftpWatts?: number; talkHr?: number } {
+  try {
+    return latestFieldTestMetrics();
+  } catch { return {}; }
+}
+
 /** Возраст из профиля. */
 function profileAge(): number | undefined {
   try {
@@ -229,10 +237,11 @@ export const CardioConstructor: React.FC = () => {
   const [age, setAge] = useState(String(wizard.age ?? profileAge() ?? 30));
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
-  // PRO-калибровка (Эпик A) + среда (Эпик G): LTHR/FTP/talk-test, жара/высота
-  const [lthr, setLthr] = useState(String((wizard as WizardState).lthr ?? ''));
-  const [ftpWatts, setFtpWatts] = useState(String((wizard as WizardState).ftpWatts ?? ''));
-  const [talkHr, setTalkHr] = useState(String((wizard as WizardState).talkHr ?? ''));
+  // PRO-калибровка (Эпик A) + среда (Эпик G): LTHR/FTP/talk-test, жара/высота.
+  // Приоритет: wizard > журнал замеров (раунд 5) > пусто.
+  const [lthr, setLthr] = useState(() => String((wizard as WizardState).lthr ?? fieldTestDefaults().lthr ?? ''));
+  const [ftpWatts, setFtpWatts] = useState(() => String((wizard as WizardState).ftpWatts ?? fieldTestDefaults().ftpWatts ?? ''));
+  const [talkHr, setTalkHr] = useState(() => String((wizard as WizardState).talkHr ?? fieldTestDefaults().talkHr ?? ''));
   const [tempC, setTempC] = useState(String((wizard as WizardState).tempC ?? ''));
   const [altitudeM, setAltitudeM] = useState(String((wizard as WizardState).altitudeM ?? ''));
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
@@ -866,6 +875,18 @@ export const CardioConstructor: React.FC = () => {
     } catch { flashMsg('⚠ Не удалось прочитать дневник АД'); }
   };
 
+  /** Раунд 5: подтянуть LTHR/FTP/talk из журнала контрольных замеров. */
+  const fromFieldTestLog = () => {
+    try {
+      const m = latestFieldTestMetrics();
+      const parts: string[] = [];
+      if (m.lthr != null) { setLthr(String(m.lthr)); parts.push(`LTHR ${m.lthr}`); }
+      if (m.ftpWatts != null) { setFtpWatts(String(m.ftpWatts)); parts.push(`FTP ${m.ftpWatts} Вт`); }
+      if (m.talkHr != null) { setTalkHr(String(m.talkHr)); parts.push(`talk ${m.talkHr}`); }
+      flashMsg(parts.length > 0 ? `🔬 Из журнала замеров: ${parts.join(' · ')}` : '⚠ В журнале замеров нет LTHR/FTP/talk — добавьте в Дневнике → Журнал → 🔬');
+    } catch { flashMsg('⚠ Не удалось прочитать журнал замеров'); }
+  };
+
   const saveToProfile = () => {
     try {
       updateSection('personal', {
@@ -1044,7 +1065,7 @@ export const CardioConstructor: React.FC = () => {
           legDays={legDays} setLegDays={setLegDays}
           factorsOn={factorsOn} onToggleFactor={onToggleFactor}
           factorsSummary={factorsSummary}
-          onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr}
+          onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} onFromLog={fromFieldTestLog}
           onReset={resetParams}
           wizardMode={wizardMode}
           periodizationModel={periodizationModel} setPeriodizationModel={setPeriodizationModel}

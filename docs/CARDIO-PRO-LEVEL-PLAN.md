@@ -123,6 +123,22 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
 - **Тесты**: storage 2/2 (roundtrip + битый JSON) в `cardio-pro-level.test.ts` (34/34);
   NEW `cardio-field-test-log.test.tsx` 7/7 (пусто/добавление/Responder/валидация/LTHR/FTP/удаление/ремонт).
 
+## Продолжение — раунд 5 (замеры → параметры)
+
+- **Замыкание контура**: `latestFieldTestMetrics(log?)` — последние LTHR/FTP/talk по видам
+  (валидация диапазонов, мусор игнорируется).
+- **Подхват**: `CardioConstructor` — инициализаторы lthr/ftpWatts/talkHr по приоритету
+  wizard > журнал > ''; `fromFieldTestLog` + кнопка «🔬 Из журнала замеров» в PRO-аккордеоне
+  (`CardioParamsStep.onFromLog`, опциональный) с flash-фидбэком; пустой журнал — предупреждение.
+- **Тесты**: `latestFieldTestMetrics` в `cardio-pro-level.test.ts`;
+  harness-тест «кнопка подтягивает LTHR/FTP/talk» в `cardio-field-test-log.test.tsx` (8/8).
+
+## Осознанные остатки (не баги)
+
+- ML VGP responder — lite-эвристика (два теста), не обучение на истории.
+- FIT records — точечные записи с капом 20000, не посекундный стрим 50Мб export.zip (память).
+- Taper-pro — применение только с подтверждением (авто-пересборка без спроса запрещена by design).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.

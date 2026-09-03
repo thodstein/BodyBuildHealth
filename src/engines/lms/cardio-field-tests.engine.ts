@@ -280,3 +280,36 @@ export function removeFieldTestLogEntry(date: string, kind: FieldTestLogEntry['k
 export function clearFieldTestLog(): void {
   try { localStorage.removeItem(FIELD_TEST_LOG_KEY); } catch { /* ignore */ }
 }
+
+// ─── Замеры → параметры цикла ───
+
+export interface LatestFieldTestMetrics {
+  lthr?: number;
+  ftpWatts?: number;
+  talkHr?: number;
+  date?: string;
+}
+
+/**
+ * Последние метрики по видам (для подхвата в параметры цикла).
+ * Принимает журнал явно (тесты) или читает персистентность (UI).
+ */
+export function latestFieldTestMetrics(log?: FieldTestLogEntry[]): LatestFieldTestMetrics {
+  let list: FieldTestLogEntry[];
+  try {
+    list = Array.isArray(log) ? log : loadFieldTestLog();
+  } catch { return {}; }
+  const lastOf = (kind: FieldTestLogEntry['kind']): FieldTestLogEntry | undefined => {
+    const xs = list.filter(e => e.kind === kind && typeof e.date === 'string');
+    if (xs.length === 0) return undefined;
+    return [...xs].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
+  };
+  const out: LatestFieldTestMetrics = {};
+  const l = lastOf('lthr30');
+  if (l?.lthr != null && l.lthr >= 80 && l.lthr <= 220) { out.lthr = l.lthr; out.date = l.date; }
+  const f = lastOf('ftp20');
+  if (f?.ftpWatts != null && f.ftpWatts >= 30 && f.ftpWatts <= 800) { out.ftpWatts = f.ftpWatts; out.date = f.date; }
+  const t = lastOf('talk');
+  if (t?.talkHr != null && t.talkHr >= 80 && t.talkHr <= 200) { out.talkHr = t.talkHr; out.date = t.date; }
+  return out;
+}

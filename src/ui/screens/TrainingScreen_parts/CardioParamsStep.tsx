@@ -107,6 +107,7 @@ export const CardioParamsStep: React.FC<{
   onFromProfile: () => void;
   onSaveProfile: () => void;
   onFromDiaryHr: () => void;
+  onFromLog?: () => void;
   onReset: () => void;
   wizardMode?: 'simple' | 'pro';
   periodizationModel?: CardioPeriodizationModel;
@@ -125,7 +126,7 @@ export const CardioParamsStep: React.FC<{
   setTempC?: (v: string) => void;
   altitudeM?: string;
   setAltitudeM?: (v: string) => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -257,6 +258,9 @@ export const CardioParamsStep: React.FC<{
 
       {wizardMode === 'pro' && (setLthr || setFtpWatts || setTalkHr) && (
         <Accordion id="sec-field" title="PRO: полевые тесты и среда" icon="🔬" badge={lthr ? <Badge bg="rgba(0,230,138,0.13)" border="rgba(0,230,138,0.28)" color="#4ade80">LTHR {lthr}</Badge> : undefined}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {onFromLog && <button style={BTN_SMALL} onClick={onFromLog} title="Взять LTHR/FTP/talk из журнала контрольных замеров">🔬 Из журнала замеров</button>}
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             {setLthr && <NumberInput label="LTHR 30' (Friel)" value={lthr} onChange={setLthr} min={80} max={220} step={1} placeholder="165" ariaLabel="LTHR" width={100} suffix="уд/мин" />}
             {setFtpWatts && <NumberInput label="FTP 20'×0.95 (вело)" value={ftpWatts} onChange={setFtpWatts} min={30} max={800} step={1} placeholder="250" ariaLabel="FTP" width={100} suffix="Вт" />}

@@ -1,12 +1,13 @@
 /**
- * cardio-field-test-log.test.tsx — журнал контрольных замеров (раунд 4):
- * добавление по видам, валидация, responder-бейдж, удаление, персистентность.
+ * cardio-field-test-log.test.tsx — журнал контрольных замеров (раунд 4)
+ * + замыкание «замеры → параметры» (раунд 5).
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioFieldTestLog } from '../CardioFieldTestLog';
-import { loadFieldTestLog, FIELD_TEST_LOG_KEY } from '../../../../engines/lms/cardio.engine';
+import { CardioParamsStep } from '../CardioParamsStep';
+import { loadFieldTestLog, FIELD_TEST_LOG_KEY, latestFieldTestMetrics } from '../../../../engines/lms/cardio.engine';
 
 beforeEach(() => {
   try { localStorage.removeItem(FIELD_TEST_LOG_KEY); } catch { /* ignore */ }
@@ -96,5 +97,60 @@ describe('CardioFieldTestLog', () => {
     unmount();
     render(<CardioFieldTestLog />);
     expect(screen.getByText(/drift 5% · decoupling 4%/)).toBeTruthy();
+  });
+});
+
+describe('Замеры → параметры (раунд 5)', () => {
+  function ParamsHarness() {
+    const [lthr, setLthr] = useState('');
+    const [ftpWatts, setFtpWatts] = useState('');
+    const [talkHr, setTalkHr] = useState('');
+    const noop = () => {};
+    return (
+      <CardioParamsStep
+        goal="cut" setGoal={noop}
+        totalWeeks={12} setTotalWeeks={noop}
+        daysAvailable={5} setDaysAvailable={noop}
+        recoveryLow={false} setRecoveryLow={noop}
+        phaseSplit={{ auto: true, base: 0, build: 0, maintenance: 0 }} setPhaseSplit={noop}
+        comps={[]}
+        bodyWeight={80} setBodyWeight={noop}
+        taperWeeks={2} setTaperWeeks={noop} taperEnabled={true} setTaperEnabled={noop} peakWeek={true} setPeakWeek={noop}
+        level="intermediate" setLevel={noop}
+        equipment={[]} setEquipment={noop}
+        lowImpact={false} setLowImpact={noop}
+        age="30" setAge={noop}
+        sex="male" setSex={noop}
+        restingHr="" setRestingHr={noop}
+        legDays={[]} setLegDays={noop}
+        factorsOn={{ sleep: false, stress: false, hrv: false, ped: false, joints: false }} onToggleFactor={noop}
+        factorsSummary={[]}
+        onFromProfile={noop} onSaveProfile={noop} onFromDiaryHr={noop}
+        onFromLog={() => {
+          const m = latestFieldTestMetrics();
+          if (m.lthr != null) setLthr(String(m.lthr));
+          if (m.ftpWatts != null) setFtpWatts(String(m.ftpWatts));
+          if (m.talkHr != null) setTalkHr(String(m.talkHr));
+        }}
+        onReset={noop}
+        lthr={lthr} setLthr={setLthr}
+        ftpWatts={ftpWatts} setFtpWatts={setFtpWatts}
+        talkHr={talkHr} setTalkHr={setTalkHr}
+      />
+    );
+  }
+
+  it('кнопка «Из журнала замеров» подтягивает LTHR/FTP/talk', () => {
+    localStorage.setItem(FIELD_TEST_LOG_KEY, JSON.stringify([
+      { date: '2026-01-01', kind: 'lthr30', lthr: 172 },
+      { date: '2026-02-01', kind: 'ftp20', ftpWatts: 250 },
+      { date: '2026-03-01', kind: 'talk', talkHr: 144 },
+    ]));
+    render(<ParamsHarness />);
+    fireEvent.click(screen.getByRole('button', { name: /полевые тесты/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Из журнала замеров/ }));
+    expect((screen.getByLabelText('LTHR') as HTMLInputElement).value).toBe('172');
+    expect((screen.getByLabelText('FTP') as HTMLInputElement).value).toBe('250');
+    expect((screen.getByLabelText('Talk-test') as HTMLInputElement).value).toBe('144');
   });
 });
