@@ -292,3 +292,17 @@ export function oilCatchupCap(weightScale: number): number {
 export function eggCatchupCap(weightScale: number): number {
   return Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * (weightScale || 1)) + 10;
 }
+
+// ─── Итерация C (HIGH-VOLUME): инсулин-окна как peri ───────────────────────
+// Болюс-окно (`⚡ Углеводы под инсулин`) типизировано как 'snack' (исторически),
+// но физиологически это фиксированное окно: dose×10 быстрых У, жиры 0.
+// Маркер закрывает его для всех коррекций/ребалансов/вторых рецептов — как peri.
+/** Маркер инсулин-окна на объекте приёма (тип остаётся 'snack' для совместимости UI). */
+export const INSULIN_WINDOW_MARK = '_insulinWindow';
+/** true для peri-окон (pre/post/intra/presleep) и инсулин-окон. */
+export function isPeriLikeMeal(m: { type?: string } | null | undefined): boolean {
+  if (!m) return false;
+  const t = String((m as any).type || '');
+  if (t === 'preworkout' || t === 'postworkout' || t === 'intra' || t === 'presleep') return true;
+  return (m as any)[INSULIN_WINDOW_MARK] === true;
+}

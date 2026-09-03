@@ -33,6 +33,36 @@ function legacyDecompIds(recipe: Recipe): string[] | null {
   return ids;
 }
 
+/**
+ * Итерация D (HIGH-VOLUME): классы ингредиентов для компонентного масштабирования.
+ * Раздувание ×4 всего рецепта даёт «специй 15 г, масла 75 г» — вместо этого base
+ * (белок/крупа) масштабируется полностью, а жир/приправы/овощи — с потолками.
+ */
+export type RecipeComponentClass = 'base' | 'fat' | 'seasoning' | 'veg';
+export function recipeComponentClass(foodId: string): RecipeComponentClass {
+  const id = (foodId || '').toLowerCase();
+  let f: FoodItem | undefined;
+  try { f = FOOD_DB.find(x => x.id === foodId); } catch { f = undefined; }
+  if (/^(spice_|herb_|sauce_|seed_cumin|seed_coriander)/.test(id) || (f && f.category === 'other')) return 'seasoning';
+  if ((f && f.category === 'fat') || (/oil|butter|_nuts|nuts_|_seeds|seeds_|peanut|tahini|urbec/.test(id) && (f?.fat || 0) >= 20)) return 'fat';
+  // Сладкие фрукты — углеводная база (банан в гейнере масштабируется), несладкие — овощи.
+  if (f && f.category === 'veg_fruit') return (f.carbs || 0) >= 15 ? 'base' : 'veg';
+  if (/^(veg_|salad|greens_|cabbage|broccoli|cucumber|tomato|pepper|onion|mushroom|spinach|kale|carrot)/.test(id)) return 'veg';
+  return 'base';
+}
+/** Потолок компонентного фактора (s ≤ 1 — всё пропорционально вниз). */
+export function componentScaleFactor(cls: RecipeComponentClass, s: number): number {
+  if (s <= 1) return s;
+  if (cls === 'fat' || cls === 'seasoning') return Math.min(s, 1.5);
+  if (cls === 'veg') return Math.min(s, 2);
+  return s;
+}
+/** Масштаб порции ингредиента с учётом класса (авторская пропорция × порции без ломки). */
+export function scaleComponentAmount(foodId: string, amount: number, s: number): number {
+  const f = componentScaleFactor(recipeComponentClass(foodId), s);
+  return Math.max(5, Math.round(((amount || 0) * f) / 5) * 5);
+}
+
 export type CookSkill = 'basic' | 'medium' | 'advanced';
 export type CookFrequency = 'daily' | 'every_3_days' | 'weekly';
 

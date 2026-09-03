@@ -38,6 +38,7 @@ import {
   QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets } from "./day-target-corrector";
+import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 
@@ -251,6 +252,91 @@ function mealCapScale(pG: number, cG: number, fG: number): number {
 }
 function mealCapScaleOf(m: { target?: { p: number; c: number; f: number } }): number {
   return m && m.target ? mealCapScale(m.target.p, m.target.c, m.target.f) : 1;
+}
+// ─── Итерация A (HIGH-VOLUME): capacity-aware распределение углеводов ───────
+// Старая схема раздавала доли CARB_W вслепую (обед 1.7× → 400г+), а излишек сверх
+// капов «добивался» посадками (батат ×5). Новая: сначала вместимость каждого приёма,
+// потом доли min(доля, вместимость), остаток — в приёмы с комнатой. Добивка посадок —
+// только хвост <15%, иначе это ошибка распределения.
+/** Физическая вместимость приёма по углеводам (г). Peri — физиологические окна, не приёмы. */
+export function mealCarbCapacityG(role: string, opts: { budget?: string; weightKg?: number; trainDurationMin?: number }): number {
+  const ws = Math.max(1, Math.min(1.6, (opts.weightKg || 80) / 80));
+  if (role === 'preSleep') return 0; // казеин без углеводов
+  if (role === 'prew') return 60;    // медленные за 90 мин
+  if (role === 'postw') return 75;   // быстрые в окно
+  if (role === 'intra') return Math.round(Math.max(30, Math.min(90, 40 * (opts.trainDurationMin ?? 75) / 60)));
+  if (role === 'breakfast' || role === 'lunch' || role === 'dinner') {
+    const grainCap = Math.round(((opts.budget === 'max' || opts.budget === 'enhanced') ? 350 : 280) * ws);
+    return Math.max(120, Math.round(grainCap * 0.72));
+  }
+  // Перекусы — слоты расширения: крупа в комнате + фрукт + comfort.
+  return 120;
+}
+/**
+ * Распределяет total углеводов по ролям: доля по весу, но не выше вместимости.
+ * Излишек — в приёмы с комнатой (пропорционально комнате); если всё полно —
+ * честно сверх капов в мейны+снеки (overCap с именами ролей для заметки).
+ * Инвариант: сумма vals === total.
+ */
+export function distributeCarbsByCapacity(
+  total: number,
+  roles: string[],
+  weightOf: (r: string) => number,
+  capacityOf: (r: string) => number,
+): { vals: Record<string, number>; overCap: string[] } {
+  const vals: Record<string, number> = {};
+  const wSum = roles.reduce((s, r) => s + Math.max(0, weightOf(r)), 0) || 1;
+  let excess = 0;
+  for (const r of roles) {
+    const raw = Math.round(total * Math.max(0, weightOf(r)) / wSum);
+    const cap = Math.max(0, capacityOf(r));
+    vals[r] = Math.min(raw, cap);
+    excess += Math.max(0, raw - cap);
+  }
+  // Пас 2: излишек в комнаты (до 3×roles проходов — сходимость при каскаде).
+  for (let pass = 0; pass < Math.max(1, roles.length * 3) && excess > 0; pass++) {
+    const roomy = roles.filter(r => capacityOf(r) - (vals[r] ?? 0) > 0);
+    if (roomy.length === 0) break;
+    const roomTotal = roomy.reduce((s, r) => s + (capacityOf(r) - (vals[r] ?? 0)), 0) || 1;
+    let moved = 0;
+    for (const r of roomy) {
+      if (excess <= 0) break;
+      const room = capacityOf(r) - (vals[r] ?? 0);
+      const share = Math.min(room, Math.round(excess * room / roomTotal));
+      const give = Math.min(share, excess);
+      if (give > 0) { vals[r] = (vals[r] ?? 0) + give; excess -= give; moved += give; }
+    }
+    if (moved <= 0) break;
+  }
+  // Пас 3: всё полно — честно сверх капов в мейны+снеки (пропорционально весу).
+  const overCap: string[] = [];
+  if (excess > 0) {
+    const flex = roles.filter(r => r === 'breakfast' || r === 'lunch' || r === 'dinner' || r.startsWith('snack'));
+    const fw = flex.reduce((s, r) => s + Math.max(0, weightOf(r)), 0) || 1;
+    for (const r of flex) {
+      const give = Math.round(excess * Math.max(0, weightOf(r)) / fw);
+      if (give > 0) { vals[r] = (vals[r] ?? 0) + give; overCap.push(r); }
+    }
+    // Округление паса 3 — на самый весомый flex.
+    let sum = roles.reduce((s, r) => s + (vals[r] ?? 0), 0);
+    if (flex.length > 0 && sum !== total) {
+      const top = [...flex].sort((a, b) => weightOf(b) - weightOf(a))[0];
+      vals[top] = Math.max(0, (vals[top] ?? 0) + (total - sum));
+    }
+  } else {
+    // Reconcile округления ±пару граммов — в приёмы с комнатой (не в «последний»).
+    let sum = roles.reduce((s, r) => s + (vals[r] ?? 0), 0);
+    let guard = roles.length * 2 + 4;
+    while (sum !== total && guard-- > 0) {
+      const d = total - sum > 0 ? 1 : -1;
+      const cand = roles.filter(r => d > 0 ? (vals[r] ?? 0) < capacityOf(r) : (vals[r] ?? 0) > 0)
+        .sort((a, b) => d > 0 ? (capacityOf(b) - (vals[b] ?? 0)) - (capacityOf(a) - (vals[a] ?? 0)) : (vals[b] ?? 0) - (vals[a] ?? 0))[0]
+        || roles[0];
+      vals[cand] = Math.max(0, (vals[cand] ?? 0) + d);
+      sum += d;
+    }
+  }
+  return { vals, overCap };
 }
 // D-28+ fix (жалоба «500 г клюквы в обед»): реалистичная порция фрукта в приёме (г).
 // Фрукт — микронутриентная «добавка», а не углеводный носитель; используется и в E5-добивке,
@@ -939,6 +1025,10 @@ const _pickCtx: {
   currentWeightKg: number;
   currentExcludedIds: Set<string> | undefined;
   currentCarbGPerKg: number;
+  // Итерация B (HIGH-VOLUME): флаг экстремального дня — НОВЫЕ аддитивные механики
+  // (второй comfort, лестница плотности) работают только здесь; обычные дни идут
+  // бит-идентично старому движку (нулевой риск регрессии сходимости).
+  highVolumeDay: boolean;
   _locked: boolean;
 } = {
   tasteProfile: undefined,
@@ -949,6 +1039,7 @@ const _pickCtx: {
   currentWeightKg: 80,
   currentExcludedIds: undefined,
   currentCarbGPerKg: 0,
+  highVolumeDay: false,
   _locked: false,
 };
 
@@ -1312,6 +1403,8 @@ function buildWholeMeal(
     fiberCapG?: number; // Этап 7: верхний предел клетчатки (пик-неделя ББ) — лёгкие овощи
     breakfast?: boolean; // E1: продуктовый пул «завтрака» (каши/хлопья + ягоды/сухофрукты), а не общий
     snack?: boolean; // E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи)
+    mealKind?: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // Итерация A: типология тарелки (обед ≠ ужин)
+    lowFatDinner?: boolean; // Итерация A: загрузка под утреннюю тренировку — ужин без жирных носителей
     breakfastStyle?: BreakfastStyle; // N1: основа завтрака (каша/хлопья/яйца/творог)
     extraLiquids?: { food: FoodItem; grams: number; role?: MealItem['role'] }[]; // E8: молоко/кокосовое масло в завтрак
     // D-28+1: работа — per-meal portable (окно смены)
@@ -1328,7 +1421,9 @@ function buildWholeMeal(
     recentFamilies?: Set<string>;
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool: _poolIn, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids, isWorkDay, workStartMin, workEndMin, portableMode, quotaBlockedIds: _quotaBlockedIds, quotaAllowIds: _quotaAllowIds, recentFamilies: _recentFamilies } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool: _poolIn, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids, isWorkDay, workStartMin, workEndMin, portableMode, quotaBlockedIds: _quotaBlockedIds, quotaAllowIds: _quotaAllowIds, recentFamilies: _recentFamilies, lowFatDinner } = params;
+  // Итерация A: явная типология (обед = главный У-приём, ужин = белок + умеренные У).
+  const _mealKind: 'breakfast' | 'lunch' | 'dinner' | 'snack' = params.mealKind ?? (breakfast ? 'breakfast' : snack ? 'snack' : 'lunch');
   // D-28+1: per-meal portable — только окно смены (требование: per-meal, не все приёмы)
   const _needPortable = (() => {
     if (!portableMode) return false;
@@ -1476,6 +1571,9 @@ function buildWholeMeal(
         }
       }
     }
+    // Итерация A: ужин — не место тяжёлым бобовым как основе (вечером — лёгкий белок,
+    // недобор закроет MPS-добор сывороткой). Обед бобовыми — можно.
+    if (_mealKind === 'dinner' && isCarbDenseProtein && grams > 100) grams = 100;
     // Эпик B (реализм): минимальная «взрослая» порция цельного белка — 90 г на основном
     // приёме / 70 г в перекусе (90 г курицы ≈ 28 г белка). «Дегустационные» 50-60 г рыбы
     // при 90 кг атлете — не реальность; порошком добирать можно, но тарелка из 57 г трески — нет.
@@ -1548,7 +1646,35 @@ function buildWholeMeal(
       const fresh = carbPickPool.filter((f: any) => { const fam = stapleFamilyOf(f.id); return !fam || !_recentFamilies.has(fam); });
       return fresh.length >= 2 ? fresh : carbPickPool;
     })();
-    const carbSource = pickPriority(_carbPickFinal, seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds });
+    let carbSource = pickPriority(_carbPickFinal, seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds });
+    // Итерация B: вето белкового носителя — углеводный источник не должен нести >75%
+    // белковой цели приёма («лепешка 242 г = 20 г белка» при цели 22 г ломает низкобелковые
+    // дни; а тортилья GI30 при цели 40 г — хороший носитель, не трогаем). Одна fallback-
+    // попытка на низкобелковый кандидат (Б <8/100, сортировка по GI — чиним белок не ценой GL),
+    // иначе оставляем пик (сходимость важнее).
+    if (carbSource && (carbSource.protein || 0) >= 8 && proteinG > 0) {
+      const _g0 = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource, _capScale));
+      if (((carbSource.protein || 0) * _g0 / 100) / proteinG > 0.75) {
+        // Fallback — низкобелковые, отсортированные по GI (иначе чиним белок ценой GL:
+        // лапша 251 г вместо тортильи давала пер-приёмную GL 110 при лимите 105).
+        const _alt = _carbPickFinal.filter((f: any) => f.id !== carbSource!.id && (f.protein || 0) < 8)
+          .sort((a: any, b: any) => (a.gi || 55) - (b.gi || 55));
+        for (const _cand of _alt.slice(0, 4)) {
+          const _gc = gramsForMacro(_cand, carbTarget, 'carbs', carbPortionCap(_cand, _capScale));
+          if (_gc >= 30) { carbSource = _cand; break; }
+        }
+      }
+    }
+    // Итерация A: загрузка под утреннюю тренировку — в ужин не берём жирные углеводные
+    // носители (Ж ≥8/100: рисовые отруби 20.9 и т.п.), иначе «вечер без жиров» ломается
+    // внедрённым жиром (та же логика, что дневной жир-кап). Одна fallback-попытка.
+    if (lowFatDinner && carbSource && (carbSource.fat || 0) >= 8) {
+      const _alt = _carbPickFinal.filter((f: any) => f.id !== carbSource!.id && (f.fat || 0) < 8);
+      for (const _cand of _alt.slice(0, 4)) {
+        const _gc = gramsForMacro(_cand, carbTarget, 'carbs', carbPortionCap(_cand, _capScale));
+        if (_gc >= 30) { carbSource = _cand; break; }
+      }
+    }
     // FIX favorite-breakfast: отмечаем использованный любимый углевод — следующие приёмы дня
     // берут разнообразие (не монополизируем каждый приём), завтрак получает любимое первым.
     if (carbSource && preferredIds?.has(carbSource.id)) dayUsedPreferredIds?.add(carbSource.id);
@@ -1607,23 +1733,54 @@ function buildWholeMeal(
       // белка в углеводных носителях) и возвращал «гречка+рис» — остаток добирается
       // рецептурным сайдом (recipe-режим) или посадкой.
       // F1 (Эпик F): добивка углеводного остатка ПОСЛЕ комфортного капа каши.
-      // Ровно ОДИН комфортный источник на приём (хлеб/мёд/сухофрукты) с жёсткими
-      // «дегустационными» капами: финики/изюм ≤60 г, мёд ≤40 г, хлеб ≤100 г.
-      // Раньше loop добавлял до 3 источников и «Финики 180 г + Финики 70 г» в один приём.
-      if (!breakfast && remC > 40) {
-        const usedIds2 = new Set(items.map(i => i.id));
-        const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
-        const comfortPool = COMFORT_CARB_IDS
-          .map(id => FOOD_DB.find(f => f.id === id))
-          .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
-        const src2 = comfortPool.length > 0 ? pickPriority(comfortPool, seed + 27, { lockedIds, recentIds, hardRecentIds })
-          : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam)[0];
-        if (src2) {
-          const portionCap = COMFORT_PORTION_LIMITS[src2.id] ?? 100;
-          const g2 = Math.min(portionCap, Math.floor(Math.min(gramsForMacro(src2, Math.min(remC, 80), 'carbs', carbPortionCap(src2)), 250) / 10) * 10);
+      // Итерация A: лёгкий ужин (загрузка под утро; на high-volume — и цель <60 г) —
+      // без comfort, вечер остаётся лёгким (белок + гарнир + овощи); обычный ужин и обед — можно.
+      // Итерация B: капы ×1.5 на больших приёмах (_capScale ≥1.5 — масса) + ВТОРОЙ источник
+      // при остатке >100 г (хлеб + мёд, а не «финики 180 г»). Всё в съедобных пределах.
+      const _dinnerLight = _mealKind === 'dinner' && (!!lowFatDinner || (_pickCtx.highVolumeDay && carbG < 60));
+      // Итерация B: не льём добивку в уже тяжёлую тарелку (>550 г твёрдого) — иначе
+      // приём вылетает за 700 г съедобности и финальный трим режет схоженные угли.
+      const _solidW = () => items.filter((i: any) => i.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
+      if (!breakfast && remC > 40 && !_dinnerLight) {
+        const _comfortMult = _capScale >= 1.5 ? 1.5 : 1;
+        for (let _ci = 0; _ci < 2; _ci++) {
+          // Второй источник — только в high-volume день (иначе бит-идентично старому коду).
+          if (_ci === 1 && (remC <= 100 || _solidW() > 550 || !_pickCtx.highVolumeDay)) break;
+          const usedIds2 = new Set(items.map(i => i.id));
+          const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
+          const comfortPool = COMFORT_CARB_IDS
+            .map(id => FOOD_DB.find(f => f.id === id))
+            .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
+          const src2 = comfortPool.length > 0 ? pickPriority(comfortPool, seed + 27 + _ci * 11, { lockedIds, recentIds, hardRecentIds })
+            // Fallback-второй гарнир — самый ПЛОТНЫЙ (У/100), иначе батат 453 г раздувает
+            // тарелку за 700 г съедобности при тех же углях, что 150 г сухой крупы.
+            : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam)
+              .sort((a: FoodItem, b: FoodItem) => (b.carbs || 0) - (a.carbs || 0))[0];
+          if (!src2) break;
+          const portionCap = Math.round((COMFORT_PORTION_LIMITS[src2.id] ?? 100) * _comfortMult);
+          const g2 = Math.min(edibilityCapFor(src2.id, portionCap), Math.floor(Math.min(gramsForMacro(src2, Math.min(remC, 80), 'carbs', carbPortionCap(src2)), 250) / 10) * 10);
           if (g2 >= 30) {
             const it2 = makeItem(src2, g2, 'carb_slow');
             items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
+          } else break;
+        }
+        // Итерация B: лестница плотности — остаток >60 г после comfort закрываем ОДНИМ
+        // шагом ladder (сок/мёд/пряники/финики/рисовый крем), а не вторым гарниром.
+        // Только в high-volume день; та же защита от перелива тарелки (>550 г не доливаем).
+        if (remC > 60 && _solidW() <= 550 && _pickCtx.highVolumeDay) {
+          const usedIds3 = new Set(items.map(i => i.id));
+          for (const step of liveLadderSteps()) {
+            if (remC <= 60) break;
+            if (usedIds3.has(step.id)) continue;
+            const f = FOOD_DB.find(x => x.id === step.id);
+            if (!f || (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) || !foodAvailableForPlan(f)) continue;
+            const g3 = Math.min(edibilityCapFor(f.id, step.maxG), Math.floor(Math.min(gramsForMacro(f, Math.min(remC, 90), 'carbs', carbPortionCap(f)), 400) / 5) * 5);
+            if (g3 >= 30) {
+              const it3 = makeItem(f, g3, f.id.includes('juice') || f.id === 'dextrose' ? 'liquid' : 'carb_fast');
+              items.push(it3); remP -= it3.p; remF -= it3.f; remC -= it3.c;
+              rationales.push(`Плотная добивка: ${f.name} ${g3} г (лестница плотности, остаток приёма)`);
+              break;
+            }
           }
         }
       }
@@ -2408,7 +2565,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // также bulk + длинная тренировка ≥75 мин (прокси высокого недельного объёма) → 10
     if (_isBulk && ((input.budget === 'max') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
   }
-  const _carbCeiling = _capDisabled ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
+  // Итерация C: болюсный инсулин снимает потолок под свою потребность (≈10 г/ЕД ×1.2),
+  // иначе 1500У режется капом 8-10 г/кг ещё на целях (гипогликемия опаснее перебора).
+  const _bolusUnits = (input.injections || [])
+    .filter(i => (i.type || '').toLowerCase().includes('инсулин') && i.esterType !== 'long')
+    .reduce((s, i) => s + (Number(i.dose) || 0), 0);
+  const _carbCeiling = _capDisabled ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg), _bolusUnits > 0 ? Math.round(_bolusUnits * 12) : 0);
   let _baseCarbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
   // Auto carb periodization (train vs rest): Helms 2014 / Slater 2011 — train 4-6 g/kg, rest 2-3 g/kg.
   // Applied as ±12% around base (train +12%, rest -12%) while respecting floor/ceiling and refeedDay override.
@@ -2476,6 +2638,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const morningTrainLoad = !!(input.morningTrainLoad && input.isTrainingDay && input.trainStartMin !== undefined && input.trainStartMin < 14 * 60);
   const _wOf = (r: string): number => {
     if (r === 'preSleep') return 0;
+    // Итерация B (P5): на high-volume дне веса выравниваются — иначе обед 1.7× тянет
+    // 300У в один приём (несъедобно при любом составе). Обычные дни — классика без изменений.
+    if (_pickCtx.highVolumeDay) {
+      const flat: Record<string, number> = {
+        breakfast: 1.1, lunch: 1.35, dinner: 0.8, prew: 0.9, postw: 1.1,
+        snack: 0.6, snack2: 0.6, snack3: 0.5, snack4: 0.5,
+      };
+      if (flat[r] !== undefined) return flat[r];
+    }
     let v = CARB_W[r] ?? 0.5;
     if (r === 'dinner' && input.eveningLowCarb) v *= 0.5;
     if (r === 'intra') {
@@ -2494,94 +2665,92 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (input.eveningLowCarb && r === 'lunch') v *= 1.2;
     return v;
   };
-  const _wSum = _roles.reduce((s, r) => s + _wOf(r), 0) || 1;
-  const _carbForRaw = (r: string): number => _keep.has(r) ? Math.round(carbsTotal * _wOf(r) / _wSum) : 0;
-  // P2: reconcile rounding — сумма _carbForRaw может отличаться от carbsTotal на ±3-6г
-  const _carbFor = (() => {
+  // Итерация A: capacity-aware распределение — доли CARB_W, но не выше вместимости
+  // приёма (пери-окна — физиологические капы, мейны — потолок тарелки). Излишек — в
+  // приёмы с комнатой; старый код («всё в последний» + размаз по мейнам) удалён.
+  // Итерация C: пред-резерв углеводов под болюс-окна — окна входят в дневную сумму
+  // (distribute получает остаток), а не падают сверху (иначе посадка/корректор съедают
+  // дозу как «перебор»: 800У + окно 100У → резка максимального углеводного пункта = окна).
+  const _plannedMealMins: number[] = [tBreakfast, tLunch, tDinner, ..._snackTimes, ...((_keep.has('preSleep') && wantPreSleep) ? [tPreSleep] : [])]
+    .map((t: any) => _toMin2(t)).filter((v: number) => Number.isFinite(v));
+  if (trainWindow && _keep.has('prew')) _plannedMealMins.push(prewMin);
+  if (trainWindow && _keep.has('postw')) _plannedMealMins.push(postwMin);
+  if (intraEligible && _keep.has('intra') && input.trainStartMin) _plannedMealMins.push(input.trainStartMin + 30);
+  const _insulinPlanned: { min: number; carbG: number }[] = (input.injections || [])
+    .filter(i => (i.type || '').toLowerCase().includes('инсулин') && i.esterType !== 'long')
+    .map(inj => {
+      const dose = Number(inj.dose) || 8;
+      const t = inj.time ? _toMin2(inj.time) : NaN;
+      return { min: Number.isFinite(t) ? t : 8 * 60, carbG: Math.max(30, Math.min(120, Math.round(dose * 10))) };
+    });
+  const _insulinReserved = _insulinPlanned.reduce((s, p) => s + p.carbG, 0);
+  const _carbsForRoles = Math.max(carbFloorG, carbsTotal - _insulinReserved);
+  // Итерация B: флаг экстремального дня для гейтов buildWholeMeal (второй comfort,
+  // лестница): обычные дни идут старым кодом бит-в-бит.
+  _pickCtx.highVolumeDay = _isHighCarbDay(carbsTotal, input.weightKg)
+    || _bolusUnits > 0
+    || (adjustedProteinG || input.goalProteinG) / Math.max(40, input.weightKg || 80) >= 2.8
+    || (input.goalKcal || 0) >= 4200;
+  const _capOf = (r: string): number => _keep.has(r)
+    ? mealCarbCapacityG(r, { budget: input.budget, weightKg: input.weightKg, trainDurationMin: input.trainDurationMin })
+    : 0;
+  // Legacy-конвейер ДОСЛОВНО (сырые доли → reconcile в последний → peri-кап с размазом
+  // 1.0/1.7/0.7 → mainCap-размаз): пока ни один кап не задет, значения бит-идентичны
+  // старому движку (нулевой риск регрессии обычных дней); capacity включается только
+  // там, где legacy ломался (обед 400 г+, пери 300 г амилопектина).
+  const _legacyVals = (() => {
+    const _wSumL = _roles.reduce((s, r) => s + _wOf(r), 0) || 1;
     const vals: Record<string, number> = {};
     let sum = 0;
-    for (const r of _roles) { vals[r] = _carbForRaw(r); sum += vals[r]; }
-    const diff = carbsTotal - sum;
-    if (diff !== 0 && _roles.length > 0) {
-      const last = _roles[_roles.length - 1];
-      vals[last] = Math.max(0, vals[last] + diff);
+    for (const r of _roles) { vals[r] = _keep.has(r) ? Math.round(_carbsForRoles * _wOf(r) / _wSumL) : 0; sum += vals[r]; }
+    const diff = _carbsForRoles - sum;
+    if (diff !== 0 && _roles.length > 0) { const last = _roles[_roles.length - 1]; vals[last] = Math.max(0, vals[last] + diff); }
+    const _prewCap = 60;
+    const _postwCap = 75;
+    const _intraCap = Math.round(Math.max(30, Math.min(90, INTRA_CARB_G_PER_H * (input.trainDurationMin ?? 75) / 60)));
+    const _prew0 = vals.prew || 0, _postw0 = vals.postw || 0, _intra0 = vals.intra || 0;
+    vals.prew = Math.min(_prew0, _prewCap);
+    vals.postw = Math.min(_postw0, _postwCap);
+    vals.intra = Math.min(_intra0, _intraCap);
+    const _periExcess = Math.max(0, (_prew0 - (vals.prew || 0)) + (_postw0 - (vals.postw || 0)) + (_intra0 - (vals.intra || 0)));
+    if (_periExcess > 0) {
+      const _wB = 1.0, _wL = 1.7, _wD = 0.7, _wSum2 = _wB + _wL + _wD;
+      vals.breakfast = (vals.breakfast || 0) + Math.round(_periExcess * _wB / _wSum2);
+      vals.lunch = (vals.lunch || 0) + Math.round(_periExcess * _wL / _wSum2);
+      vals.dinner = (vals.dinner || 0) + Math.round(_periExcess * _wD / _wSum2);
     }
-    return (r: string) => vals[r] ?? 0;
+    return vals;
   })();
-  let breakC = _carbFor('breakfast');
-  let lunchC = _carbFor('lunch');
-  let dinnerC = _carbFor('dinner');
-  let prewCarbG = _carbFor('prew');
-  let postwCarbG = _carbFor('postw');
-  let intraCarbG = _carbFor('intra');
+  const _mainCapCheck = mealCarbCapacityG('lunch', { budget: input.budget, weightKg: input.weightKg });
+  const _legacyViolates = _roles.some(r => (_legacyVals[r] || 0) > _capOf(r) + 1e-9)
+    || ['breakfast', 'lunch', 'dinner'].some(k => (_legacyVals[k] || 0) > _mainCapCheck);
+  const _capDistr = distributeCarbsByCapacity(_carbsForRoles, _roles, _wOf, _capOf);
+  const _distr = _legacyViolates ? _capDistr : { vals: _legacyVals, overCap: [] as string[] };
+  const _carbFor = (r: string) => _distr.vals[r] ?? 0;
+  // _mainCarbCap сохранён для совместимости нижних проходов (компенсация стражей).
+  const _mainCarbCap = mealCarbCapacityG('lunch', { budget: input.budget, weightKg: input.weightKg });
+  const breakC = _carbFor('breakfast');
+  const lunchC = _carbFor('lunch');
+  const dinnerC = _carbFor('dinner');
+  const prewCarbG = _carbFor('prew');
+  const postwCarbG = _carbFor('postw');
+  const intraCarbG = _carbFor('intra');
   const snackC = _carbFor('snack');
   const snack2C = _carbFor('snack2');
   const snack3C = _carbFor('snack3');
   const snack4C = _carbFor('snack4');
-  // ─── Физиологический кап пери-углеводов (предтрен/пост-трен/intra) ───
-  // Пери-слоты раньше масштабировались ЛИНЕЙНО от дневного бюджета (800г → ~320г пери:
-  // «300г амилопектина на тренировке»), оставляя обычным приёмам крохи («100г каши утром»).
-  // Кап = физиологический потолок (prew медленные ~60г, postw быстрые ~80г, intra 40г/ч),
-  // излишек возвращается в основные приёмы (завтрак/обед/ужин) пропорционально.
-  {
-    // Пери-углеводы — ФИЗИОЛОГИЧЕСКОЕ ОКНО, а не полноценный приём: не растут от дневного
-    // бюджета и веса. Избыток уходит в основные приёмы (завтрак/обед/ужин).
-    const _prewCap = 60;   // медленных углеводов за 90 мин до тренировки
-    const _postwCap = 75;  // быстрых углеводов в анаболическое окно (не «300г амилопектина»)
-    const _intraCap = Math.round(Math.max(30, Math.min(90, INTRA_CARB_G_PER_H * (input.trainDurationMin ?? 75) / 60)));
-    const _prew0 = prewCarbG, _postw0 = postwCarbG, _intra0 = intraCarbG;
-    prewCarbG = Math.min(prewCarbG, _prewCap);
-    postwCarbG = Math.min(postwCarbG, _postwCap);
-    intraCarbG = Math.min(intraCarbG, _intraCap);
-    const _periExcess = Math.max(0, (_prew0 - prewCarbG) + (_postw0 - postwCarbG) + (_intra0 - intraCarbG));
-    if (_periExcess > 0) {
-      const _wB = 1.0, _wL = 1.7, _wD = 0.7, _wSum2 = _wB + _wL + _wD;
-      breakC += Math.round(_periExcess * _wB / _wSum2);
-      lunchC += Math.round(_periExcess * _wL / _wSum2);
-      dinnerC += Math.round(_periExcess * _wD / _wSum2);
-    }
+  // Честная нота: вместимости не хватило — часть приёмов несёт сверх капа.
+  if (_distr.overCap.length > 0) {
+    notes.push(`⚠ Углеводов ${carbsTotal} г — больше суммарной вместимости приёмов: ${_distr.overCap.join(', ')} несут сверх капа. Добавьте приём (6–8 на массе) или поднимите бюджет — иначе порции несъедобны.`);
   }
-  // ─── Кап углеводов на основной приём + перераспределение излишка ───
-  // CARB_W даёт обеду 1.7× (для высокоуглеводных дней на 3 приёмах — 400г+ углеводов),
-  // а физический потолок приёма = лимит каши (сухая крупа ~70% углей). Излишек сверх капа
-  // переносим в основные приёмы с запасом (иначе обед «упёрся в лимит», а остальное пусто).
-  // Кап считается от реального потолка: maxDryGrainPerMeal × 0.7 углей — консервативно.
-  const _mainCarbCap = (() => {
-    const ws = Math.max(1, Math.min(1.6, input.weightKg / 80));
-    const grainCap = Math.round(((input.budget === 'max' || input.budget === 'enhanced') ? 350 : 280) * ws);
-    return Math.max(120, Math.round(grainCap * 0.72));
-  })();
+  // F-честность: бейджи режима дня (г/кг + фарма) — пользователь видит, в каком режиме план.
   {
-    const _mains: { key: 'breakfast' | 'lunch' | 'dinner'; c: number }[] = [
-      { key: 'breakfast', c: breakC }, { key: 'lunch', c: lunchC }, { key: 'dinner', c: dinnerC },
-    ];
-    // «Комната» перераспределения излишка — только в основных (они несут кашу).
-    let _totalMain = 0;
-    for (let _pass = 0; _pass < 12; _pass++) {
-      _totalMain = _mains.reduce((s, m) => s + m.c, 0);
-      const _over = _mains.find(m => m.c > _mainCarbCap);
-      if (!_over) break;
-      const _excess = _over.c - _mainCarbCap;
-      _over.c = _mainCarbCap;
-      // размазываем по основным с запасом (не превышая кап) и по перекусам (не имеют капа каши)
-      const _roomMains = _mains.filter(m => m.c < _mainCarbCap);
-      const _roomTotal = _roomMains.reduce((s, m) => s + (_mainCarbCap - m.c), 0);
-      if (_roomTotal > 0) {
-        let _left = _excess;
-        for (const m of _roomMains) {
-          const _share = Math.round(_excess * (_mainCarbCap - m.c) / _roomTotal);
-          m.c += Math.min(_share, _left);
-          _left -= Math.min(_share, _left);
-          if (_left <= 0) break;
-        }
-      }
-    }
-    for (const m of _mains) {
-      if (m.key === 'breakfast') (breakC) = m.c;
-      else if (m.key === 'lunch') (lunchC) = m.c;
-      else (dinnerC) = m.c;
-    }
-    void _totalMain;
+    const _w = Math.max(40, input.weightKg || 80);
+    const _cPerKg = carbsTotal / _w;
+    const _pPerKg = (adjustedProteinG || input.goalProteinG) / _w;
+    if (_cPerKg >= 6.5) notes.push(`🔥 Высокоуглеводный день: ${carbsTotal} г = ${_cPerKg.toFixed(1)} г/кг — обед главный приём, перекусы несут угли, напитки/плотная добивка разрешены.`);
+    if (_pPerKg >= 3.0) notes.push(`🥩 Белок ${_pPerKg.toFixed(1)} г/кг — выше потолка Morton 2.2 / сушка 3.1: избыток окислится, держим для сытости и MPS-частоты.`);
+    if (_bolusUnits > 0) notes.push(`💉 Инсулин-режим: болюс ${_bolusUnits} ЕД — окна dose×10 г быстрых У закреплены и защищены от коррекций.`);
   }
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
@@ -2790,7 +2959,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
     // D-28 П10: овощи НЕ на завтраке (маркер обеда/ужина); завтрак = белок + медленные
     // углеводы + ягоды/фрукт + жиры. Раньше includeVeg>=5 добавлял брокколи в завтрак.
-    includeVeg: false, includeFruit: true, breakfast: true, breakfastStyle: input.breakfastStyle,
+    includeVeg: false, includeFruit: true, breakfast: true, mealKind: 'breakfast', breakfastStyle: input.breakfastStyle,
     extraLiquids: _breakfastExtras.length > 0 ? _breakfastExtras : undefined,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
@@ -2839,6 +3008,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     proteinG: mealBudget.lunch.p,
     carbG: mealBudget.lunch.c,
     fatG: mealBudget.lunch.f,
+    mealKind: 'lunch',
     pool, proteinRotationIds: lunchRot.ids, seed: seedBase + 2,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
@@ -2980,6 +3150,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     proteinG: mealBudget.dinner.p,
     carbG: mealBudget.dinner.c,
     fatG: mealBudget.dinner.f,
+    mealKind: 'dinner',
+    lowFatDinner: morningTrainLoad,
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
@@ -3020,19 +3192,45 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _hasMealNear = (min: number, tol = 30): boolean => meals.some(m => {
     const mt = _toMinOf(m.time); return mt !== null && Math.abs(mt - min) <= tol;
   });
-  const _injectMealAt = (min: number, label: string, note: string, carbG = 40, proteinG = 25): void => {
+  const _injectMealAt = (min: number, label: string, note: string, carbG = 40, proteinG = 25, opts?: { insulinWindow?: boolean }): void => {
     const t = fmtTime(min);
     // Малый белково-углеводный приём (лёгкий, без жиров) — для сопровождения укола.
     // D-28+ fix (жалоба «инсулин и на тренировке так мало углеводов»): порция углеводов
     // теперь дозируется (carbG), а не жёстко 40 г — для инсулина она считается от дозы (~10 г/1 ЕД).
-    const source = pool.fastProtein[0] || pool.proteinSolid[0];
-    const carb = pool.carbFast[0] || pool.carbSlow[0];
+    // Итерация C: ТОЧНЫЕ граммы без snap-сетки (makeItem округлял дозу 25 г → 100 г —
+    // окно 100У превращалось в 39У) + предпочтение сыворотке (быстро, малый объём).
+    // Пункты помечаются _fixedGrams — коррекции/снапы их не масштабируют (прецедент: креатин).
+    const _mkExact = (food: FoodItem, grams: number, role: MealItem['role']): MealItem => {
+      const r = grams / 100;
+      const p = Math.round((food.protein || 0) * r * 10) / 10;
+      const f = Math.round((food.fat || 0) * r * 10) / 10;
+      const c = Math.round((food.carbs || 0) * r * 10) / 10;
+      return {
+        id: food.id, name: food.name, amount: grams, role,
+        kcal: Math.round(4 * p + 9 * f + 4 * c), p, f, c,
+        fiber: Math.round((food.fiber || 0) * r * 10) / 10, leucine_mg: 0,
+        _fixedGrams: grams,
+      } as any;
+    };
+    const _powders = (pool.fastProtein || []).filter(f => isProteinPowderId(f.id));
+    const source = _powders[0] || pool.fastProtein[0] || pool.proteinSolid[0];
+    // Итерация C: carbG — ГРАММЫ УГЛЕВОДОВ дозы (не граммы продукта!): пересчитываем в
+    // граммы продукта по плотности (100У = 122 г мёда, а не 357 г варёного риса).
+    // Предпочитаем плотные быстрые (≥60У/100) — окно компактное и быстрое.
+    const _carbCands = [...(pool.carbFast || []), ...(pool.carbSlow || [])]
+      .filter(f => (f.carbs || 0) > 0 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
+    const _denseFirst = [..._carbCands].sort((a, b) => (b.carbs || 0) - (a.carbs || 0))[0];
+    const carb = (_denseFirst && (_denseFirst.carbs || 0) >= 60) ? _denseFirst : (pool.carbFast[0] || pool.carbSlow[0]);
     const items: MealItem[] = [];
-    if (source) items.push(makeItem(source, proteinG, 'fast_protein'));
-    if (carb) items.push(makeItem(carb, carbG, 'carb_fast'));
+    if (source) items.push(_mkExact(source, proteinG, 'fast_protein'));
+    if (carb) items.push(_mkExact(carb, Math.max(20, Math.round(carbG / Math.max(1, carb.carbs || 1) * 100)), 'carb_fast'));
     if (items.length === 0) return;
-    const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-    meals.push({ label, time: t, items, totals, type: 'snack', target: { p: proteinG, c: carbG, f: 0 }, rationale: [note], mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 } });
+    const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    // Итерация C: инсулин-окно маркируется (тип 'snack' сохранён для UI) — коррекции,
+    // ребалансы и вторые рецепты его не трогают (маркер _insulinWindow).
+    const _injected: any = { label, time: t, items, totals, type: 'snack', target: { p: proteinG, c: carbG, f: 0 }, rationale: [note], mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 } };
+    if (opts?.insulinWindow) _injected._insulinWindow = true;
+    meals.push(_injected);
     // A6 (санитария): инъекционные мини-приёмы регистрируются в usedTodayIds/allFoodsUsed —
     // раньше обходили markUsed → diversity недосчитывался, whey дублировался с пост-треном.
     const _injMeal = meals[meals.length - 1];
@@ -3047,14 +3245,33 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // углеводов, чем базальный фон, — плоский 40 г не обеспечивал гликемическую безопасность.
   const _insulinInjs = _injList.filter(i => (i.type || '').toLowerCase().includes('инсулин'));
   for (const inj of _insulinInjs) {
-    const injMin = _toMinOf(inj.time) ?? (inj.esterType === 'long' ? 22 * 60 : 8 * 60);
+    // Итерация C: базальный (long) — фон без углеводного окна (не болюс); окна только
+    // под болюсы, каждое со своей дозой. Несколько болюсов = несколько окон.
+    if (inj.esterType === 'long') continue;
+    const injMin = _toMinOf(inj.time) ?? 8 * 60;
+    const dose = Number(inj.dose) || 8;
+    const needC = Math.round(dose * 10); // потребность окна
     if (!_hasMealNear(injMin)) {
-      const isBolus = inj.esterType !== 'long';
-      const dose = Number(inj.dose) || (isBolus ? 8 : 10);
-      // ~10 г быстрых углеводов на 1 ЕД болюсного инсулина; кап 120 г на один приём (безопасность).
-      const carbG = Math.max(30, Math.min(120, Math.round(dose * 10)));
+      // ~10 г быстрых углеводов на 1 ЕД болюсного инсулина; кап 120 г на одно окно (безопасность).
+      const carbG = Math.max(30, Math.min(120, needC));
       const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
-      _injectMealAt(injMin, label, `${label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG);
+      _injectMealAt(injMin, label, `${label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG, 25, { insulinWindow: true });
+    } else {
+      // Близкий приём покрывает болюс, только если несёт ≥80% потребности, —
+      // иначе top-up окно на разницу (перекус 35 г не держит 10 ЕД!). Безопасность важнее дубля.
+      let _near: any = null; let _nearDt = Infinity;
+      for (const m of meals) {
+        const mt = _toMinOf(m.time);
+        if (mt === null) continue;
+        const dt = Math.abs(mt - injMin);
+        if (dt < _nearDt) { _nearDt = dt; _near = m; }
+      }
+      const _nearC = _near ? (_near.totals?.c || 0) : 0;
+      if (_near && _nearDt <= 60 && _nearC < needC * 0.8) {
+        const topC = Math.max(30, Math.min(120, needC - Math.round(_nearC)));
+        const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
+        _injectMealAt(injMin, label, `${label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true });
+      }
     }
   }
 
@@ -3094,7 +3311,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   });
 
   // Плотный сытный рацион без перегруза ЖКТ: 350-600г/приём, гарнир 80-120г сухо для 100кг, псиллиум ≤10г, орехи ≤15г
+  // Итерация C: dosed-окна (маркер инсулина) пропускаем — у них точные граммы дозы, а не «тарелка».
   for (const m of meals) {
+    if ((m as any)._insulinWindow) continue;
     const weightScaleDense2 = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80));
     for (const it of m.items) {
       if (['psyllium_husk','glucomannan','inulin','Benefiber','wheat_bran_supplement','cocoa'].includes(it.id) && it.amount > 10) {
@@ -3169,8 +3388,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _curC = meals.reduce((s, m) => s + (m.totals?.c || 0), 0);
     if (overloaded.length > 0 && _curC < carbsTotal * 0.97) {
       const grainCap = maxGrainPerMeal(input.budget);
-      const names = overloaded.map(m => m.label).join(', ');
-      notes.push(`⚠ Перегрузка приёма: в «${names}» порция каши/крупы упёрлась в лимит ${grainCap} г. Углеводы дня не добиваются — увеличьте число приёмов пищи (сейчас ${input.mealsCount}, минимум ${Math.min(6, input.mealsCount + 1)}), чтобы распределить нагрузку.`);
+      // F-честность: называем ЧЕМ закрыт приём (рис 170 сух + пряники 80 + сок 300),
+      // а не абстрактно «каша упёрлась».
+      const names = overloaded.map(m => {
+        const carbs = m.items.filter((it: any) => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fruit' || it.role === 'liquid')
+          .map((it: any) => `${it.name} ${Math.round(it.amount || 0)} г`).join(' + ');
+        return `${m.label} (${carbs || '—'})`;
+      }).join('; ');
+      notes.push(`⚠ Перегрузка приёма: ${names} — порция каши/крупы упёрлась в лимит ${grainCap} г. Углеводы дня не добиваются — увеличьте число приёмов пищи (сейчас ${input.mealsCount}, минимум ${Math.min(6, input.mealsCount + 1)}), чтобы распределить нагрузку.`);
     }
     // E2 (spacing note): слишком большие или слишком малые интервалы между белковыми приёмами.
     // A6-фикс: _times отсортированы, indexOf по времени ловил ПЕРВОЕ совпадение — при двух
@@ -3367,7 +3592,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Чистка-2026 (распределение КБЖУ): единый фильтр «гибких» приёмов — коррекции дня
   // (kcal-догон/fixM/preciseAdjust/посадка) не должны перетасовывать бюджеты peri-окон
   // и pre-sleep (физиология: капы углей, казеин 28-45 г, 0 жиров/углей на ночь).
-  const _flexMeal = (m: { type?: string }) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4'].includes(m.type || '');
+  // Итерация C: инсулин-окна (тип 'snack' + маркер) — не гибкие. Только маркер:
+  // peri-типы здесь не трогаем (у flex-списка своя семантика типов).
+  const _flexMeal = (m: { type?: string }) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4'].includes(m.type || '') && !(m as any)._insulinWindow;
   {
     const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
     if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * 1.10) {
@@ -3421,7 +3648,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // D-28 fix (жалоба «мелкие порции 15-20 г в peri-workout»): сокращаем СНАЧАЛА
       // цельно-продуктовые белки (курица/рыба/творог), а не сыворотку pre/post/intra —
       // иначе коррекция ужимала whey_isolate до 9-10 г, ломая анаболическое окно.
-      const allProteinItems = meals.flatMap(m => m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein').map(it => ({ meal: m, item: it })));
+      // Итерация C: insulin-окна не режем (маркер) — дозы неприкосновенны.
+      const allProteinItems = meals.filter(m => !(m as any)._insulinWindow).flatMap(m => m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein').map(it => ({ meal: m, item: it })));
       const wholeItems = allProteinItems.filter(({ item }) => item.role === 'protein');
       const proteinItems = wholeItems.length > 0 ? wholeItems : allProteinItems;
       if (proteinItems.length > 0) {
@@ -3453,7 +3681,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const devC = (totals.c - goalC) / Math.max(1, goalC);
     if (devC > 0.10) {
       const excessC = totals.c - goalC;
-      const carbItems = meals.flatMap(m => m.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fruit').map(it => ({ meal: m, item: it })));
+      // Итерация C: insulin-окна не режем (маркер; раньше P4-CARB съедал дозу окна до 39 г).
+      const carbItems = meals.filter(m => !(m as any)._insulinWindow).flatMap(m => m.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fruit').map(it => ({ meal: m, item: it })));
       if (carbItems.length > 0) {
         const reducePerItem = excessC / carbItems.length;
         carbItems.forEach(({ meal, item }) => {
@@ -4122,7 +4351,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     let devP4b = (totals.p - goalP4b) / Math.max(1, goalP4b);
     while (devP4b > 0.05 && guard4b-- > 0) {
       const excess4b = totals.p - goalP4b;
-      const all4b = meals.flatMap(m => m.items.filter(it => ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') || (it.role === 'veg' && (it.p || 0) >= 10))).map(it => ({ meal: m, item: it })));
+      // Итерация C: insulin-окна не режем (маркер).
+      const all4b = meals.filter(m => !(m as any)._insulinWindow).flatMap(m => m.items.filter(it => ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') || (it.role === 'veg' && (it.p || 0) >= 10))).map(it => ({ meal: m, item: it })));
       const whole4b = all4b.filter(({ item }) => item.role === 'protein');
       // Эпик B: если все цельные белки уже у реалистичных полов — режем и порошковые
       // (казеин 42→28 г и т.п., пол 20 г), иначе день зависает на +5-6% белка.
@@ -4226,7 +4456,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // жир↑/угли↓ без сходимости). Белок НЕ режется посадкой вообще — им управляет P4b
         // (посадочная резка сыворотки до 17 г ломала MPS-порцию).
         let bMi=-1,bIi=-1,bSaved=0;
-        meals.forEach((m,mi)=> (m.items||[]).forEach((it:any,ii:number)=>{
+        meals.forEach((m,mi)=> {
+          // Итерация C: строгая посадка не трогает insulin-окна (маркер), иначе съедает дозу.
+          if ((m as any)._insulinWindow) return;
+          (m.items||[]).forEach((it:any,ii:number)=>{
           const role=(it as any).role||'';
           const isProtein = role==='protein'||role==='slow_protein'||role==='fast_protein';
           if (isProtein) return;
@@ -4237,7 +4470,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // Р-2.3: ранжируем по ГРАММАМ перебираемого макро в порции (жир↑ → режем жирнейший)
           const saved = (it.amount||0) * per100 / 100;
           if (saved > bSaved) { bSaved=saved; bMi=mi; bIi=ii; }
-        }));
+          });
+        });
         if (bIi<0 || bSaved < 10) break;
         const meal = meals[bMi]; const it = meal.items[bIi];
         // Р-2.1: посадочная резка — пол только для БЕЛКА (40 г), углеводы/жиры свободно
@@ -4305,8 +4539,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // Перекусы — БЕЛКОВЫЙ слот (MPS gap fill): угли/жиры дня добиваются в основные
         // приёмы (раньше посадка наливала «батат 120 г» в полдник с целью 14 г углей).
         const _isSnackSlot = (t: any) => (t || '').startsWith('snack');
+        // Итерация B: snack carb-mode — на high-carb дне, когда основные приёмы заполнены
+        // (share ≥0.95), углеводный недобор добивается и в перекусы (крупа в комнате ккал).
+        // Иначе 1500У некуда лить: мейны в капах, а снекам У запрещены.
+        const _highCarbDay = _isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80);
+        const _mainsFull = _highCarbDay && effWorst === 'c' && ['breakfast', 'lunch', 'dinner']
+          .every(t => { const mm = meals.find((x: any) => x.type === t); return !mm || _mealShareRatio(mm) >= 0.95; });
         const _candMeals = meals.filter((m:any)=> m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && m.type !== 'postworkout'
-          && !(effWorst !== 'p' && _isSnackSlot(m.type))
+          && !(m as any)._insulinWindow
+          && !(effWorst !== 'p' && !_mainsFull && _isSnackSlot(m.type))
           && !(morningTrainLoad && effWorst === 'f' && m.type === 'dinner'));
         let targetMeal = _candMeals.length > 0
           ? _candMeals.reduce((a:any,b:any)=>(_mealShareRatio(a) <= _mealShareRatio(b) ? a : b))
@@ -4787,6 +5028,122 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           _pDev = input.goalProteinG - totals.p;
         }
       }
+      // Итерация B: съедобный вес приёма ≤700 г твёрдой пищи (жидкости не в счёт) —
+      // САМЫЙ последний проход (после посадок/компенсаций, которые раздувают обратно).
+      // Сначала ПЕРЕНОС излишка в самый недогруженный flex-приём (день в сумме не меняется),
+      // и только если комнаты нет нигде — резка (овощи → фрукты → comfort → гарнир до 90%).
+      // Белок/жиры/порошки/peri — не трогаем ни там, ни там.
+      {
+        const MAX_MEAL_SOLID_G = 700;
+        const _isComfort = (id: string) => (COMFORT_PORTION_LIMITS[id] !== undefined) || isConcentrateFood({ id } as any);
+        const _solidOf = (m: any) => (m.items || []).filter((it: any) => it.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
+        const _roomKcalOf = (m: any): number => {
+          const t = (m as any).target;
+          const tk = t ? (t.p || 0) * 4 + (t.c || 0) * 4 + (t.f || 0) * 9 : 0;
+          if (tk <= 0) return 0;
+          return Math.max(0, tk - (m.totals?.kcal || 0));
+        };
+        for (const m of meals) {
+          if ((m as any)._insulinWindow) continue;
+          let _over = _solidOf(m) - MAX_MEAL_SOLID_G;
+          if (_over <= 0) continue;
+          // Резка — только если день ПЕРЕБРАН (ккал или угли сверх цели): иначе срезка
+          // усугубит недобор (кейс rest-600: обед тяжёлый, но день −20% — резать нельзя,
+          // только переносить). Перенос разрешён всегда (сумму дня не меняет).
+          const _dayOverForCut = totals.kcal > (input.goalKcal || 0) || totals.c > (input.goalCarbsG || 0);
+          const _prio = (it: any): number => {
+            if (it.role === 'veg') return 0;
+            if (it.role === 'fruit') return 1;
+            if (_isComfort(it.id)) return 2;
+            if (it.role === 'carb_slow' || it.role === 'carb_fast') return 3;
+            return 9; // белок/жиры/добавки — не трогаем
+          };
+          // Emergency-полы (глубже обычных реалистичных — приём уже несъедобен):
+          // гарнир min(150 г, 70%) — киноа 612 г обязана ужаться, а не «пол 551 г».
+          const _floorOf = (it: any, pri: number): number => {
+            if (pri === 0 || pri === 1) return 30;
+            if (pri === 2) return 20;
+            return Math.min(150, Math.max(60, Math.round((it.amount || 0) * 0.7)));
+          };
+          const _order = (m.items || []).map((it: any) => ({ it, pri: _prio(it) }))
+            .filter(x => x.pri < 9).sort((a, b) => a.pri - b.pri);
+          const _log: string[] = [];
+          const _scaleIt = (it: any, from: number, to: number) => {
+            const r = to / Math.max(1, from);
+            it.amount = to;
+            it.p = Math.round((it.p || 0) * r * 10) / 10; it.f = Math.round((it.f || 0) * r * 10) / 10;
+            it.c = Math.round((it.c || 0) * r * 10) / 10; it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+          };
+          for (const { it, pri } of _order) {
+            if (_over <= 0) break;
+            const _floor = _floorOf(it, pri);
+            const _cur = it.amount || 0;
+            if (_cur <= _floor) continue;
+            let _take = Math.min(_over, _cur - _floor);
+            if (_take <= 0) continue;
+            // Реципиент: самый недогруженный flex (комната ≥100 ккал), чтобы самому не вылететь за 750 г.
+            // Не переносим в уже тяжёлый (≥700 г) приём — иначе концентрируем раздув в нём.
+            const _recs = meals.filter((x: any) => x !== m && !(x as any)._insulinWindow && _flexMeal(x) && _solidOf(x) < MAX_MEAL_SOLID_G)
+              .map((x: any) => ({ x, room: _roomKcalOf(x) }))
+              .filter(x => x.room >= 100)
+              .sort((a, b) => b.room - a.room);
+            let _moved = 0;
+            for (const { x, room } of _recs.slice(0, 3)) {
+              if (_take <= 0) break;
+              const _roomG = 750 - _solidOf(x);
+              if (_roomG <= 0) continue;
+              // Не заливаем реципиента сверх его ккал-комнаты (иначе чиним одно, ломаем другое).
+              const _kpg = (it.kcal || 0) / Math.max(1, _cur);
+              const _gByKcal = Math.floor(room / Math.max(0.5, _kpg));
+              const _g = Math.min(_take, _roomG, Math.max(0, _gByKcal));
+              if (_g < 10) continue;
+              const _pg = it.p / Math.max(1, _cur), _fg = it.f / Math.max(1, _cur),
+                _cg = it.c / Math.max(1, _cur), _fibg = (it.fiber || 0) / Math.max(1, _cur);
+              _scaleIt(it, _cur - _moved, _cur - _moved - _g);
+              const _ex = (x.items || []).find((y: any) => y.id === it.id);
+              if (_ex) {
+                _scaleIt(_ex, _ex.amount || 0, (_ex.amount || 0) + _g);
+              } else {
+                (x.items || []).push({
+                  id: it.id, name: it.name, amount: _g, role: it.role,
+                  p: Math.round(_pg * _g * 10) / 10, f: Math.round(_fg * _g * 10) / 10,
+                  c: Math.round(_cg * _g * 10) / 10,
+                  kcal: Math.round(4 * _pg * _g + 9 * _fg * _g + 4 * _cg * _g),
+                  fiber: Math.round(_fibg * _g * 10) / 10, leucine_mg: 0,
+                });
+              }
+              x.totals = mealTotalsOf(x.items);
+              _moved += _g; _take -= _g;
+              _log.push(`${it.name} ${_g} г → «${x.label}»`);
+            }
+            // Остаток без комнаты — резка (последнее средство, и только если день
+            // перебран: иначе режем недобор). Иначе оставляем с честной нотой ниже.
+            const _rest = Math.min(_take, _cur - _moved - _floor);
+            if (_rest > 0 && _dayOverForCut) {
+              _scaleIt(it, _cur - _moved, _cur - _moved - _rest);
+              _log.push(`${it.name} −${_rest} г (комнаты нет нигде)`);
+            }
+            _over = _solidOf(m) - MAX_MEAL_SOLID_G; // честный пересчёт после переносов/резки
+          }
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+          if (_log.length > 0) notes.push(`⚖️ «${m.label}» облегчён до съедобных ${MAX_MEAL_SOLID_G} г: ${_log.join(', ')}`);
+          if (_solidOf(m) > MAX_MEAL_SOLID_G) notes.push(`⚠ «${m.label}» остался тяжёлым (${_solidOf(m)} г): день недобирает — резать нельзя, добавьте приём`);
+        }
+      }
+      // Итерация C: окна болюса — ТОЛЬКО доза. Любые посторонние пункты, которые
+      // доборы приняли за «перекус» (тип 'snack'), вычищаем: окно = dose, nothing else.
+      // Самый последний проход — после него только return.
+      for (const m of meals) {
+        if (!(m as any)._insulinWindow) continue;
+        const _extra = (m.items || []).filter((it: any) => !(it as any)._fixedGrams);
+        if (_extra.length === 0) continue;
+        m.items = (m.items || []).filter((it: any) => (it as any)._fixedGrams);
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+        notes.push(`💉 Окно «${m.label}» очищено до дозы: убрано ${_extra.map((it: any) => `${it.name} ${Math.round(it.amount || 0)} г`).join(', ')}`);
+      }
     }
 
     return {
@@ -4811,6 +5168,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _pickCtx.currentBudget = 'medium';
     _pickCtx.currentWeightKg = 80;
     _pickCtx.currentCarbGPerKg = 0;
+    _pickCtx.highVolumeDay = false;
   }
 }
 

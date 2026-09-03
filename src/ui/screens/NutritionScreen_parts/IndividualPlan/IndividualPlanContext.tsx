@@ -2244,9 +2244,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const m = resolved.meals[mealIdx];
     if (!m || !m.recipeApplied) { setRecipePickerMeal(null); return; }
     // G3: одно окно = одно блюдо — второй рецепт запрещён в peri/presleep.
+    // Итерация C: инсулин-окна тоже (маркер или метка «инсулин»).
     const _mType = String((m as any).type || '');
     const _mLabel = String(m.label || '');
-    if (['preworkout', 'postworkout', 'intra', 'presleep'].includes(_mType) || /предтрен|пост-трен|intra|перед сном|pre-sleep/i.test(_mLabel)) {
+    if (['preworkout', 'postworkout', 'intra', 'presleep'].includes(_mType) || /предтрен|пост-трен|intra|перед сном|pre-sleep|инсулин/i.test(_mLabel) || (m as any)._insulinWindow) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ В peri-окно и на ночь — одно блюдо: второй рецепт сюда нельзя', 'warning');
       setRecipePickerMeal(null);
       return;

@@ -113,7 +113,11 @@ export function computeDieteticCarbTarget(opts: {
   const minCarbG = opts.minCarbG ?? 50;
   const insulinTotal = Math.max(0, opts.insulinTotalUnits || 0);
   const insulinFloor = Math.round(insulinTotal * 10); // ~10 г на 1 ЕД
-  const ceilingAbs = Math.round(w * maxCarbGPerKg);
+  // Итерация C: под инсулином абсолютный потолок уступает гликемической безопасности —
+  // окно требует insulinFloor (≈10 г/ЕД), иначе гипогликемия. 1500У на курсе — реально.
+  const ceilingAbs = insulinTotal > 0
+    ? Math.max(Math.round(w * maxCarbGPerKg), Math.round(insulinFloor * 1.2))
+    : Math.round(w * maxCarbGPerKg);
   const floorCapped = Math.min(insulinFloor, ceilingAbs);
   const ceiling = Math.max(Math.round(w * carbGPerKg), floorCapped, minCarbG);
   const val = Math.max(floorCapped, Math.min(Math.max(opts.rawCarbsG || 0, minCarbG), ceiling));

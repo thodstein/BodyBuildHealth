@@ -17,7 +17,8 @@
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
-import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
+import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount } from './recipe-engine';
+import { isHighCarbDay } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
@@ -192,19 +193,29 @@ export function scaleRecipeToTarget(
   recipe: Recipe,
   target: { kcal: number; p?: number; f?: number; c?: number },
   athleteWeightKg: number = 80,
+  opts?: { highCarb?: boolean },
 ): { items: PlanItemLike[]; scale: number; portions: number } | null {
   const built = buildRecipeMealItems(recipe);
   if (!built || built.length === 0) return null;
   const t = sumMealTotals(built);
   const kcal = Math.max(50, t.kcal || 1);
-  const heavyScaleMax = athleteWeightKg >= 120 ? 3.0 : athleteWeightKg >= 110 ? 2.8 : athleteWeightKg >= 100 ? 2.5 : 2.2;
+  // Итерация D: потолок от ЦЕЛИ приёма (обед 900+ ккал → ×3 независимо от веса атлета),
+  // капы шире на high-carb (У 1.8/Б 1.4 — белок доберётся топ-апом, а угли нет).
+  const _byWeight = athleteWeightKg >= 120 ? 3.0 : athleteWeightKg >= 110 ? 2.8 : athleteWeightKg >= 100 ? 2.5 : 2.2;
+  const _byTarget = target.kcal >= 900 ? 3.0 : target.kcal >= 700 ? 2.8 : 2.2;
+  const heavyScaleMax = Math.max(_byWeight, _byTarget);
   const tp = target.p ?? 30, tf = target.f ?? 15, tc = target.c ?? 40;
+  // Авто-high-carb: приём с целью ≥120 г У — те же широкие капы без явного флага.
+  const _hc = opts?.highCarb ?? (tc >= 120);
+  const _pc = _hc ? 1.4 : 1.2;
+  const _cc = _hc ? 1.8 : 1.2;
   let s = Math.max(0.5, Math.min(heavyScaleMax, target.kcal / kcal));
-  if (t.p > 0) s = Math.min(s, (1.2 * tp) / t.p);
+  if (t.p > 0) s = Math.min(s, (_pc * tp) / t.p);
   if (t.f > 0) s = Math.min(s, (1.5 * tf) / t.f);
-  if (t.c > 0) s = Math.min(s, (1.2 * tc) / t.c);
-  // Чистка-2026: квантование в порционный ряд (исходный рецепт = 1 порция)
-  const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
+  if (t.c > 0) s = Math.min(s, (_cc * tc) / t.c);
+  // Чистка-2026: квантование в порционный ряд (исходный рецепт = 1 порция).
+  // Итерация D: ряд продлён до ×5 (компонентный скейл не ломает специи/масло).
+  const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
   let best = PORTION_STEPS[0];
   let bestDist = Infinity;
   for (const st of PORTION_STEPS) {
@@ -213,7 +224,7 @@ export function scaleRecipeToTarget(
     if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) < 1e-9 && st > best)) { bestDist = d; best = st; }
   }
   s = best;
-  const scaled = built.map(it => scaleItem(it, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)));
+  const scaled = built.map(it => scaleItem(it, scaleComponentAmount(it.id, it.amount || 0, s)));
   return { items: scaled, scale: s, portions: s };
 }
 
@@ -289,6 +300,8 @@ function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
 
 function flexMealIndex(meals: PlanMealLike[], excludePresleep = false): number {
   for (let i = meals.length - 1; i >= 0; i--) {
+    // Итерация C: инсулин-окна (тип 'snack' + маркер) — не гибкие слоты.
+    if ((meals[i] as any)?._insulinWindow) continue;
     const l = meals[i]?.label || '';
     const t = (meals[i] as any)?.type;
     // Чистка-2026: Pre-sleep — 0 углеводов по дизайну (казеин/творог); карб-топ-ап туда не идёт
@@ -299,6 +312,7 @@ function flexMealIndex(meals: PlanMealLike[], excludePresleep = false): number {
   }
   // нет перекусов — берём последний приём, который НЕ собран из рецепта (не портим авторские порции)
   for (let i = meals.length - 1; i >= 0; i--) {
+    if ((meals[i] as any)?._insulinWindow) continue;
     // Чистка-2026: fallback тоже уважает excludePresleep — карб-топ-ап не льётся
     // в peri-окна и pre-sleep («мёд 69 г в предтрен» / «булгур на ночь»).
     if (excludePresleep) {
@@ -580,7 +594,10 @@ export function rebalanceDayAfterRecipes(
         if ((m as any).recipeApplied2) addOf((m as any).recipeAppliedData2);
         return allAll ? new Set<string>((m.items || []).map(i => i.id)) : s;
       })();
+      // Итерация C: инсулин-окно целиком locked (резка дозы-углей = гипогликемия).
+      const _lockedWindow = !!(m as any)._insulinWindow;
       (m.items || []).forEach((it, ii) => {
+        if (_lockedWindow) return;
         if (coreIds && coreIds.has(it.id)) return;
         if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
         const a = it.amount || 0;
@@ -996,6 +1013,8 @@ function distOf(totals: { kcal: number; p: number; f: number; c: number } | null
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
   const { meals, pool, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  // Итерация D: флаг high-carb дня (широкие scale-капы, 3 сайда) — из дневных целей.
+  const _dayHighCarb = isHighCarbDay(targets?.c || 0, args.athleteWeightKg ?? 80);
   const dayUsedNames = new Set<string>();
   let appliedCount = 0;
   // C1 (Эпик C): дневные квоты реалистичной тарелки ДЕЙСТВУЮТ на рецептурный путь.
@@ -1125,17 +1144,20 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       athleteWeightKg: args.athleteWeightKg,
     };
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
-    // Для тяжей 100-120кг — масштабирование до 3.0 и 2-3 порции, иначе 14г каши
-    const heavyScaleMax = (args.athleteWeightKg ?? 80) >= 120 ? 3.0 : (args.athleteWeightKg ?? 80) >= 110 ? 2.8 : (args.athleteWeightKg ?? 80) >= 100 ? 2.5 : 2.2;
+    // Для тяжей 100-120кг — масштабирование до 3.0 и 2-3 порции, иначе 14г каши.
+    // Итерация D: потолок и от цели приёма (обед 900+ ккал → ×3 независимо от веса).
+    const _byWeight = (args.athleteWeightKg ?? 80) >= 120 ? 3.0 : (args.athleteWeightKg ?? 80) >= 110 ? 2.8 : (args.athleteWeightKg ?? 80) >= 100 ? 2.5 : 2.2;
+    const heavyScaleMax = Math.max(_byWeight, targetKcal >= 900 ? 3.0 : targetKcal >= 700 ? 2.8 : 2.2);
     // КБЖУ ≤3%: рецепт не должен масштабироваться вверх по белку/углям сильнее 1.2×
     // цели приёма — иначе день систематически перебирает белок (+18%) и недобирает угли.
-    const heavyProteinCap = 1.2;
-    const heavyCarbCap = 1.2;
+    // Итерация D: на high-carb У 1.8/Б 1.4 (белок доберётся топ-апом, а угли нет).
+    const heavyProteinCap = _dayHighCarb ? 1.4 : 1.2;
+    const heavyCarbCap = _dayHighCarb ? 1.8 : 1.2;
     // Чистка-2026: МАСШТАБ В ПОРЦИЯХ — исходный рецепт = 1 порция. Идеальный непрерывный
-    // масштаб (ккал-дистанция с капами Б/Ж/У) квантуется в человеческий ряд: ×0.5 / ×1 /
-    // ×1.5 / ×2 / ×2.5 / ×3 («Мюсли ×1.5 порции»), а не «×1.37» — граммовки ингредиентов
-    // остаются пропорцией авторского рецепта. Остаток цели закрывают сайды/посадка.
-    const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
+    // масштаб (ккал-дистанция с капами Б/Ж/У) квантуется в человеческий ряд («Мюсли ×1.5
+    // порции»), а не «×1.37» — граммовки ингредиентов остаются пропорцией авторского
+    // рецепта (компонентный скейл: специи/масло не раздуваются). Остаток закрывают сайды/посадка.
+    const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
     const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
       const ideal = Math.max(0.5, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
       let capS = heavyScaleMax;
@@ -1244,8 +1266,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         return Math.max(0.5, s);
       })();
       const s = scaleOf(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
+      // Итерация D: компонентный скейл — base полностью, жир/приправы/овощи с потолками.
       let finalItems: PlanItemLike[] = (s !== 1)
-        ? built.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
+        ? built.map(it => scaleItem(it as PlanItemLike, scaleComponentAmount(it.id, it.amount || 0, s)))
         : built as PlanItemLike[];
       // rawCarbs: угли ЧИСТОГО рецепта (после масштаба, до сайд-добивки) — по ним carb-гейт.
       const rawCarbs = sumMealTotals(finalItems).c || 0;
@@ -1263,8 +1286,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         let tNow = sumMealTotals(finalItems);
         let kcalNow = tNow.kcal || 0;
         // Сайд добивка — порционный ряд даёт шаг до ±25% ккал: остаток порции добирают
-        // сайды (до 2 везде — иначе недобор после кванта не закрыть).
-        const maxSides = 2;
+        // сайды (до 2 везде, до 3 на high-carb — иначе недобор после кванта не закрыть).
+        // Итерация D: «×3 + сайд» вместо раздувания рецепта сверх ×3 происходит сам:
+        // капы держат рецепт, сайды закрывают остаток (sideNote ниже помечает добор).
+        const maxSides = _dayHighCarb ? 3 : 2;
         let sidesAdded = 0;
         while (sidesAdded < maxSides) {
           const dP = (tgt.p || 0) - tNow.p;
@@ -1303,7 +1328,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
             fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
           }, g)];
-          sideNote = sideNote ? sideNote + ` + ${side.name} ${g}г` : `➕ Сайд к «${flat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
+          // Итерация D: бейдж «×3 + 🍚» — рецепт на капе масштаба, остаток несёт сайд.
+          const _scaleTag = s >= 3 ? ` (рецепт ×${s})` : '';
+          sideNote = sideNote ? sideNote + ` + ${side.name} ${g}г` : `➕ Сайд к «${flat.name}»${_scaleTag}: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
           tNow = sumMealTotals(finalItems);
           kcalNow = tNow.kcal || 0;
           sidesAdded++;

@@ -13,6 +13,9 @@
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import { foodAvailableForPlan, stapleFamilyOf } from './food-availability';
+// Маркер инсулин-окна (тип 'snack', закрыт для коррекций как peri). NB: проверять ТОЛЬКО
+// маркер, а не isPeriLikeMeal(): старые гейты по типам разные в каждой ветке
+// (swap скипает prew, cut — нет) и их расширение ломает peri-поведение.
 
 export interface DayTargets { kcal: number; p: number; f: number; c: number; }
 export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; }
@@ -203,7 +206,7 @@ export function correctDayToTargets(
           let victimMi = -1, victimIi = -1, victimBad = -1;
           let victimIt: CorrectorItem = { id: '', name: '', amount: 0, kcal: 0, p: 0, f: 0, c: 0 };
           meals.forEach((m, mi) => {
-            if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout') return;
+            if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout' || (m as any)._insulinWindow) return;
             (m.items || []).forEach((it, ii) => {
               if ((it as any)._fixedGrams) return;
               if (isCoreRecipeItem(m, it.id)) return;
@@ -278,7 +281,7 @@ export function correctDayToTargets(
       type Cand = { mi: number; ii: number; it: CorrectorItem; per100: number; totalMacro: number };
       const cands: Cand[] = [];
       meals.forEach((m, mi) => {
-        if (m.type === 'presleep' || m.type === 'intra') return;
+        if (m.type === 'presleep' || m.type === 'intra' || (m as any)._insulinWindow) return;
         (m.items || []).forEach((it, ii) => {
           if ((it as any)._fixedGrams) return;
           if ((it.amount || 0) < 15) return;
@@ -345,7 +348,7 @@ export function correctDayToTargets(
       type Cand = { mi: number; ii: number; it: CorrectorItem; per100: number };
       const cands: Cand[] = [];
       meals.forEach((m, mi) => {
-        if (m.type === 'presleep' || m.type === 'intra') return;
+        if (m.type === 'presleep' || m.type === 'intra' || (m as any)._insulinWindow) return;
         // Чистка-2026: недобор закрываем ТОЛЬКО в полноценные приёмы — пери-окна (предтрен/
         // пост-трен) имеют фиксированные капы углей и 0 жиров («мёд 69 г в предтрен» — баг).
         if (m.type === 'preworkout' || m.type === 'postworkout') return;
@@ -475,7 +478,7 @@ export function correctDayToTargets(
       // выбираем приём с минимальной долей ккал (недогруженный);
       // для комфортных источников — приём, где этого id ещё НЕТ (не дублируем)
       const _comfortDup = COMFORT_CAP[best.id] !== undefined;
-      let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout')
+      let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow)
         .filter(m => !_comfortDup || !m.items.some(it => it.id === best.id))
         .reduce((a, b) => {
           const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
