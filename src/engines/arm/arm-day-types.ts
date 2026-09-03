@@ -36,7 +36,7 @@ export const FORCE_TECHNIQUE_GROUPS: ReadonlySet<string> = new Set([
 /** Единый источник sessionTag → мышцы для движка + селектора. */
 export const TAG_MUSCLES_ARM: Record<string, string[]> = {
   TableHeavy: ['wrist_flexors', 'pronators', 'brachialis', 'back_pressure'],
-  TableTech: ['risers', 'pronators', 'supinators', 'shoulder_stab', 'wrist_flexors'],
+  TableTech: ['risers', 'pronators', 'supinators', 'shoulder_stab', 'wrist_flexors', 'radial_deviators', 'thumb'],
   TableCup: ['wrist_flexors', 'risers', 'thumb', 'brachialis'],
   TablePronation: ['pronators', 'brachioradialis', 'wrist_flexors', 'back_pressure'],
   TableSupination: ['supinators', 'brachialis', 'biceps_long', 'shoulder_stab'],

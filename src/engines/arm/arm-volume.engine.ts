@@ -77,6 +77,7 @@ export function sessionLimitsForArm(input: {
   onCourse?: boolean;
   recoveryMult?: number;
   discipline?: string;
+  sessionTag?: string;
 }): { maxExercises: number; maxSets: number } {
   const lvl = (input.level || '').toLowerCase();
   const enhanced = lvl === 'enhanced';
@@ -90,6 +91,11 @@ export function sessionLimitsForArm(input: {
   } else if (disc === 'hybrid') {
     maxEx = enhanced ? 7 : 6;
     maxSets = enhanced ? 13 : 9;
+  }
+  // PRO F: TableTech несёт 7 мышц (risers/pron/sup/shoulder/wrist/radial/thumb) — кап 7
+  if (!enhanced && disc === 'armwrestling' && (input.sessionTag || '') === 'TableTech') {
+    maxEx = 7;
+    maxSets = 12;
   }
   if (input.recoveryMult && input.recoveryMult < 0.8) {
     maxEx = Math.max(4, maxEx - 1);

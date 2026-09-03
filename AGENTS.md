@@ -3208,3 +3208,20 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **UI** `src/ui/screens/SRCBBScreen_parts/PLSeasonBuilder.tsx:592` — карточка `🧩 Сезон по микроциклам` в `SRCBBScreen:settings` (переключатель `single|season` + 4 слота с `weeks/enabled/order` + **кнопка `＋ Добавить период` (дубль сила→скорость→сила, `removeSlot`)** + `auto|manual` + диалог согласия `[✓ Согласен 12→7][✕ Оставить 1:1][🔄 Другой]` + `hasBlockedSegments` блокирует сборку + сводка `нед 1-12 → …` + `he_pl_session.season` persist). `SRCBBScreen` — печать/сводка поддерживают `proposed_*` как `по согласию`.
 - **Тесты:** `lms-season 26/26` (дубль/пустой/speed-fallback/summary strict_skip), `lms-comp-gap 8/8` (с согласием/без), `lms-speed-index 5/5`, `pl-season-builder 11/11` (с согласием), `lms 888/888`, `SRCBBScreen_parts` зелёные, `tsc 0` (6GB).
 - **Источник immutable:** `LMS_CYCLES` не мутируется, `fit` всегда `derived` копия, одиночный цикл `faithful:true` всегда `exact`.
+
+## Армрестлинг: PRO-уровень — эпики A–J полностью (Sep 03 2026)
+
+Выполнение PRO-плана (аудит 36 движков + 72 упражнения + интернет-источники: WAF 2025 Rules, ImproveYourGrip, Donatif, StrengthLog, GrinderGym, GripStrength 12-нед, GoldenGrip, Praxis топ-3, PMC/BMC переломы humerus, ArmliftingUSA/IronMind). NEW 11 движков + 11 тестов; встройка в билдер аддитивно (ядро-инварианты целы).
+
+- **A arm-waf:** полные WAF-категории 2025 (Senior M11/F8, Master/GM/SGM/SSGM, SubJunior/Junior/Youth23, Para PID/PIU/PIDH/PIUH/VI/HI/CP) + `wafAgeGroupFor/wafClassFor/wafCutTargetFor/buildWafStartCard` (руки L/R = отдельные зачёты). Тесты 7/7.
+- **B arm-bilateral:** асимметрия L/R, добивка слабой +15% (7-12%) / +25% (≥12%, норма элиты Bezkorovainyi), сильная — maintenance, кап MRV. Тесты 5/5.
+- **C arm-supermatch:** best-of-5/6 (раунды 10-15с/отдых 60-90с по уровню), TUT-прогрессия к пику, делоад −40%. Тесты 4/4.
+- **D arm-start-strap:** 4 дрилла (reaction_go/referee_grip/strap_start/foul_freeze) + ремень-сессия 10 удержаний + `startReadiness` (реакция ≤350мс, 0 фальстартов). Тесты 3/3.
+- **E arm-sparring:** гейт 100% (запрет в deload/пик/tendon>18/повтор на неделе) + партнёр ±5 кг + `pickSparringPartner`. Тесты 4/4.
+- **F arm-load-quant:** `armEpley1RM` с гардом 1-12 (имя не конфликтует с `arm-progression.epley1RM`), `smallMuscleE1RM` 3-8, `holdE1RM`, `workMaxFromBenchmarks` (бенчи вместо default-30), `ensureRadialFingers` (Praxis топ-3). TableTech += radial_deviators+thumb; кап сессии TableTech → 7 (`sessionLimitsForArm {sessionTag}`). Тесты 6/6.
+- **G arm-diary-autoreg:** sRPE/боль/VBT → volumeMult/RIR+/замены (side→изометрия, pron heavy→pulses при боли ≥4); билдер применяет через `effCh` на уровне мышцы + `volumeMult`/`rirShift`. Тесты 5/5.
+- **H arm-competition-prep:** весогонка (темп M0.5/F0.4 %/нед, too_fast/too_slow), `weeksUntilStart/prepPhaseForWeeksOut` (base/strength/taper/peak), `legsAnchorBlock` (присед+тяга+фермер — StrengthLog якорь). Тесты 6/6.
+- **I arm-video-analysis:** Kinovea-CSV (`,`/`;`) → xLoop/yMax/vMax → hook/toproll/press + SRD 4. Тесты 4/4.
+- **J arm-platform:** WR-таблица (RT 130.5/77.2), попытки 90/96/102%, скоринг %WR, ротация support/pinch/crush. Тесты 5/5.
+- **Встройка:** `arm-pro-integration.applyArmPro` (единая точка, всё try/catch) → билдер: mergedWorkMax (бенчи, явный приоритетнее), `effCh`, rationale/safetyWarnings; валидатор: radial/containment-warning + taper-side-warning (только warnings); UI: PRO-карта в params (WAF-превью, L/R, бенчи, дневник, спарринг, supermatch/ремень toggles).
+- **Проверено:** arm-область **308/308** (35 файлов, было 238/239 — 1 падение dedup уже починено в дереве), UI arm 9/9, tsc 0 по своим файлам (1 пред-существующая ошибка в чужом `ArmDiagnosticsHub.tsx:943 scoreColor` — не тронута). Коммит строго pathspec (29 файлов: 11 движков + 11 тестов + 7 правок), чужие bb/cardio/nutrition/TA-файлы не тронуты; параллельные коммиты линейки (29fba3fdb, 4c280039a) не откатывались.

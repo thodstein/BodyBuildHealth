@@ -15,6 +15,7 @@ import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
+import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
@@ -73,6 +74,24 @@ export function ArmAutoConstructor() {
   const [courseIntensity, setCourseIntensity] = useState<'mild'|'moderate'|'heavy'>('moderate');
   const [showPed, setShowPed] = useState(false);
   const [workMaxEdit, setWorkMaxEdit] = useState<Record<string, string>>({});
+  // PRO A–J: старт/руки/бенчи/дневник/спарринг (всё опционально)
+  const [proBw, setProBw] = useState<string>('');
+  const [proAge, setProAge] = useState<string>('');
+  const [proArm, setProArm] = useState<string>('both');
+  const [proDate, setProDate] = useState<string>('');
+  const [proTargetW, setProTargetW] = useState<string>('');
+  const [proLeft, setProLeft] = useState<string>('');
+  const [proRight, setProRight] = useState<string>('');
+  const [proBenchRt, setProBenchRt] = useState<string>('');
+  const [proBenchWristLb, setProBenchWristLb] = useState<string>('');
+  const [proBenchPron, setProBenchPron] = useState<string>('');
+  const [proBenchSide, setProBenchSide] = useState<string>('');
+  const [proSrpe, setProSrpe] = useState<string>('');
+  const [proElbow, setProElbow] = useState<string>('');
+  const [proSpar, setProSpar] = useState<string>('off');
+  const [proSparDelta, setProSparDelta] = useState<string>('0');
+  const [proSupermatch, setProSupermatch] = useState<boolean>(false);
+  const [proStrap, setProStrap] = useState<boolean>(false);
 
   const workMax = useMemo(() => {
     try {
@@ -210,6 +229,23 @@ export function ArmAutoConstructor() {
         hrvMs: recovery.hrvMs,
         sleepHours: recovery.sleepHours,
         stressLevel: recovery.stressLevel,
+        // PRO A–J (пустые строки = не задано)
+        bodyWeightKg: parseFloat(proBw) > 0 ? parseFloat(proBw) : (recovery as any).bodyWeightKg,
+        ageYears: parseFloat(proAge) > 0 ? parseFloat(proAge) : undefined,
+        arm: (proArm === 'left' || proArm === 'right' ? proArm : 'both') as any,
+        leftKg: parseFloat(proLeft) > 0 ? parseFloat(proLeft) : undefined,
+        rightKg: parseFloat(proRight) > 0 ? parseFloat(proRight) : undefined,
+        competitionDateIso: proDate || undefined,
+        targetWeightKg: parseFloat(proTargetW) > 0 ? parseFloat(proTargetW) : undefined,
+        supermatch: proSupermatch || undefined,
+        strapExpected: proStrap || undefined,
+        sparring: proSpar === 'off' ? undefined : { intensityPct: Number(proSpar) as any, partnerDeltaKg: parseFloat(proSparDelta) || 0 },
+        diary: (parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0)
+          ? [{ dateIso: new Date().toISOString().slice(0, 10), srpe: parseFloat(proSrpe) || undefined, elbowPain: parseFloat(proElbow) || undefined }]
+          : undefined,
+        bench: (parseFloat(proBenchRt) > 0 || parseFloat(proBenchWristLb) > 0 || parseFloat(proBenchPron) > 0 || parseFloat(proBenchSide) > 0)
+          ? { rtKg: parseFloat(proBenchRt) || undefined, wristCurlLb: parseFloat(proBenchWristLb) || undefined, pronHoldSec: parseFloat(proBenchPron) || undefined, sideKg: parseFloat(proBenchSide) || undefined }
+          : undefined,
       });
       plan = finalizeArmPlan(plan, { level });
       // PRO инъекция 12 мёртвых точек (если пришли из хаба) — parity с TA
@@ -392,6 +428,43 @@ export function ArmAutoConstructor() {
               ))}
             </div>
             <div style={{ ...SMALL, marginTop:6, color:'#6a8a9a' }}>Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%).</div>
+          </div>
+
+          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <label style={{ ...SMALL }}>Вес, кг<br/><input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Возраст<br/><input value={proAge} onChange={e=>setProAge(e.target.value)} placeholder="30" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Рука<br/>
+                <select value={proArm} onChange={e=>setProArm(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="both">Обе (2 зачёта)</option><option value="left">Левая</option><option value="right">Правая</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Дата старта<br/><input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Целевой вес, кг<br/><input value={proTargetW} onChange={e=>setProTargetW(e.target.value)} placeholder="85" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Спарринг<br/>
+                <select value={proSpar} onChange={e=>setProSpar(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="off">Выкл</option><option value="70">70% техника</option><option value="90">90% контроль</option><option value="100">100% (heavy-нед)</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Сила левой, кг<br/><input value={proLeft} onChange={e=>setProLeft(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Сила правой, кг<br/><input value={proRight} onChange={e=>setProRight(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Партнёр Δ, кг<br/><input value={proSparDelta} onChange={e=>setProSparDelta(e.target.value)} placeholder="0" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>RT бенч, кг<br/><input value={proBenchRt} onChange={e=>setProBenchRt(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Wrist curl, lb<br/><input value={proBenchWristLb} onChange={e=>setProBenchWristLb(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Pron hold, с<br/><input value={proBenchPron} onChange={e=>setProBenchPron(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Side, кг<br/><input value={proBenchSide} onChange={e=>setProBenchSide(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>sRPE (дневник)<br/><input value={proSrpe} onChange={e=>setProSrpe(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Боль локтя 0-10<br/><input value={proElbow} onChange={e=>setProElbow(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={proSupermatch} onChange={e=>setProSupermatch(e.target.checked)} /> Суперматч best-of-5/6</label>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={proStrap} onChange={e=>setProStrap(e.target.checked)} /> Ожидается ремень</label>
+            </div>
+            {(proBw || proAge) && (()=>{ try {
+              const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any });
+              return <div style={{ ...SMALL, marginTop: 8, color: ACCENT }}>WAF {card.ageGroup} · кат. {card.weightClass.label} кг · {card.weighInNote}</div>;
+            } catch { return null; } })()}
           </div>
 
           <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop: 14 }}>⚡ Собрать план</button>

@@ -38,6 +38,19 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
     if (plan.discipline === 'armwrestling' && ratio < 0.3 && wk.sessions.length >= 3) {
       warnings.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% — для армрестлинга мало стола`);
     }
+    // PRO F: radial/fingers должны встречаться (Praxis топ-3 + containment)
+    if (plan.discipline === 'armwrestling') {
+      const hasRadial = wk.sessions.some(s => s.exercises.some(e => e.muscle === 'radial_deviators'));
+      const hasContain = wk.sessions.some(s => s.exercises.some(e => e.muscle === 'thumb' || e.muscle === 'risers'));
+      if (!hasRadial) warnings.push(`Н${wk.week}: нет radial_deviators — добавить лучевое отведение (Praxis топ-3)`);
+      if (!hasContain) warnings.push(`Н${wk.week}: нет thumb/risers — добавить containment`);
+    }
+    // PRO E/H: side в тейпере — только техника минимум
+    if (wk.taper) {
+      let sideSets = 0;
+      for (const sess of wk.sessions) for (const ex of sess.exercises) if (ex.muscle === 'side_pressure') sideSets += ex.sets;
+      if (sideSets > 2) warnings.push(`Н${wk.week}: taper + side_pressure ${sideSets} >2 — оставить только технику`);
+    }
   }
 
   const humerusWarnings = checkHumerusGuard(plan);

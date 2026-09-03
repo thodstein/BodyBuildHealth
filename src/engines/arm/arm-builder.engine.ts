@@ -12,6 +12,8 @@ import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
 import { buildArmSchedule, specializationMrvFactor, specForWeek } from './arm-specialization.engine';
 import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
 import { tableWeekKind, tableWeekParams } from './arm-table.engine';
+import { applyArmPro } from './arm-pro-integration.engine';
+import { ensureRadialFingers } from './arm-load-quant.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -261,6 +263,16 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
 
+  // PRO A–J: оркестратор (аддитивно, try/catch внутри — ядро не падает)
+  let pro: { rationale: string[]; warnings: string[]; volumeMult: number; rirShift: number; replaceSideWithIso: boolean; replaceHeavyPronWithPulses: boolean; workMaxPatch: Record<string, number> };
+  try {
+    pro = applyArmPro(input);
+  } catch {
+    pro = { rationale: [], warnings: [], volumeMult: 1, rirShift: 0, replaceSideWithIso: false, replaceHeavyPronWithPulses: false, workMaxPatch: {} };
+  }
+  // Бенчи → workMax: явный workMax пользователя приоритетнее
+  const mergedWorkMax: Record<string, number> = { ...(pro.workMaxPatch || {}), ...(input.workMax || {}) };
+
   // MRV multipliers — через adaptForPEDs с tendonCap 1.5× + fallback для неизвестных педов (тест 'test_e')
   let pedMult = 1;
   let pedAdapt: any = null;
@@ -419,30 +431,39 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     for (let d = 0; d < pattern.schedule.length; d++) {
       const sched = pattern.schedule[d];
       if (sched.kind !== 'тренировка') continue;
-      const ch = (isDeload ? 'лёг' : isPeaking ? 'техника' : sched.character) as any;
+      let ch = (isDeload ? 'лёг' : isPeaking ? 'техника' : sched.character) as any;
       const tag = sched.sessionTag || 'FullArm';
+      // PRO G: боль ≥4 — side только техника/изометрия (humerus/UCL)
+      const isSideTag = tag === 'SidePress' || (TAG_MUSCLES_ARM[tag] || []).includes('side_pressure');
+      if (pro.replaceSideWithIso && isSideTag && ch === 'тяж') ch = 'техника';
       const muscles = TAG_MUSCLES_ARM[tag] || [tag];
       const exercises: ArmExercise[] = [];
       const usedInSession = new Set<string>();
 
       // Filter muscles — for armlifting, skip armwrestling-specific
-      const filteredMuscles = muscles.filter(m => {
+      const baseFiltered = muscles.filter(m => {
         if (discipline === 'armlifting' && ['pronators','supinators','side_pressure','back_pressure'].includes(m)) return false;
         if (discipline === 'armwrestling' && ['grip_crush'].includes(m) && !weakPoints.includes('grip_crush')) return false;
         return ARM_MUSCLES.includes(m as any);
       });
+      // PRO F: FullArm всегда содержит radial/fingers (Praxis топ-3 + containment)
+      const filteredMuscles = tag === 'FullArm' ? ensureRadialFingers(baseFiltered) : baseFiltered;
 
       for (const mus of filteredMuscles) {
+        // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
+        const effCh = (pro.replaceSideWithIso && mus === 'side_pressure' && ch === 'тяж')
+          ? 'техника'
+          : (pro.replaceHeavyPronWithPulses && mus === 'pronators' && ch === 'тяж') ? 'техника' : ch;
         // spec filter: if specialization active and muscle not in targets + not core — accessory
         let role: 'primary'|'accessory' = 'primary';
         if (specSchedule.active && weekSpecs.length > 0 && !weekSpecs.includes(mus) && !['shoulder_stab','core_anchor'].includes(mus)) {
           role = 'accessory';
         }
-        const target = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult) : 6;
+        const target = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1)) : 6;
         const freq = muscleFreq[mus] || 1;
-        const sets = setsFor(mus, ch, w, target, freq);
-        const reps = repsFor(mus, ch, phase);
-        const rir = rirFor(ch, phase, w, technique);
+        const sets = setsFor(mus, effCh, w, target, freq);
+        const reps = repsFor(mus, effCh, phase);
+        const rir = Math.max(0, Math.min(5, rirFor(effCh, phase, w, technique) + (pro.rirShift || 0)));
         const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique);
         if (!exTpl) continue;
         usedInSession.add(exTpl.id);
@@ -460,9 +481,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         for (let s = 0; s < sets; s++) {
           const repVal = reps[0] + Math.floor(rng() * (reps[1] - reps[0] + 1));
           // Вес по workMax + cross-meso прогрессия: тяж 82%, техника 60%, памп 68%
-          const pct = ch === 'тяж' ? 0.82 : ch === 'техника' ? 0.6 : ch === 'памп' ? 0.68 : 0.65;
+          const pct = effCh === 'тяж' ? 0.82 : effCh === 'техника' ? 0.6 : effCh === 'памп' ? 0.68 : 0.65;
           // cross-meso: если есть предыдущий план — его финальный вес +2.5% как база
-          let effectiveWorkMax = input.workMax || {};
+          let effectiveWorkMax: Record<string, number> = { ...mergedWorkMax };
           if (crossMesoWorkMax && crossMesoWorkMax[mus] != null) {
             const baseFromPrev = crossMesoWorkMax[mus];
             const curMax = weightForMuscle(mus, effectiveWorkMax, 1);
@@ -472,14 +493,14 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             }
           }
           const wgt = weightForMuscle(mus, effectiveWorkMax, pct);
-          const hold = exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (ch === 'техника' ? 15 : 10) : undefined;
+          const hold = exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined;
           workSets.push({
             reps: repVal,
             rir,
             weight: wgt,
-            restSeconds: mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : ch === 'тяж' ? 120 : 90,
+            restSeconds: mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : effCh === 'тяж' ? 120 : 90,
             tempo: tempoForKind,
-            technique: mus === 'side_pressure' && ch === 'тяж' ? 'none' : ch === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
+            technique: mus === 'side_pressure' && effCh === 'тяж' ? 'none' : effCh === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
             holdSeconds: hold,
           });
         }
@@ -488,7 +509,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           muscle: mus as any,
           name: exTpl.name,
           role: 'primary',
-          character: ch,
+          character: effCh,
           sets,
           repsRange: reps,
           rir,
@@ -506,8 +527,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         });
       }
 
-      // Enforce session limits — с учётом дисциплины
-      const limits = sessionLimitsForArm({ level, onCourse: !!pedAdapt, discipline });
+      // Enforce session limits — с учётом дисциплины и тега (TableTech PRO F: 7)
+      const limits = sessionLimitsForArm({ level, onCourse: !!pedAdapt, discipline, sessionTag: tag });
       if (exercises.length > limits.maxExercises) {
         // Удаляем accessory последними, primary не трогаем
         const priCount = exercises.filter(e => e.role === 'primary').length;
@@ -562,6 +583,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
   if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
   if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
+  // PRO A–J: строки оркестратора (аддитивно)
+  for (const line of pro.rationale) rationale.push(line);
+  const proWarnings = [...pro.warnings];
 
   // Weekly volume
   const weeklyVolume: Record<number, Record<string, any>> = {};
@@ -598,6 +622,6 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     mrvByMuscle,
     specializationSchedule: specSchedule,
     inputSnapshot: input,
-    safetyWarnings: [],
+    safetyWarnings: proWarnings,
   };
 }

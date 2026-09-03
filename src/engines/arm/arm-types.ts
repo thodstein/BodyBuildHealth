@@ -102,6 +102,22 @@ export interface ArmBuilderInput {
   proteinPerKg?: number;
   previousPlan?: ArmPlan;
   enableHumerusGuard?: boolean;
+  // ── PRO A–J (все опциональны, движок обратно совместим) ──
+  ageYears?: number;
+  bodyWeightKg?: number;
+  arm?: 'left' | 'right' | 'both';
+  dominantArm?: 'left' | 'right';
+  leftKg?: number; // сила левой (RT/прон/cup — одна метрика)
+  rightKg?: number; // сила правой
+  paraClass?: string; // WAF para: none|PID|PIU|PIDH|PIUH|VI|HI|CPD|CPU
+  competitionDateIso?: string; // дата старта → тейпер/весогонка/фаза
+  targetWeightKg?: number; // целевой вес (потолок категории)
+  supermatch?: boolean; // режим best-of-5/6 (эпик C)
+  sparring?: { intensityPct?: 70 | 90 | 100; partnerDeltaKg?: number; sessionsThisWeek?: number };
+  strapExpected?: boolean; // ожидается судейский ремень
+  diary?: Array<{ dateIso: string; srpe?: number; elbowPain?: number; wristPain?: number; velocityLossPct?: number | null }>;
+  trackCsv?: string; // Kinovea-трекинг кисти (эпик I)
+  bench?: { wristCurlLb?: number; pronHoldSec?: number; cupHoldSec?: number; cocLevel?: number; rtKg?: number; sideKg?: number };
 }
 
 export interface ArmInjury {
