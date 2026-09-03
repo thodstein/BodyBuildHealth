@@ -9,6 +9,7 @@ import {
   CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
   cardioFitnessForecast, cardioTaperRecommendation,
   CARDIO_PERIODIZATION_LABELS,
+  timeInZones, polarizationIndex, classifyTid,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment, type CardioPeriodizationModel, type CardioTaperModel,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
@@ -192,6 +193,17 @@ export const CardioParamsStep: React.FC<{
   }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
+  // PRO: TID Polarization Index превью-цикла (раунд 9)
+  const tidPreview = useMemo(() => {
+    if (!preview.cycle) return null;
+    try {
+      const tiz = timeInZones(preview.cycle);
+      if (tiz.totalMin === 0) return null;
+      const pi = polarizationIndex(tiz.pct.z1, tiz.pct.z2, tiz.pct.z3);
+      const cls = classifyTid(tiz);
+      return { pi, model: cls.model, label: cls.label };
+    } catch { return null; }
+  }, [preview.cycle]);
   const applyPreset = (id: string) => {
     const p = CARDIO_PRESETS.find(x => x.id === id);
     if (!p) return;
@@ -449,6 +461,12 @@ export const CardioParamsStep: React.FC<{
             <StatTile label="HIIT-НЕД" value={String(s.hiitWeeks)} color="#a78bfa" />
             <StatTile label="ЦЕЛЬ" value={CARDIO_GOAL_LABELS[goal]} color="#94a3b8" />
             {preview.cycle && <StatTile label="+VO2MAX" value={`+${cardioFitnessForecast(preview.cycle).vo2GainPct}%`} color="#60a5fa" sub={`${cardioFitnessForecast(preview.cycle).effectiveWeeks} нед`} />}
+            {tidPreview && tidPreview.pi != null && (
+              <StatTile
+                label="POL-IDX" value={String(tidPreview.pi)} color={tidPreview.model === 'polarized' ? '#4ade80' : tidPreview.model === 'pyramidal' ? '#60a5fa' : '#fbbf24'}
+                sub={tidPreview.model === 'polarized' ? 'polarized' : tidPreview.model === 'pyramidal' ? 'pyramidal' : tidPreview.model === 'threshold' ? 'threshold!' : 'mixed'}
+              />
+            )}
           </div>
         ) : (
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)' }}>Заполните параметры — появится сводка.</div>

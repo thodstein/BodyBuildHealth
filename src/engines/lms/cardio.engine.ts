@@ -3293,6 +3293,7 @@ export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle)
  * Авто-исправления по отчёту качества:
  * - сушка/рекомпозиция без HIIT (и восстановление позволяет) → добавить HIIT на build/maintenance;
  * - здоровье/рекомпозиция с малым объёмом → увеличить частоту zone2 на maintenance-неделях;
+ * - TID threshold (много Z2) → первый MISS недели в zone2 (пирамидализация, Seiler);
  * - возвращает копию цикла + список изменений (для подтверждения).
  */
 export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: number; recoveryLow?: boolean } = {}): CardioTuneResult {
@@ -3303,6 +3304,8 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
   const ffm = cycleFfmKg(cycle);
   const sex = cycle.config?.sex;
   const s = cardioCycleSummary(cycle);
+  let tidThreshold = false;
+  try { tidThreshold = classifyTidLocal(calcTimeInZones(cycle)).model === 'threshold'; } catch { /* TID — рекомендательно */ }
   const weeks = cycle.weeks.map(w => {
     let sessions = w.sessions;
     // 1. HIIT для cut/recomp/подготовки ББ
@@ -3319,6 +3322,16 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
         const before = `${z2.type.toUpperCase()} ×${z2.weeklyFrequency}`;
         sessions = sessions.map(x => (x.type === 'zone2' ? { ...x, weeklyFrequency: x.weeklyFrequency + 1 } : x));
         changes.push({ week: w.week, label: 'Zone 2 частота +1', from: before, to: `ZONE2 ×${z2.weeklyFrequency + 1}` });
+      }
+    }
+    // 3. TID threshold → первый MISS недели в zone2 (та же длительность/частота, ккал пересчитаны)
+    if (tidThreshold && (w.phase === 'build' || w.phase === 'maintenance') && !w.deload && !w.taper) {
+      const idx = sessions.findIndex(x => x.type === 'miss');
+      if (idx >= 0) {
+        const m = sessions[idx];
+        const conv = recalcSessionKcal({ ...m, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: 'MISS → Zone 2 авто-улучшением (TID threshold → pyramidal, Seiler)' }, bw, sex, ffm);
+        sessions = [...sessions.slice(0, idx), conv, ...sessions.slice(idx + 1)];
+        changes.push({ week: w.week, label: 'MISS → Zone 2 (TID)', from: `MISS ${m.durationMin}×${m.weeklyFrequency}`, to: `ZONE2 ${conv.durationMin}×${conv.weeklyFrequency}` });
       }
     }
     return rebuildWeek(w, sessions, []);

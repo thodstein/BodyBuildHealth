@@ -162,6 +162,15 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
 - **Тесты**: варианты несут LTHR+жару во все три цикла (146-156 вместо 114-133)
   в `cardio-pro-level.test.ts` (43/43).
 
+## Продолжение — раунд 9 (качество чинится)
+
+- **TID-ремонт**: `improveCardioCycle` += правило 3 — при TID threshold первый MISS
+  build/maintenance-недели конвертится в zone2 (та же длительность/частота, ккал пересчитаны,
+  минуты недели сохранены). Петля «quality warn → improve fix» замкнута.
+- **PI в hero**: `CardioParamsStep` — `POL-IDX`-тайл превью-цикла (polarized/pyramidal/threshold!/mixed).
+- **Тесты**: threshold-ремонт (конверсия, минуты, уход warn) + нетронутость не-threshold
+  в `cardio-pro-level.test.ts` (45/45).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.

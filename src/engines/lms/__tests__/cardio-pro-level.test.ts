@@ -522,3 +522,41 @@ describe('PRO prep calibration', () => {
     }
   });
 });
+
+// ─── Раунд 9: TID-ремонт в improve + PI превью ───
+describe('PRO TID repair', () => {
+  const thresholdCycle = () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    for (const w of c.weeks) {
+      if (w.deload || w.taper) continue;
+      w.sessions = [
+        { type: 'zone2', durationMin: 30, weeklyFrequency: 2, intensity: 'moderate', kcalPerSession: 200, purpose: 'x' },
+        { type: 'miss', durationMin: 30, weeklyFrequency: 3, intensity: 'moderate', kcalPerSession: 300, purpose: 'x' },
+      ];
+      w.totalMinutes = 150;
+    }
+    return c;
+  };
+  it('threshold → MISS конвертится в zone2, warn уходит', async () => {
+    const { improveCardioCycle, timeInZones } = await import('../cardio.engine');
+    const c = thresholdCycle();
+    const before = timeInZones(c).pct.z2;
+    const r = improveCardioCycle(c, { daysAvailable: 7 });
+    expect(r.changes.some(x => x.label.includes('MISS → Zone 2'))).toBe(true);
+    const after = timeInZones(r.cycle).pct.z2;
+    expect(after).toBeLessThan(before);
+    // минуты недели сохранены (та же длительность/частота), ккал пересчитаны вниз
+    // (нед 3 — build; нед 1-2 base не трогаем, нед 4 делод)
+    const w3 = r.cycle.weeks.find(w => w.week === 3)!;
+    expect(w3.totalMinutes).toBe(150);
+    expect(w3.sessions.every(s => s.type !== 'miss')).toBe(true);
+    const q = cardioQualityReport(r.cycle, 7);
+    expect(q.findings.some(f => f.level === 'warn' && f.text.includes('TID threshold'))).toBe(false);
+  });
+  it('не-threshold цикл TID-правилом не трогается', async () => {
+    const { improveCardioCycle } = await import('../cardio.engine');
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    const r = improveCardioCycle(c, { daysAvailable: 7 });
+    expect(r.changes.some(x => x.label.includes('MISS → Zone 2'))).toBe(false);
+  });
+});
