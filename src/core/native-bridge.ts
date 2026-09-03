@@ -445,6 +445,15 @@ function randomChallenge(): Uint8Array {
 
 const CRED_KEY = 'he_webauthn_cred_v1';
 
+/** Удалить зарегистрированный биометрический ключ (выключение биометрии). */
+export function disableBiometrics(): void {
+  try {
+    localStorage.removeItem(CRED_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Доступна ли платформенная биометрия (отпечаток/Face) в этом WebView. */
 export async function isBiometricAvailable(): Promise<boolean> {
   try {

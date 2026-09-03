@@ -33,9 +33,62 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Homescreen-виджеты APK (только native; Telegram Mini App их не имеет) -->
+        <receiver
+            android:name=".widgets.TrainingWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_training_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_training_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.TimerWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_timer_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.healthengine.app.action.TIMER_CMD" />
+                <action android:name="com.healthengine.app.action.TIMER_TICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_timer_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.ComplianceWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_compliance_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_compliance_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.NutritionWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_nutrition_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.healthengine.app.action.WIDGET_WATER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_nutrition_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Точные тики таймера отдыха (на Android 12+ без гранта тикают неточно — таймер самокорректируется по endAt) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Биометрия через WebAuthn platform authenticator (см. native-bridge authenticateWithBiometrics) -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 </manifest>

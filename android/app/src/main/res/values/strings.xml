@@ -4,4 +4,12 @@
     <string name="title_activity_main">Health Engine</string>
     <string name="package_name">com.healthengine.app</string>
     <string name="custom_url_scheme">com.healthengine.app</string>
+    <string name="widget_training_label">HE · Тренировка</string>
+    <string name="widget_training_desc">Текущая тренировка и быстрый переход в план</string>
+    <string name="widget_timer_label">HE · Таймер</string>
+    <string name="widget_timer_desc">Автономный таймер отдыха: пресеты, старт, пауза</string>
+    <string name="widget_compliance_label">HE · Комплаенс</string>
+    <string name="widget_compliance_desc">Процент выполнения плана за неделю</string>
+    <string name="widget_nutrition_label">HE · Питание</string>
+    <string name="widget_nutrition_desc">Ккал дня, вода в один тап, быстрый переход в дневник</string>
 </resources>

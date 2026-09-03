@@ -1492,3 +1492,195 @@ html.app-native .hub-head {
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
 }
+
+/* ─── 26. NATIVE PHONE — виджеты, биометрия, возможности APK ─── */
+html.app-native .native-feature-card {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.82), rgba(12, 23, 40, 0.82));
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+html.app-native .native-feature-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+html.app-native .native-feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3);
+  flex-shrink: 0;
+}
+
+html.app-native .native-feature-title {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  color: #fff;
+}
+
+html.app-native .native-feature-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(226, 236, 255, 0.6);
+  margin-top: 1px;
+}
+
+html.app-native .native-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(226, 236, 255, 0.3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+html.app-native .native-dot--ok {
+  background: #c9f73a;
+  box-shadow: 0 0 10px rgba(201, 247, 58, 0.6);
+}
+
+html.app-native .native-dot--bad {
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+html.app-native .native-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+html.app-native .native-feature-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(140, 190, 255, 0.1);
+}
+
+html.app-native .native-feature-row-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+html.app-native .native-feature-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+html.app-native .native-feature-row-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+html.app-native .native-feature-row-desc {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(226, 236, 255, 0.55);
+  line-height: 1.35;
+  margin-top: 1px;
+}
+
+html.app-native .native-feature-btn {
+  flex-shrink: 0;
+  padding: 9px 12px;
+  border-radius: 13px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  border: none;
+  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3);
+  min-height: 40px;
+}
+
+html.app-native .native-feature-btn:disabled {
+  opacity: 0.5;
+}
+
+html.app-native .native-feature-btn--danger {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: none;
+}
+
+html.app-native .native-feature-wide {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  border: none;
+  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  min-height: 48px;
+}
+
+html.app-native .native-feature-wide:disabled {
+  opacity: 0.6;
+}
+
+html.app-native .native-feature-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+html.app-native .native-feature-msg {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #fff;
+  background: rgba(201, 247, 58, 0.08);
+  border: 1px solid rgba(201, 247, 58, 0.2);
+}
+
+html.app-native .native-feature-details {
+  margin-top: 10px;
+}
+
+html.app-native .native-feature-details summary {
+  font-size: 12px;
+  font-weight: 800;
+  color: #c9f73a;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+
+html.app-native .native-feature-how {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: rgba(226, 236, 255, 0.75);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(140, 190, 255, 0.1);
+}

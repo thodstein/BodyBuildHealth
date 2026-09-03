@@ -17,7 +17,47 @@ import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
-import { setupNativeBackButton, haptics } from './core/native-bridge';
+import { setupNativeBackButton, haptics, isBiometricAvailable, authenticateWithBiometrics } from './core/native-bridge';
+
+/** Экран блокировки входа. Рендерится ТОЛЬКО в APK при включённом блоке. */
+function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [fail, setFail] = useState(false);
+  const unlock = async () => {
+    setBusy(true);
+    setFail(false);
+    try {
+      const ok = await authenticateWithBiometrics('Разблокировка Health Engine');
+      if (ok) onUnlocked();
+      else setFail(true);
+    } catch {
+      setFail(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      role="alertdialog"
+      aria-label="Приложение заблокировано"
+      style={{ position: 'fixed', inset: 0, zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24, background: '#050b16', textAlign: 'center' }}
+    >
+      <div style={{ fontSize: 52 }}>🔒</div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: -0.5 }}>Health Engine заблокирован</div>
+      <div style={{ fontSize: 12, color: 'rgba(226,236,255,0.65)', maxWidth: 300, lineHeight: 1.5 }}>
+        Подтвердите личность отпечатком или лицом, чтобы продолжить
+      </div>
+      <button
+        onClick={unlock}
+        disabled={busy}
+        style={{ padding: '14px 28px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 800, color: '#0a1a08', background: 'linear-gradient(135deg, #c9f73a, #00e68a)', minHeight: 52, minWidth: 220 }}
+      >
+        {busy ? 'Ждите…' : '🖐️ Разблокировать'}
+      </button>
+      {fail && <div style={{ fontSize: 12, color: '#f87171' }}>Не распознано — попробуйте ещё раз</div>}
+    </div>
+  );
+}
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
@@ -49,10 +89,36 @@ export default function App() {
   const [subTab, setSubTab] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [screenKey, setScreenKey] = useState(0);
+  // Блок входа по биометрии — ТОЛЬКО APK (флаги he_biometry_* из BiometrySetupCard).
+  const [appLocked, setAppLocked] = useState(false);
   // touchRef removed
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let alive = true;
+    const check = async () => {
+      try {
+        if (localStorage.getItem('he_biometry_lock') !== '1') return;
+        if (localStorage.getItem('he_biometry_enabled') !== '1') return;
+        if (!(await isBiometricAvailable())) return;
+        if (alive) setAppLocked(true);
+      } catch {
+        /* без блокировки при любой ошибке */
+      }
+    };
+    void check();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -302,6 +368,7 @@ export default function App() {
       </main>
       <ToastContainer />
       <KvUpdateBanner />
+      {appLocked && <NativeAppLock onUnlocked={() => setAppLocked(false)} />}
       <nav className="tabs">
         {PRIMARY_NAV.map(item => (
           <button

@@ -6,7 +6,7 @@
  * контент: приветствие, статистика недели, последняя тренировка, быстрые действия.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getProfile } from '../../core/profile-manager';
 import { getWeightLog } from '../../engines/profile-store';
 import {
@@ -17,6 +17,11 @@ import {
 } from '../../engines/workout-logger.engine';
 import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
+import { consumeWidgetLaunchTarget } from '../../core/widget-bridge';
+import { syncAllWidgets } from '../native/widget-sync';
+import { WidgetsSetupCard } from '../native/WidgetsSetupCard';
+import { BiometrySetupCard } from '../native/BiometrySetupCard';
+import { NativeFeaturesCard } from '../native/NativeFeaturesCard';
 
 export type DashboardNativeNavId =
   | 'training' | 'nutrition' | 'labs' | 'risks' | 'pharma' | 'support'
@@ -90,6 +95,38 @@ const ACTIONS: { id: DashboardNativeNavId; icon: string; label: string; hint: st
 ];
 
 export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
+  const [widgetMsg, setWidgetMsg] = useState<string | null>(null);
+
+  // Виджеты: при входе на Главную — отдать очередь в дневники, запушить
+  // свежие снапшоты и отработать тап по виджету (one-shot deep link).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await syncAllWidgets();
+        if (!alive) return;
+        const parts: string[] = [];
+        if (r.drainedWaterMl > 0) parts.push(`💧 +${r.drainedWaterMl} мл из виджета`);
+        if (r.drainedFoods > 0) parts.push(`🍽️ блюд из виджета: ${r.drainedFoods}`);
+        if (parts.length > 0) setWidgetMsg(parts.join(' · '));
+      } catch {
+        /* виджеты недоступны — тихий no-op */
+      }
+      try {
+        const target = await consumeWidgetLaunchTarget();
+        if (!alive || !target || target === 'home') return;
+        if (target === 'training' || target === 'nutrition' || target === 'support') {
+          onNavigate?.(target);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [onNavigate]);
+
   const data = useMemo(() => {
     const profile = safe(() => getProfile(), null as never);
     const settings = (profile as unknown as { settings?: never } | null)?.settings as
@@ -258,6 +295,17 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
         )}
+
+        {widgetMsg && (
+          <div className="native-home-warn native-home-warn--ok" role="status">
+            <div className="native-home-warn-s">{widgetMsg}</div>
+          </div>
+        )}
+
+        <div className="native-home-section">Телефон · APK</div>
+        <WidgetsSetupCard />
+        <BiometrySetupCard />
+        <NativeFeaturesCard />
       </div>
     </div>
   );
