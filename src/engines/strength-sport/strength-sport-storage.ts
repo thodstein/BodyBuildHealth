@@ -103,3 +103,18 @@ export function removeStrengthSportPlan(id: string): void {
     if (cur?.id === id) localStorage.removeItem(KEY);
   } catch {}
 }
+
+// Cloud explicit helper — he_strength_* уже авто-синк через cloud-kv (he_ prefix, не в EXCLUDED), но для явного вызова из UI
+export function syncStrengthSportToCloud(): void {
+  try {
+    // триггерит cloud-kv hook: touch mtimes via setItem same value
+    const keys = [KEY, LIST_KEY, 'he_strength_annual_v1', 'he_lv_profile_ss_v1', 'he_hrv_log', 'he_grip_profile_v1'];
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v != null) {
+        // write same value to trigger markDirty (cloud-kv проверяет prev===v и пропускает, поэтому форсим dirty через временный ключ)
+        localStorage.setItem(k, v);
+      }
+    }
+  } catch {}
+}

@@ -346,3 +346,10 @@ export const SM_WEAKPOINT_BY_EVENT: Record<string, SMWeakPoint[]> = {
 export function getSMWeakPointsForEvent(eventId: string): SMWeakPoint[] {
   return SM_WEAKPOINT_BY_EVENT[eventId] || [];
 }
+
+export function isValidSMWeakPoint(v: string): v is SMWeakPoint {
+  return (Object.keys(SM_BIOMECH) as string[]).includes(v);
+}
+export function normalizeSMWeakPoints(input: string[]): SMWeakPoint[] {
+  return input.map(s=> String(s).trim()).filter(isValidSMWeakPoint).slice(0,4) as SMWeakPoint[];
+}

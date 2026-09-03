@@ -100,6 +100,7 @@ export function detectPlateau(logs: any[], lift: string): boolean {
   return !!(t && Math.abs(t.changePct) < 2);
 }
 
+/** @deprecated impure — используйте buildDiaryTrendSS(logs) с явным массивом (чистый). Оставлен для обратной совместимости UI. */
 export function loadDiaryLogsSS(): any[] {
   try {
     for (const key of ['he_workout_log', 'he_training_log', 'he_workout_history', 'he_srpe_sessions']) {

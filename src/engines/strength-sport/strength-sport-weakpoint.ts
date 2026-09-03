@@ -89,3 +89,22 @@ export function getCorrectionForWeakPoint(wp: WLWeakPoint): string[] {
 export function allWLWeakPoints(): WLWeakPoint[] {
   return Object.keys(WL_WEAKPOINT_LABELS) as WLWeakPoint[];
 }
+
+// Branded validation — stringly-typed защита от опечаток (isValidWLWeakPoint)
+export type Brand<K, T> = K & { __brand: T };
+export type WLWeakPointBrand = Brand<string, 'WLWeakPoint'>;
+export function isValidWLWeakPoint(v: string): v is WLWeakPoint {
+  return (Object.keys(WL_WEAKPOINT_LABELS) as string[]).includes(v);
+}
+export function assertWLWeakPoint(v: string): WLWeakPoint {
+  if (!isValidWLWeakPoint(v)) throw new Error(`Invalid WLWeakPoint: ${v}`);
+  return v;
+}
+export function normalizeWLWeakPoints(input: string[]): WLWeakPoint[] {
+  return input.map(s=> String(s).trim()).filter(isValidWLWeakPoint).slice(0,4) as WLWeakPoint[];
+}
+
+// I18n EN → RU маппинг для API/экспорта (EN id ↔ RU label)
+export const WL_WEAKPOINT_I18N: Record<WLWeakPoint, { en: string; ru: string }> = Object.fromEntries(
+  Object.entries(WL_WEAKPOINT_LABELS).map(([k, ru])=> [k, { en: k, ru }])
+) as any;
