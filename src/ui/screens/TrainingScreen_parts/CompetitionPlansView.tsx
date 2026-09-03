@@ -9,6 +9,8 @@ import { MEET_STRATEGY_PCT_LABEL, MEET_STRATEGY_LABEL } from '../../../engines/l
 import { coachPLPeakPlan } from '../../../engines/lms/lms-taper-coach.engine';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { diaryCard, diaryLabel, ACCENT, DIM } from './diary-tokens';
+import { isNativeApp } from '../../../core/app-platform';
+import { NativeEmptyArt } from '../../native/NativeEmpty';
 
 export interface CompetitionPlanRecord {
   id: string;
@@ -73,11 +75,12 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
 
   if (plans.length === 0) {
     return (
-      <div style={{ ...diaryCard, border: '1px solid rgba(234,179,8,0.2)' }}>
+      <div className="comp-empty" style={{ ...diaryCard, border: '1px solid rgba(234,179,8,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ ...diaryLabel, color: '#eab308', marginBottom: 0 }}>🏁 Соревнования</div>
           {onBack && <button onClick={onBack} style={{ fontSize: 10, color: DIM, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>← В запись</button>}
         </div>
+        {isNativeApp() && <NativeEmptyArt kind="trophy" />}
         <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
           Пока нет сохранённых соревновательных циклов.
           <br />В ПЛ-авто → «Соревнование + тапер» → добавьте тапер к плану, затем нажмите «🏆 Сохранить как соревновательный» — цикл с неделей соревнований и прикидами появится здесь.

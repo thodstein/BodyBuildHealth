@@ -1971,3 +1971,92 @@ html.app-native .profile-pve-btn[data-filled='true'] {
   border-color: rgba(201, 247, 58, 0.45) !important;
   box-shadow: 0 4px 16px rgba(201, 247, 58, 0.12) !important;
 }
+
+/* ─── 31. NATIVE EMPTY — пустые состояния с CTA ──────────────── */
+html.app-native .native-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  text-align: center;
+}
+
+html.app-native .native-empty-art {
+  filter: drop-shadow(0 6px 18px rgba(201, 247, 58, 0.15));
+  animation: nativeScreenIn 0.42s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .native-empty-title {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  color: #fff;
+}
+
+html.app-native .native-empty-hint {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(226, 236, 255, 0.6);
+  max-width: 320px;
+}
+
+html.app-native .native-empty-cta {
+  margin-top: 6px;
+  padding: 12px 22px;
+  border-radius: 15px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  min-height: 48px;
+}
+
+html.app-native .native-empty-cta:active {
+  transform: scale(0.96);
+}
+
+/* Пустые контейнеры: CTA-кнопки крупные */
+html.app-native .day-empty-cta,
+html.app-native .programs-empty-cta {
+  margin: 12px auto 4px;
+  padding: 12px 22px;
+  border-radius: 15px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  min-height: 48px;
+  display: block;
+}
+
+html.app-native .day-empty-cta:active,
+html.app-native .programs-empty-cta:active {
+  transform: scale(0.96);
+}
+
+html.app-native .day-empty .native-empty-art,
+html.app-native .programs-empty .native-empty-art,
+html.app-native .comp-empty .native-empty-art {
+  margin-bottom: 6px;
+}
+
+html.app-native .kit-empty {
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.5), rgba(12, 23, 40, 0.5)) !important;
+  border: 1px dashed rgba(140, 190, 255, 0.2) !important;
+  margin: 4px 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .native-empty-art {
+    animation: none;
+  }
+}

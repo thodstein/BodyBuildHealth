@@ -400,9 +400,9 @@ export const ProgressBar: React.FC<{ value: number; max?: number; color?: string
 
 export const Divider: React.FC = () => <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />;
 
-export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', textAlign: 'center' }}>
-    <div style={{ fontSize: 28 }}>{icon}</div>
+export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; action?: React.ReactNode; art?: React.ReactNode }> = ({ icon, title, desc, action, art }) => (
+  <div className="kit-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', textAlign: 'center' }}>
+    {art ?? <div style={{ fontSize: 28 }}>{icon}</div>}
     <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{title}</div>
     {desc && <div style={{ fontSize: 11, color: '#fff', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
     {action}

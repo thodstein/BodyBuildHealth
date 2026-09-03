@@ -81,6 +81,8 @@ import { labTrainingAdjust } from './lab-training-adjust';
 import { distributePhases, PHASE_CONFIGS } from './phase-periodization';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
+import { isNativeApp } from '../../../core/app-platform';
+import { NativeEmptyArt } from '../../native/NativeEmpty';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
@@ -1176,10 +1178,19 @@ export const ProgramManagerPanel: React.FC = () => {
           />
         </div>
         {programs.length === 0 && (
-          <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+          <div className="programs-empty" style={{ padding: '24px 12px', textAlign: 'center' }}>
+            {isNativeApp() ? (
+              <NativeEmptyArt kind="dumbbell" />
+            ) : (
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+            )}
             <div style={{ fontSize: 13, fontWeight: 700, color: DIM_STRONG, marginBottom: 4 }}>Пока нет сохранённых программ</div>
             <div style={{ fontSize: 11, color: DIM }}>Создайте программу с нуля или клонируйте из библиотеки.</div>
+            {isNativeApp() && (
+              <button className="programs-empty-cta" onClick={() => startCreate('bb')}>
+                🆕 Создать программу
+              </button>
+            )}
           </div>
         )}
         {filteredPrograms().length === 0 && programs.length > 0 && (

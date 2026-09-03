@@ -1,5 +1,7 @@
 import React from 'react';
 import { MealCard } from './MealCard';
+import { isNativeApp } from '../../../../core/app-platform';
+import { NativeEmptyArt } from '../../../../ui/native/NativeEmpty';
 
 interface DayMealsListProps {
   dayMeals: Record<string, any[]>;
@@ -25,10 +27,19 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
 
   if (!hasData) {
     return (
-      <div style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
-        <div style={{ width:56, height:56, borderRadius:16, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.15)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px', fontSize:28 }}>🍽</div>
+      <div className="day-empty" style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
+        {isNativeApp() ? (
+          <NativeEmptyArt kind="plate" />
+        ) : (
+          <div style={{ width:56, height:56, borderRadius:16, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.15)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px', fontSize:28 }}>🍽</div>
+        )}
         <div style={{ fontSize: 13, color: '#fff', marginBottom: 6, fontWeight: 700 }}>Пока пусто — начните день</div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom:14, lineHeight:1.5 }}>Добавьте завтрак, обед или перекус — поиск, штрихкод, фото чека или план</div>
+        {isNativeApp() && (
+          <button className="day-empty-cta" onClick={onImportFromPlan} aria-label="Импорт из плана">
+            📥 Импорт из плана
+          </button>
+        )}
         <div style={{ display:'flex', gap:6, justifyContent:'center', flexWrap:'wrap' }}>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>🔍 Поиск</span>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>📱 Штрихкод</span>
