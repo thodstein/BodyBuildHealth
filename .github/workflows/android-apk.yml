@@ -1,9 +1,8 @@
 # Android APK — сборка без Android Studio
 #
 # Один код → два артефакта: Telegram Mini App (Vercel, dist/) и APK (dist/ + Capacitor).
-# Debug-APK собирается всегда и готов к установке. Release-подпись — только если
-# в Secrets репозитория лежат ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD /
-# ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD (см. docs/NATIVE-APP.md § «Подпись»).
+# Собирает debug-APK — ставится на телефон сразу. Подписанный release для сторов —
+# отдельный шаг, когда будет keystore (см. docs/NATIVE-APP.md §7 «Подпись release»).
 name: android-apk
 
 on:
@@ -15,10 +14,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # NOTE: контекст secrets недоступен в выражениях if — поэтому флаг
-    # считается один раз здесь (в env это разрешено), а шаги проверяют env.
-    env:
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,33 +49,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Decode keystore (release, опционально)
-        if: env.HAS_KEYSTORE == 'true'
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
-          echo "storeFile=release.keystore" >> android/keystore.properties
-          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/keystore.properties
-          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/keystore.properties
-          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/keystore.properties
-
-      - name: Assemble release APK (только с keystore)
-        if: env.HAS_KEYSTORE == 'true'
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
-
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: he-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-      - name: Upload release APK
-        if: env.HAS_KEYSTORE == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: he-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
