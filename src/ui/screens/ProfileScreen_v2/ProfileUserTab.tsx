@@ -48,6 +48,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
     <div>
       {/* Sticky quick-jump */}
       <div
+        className="profile-jump"
         style={{
           position: 'sticky',
           top: 0,
@@ -61,6 +62,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
         }}
       >
         <div
+          className="profile-jump-row"
           style={{
             display: 'flex',
             gap: 6,
@@ -77,6 +79,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
                 type="button"
                 onClick={() => handleJump(link.id)}
                 aria-label={`Перейти к разделу ${link.label}`}
+                className="profile-jump-link"
                 style={{
                   flexShrink: 0,
                   padding: '6px 12px',
@@ -111,7 +114,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="profile-user-sections" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <UserPersonalSection />
         <UserHealthSection />
         <UserDietSection />

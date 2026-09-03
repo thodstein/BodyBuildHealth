@@ -121,14 +121,16 @@ export const ProfileReportsTab: React.FC<{
   }, [initialView]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы отчётов">
+    <div className="profile-reports" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="profile-reports-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы отчётов">
         {VIEW_TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setView(t.id)}
             role="tab"
             aria-selected={view === t.id}
+            className="profile-reports-tab"
+            data-active={view === t.id}
             style={{
               padding: '7px 12px',
               borderRadius: 8,
@@ -157,7 +159,7 @@ export const ProfileReportsTab: React.FC<{
           <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 10, lineHeight: 1.3 }}>
             Переход к страницам отчётов модулей: откроется именно отчёт с кнопкой генерации, а не главная страница блока.
           </div>
-          <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div role="list" className="profile-reports-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {REPORT_SOURCES.map((src) => {
               const list = readReportEntries(src);
               const last = list[0];
@@ -165,6 +167,7 @@ export const ProfileReportsTab: React.FC<{
                 <button
                   key={src.target}
                   onClick={() => onNavigate?.(src.target)}
+                  className="profile-reports-item"
                   role="listitem"
                   aria-label={`Открыть ${src.label}`}
                   style={{

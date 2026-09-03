@@ -237,6 +237,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   style,
 }) => (
   <div
+    className="diary-section"
     style={{
       borderRadius: 18,
       background: `linear-gradient(180deg, ${color}14, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
@@ -313,6 +314,9 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
         role="button"
         tabIndex={0}
         aria-label={`Открыть дневник «${meta.title}»`}
+        className="diary-card"
+        data-diary={diaryKey}
+        data-stale={stale}
         style={{
           ...cardStyles.base,
           ...cardStyles.normal(meta.color),
@@ -437,6 +441,9 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           role="button"
           tabIndex={0}
           aria-label={`Открыть дневник «${meta.title}»`}
+          className="diary-card"
+          data-diary={diaryKey}
+          data-stale={stale}
           style={{
             ...cardStyles.base,
             ...(stale ? cardStyles.stale(staleColor) : cardStyles.normal(meta.color)),

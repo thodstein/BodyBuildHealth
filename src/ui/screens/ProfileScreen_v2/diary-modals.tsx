@@ -310,6 +310,7 @@ export const SectionCard: React.FC<{
   style?: React.CSSProperties;
 }> = ({ icon, title, color, badge, hint, children, style }) => (
   <div
+    className="diary-section"
     style={{
       borderRadius: 18,
       background: `linear-gradient(180deg, ${color}14, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
@@ -854,7 +855,7 @@ export const DiaryModalShell: React.FC<{
         }
       `}</style>
       <div
-        className="dm-overlay"
+        className="dm-overlay diary-modal"
         onClick={onClose}
         role="dialog"
         aria-modal="true"

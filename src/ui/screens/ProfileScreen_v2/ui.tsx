@@ -386,7 +386,7 @@ export const NumberInput: React.FC<{
     setLocal(value === undefined || value === null ? '' : String(value));
   }, [value]);
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div className="profile-numinput" style={{ position: 'relative', width: '100%' }}>
       <input
         type="number"
         value={local}
@@ -421,6 +421,7 @@ export const TextInput: React.FC<{
 }> = ({ value, onChange, placeholder, maxLength }) => (
   <input
     type="text"
+    className="profile-textinput"
     value={value ?? ''}
     onChange={e => onChange(e.target.value)}
     placeholder={placeholder}
@@ -437,6 +438,7 @@ export const SelectInput: React.FC<{
   disabled?: boolean;
 }> = ({ value, onChange, options, placeholder, disabled }) => (
   <select
+    className="profile-selectinput"
     value={value ?? ''}
     onChange={e => onChange(e.target.value)}
     disabled={disabled}
@@ -658,7 +660,7 @@ export const Field: React.FC<{
   fullWidth?: boolean;
   style?: React.CSSProperties;
 }> = ({ label, hint, children, fullWidth, style }) => (
-  <div style={{ marginBottom: 12, ...(fullWidth ? { gridColumn: '1 / -1' } : {}), ...style }}>
+  <div className="profile-field" style={{ marginBottom: 12, ...(fullWidth ? { gridColumn: '1 / -1' } : {}), ...style }}>
     <label style={labelStyle}>{label}</label>
     {children}
     {hint && <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 4 }}>{hint}</div>}
@@ -801,10 +803,12 @@ export const PopupValueEditor: React.FC<{
   })();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="profile-pve" style={{ display: 'flex', flexDirection: 'column' }}>
       <button
         type="button"
         onClick={openPopup}
+        className="profile-pve-btn"
+        data-filled={hasValue}
         aria-label={`${label}: ${displayValue()}`}
         style={{
           position: 'relative',
