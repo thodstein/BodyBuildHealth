@@ -576,4 +576,60 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
 /* ── Export ──────────────────────────────────────────────────────────────── */
 
 export * from './diary-helpers';
-export * from './diary-modals';
+// ВНИМАНИЕ: `export * from './diary-modals'` здесь ЗАПРЕЩЁН.
+// diary-modals дублирует 6 имён этого файла (DIARY_META, SectionCard,
+// btnGhost, btnPrimary, fieldInput, fieldLabel): звезда резолвится
+// по-разному в dev-SSR и прод-бандле (тесты видели чужой SectionCard).
+// Канон — ЛОКАЛЬНЫЕ версии ниже; из diary-modals реэкспортим всё остальное явно.
+export type {
+  UndoAction,
+  RoutineKind,
+  RoutineStepId,
+  ActiveRoutine,
+} from './diary-modals';
+export {
+  pushUndoAction,
+  topUndo,
+  dismissTopUndo,
+  nextRoutineStep,
+  ROUTINE_STEPS,
+  routineNextStep,
+  routineStepIndex,
+  ROUTINE_STEP_LABELS,
+  ROUTINE_KIND_LABELS,
+  migrateLegacyRoutine,
+  daysAgoLabel,
+  staleColorFor,
+  daysSince,
+  readDiaryEntries,
+  lastEntryOf,
+  findByDate,
+  findByDateAndSubstance,
+  useDiaryDraft,
+  PAIN_ZONES,
+  NEURO_SYMPTOMS,
+  ACNE_AREAS,
+  HEMATO_SYMPTOMS,
+  painZoneColor,
+  acneAreaColor,
+  LiveBadge,
+  FormBanner,
+  Sparkline,
+  ScalePicker,
+  StepperInput,
+  ChipGroup,
+  TextField,
+  DiaryModalShell,
+  Modal,
+  DateInput,
+  TodayChip,
+  RepeatLastChip,
+  AddSleepModal,
+  AddBPModal,
+  bpCategory,
+  AddBodyMeasurementsModal,
+  AddWeightModal,
+  AddInjectionModal,
+  AddHealthModal,
+  AddCardioModal,
+} from './diary-modals';

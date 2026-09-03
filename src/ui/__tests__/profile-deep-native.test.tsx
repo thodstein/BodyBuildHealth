@@ -80,6 +80,9 @@ describe('profile deep hooks', () => {
     );
     expect(container.querySelector('.probe-class')).not.toBeNull();
     expect(container.querySelector('.diary-section')).not.toBeNull();
+    // Локальная версия diary-ui (канон): заголовок — h3.
+    // Дубликат из diary-modals рисует span — его здесь быть не должно.
+    expect(container.querySelector('.diary-section h3')).not.toBeNull();
     expect(screen.getByText('Сон')).not.toBeNull();
   });
 
