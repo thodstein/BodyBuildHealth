@@ -8,6 +8,7 @@ import { analyzeBBStimulus, type BBStimulusResult } from './bb-stimulus.engine';
 import { scoreBB, type BBScoreResult } from './bb-scoring.engine';
 import { normalizeSpecializationTargets, isSpecializationTargetConflict } from './bb-specialization.engine';
 import { canonicalMuscle } from './bb-specialization.engine';
+import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
 
 export interface BBDiagnosticsHubInput {
   level: string;
@@ -55,7 +56,6 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
       deltaPct: -15,
       source: 'volume' as const,
     }));
-    // manual first — granular zones считаются разными ключами, чтобы delt_mid+delt_rear не схлопнулись в shoulders
     const map = new Map<string, BBWeakCandidate>();
     for (const c of [...manual, ...merged]) {
       const k = c.granular || c.muscle;
@@ -66,7 +66,6 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
     candidates = Array.from(map.values());
   }
 
-  // валидация конфликта shoulders+delt_mid: если есть конфликт — оставляем первый
   const filtered: BBWeakCandidate[] = [];
   for (const c of candidates) {
     const g = c.granular || c.muscle;
@@ -85,15 +84,29 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
     input.factVolume || null,
   );
   const stimulus = analyzeBBStimulus(input.plan || null);
+  // exercise audit для расширенного скоринга (SFR/угол/lengthened)
+  let avgSfr: number | null = null;
+  let angleGaps = 0;
+  let lengthenedRatio: number | null = null;
+  try {
+    if (input.plan) {
+      const audit = auditPlanExercises(input.plan as any);
+      if (audit) {
+        avgSfr = audit.avgSfr;
+        lengthenedRatio = audit.lengthenedRatio;
+        angleGaps = Object.values(audit.byMuscle).filter(bm => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6).length;
+        const strictGaps = Object.values(audit.byMuscle).filter(bm => bm.strictCoverage.total > 0 && bm.strictCoverage.covered === 0).length;
+        angleGaps += strictGaps;
+      }
+    }
+  } catch {}
 
   // volume issues для scoring
   let volumeIssues = 0;
   let volumeExceeding = 0;
   if (input.factVolume) {
-    // грубая оценка: count exceeding — не пересчитываем landmarks, используем candidates volume source
     const volCands = byVol.length;
     volumeIssues = volCands;
-    // exceeding отдельно — если delta очень негатив и sets >> MAV? Упростим: volCands с delta < -40 как exceeding
     volumeExceeding = byVol.filter(c => c.deltaPct < -40).length;
   }
 
@@ -118,6 +131,9 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
     hasDiary: !!input.hasDiary,
     hasCircumf: !!input.hasCircumf,
     hasVbt: !!input.hasVbt,
+    avgSfr,
+    angleGaps,
+    lengthenedRatio,
   });
 
   const findings: string[] = [];

@@ -18,6 +18,9 @@ export interface BBScoreInput {
   hasDiary: boolean;
   hasCircumf: boolean;
   hasVbt: boolean;
+  avgSfr?: number | null; // средний SFR плана (для penExercise)
+  angleGaps?: number; // кол-во мышц с singleAngle / missing (для penAngle)
+  lengthenedRatio?: number | null; // 0-1
 }
 
 export interface BBScoreResult {
@@ -45,6 +48,9 @@ export function scoreBB(input: BBScoreInput): BBScoreResult {
   const penACWR = input.acwrDanger >= 1 ? 18 : input.acwrCaution >= 2 ? 10 : input.acwrCaution >= 1 ? 6 : 0;
   const penMobility = input.mobilityFails >= 3 ? 14 : input.mobilityFails >= 2 ? 8 : input.mobilityFails >= 1 ? 4 : 0;
   const penVBT = input.vbtLossPct != null ? (input.vbtLossPct > 40 ? 20 : input.vbtLossPct > 25 ? 10 : 0) : 0;
+  const penExercise = input.avgSfr != null ? (input.avgSfr < 3.5 ? 8 : input.avgSfr < 4.0 ? 4 : 0) : 0;
+  const penAngle = (input.angleGaps ?? 0) >= 2 ? 8 : (input.angleGaps ?? 0) >= 1 ? 4 : 0;
+  const penLengthened = input.lengthenedRatio != null ? (input.lengthenedRatio < 0.25 ? 6 : input.lengthenedRatio < 0.35 ? 3 : 0) : 0;
 
   const penalties: Record<string, number> = {
     weak: penWeak,
@@ -54,6 +60,9 @@ export function scoreBB(input: BBScoreInput): BBScoreResult {
     acwr: penACWR,
     mobility: penMobility,
     vbt: penVBT,
+    exercise: penExercise,
+    angle: penAngle,
+    lengthened: penLengthened,
   };
   const raw = Math.sqrt(Object.values(penalties).reduce((s, v) => s + v * v, 0));
   let score = Math.max(0, Math.min(100, Math.round(100 - raw)));

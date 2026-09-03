@@ -293,6 +293,108 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { const raw = localStorage.getItem('he_unified_intel_snapshot_v1'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   }, [diarySessions]);
 
+  // ── Упражнения → эффект (единый инструмент) ──
+  const bbPlan = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans');
+      if (!raw) return null;
+      const j = JSON.parse(raw);
+      if (j?.plan?.weeks) return j.plan;
+      if (Array.isArray(j) && j[0]?.plan?.weeks) return j[0].plan;
+      if (j?.weeks) return j;
+      return null;
+    } catch { return null; }
+  }, [diarySessions, state.exerciseSelectedId]);
+
+  const planAudit = useMemo(() => {
+    try { return bbPlan ? auditPlanExercises(bbPlan) : null; } catch { return null; }
+  }, [bbPlan]);
+
+  const selectedExRaw = useMemo(() => {
+    const id = state.exerciseSelectedId;
+    if (!id) return null;
+    // ищем в плане
+    if (bbPlan) {
+      for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) {
+        const curId = String(ex.exerciseName || ex.id || ex.name || '').toLowerCase();
+        if (curId === String(id).toLowerCase()) return { id: String(ex.exerciseName || ex.id), name: String(ex.name || ex.exerciseName || id), muscle: String(ex.muscle || ''), sets: ex.sets ?? ex.workSets?.length ?? 3, rir: ex.rir ?? 2, tempo: ex.tempo, pauseSeconds: ex.pauseSeconds, stretchPhase: (ex as any).stretchPhase };
+      }
+    }
+    const cat = EXERCISE_CATALOG.find(c => c.id === id);
+    if (cat) return { id: cat.id, name: cat.name, muscle: cat.group, sets: 3, rir: 2 };
+    return { id, name: id, muscle: 'chest' };
+  }, [state.exerciseSelectedId, bbPlan]);
+
+  const selectedDiagnosis = useMemo(() => {
+    if (!selectedExRaw) return null;
+    try {
+      const asym = (() => {
+        const vals = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, v]) => Number(v));
+        return vals.length ? Math.max(...vals) : null;
+      })();
+      const singleAngleMuscle = planAudit ? Object.entries(planAudit.byMuscle).find(([, bm]) => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6)?.[0] || null : null;
+      const uncovered = planAudit?.byMuscle[selectedExRaw.muscle || '']?.regionalCoverage.missing || [];
+      return diagnoseExercise(selectedExRaw as any, {
+        goal: 'hypertrophy', level, weakZones: report.weakZonesGranular, weakMusclesCanonical: report.weakMusclesCanonical,
+        muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null,
+        singleAngleMuscle, uncoveredSubregions: uncovered,
+      } as any);
+    } catch { return null; }
+  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit]);
+
+  const selectedCorrections = useMemo(() => {
+    if (!selectedDiagnosis || !selectedExRaw) return [];
+    try { return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle }); } catch { return []; }
+  }, [selectedDiagnosis, selectedExRaw, level]);
+
+  const selectedProf = useMemo(() => {
+    if (!selectedExRaw) return null;
+    try { return getProfExecutionProfile(selectedExRaw.muscle || ''); } catch { return null; }
+  }, [selectedExRaw]);
+
+  const exerciseLibraryFiltered = useMemo(() => {
+    let list = EXERCISE_CATALOG;
+    if (state.exerciseFilterSfr >= 4) list = list.filter(e => (sfrOf(e as any) ?? 0) >= 4);
+    if (state.exerciseFilterProfile !== 'all') list = list.filter(e => {
+      try {
+        const eff = calcExerciseEffect(e as any, {});
+        return eff.profile === state.exerciseFilterProfile;
+      } catch { return false; }
+    });
+    if (state.exerciseFilterUnilateral) list = list.filter(e => {
+      try { const eff = calcExerciseEffect(e as any, {}); return eff.unilateral; } catch { return false; }
+    });
+    return list.slice(0, 40);
+  }, [state.exerciseFilterSfr, state.exerciseFilterProfile, state.exerciseFilterUnilateral]);
+
+  const handleApplyExerciseCorrection = (action: any, targetExId?: string | null) => {
+    const weak = report.weakZonesGranular;
+    if (!weak.length && !action.targetId && action.type !== 'modifyExecution' && action.type !== 'modifyTempo' && action.type !== 'modifyROM') {
+      setToast('Выбери слабую зону или упражнение — нечего применять');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    const delta = (() => { try { return bbPlan && action ? simulateCorrection(bbPlan, action, targetExId || selectedExRaw?.id || null) : null; } catch { return null; } })();
+    applyToPlanner({
+      kind: 'weakpoints',
+      label: `ББ: ${weak.join(', ') || 'техника'} → ${action.targetName || action.type}`,
+      data: {
+        groups: weak.length ? weak : report.weakMusclesCanonical,
+        weakPoints: weak.length ? weak : report.weakMusclesCanonical,
+        weakZonesGranular: weak, weakMusclesCanonical: report.weakMusclesCanonical,
+        preferredExerciseIds: action.targetId ? [action.targetId] : [],
+        exerciseSwap: action.targetId && targetExId ? { oldId: targetExId, newId: action.targetId } : action.targetId && selectedExRaw?.id ? { oldId: selectedExRaw.id, newId: action.targetId } : undefined,
+        labDiagnosis: selectedDiagnosis ? { flags: selectedDiagnosis.flags, issues: selectedDiagnosis.issues, score: selectedDiagnosis.score } : null,
+        labCorrection: action, labDelta: delta,
+        bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
+      } as any,
+      source: 'intellectual',
+    });
+    setToast(`✓ Коррекция ${action.type} → в ББ-авто${delta?.summary ? ` (${delta.summary})` : ''}`);
+    setTimeout(() => setToast(''), 3000);
+    try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any)); localStorage.setItem('he_training_planning_track', 'bb'); } catch {}
+  };
+
   return (
     <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(0,230,138,0.22)', position: 'relative', overflow: 'hidden' }}>
@@ -301,7 +403,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>💪</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ББ-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Отстающие × e1RM/Rееves + симметрия L/R + стимул lengthened + объём MEV/MAV/MRV + ACWR per-muscle + OHS6 + VBT 20-25%.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Отстающие × e1RM/Reeves + симметрия + 🏋️ Упражнения (SFR/lengthened/паттерн/темп/техника PROF) + объём MEV/MAV/MRV + ACWR + OHS6 + VBT.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
@@ -313,10 +415,12 @@ export const BBDiagnosticsHub: React.FC = () => {
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{report.weakMusclesCanonical.length ? `${report.weakMusclesCanonical.length} слабые` : 'баланс'}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Стимул {report.stimulus.scorePenalty ? `−${report.stimulus.scorePenalty}` : 'OK'}</span>
+          {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {planAudit.avgSfr ?? '—'}</span>}
+          {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e' }}>len {(planAudit.lengthenedRatio * 100).toFixed(0)}%</span>}
           {report.score.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {report.score.floors[0]}</span>}
         </div>
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
-          Выбери слабые зоны (1-2) + замеры + VBT → RSS-скор, verification и коррекции. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны с бонусом в конструктор. Объём/ACWR — из дневника, симметрия — из замеров.
+          Выбери слабые зоны + упражнение → диагноз 12 флагов + PROF «как дать в мышцу» → Δ-эффект. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны + технику/темп/замену в конструктор (SFR + lengthened + паттерн).
         </div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
@@ -366,6 +470,176 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
               <div style={{ fontSize: 10, color: DIM }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${k} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
               <div style={{ fontSize: 10, color: report.symmetry.score < 70 ? '#ef4444' : DIM, marginTop: 4 }}>{report.symmetry.issues.join(' · ') || 'Пропорции в норме'}</div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'exercise' && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Упражнения — диагностика + PROF-коррекция → эффект в плане (максимально)</div>
+            {/* Лента аудита */}
+            {planAudit ? (
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(168,85,247,0.06))', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>SFR {planAudit.avgSfr ?? '—'}/5 {planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '⚠ низко' : 'OK'}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>lengthened {(planAudit.lengthenedRatio * 100).toFixed(0)}% {planAudit.lengthenedRatio < 0.3 ? '⚠ мало' : 'OK'}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.unilateralRatio < 0.08 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.unilateralRatio < 0.08 ? '#f59e0b' : '#22c55e' }}>uni {(planAudit.unilateralRatio * 100).toFixed(0)}% {planAudit.unilateralRatio < 0.08 ? '→ добавь' : 'OK'}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.fatigueDensity > 1.35 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.fatigueDensity > 1.35 ? '#ef4444' : DIM }}>усталость {planAudit.fatigueDensity.toFixed(2)} {planAudit.fatigueDensity > 1.35 ? '⚠ высоко' : ''}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{planAudit.totalExercises} упр · {planAudit.totalSets} сетов</span>
+                </div>
+                {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Флаги: {planAudit.flags.join(' · ')}</div>}
+                <div style={{ color: DIM, marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {report.weakZonesGranular.join(', ') || '—'} · asym {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
+              </div>
+            ) : (
+              <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: DIM, marginBottom: 8 }}>Нет плана ББ — собери в ББ-авто, тогда аудит портфеля появится здесь.</div>
+            )}
+
+            {/* Секция 1: Аудит портфеля по мышцам */}
+            {planAudit && (
+              <div style={{ marginBottom: 10, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.03)', fontSize: 11, fontWeight: 700, color: '#fff' }}>1 · Аудит портфеля по мышцам (каждое упражнение — максимально)</div>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {Object.entries(planAudit.byMuscle).map(([m, bm]) => (
+                    <div key={m} style={{ padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.04)', background: bm.totalSets >= 6 && bm.angleCoverage.covered === 1 ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <b style={{ color: '#fff', fontSize: 11 }}>{m}</b>
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: bm.avgSfr != null && bm.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', color: bm.avgSfr != null && bm.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {bm.avgSfr ?? '—'}</span>
+                        <span style={{ fontSize: 10, color: DIM }}>len {bm.lengthened}/{bm.totalSets} · mid {bm.mid} · short {bm.shortened}</span>
+                        <span style={{ fontSize: 10, color: bm.angleCoverage.missing.length ? '#f59e0b' : '#22c55e' }}>углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} {bm.angleCoverage.missing.length ? `→ нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')}` : 'OK'}</span>
+                        <span style={{ fontSize: 10, color: bm.strictCoverage.missing.length ? '#f59e0b' : DIM }}>строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
+                        <span style={{ fontSize: 10, color: bm.regionalCoverage.missing.length ? '#f59e0b' : DIM }}>подрег {bm.regionalCoverage.covered}/{bm.regionalCoverage.total}</span>
+                        <span style={{ fontSize: 10, color: DIM }}>{bm.totalSets} сет · уни {bm.unilateral} · устал {bm.fatigueDensity.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {bm.exercises.map((eff, i) => {
+                          const sc = exerciseEffectScore(eff);
+                          const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
+                          return (
+                            <span key={i} title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name }))}>
+                              {eff.name} · SFR{eff.sfr ?? '—'} {eff.profile === 'lengthened' ? '📐' : eff.profile === 'short' ? '🔹' : '▪'} {eff.unilateral ? '↔' : ''} {eff.angleClass ? `·${eff.angleClass}` : ''} {eff.strictGroup ? `·${eff.strictGroup.key}` : ''} ·{sc}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Секция 2: Диагноз выбранного */}
+            <div style={{ padding: '10px', borderRadius: 10, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                <select value={state.exerciseSelectedId || ''} onChange={e => setState(s => ({ ...s, exerciseSelectedId: e.target.value || null }))} style={{ flex: 1, minWidth: 180, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
+                  <option value="">— выбери упражнение —</option>
+                  {EXERCISE_CATALOG.slice(0, 80).map(c => <option key={c.id} value={c.id}>{c.name} · {c.group} · SFR{sfrOf(c as any) ?? '—'}</option>)}
+                </select>
+                <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.04)', color: DIM, fontSize: 11, cursor: 'pointer' }}>Сброс</button>
+              </div>
+              {!selectedDiagnosis ? (
+                <div style={{ fontSize: 10, color: DIM }}>Выбери упражнение — появится диагноз 12 флагов + PROF-чек + оценка 0-100.</div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ padding: '4px 10px', borderRadius: 20, background: selectedDiagnosis.score >= 70 ? 'rgba(34,197,94,0.12)' : selectedDiagnosis.score >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${selectedDiagnosis.score >= 70 ? 'rgba(34,197,94,0.22)' : selectedDiagnosis.score >= 50 ? 'rgba(245,158,11,0.22)' : 'rgba(239,68,68,0.22)'}`, color: selectedDiagnosis.score >= 70 ? '#22c55e' : selectedDiagnosis.score >= 50 ? '#f59e0b' : '#ef4444', fontWeight: 800, fontSize: 11 }}>Оценка {selectedDiagnosis.score}/100</span>
+                    <span style={{ fontSize: 10, color: DIM }}>{selectedDiagnosis.effect.name} · {selectedDiagnosis.effect.muscle || '—'} · SFR{selectedDiagnosis.effect.sfr ?? '—'} · {selectedDiagnosis.effect.profile ?? '—'} · {selectedDiagnosis.effect.angleClass ?? '—'} · {selectedDiagnosis.effect.strictGroup?.key ?? '—'} · {selectedDiagnosis.effect.jointStress ?? '—'} · {selectedDiagnosis.effect.unilateral ? '↔ unilateral' : 'bilateral'}</span>
+                    {selectedProf && <span style={{ fontSize: 10, color: '#a78bfa' }}>PROF {selectedProf.label}: {selectedProf.cues[0]}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {selectedDiagnosis.flags.map(f => <span key={f} style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b', fontSize: 10, fontWeight: 600 }}>{f}</span>)}
+                    {selectedDiagnosis.flags.length === 0 && <span style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 10 }}>OK — выполнение чистое</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: selectedDiagnosis.issues.length ? '#fbbf24' : '#22c55e', lineHeight: 1.5, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px' }}>{selectedDiagnosis.issues.join(' · ') || 'Замечаний нет — эталон для ББ'}</div>
+                  {selectedDiagnosis.profGaps.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>PROF гэпы: {selectedDiagnosis.profGaps.map(g => g.issue).join(' · ')}</div>}
+                  {selectedExRaw && (() => { try { const instr = buildExerciseInstructions({ exerciseId: selectedExRaw.id || undefined, exerciseName: selectedExRaw.name, muscle: selectedExRaw.muscle || undefined } as any); return <div style={{ fontSize: 10, color: DIM, marginTop: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Техника ({instr.source}) · паттерн {instr.pattern} · темп {instr.tempo} · {instr.order}</b><br />{instr.cues.slice(0, 3).join(' · ')}<br /><span style={{ color: '#f87171' }}>Ошибки: {instr.mistakes.slice(0, 3).join(' · ')}</span></div>; } catch { return null; } })()}
+                </div>
+              )}
+            </div>
+
+            {/* Секция 3: PROF-коррекция выполнения (центральная) */}
+            {selectedDiagnosis && selectedProf && (
+              <div style={{ padding: '10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(168,85,247,0.08),rgba(0,230,138,0.06))', border: '1px solid rgba(168,85,247,0.18)', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>3 · PROF-коррекция выполнения — как дать именно в мышцу ({selectedProf.label})</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8, fontSize: 10 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Угол:</b> {selectedProf.angle || '—'}</div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Локти:</b> {selectedProf.elbow || '—'}</div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Лопатки:</b> {selectedProf.scapula || '—'}</div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Темп:</b> {selectedProf.tempo} · <b>ROM:</b> {selectedProf.rom}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {selectedProf.cues.map((c, i) => <span key={i} style={{ padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.14)', color: '#00e68a', fontSize: 10, fontWeight: 600 }}>{i + 1}. {c}</span>)}
+                </div>
+                <div style={{ fontSize: 10, color: '#f87171', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>Ошибки: {selectedProf.errors.join(' · ')}</div>
+                <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>Mind-muscle: {selectedProf.mindMuscle} · TUT ↑, пауза в растянутой = stretch-mediated (Maeo 2023)</div>
+                <button onClick={() => handleApplyExerciseCorrection({ type: 'modifyExecution', execCues: selectedProf.cues, reason: `PROF техника ${selectedProf.label}`, confidence: 0.85, deltaPreview: `Проработка ${selectedProf.label}` } as any, selectedExRaw?.id || null)} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>▶ Применить технику PROF в план</button>
+              </div>
+            )}
+
+            {/* Секция 4: Коррекция упражнением (замена/дополнение) */}
+            {selectedDiagnosis && selectedCorrections.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>4 · Коррекция упражнением → эффект (топ-3)</div>
+                {selectedCorrections.slice(0, 3).map((a, i) => {
+                  const delta = (() => { try { return simulateCorrection(bbPlan, a as any, selectedExRaw?.id || null); } catch { return null; } })();
+                  return (
+                    <div key={i} style={{ padding: '8px 10px', borderRadius: 10, background: i === 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${i === 0 ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ padding: '2px 7px', borderRadius: 20, background: i === 0 ? '#00e68a' : 'rgba(255,255,255,0.08)', color: i === 0 ? '#06281c' : '#fff', fontWeight: 800, fontSize: 10 }}>#{i + 1} {a.type}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{a.targetName || a.tempo || a.execCues?.[0] || a.type}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', color: '#a78bfa' }}>conf {(a.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, marginBottom: 4 }}>{a.reason}</div>
+                      <div style={{ fontSize: 10, color: '#60a5fa', marginBottom: 6 }}>{a.deltaPreview} {delta?.summary ? `· Δ ${delta.summary}` : ''} {delta?.issuesResolved?.length ? `→ исправит: ${delta.issuesResolved.join(', ')}` : ''}</div>
+                      <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: i === 0 ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', color: i === 0 ? '#06281c' : '#fff', border: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>▶ Применить в ББ-авто</button>
+                    </div>
+                  );
+                })}
+                {selectedCorrections.length > 3 && (
+                  <details style={{ fontSize: 10, color: DIM }}>
+                    <summary style={{ cursor: 'pointer', color: ACCENT }}>Ещё {selectedCorrections.length - 3} коррекции</summary>
+                    <div style={{ marginTop: 6 }}>
+                      {selectedCorrections.slice(3).map((a, i) => (
+                        <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 4 }}>
+                          <div style={{ fontWeight: 700, color: '#fff' }}>{a.type} {a.targetName || a.tempo || ''}</div>
+                          <div style={{ color: DIM }}>{a.reason}</div>
+                          <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>Применить</button>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Секция 5: Библиотека */}
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>5 · Библиотека SFR+паттернов (максимум на каждое)</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                <label style={{ fontSize: 10, color: DIM }}>SFR≥
+                  <select value={String(state.exerciseFilterSfr)} onChange={e => setState(s => ({ ...s, exerciseFilterSfr: parseInt(e.target.value) }))} style={{ marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }}>
+                    <option value="0">все</option><option value="4">4</option><option value="5">5</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: 10, color: DIM }}>Профиль
+                  <select value={state.exerciseFilterProfile} onChange={e => setState(s => ({ ...s, exerciseFilterProfile: e.target.value }))} style={{ marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }}>
+                    <option value="all">все</option><option value="lengthened">lengthened</option><option value="mid">mid</option><option value="short">short</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={state.exerciseFilterUnilateral} onChange={e => setState(s => ({ ...s, exerciseFilterUnilateral: e.target.checked }))} /> unilateral</label>
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 160, overflowY: 'auto' }}>
+                {exerciseLibraryFiltered.map(c => {
+                  const eff = (() => { try { return calcExerciseEffect(c as any, {}); } catch { return null; } })();
+                  const sc = eff ? exerciseEffectScore(eff) : 50;
+                  const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}12`, border: `1px solid ${col}22`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id }))}>
+                      {c.name} · SFR{eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

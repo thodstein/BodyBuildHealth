@@ -613,6 +613,12 @@ export const BbAutoConstructor: React.FC = () => {
     ...(prof.workMax || {}),
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
+  const [preferredExerciseIds, setPreferredExerciseIds] = useState<string[]>(() => {
+    try { const raw = localStorage.getItem('he_bb_preferred_exercises'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr.slice(0, 8) : []; } catch { return []; }
+  });
+  const [exerciseSwaps, setExerciseSwaps] = useState<Array<{ oldId: string; newId: string }>>(() => {
+    try { const raw = localStorage.getItem('he_bb_exercise_swaps'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
+  });
   // Epic A: персональная калибровка MEV (личный минимум объёма). Хранится в he_bb_mev_calibration.
   const [mevCal, setMevCal] = useState<MEVCalibration | null>(() => loadMEVCalibration());
   const [mevDraft, setMevDraft] = useState<MEVSignal>({ pump: 4, soreness: 2, performance: 4 });
@@ -1331,6 +1337,29 @@ export const BbAutoConstructor: React.FC = () => {
           setBridgeMsg(`🔗 Слабые группы → ББ-авто: ${normalized.join(', ')}`);
           setTimeout(() => setBridgeMsg(''), 4000);
         }
+        const pref = (payload.data as any).preferredExerciseIds as string[] | undefined;
+        if (Array.isArray(pref) && pref.length) {
+          const clean = pref.map(s => String(s).toLowerCase().trim()).filter(Boolean).slice(0, 8);
+          setPreferredExerciseIds(clean);
+          try { localStorage.setItem('he_bb_preferred_exercises', JSON.stringify(clean)); } catch {}
+          setBridgeMsg((prev: string) => prev ? `${prev} · упр: ${clean.join(', ')}` : `🔗 Упражнения → ББ-авто: ${clean.join(', ')}`);
+          setTimeout(() => setBridgeMsg(''), 5000);
+        }
+        const swap = (payload.data as any).exerciseSwap as { oldId: string; newId: string } | undefined;
+        if (swap && swap.oldId && swap.newId) {
+          const entry = { oldId: String(swap.oldId).toLowerCase(), newId: String(swap.newId).toLowerCase() };
+          setExerciseSwaps(prev => {
+            const next = [...prev.filter(p => p.oldId !== entry.oldId), entry].slice(-8);
+            try { localStorage.setItem('he_bb_exercise_swaps', JSON.stringify(next)); } catch {}
+            return next;
+          });
+          setBridgeMsg((prev: string) => prev ? `${prev} · замена ${entry.oldId}→${entry.newId}` : `🔗 Замена → ББ-авто: ${entry.oldId}→${entry.newId}`);
+          setTimeout(() => setBridgeMsg(''), 5000);
+        }
+        const labDiag = (payload.data as any).labDiagnosis;
+        if (labDiag) {
+          try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
+        }
       } else if (payload.kind === 'pm' && payload.data) {
         const d: any = payload.data;
         const patch: Record<string, number> = {};
@@ -1911,6 +1940,60 @@ export const BbAutoConstructor: React.FC = () => {
     // Проф-методики: DUP поверх плана (все ветки). Суперсеты и схемы объёма для всех веток теперь обрабатываются внутри движка (finalize) через BBBuilderInput/CycleToPlanInput — единый путь.
     if (dupMode !== 'none') {
       plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
+    }
+    // Лаборатория ББ-диагностики: замены упражнений + предпочитаемые (PROF) — применяются поверх плана до finalize-валидации
+    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0) {
+      const swaps = exerciseSwaps.slice();
+      // preferred как swap если упражнения нет в плане — добавим в первую неделю
+      for (const pid of preferredExerciseIds) {
+        const low = String(pid).toLowerCase();
+        const already = (plan.weeks || []).some((w: any) => (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => String(e.exerciseName || e.id || '').toLowerCase() === low)));
+        if (!already) {
+          const cat = getExerciseById(pid) || EXERCISE_CATALOG.find(c => c.id.toLowerCase() === low);
+          if (cat) {
+            const targetMuscle = (cat.group || 'chest').toLowerCase();
+            // найдём сессию где эта мышца primary — иначе первая
+            let targetSession: any = null;
+            for (const w of (plan.weeks || [])) {
+              for (const s of (w.sessions || [])) {
+                const has = (s.exercises || []).some((e: any) => String(e.muscle || '').toLowerCase() === targetMuscle);
+                if (has) { targetSession = s; break; }
+              }
+              if (targetSession) break;
+            }
+            if (!targetSession) targetSession = (plan.weeks?.[0] as any)?.sessions?.[0];
+            if (targetSession && Array.isArray(targetSession.exercises)) {
+              // заменим последний accessory чтобы не ломать объём, или добавим если ≤ лимита
+              const canAdd = targetSession.exercises.length < 10;
+              if (canAdd) {
+                targetSession.exercises.push({ muscle: targetMuscle, name: cat.name, exerciseName: cat.id, role: 'accessory' as const, sets: 3, repsRange: [10, 12] as any, rir: 2, tempo: '3-1-1-0', comment: `🧬 Лаб: предпочтено ${cat.name} (SFR)` } as any);
+              } else {
+                const idx = targetSession.exercises.length - 1;
+                if (idx >= 1) targetSession.exercises[idx] = { muscle: targetMuscle, name: cat.name, exerciseName: cat.id, role: 'accessory' as const, sets: 3, repsRange: [10, 12] as any, rir: 2, tempo: '3-1-1-0', comment: `🧬 Лаб: замена на ${cat.name}` } as any;
+              }
+            }
+          }
+        }
+      }
+      for (const sw of swaps) {
+        const oldLow = String(sw.oldId).toLowerCase();
+        const newLow = String(sw.newId).toLowerCase();
+        const newCat = getExerciseById(sw.newId) || EXERCISE_CATALOG.find(c => c.id.toLowerCase() === newLow);
+        if (!newCat) continue;
+        for (const w of (plan.weeks || [])) {
+          for (const s of (w.sessions || [])) {
+            for (let ei = 0; ei < (s.exercises || []).length; ei++) {
+              const ex: any = s.exercises[ei];
+              const cur = String(ex.exerciseName || ex.id || '').toLowerCase();
+              if (cur === oldLow) {
+                const keeps = { muscle: ex.muscle || newCat.group, sets: ex.sets, repsRange: ex.repsRange, rir: ex.rir, tempo: newCat.stretchPhase ? '3-1-1-0' : ex.tempo, comment: `🧬 Лаб: ${ex.name || oldLow} → ${newCat.name} (коррекция)` } as any;
+                s.exercises[ei] = { ...ex, name: newCat.name, exerciseName: newCat.id, ...keeps };
+              }
+            }
+          }
+        }
+      }
+      plan.rationale = [...(plan.rationale || []), `🧬 Лаб ББ: применены ${preferredExerciseIds.length ? `предпочтения ${preferredExerciseIds.join(', ')}` : ''}${preferredExerciseIds.length && exerciseSwaps.length ? ' · ' : ''}${exerciseSwaps.length ? `замены ${exerciseSwaps.map(s => `${s.oldId}→${s.newId}`).join(', ')}` : ''}`];
     }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 
