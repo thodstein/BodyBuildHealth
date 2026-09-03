@@ -140,6 +140,39 @@ describe('bb-quality-weekly: свойства', () => {
     }
   });
 
+  it('PPL: нет session_cap в пределах лифта финализатора (42/46)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2, workMax: baseWM } as any);
+    for (const w of plan.weeks) {
+      const s = scoreVolumeWeek(plan as any, w.week);
+      const over42 = (w as any).sessions.some((sess: any) =>
+        (sess.exercises || []).filter((e: any) => !e.warmupActivator && !e.optional)
+          .reduce((a: number, e: any) => a + (Number(e.sets) || 0), 0) > 42);
+      if (!over42) {
+        expect(s.issues.find(i => i.code === 'session_cap')).toBeUndefined();
+      }
+    }
+  });
+
+  it('taper после делода: нет taper_volume_increased (возврат к работе — по дизайну)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 8, workMax: baseWM } as any);
+    const taperAfterDeload = plan.weeks.filter((w: any, idx: number) => {
+      const prev = plan.weeks[idx - 1] as any;
+      return (w as any).taper && prev && (prev.deload || String(prev.phase || '').toLowerCase() === 'deload');
+    });
+    expect(taperAfterDeload.length).toBeGreaterThan(0);
+    for (const w of taperAfterDeload) {
+      const s = scoreVolumeWeek(plan as any, (w as any).week);
+      expect(s.issues.find(i => i.code === 'taper_volume_increased')).toBeUndefined();
+    }
+  });
+
+  it('частота пучков: задняя дельта считается по прямым сетам модели объёма (не по ключам)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2, workMax: baseWM } as any);
+    const s = scoreVolumeWeek(plan as any, 1);
+    // Та же работа в Pull-сессиях тегируется то delt_rear, то shoulders — частота обязана быть 2×.
+    expect(s.issues.find(i => i.code === 'low_frequency' && i.muscle === 'delt_rear')).toBeUndefined();
+  });
+
   it('PRO: строка паттернов arms покрывает руки (детали карточки)', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2, workMax: baseWM } as any);
     const pro = scoreProWeek(plan as any, 1);

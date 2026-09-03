@@ -257,10 +257,19 @@ function isGraded(m: string, sets: { excluded: Set<string>; graded: Set<string> 
   return sets.graded.has(m) || sets.graded.has(canonicalMuscle(m));
 }
 
-/** Сколько сессий недели содержат мышцу (точное совпадение ключа или каноническое). */
+/** Сколько сессий недели дают мышце ПРЯМЫЕ сеты — той же моделью, что и объём
+ *  (aggregateBBVolume: 'shoulders' по имени reklассифицируется в пучки delt_*).
+ *  Сырые ключи тегов врут: одна и та же работа в разных сессиях тегируется то
+ *  'delt_rear', то 'shoulders' — подсчёт по ключам давал ложную частоту 1×.
+ *  Плюс фолбэк: пучку засчитывается неклассифицированный остаток 'shoulders'. */
 function sessionsWithMuscle(week: any, muscle: string): number {
   let n = 0;
   for (const s of week?.sessions || []) {
+    try {
+      const agg = aggregateBBVolume([s]);
+      if ((agg[muscle]?.directSets || 0) > 0) { n++; continue; }
+      if ((muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') && (agg['shoulders']?.directSets || 0) > 0) { n++; continue; }
+    } catch { /* нет данных — сессия не считается */ }
     const keys = new Set<string>((s.exercises || []).map((e: any) => String(e.muscle || '')));
     if (keys.has(muscle)) { n++; continue; }
     const cm = canonicalMuscle(muscle);
@@ -269,6 +278,13 @@ function sessionsWithMuscle(week: any, muscle: string): number {
     }
   }
   return n;
+}
+
+/** PPL-лифт лимита сессии — паритет с финализатором (bb-finalize: тяжёлый Pull
+ *  41 сет задуман, кап 42/46). Без лифта карточка штрафовала то, что
+ *  конструктор построил осознанно. isPPL — тот же предикат (id содержит 'ppl'). */
+function isPPLPlan(plan: PlanLike): boolean {
+  return String((plan as any).pattern?.id || '').toLowerCase().includes('ppl');
 }
 
 const SHOULDER_HEADS = ['delt_front', 'delt_mid', 'delt_rear', 'shoulders'];
@@ -493,7 +509,8 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
     penalize('warning', 3, { code: 'muscle_balance', message: b, source: 'баланс недели (факт)' });
   }
 
-  // Лимиты сессии — централизованные (уровень/стаж/курс/режим уже внутри).
+  // Лимиты сессии — централизованные (уровень/стаж/курс/режим уже внутри)
+  // + PPL-лифт финализатора (паритет: тяжёлый Pull задуман на 41 сет).
   try {
     const limits = sessionLimitsFor({
       level, trainingYears: snap.trainingYears,
@@ -502,24 +519,27 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
       calorieSurplus: snap.calorieSurplus, proteinPerKg: snap.proteinPerKg,
       labMrvMultiplier: snap.labMrvMultiplier, trainingVolumeMode: snap.trainingVolumeMode,
     });
+    const ppl = isPPLPlan(plan);
+    const maxSets = ppl ? Math.max(limits.maxWorkingSets, level === 'enhanced' ? 46 : 42) : limits.maxWorkingSets;
     let capped = 0;
     (week.sessions || []).forEach((s: any, idx: number) => {
       if (capped >= 2) return;
       const working = (s.exercises || []).filter((e: any) => !e.warmupActivator && !e.optional);
       const sets = working.reduce((a: number, e: any) => a + (Number(e.sets) || 0), 0);
-      if (working.length > limits.maxExercises || sets > limits.maxWorkingSets) {
+      if (working.length > limits.maxExercises || sets > maxSets) {
         capped++;
         penalize('warning', 3, {
           code: 'session_cap',
-          message: `Сессия ${idx + 1}: ${working.length} упр / ${sets} сетов при лимите ${limits.maxExercises}/${limits.maxWorkingSets}`,
-          source: `лимит сессии (уровень/стаж/режим)`,
+          message: `Сессия ${idx + 1}: ${working.length} упр / ${sets} сетов при лимите ${limits.maxExercises}/${maxSets}`,
+          source: `лимит сессии${ppl ? ' PPL (финализатор)' : ' (уровень/стаж/режим)'}`,
         });
       }
     });
   } catch { /* нет данных — нет штрафа */ }
 
-  // Делод/taper-правила (паритет с bb-validator).
+  // Делод/taper-правила (паритет с bb-validator + факт предыдущей недели).
   const prev = weekByNo(plan, week.week - 1);
+  const prevDeload = prev ? isDeloadWeek(prev) : false;
   if (deload && prev) {
     const tot = weekTotalSets(week);
     const prevTot = weekTotalSets(prev);
@@ -531,7 +551,9 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
       penalize('warning', 3, { code: 'deload_rir_too_low', message: `Делод: минимальный RIR ${minRir} < 3`, source: 'делод (факт)', fact: minRir, expected: 3 });
     }
   }
-  if (taper && prev) {
+  // Taper после делода: рост объёма vs разгрузочной недели — возврат к работе
+  // по дизайну, а не нарушение (сравнивать не с чем — предыдущая неделя делод).
+  if (taper && prev && !prevDeload) {
     const tot = weekTotalSets(week);
     const prevTot = weekTotalSets(prev);
     if (tot > prevTot) {
