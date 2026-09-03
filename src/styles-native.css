@@ -1482,6 +1482,65 @@ html.app-native .nav-btn:focus-visible {
   html.app-native .ck-card {
     animation: none;
   }
+  html.app-native .tab-slide-left,
+  html.app-native .tab-slide-right {
+    animation: none;
+  }
+}
+
+/* ─── 27. NATIVE SWIPE — анимация перехода между вкладками ───── */
+@keyframes nativeSlideLeft {
+  from {
+    opacity: 0.35;
+    transform: translateX(56px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nativeSlideRight {
+  from {
+    opacity: 0.35;
+    transform: translateX(-56px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+html.app-native .tab-slide-left {
+  animation: nativeSlideLeft 0.34s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .tab-slide-right {
+  animation: nativeSlideRight 0.34s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* ─── 28. NATIVE SKELETON — скелетоны загрузки ───────────────── */
+@keyframes nativeSkeletonShimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+html.app-native .native-skeleton {
+  border-radius: 16px;
+  background: linear-gradient(100deg, rgba(21, 38, 66, 0.6) 40%, rgba(52, 78, 120, 0.6) 50%, rgba(21, 38, 66, 0.6) 60%);
+  background-size: 200% 100%;
+  animation: nativeSkeletonShimmer 1.4s ease infinite;
+  min-height: 64px;
+}
+
+html.app-native .native-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* ─── 21. NATIVE HUBS DEEP — шапки и корни разделов ──────────── */

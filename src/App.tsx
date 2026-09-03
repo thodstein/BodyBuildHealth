@@ -18,6 +18,7 @@ import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
 import { setupNativeBackButton, haptics, isBiometricAvailable, authenticateWithBiometrics } from './core/native-bridge';
+import { useSwipeTabs } from './ui/native/useSwipeTabs';
 
 /** Экран блокировки входа. Рендерится ТОЛЬКО в APK при включённом блоке. */
 function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
@@ -193,6 +194,28 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
+  // Свайпы между вкладками — ТОЛЬКО APK (порядок PRIMARY_NAV, с анимацией).
+  // В Telegram ветка не монтируется вообще.
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
+  useEffect(() => {
+    if (!slideDir) return;
+    const t = window.setTimeout(() => setSlideDir(null), 380);
+    return () => window.clearTimeout(t);
+  }, [slideDir, tab, screenKey]);
+  const swipeTo = (dir: 'left' | 'right') => {
+    const ids = PRIMARY_NAV.map(i => i.id);
+    const idx = ids.indexOf(tab);
+    if (idx < 0) return;
+    const next = dir === 'left' ? ids[(idx + 1) % ids.length] : ids[(idx - 1 + ids.length) % ids.length];
+    if (next === tab) return;
+    setSlideDir(dir);
+    go(next);
+  };
+  useSwipeTabs(mainRef, isNativeApp() && !appLocked && initialized, {
+    onSwipeLeft: () => swipeTo('left'),
+    onSwipeRight: () => swipeTo('right'),
+  });
+
   // handleNavigate: каждая цель указывает tab + subTab (конкретный дневник/отчёт).
   // subTab пробрасывается в конкретный экран через props.
   const handleNavigate = useCallback((screen: string) => {
@@ -307,9 +330,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', applyDownload);
   }, []);
 
-  // Swipe removed — only within-tab swiping allowed
-
-  // Swipe removed
+  // Свайпы между вкладками — хук useSwipeTabs выше (только APK).
 
   const renderContent = () => {
     if (!initialized) return (
@@ -340,7 +361,7 @@ export default function App() {
       <DarkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0, pointerEvents:'none', opacity:0.3 }} />
-<div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+<div className={slideDir ? `tab-slide-${slideDir}` : undefined} style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Sync + locale toggles (top-right) */}
           <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 1000, display: 'flex', gap: 6 }}>
             <KvSyncButton />
