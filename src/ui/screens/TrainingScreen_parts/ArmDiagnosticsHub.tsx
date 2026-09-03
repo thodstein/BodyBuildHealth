@@ -941,7 +941,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
             </div>
             {showScoring && scoring && (
               <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-                <b style={{ color: scoreColor(scoring.level) }}>RSS {scoring.score} {scoreLabel(scoring.level)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.slice(0,2).map(f=>f.text).join(' · ')}
+                <b style={{ color: scoreColor(scoring.level) }}>RSS {scoring.score} {scoreLabel(scoring.score)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.slice(0,2).map(f=>f.text).join(' · ')}
               </div>
             )}
             {forceHistory.stats.length>0 && (
