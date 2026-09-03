@@ -4961,7 +4961,7 @@ export const BbAutoConstructor: React.FC = () => {
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
-<CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`Объём ${quality.viewVolume}/100 · PRO ${quality.viewPro}/100 · ${quality.viewTag}`}>
+<CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${builtPlan.pattern?.name || '—'} · ${W.length} нед · ${builtPlan.weeks[0]?.sessions.length || bbDays}×/нед`}>
           <div style={{ display:'grid', gap:8, fontSize:11 }}>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.14)', color:'#a855f7' }}>{builtPlan.pattern?.name || '—'} · {W.length} нед · {builtPlan.weeks[0]?.sessions.length || bbDays}×/нед</span>
@@ -4988,9 +4988,13 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center' }}>
               <button type="button" onClick={() => setQualityWeek('avg')} aria-pressed={quality.mode === 'avg'} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border: quality.mode === 'avg' ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: quality.mode === 'avg' ? 'rgba(168,85,247,0.15)' : 'transparent', color: quality.mode === 'avg' ? '#a855f7' : '#fff', fontWeight: quality.mode === 'avg' ? 800 : 400 }}>Среднее</button>
-              {builtPlan.weeks.map((w:any) => (
-                <button key={w.week} type="button" onClick={() => setQualityWeek(w.week)} aria-pressed={quality.mode === w.week} title={`Нед ${w.week}: ${(w as any).phase || ''}${(w as any).deload ? ' (делод)' : ''}${(w as any).taper ? ' (taper)' : ''}`} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border: quality.mode === w.week ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: quality.mode === w.week ? 'rgba(168,85,247,0.15)' : 'transparent', color: quality.mode === w.week ? '#a855f7' : '#fff', fontWeight: quality.mode === w.week ? 800 : 400 }}>{w.week}</button>
-              ))}
+              {builtPlan.weeks.map((w:any) => {
+                const phColor = (PHASE_COLORS as any)[String((w as any).phase || ((w as any).deload ? 'deload' : 'accumulation'))] || '#fff';
+                const active = quality.mode === w.week;
+                return (
+                <button key={w.week} type="button" onClick={() => setQualityWeek(w.week)} aria-pressed={active} title={`Нед ${w.week}: ${(w as any).phase || ''}${(w as any).deload ? ' (делод)' : ''}${(w as any).taper ? ' (taper)' : ''}`} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border: active ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(168,85,247,0.15)' : 'transparent', color: active ? '#a855f7' : '#fff', fontWeight: active ? 800 : 400, display:'inline-flex', alignItems:'center', gap:5 }}><span style={{ width:6, height:6, borderRadius:'50%', background: phColor, flexShrink:0 }} />{w.week}</button>
+                );
+              })}
             </div>
             <div style={{ display:'flex', gap:3, alignItems:'flex-end', flexWrap:'wrap' }} title="Понедельные скоры: зелёный — объём, голубой — PRO">
               {quality.perWeek.map((p:any) => (
@@ -5008,25 +5012,26 @@ export const BbAutoConstructor: React.FC = () => {
                 return (
                   <div key={m.muscle} style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1.4fr', gap:6, alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', fontSize:10 }}>
                     <span style={{ fontWeight:700, color:'#fff' }}>{m.label || m.muscle}</span>
-                    <span style={{ color:'#fff' }}>{m.effectiveSets} эфф <span style={{ opacity:0.55 }}>({m.directSets} прям · цель {m.targetSets})</span></span>
+                    <span style={{ color:'#fff' }}>{m.effectiveSets} эфф <span style={{ opacity:0.55 }}>({m.directSets} прям{m.targetSets > 0 ? ` · цель ${m.targetSets}` : ''})</span></span>
                     <span style={{ color: stColor, fontWeight:700 }}>{stLabel} <span style={{ opacity:0.7, fontWeight:400 }}>· MEV {m.mev}/MAV {m.mav}/MRV {m.mrv}{m.note ? ` · ${m.note}` : ''}</span></span>
                   </div>
                 );
               })}
             </div>
-            {(quality.selVolume.issues.length > 0 || quality.selPro.totalIssues.length > 0) && (
-              <div style={{ display:'grid', gap:3, fontSize:10 }}>
-                {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').slice(0, 5).map((i:any, idx:number) => (
-                  <div key={'v' + idx} style={{ color:'#fff' }}>{i.severity === 'error' ? '🔴' : '🟡'} {i.message} <span style={{ opacity:0.55 }}>[{i.source}]</span></div>
-                ))}
-                {quality.selPro.totalIssues.slice(0, 3).map((iss:string, idx:number) => (
-                  <div key={'p' + idx} style={{ color:'#fff' }}>🔵 {iss}</div>
-                ))}
-                {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').length === 0 && quality.selPro.totalIssues.length === 0 && (
-                  <div style={{ color:'#22c55e' }}>✅ Неделя в целях плана — отклонений нет</div>
-                )}
-              </div>
-            )}
+            <div style={{ display:'grid', gap:3, fontSize:10 }}>
+              {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').slice(0, 5).map((i:any, idx:number) => (
+                <div key={'v' + idx} style={{ color:'#fff' }}>{i.severity === 'error' ? '🔴' : '🟡'} {i.message} <span style={{ opacity:0.55 }}>[{i.source}]</span></div>
+              ))}
+              {quality.selPro.totalIssues.slice(0, 3).map((iss:string, idx:number) => (
+                <div key={'p' + idx} style={{ color:'#fff' }}>🔵 {iss}</div>
+              ))}
+              {quality.selVolume.issues.filter((i:any) => i.severity === 'info').slice(0, 2).map((i:any, idx:number) => (
+                <div key={'n' + idx} style={{ color:'#fff', opacity:0.55 }}>ℹ️ {i.message} <span style={{ opacity:0.7 }}>[{i.source}]</span></div>
+              ))}
+              {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').length === 0 && quality.selPro.totalIssues.length === 0 && (
+                <div style={{ color:'#22c55e' }}>✅ Неделя в целях плана — отклонений нет</div>
+              )}
+            </div>
           </div>
         </CollapsibleCard>
         <CollapsibleCard title="📊 Общие сведения о нагрузке" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${metrics.totalSets} сетов · тяж ${(metrics.тяжPct*100).toFixed(0)}% · памп ${(metrics.пампPct*100).toFixed(0)}%`}>
