@@ -153,6 +153,15 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
 - **Тесты**: prep LTHR-приоритет / Karvonen-фолбэк / talk-потолок / жара+высота +10 / explanation
   в `cardio-pro-level.test.ts` (42/42).
 
+## Продолжение — раунд 8 (варианты консистентны)
+
+- **Расхождение закрыто**: `cardioPlanVariants` и `explainCardioChoice` в `CardioConstructor`
+  строились без калибровки — варианты и «Почему этот план» показывали возрастные зоны
+  при заданном LTHR. Проброшены `lthr/ftpWatts/talkZone2Hr/tempC/altitudeM` (+ deps);
+  `paramsDirty` теперь ловит и смену калибровки/среды (раньше молчал).
+- **Тесты**: варианты несут LTHR+жару во все три цикла (146-156 вместо 114-133)
+  в `cardio-pro-level.test.ts` (43/43).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.

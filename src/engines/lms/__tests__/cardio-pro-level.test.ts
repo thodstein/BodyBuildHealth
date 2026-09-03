@@ -58,7 +58,7 @@ import {
 import { fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop, extractFitRecords } from '../../cardio-import.engine';
 import {
   buildCardioCycle, applyIndividualizedTaperToCycle, cardioQualityReport, zonesFromTalkTest,
-  buildCardioCycleFromPrep, explainCardioChoice, type CardioPrepPlanLike,
+  buildCardioCycleFromPrep, explainCardioChoice, cardioPlanVariants, type CardioPrepPlanLike,
 } from '../cardio.engine';
 
 // ─── A: field-tests ───
@@ -510,5 +510,15 @@ describe('PRO prep calibration', () => {
     expect(lines.join(' ')).toMatch(/LTHR 170/);
     const lines2 = explainCardioChoice({ goal: 'cut', totalWeeks: 8, age: 30 }, buildCardioCycle({ goal: 'cut', totalWeeks: 8, age: 30 }));
     expect(lines2.join(' ')).toMatch(/Возраст 30/);
+  });
+  it('варианты несут калибровку (lthr+жара) во все три цикла', () => {
+    const vs = cardioPlanVariants({ goal: 'health', totalWeeks: 4, age: 30, lthr: 172, tempC: 30 });
+    expect(vs.map(v => v.id).sort()).toEqual(['base', 'gentle', 'intense']);
+    for (const v of vs) {
+      const z2 = v.cycle.weeks[0].sessions.find(s => s.type === 'zone2')?.targetHr;
+      // lthrZones(172) Z2 = 141-151, жара +5 → 146-156; возрастные были бы 114-133
+      expect(z2?.min).toBe(146);
+      expect(z2?.max).toBe(156);
+    }
   });
 });

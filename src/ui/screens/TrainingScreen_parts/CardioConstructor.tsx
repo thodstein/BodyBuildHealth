@@ -776,9 +776,14 @@ export const CardioConstructor: React.FC = () => {
         restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
         sex,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+        lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
+        ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
+        talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
+        tempC: tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined,
+        altitudeM: altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined,
       });
     } catch { return []; }
-  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
+  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
   const planExplanation = useMemo(() => {
     if (!cycle || step !== 'preview') return [];
@@ -788,8 +793,11 @@ export const CardioConstructor: React.FC = () => {
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
+      lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
+      ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
+      talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
     }, cycle);
-  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
+  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, lthr, ftpWatts, talkHr]);
 
   // Цикл устарел относительно текущих параметров мастера (для предпросмотра).
   const effLevel = variant === 'gentle' ? ('beginner' as CardioLevel) : variant === 'intense' ? ('advanced' as CardioLevel) : level;
@@ -820,8 +828,13 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.sleepHours !== previewFactors.sleepHours) return true;
     if (cfg.stressLevel !== previewFactors.stressLevel) return true;
     if (cfg.hrvMs !== previewFactors.hrvMs) return true;
+    if (!same(cfg.lthr, Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined)) return true;
+    if (!same(cfg.ftpWatts, Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined)) return true;
+    if (!same(cfg.talkZone2Hr, Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined)) return true;
+    if (!same(cfg.tempC, tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined)) return true;
+    if (!same(cfg.altitudeM, altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined)) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
   const resetParams = () => {
     setGoal('cut');
