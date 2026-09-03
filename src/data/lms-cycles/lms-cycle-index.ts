@@ -102,6 +102,8 @@ import { CALGARY_8 } from './calgary-8';
 import { HATCH } from './hatch';
 import { WENDLER_BBB } from './wendler-bbb';
 import { BULGARIAN } from './bulgarian';
+import { LILLIEBRIDGE } from './lilliebridge';
+import { RUSSIAN_SQUAT } from './russian-squat';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -200,6 +202,8 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     HATCH,
     WENDLER_BBB,
     BULGARIAN,
+    LILLIEBRIDGE,
+    RUSSIAN_SQUAT,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
