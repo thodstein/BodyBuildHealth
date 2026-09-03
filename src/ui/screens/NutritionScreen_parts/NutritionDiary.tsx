@@ -602,7 +602,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [diaryData, selectedDate, dayTotals, showToast]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="food-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
         <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 999,
           padding: '10px 24px', borderRadius: 14, background: '#202023', border: '1px solid rgba(255,255,255,0.06)',

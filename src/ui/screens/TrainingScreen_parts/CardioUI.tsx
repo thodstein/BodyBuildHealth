@@ -113,7 +113,7 @@ export const SectionCard: React.FC<{
   hint?: string;
   children: React.ReactNode;
 }> = ({ id, title, right, accent, hint, children }) => (
-  <div className="ck-card" style={accent ? CARD_ACCENT : CARD} id={id}>
+  <div className="ck-card kit-section" style={accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
       <div style={ROW}>
         <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', letterSpacing: 0.1 }}>{title}</span>
@@ -127,7 +127,7 @@ export const SectionCard: React.FC<{
 );
 
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = '#94a3b8', sub }) => (
-  <div className="ck-tile" style={{ flex: '1 1 96px', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+  <div className="ck-tile kit-stat" style={{ flex: '1 1 96px', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
     <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>{label}</span>
     <span style={{ fontSize: 18, fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
     {sub && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)' }}>{sub}</span>}
@@ -168,7 +168,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[] }> = 
 };
 
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string }> = ({ icon, text, desc }) => (
-  <div className="ck-group-head" style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 6, borderLeft: `3px solid ${ACCENT}`, paddingLeft: 10, borderRadius: 4, background: 'linear-gradient(90deg, rgba(0,230,138,0.06), transparent)' }}>
+  <div className="ck-group-head kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 6, borderLeft: `3px solid ${ACCENT}`, paddingLeft: 10, borderRadius: 4, background: 'linear-gradient(90deg, rgba(0,230,138,0.06), transparent)' }}>
     <span style={{ fontSize: 13, fontWeight: 850, color: ACCENT, letterSpacing: 0.1 }}>{icon} {text}</span>
     {desc && <span style={HINT_SM}>{desc}</span>}
   </div>
@@ -371,7 +371,8 @@ export const ChipToggle: React.FC<{
   disabled?: boolean;
 }> = ({ active, onClick, children, ariaLabel, disabled }) => (
   <button
-    className="ck-chip"
+    className="ck-chip kit-chiptoggle"
+    data-active={active}
     style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.4 : 1 }}
     onClick={onClick}
     disabled={disabled}
@@ -391,7 +392,7 @@ export const Badge: React.FC<{ color?: string; bg?: string; border?: string; chi
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 6 }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div style={{ height, borderRadius: height / 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" className="kit-progress" style={{ height, borderRadius: height / 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
       <div style={{ height, borderRadius: height / 2, width: pct + '%', background: color, transition: 'width 0.35s ease', boxShadow: `0 0 8px ${color}55` }} />
     </div>
   );
@@ -409,7 +410,7 @@ export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; 
 );
 
 export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }[]; active: string; onChange: (id: string) => void }> = ({ tabs, active, onChange }) => (
-  <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', scrollbarWidth: 'none' }}>
+  <div className="kit-tabs" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', scrollbarWidth: 'none' }}>
     {tabs.map(t => {
       const isActive = active === t.id;
       return (
@@ -417,6 +418,8 @@ export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }
           key={t.id}
           onClick={() => onChange(t.id)}
           aria-pressed={isActive}
+          className="kit-tab"
+          data-active={isActive}
           style={{
             flex: '1 0 auto', minWidth: 64, padding: '7px 12px', borderRadius: 9, fontSize: 12, fontWeight: isActive ? 800 : 600,
             border: isActive ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent',
@@ -435,7 +438,7 @@ export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }
 export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultOpen?: boolean; icon?: string; badge?: React.ReactNode; children: React.ReactNode }> = ({ id, title, defaultOpen = false, icon, badge, children }) => {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div id={id} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 72 }}>
+    <div id={id} className="kit-accordion" style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 72 }}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
@@ -457,7 +460,7 @@ export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultO
 // ─── v3 — Hero, Segmented, Timeline ───
 
 export const HeroCard: React.FC<{ icon?: string; title: string; subtitle?: string; right?: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, subtitle, right, children }) => (
-  <div style={CARD_HERO}>
+  <div className="kit-hero" style={CARD_HERO}>
     <div style={ROW}>
       {icon && <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</span>}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -477,7 +480,7 @@ export const Segmented: React.FC<{
   columns?: number;
   ariaLabel?: string;
 }> = ({ options, value, onChange, columns, ariaLabel }) => (
-  <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'grid', gridTemplateColumns: columns ? `repeat(${columns},1fr)` : 'repeat(auto-fill, minmax(140px,1fr))', gap: 6 }}>
+  <div role="radiogroup" aria-label={ariaLabel} className="kit-segmented" style={{ display: 'grid', gridTemplateColumns: columns ? `repeat(${columns},1fr)` : 'repeat(auto-fill, minmax(140px,1fr))', gap: 6 }}>
     {options.map(o => {
       const active = value === o.value;
       return (
@@ -486,6 +489,8 @@ export const Segmented: React.FC<{
           role="radio"
           aria-checked={active}
           disabled={o.disabled}
+          className="kit-segmented-opt"
+          data-active={active}
           onClick={() => !o.disabled && onChange(o.value)}
           style={{
             padding: '10px 12px', borderRadius: RADIUS_MD, textAlign: 'left', cursor: o.disabled ? 'not-allowed' : 'pointer',
@@ -510,11 +515,11 @@ export const SegmentedChips: React.FC<{
   onChange: (v: string) => void;
   ariaLabel?: string;
 }> = ({ options, value, onChange, ariaLabel }) => (
-  <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+  <div role="radiogroup" aria-label={ariaLabel} className="kit-chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
     {options.map(o => {
       const active = value === o.value;
       return (
-        <button key={o.value} role="radio" aria-checked={active} onClick={() => onChange(o.value)} style={active ? CHIP_ACTIVE : CHIP}>
+        <button key={o.value} role="radio" aria-checked={active} onClick={() => onChange(o.value)} className="kit-chip" data-active={active} style={active ? CHIP_ACTIVE : CHIP}>
           {o.icon ? o.icon + ' ' : ''}{o.label}
         </button>
       );

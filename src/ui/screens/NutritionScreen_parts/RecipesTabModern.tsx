@@ -125,9 +125,9 @@ export const RecipesTabModern: React.FC = () => {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="recipes-modern" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {/* Hero header */}
-      <div style={{ padding:16, borderRadius:18, background:'linear-gradient(135deg,#0f1e15 0%,#1a2a1f 45%,#18181b 100%)', border:'1px solid rgba(0,230,138,0.14)', boxShadow:'0 4px 24px rgba(0,230,138,0.08)', position:'relative', overflow:'hidden' }}>
+      <div className="modern-hero" style={{ padding:16, borderRadius:18, background:'linear-gradient(135deg,#0f1e15 0%,#1a2a1f 45%,#18181b 100%)', border:'1px solid rgba(0,230,138,0.14)', boxShadow:'0 4px 24px rgba(0,230,138,0.08)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-30, right:-30, width:120, height:120, background:'radial-gradient(circle, rgba(0,230,138,0.12) 0%, transparent 70%)', borderRadius:'50%' }} />
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, position:'relative' }}>
           <div>

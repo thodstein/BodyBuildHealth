@@ -27,6 +27,7 @@ import { ModernHero, ModernPill, ModernSearch, modernCardBg } from './NutritionS
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
+import { isNativeApp } from '../../core/app-platform';
 import { getNutritionV2Data } from '../../core/nutrition-v2-data';
 import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
@@ -1231,6 +1232,42 @@ const FavoritesTab: React.FC = () => {
   </div></div>);
 };
 
+/** NutritionHeroStats — «съедено сегодня» в hero, ТОЛЬКО APK (isNativeApp гейт).
+ *  Telegram его не рендерит вообще. */
+const NutritionHeroStats: React.FC<{
+  kcal: number;
+  protein: number;
+  targetKcal: number;
+  targetProtein: number;
+  dishes: number;
+}> = ({ kcal, protein, targetKcal, targetProtein, dishes }) => {
+  const kcalPct = targetKcal > 0 ? Math.min(100, Math.round((kcal / targetKcal) * 100)) : 0;
+  const pPct = targetProtein > 0 ? Math.min(100, Math.round((protein / targetProtein) * 100)) : 0;
+  const bar = (pct: number) => (
+    <span className="nutrition-hero-bar">
+      <span className="nutrition-hero-bar-fill" style={{ width: `${pct}%` }} />
+    </span>
+  );
+  return (
+    <div className="nutrition-hero-stats" aria-label="Съедено сегодня">
+      <div className="nutrition-hero-stat">
+        <span className="nutrition-hero-stat-v">{Math.round(kcal)} / {targetKcal}</span>
+        <span className="nutrition-hero-stat-l">ккал · {kcalPct}%</span>
+        {bar(kcalPct)}
+      </div>
+      <div className="nutrition-hero-stat">
+        <span className="nutrition-hero-stat-v">{Math.round(protein)} / {targetProtein} г</span>
+        <span className="nutrition-hero-stat-l">белок · {pPct}%</span>
+        {bar(pPct)}
+      </div>
+      <div className="nutrition-hero-stat">
+        <span className="nutrition-hero-stat-v">{dishes}</span>
+        <span className="nutrition-hero-stat-l">блюд сегодня</span>
+      </div>
+    </div>
+  );
+};
+
 export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<ActiveTab>('mealplan');
@@ -1426,19 +1463,32 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   };
 
   if (page === 'hero') {
+    const todayISO = (() => { try { return new Date().toISOString().split('T')[0]; } catch { return ''; } })();
+    const todayEntries = todayISO ? (dailyLogs[todayISO] || []) : [];
+    const todayKcal = todayEntries.reduce((s, e) => s + (e.kcal || 0), 0);
+    const todayProtein = todayEntries.reduce((s, e) => s + (e.p || 0), 0);
     return (
-      <div style={{ position:'fixed', inset:0, display:'flex', flexDirection:'column' }}>
+      <div className="nutrition-hero" style={{ position:'fixed', inset:0, display:'flex', flexDirection:'column' }}>
         <img src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 45%, rgba(0,0,0,0.85))' }} />
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-          <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Питание</h1>
-          <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 14px', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <h1 className="nutrition-hero-title" style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Питание</h1>
+          <p className="nutrition-hero-sub" style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 14px', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
+          {isNativeApp() && (
+            <NutritionHeroStats
+              kcal={todayKcal}
+              protein={todayProtein}
+              targetKcal={macroTargets.kcal}
+              targetProtein={macroTargets.protein}
+              dishes={todayEntries.length}
+            />
+          )}
+          <div className="nutrition-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
               { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
               { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, каталог, рецепты, рестораны, справочник', color: '#f97316' },
             ].map(card => (
-              <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
+              <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} className="nutrition-hero-card" data-section={card.section} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)',
               }}>
@@ -1457,8 +1507,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   }
 
   return (
-    <div className="screen nutrition nutrition-screen" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
-      <div style={{
+    <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
+      <div className="nutrition-tabs-head" style={{
         display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0,
         background:'#18181b',
         borderBottom:'1px solid rgba(255,255,255,0.06)',
@@ -1506,8 +1556,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
-        <div style={{
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
+        <div className="nutrition-chips" style={{
           display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
           padding:'10px 4px 12px',
           scrollbarWidth:'none', msOverflowStyle:'none',
@@ -1516,7 +1566,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
             const isActive = tab === t;
             return (
-              <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
+              <button key={t} onClick={() => setTab(t as ActiveTab)} className="nutrition-chip" data-active={isActive} style={{
                 flexShrink:0, padding:'10px 16px', borderRadius:14, cursor:'pointer',
                 fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
                 border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',

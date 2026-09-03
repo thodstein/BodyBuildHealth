@@ -6,8 +6,8 @@ import { BbAutoConstructor } from './BbAutoConstructor';
 
 export const PlannerBbAuto: React.FC = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
+    <div className="hub-bb" style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      <div className="hub-head" style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
         💪 Бодибилдинг — авто-конструктор
       </div>
       <BbAutoConstructor />

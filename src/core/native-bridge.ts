@@ -356,7 +356,7 @@ export function watchOnline(cb: (online: boolean) => void): () => void {
 
 /** Статус-бар + сплэш для APK. Вне native — no-op. */
 export async function initNativeChrome(
-  bgColor = '#0a1628',
+  bgColor = '#050b16',
   style: 'dark' | 'light' = 'dark',
 ): Promise<void> {
   if (!isCapacitorNative()) return;

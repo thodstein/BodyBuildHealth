@@ -76,7 +76,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const filled = Math.round((completeness / 100) * 12);
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+    <div className="profile-hero" style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
       <img
         src="/profile-hero.png"
         alt="Profile"
@@ -90,7 +90,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             <span style={{ width:5, height:5, borderRadius:5, background:'#34d399', boxShadow:'0 0 8px rgba(52,211,153,0.5)', display:'inline-block' }} /> ПРОФИЛЬ
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, flexWrap:'wrap' }}>
-            <span style={{ fontSize:22, fontWeight:900, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.9)', letterSpacing:'-0.6px', lineHeight:1 }}>{profile.name || 'Профиль'}</span>
+            <span className="profile-hero-name" style={{ fontSize:22, fontWeight:900, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.9)', letterSpacing:'-0.6px', lineHeight:1 }}>{profile.name || 'Профиль'}</span>
             {sexIcon && <span style={{ fontSize:16, color:'#34d399' }}>{sexIcon}</span>}
             {phaseBadge && (
               <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, background:phaseBadge.color+'cc', color:'#0a0a0a' }}>{phaseBadge.label}</span>
@@ -109,7 +109,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               {parts.join(' · ')}{parts.length > 0 && goalLabel ? ' · ' : ''}{goalLabel}
             </div>
           )}
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+          <div className="profile-hero-progress" style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
             <div
               role="progressbar"
               aria-valuenow={completeness}
@@ -129,13 +129,15 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
           )}
         </div>
 
-        <div role="navigation" aria-label="Разделы профиля" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        <div role="navigation" aria-label="Разделы профиля" className="profile-hero-nav" style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {TABS.map(t => (
             <div
               key={t.id}
               role="button"
               tabIndex={0}
               onClick={() => onSelectTab(t.id)}
+              className="profile-hero-card"
+              data-id={t.id}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectTab(t.id); }}}
               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${t.color}40`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${t.color}18 inset`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}

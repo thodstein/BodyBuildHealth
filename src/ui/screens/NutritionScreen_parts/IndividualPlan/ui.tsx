@@ -12,7 +12,7 @@ export const getDefaultKcal = (profile: UserProfile | null) => {
 };
 
 export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
-  <div style={{
+  <div className="plan-glass" data-color={color || 'none'} style={{
     borderRadius: 20, overflow: 'hidden',
     background: 'linear-gradient(180deg, rgba(26,26,30,0.96) 0%, rgba(18,18,20,0.98) 100%)',
     border: '1px solid rgba(255,255,255,0.07)',
@@ -38,7 +38,7 @@ export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string
 );
 
 export const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
-  <button onClick={onClick} style={{
+  <button onClick={onClick} className="plan-pill" data-active={active || false} style={{
     padding: '8px 16px', borderRadius: 999, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', letterSpacing: '-0.15px', transition: 'all 0.2s cubic-bezier(0.16,1,0.3,1)',
     transform: active ? 'scale(1.02)' : 'scale(1)',
     fontWeight: active ? 800 : 600,

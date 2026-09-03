@@ -29,6 +29,28 @@ import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../en
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
 import { LABS_CARD } from './LabsScreen_parts/LabsUI';
+import { isNativeApp } from '../../core/app-platform';
+
+/** RiskHeroStats — нетто/брутто риск в hero, ТОЛЬКО APK (isNativeApp гейт). */
+const RiskHeroStats: React.FC<{ net: number | null; raw: number | null }> = ({ net, raw }) => {
+  const level = net === null ? 'нет данных' : net < 25 ? 'низкий' : net < 50 ? 'умеренный' : net < 75 ? 'высокий' : 'критический';
+  return (
+    <div className="risk-hero-stats" aria-label="Сводка рисков">
+      <div className="risk-hero-stat">
+        <span className="risk-hero-stat-v">{net === null ? '—' : `${Math.round(net)}%`}</span>
+        <span className="risk-hero-stat-l">нетто · {level}</span>
+      </div>
+      <div className="risk-hero-stat">
+        <span className="risk-hero-stat-v">{raw === null ? '—' : `${Math.round(raw)}%`}</span>
+        <span className="risk-hero-stat-l">брутто</span>
+      </div>
+      <div className="risk-hero-stat">
+        <span className="risk-hero-stat-v">6 / 28</span>
+        <span className="risk-hero-stat-l">систем / механизмов</span>
+      </div>
+    </div>
+  );
+};
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -866,7 +888,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
       {/* ─── HERO PAGE — на весь экран, без стекла, как в БАД/Статьи/Профиль ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', zIndex:100, display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
+        <div className="risk-hero" style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', zIndex:100, display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
           <img src="/risk-hero.png?v=20250827h" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', background:'#07070a', filter:'brightness(1.06) saturate(1.04)' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
@@ -874,21 +896,27 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', color:'#ef4444', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
                 <span style={{ width:5, height:5, borderRadius:5, background:'#ef4444', boxShadow:'0 0 8px rgba(239,68,68,0.6)', display:'inline-block' }} /> РИСКИ
               </div>
-              <h1 style={{ fontSize:22, fontWeight:900, color:'#fff', margin:'8px 0 4px', textShadow:'0 2px 12px rgba(0,0,0,0.9)', letterSpacing:'-0.6px', lineHeight:1 }}>Оценка рисков</h1>
-              <p style={{ fontSize:11, color:'#fff', margin:0, lineHeight:1.4, textShadow:'0 1px 6px rgba(0,0,0,0.8)', maxWidth:480 }}>Механизм-ориентированная модель ТЗ, вероятностные методы, клиника и справочник — всё в одном хабе</p>
+              <h1 className="risk-hero-title" style={{ fontSize:22, fontWeight:900, color:'#fff', margin:'8px 0 4px', textShadow:'0 2px 12px rgba(0,0,0,0.9)', letterSpacing:'-0.6px', lineHeight:1 }}>Оценка рисков</h1>
+              <p className="risk-hero-sub" style={{ fontSize:11, color:'#fff', margin:0, lineHeight:1.4, textShadow:'0 1px 6px rgba(0,0,0,0.8)', maxWidth:480 }}>Механизм-ориентированная модель ТЗ, вероятностные методы, клиника и справочник — всё в одном хабе</p>
+              {isNativeApp() && (
+                <RiskHeroStats
+                  net={riskResult ? riskResult.overallNet : null}
+                  raw={riskResult ? riskResult.overallRaw : null}
+                />
+              )}
               <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
                 <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>6 систем</span>
                 <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>28 механизмов</span>
                 <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(239,68,68,0.16)', color:'#ef4444' }}>ТЗ-модель</span>
               </div>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="risk-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · полуколичественная шкала · верификация анализами.', color: '#8b5cf6' },
                 { id: 'calculations', icon: '🧮', title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника — все модели в одном месте.', color: '#22c55e' },
                 { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
               ].map(card => (
-                <div key={card.id} role="button" tabIndex={0} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'tz_spec' ? 'overview' : 'overview'); }} onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); (e.currentTarget as HTMLDivElement).click(); }}} onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${card.color}30`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 16px rgba(0,0,0,0.22), 0 0 0 1px ${card.color}14 inset`; }} onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 10px rgba(0,0,0,0.16)'; }} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 3px 10px rgba(0,0,0,0.16)', background:'rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}>
+                <div key={card.id} role="button" tabIndex={0} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'tz_spec' ? 'overview' : 'overview'); }} onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); (e.currentTarget as HTMLDivElement).click(); }}} onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${card.color}30`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 16px rgba(0,0,0,0.22), 0 0 0 1px ${card.color}14 inset`; }} onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 10px rgba(0,0,0,0.16)'; }} className="risk-hero-card" data-id={card.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 3px 10px rgba(0,0,0,0.16)', background:'rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}>
                   <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${card.color}22, ${card.color}10)`, border:`1px solid ${card.color}28`, fontSize:18, boxShadow:`0 3px 10px ${card.color}20`, position:'relative' }}>{card.icon}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{card.title}</div>
@@ -905,7 +933,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── TOP NAV BAR — glass, sticky ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
+        <div className="risk-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
           <button onClick={() => setMainTab('hero')} style={{ padding:'7px 12px', cursor:'pointer', fontSize:11, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', borderRadius:999, display:'flex', alignItems:'center', gap:6 }}>← Обзор</button>
           <div style={{ width:1, height:18, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
           <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
@@ -920,7 +948,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── SCROLLABLE CONTENT — увеличен отступ чтобы дашборд не перекрывал ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
+        <div className="risk-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
           <div style={{ padding:'0 12px' }}>
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
@@ -992,7 +1020,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {(mainTab !== 'calculations' || calcPage !== 'hero') && (
             <>
               {/* Sub-tab pills + back button for calculations */}
-              <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
+              <div className="risk-subtabs" style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
                 {mainTab === 'calculations' && (
                   <button onClick={() => {
                     if (basicPage !== 'main') { setBasicPage('main'); return; }
@@ -1024,7 +1052,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             } else {
               setSubTab(t as any);
             }
-          }} style={{
+          }} className="risk-subtab" data-active={subTab === t || basicPage === t || mcPage === t} style={{
             padding: '5px 7px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
             cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t || basicPage === t || mcPage === t ? '2px solid #8b5cf6' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
             color: subTab === t || basicPage === t || mcPage === t ? '#fff' : 'rgba(255,255,255,0.52)',

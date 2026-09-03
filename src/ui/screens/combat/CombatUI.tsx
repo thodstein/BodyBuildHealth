@@ -196,7 +196,7 @@ export const SectionCard: React.FC<{
   hint?: string;
   children: React.ReactNode;
 }> = ({ id, title, subtitle, icon, right, accent, hint, children }) => (
-  <div style={accent ? CARD_ACCENT : CARD} id={id}>
+  <div className="kit-section" style={accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
       <div style={{ ...ROW, marginBottom: 2 }}>
         {icon && (
@@ -219,7 +219,7 @@ export const SectionCard: React.FC<{
 );
 
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
-  <div style={{
+  <div className="kit-stat" style={{
     flex: '1 1 110px', padding: '12px 12px', borderRadius: 12,
     background: 'rgba(58,58,60,0.48)', border: `0.5px solid ${SEPARATOR}`, display: 'flex', flexDirection: 'column', gap: 3,
     fontFamily: SF,
@@ -257,7 +257,7 @@ export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent'; ch
 };
 
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string }> = ({ icon, text, desc }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 0 6px 12px', borderLeft: `2px solid ${ACCENT}`, margin: '4px 0', fontFamily: SF }}>
+  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 0 6px 12px', borderLeft: `2px solid ${ACCENT}`, margin: '4px 0', fontFamily: SF }}>
     <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 13 }}>{icon}</span>{text}
     </span>
@@ -272,7 +272,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   return (
-    <div style={{ display: 'flex', gap: 6, padding: 4, background: 'rgba(58,58,60,0.72)', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }}>
+    <div className="kit-sectionnav" style={{ display: 'flex', gap: 6, padding: 4, background: 'rgba(58,58,60,0.72)', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }}>
       {items.map(n => {
         const active = activeId ? activeId === n.id : false;
         return (
@@ -280,6 +280,8 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
             key={n.id}
             onClick={() => goTo(n.id)}
             aria-pressed={active}
+            className="kit-sectionnav-opt"
+            data-active={active}
             style={{
               padding: '6px 12px', borderRadius: 7, fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer', fontFamily: SF,
               border: 'none',
@@ -300,7 +302,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 4 }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
+    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" className="kit-progress" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
       <div style={{
         height: '100%', borderRadius: height / 2, width: pct + '%',
         background: color,
@@ -341,6 +343,8 @@ export const Stepper: React.FC<{ label?: string; value: number; min?: number; ma
 
 export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; disabled?: boolean; icon?: string }> = ({ active, onClick, children, disabled, icon }) => (
   <button
+    className="kit-chiptoggle"
+    data-active={active}
     style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF }}
     onClick={onClick} disabled={disabled} aria-pressed={active}
   >
@@ -361,7 +365,7 @@ export const Divider: React.FC = () => <div style={{ height: 0.5, background: SE
 
 export const GlassButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'ghost' | 'primary' | 'soft' }> = ({ variant = 'ghost', style, children, ...props }) => {
   const base = variant === 'primary' ? BTN_PRIMARY : variant === 'soft' ? { ...BTN, background: 'rgba(58,58,60,0.72)' } : BTN;
-  return <button style={{ ...base, ...style, fontFamily: SF }} {...props}>{children}</button>;
+  return <button className="kit-glassbtn" data-variant={variant} style={{ ...base, ...style, fontFamily: SF }} {...props}>{children}</button>;
 };
 
 export const CardHeader: React.FC<{ icon: string; title: string; subtitle?: string; right?: React.ReactNode; accent?: boolean }> = ({ icon, title, subtitle, right, accent }) => (

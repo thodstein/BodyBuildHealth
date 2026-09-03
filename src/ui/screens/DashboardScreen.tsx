@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProfileRefresh } from '../../core/profile-manager';
+import { getAppPlatform } from '../../core/app-platform';
+import { DashboardNative } from './DashboardScreen.native';
 import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 
@@ -48,7 +50,11 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     } catch {}
   }, []);
 
+  // APK: PRO-домашний экран. Telegram/web — классический hero ниже без изменений.
+  const isNative = getAppPlatform() === 'native';
+
   return (
+    isNative ? <DashboardNative onNavigate={onNavigate} /> : (
     <div style={{ position:'fixed', inset:0, width:'100%', height:'var(--tg-viewport-height, 100dvh)', minHeight:'var(--tg-viewport-height, 100dvh)', maxHeight:'var(--tg-viewport-height, 100dvh)', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a', isolation:'isolate', contain:'paint' as any }}>
       <img src="/hero-main.png?v=20250827k" alt="" decoding="async" fetchPriority={'high' as any} draggable={false} className="hero-fullscreen-img dashboard-hero-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', background:'#07070a', transform:'translateZ(0)', willChange:'auto', backfaceVisibility:'hidden' as any, pointerEvents:'none' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.04) 78%, rgba(0,0,0,0.14) 100%)', pointerEvents:'none' }} />
@@ -111,5 +117,6 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
     </div>
+    )
   );
 };

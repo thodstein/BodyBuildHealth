@@ -244,7 +244,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     if (section !== 'home') { setSection('home'); resetMain(); return; }
   };
   const backBtnStyle: React.CSSProperties = { padding:'8px 12px', borderRadius:12, fontSize:12, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.75)', fontWeight:700, whiteSpace:'nowrap' as const, minHeight:34, display:'inline-flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(10px)' };
-  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap' as const }}>
+  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div className="support-backnav" style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap' as const }}>
     <button onClick={goBack} style={backBtnStyle}>← Назад</button>
     <button onClick={goHome} style={backBtnStyle}>{homeLabel}</button>
   </div>;
@@ -2216,7 +2216,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       })()}
 
       {/* ===== BOTTOM TAB BAR — компактный, херо на весь экран за ним (не трогать — размер только для херо) ===== */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
+      <div className="support-subbar" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
         {[
           { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
           { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },

@@ -138,7 +138,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     <>
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
           {plRuntime && plRuntime.days.length > 0 && (

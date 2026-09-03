@@ -91,7 +91,7 @@ export const sysPillStyle = (active: boolean, color: string): React.CSSPropertie
 // ── Мини-компоненты ──
 
 export const LabsSectionHeader: React.FC<{ icon: string; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+  <div className="labs-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
     <div style={{
       width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: accent + '18', border: `1px solid ${accent}30`, fontSize: 15, flexShrink: 0,
@@ -105,7 +105,7 @@ export const LabsSectionHeader: React.FC<{ icon: string; title: string; subtitle
 );
 
 export const LabsKpiCard: React.FC<{ icon: string; label: string; value: string | number; sub?: string; color: string; accent?: string }> = ({ icon, label, value, sub, color }) => (
-  <div style={{
+  <div className="labs-kpi" style={{
     background: color + '0F',
     border: `1px solid ${color}22`,
     borderRadius: 14,
@@ -156,7 +156,7 @@ export const LabsBadge: React.FC<{ color: string; bg?: string; children: React.R
 );
 
 export const LabsEmpty: React.FC<{ icon: string; title: string; desc: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
-  <div style={{ ...LABS_CARD_FLAT, textAlign: 'center', padding: 22 }}>
+  <div className="labs-empty" style={{ ...LABS_CARD_FLAT, textAlign: 'center', padding: 22 }}>
     <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
     <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: action ? 10 : 0 }}>{desc}</div>

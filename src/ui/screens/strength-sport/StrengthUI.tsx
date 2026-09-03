@@ -163,7 +163,7 @@ export const SectionCard: React.FC<{
   hint?: string;
   children: React.ReactNode;
 }> = ({ id, title, subtitle, icon, right, accent, strong, hint, children }) => (
-  <div style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
+  <div className="kit-section" style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
       <div style={{ ...ROW, marginBottom: 2 }}>
         {icon && (
@@ -185,7 +185,7 @@ export const SectionCard: React.FC<{
   </div>
 );
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
-  <div style={{
+  <div className="kit-stat" style={{
     flex: '1 1 110px', padding: '12px 12px', borderRadius: 12,
     background: 'rgba(58,58,60,0.48)', border: `0.5px solid ${SEPARATOR}`, display: 'flex', flexDirection: 'column', gap: 3,
     fontFamily: SF,
@@ -221,7 +221,7 @@ export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent' | '
   );
 };
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string; strong?: boolean }> = ({ icon, text, desc, strong }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 0 6px 12px', borderLeft: `2px solid ${strong ? ACCENT_STRONG : ACCENT}`, margin: '4px 0', fontFamily: SF }}>
+  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 0 6px 12px', borderLeft: `2px solid ${strong ? ACCENT_STRONG : ACCENT}`, margin: '4px 0', fontFamily: SF }}>
     <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 13 }}>{icon}</span>{text}
     </span>
@@ -231,13 +231,15 @@ export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string;
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 4 }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
+    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" className="kit-progress" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
       <div style={{ height: '100%', borderRadius: height / 2, width: pct + '%', background: color, transition: 'width 0.40s cubic-bezier(0.2,0,0,1)' }} />
     </div>
   );
 };
 export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; disabled?: boolean; icon?: string }> = ({ active, onClick, children, disabled, icon }) => (
   <button
+    className="kit-chiptoggle"
+    data-active={active}
     style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF }}
     onClick={onClick} disabled={disabled} aria-pressed={active}
   >

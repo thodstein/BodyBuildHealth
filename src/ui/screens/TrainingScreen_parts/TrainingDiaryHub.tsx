@@ -470,8 +470,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
   return (
     <DiaryHubContext.Provider value={hub}>
-    <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ background:'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(168,85,247,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+    <div key={mode} className="diary-mode-pop hub-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="hub-head" style={{ background:'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(168,85,247,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.18)', border:'1px solid rgba(168,85,247,0.30)', fontSize:16 }}>📓</span>
           <div>

@@ -17,7 +17,7 @@ import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
-import { setupNativeBackButton } from './core/native-bridge';
+import { setupNativeBackButton, haptics } from './core/native-bridge';
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
@@ -109,6 +109,14 @@ export default function App() {
   }, [tab]);
 
   const go = (t: Tab, st: string | null = null) => {
+    // Тактильный отклик — ТОЛЬКО APK. В Telegram ветка не выполняется вообще.
+    if (isNativeApp() && tab !== t) {
+      try {
+        void haptics('light');
+      } catch {
+        /* ignore */
+      }
+    }
     if (tab === t) {
       setScreenKey(k => k + 1);
     } else {

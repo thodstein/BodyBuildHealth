@@ -61,10 +61,55 @@ import {
 } from './TrainingScreen_parts/shared';
 import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type PlannerMode, type TrainingZone } from './TrainingScreen_parts/nav';
 import { hapticImpact } from '../../core/telegram';
+import { isNativeApp } from '../../core/app-platform';
+import {
+  getWorkoutStats,
+  getLastSession,
+  getSessionsByWeek,
+  getISOWeekNumber,
+} from '../../engines/workout-logger.engine';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
+
+/** TrainingHeroStats — полоска статистики hero, ТОЛЬКО APK (isNativeApp гейт в hero).
+ *  Telegram её не рендерит вообще. Все источники в try/catch. */
+const TrainingHeroStats: React.FC = () => {
+  let week = 0;
+  let streak = 0;
+  let total = 0;
+  let last: { date: string; focus: string } | null = null;
+  try {
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+    week = getSessionsByWeek(getISOWeekNumber(iso)).length;
+    const stats = getWorkoutStats();
+    streak = stats.streak || 0;
+    total = stats.totalSessions || 0;
+    const l = getLastSession();
+    if (l) last = { date: l.date, focus: l.focus };
+  } catch {
+    /* пустой дневник — показываем нули */
+  }
+  const lastLabel = last ? `${last.focus || 'Тренировка'}` : '—';
+  return (
+    <div className="training-hero-stats" aria-label="Статистика тренировок">
+      <div className="training-hero-stat">
+        <span className="training-hero-stat-v">{week}</span>
+        <span className="training-hero-stat-l">на неделе</span>
+      </div>
+      <div className="training-hero-stat">
+        <span className="training-hero-stat-v">{streak > 0 ? `🔥${streak}` : streak}</span>
+        <span className="training-hero-stat-l">стрик, дн</span>
+      </div>
+      <div className="training-hero-stat training-hero-stat--wide">
+        <span className="training-hero-stat-v">{total}</span>
+        <span className="training-hero-stat-l">всего · {lastLabel}</span>
+      </div>
+    </div>
+  );
+};
 
 export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
@@ -532,19 +577,20 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── HERO PAGE ─── */}
       {page === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+        <div className="training-hero" style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <img src="/training-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)' }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
-            <p style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+            <h1 className="training-hero-title" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
+            <p className="training-hero-sub" style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {isNativeApp() && <TrainingHeroStats />}
+            <div className="training-hero-zones" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
                 return (
-                <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} style={{
+                <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} className="training-hero-zone" data-zone={z} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff',
                   transition: 'all 0.2s',
@@ -570,7 +616,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора — современно, стеклянные карточки ─── */}
       {page === 'planning' && (
-        <div style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'radial-gradient(1100px 520px at 15% -10%, rgba(0,230,138,0.14), transparent 60%), radial-gradient(900px 460px at 92% 4%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(700px 380px at 60% 100%, rgba(236,72,153,0.08), transparent 60%), #0a0a0a', overflow:'auto' }}>
+        <div className="training-planning" style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'radial-gradient(1100px 520px at 15% -10%, rgba(0,230,138,0.14), transparent 60%), radial-gradient(900px 460px at 92% 4%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(700px 380px at 60% 100%, rgba(236,72,153,0.08), transparent 60%), #0a0a0a', overflow:'auto' }}>
           <div style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'8px 10px', background:'rgba(10,10,12,0.75)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:8 }}>
             <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'5px 10px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff' }}>← На главную</button>
             <div style={{ flex:1, minWidth:0 }}>
@@ -630,7 +676,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── CONSTRUCTOR WINDOW — уровень 3: сам конструктор (новое окно, 100% контента) ─── */}
       {page === 'constructor' && (
-        <div style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
+        <div className="training-constructor" style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
           <div style={{ flexShrink:0, padding:'6px 8px', background:'rgba(0,230,138,0.08)', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:6 }}>
             <button onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
             <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6 }}>
@@ -654,7 +700,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── TAB VIEW HEADER — ультракомпактный ─── */}
       {page === 'tabs' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 30 }}>
+        <div className="training-tabs-head" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 30 }}>
           <button onClick={() => { setPage('hero'); setZone(null); }} style={{
             padding: '3px 7px', cursor: 'pointer', fontSize: 11,
             color: '#fff', border: 'none', background: 'transparent',
@@ -679,9 +725,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           return (
             <div style={{ marginBottom: 10, display:'flex', flexDirection:'column', gap:8 }}>
               {cats.map(cat => (
-                <div key={cat.label} style={{ background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
+                <div key={cat.label} className="training-subnav-card" style={{ background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom:6, display:'flex', alignItems:'center', gap:6, letterSpacing:0.3, textTransform:'uppercase' as any }}><span style={{ width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11 }}>{cat.icon}</span> {cat.label}</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="training-subnav" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
                       <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
                         padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
@@ -697,7 +743,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           );
         }
         return (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
+          <div className="training-subnav training-subnav-card" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
             {ZONES[zone].tabs.map(k => (
               <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
                 padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,

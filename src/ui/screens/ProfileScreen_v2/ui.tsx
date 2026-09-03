@@ -346,7 +346,7 @@ export const labelStyle: React.CSSProperties = {
 export const GroupHeader: React.FC<{ icon: string; title: string; color?: string; style?: React.CSSProperties }> = ({ icon, title, color, style }) => {
   const c = color || colors.text;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, ...style }}>
+    <div className="profile-grouphead" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, ...style }}>
       <span aria-hidden="true" style={{
         width: 28, height: 28, borderRadius: 8, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -460,6 +460,8 @@ export const BoolChip: React.FC<{
     <button
       type="button"
       onClick={() => onChange(!checked)}
+      className="profile-boolchip"
+      data-active={checked}
       style={{
         padding: '6px 12px',
         borderRadius: 14,
@@ -571,6 +573,7 @@ export const AccordionSection: React.FC<{
   return (
     <div
       id={id}
+      className="profile-accordion"
       style={{
         ...glassCard,
         backdropFilter: 'blur(10px)',

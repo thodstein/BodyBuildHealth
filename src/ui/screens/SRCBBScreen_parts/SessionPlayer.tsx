@@ -824,7 +824,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   };
 
   return (
-    <div>
+    <div className="session-player">
       <style>{timerAnimationStyle}</style>
       {(() => {
         const totalWeeklySets = days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + (e.targetSets?.length || 0), 0), 0);

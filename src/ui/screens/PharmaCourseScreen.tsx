@@ -266,7 +266,7 @@ export const PharmaCourseScreen: React.FC = () => {
   const subsForClass = SUBSTANCES_BY_CLASS[pickerClass] ?? [];
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-course" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .pc-glass { background: rgba(20,20,24,0.62); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 8px 24px rgba(0,0,0,0.28); }

@@ -105,9 +105,9 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   const meta = TAB_META[tab];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: 0 }}>
+    <div className="profile-inner" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: 0 }}>
       {/* Sticky-хедер вкладки — в стиле NutritionScreen */}
-      <div style={{
+      <div className="profile-head" style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
         background: '#18181b',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -130,7 +130,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
       </div>
 
       {/* Содержимое вкладки с прокруткой */}
-      <div style={{
+      <div className="profile-body" style={{
         flex: '1 1 0',
         height: 0,
         minHeight: 0,

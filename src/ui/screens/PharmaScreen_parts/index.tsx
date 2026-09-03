@@ -56,21 +56,21 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     const courseLen = linked.course?.length ?? 0;
     const risk = linked.risk?.overallNet;
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
+      <div className="pharma-hero" style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
         <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
 
         {/* header — без стекла, hero открыт */}
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom))', maxWidth:560, width:'100%', margin:'0 auto' }}>
           <div style={{ marginBottom:14 }}>
-            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>
+            <h1 className="pharma-hero-title" style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>
               Фармакология
             </h1>
-            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 12px rgba(0,0,0,0.85)', maxWidth:360 }}>
+            <p className="pharma-hero-sub" style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 12px rgba(0,0,0,0.85)', maxWidth:360 }}>
               Курс, PK/PD симуляция, каталог веществ и проверка взаимодействий — всё в одном хабе
             </p>
             {/* quick stats — без пилюль, без стекла */}
-            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <div className="pharma-hero-quickstats" style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <span style={{ fontSize:11, opacity:0.9 }}>💊</span>
                 <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>В курсе <b>{courseLen}</b></span>
@@ -88,9 +88,9 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
             </div>
           </div>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div className="pharma-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {cards.map(c => (
-              <button key={c.key} onClick={() => setPage(c.key)} style={{
+              <button key={c.key} onClick={() => setPage(c.key)} className="pharma-hero-card" data-key={c.key} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(18,18,20,0.62)', border:'1px solid rgba(255,255,255,0.12)',
@@ -124,9 +124,9 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   const pageIcon: Record<PharmaPage, string> = { main:'💊', course:'💊', calculators:'🧬', info:'📚', reports:'📊' };
 
   return (
-    <div className="screen pharma" style={{ padding:'12px 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
+    <div className="screen pharma pharma-inner" style={{ padding:'12px 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
       {/* header bar */}
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexShrink:0 }}>
+      <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexShrink:0 }}>
         <button onClick={() => setPage('main')} style={{
           display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
           background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', backdropFilter:'blur(8px)',

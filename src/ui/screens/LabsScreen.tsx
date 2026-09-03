@@ -28,6 +28,29 @@ import { normalizedRatio } from '../../core/labs-mapping';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, downloadCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
+import { isNativeApp } from '../../core/app-platform';
+
+/** LabsHeroStats — сводка hero, ТОЛЬКО APK (isNativeApp гейт). Telegram не рендерит. */
+const LabsHeroStats: React.FC<{
+  markers: number;
+  completionPct: number;
+  alerts: number;
+}> = ({ markers, completionPct, alerts }) => (
+  <div className="labs-hero-stats" aria-label="Сводка анализов">
+    <div className="labs-hero-stat">
+      <span className="labs-hero-stat-v">{markers}</span>
+      <span className="labs-hero-stat-l">маркеров</span>
+    </div>
+    <div className="labs-hero-stat">
+      <span className="labs-hero-stat-v">{completionPct}%</span>
+      <span className="labs-hero-stat-l">панель готова</span>
+    </div>
+    <div className="labs-hero-stat">
+      <span className="labs-hero-stat-v">{alerts}</span>
+      <span className="labs-hero-stat-l">тревог</span>
+    </div>
+  </div>
+);
 import { RiskVerificationList } from './RiskScreen_parts/RiskVerificationList';
 
 const NO_LABS_KEY = 'he_force_no_labs';
@@ -585,22 +608,29 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── HERO PAGE — на весь экран, fixed overlay, glass не перекрывает ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
+        <div className="labs-hero" style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
           <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
           <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
             <div style={{ marginBottom:14 }}>
-            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>Лаборатория</h1>
-            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, maxWidth:360, textShadow:'0 1px 12px rgba(0,0,0,0.85)' }}>
+            <h1 className="labs-hero-title" style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>Лаборатория</h1>
+            <p className="labs-hero-sub" style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, maxWidth:360, textShadow:'0 1px 12px rgba(0,0,0,0.85)' }}>
               Механизм-ориентированная модель ТЗ, тренды и обследования — всё в одном хабе
             </p>
             </div>
-<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {isNativeApp() && (
+              <LabsHeroStats
+                markers={uniqMarkers.length}
+                completionPct={completionPct}
+                alerts={trendAlertList.length}
+              />
+            )}
+<div className="labs-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, каталог, динамика, дневник и графики. Единый ввод по фазе, импорт PDF/фото.', color: LABS_ACCENT },
                 { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'ASI/HMI/CR, риски по системам, механизм-модель ТЗ и верификация.', color: '#f97316' },
               ].map(card => (
-                <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
+                <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} className="labs-hero-card" data-id={card.id} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                   background:'transparent', border:'1px solid rgba(255,255,255,0.14)', backdropFilter:'none', WebkitBackdropFilter:'none', boxShadow:'none', color:'#fff', transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
                 }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}>
@@ -616,7 +646,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </button>
               ))}
               {trendAlertList.length > 0 && (
-                <button onClick={() => { setMainTab('lab'); setSubTab('trends'); }} style={{
+                <button onClick={() => { setMainTab('lab'); setSubTab('trends'); }} className="labs-hero-card labs-hero-alert" style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#fff',
                   transition: 'all 0.2s',
@@ -645,7 +675,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── TOP NAV BAR — glass, sticky ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
+        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
           <button onClick={() => setMainTab('hero')} style={{
             padding:'7px 12px', cursor:'pointer', fontSize:11, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', borderRadius:999, display:'flex', alignItems:'center', gap:6,
           }}>← Назад</button>
@@ -654,15 +684,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── SCROLLABLE CONTENT — увеличен нижний отступ чтобы дашборд не перекрывал ─── */}
       {mainTab !== 'hero' && (
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
+      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
           {/* Sub-tab segmented control */}
-          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
+          <div className="labs-subtabs" style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
             {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
-              <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+              <button key={t.id} onClick={() => setSubTab(t.id)} className="labs-subtab" data-active={subTab === t.id} style={{
                 padding: '5px 7px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
                 cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t.id ? '2px solid #00e68a' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
                 color: subTab === t.id ? '#fff' : 'rgba(255,255,255,0.52)',

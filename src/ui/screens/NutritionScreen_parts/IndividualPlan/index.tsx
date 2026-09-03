@@ -118,8 +118,8 @@ const IndividualPlanInner: React.FC = () => {
   return (
     <>
       {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 84, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
-        <div style={{
+      <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 84, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
+        <div className="plan-tabbar" style={{
           display:'flex', gap:4, padding:4, overflowX:'auto', scrollbarWidth:'none',
           background:'linear-gradient(180deg, rgba(32,32,36,0.92), rgba(18,18,20,0.96))',
           border:'1px solid rgba(255,255,255,0.07)', borderRadius:16,
@@ -130,7 +130,7 @@ const IndividualPlanInner: React.FC = () => {
           {visibleTabs.map(t => {
             const active = activeTab === t.key;
             return (
-              <button key={t.key} onClick={() => setTab(t.key)} style={{
+              <button key={t.key} onClick={() => setTab(t.key)} className="plan-tab" data-active={active} style={{
                 flexShrink:0, padding:'9px 14px', borderRadius:12, cursor:'pointer', minHeight: 38,
                 fontSize: 12, fontWeight: active ? 800 : 600, letterSpacing:'-0.2px',
                 border: active ? '1px solid rgba(0,230,138,0.38)' : '1px solid transparent',
