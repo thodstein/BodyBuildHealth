@@ -3,7 +3,7 @@
  * Собирает weak/grip/force/vbt/table/tendon + суставные риски + 12 мёртвых точек (ARM_BIOMECH) + коррекции.
  * Общий score опционален (arm-scoring PRO оверлей), основной путь — механизм-уровни.
  */
-import { diagnoseArmWeakPoint, diagnoseArmWeakDetailed } from './arm-weakpoint.engine';
+import { diagnoseArmWeakDetailed } from './arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from './arm-injury-guard.engine';
 import { estimateForceVector, forceAdvice } from './arm-force-capture.engine';
@@ -74,9 +74,7 @@ export function buildArmDiagnosticsReport(input: {
   hasGripHistory?: boolean;
 }): ArmDiagnosticsReport {
   const detailed = diagnoseArmWeakDetailed({ weakTest: input.weakTest, weakPoints: input.weakPoints, technique: input.technique });
-  const diag = detailed; // для совместимости — detailed расширяет base
-  // также сохраним легкую диагностику для backward compat
-  const legacyDiag = diagnoseArmWeakPoint({ weakTest: input.weakTest, technique: input.technique });
+  const diag = detailed; // detailed расширяет base (weakMuscles/priorities/rationale сохранены)
   const gripWithMeta: any = { ...input.grip };
   if (input.bodyWeightKg != null) gripWithMeta.bodyWeightKg = input.bodyWeightKg;
   if (input.sex) gripWithMeta.sex = input.sex;

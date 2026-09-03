@@ -44,6 +44,8 @@ export interface ArmBiomechInfo {
   joint: string;
   angleRangeDeg: [number, number];
   keyJoint: string;
+  /** Каким углом валидировать в хабе: 'wrist'|'elbow'|'forearm'|'none' (side/back — 'none', угол неприменим). */
+  angleJoint?: 'wrist' | 'elbow' | 'forearm' | 'none';
   weakMuscles: string[];
   biomechanicalReason: string;
   corrections: string[]; // exercise ids from exercise-catalog-arm.ts
@@ -97,9 +99,9 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     joint: 'кисть (radial deviation + пальцы)',
     angleRangeDeg: [15, 40],
     keyJoint: 'разгибатели пальцев/risers (radial deviation)',
-    weakMuscles: ['risers','thumb','ulnar_deviators'],
+    weakMuscles: ['risers','thumb','ulnar_deviators','radial_deviators'],
     biomechanicalReason: 'Высота костяшек (knuckle height) определяет leverage toproll. Падение высоты → соперник уходит выше руки.',
-    corrections: ['riser_lift','finger_containment_band','plate_pinch_hold','wrist_roller'],
+    corrections: ['riser_lift','finger_containment_band','plate_pinch_hold','radial_dev_heavy','ulnar_dev_heavy'],
     loadCues: 'Вертикальная ручка, подъём за счёт пальцев (Devon Larratt), без читинга плечом.',
     intensityPct: 0.65,
     rationale: 'Rising — finger containment + thumb.',
@@ -191,6 +193,7 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     references: ['Brismar 1975 humerus','Holstein-Lewis','GoldenGrip side slowly','Kuznetsov'],
     workingDirection: 'to_thumb',
     elbowDeg: [110,120],
+    angleJoint: 'none',
   },
   side_pin: {
     weakPoint: 'side_pin',
@@ -207,6 +210,7 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     rationale: 'Pin — только ремнём, humerus guard.',
     references: ['PMC spiral fracture 90%','SciDirect humerus','Gripzilla humerus prevention'],
     workingDirection: 'to_thumb',
+    angleJoint: 'none',
     elbowDeg: [120],
   },
   back_start: {
@@ -225,6 +229,7 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     references: ['GoldenGrip back_drag','TAWF back pressure','StrengthLog back_pressure'],
     workingDirection: 'to_middle',
     elbowDeg: [90,110],
+    angleJoint: 'none',
   },
   back_drag: {
     weakPoint: 'back_drag',
@@ -242,6 +247,7 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     references: ['Grokipedia lat/back','StrengthLog shoulder integrity','GoldenGrip anti-rotation'],
     workingDirection: 'to_middle',
     elbowDeg: [110,120],
+    angleJoint: 'none',
   },
   contain_fingers: {
     weakPoint: 'contain_fingers',
@@ -250,15 +256,16 @@ export const ARM_BIOMECH: Record<ArmWeakPoint, ArmBiomechInfo> = {
     joint: 'пальцы (pinch) + большой',
     angleRangeDeg: [0, 30],
     keyJoint: 'пальцы + thumb (grip_pinch)',
-    weakMuscles: ['grip_pinch','thumb','risers'],
-    biomechanicalReason: 'Пальцы открываются → теряется hand control. Thumb containment ключ для high hand vs low hand (Levan vs Denis).',
-    corrections: ['hub_pinch','plate_pinch_hold','finger_containment_band','coc_gripper','saxon_bar'],
-    loadCues: 'Резина вокруг пальцев — не распахивать. Pinch удержание 10-20с.',
+    weakMuscles: ['grip_pinch','thumb','risers','grip_support'],
+    biomechanicalReason: 'Пальцы открываются → теряется hand control. Thumb containment ключ для high hand vs low hand (Levan vs Denis). Support-провал (RT<60) — та же точка: не хватает удержания.',
+    corrections: ['hub_pinch','plate_pinch_hold','rolling_thunder','apollon_axle','finger_containment_band','coc_gripper'],
+    loadCues: 'Резина вокруг пальцев — не распахивать. Pinch удержание 10-20с. Support: RT/Axle DOH без лямок.',
     intensityPct: 0.60,
-    rationale: 'Containment — risers+thumb+palm.',
-    references: ['Mithril finger containment','ImproveYourGrip finger','Grokipedia thumb'],
+    rationale: 'Containment — risers+thumb+palm+support.',
+    references: ['Mithril finger containment','ImproveYourGrip finger','Grokipedia thumb','IronMind RT 130.5'],
     workingDirection: 'to_thumb',
     elbowDeg: [90,110],
+    angleJoint: 'none',
   },
 };
 
@@ -284,6 +291,26 @@ export function isValidAngleForArmWeakPoint(wp: ArmWeakPoint, angleDeg: number):
   return angleDeg >= lo && angleDeg <= hi;
 }
 
+/** Каким слайдером валидировать точку. Side/back/contain — 'none' (угол неприменим, контроль по технике/нагрузке). */
+export function angleJointForWeakPoint(wp: ArmWeakPoint): 'wrist' | 'elbow' | 'forearm' | 'none' {
+  const b = ARM_BIOMECH[wp];
+  if (b?.angleJoint) return b.angleJoint;
+  if (wp === 'side_mid' || wp === 'side_pin' || wp === 'back_start' || wp === 'back_drag' || wp === 'contain_fingers') return 'none';
+  if (wp === 'sup_drag') return 'elbow';
+  if (wp === 'cup_start' || wp === 'cup_hold' || wp === 'rising_top') return 'wrist';
+  return 'forearm';
+}
+
+/** VBT-пороги для арм-точки (план §6.3 решён): мелкие сухожильные группы — чувствительнее, чем TA 10%/carry 15%.
+ *  cup/rising 12/20, pron/sup 15/25, side 10/20, back 15/25, contain(grip) 15/25. Не меняет arm-vbt-capture.engine (чужой) — только хинт для хаба. */
+export function vbtThresholdForWeakPoint(wp: ArmWeakPoint): { warnPct: number; stopPct: number } {
+  if (wp === 'cup_start' || wp === 'cup_hold' || wp === 'rising_top') return { warnPct: 12, stopPct: 20 };
+  if (wp === 'pron_open' || wp === 'pron_lock' || wp === 'sup_cup' || wp === 'sup_drag') return { warnPct: 15, stopPct: 25 };
+  if (wp === 'side_mid' || wp === 'side_pin') return { warnPct: 10, stopPct: 20 };
+  if (wp === 'back_start' || wp === 'back_drag') return { warnPct: 15, stopPct: 25 };
+  return { warnPct: 15, stopPct: 25 };
+}
+
 export interface JointAnglesInput { elbow?: number; wrist?: number; forearm?: number; shoulder?: number; }
 
 export function autoValidateArmAngles(angles: JointAnglesInput, weakPoints?: ArmWeakPoint[]): Array<{ weakPoint: ArmWeakPoint; angle: number; valid: boolean; recommendation: string }> {
@@ -292,6 +319,7 @@ export function autoValidateArmAngles(angles: JointAnglesInput, weakPoints?: Arm
   for (const wp of wps) {
     const bio = ARM_BIOMECH[wp];
     if (!bio) continue;
+    if (angleJointForWeakPoint(wp) === 'none') continue;
     const key = bio.keyJoint.toLowerCase();
     let angleVal: number | undefined;
     if (key.includes('лучезапяст') || key.includes('кист') || key.includes('wrist') || key.includes('flexion')) angleVal = angles.wrist;

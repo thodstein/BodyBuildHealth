@@ -21,7 +21,7 @@ import { buildArmAcwr } from '../../../engines/arm/arm-acwr.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
-import { ARM_BIOMECH, type ArmWeakPoint, weakPointsForTechnique, isValidAngleForArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
+import { ARM_BIOMECH, type ArmWeakPoint, weakPointsForTechnique, isValidAngleForArmWeakPoint, angleJointForWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -228,6 +228,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const angleValid = useMemo(() => validateArmAngles(angles), [angles]);
   const recAngles = useMemo(() => recommendAnglesForTechnique(state.technique), [state.technique]);
+  const autoPoint = useMemo(() => {
+    try {
+      return phaseForArmAngle({ elbowDeg: angles.elbowDeg, wristDeg: angles.wristDeg, forearmDeg: angles.forearmDeg, technique: state.technique });
+    } catch { return null; }
+  }, [angles.elbowDeg, angles.wristDeg, angles.forearmDeg, state.technique]);
 
   const vbt = useMemo(() => {
     const w = parseFloat(state.vbtWeight);
@@ -615,6 +620,18 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize:10, color: DIM, marginTop:4 }}>{benchAdviceForLevel(benchRes.level)}</div>
               </div>
             </div>
+            {(state.pinchSec && parseFloat(state.pinchSec) < 10) || (state.rtKg && parseFloat(state.rtKg) < 60) ? (
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginBottom:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>Слабое звено хвата → коррекция (contain_fingers)</div>
+                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
+                  {state.pinchSec && parseFloat(state.pinchSec) < 10 ? `Pinch ${state.pinchSec}с <10с → hub_pinch / plate_pinch_hold 3×15с @60% · ` : ''}
+                  {state.rtKg && parseFloat(state.rtKg) < 60 ? `RT ${state.rtKg}кг <60 → rolling_thunder / apollon_axle DOH 3×5 @60%` : ''}
+                </div>
+                <button onClick={()=>toggleWeakPoint('contain_fingers')} aria-pressed={state.weakPoints.includes('contain_fingers')} style={{ marginTop:6, padding:'5px 10px', borderRadius:999, border:'1px solid', borderColor: state.weakPoints.includes('contain_fingers') ? '#f59e0b' : '#1f3a5f', background: state.weakPoints.includes('contain_fingers') ? 'rgba(245,158,11,0.16)' : '#0a1629', color: state.weakPoints.includes('contain_fingers') ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:600 }}>
+                  {state.weakPoints.includes('contain_fingers') ? '✓ contain_fingers выбрана' : '+ Добавить contain_fingers'}
+                </button>
+              </div>
+            ) : null}
             <div style={{ fontSize:10, color:DIM }}>Нормы IronMind: RT 55 avg /84 accomplished /130.5 WR M /77.2 WR F. Axle Saxon WR 133кг. Side/back нормированы на WAF класс.</div>
           </div>
         )}
@@ -636,6 +653,12 @@ export const ArmDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{angleValid.valid? '✓ В допуске' : angleValid.warnings.join(' · ')}</div>
               <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Рекомендация для {state.technique}: {recAngles.elbowDeg}° {recAngles.direction} (hasVideoSupport: {hasVideoSupport()?'да':'нет — подключи Hands/BlazePose'})</div>
             </div>
+            {autoPoint && !state.weakPoints.includes(autoPoint) && (
+              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginBottom:8 }}>
+                <div style={{ fontSize:10, color:DIM }}>Авто по углам ({angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°): похожа на <b style={{ color:'#f59e0b' }}>{autoPoint}</b> — {ARM_BIOMECH[autoPoint].label}</div>
+                <button onClick={()=>toggleWeakPoint(autoPoint)} style={{ marginTop:6, padding:'5px 10px', borderRadius:999, border:'1px solid #f59e0b', background:'rgba(245,158,11,0.12)', color:'#f59e0b', cursor:'pointer', fontSize:10, fontWeight:600 }}>+ Добавить {autoPoint}</button>
+              </div>
+            )}
             <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео (BlazePose/HANDS) — опционально</div>
               <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки.</div>
@@ -694,17 +717,19 @@ export const ArmDiagnosticsHub: React.FC = () => {
               {state.weakPoints.length>0 && (
                 <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
                   {(diag as any).biomechCards?.map((c:any)=> {
-                    const valid = isValidAngleForArmWeakPoint(c.weakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? parseFloat(state.wristDeg)||10 : c.keyJoint.toLowerCase().includes('локт')? parseFloat(state.elbowDeg)||110 : parseFloat(state.forearmDeg)||90);
+                    const aj = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint);
+                    const curDeg = aj==='wrist' ? (parseFloat(state.wristDeg)||10) : aj==='elbow' ? (parseFloat(state.elbowDeg)||110) : (parseFloat(state.forearmDeg)||90);
+                    const valid = aj==='none' ? null : isValidAngleForArmWeakPoint(c.weakPoint, curDeg);
                     const corr = ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint];
                     return (
-                      <div key={c.weakPoint} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:`1px solid ${valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>
+                      <div key={c.weakPoint} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:`1px solid ${valid===null?'rgba(255,255,255,0.12)':valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                           <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{c.label}</span>
-                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: valid?'rgba(34,197,94,0.14)':'rgba(239,68,68,0.14)', color: valid?'#22c55e':'#ef4444', border:`1px solid ${valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid?'✅':'⚠ вне'}</span>
+                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: valid===null?'rgba(255,255,255,0.06)':valid?'rgba(34,197,94,0.14)':'rgba(239,68,68,0.14)', color: valid===null?DIM:valid?'#22c55e':'#ef4444', border:`1px solid ${valid===null?'rgba(255,255,255,0.12)':valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
                           <span style={{ fontSize:10, color:DIM }}>{c.technique.join('/')} · {c.weakMuscles.join('/')}</span>
                         </div>
                         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{c.reason}</div>
-                        <div style={{ fontSize:10, color:'#5ee', marginTop:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i></div>
+                        <div style={{ fontSize:10, color:'#5ee', marginTop:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).warnPct}/{vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).stopPct}%</div>
                         {corr && <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Сеты {corr.sets}×{corr.repsRange[0]}-{corr.repsRange[1]} RIR{corr.rir}{corr.holdSeconds?` hold ${corr.holdSeconds}с`:''} → день {corr.dayTags[0]} · группа {corr.substitutionGroup}</div>}
                       </div>
                     );
@@ -913,6 +938,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
               <b style={{ color:'#fff' }}>ACWR — факт:</b> ACWR {acwr ? acwr.ratio : '—'} — факт {acwr ? '' : '(нужен дневник sRPE ≥2 сесс.)'} {tendonAcwr ? `· Tendon ACWR ${tendonAcwr.ratio} — факт` : ''}
             </div>
+            {showScoring && scoring && (
+              <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
+                <b style={{ color: scoreColor(scoring.level) }}>RSS {scoring.score} {scoreLabel(scoring.level)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.slice(0,2).map(f=>f.text).join(' · ')}
+              </div>
+            )}
             {forceHistory.stats.length>0 && (
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Fatigue 12-нед (патент WO2026106582A1)</div>
@@ -937,10 +967,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{c.label}</span>
                   <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(245,158,11,0.12)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.18)' }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint}</span>
                   <span style={{ fontSize:10, color:DIM }}>{c.weakMuscles.join('/')}</span>
-                  <span style={{ marginLeft:'auto', fontSize:10, color: isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? angles.wristDeg : c.keyJoint.toLowerCase().includes('локт')? 110 : angles.forearmDeg) ? '#22c55e' : '#ef4444' }}>{isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, c.keyJoint.toLowerCase().includes('лучезапяст')? angles.wristDeg : c.keyJoint.toLowerCase().includes('локт')? 110 : angles.forearmDeg) ? '✅' : '⚠ вне диапазона'}</span>
+                  <span style={{ marginLeft:'auto', fontSize:10, color: (()=>{ const aj2 = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint); if (aj2==='none') return DIM; const d2 = aj2==='wrist' ? angles.wristDeg : aj2==='elbow' ? angles.elbowDeg : angles.forearmDeg; return isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, d2) ? '#22c55e' : '#ef4444'; })() }}>{(()=>{ const aj3 = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint); if (aj3==='none') return '• угол н/п'; const d3 = aj3==='wrist' ? angles.wristDeg : aj3==='elbow' ? angles.elbowDeg : angles.forearmDeg; return isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, d3) ? '✅' : '⚠ вне диапазона'; })()}</span>
                 </div>
                 <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{c.reason}</div>
-                <div style={{ fontSize:11, color:'#5ee', marginBottom:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i></div>
+                <div style={{ fontSize:11, color:'#5ee', marginBottom:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT warn {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).warnPct}%/stop {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).stopPct}%</div>
                 <div style={{ fontSize:10, color:DIM }}>День {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.dayTags[0] || '—'} · {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.sets}×{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.repsRange.join('-')} RIR{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.rir} {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds?`hold ${ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds}с`:''} · {c.technique.join('/')}</div>
               </div>
             ))}

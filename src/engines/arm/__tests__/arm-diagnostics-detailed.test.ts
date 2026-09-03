@@ -46,4 +46,12 @@ describe('arm diagnostics detailed 12 точек', () => {
     } as any);
     expect(r.findings.some(f=> f.text.includes('Side') || f.text.includes('side'))).toBe(true);
   });
+  it('support RT<60 → contain_fingers с support-коррекцией', () => {
+    const r = buildArmDiagnosticsReport({
+      weakTest:{ gripSupportMaxKg: 50 } as any, grip:{} as any, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8,
+    } as any);
+    expect(r.weakMuscles).toContain('grip_support');
+    expect(r.weakPoints).toContain('contain_fingers');
+    expect(r.corrections?.find(c=> c.weakPoint==='contain_fingers')?.exercises).toContain('rolling_thunder');
+  });
 });

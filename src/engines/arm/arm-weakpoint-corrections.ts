@@ -33,7 +33,7 @@ export const ARM_CORRECTIONS: Record<ArmWeakPoint, ArmCorrectionInfo> = {
   },
   rising_top: {
     weakPoint: 'rising_top',
-    exercises: ['riser_lift','finger_containment_band','plate_pinch_hold','wrist_roller'],
+    exercises: ['riser_lift','finger_containment_band','plate_pinch_hold','radial_dev_heavy','ulnar_dev_heavy'],
     intensityPct: 0.65, repsRange: [8,12], sets: 3, rir: 2, holdSeconds: 10, tempo: '2-1-1-0',
     substitutionGroup: 'rising', dayTags: ['TableTech','GripHeavy','FullArm'],
   },
@@ -87,7 +87,7 @@ export const ARM_CORRECTIONS: Record<ArmWeakPoint, ArmCorrectionInfo> = {
   },
   contain_fingers: {
     weakPoint: 'contain_fingers',
-    exercises: ['hub_pinch','plate_pinch_hold','finger_containment_band','coc_gripper','saxon_bar'],
+    exercises: ['hub_pinch','plate_pinch_hold','rolling_thunder','apollon_axle','finger_containment_band','coc_gripper'],
     intensityPct: 0.60, repsRange: [8,12], sets: 3, rir: 2, holdSeconds: 15, tempo: '2-1-1-0',
     substitutionGroup: 'grip_pinch', dayTags: ['GripHeavy','PinchGrip','HubPinch','FullArm'],
   },

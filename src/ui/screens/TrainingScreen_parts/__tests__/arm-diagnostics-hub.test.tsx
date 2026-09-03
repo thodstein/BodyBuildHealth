@@ -76,4 +76,31 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(sidePinBtn.getAttribute('aria-pressed')).toBe('true');
     expect(document.body.textContent.toLowerCase()).toContain('humerus');
   });
+
+  it('side/back угол н/п — честный бейдж вместо ложного ⚠', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    fireEvent.click(screen.getByText(/Side pin/));
+    expect(document.body.textContent).toContain('угол н/п');
+  });
+
+  it('grip-чип: pinch<10с предлагает contain_fingers', () => {
+    render(<ArmDiagnosticsHub />);
+    const pinchInput = screen.getByPlaceholderText('15');
+    fireEvent.change(pinchInput, { target: { value: '6' } });
+    expect(document.body.textContent).toContain('Слабое звено хвата');
+    const addBtn = screen.getByText(/Добавить contain_fingers/);
+    fireEvent.click(addBtn);
+    expect(addBtn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('авто-подсказка по углам предлагает точку', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    const wristInputs = screen.getAllByPlaceholderText('10');
+    // wristDeg уже 10 по умолчанию; ставим forearm 140 → pron_lock
+    const foreInput = screen.getByPlaceholderText('90');
+    fireEvent.change(foreInput, { target: { value: '140' } });
+    expect(document.body.textContent).toContain('Авто по углам');
+  });
 });

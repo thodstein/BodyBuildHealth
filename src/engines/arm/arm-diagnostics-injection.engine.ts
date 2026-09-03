@@ -66,6 +66,7 @@ function weightForExercise(exId: string, workMax: Record<string, number>, intens
   else if (low.includes('hammer') || low.includes('hook_drag')) base = workMax['brachialis'] || workMax['default'] || 40;
   else if (low.includes('side')) base = workMax['side_pressure'] || workMax['default'] || 30;
   else if (low.includes('lat_drag') || low.includes('row_strap') || low.includes('landmine')) base = workMax['back_pressure'] || workMax['default'] || 50;
+  else if (low.includes('rolling_thunder') || low.includes('apollon_axle') || low.includes('axle')) base = workMax['grip_support'] || workMax['default'] || 60;
   else if (low.includes('hub') || low.includes('plate_pinch') || low.includes('saxon') || low.includes('coc')) base = workMax['grip_pinch'] || workMax['grip_support'] || workMax['default'] || 20;
   else base = workMax['default'] || 30;
   return Math.round(base * intensityPct * 2) / 2;
@@ -148,15 +149,8 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
     const workMax = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const weight = weightForExercise(exId, workMax, corr.intensityPct);
     const repsAvg = Math.round((corr.repsRange[0] + corr.repsRange[1]) / 2);
-    const actualTarget = findSessionForWeakPoint(week, wp, opts.dayMap) ?? targetSession;
-    // финальный выбор сессии (с учётом переполнения — уже проверили)
-    let finalSession = actualTarget;
-    if (finalSession.exercises.length >= 8) {
-      for (const tag of (corr.dayTags || [])) {
-        const s = week.sessions.find((x: any) => x.sessionTag === tag && x.exercises.length < 8);
-        if (s) { finalSession = s; break; }
-      }
-    }
+    // targetSession уже проверен на dedup и cap выше — используем его напрямую (без повторного find, чтобы не уйти в другую сессию мимо dedup)
+    const finalSession = targetSession;
     if (finalSession.exercises.length >= 8) { skippedBudget++; notes.push(`⊘ ${wp} переполнено`); continue; }
 
     const newEx: any = {

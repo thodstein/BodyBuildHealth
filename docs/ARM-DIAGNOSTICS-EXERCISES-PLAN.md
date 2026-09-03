@@ -1,6 +1,6 @@
 # Арм-диагностика — упражнения, слабые и мёртвые точки, коррекции (PRO-план)
 
-> Статус: **PLAN ONLY** (Sep 3 2026). Изучен интернет (StrengthLog/TAWF/GoldenGrip/Gripzilla/Bezkorovainyi/Brismar-Holstein) + аудит кода `src/engines/arm/` и `ArmDiagnosticsHub.tsx:681`. Цель — довести арм-хаб до parity с `WLDiagnosticsHub`/`BBDiagnosticsHub` по глубине диагностики (углы/биомеханика/мертвые точки/коррекции/инъекция в план).
+> Статус: **IMPLEMENTED (база, коммит 17265b98) + ДОРАБОТКА (этот раунд)**. Изучен интернет (StrengthLog/TAWF/GoldenGrip/Mithril/ImproveYourGrip/Bezkorovainyi/Brismar-Holstein) + аудит кода `src/engines/arm/` и `ArmDiagnosticsHub.tsx:1003`. Цель — довести арм-хаб до parity с `WLDiagnosticsHub`/`BBDiagnosticsHub` по глубине диагностики (углы/биомеханика/мертвые точки/коррекции/инъекция в план). §8 — разбор реализации, найденные баги и решения открытых вопросов §6.
 
 ---
 
@@ -250,6 +250,35 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 4. **Humerus hard-cap — 3 сета side первые 4 нед уже есть (`arm-injury-guard`), но UI не блокирует. Делать hard-cap в инъекции (skip если >3) или только warn?
 
 ---
+
+## 8. Доработка — разбор реализации + решения §6 (раунд 2)
+
+### 8.1 Что реализовано из плана (факт)
+- `arm-biomechanics.engine.ts` — 12 точек + `angleRangeDeg/keyJoint/reason/corrections/intensity 0.60–0.70` + `phaseForArmAngle/autoValidateArmAngles`.
+- `arm-weakpoint-corrections.ts` — 12→упражнения (все id проверены по `exercise-catalog-arm.ts:72`), `LEGACY_TO_DETAILED` 8→12.
+- `arm-weakpoint.engine.ts` — `diagnoseArmWeakDetailed` (merge weakTest+weakPoints, max 3, `biomechCards`), алиасы целы.
+- `arm-diagnostics-hub.engine.ts` — detailed-отчёт (`weakPoints/biomechCards/corrections/scoring` + angle validation), механизм-уровни сохранены.
+- `arm-diagnostics-injection.engine.ts` — `injectArmCorrections` 3× @%, per-day dedup, budget, tendon-cap, humerus guard, dayTags.
+- `arm-scoring.engine.ts` — RSS-оверлей (не гейт), floors asym≥12/side>9/tendon>22 cap 49.
+- `ArmDiagnosticsHub.tsx` (v4, 5 табов целы) — Wrist: 12 чипов группами + карточки + angle-бейдж; Pressure: 4 точки + humerus; Strength: F/t→точки; header RSS gauge; `v3→v4` миграция.
+- Тесты: 4 новых файла (24) + hub 7 — зелёные на момент базы.
+
+### 8.2 Найденные баги и исправления (только свои файлы)
+1. **Support-путь потерян (критично).** `LEGACY_TO_DETAILED.support → contain_fingers`, но коррекции `contain_fingers` были pinch-only (`hub/plate/coc/saxon`) — RT<60 вёл в пинч-тупик, `rolling_thunder/apollon_axle` вообще не встречались ни в одной коррекции. Интернет (GoldenGrip/Mithril/ImproveYourGrip STAGE 3–5) требует разделять support/pinch/crush. **Фикс:** `contain_fingers.weakMuscles += grip_support`, corrections `+= rolling_thunder, apollon_axle` (оба есть в каталоге), `weightForExercise` — явная ветка `grip_support` (было default 30). Тест: RT 50 → `grip_support` в мышцах + `rolling_thunder` в коррекциях.
+2. **Ложный ⚠ для side/back/contain (углы).** Хаб валидировал side/back (`angleRange` плеча 20–50°) значением `forearmDeg` 90° и contain (`пальцы`, слайдера нет) значением локтя 110° — всегда «вне диапазона». Движок (`autoValidateArmAngles`) такие точки уже пропускал (av undefined → skip) — расхождение движок/UI. **Фикс:** `ArmBiomechInfo.angleJoint?: wrist|elbow|forearm|none` + `angleJointForWeakPoint()` (`side/back/contain → none`, `sup_drag → elbow`, `cup/rising → wrist`, остальное `forearm`); `autoValidate` пропускает `none`; хаб показывает `• угол н/п — контроль по технике` вместо ложного ⚠. Явное поле проставлено side/back/contain, остальные — через хелпер (без ломки 12 записей).
+3. **Ulnar/radial без покрытия.** В каталоге есть `ulnar_dev/radial_dev(_heavy)` (StrengthLog включает их 2×10–12), но ни одна точка на них не ссылалась. **Фикс:** `rising_top += radial_dev_heavy, ulnar_dev_heavy` (и в `ARM_BIOMECH`, и в `ARM_CORRECTIONS`).
+4. **Мёртвый код.** `legacyDiag` в `arm-diagnostics-hub.engine.ts` считался и не использовался; в `arm-diagnostics-injection.engine.ts` `targetSession → actualTarget → finalSession` пересчитывался 3× через `findSessionForWeakPoint` мимо уже проверенного dedup. **Фикс:** удалено/упрощено (поведение то же, `finalSession = targetSession`).
+5. **План §4 Grip-таб не доделан.** Чип «слабое звено хвата → коррекция» из плана отсутствовал. **Фикс:** блок в Grip-табе (pinch<10с → hub/plate 3×15с @60%; RT<60 → RT/Axle DOH 3×5 @60%; кнопка `+ contain_fingers`).
+6. **`phaseForArmAngle` не использовался в UI.** План §3.4 требовал аналог `phaseForReps`, движок есть, хаб не звал. **Фикс:** `autoPoint` useMemo + блок «Авто по углам» во Wrist-табе с кнопкой добавления.
+
+### 8.3 Решения открытых вопросов §6
+1. **Score — оставлен оверлеем, не гейтом** (механизм-уровни основные). Показ только при `verification>0 || floors>0` — как предложено. Дополнительно RSS-бейдж продублирован в Recovery-таб.
+2. **12 чипов — группы + ●-фильтр по технике** (без аккордеонов, лимит 3) — как предложено. Плюс авто-подсказка не даёт утонуть в 12.
+3. **VBT-пороги — приняты, но БЕЗ ломки чужого `arm-vbt-capture.engine.ts`** (там wrist 20/30, rotation 25/35 — lax для мелких сухожилий). Решение: `vbtThresholdForWeakPoint()` в своём `arm-biomechanics` (cup/rising 12/20, pron/sup 15/25, side 10/20, back/contain 15/25) — показывается хинтом в карточках (`VBT warn/stop`), глобальные пороги не тронуты, чужие тесты целы. Основание: Mithril «lower fatigue, higher control for technical work».
+4. **Humerus — warn + мягкий skip, не hard-блок.** Инъекция скипает side при `sideSets≥6` первые 4 нед (эквивалент ≤3/сессия при 2 сессиях), валидатор/гварды продолжают варнить (RIR≥2, ≤10%/нед). Hard-cap на 3 сета в UI не блокируем — иначе новичку с 2 столовыми сессиями нельзя добрать даже норму.
+
+### 8.4 Что осознанно НЕ тронуто
+- `exercise-catalog-arm.ts`, `arm-vbt-capture.engine.ts`, `planner-bridge-handlers.ts`, `ArmAutoConstructor.tsx`, чужие `arm-*` движки/тесты (bilateral/competition-prep/video/waf и т.д.) — границы по `git status`, кодировка только через edit-инструмент.
 
 ## 7. Источники (для ссылок в коде)
 
