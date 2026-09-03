@@ -285,6 +285,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - `phaseForArmAngle`: press+120° теперь хинтит `side_mid`, а не `side_pin` — авто-подсказка не должна первой предлагать humerus-рискованное дожимание (`side_pin` — только ручной выбор). Тест добавлен.
 - Проверено: вся arm-область 37 файлов / 320 тестов зелёные (включая чужие PRO A-J), свои 7 файлов — 68/68.
 
+### 8.6 Раунд 4 — мёртвый код в движках
+- `arm-weakpoint.engine.ts`: убран пустой `if (hook && !sup)` (точки не форсим — лимит 3, техника-подсказки уже в base rationale).
+- `arm-scoring.engine.ts`: убран недостижимый `if (>22)` внутри ветки `>lim` (ветка `>22` выше перехватывает первой).
+- Поведение не менялось, только чистка.
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).

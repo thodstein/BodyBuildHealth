@@ -232,10 +232,7 @@ export function diagnoseArmWeakDetailed(input: {
   }
   const mergedRaw = [...explicit, ...fromPatterns, ...legacyExpanded, ...weakTestExpanded];
   const uniqPoints = Array.from(new Set(mergedRaw)).slice(0, 3) as ArmWeakPoint[];
-  // техника-специфичные дополнения уже в base; добавим слабые точки если техника требует и нет
-  if (input.technique === 'hook' && !uniqPoints.some(p => p.startsWith('sup'))) {
-    // не форсим если уже есть — только info
-  }
+  // техника-специфичные дополнения уже в base rationale — точки не форсим, чтобы не раздувать лимит 3
   const biomechCards = uniqPoints.map(wp => {
     const bio = ARM_BIOMECH[wp];
     const corr = ARM_CORRECTIONS[wp];

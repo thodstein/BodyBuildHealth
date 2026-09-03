@@ -85,7 +85,6 @@ export function scoreArm(input: ArmScoringInput): ArmScoringResult {
     } else if (input.tendonSets > lim) {
       penalties.push(input.tendonSets > lim + 4 ? PENALTY.tendonCrit : PENALTY.tendonWarn);
       findings.push({ level: input.tendonSets > lim + 4 ? 'critical' : 'warn', text: `Tendon ${input.tendonSets} >${lim}` });
-      if (input.tendonSets > 22) floors.push('Tendon >22');
     } else {
       findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске` });
     }
