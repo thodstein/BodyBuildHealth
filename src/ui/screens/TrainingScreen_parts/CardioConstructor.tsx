@@ -743,6 +743,16 @@ export const CardioConstructor: React.FC = () => {
     flashMsg('⚖️ Zone 2 +15 мин применено (отмена — «↩ Вернуть версию»)');
   };
 
+  /** PRO taper-применение из вкладки «Тапер»: snapshot версии + save + flash (отмена — «↩ Вернуть версию»). */
+  const applyTaper = (next: CardioCycle, reason: string) => {
+    saveCardioCycleVersion(cycle ?? next, reason);
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setCycle(next);
+    reload();
+    flashMsg(`📉 Taper применён (отмена — «↩ Вернуть версию»)`);
+  };
+
   const planVariants = useMemo(() => {
     if (step !== 'preview') return [];
     try {
@@ -1078,6 +1088,7 @@ export const CardioConstructor: React.FC = () => {
           onExport={downloadIcs} onPrint={printCycle} onDuplicate={duplicate} onActivate={activate}
           onCompare={compareWith} onRemove={removeCycle} onChanged={refreshActive}
           onSaveScenario={saveScenario} onLoadScenario={loadScenario} onRemoveScenario={deleteScenario}
+          onApplyTaper={applyTaper}
         />
       )}
       {step === 'diary' && (

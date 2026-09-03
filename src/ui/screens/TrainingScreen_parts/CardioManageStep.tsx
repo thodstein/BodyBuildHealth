@@ -15,6 +15,7 @@ import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
+import { CardioTaperStep } from './CardioTaperStep';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
@@ -47,7 +48,9 @@ export const CardioManageStep: React.FC<{
   onCompare: (c: CardioCycle) => void;
   onRemove: (c: CardioCycle) => void;
   onChanged: () => void;
-}> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
+  /** PRO taper-применение: персист делает родитель (snapshot + save + flash). */
+  onApplyTaper?: (next: CardioCycle, reason: string) => void;
+}> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario, onApplyTaper }) => {
   const [copyFlash, setCopyFlash] = useState(false);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
@@ -176,11 +179,12 @@ export const CardioManageStep: React.FC<{
   const libraryPages = Math.max(1, Math.ceil(filteredLibrary.length / LIB_PAGE_SIZE));
   const pagedLibrary = filteredLibrary.slice(libraryPage * LIB_PAGE_SIZE, (libraryPage + 1) * LIB_PAGE_SIZE);
 
-  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'library' | 'scenarios'>('integrations');
+  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'taper' | 'library' | 'scenarios'>('integrations');
   const TABS = [
     { id: 'integrations', label: 'Интеграции', icon: '🔗' },
     { id: 'export', label: 'Экспорт', icon: '📤' },
     { id: 'week', label: 'Неделя', icon: '🛠' },
+    { id: 'taper', label: 'Тапер', icon: '📉' },
     { id: 'library', label: 'Библиотека', icon: '📚' },
     { id: 'scenarios', label: 'Сценарии', icon: '📸' },
   ] as const;
@@ -333,6 +337,14 @@ export const CardioManageStep: React.FC<{
       {tab === 'week' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
+        </div>
+      )}
+
+      {tab === 'taper' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {onApplyTaper
+            ? <CardioTaperStep cycle={cycle} onApply={onApplyTaper} />
+            : <EmptyState icon="📉" title="Taper недоступен" desc="Обновите конструктор: нет обработчика применения." />}
         </div>
       )}
 
