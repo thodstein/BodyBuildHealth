@@ -4,9 +4,11 @@ import { velocityAttempts } from '../../../engines/lms/attempt-calculator.engine
 import { trafficLight } from '../../../engines/pro/training-load.engine';
 import { fetchOPLHistory } from '../../../engines/openpowerlifting-import.engine';
 import { dailyReadinessCheck, mvtForLift, velocityForPct, calibrateLVP, trainingMax } from '../../../engines/pro/vbt.engine';
+import { avgIntensity, checkTonnageGate } from '../../../engines/lms/pl-tonnage-gate.engine';
+import { dotsScore } from '../../../engines/pro/relative-strength.engine';
 import type { VBTLift } from '../../../engines/pro/vbt.engine';
 
-export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, onApplyFrequency }) => {
+export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void; plan?: { weeks: Array<{ week: number; days: Array<{ exercises: Array<{ workSets: Array<{ weight: number; reps: number; sets: number; pct: number }> }> }> }> } | null }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, onApplyFrequency, plan }) => {
   const freqs = useMemo(() => Object.keys(totalSets).map(m => planFrequency(m, totalSets[m], days, level)), [totalSets, days, level]);
   const [lift, setLift] = useState<VBTLift>('squat');
   const attempts = useMemo(() => {
@@ -87,6 +89,24 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
           <span>→ TM 90% = {trainingMax(compMax,0.90)}кг, 92% = {trainingMax(compMax,0.92)}кг (буфер Шейко)</span>
         </div>
       </div>
+      {plan && (() => {
+        const avg = avgIntensity(plan as never);
+        const gates = checkTonnageGate(plan as never);
+        const danger = gates.filter(g=>g.flag==='danger').length;
+        const warn = gates.filter(g=>g.flag==='warn').length;
+        const total = Object.values(e1RM).reduce((a,b)=>a+(b||0),0);
+        const dots = total>0 ? dotsScore(total, 83, 'male') : 0;
+        return (
+          <div style={{ padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>📈 Sheiko Gate + DOTS</div>
+            <div style={{ fontSize: 10, color: '#fff' }}>Средняя интенсивность: <b>{avg}%</b> {avg>=73 && avg<=77 ? <span style={{color:'#22c55e'}}>✓ Шейко-норма 75%</span> : <span style={{color:'#ef4444'}}>⚠ вне 75%±2%</span>} | Тоннаж гейт: {danger? <span style={{color:'#ef4444'}}>{danger}× danger</span> : warn? <span style={{color:'#f59e0b'}}>{warn}× warn</span> : <span style={{color:'#22c55e'}}>ок</span>}</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тотал e1RM {total}кг → DOTS <b>{dots}</b> (83кг male) {dots>=400 ? '— МС' : dots>=350 ? '— КМС' : ''}</div>
+            {gates.filter(g=>g.flag!=='ok').slice(0,3).map(g=>(
+              <div key={g.week} style={{ fontSize: 9, color: g.flag==='danger'?'#ef4444':'#f59e0b' }}>Нед {g.week}: {g.changePct}% {g.note}</div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 };
