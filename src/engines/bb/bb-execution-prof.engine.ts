@@ -174,9 +174,9 @@ export function diagnoseExecutionProf(
       gaps.push({ field: 'tempo', expected: prof.tempo, actual: actualTempo, issue: `Темп ${actualTempo} → ${prof.tempo} (пауза в растянутой)` });
     }
   }
-  // ROM
+  // ROM (регистронезависимо + cues: часть rom-строк без слова «пауза», но cues её требуют)
   const hasPause = Number(actual?.pauseSeconds ?? (ex as any).pauseSeconds ?? 0) > 0;
-  const needPause = prof.rom.includes('пауза');
+  const needPause = /пауза/i.test(prof.rom) || prof.cues.some(c => /пауза/i.test(c));
   if (needPause && !hasPause) {
     gaps.push({ field: 'rom', expected: prof.rom, issue: 'Нет паузы в растянутой — теряется stretch-mediated' });
   }

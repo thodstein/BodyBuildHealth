@@ -1,6 +1,6 @@
 # ББ-диагностика PRO — ЕДИНЫЙ инструмент (диагностика + коррекция упражнений → эффект в плане)
 
-> **Статус:** 📋 единый план (Sep 03 2026) — заменяет `BB-DIAGNOSTICS-EXERCISE-EFFECT-PLAN.md` + `EXERCISE-LAB-DIAGNOSTICS-CORRECTION-PLAN.md` (было 2 плана — ошибка, оставлен 1).
+> **Статус:** ✅ ВЫПОЛНЕН полностью (Sep 2026) — единый план, заменяет `BB-DIAGNOSTICS-EXERCISE-EFFECT-PLAN.md` + `EXERCISE-LAB-DIAGNOSTICS-CORRECTION-PLAN.md` (было 2 плана — ошибка, оставлен 1). Эпики A+B+C закрыты: 6 движков + таб `🏋️ Упражнения` (5 секций) + мост + скоринг + экспорт + 49 тестов. Правки после ревью: фикс `tempoFor` (character→`.notation`), чинен разрыв хаба (импорты/таб/стейт), deep-link в библиотеке.
 > **Где:** `src/ui/screens/TrainingScreen_parts/BBDiagnosticsHub.tsx:1` (6 табов, 380с, `weak`/`symmetry`/`stimulus`/`volume`/`recovery`/`mobility`) становится **единым хабом**. Лаборатория `src/ui/screens/TrainingScreen_parts/ExerciseLabMerged.tsx:1` (4 шага) остаётся общим каталогом, **диагностика ББ — только в ББ-хабе** (без дубля).
 > **Цель одним предложением:** `план ББ (he_bb_plan_saved) + дневник + замеры + OHS/VBT → диагноз по мышцам и по конкретным упражнениям → коррекция (чем заменить/дополнить, как изменить) → Δ-эффект → 1 кнопка «Применить в ББ-авто» `BbAutoConstructor.tsx:615``.
 
@@ -106,13 +106,20 @@
 
 ## 5. План реализации (один инструмент)
 
-**Эпик A — движки ядра (3.5 дн):** `bb-exercise-effect` + `bb-plan-exercise-audit` + `bb-exercise-diagnosis` + `bb-execution-prof` (PROF чек-листы по 10 мышцам) + `bb-exercise-correction` + `bb-exercise-simulator` — чистые, без UI. Тесты 28.
+**Эпик A — движки ядра (3.5 дн, ✅ ВЫПОЛНЕН):** `bb-exercise-effect` + `bb-plan-exercise-audit` + `bb-exercise-diagnosis` + `bb-execution-prof` (PROF чек-листы по 10 мышцам) + `bb-exercise-correction` + `bb-exercise-simulator` — чистые, без UI. Тесты 28 (в `bb-diagnostics-pro.test.ts`).
 
-**Эпик B — таб `exercise` в хабе (3 дн):** `BBDiagnosticsHub.tsx` новый `BBTab='exercise'` `BBDiagnosticsHub.tsx:25`, 4 секции, drawer каталога `ExerciseLabCatalog`, персист `he_bb_diagnostics_hub_v1:exerciseState`, deep-link `→ Качество/Объём`. Тесты 8.
+**Эпик B — таб `exercise` в хабе (3 дн, ✅ ВЫПОЛНЕН):** `BBDiagnosticsHub.tsx` новый `BBTab='exercise'` `BBDiagnosticsHub.tsx:25`, 5 секций (лента + аудит + диагноз + PROF + коррекции + библиотека), персист `he_bb_diagnostics_hub_v1:exerciseState`, deep-link `→ Качество/Объём`. Тесты 8 (в `bb-diagnostics-hub.test.tsx`).
 
-**Эпик C — мост + BbAuto + скоринг (1 дн):** `planner-bridge` расширение `weakpoints` (`preferredExerciseIds`/`exerciseSwap`/`labDiagnosis`), `BbAutoConstructor.tsx:615` приём, `bb-scoring.engine.ts:32` `penExercise`/`penAngle` (мягко, RSS сохранён), `bb-diagnostics-export.engine.ts` таблица «Упражнение→эффект». Тесты 8.
+**Эпик C — мост + BbAuto + скоринг (1 дн, ✅ ВЫПОЛНЕН):** `planner-bridge` расширение `weakpoints` (`preferredExerciseIds`/`exerciseSwap`/`labDiagnosis`/`labCorrection`/`labDelta`), `BbAutoConstructor.tsx:616,1343,1958` приём (preferred + swaps + executionCorrections с persist `he_bb_preferred_exercises`/`he_bb_exercise_swaps`/`he_bb_execution_corrections`), `bb-scoring.engine.ts:21,51` `penExercise`/`penAngle`/`penLengthened` (мягко, RSS сохранён), `bb-diagnostics-export.engine.ts:13,75` таблица «Упражнение→эффект» (HTML+CSV). Тесты 8.
 
 **Итого ~7.5 дн, MVP (A + B секции 1-3) ~4 дн.** tsc 0, `vitest bb-diagnostics` 44+ зелёных, `bb` без регрессий, 0 дублей (reuse `SFR_EXERCISE_DB`/`ANGLE_CLASSES`/`SUBREGION_DEFS`/`JOINT_STRESS_DB`/`EXERCISE_BIOMECHANICS_DB`).
+
+## 7. Интернет-доработка (Sep 2026, сверено с сетью)
+
+- **SFR (Israetel/RP; Outlift 16.09.2024; RP Complete Hypertrophy Guide 2024; Hevy Coach 2024; Mirafit 2025; Barbell Physio 2026):** SFR = стимул целевой мышцы / системная усталость. High-SFR: тросы/машины/гантели (наш SFR 4-5: `incline_db`, `lateral_raise*`, `leg_ext`, `row_chest_supported`), изоляция у отказа дешевле базы у отказа (failure≈тот же рост, больше усталости — тренировать базу RPE 7-8, изоляцию ближе к отказу). RSM (raw stimulus magnitude): высокостимульные `row_bar`/становая — первыми в сессии, остальное добивать low-fatigue. Замены-канон: deadlift→RDL, OHP→lateral raise, bench→dips, squat→leg press/hack — наш `rankSubstituteCandidates` так и скорит (SFR + stretchPhase + jointStress low + `canReplace`).
+- **Lengthened (Wolf et al. 2023 meta; Wolf/PeerJ 2025 trained upper-body LP≈full ROM; Strey et al. 2026 meta LL>SL ES=0.283; Kassiano gastrocnemius lengthened>full; lengthened supersets beyond failure 2024):** итог — растить в растянутой позиции: полный ROM ИЛИ lengthened partials; LP — не замена базе, а добивка после отказа full ROM (lengthened superset). Наш `wrongProfile`/`romGap` + `modifyROM` (пауза 1с внизу) так и работают; PROF-темпы с паузой внизу — канон.
+- **Темп (Schoenfeld 2017 meta: eccentric-преимущество исчезает при равном объёме; Wilk 2021: эксцентрик 2-4с оптимум, >6с хуже; Kojic/Frontiers 2024: 4/0/1/0 > 1/0/1/0 для VL, регион-специфично; Schoenfeld 2015: 0.5-8с/повт эффективно, >10с хуже):** наш PROF-канон (гипертрофия `3-1-1-0`, тяж `2-0-1-0`, эксцентрик 2-4с + пауза 1с + взрывная концентрика) в норме. Фикс в этом раунде: `bb-exercise-correction` больше не зовёт `tempoFor(goal, level)` (сигнатура — character/technique/phase/exerciseName, возвращает `TempoSpec`), а маппит goal→character (`памп`/`тяж`/`лёг`) и берёт `.notation`.
+- **Вариация (Kassiano 2022 systematic review; Baz-Valle 2019; Kassiano 2024 RQES):** систематическая вариация = региональная гипертрофия+, рандомная еженедельная = вред. Наш `STRICT_GROUPS` + `angleCoverage` + ротация по мезоциклам (не хоппинг) — так и задумано; песочница показывает Δ до применения.
 
 ## 6. Критерий готовности
 

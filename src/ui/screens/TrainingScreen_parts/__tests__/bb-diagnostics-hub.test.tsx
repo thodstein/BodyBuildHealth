@@ -33,4 +33,34 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(chk);
     expect(chk).not.toBeChecked();
   });
+  it('exercise tab renders 5 sections', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [
+      { exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2 }] },
+      { exercises: [{ exerciseName: 'incline_db', name: 'Жим гантелей на наклонной (30°)', muscle: 'chest', sets: 3, rir: 2 }] },
+    ] }] }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    expect(screen.getAllByText(/диагностика \+ PROF-коррекция/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Аудит портфеля по мышцам/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Диагноз упражнения/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Библиотека SFR/)[0]).toBeInTheDocument();
+  });
+  it('exercise tab without plan shows empty-state, no crash', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    expect(screen.getAllByText(/Нет плана ББ/)[0]).toBeInTheDocument();
+  });
+  it('exercise select and reset do not crash', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    const sel = document.querySelector('select') as HTMLSelectElement;
+    expect(sel).not.toBeNull();
+    fireEvent.click(screen.getAllByText(/Сброс/)[0]);
+    expect(sel.value).toBe('');
+  });
+  it('header shows SFR/len chips when plan present', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 3, rir: 2 }] }] }] }));
+    render(<BBDiagnosticsHub />);
+    expect(screen.getAllByText(/SFR/)[0]).toBeInTheDocument();
+  });
 });

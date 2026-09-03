@@ -1,7 +1,7 @@
 /**
- * BBDiagnosticsHub.tsx — ББ-диагностика PRO (тонкий хаб, без дублей).
- * 3 уникальных таба (слабые/симметрия/стимул) + 3 композитных (объём→VolumeHub, восстановление→Unified snapshot, мобильность/VBT→reuse WL libs).
- * Хедер RSS 0-100 + verification + ACWR-chip + MRV-chip. Мост weakpoints → BbAutoConstructor.
+ * BBDiagnosticsHub.tsx — ББ-диагностика PRO (единый инструмент: мышца + упражнение → эффект → коррекция).
+ * 7 табов: weak/symmetry/exercise(диагностика+PROF-коррекция+Δ)/stimulus/volume/recovery/mobility.
+ * Хедер RSS 0-100 + verification + ACWR/SFR-чипы. Мост weakpoints (+preferredExerciseIds/exerciseSwap/labDiagnosis) → BbAutoConstructor.
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, DIM, ACCENT } from './training-ui';
@@ -20,9 +20,18 @@ import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-s
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
 import { isSpecializationTargetConflict } from '../../../engines/bb/bb-specialization.engine';
+import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
+import { auditPlanExercises } from '../../../engines/bb/bb-plan-exercise-audit.engine';
+import { diagnoseExercise } from '../../../engines/bb/bb-exercise-diagnosis.engine';
+import { prescribeCorrections } from '../../../engines/bb/bb-exercise-correction.engine';
+import { simulateCorrection } from '../../../engines/bb/bb-exercise-simulator.engine';
+import { getProfExecutionProfile } from '../../../engines/bb/bb-execution-prof.engine';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
+import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
-type BBTab = 'weak' | 'symmetry' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
+type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
 
 type BBState = {
   weakManual: string[];
@@ -31,6 +40,10 @@ type BBState = {
   kneeToWallCm: string; ankleDeg: string; heelRetest: '' | 'better' | 'same';
   vbtBest: string; vbtLast: string; vbtWeight: string;
   csvText: string;
+  exerciseSelectedId: string | null;
+  exerciseFilterSfr: number;
+  exerciseFilterProfile: string;
+  exerciseFilterUnilateral: boolean;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -40,11 +53,16 @@ const DEFAULT_STATE: BBState = {
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
   vbtBest: '', vbtLast: '', vbtWeight: '',
   csvText: '',
+  exerciseSelectedId: null,
+  exerciseFilterSfr: 0,
+  exerciseFilterProfile: 'all',
+  exerciseFilterUnilateral: false,
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
   { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'гранулярные 1-2 + e1RM + Reeves' },
   { id: 'symmetry', label: 'Симметрия', icon: '⚖️', desc: 'L/R + V-taper + FFMI' },
+  { id: 'exercise', label: 'Упражнения', icon: '🏋️', desc: 'диагностика+PROF-коррекция+Δ' },
   { id: 'stimulus', label: 'Стимул', icon: '💪', desc: 'lengthened + pattern + BFR' },
   { id: 'volume', label: 'Объём', icon: '📊', desc: 'MEV/MAV/MRV чип' },
   { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'ACWR per-muscle + Unified' },
@@ -615,6 +633,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             {/* Секция 5: Библиотека */}
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>5 · Библиотека SFR+паттернов (максимум на каждое)</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Детали объёма — <b>📐 Объём-хаб → Объём</b> · качество плана — <b>→ Качество</b> · нагрузка — <b>⚡ Интеллект</b> (без дублей, здесь только выбор).</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
                 <label style={{ fontSize: 10, color: DIM }}>SFR≥
                   <select value={String(state.exerciseFilterSfr)} onChange={e => setState(s => ({ ...s, exerciseFilterSfr: parseInt(e.target.value) }))} style={{ marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }}>

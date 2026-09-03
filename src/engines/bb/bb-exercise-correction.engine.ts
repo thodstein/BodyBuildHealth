@@ -125,10 +125,15 @@ export function prescribeCorrections(
     });
   }
 
-  // 3 modifyTempo — если tempoMismatch
+  // 3 modifyTempo — если tempoMismatch (интернет: эксцентрик 2-4с оптимум, Wilk 2021; >6с хуже)
   if (flags.has('tempoMismatch')) {
     const goal = String(ctx.goal || 'hypertrophy').toLowerCase();
-    const expected = tempoFor(goal as any, (ctx.level as any) || 'intermediate') || (goal.includes('hypertroph') ? '3-1-1-0' : '2-0-1-0');
+    const character = (goal.includes('strength') || goal.includes('сила')) ? 'тяж' : (goal.includes('endurance') || goal.includes('вынос')) ? 'лёг' : 'памп';
+    let expected = goal.includes('hypertroph') || goal.includes('mass') ? '3-1-1-0' : goal.includes('strength') ? '2-0-1-0' : '2-1-2-0';
+    try {
+      const spec = tempoFor(character as any, undefined, undefined, ex.name);
+      if (spec && typeof spec.notation === 'string' && spec.notation) expected = spec.notation;
+    } catch {}
     out.push({
       type: 'modifyTempo', tempo: expected,
       reason: `Темп ${ex.tempo || '—'} → ${expected} (TUT + пауза для гипертрофии)`,

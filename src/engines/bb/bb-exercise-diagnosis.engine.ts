@@ -79,13 +79,11 @@ export function diagnoseExercise(
   const goal = String(ctx.goal || 'hypertrophy').toLowerCase();
   const prof = effect.profile;
   if (goal.includes('hypertroph') || goal.includes('mass') || goal === 'bulk') {
-    if (prof === 'peak_contraction' || prof === 'mid') {
-      // проверяем что упражнение могло бы быть lengthened
-      const isChestBackLegs = ['chest', 'back', 'chest_upper', 'back_width', 'quads', 'hamstrings', 'glutes'].includes(muscle || '');
-      if (isChestBackLegs && prof !== 'lengthened') {
-        flags.push('wrongProfileForGoal');
-        issues.push(`Профиль ${prof} — для гипертрофии нужен lengthened (растянутая)`);
-      }
+    // проверяем что упражнение могло бы быть lengthened (профиль mid/short вместо lengthened)
+    const isChestBackLegs = ['chest', 'back', 'chest_upper', 'back_width', 'quads', 'hamstrings', 'glutes'].includes(muscle || '');
+    if (isChestBackLegs && prof && prof !== 'lengthened') {
+      flags.push('wrongProfileForGoal');
+      issues.push(`Профиль ${prof} — для гипертрофии нужен lengthened (растянутая)`);
     }
   }
 
