@@ -48,6 +48,9 @@ export type { TaperDecay, FatigueClass, PreTaperState, IndividualTaperPlan } fro
 export { exponentialTaperMult, stepTaperMult, recommendTaperDecay, individualizedTaperPlan, performanceGainEstimate, taperCutFromCycle } from './cardio-taper-pro.engine';
 export type { HeatContext, SessionGap, TimingInput, InterferenceV2Input, InterferenceV2Result } from './cardio-safety.engine';
 export { heatAltitudeHrAdd, hydrationAdvice, cardioTimingPenalty, cardioInterferenceV2 } from './cardio-safety.engine';
+// Локальные алиасы для использования внутри движка (реэкспорты выше — только наружу).
+import { zonesFromTalkTest as talkZonesFromTest } from './cardio-field-tests.engine';
+import { timeInZones as calcTimeInZones, classifyTid as classifyTidLocal } from './cardio-tid.engine';
 export {
   cardioHeartZones,
   maxHrClassic,
@@ -793,16 +796,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     + (input.altitudeM != null && input.altitudeM > 1000 ? Math.min(15, Math.round((input.altitudeM - 1000) / 300)) : 0);
   const zones = (() => {
     if (input.lthr != null && input.lthr >= 80 && input.lthr <= 220) return lthrZones(Math.round(input.lthr));
+    // talk-test — единый источник zonesFromTalkTest (дедуп с field-tests движком)
     if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) {
-      const ceil = Math.round(input.talkZone2Hr);
-      const mk = (zone: number, label: string, min: number, max: number, purpose: string): HeartZone => ({ zone, label, rangeMin: 0, rangeMax: 0, bpmMin: min, bpmMax: max, purpose });
-      return [
-        mk(1, 'Z1 Recovery', Math.max(60, ceil - 35), Math.max(80, ceil - 16), 'Восстановление (talk-test)'),
-        mk(2, 'Z2 Zone 2', Math.max(80, ceil - 15), ceil, 'Аэробная база (talk-test)'),
-        mk(3, 'Z3 Tempo/MISS', ceil + 1, ceil + 15, 'Темпо (talk-test)'),
-        mk(4, 'Z4 Threshold', ceil + 16, ceil + 30, 'Порог (talk-test)'),
-        mk(5, 'Z5 VO2max', ceil + 31, ceil + 55, 'Максимум (talk-test)'),
-      ];
+      return talkZonesFromTest(input.talkZone2Hr) ?? undefined;
     }
     return input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex, (input as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) : undefined;
   })();
@@ -3141,6 +3137,20 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
       else if (cv < 0.15) add('info', 'Вариативность объёма низкая — добавьте волны нагрузки.', 0);
     }
   }
+
+  // 10. TID Polarization Index (Treff 2019): threshold-модель — warn,
+  //     polarized/pyramidal — ok, смешанное — info. Новичкам — pyramidal (Silva 2025).
+  try {
+    const tiz = calcTimeInZones(cycle);
+    if (tiz.totalMin > 0 && (tiz.pct.z2 > 0 || tiz.pct.z3 > 0)) {
+      const cls = classifyTidLocal(tiz);
+      const pi = cls.pi != null ? `PI ${cls.pi}` : 'PI —';
+      if (cls.model === 'threshold') add('warn', `TID threshold: Z2 ${tiz.pct.z2}% — много средней интенсивности (${pi}); сдвиньте часть Z2 в Z1 (Seiler 80/20).`, 10);
+      else if (cls.model === 'polarized') add('ok', `TID polarized ${tiz.pct.z1}/${tiz.pct.z2}/${tiz.pct.z3} (${pi}, Z1>Z3>Z2) — распределение пиковое.`, 0);
+      else if (cls.model === 'pyramidal') add('ok', `TID pyramidal ${tiz.pct.z1}/${tiz.pct.z2}/${tiz.pct.z3} (${pi}) — базовая модель, к старту поляризуйте (PYR→POL).`, 0);
+      else add('info', `TID смешанное ${tiz.pct.z1}/${tiz.pct.z2}/${tiz.pct.z3} (${pi}) — для пика выберите polarized/pyramidal.`, 0);
+    }
+  } catch { /* TID — рекомендательный слой, молчим */ }
 
   return { score: Math.max(0, Math.min(100, 100 - penalty)), findings };
 }

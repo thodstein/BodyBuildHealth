@@ -56,7 +56,7 @@ import {
   cardioInterferenceV2,
 } from '../cardio-safety.engine';
 import { fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop, extractFitRecords } from '../../cardio-import.engine';
-import { buildCardioCycle, applyIndividualizedTaperToCycle } from '../cardio.engine';
+import { buildCardioCycle, applyIndividualizedTaperToCycle, cardioQualityReport, zonesFromTalkTest } from '../cardio.engine';
 
 // ─── A: field-tests ───
 describe('PRO A field-tests', () => {
@@ -426,5 +426,27 @@ describe('PRO A3 field-test storage', () => {
     expect(m.lthr).toBe(172);
     expect(m.ftpWatts).toBe(240);
     expect(m.talkHr).toBe(144);
+  });
+  it('build talk-зоны = zonesFromTalkTest (дедуп)', () => {
+    const ref = zonesFromTalkTest(145)!;
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, talkZone2Hr: 145 });
+    const z2 = c.weeks[0].sessions.find(s => s.type === 'zone2')?.targetHr;
+    expect(z2?.min).toBe(ref[1].bpmMin);
+    expect(z2?.max).toBe(ref[1].bpmMax);
+  });
+  it('quality: threshold → warn, pyramidal → ok', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    for (const w of c.weeks) {
+      if (w.deload || w.taper) continue;
+      w.sessions = [
+        { type: 'zone2', durationMin: 30, weeklyFrequency: 2, intensity: 'moderate', kcalPerSession: 200, purpose: 'x' },
+        { type: 'miss', durationMin: 30, weeklyFrequency: 3, intensity: 'moderate', kcalPerSession: 300, purpose: 'x' },
+      ];
+      w.totalMinutes = 150;
+    }
+    const r = cardioQualityReport(c, 7);
+    expect(r.findings.some(f => f.level === 'warn' && f.text.includes('TID threshold'))).toBe(true);
+    const ok = cardioQualityReport(buildCardioCycle({ goal: 'health', totalWeeks: 6 }), 7);
+    expect(ok.findings.some(f => f.level === 'ok' && f.text.includes('TID pyramidal'))).toBe(true);
   });
 });

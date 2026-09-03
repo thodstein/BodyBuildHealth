@@ -133,6 +133,16 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
 - **Тесты**: `latestFieldTestMetrics` в `cardio-pro-level.test.ts`;
   harness-тест «кнопка подтягивает LTHR/FTP/talk» в `cardio-field-test-log.test.tsx` (8/8).
 
+## Продолжение — раунд 6 (консолидация скоринга)
+
+- **Дедуп talk-зон**: инлайн-конструктор зон в `buildCardioCycle` заменён вызовом
+  `zonesFromTalkTest` (единый источник с field-tests движком; bpm побайтово те же,
+  различались только подписи) — паритет покрыт тестом.
+- **PI в качестве**: `cardioQualityReport` += блок 10 (TID Polarization Index):
+  threshold → warn −10, polarized/pyramidal → ok, смешанное → info.
+  Встроенные циклы — pyramidal (штрафов не добавляется, проверено существующими тестами).
+- **Тесты**: talk-паритет + threshold-warn/pyramidal-ok в `cardio-pro-level.test.ts` (37/37).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.
