@@ -34,6 +34,19 @@ import {
 import { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
+// PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
+export type { FieldTestSource, FieldTestInput, PersonalZones } from './cardio-field-tests.engine';
+export { ftpFrom20MinTest, criticalPowerFrom3And12, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput } from './cardio-field-tests.engine';
+export type { DailyLoad, PmcPoint, HrDriftContext } from './cardio-pmc.engine';
+export { dailyPmcSeries, hrTss, powerTss, runTss, correctHrForDrift, driftCorrectedTss, tssRampRate, interpretTsb } from './cardio-pmc.engine';
+export type { TidModel, TimeInZones, SeasonPhase } from './cardio-tid.engine';
+export { tidZoneOf, timeInZones, polarizationIndex, classifyTid, tidAdvice, phasedTidTarget, tidDistanceToTarget } from './cardio-tid.engine';
+export type { DecouplingLevel, DecouplingResult, DurabilityPoint } from './cardio-durability.engine';
+export { aerobicDecoupling, efficiencyPowerHr, efficiencyPaceHr, durabilityTrend, responderClassification, durabilityDurationTarget } from './cardio-durability.engine';
+export type { TaperDecay, FatigueClass, PreTaperState, IndividualTaperPlan } from './cardio-taper-pro.engine';
+export { exponentialTaperMult, stepTaperMult, recommendTaperDecay, individualizedTaperPlan, performanceGainEstimate } from './cardio-taper-pro.engine';
+export type { HeatContext, SessionGap, TimingInput, InterferenceV2Input, InterferenceV2Result } from './cardio-safety.engine';
+export { heatAltitudeHrAdd, hydrationAdvice, cardioTimingPenalty, cardioInterferenceV2 } from './cardio-safety.engine';
 export {
   cardioHeartZones,
   maxHrClassic,
@@ -229,6 +242,14 @@ export interface CardioCycleInput {
   maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
   /** Модель периодизации (Seiler 2026): linear / polarized 80/20 / pyramidal / pyramidal→polarized */
   periodizationModel?: CardioPeriodizationModel;
+  /** PRO-калибровка (Эпик A): LTHR (Friel 30'), FTP (вело 20'×0.95), talk-test потолок Z2. Приоритет LTHR > FTP > talk > age. */
+  lthr?: number;
+  ftpWatts?: number;
+  talkZone2Hr?: number;
+  /** PRO-контекст среды (Эпик G): жара/влажность/высота для поправки HR-зон. */
+  tempC?: number;
+  humidityPct?: number;
+  altitudeM?: number;
   /** Снапшот параметров сборки (для «⚙️ Изменить параметры»). Заполняется в buildCardioCycle. */
   config?: CardioCycleInput;
   id?: string;
@@ -766,7 +787,25 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const recoveryLow = !!input.recoveryLow || stressHigh;
   const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
-  const zones = input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex, (input as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) : undefined;
+  // PRO-калибровка зон (Эпик A): LTHR > talk-test > age. Жара/высота (Эпик G) сдвигают зоны вверх.
+  const heatAdd = (input.tempC != null && input.tempC > 25 ? Math.min(10, Math.round(input.tempC - 25)) : 0)
+    + (input.altitudeM != null && input.altitudeM > 1000 ? Math.min(15, Math.round((input.altitudeM - 1000) / 300)) : 0);
+  const zones = (() => {
+    if (input.lthr != null && input.lthr >= 80 && input.lthr <= 220) return lthrZones(Math.round(input.lthr));
+    if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) {
+      const ceil = Math.round(input.talkZone2Hr);
+      const mk = (zone: number, label: string, min: number, max: number, purpose: string): HeartZone => ({ zone, label, rangeMin: 0, rangeMax: 0, bpmMin: min, bpmMax: max, purpose });
+      return [
+        mk(1, 'Z1 Recovery', Math.max(60, ceil - 35), Math.max(80, ceil - 16), 'Восстановление (talk-test)'),
+        mk(2, 'Z2 Zone 2', Math.max(80, ceil - 15), ceil, 'Аэробная база (talk-test)'),
+        mk(3, 'Z3 Tempo/MISS', ceil + 1, ceil + 15, 'Темпо (talk-test)'),
+        mk(4, 'Z4 Threshold', ceil + 16, ceil + 30, 'Порог (talk-test)'),
+        mk(5, 'Z5 VO2max', ceil + 31, ceil + 55, 'Максимум (talk-test)'),
+      ];
+    }
+    return input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex, (input as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) : undefined;
+  })();
+  const zonesAdj = zones && heatAdd > 0 ? zones.map(z => ({ ...z, bpmMin: z.bpmMin + heatAdd, bpmMax: z.bpmMax + heatAdd })) : zones;
   const profile = profileForGoal(input.goal, input.periodizationModel);
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
@@ -804,9 +843,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     sessions = sessions.map(s => {
       const dur = Math.max(10, Math.round(s.durationMin * factorMult));
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
-      const zone = s.type === 'hiit' ? zones?.[3] : s.type === 'miss' ? zones?.[2] : zones?.[1];
+      const zone = s.type === 'hiit' ? zonesAdj?.[3] : s.type === 'miss' ? zonesAdj?.[2] : zonesAdj?.[1];
       let targetHr = zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr;
-      if (s.type === 'zone2' && zones && targetHr) {
+      if (s.type === 'zone2' && zonesAdj && targetHr) {
         // Позиция внутри Z2: 0 = нижняя граница, 1 = верхняя.
         const prog = phase === 'taper' || phase === 'peak' || phase === 'transition'
           ? 0
@@ -884,9 +923,19 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       maxHrFormula: (input as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula,
       periodizationModel: input.periodizationModel,
       taperModel: input.taperModel,
+      lthr: input.lthr,
+      ftpWatts: input.ftpWatts,
+      talkZone2Hr: input.talkZone2Hr,
+      tempC: input.tempC,
+      humidityPct: input.humidityPct,
+      altitudeM: input.altitudeM,
     };
   }
   if (ffmKg != null) cycle.rationale.push(`FFM ${ffmKg} кг (жир ${input.bodyFatPct}%) — расход по безжировой массе.`);
+  if (input.lthr != null && input.lthr >= 80 && input.lthr <= 220) cycle.rationale.push(`LTHR ${Math.round(input.lthr)} уд/мин (Friel 30') — зоны точные; HIIT контролируйте по мощности/темпу (HR занижает Z3).`);
+  else if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) cycle.rationale.push(`Talk-test: потолок Z2 ${Math.round(input.talkZone2Hr)} уд/мин — зоны оценочные.`);
+  if (input.ftpWatts != null && input.ftpWatts >= 30) cycle.rationale.push(`FTP ${Math.round(input.ftpWatts)} Вт — ватт-зоны Coggan первичны для вело.`);
+  if (heatAdd > 0) cycle.rationale.push(`Жара/высота: зоны +${heatAdd} уд/мин (терморегуляция/гипоксия) — пейте 500-750 мл/ч, >90' электролиты.`);
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
   if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
   for (const n of factorNotes) cycle.rationale.push(n);

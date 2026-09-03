@@ -1,11 +1,16 @@
 /**
- * CardioAnalyticsDashboard.tsx — мини-дашборд аналитики (H3).
- * 7д vs 28д, TRIMP тренд, HR compliance, стрик.
+ * CardioAnalyticsDashboard.tsx — мини-дашборд аналитики PRO (H3 + эпики B/D/E/F/G).
+ * 7д vs 28д, TRIMP тренд, HR compliance, TID PI, durability, PMC daily, taper-pro, safety.
  */
 import React, { useMemo } from 'react';
 import { CARD, ROW, LABEL, HINT_SM, Badge, StatTile } from './CardioUI';
 import { cardioLogStats, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift, interferenceForCycle } from '../../../engines/lms/cardio.engine';
+import {
+  cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift, interferenceForCycle,
+  timeInZones, polarizationIndex, classifyTid,
+  dailyPmcSeries, tssRampRate, interpretTsb,
+  aerobicDecoupling, heatAltitudeHrAdd, cardioInterferenceV2,
+} from '../../../engines/lms/cardio.engine';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -98,6 +103,76 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     } catch { return null; }
   }, [cycle]);
 
+  // PRO: TID Polarization Index (Treff 2019) по плану цикла
+  const tid = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const tiz = timeInZones(cycle);
+      const pi = polarizationIndex(tiz.pct.z1, tiz.pct.z2, tiz.pct.z3);
+      const cls = classifyTid(tiz);
+      return { ...tiz, pi, model: cls.model, label: cls.label };
+    } catch { return null; }
+  }, [cycle]);
+
+  // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS
+  const pmc = useMemo(() => {
+    if (log.length < 7) return null;
+    try {
+      const factor: Record<string, number> = { zone2: 2, miss: 3, hiit: 5, recovery: 1 };
+      const daily = log.filter(e => e.completed).map(e => ({
+        date: e.date,
+        load: e.avgHr && cycle?.config?.restingHr && cycle?.config?.age
+          ? (() => {
+              const maxHr = cycle.config.sex === 'female' ? 226 - (cycle.config.age as number) : 220 - (cycle.config.age as number);
+              const hrr = Math.max(0, Math.min(1, ((e.avgHr as number) - (cycle.config.restingHr as number)) / (maxHr - (cycle.config.restingHr as number))));
+              const k = cycle.config.sex === 'female' ? 0.86 : 0.64;
+              const b = cycle.config.sex === 'female' ? 1.67 : 1.92;
+              const t = e.durationMin * hrr * k * Math.exp(b * hrr);
+              return t > 0 ? Math.round(t) : e.durationMin * (factor[e.type] ?? 2);
+            })()
+          : e.durationMin * (factor[e.type] ?? 2),
+      }));
+      const now = new Date();
+      const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const series = dailyPmcSeries(daily, { referenceIso: ref, days: 42 });
+      if (series.length === 0) return null;
+      const last = series[series.length - 1];
+      const ramp = tssRampRate(daily, ref);
+      return { ...last, rampPct: ramp.rampPct, rampWarn: ramp.warn, interp: interpretTsb(last.tsb) };
+    } catch { return null; }
+  }, [log, cycle]);
+
+  // PRO: durability — decoupling по двум последним HR-сессиям (Pa:Hr lite)
+  const durability = useMemo(() => {
+    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0 && e.distanceKm && e.distanceKm > 0).slice(-4);
+    if (withHr.length < 2) return null;
+    try {
+      const eff = (e: typeof withHr[number]) => (e.distanceKm as number) / (e.durationMin / 60) / (e.avgHr as number);
+      const e1 = eff(withHr[0]);
+      const e2 = eff(withHr[withHr.length - 1]);
+      if (!(e1 > 0) || !(e2 > 0)) return null;
+      return aerobicDecoupling(e1, e2);
+    } catch { return null; }
+  }, [log]);
+
+  // PRO: safety жара/высота из конфига цикла
+  const safety = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const r = heatAltitudeHrAdd({ durationMin: 60, tempC: cycle.config?.tempC, humidityPct: cycle.config?.humidityPct, altitudeM: cycle.config?.altitudeM });
+      return r.addBpm > 0 ? r : null;
+    } catch { return null; }
+  }, [cycle]);
+
+  const interfV2 = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const legPerWeek = cycle.config?.legDays ? cycle.config.legDays.filter(d => d >= 0 && d <= 6).length || 2 : 2;
+      const mods = cycle.weeks.slice(0, 4).flatMap(w => w.sessions.map(s => (s.equipment ?? s.type) as string));
+      return cardioInterferenceV2({ modality: mods.length ? mods : ['cycling'], frequencyPerWeek: 3, avgDurationMin: 30, legDaysPerWeek: legPerWeek, gap: 'separate_day', sex: cycle.config?.sex });
+    } catch { return null; }
+  }, [cycle]);
+
   return (
     <div style={CARD}>
       <div style={ROW}>
@@ -110,6 +185,9 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         <StatTile label="TRIMP 7Д" value={String(trimp7)} color="#a78bfa" sub="Banister/HR" />
         <StatTile label="HR в зоне" value={hr?.inZonePct != null ? hr.inZonePct + '%' : '—'} color={hr?.inZonePct != null && hr.inZonePct >= 70 ? '#4ade80' : '#fbbf24'} sub={hr?.avgDelta != null ? (hr.avgDelta > 0 ? '+' : '') + hr.avgDelta + ' уд' : ''} />
         {polarized && <StatTile label="80/20" value={polarized.pct + '%'} color={polarized.ok ? '#4ade80' : '#fbbf24'} sub={polarized.label} />}
+        {tid && tid.pi != null && <StatTile label="POL-IDX" value={String(tid.pi)} color={tid.model === 'polarized' ? '#4ade80' : tid.model === 'pyramidal' ? '#60a5fa' : '#fbbf24'} sub={tid.model} />}
+        {pmc && <StatTile label="TSB" value={(pmc.tsb > 0 ? '+' : '') + pmc.tsb} color={pmc.tsb > 15 || pmc.tsb < -10 ? '#f87171' : pmc.tsb > 5 ? '#4ade80' : '#fff'} sub={`CTL ${pmc.ctl}`} />}
+        {durability && <StatTile label="DECOUPL" value={durability.decouplingPct + '%'} color={durability.level === 'strong' ? '#4ade80' : durability.level === 'moderate' ? '#fbbf24' : '#f87171'} sub={durability.level} />}
         {interference && <StatTile label="INTERF." value={String(interference.score)} color={interference.level === 'low' ? '#4ade80' : interference.level === 'mid' ? '#fbbf24' : '#f87171'} sub={interference.level} />}
       </div>
       {hr?.advice && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
@@ -125,6 +203,11 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         </div>
       )}
       {hrDriftNote && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ {hrDriftNote}</div>}
+      {tid && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.22)', borderRadius: 8, padding: '6px 8px' }}>🧬 TID {tid.pct.z1}/{tid.pct.z2}/{tid.pct.z3} · PI {tid.pi ?? '—'} — {tid.label}. Новичкам — pyramidal, продвинутым к старту — polarized (PYR→POL).</div>}
+      {pmc && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.22)', borderRadius: 8, padding: '6px 8px' }}>📊 PMC daily: CTL {pmc.ctl} · ATL {pmc.atl} · TSB {pmc.tsb > 0 ? '+' : ''}{pmc.tsb} — {pmc.interp}{pmc.rampPct != null ? ` · Рампа ${pmc.rampPct}%/нед` : ''}{pmc.rampWarn ? ` · ⚠ ${pmc.rampWarn}` : ''}</div>}
+      {durability && <div style={{ fontSize: 11, color: durability.level === 'strong' ? '#4ade80' : durability.level === 'moderate' ? '#fbbf24' : '#f87171', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>🏃 Durability decoupling {durability.decouplingPct}% ({durability.level}) — {durability.advice}</div>}
+      {safety && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>🌡 Жара/высота: +{safety.addBpm} уд/мин к зонам — {safety.notes.join(' ')}</div>}
+      {interfV2 && interfV2.level !== 'low' && <div style={{ fontSize: 11, color: '#93c5fd', background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 8, padding: '6px 8px' }}>🔬 Interference v2 {interfV2.score}/10 ({interfV2.level}) — {interfV2.advice}</div>}
       {interference && interference.level !== 'low' && <div style={{ fontSize: 11, color: interference.level === 'high' ? '#f87171' : '#fbbf24', background: interference.level === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${interference.level === 'high' ? 'rgba(239,68,68,0.24)' : 'rgba(245,158,11,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>⚡ Interference {interference.score}/10 ({interference.level}) — {interference.advice}</div>}
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>🩸 При ferritin &lt;30 мкг/л — железо 18мг + витамин C, контроль Hb; RED-S &lt;30 ккал/кг FFM — объём не повышать.</div>
       <div style={HINT_SM}>TRIMP Banister (HRr×k·e^b·HRr) где есть HR, иначе фактор. Рост &gt;15% за неделю — риск перегруза. 80/20 — Seiler polarized.</div>

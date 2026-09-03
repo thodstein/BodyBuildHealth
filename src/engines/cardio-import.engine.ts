@@ -813,6 +813,73 @@ export function parseCardioImport(fileName: string, content: string | ArrayBuffe
   return parseCardioCsv(text, fileName);
 }
 
+// ── PRO: детальные FIT-записи (сплиты HR/power/cadence) ────────────────────
+// fit-file-parser отдаёт sessions/laps + records. Для durability/decoupling
+// нужны половинки steady-усилия: считаем avgHr/power первой и второй половины.
+
+export interface FitRecordPoint {
+  hr?: number;
+  powerWatts?: number;
+  speedKmh?: number;
+  cadence?: number;
+}
+
+export interface FitDetailedSession {
+  date: string;
+  durationMin: number;
+  avgHr?: number;
+  avgPowerWatts?: number;
+  avgSpeedKmh?: number;
+  records: FitRecordPoint[];
+  firstHalfEff?: number;
+  secondHalfEff?: number;
+  decouplingPct?: number | null;
+}
+
+/** Decoupling по записям FIT: эффективность = power/HR (вело) или speed/HR (бег). */
+export function fitDecoupling(records: FitRecordPoint[], mode: 'power' | 'speed' = 'power'): number | null {
+  const effs: number[] = [];
+  for (const r of records) {
+    if (r.hr == null || r.hr <= 0) continue;
+    const out = mode === 'power' ? r.powerWatts : r.speedKmh;
+    if (out == null || out <= 0) continue;
+    effs.push(out / r.hr);
+  }
+  if (effs.length < 10) return null;
+  const half = Math.floor(effs.length / 2);
+  const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const e1 = avg(effs.slice(0, half));
+  const e2 = avg(effs.slice(half));
+  if (!(e1 > 0)) return null;
+  return Math.round((((e1 - e2) / e1) * 100) * 10) / 10;
+}
+
+/** Гистограмма HR-зон по записям FIT (границы зон передаёт вызывающий код). */
+export function fitHrZoneHistogram(records: FitRecordPoint[], bounds: number[]): number[] {
+  if (!Array.isArray(bounds) || bounds.length === 0) return [];
+  const hist = new Array(bounds.length + 1).fill(0) as number[];
+  for (const r of records) {
+    if (r.hr == null) continue;
+    let idx = bounds.findIndex(b => (r.hr as number) < b);
+    if (idx < 0) idx = bounds.length;
+    hist[idx]++;
+  }
+  return hist;
+}
+
+/** Средняя мощность/темп второй половины vs первой — флаг затухания (durability). */
+export function fitSecondHalfDrop(records: FitRecordPoint[]): { dropPct: number | null; note: string } {
+  const powers = records.map(r => r.powerWatts ?? r.speedKmh ?? null).filter((v): v is number => v != null && v > 0);
+  if (powers.length < 10) return { dropPct: null, note: 'Мало записей FIT для оценки затухания.' };
+  const half = Math.floor(powers.length / 2);
+  const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const dropPct = Math.round(((avg(powers.slice(0, half)) - avg(powers.slice(half))) / avg(powers.slice(0, half))) * 1000) / 10;
+  return {
+    dropPct,
+    note: dropPct > 10 ? `Затухание ${dropPct}% >10% — durability слабая, продлите базу.` : `Затухание ${dropPct}% — в норме (<10%).`,
+  };
+}
+
 // ── Инструкции по часам ──────────────────────────────────────────────────
 export const CARDIO_IMPORT_INSTRUCTIONS: { brand: string; steps: string[]; formats: string[] }[] = [
   {

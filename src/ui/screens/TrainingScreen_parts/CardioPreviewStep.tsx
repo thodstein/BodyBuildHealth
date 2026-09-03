@@ -9,6 +9,7 @@ import {
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
   spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
   cardioFitnessForecast, cardioCoachHints, cardioWeekLegConflicts, interferenceForCycle,
+  timeInZones, polarizationIndex, classifyTid,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -160,6 +161,16 @@ export const CardioPreviewStep: React.FC<{
     } catch { return null; }
   }, [cycle]);
 
+  const tid = useMemo(() => {
+    if (!cycle) return null;
+    try {
+      const tiz = timeInZones(cycle);
+      const pi = polarizationIndex(tiz.pct.z1, tiz.pct.z2, tiz.pct.z3);
+      const cls = classifyTid(tiz);
+      return { pi, model: cls.model };
+    } catch { return null; }
+  }, [cycle]);
+
   const SUB_TABS = [
     { id: 'overview', label: 'Обзор', icon: '📊' },
     { id: 'variants', label: 'Варианты', icon: '⇄' },
@@ -184,6 +195,7 @@ export const CardioPreviewStep: React.FC<{
     { label: 'Ккал/нед', value: String(summary.avgKcalPerWeek), color: '#f59e0b' },
     { label: 'HIIT-нед', value: String(summary.hiitWeeks), color: '#a78bfa' },
     { label: 'Цель', value: CARDIO_GOAL_LABELS[cycle.goal], color: '#94a3b8' },
+    ...(tid && tid.pi != null ? [{ label: 'POL-IDX', value: String(tid.pi), color: tid.model === 'polarized' ? '#4ade80' : tid.model === 'pyramidal' ? '#60a5fa' : '#fbbf24' }] : []),
     ...(interference ? [{ label: 'Interf.', value: `${interference.score}`, color: interference.level === 'low' ? '#4ade80' : interference.level === 'mid' ? '#fbbf24' : '#f87171' }] : []),
   ];
 

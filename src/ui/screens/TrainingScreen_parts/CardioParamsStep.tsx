@@ -115,7 +115,17 @@ export const CardioParamsStep: React.FC<{
   setTaperModel?: (m: CardioTaperModel) => void;
   maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
   setMaxHrFormula?: (f: 'classic' | 'tanaka' | 'gulati') => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula }) => {
+  lthr?: string;
+  setLthr?: (v: string) => void;
+  ftpWatts?: string;
+  setFtpWatts?: (v: string) => void;
+  talkHr?: string;
+  setTalkHr?: (v: string) => void;
+  tempC?: string;
+  setTempC?: (v: string) => void;
+  altitudeM?: string;
+  setAltitudeM?: (v: string) => void;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -135,6 +145,11 @@ export const CardioParamsStep: React.FC<{
       warnings.push('«Щадить суставы» включено, но выбран бег — бег заменяется низкоударным видом.');
     }
     const ageNum = Math.max(12, Math.min(90, Number(age) || 30));
+    const lthrNum = Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined;
+    const ftpNum = Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined;
+    const talkNum = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
+    const tempNum = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
+    const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
     try {
       const cycle = buildCardioCycle({
         goal,
@@ -158,6 +173,11 @@ export const CardioParamsStep: React.FC<{
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         periodizationModel,
         maxHrFormula,
+        lthr: lthrNum,
+        ftpWatts: ftpNum,
+        talkZone2Hr: talkNum,
+        tempC: tempNum,
+        altitudeM: altNum,
         source: 'auto',
       });
       if (daysAvailable > 0 && daysAvailable < 7) {
@@ -168,7 +188,7 @@ export const CardioParamsStep: React.FC<{
       }
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -234,6 +254,21 @@ export const CardioParamsStep: React.FC<{
         </div>
         <div style={HINT_SM}>Karvonen: ЧССмакс 220−возраст (жен. 226−). Уровень меняет объём: новичок ×0.8 / продвинутый ×1.15.</div>
       </Accordion>
+
+      {wizardMode === 'pro' && (setLthr || setFtpWatts || setTalkHr) && (
+        <Accordion id="sec-field" title="PRO: полевые тесты и среда" icon="🔬" badge={lthr ? <Badge bg="rgba(0,230,138,0.13)" border="rgba(0,230,138,0.28)" color="#4ade80">LTHR {lthr}</Badge> : undefined}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {setLthr && <NumberInput label="LTHR 30' (Friel)" value={lthr} onChange={setLthr} min={80} max={220} step={1} placeholder="165" ariaLabel="LTHR" width={100} suffix="уд/мин" />}
+            {setFtpWatts && <NumberInput label="FTP 20'×0.95 (вело)" value={ftpWatts} onChange={setFtpWatts} min={30} max={800} step={1} placeholder="250" ariaLabel="FTP" width={100} suffix="Вт" />}
+            {setTalkHr && <NumberInput label="Talk-test потолок Z2" value={talkHr} onChange={setTalkHr} min={80} max={200} step={1} placeholder="145" ariaLabel="Talk-test" width={100} suffix="уд/мин" />}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {setTempC && <NumberInput label="Жара" value={tempC} onChange={setTempC} min={-10} max={45} step={1} placeholder="22" ariaLabel="Температура" width={90} suffix="°C" />}
+            {setAltitudeM && <NumberInput label="Высота" value={altitudeM} onChange={setAltitudeM} min={0} max={5000} step={50} placeholder="0" ariaLabel="Высота" width={100} suffix="м" />}
+          </div>
+          <div style={HINT_SM}>Приоритет: LTHR 30' (Friel) → FTP 20' (Coggan) → talk-test → возраст. Жара &gt;25°C / высота &gt;1000м сдвигают зоны вверх. HIIT: HR занижает Z3 до 40% (Strepp 2024) — контролируйте по мощности/темпу.</div>
+        </Accordion>
+      )}
 
       {/* ── 2. Цель + пресеты — открыто ── */}
       <Accordion id="sec-goal" title="Цель цикла и быстрые старты" icon="🎯" defaultOpen badge={<Badge bg={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '22' : undefined} border={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '44' : undefined} color={TYPE_COLOR[goal] ?? '#fff'}>{CARDIO_GOAL_LABELS[goal]}</Badge>}>

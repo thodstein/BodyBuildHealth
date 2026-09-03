@@ -229,6 +229,12 @@ export const CardioConstructor: React.FC = () => {
   const [age, setAge] = useState(String(wizard.age ?? profileAge() ?? 30));
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
+  // PRO-калибровка (Эпик A) + среда (Эпик G): LTHR/FTP/talk-test, жара/высота
+  const [lthr, setLthr] = useState(String((wizard as WizardState).lthr ?? ''));
+  const [ftpWatts, setFtpWatts] = useState(String((wizard as WizardState).ftpWatts ?? ''));
+  const [talkHr, setTalkHr] = useState(String((wizard as WizardState).talkHr ?? ''));
+  const [tempC, setTempC] = useState(String((wizard as WizardState).tempC ?? ''));
+  const [altitudeM, setAltitudeM] = useState(String((wizard as WizardState).altitudeM ?? ''));
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
   const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
@@ -345,6 +351,11 @@ export const CardioConstructor: React.FC = () => {
 
   const build = () => {
     const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
+    const lthrNum = Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined;
+    const ftpNum = Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined;
+    const talkNum = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
+    const tempNum = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
+    const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
     const base: CardioCycleInput = {
       goal,
       totalWeeks,
@@ -367,6 +378,11 @@ export const CardioConstructor: React.FC = () => {
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
       periodizationModel,
       maxHrFormula,
+      lthr: lthrNum,
+      ftpWatts: ftpNum,
+      talkZone2Hr: talkNum,
+      tempC: tempNum,
+      altitudeM: altNum,
     };
     const vOpts = variant === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -389,6 +405,11 @@ export const CardioConstructor: React.FC = () => {
   const selectVariant = (v: CardioVariant) => {
     setVariant(v);
     const bf2 = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
+    const lthrNum2 = Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined;
+    const ftpNum2 = Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined;
+    const talkNum2 = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
+    const tempNum2 = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
+    const altNum2 = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
     const base: CardioCycleInput = {
       goal,
       totalWeeks,
@@ -412,6 +433,11 @@ export const CardioConstructor: React.FC = () => {
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
       periodizationModel,
       maxHrFormula,
+      lthr: lthrNum2,
+      ftpWatts: ftpNum2,
+      talkZone2Hr: talkNum2,
+      tempC: tempNum2,
+      altitudeM: altNum2,
     };
     const vOpts = v === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -448,6 +474,11 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.age != null) setAge(String(cfg.age));
     if (cfg.restingHr != null && cfg.restingHr > 0) setRestingHr(String(cfg.restingHr));
     if (cfg.sex) setSex(cfg.sex);
+    if (cfg.lthr != null) setLthr(String(cfg.lthr));
+    if (cfg.ftpWatts != null) setFtpWatts(String(cfg.ftpWatts));
+    if (cfg.talkZone2Hr != null) setTalkHr(String(cfg.talkZone2Hr));
+    if (cfg.tempC != null) setTempC(String(cfg.tempC));
+    if (cfg.altitudeM != null) setAltitudeM(String(cfg.altitudeM));
     setLegDays(cfg.legDays ? [...cfg.legDays] : []);
     setFactorsOn({
       sleep: cfg.sleepHours != null && cfg.sleepHours < 6,
@@ -676,10 +707,11 @@ export const CardioConstructor: React.FC = () => {
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
         variant, comps, wizardMode,
+        lthr, ftpWatts, talkHr, tempC, altitudeM,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -788,6 +820,11 @@ export const CardioConstructor: React.FC = () => {
     setAge(String(profileAge() ?? 30));
     setSex(profileSex() ?? 'male');
     setRestingHr(String(profileRestingHr() ?? ''));
+    setLthr('');
+    setFtpWatts('');
+    setTalkHr('');
+    setTempC('');
+    setAltitudeM('');
     setLegDays([]);
     setComps([]);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
@@ -1003,6 +1040,11 @@ export const CardioConstructor: React.FC = () => {
           periodizationModel={periodizationModel} setPeriodizationModel={setPeriodizationModel}
           taperModel={taperModel} setTaperModel={setTaperModel}
           maxHrFormula={maxHrFormula} setMaxHrFormula={setMaxHrFormula}
+          lthr={lthr} setLthr={setLthr}
+          ftpWatts={ftpWatts} setFtpWatts={setFtpWatts}
+          talkHr={talkHr} setTalkHr={setTalkHr}
+          tempC={tempC} setTempC={setTempC}
+          altitudeM={altitudeM} setAltitudeM={setAltitudeM}
         />
       )}
       {step === 'comps' && (
