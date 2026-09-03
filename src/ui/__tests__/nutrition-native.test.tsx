@@ -84,4 +84,20 @@ describe('NutritionScreen native hero', () => {
     fireEvent.click(planning);
     expect(container.querySelector('.nutrition-chips')).not.toBeNull();
   });
+
+  it('5. графики показывают скелетон загрузки', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector(
+        '.nutrition-hero-card[data-section="diary"]',
+      ) as HTMLElement,
+    );
+    const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
+    const charts = chips.find((c) => c.textContent?.includes('Графики')) as HTMLElement;
+    expect(charts).not.toBeNull();
+    fireEvent.click(charts);
+    expect(container.querySelector('.native-skeleton-row')).not.toBeNull();
+    expect(container.querySelectorAll('.native-skeleton').length).toBeGreaterThan(0);
+  });
 });

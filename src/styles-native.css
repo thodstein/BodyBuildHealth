@@ -1543,6 +1543,112 @@ html.app-native .native-skeleton-row {
   gap: 10px;
 }
 
+/* Стартовый экран: спиннер + скелетоны контента */
+html.app-native .native-boot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 24px;
+}
+
+html.app-native .native-boot-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+}
+
+/* ─── 30. NATIVE CASCADE — каскадные появления списков ──────── */
+@keyframes nativeCascadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+html.app-native .native-home-grid > *,
+html.app-native .training-hero-zones > *,
+html.app-native .nutrition-hero-cards > *,
+html.app-native .labs-hero-cards > *,
+html.app-native .risk-hero-cards > *,
+html.app-native .pharma-hero-cards > *,
+html.app-native .support-hero-cards > *,
+html.app-native .articles-hero-cards > *,
+html.app-native .profile-hero-nav > * {
+  animation: nativeCascadeIn 0.42s cubic-bezier(0.22, 0.68, 0, 1) backwards;
+}
+
+html.app-native .native-home-grid > *:nth-child(2),
+html.app-native .training-hero-zones > *:nth-child(2),
+html.app-native .nutrition-hero-cards > *:nth-child(2),
+html.app-native .labs-hero-cards > *:nth-child(2),
+html.app-native .risk-hero-cards > *:nth-child(2),
+html.app-native .pharma-hero-cards > *:nth-child(2),
+html.app-native .support-hero-cards > *:nth-child(2),
+html.app-native .articles-hero-cards > *:nth-child(2),
+html.app-native .profile-hero-nav > *:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+html.app-native .native-home-grid > *:nth-child(3),
+html.app-native .training-hero-zones > *:nth-child(3),
+html.app-native .nutrition-hero-cards > *:nth-child(3),
+html.app-native .labs-hero-cards > *:nth-child(3),
+html.app-native .risk-hero-cards > *:nth-child(3),
+html.app-native .pharma-hero-cards > *:nth-child(3),
+html.app-native .support-hero-cards > *:nth-child(3),
+html.app-native .articles-hero-cards > *:nth-child(3),
+html.app-native .profile-hero-nav > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+html.app-native .native-home-grid > *:nth-child(4),
+html.app-native .training-hero-zones > *:nth-child(4),
+html.app-native .nutrition-hero-cards > *:nth-child(4),
+html.app-native .labs-hero-cards > *:nth-child(4),
+html.app-native .risk-hero-cards > *:nth-child(4),
+html.app-native .pharma-hero-cards > *:nth-child(4),
+html.app-native .support-hero-cards > *:nth-child(4),
+html.app-native .articles-hero-cards > *:nth-child(4),
+html.app-native .profile-hero-nav > *:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+html.app-native .native-home-grid > *:nth-child(n+5),
+html.app-native .training-hero-zones > *:nth-child(n+5),
+html.app-native .nutrition-hero-cards > *:nth-child(n+5),
+html.app-native .labs-hero-cards > *:nth-child(n+5),
+html.app-native .risk-hero-cards > *:nth-child(n+5),
+html.app-native .pharma-hero-cards > *:nth-child(n+5),
+html.app-native .support-hero-cards > *:nth-child(n+5),
+html.app-native .articles-hero-cards > *:nth-child(n+5),
+html.app-native .profile-hero-nav > *:nth-child(n+5) {
+  animation-delay: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .native-home-grid > *,
+  html.app-native .training-hero-zones > *,
+  html.app-native .nutrition-hero-cards > *,
+  html.app-native .labs-hero-cards > *,
+  html.app-native .risk-hero-cards > *,
+  html.app-native .pharma-hero-cards > *,
+  html.app-native .support-hero-cards > *,
+  html.app-native .articles-hero-cards > *,
+  html.app-native .profile-hero-nav > * {
+    animation: none;
+  }
+  html.app-native .native-skeleton {
+    animation: none;
+  }
+}
+
 /* ─── 21. NATIVE HUBS DEEP — шапки и корни разделов ──────────── */
 html.app-native .hub-diary,
 html.app-native .hub-exec,

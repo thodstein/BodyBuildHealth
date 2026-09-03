@@ -334,9 +334,14 @@ export default function App() {
 
   const renderContent = () => {
     if (!initialized) return (
-      <div className="screen-loading">
+      <div className="screen-loading native-boot">
         <div className="loading-spinner"/>
         <span>Загрузка...</span>
+        <div className="native-boot-skeleton" aria-hidden="true">
+          <div className="native-skeleton" />
+          <div className="native-skeleton" />
+          <div className="native-skeleton" />
+        </div>
       </div>
     );
 

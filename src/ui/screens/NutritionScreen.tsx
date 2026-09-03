@@ -1432,7 +1432,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const renderContent = () => {
     switch (tab) {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} onDiaryChange={reloadDiary} /></InfoErrorBoundary>;
-      case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} targets={macroTargets} /></Suspense></InfoErrorBoundary>;
+      case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div className="native-skeleton-row" style={{padding:20}} aria-label="Загрузка графиков"><div className="native-skeleton" /><div className="native-skeleton" /><div className="native-skeleton" /></div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} targets={macroTargets} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
       case 'cart': return <InfoErrorBoundary label="Корзина"><CartTab /></InfoErrorBoundary>;
       case 'restaurant': return <InfoErrorBoundary label="Ресторан"><RestaurantTab /></InfoErrorBoundary>;
