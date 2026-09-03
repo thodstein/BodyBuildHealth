@@ -25,6 +25,7 @@ import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections'
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
+import { haptics, isOnline } from '../../../core/native-bridge';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
@@ -372,6 +373,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   }, [state.level]);
 
   const toggleWeakPoint = (wp: ArmWeakPoint) => {
+    try { void haptics('light'); } catch { /* no-op */ }
     setState(s => {
       const has = s.weakPoints.includes(wp);
       let next = has ? s.weakPoints.filter(x=>x!==wp) : [...s.weakPoints, wp].slice(0,3) as ArmWeakPoint[];
@@ -441,7 +443,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
   };
 
   // legacy-чекбокс зеркалится в чипы 12 точек (единый видимый выбор): вкл — добавляет развёртку (до 3), выкл — убирает её
-  const toggleLegacy = (k: 'cup' | 'rising' | 'pron' | 'sup' | 'side' | 'back') => setState(s => {
+  const toggleLegacy = (k: 'cup' | 'rising' | 'pron' | 'sup' | 'side' | 'back') => {
+    try { void haptics('light'); } catch { /* no-op */ }
+    setState(s => {
     const turningOn = !(s as any)[k];
     const legacyKey = k === 'pron' ? 'pronation' : k === 'sup' ? 'supination' : k;
     const expanded = LEGACY_TO_DETAILED[legacyKey] || [];
@@ -453,7 +457,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
       wp = wp.filter(p => !expanded.includes(p));
     }
     return { ...s, [k]: turningOn, weakPoints: wp } as ArmDiagState;
-  });
+    });
+  };
 
   const tablePreview = Array.from({ length: 6 }, (_, i) => {
     const wk = i + 1;
@@ -573,7 +578,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
               <option value="balanced">Сбалансировано</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option>
             </select>
           </label>
-          <label style={{ fontSize: 11, color: DIM }}>Вес кг<br/><input value={state.bwKg} onChange={e=>setState(s=>({...s, bwKg:e.target.value}))} placeholder="80" style={{ width:70, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+          <label style={{ fontSize: 11, color: DIM }}>Вес кг<br/><input inputMode="decimal" value={state.bwKg} onChange={e=>setState(s=>({...s, bwKg:e.target.value}))} placeholder="80" style={{ width:70, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
           <label style={{ fontSize: 11, color: DIM }}>Пол<br/>
             <select value={state.sex} onChange={e=>setState(s=>({...s, sex:e.target.value}))} style={{ marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }}>
               <option value="male">М</option><option value="female">Ж</option>
@@ -597,14 +602,14 @@ export const ArmDiagnosticsHub: React.FC = () => {
         {/* Tab content */}
         {tab==='grip' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-              <label style={{ fontSize: 11, color: DIM }}>RT кг<br/><input value={state.rtKg} onChange={e=>setState(s=>({...s, rtKg:e.target.value}))} placeholder="60" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Axle кг<br/><input value={state.axleKg} onChange={e=>setState(s=>({...s, axleKg:e.target.value}))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Pinch сек<br/><input value={state.pinchSec} onChange={e=>setState(s=>({...s, pinchSec:e.target.value}))} placeholder="15" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Left кг<br/><input value={state.leftKg} onChange={e=>setState(s=>({...s, leftKg:e.target.value}))} placeholder="50" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Right кг<br/><input value={state.rightKg} onChange={e=>setState(s=>({...s, rightKg:e.target.value}))} placeholder="55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 12 }}>
+              <label style={{ fontSize: 11, color: DIM }}>RT кг<br/><input inputMode="decimal" value={state.rtKg} onChange={e=>setState(s=>({...s, rtKg:e.target.value}))} placeholder="60" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Axle кг<br/><input inputMode="decimal" value={state.axleKg} onChange={e=>setState(s=>({...s, axleKg:e.target.value}))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Pinch сек<br/><input inputMode="decimal" value={state.pinchSec} onChange={e=>setState(s=>({...s, pinchSec:e.target.value}))} placeholder="15" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Left кг<br/><input inputMode="decimal" value={state.leftKg} onChange={e=>setState(s=>({...s, leftKg:e.target.value}))} placeholder="50" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: DIM }}>Right кг<br/><input inputMode="decimal" value={state.rightKg} onChange={e=>setState(s=>({...s, rightKg:e.target.value}))} placeholder="55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:8 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:8 }}>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector · WAF {weightClassAuto}</div>
                 <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%${forceVecPro.asymmetryPct>=12?' 🔴':forceVecPro.asymmetryPct>=7?' 🟠':' 🟢'}` : ''}</div>
@@ -614,9 +619,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>VBT</div>
                 <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
                 <div style={{ display:'flex', gap:6, marginTop:6 }}>
-                  <input value={state.vbtWeight} onChange={e=>setState(s=>({...s, vbtWeight:e.target.value}))} placeholder="кг" style={{ flex:1, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                  <input value={state.vbtReps} onChange={e=>setState(s=>({...s, vbtReps:e.target.value}))} placeholder="повт" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                  <input value={state.vbtVel} onChange={e=>setState(s=>({...s, vbtVel:e.target.value}))} placeholder="м/с" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                  <input inputMode="decimal" value={state.vbtWeight} onChange={e=>setState(s=>({...s, vbtWeight:e.target.value}))} placeholder="кг" style={{ flex:1, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                  <input inputMode="numeric" value={state.vbtReps} onChange={e=>setState(s=>({...s, vbtReps:e.target.value}))} placeholder="повт" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                  <input inputMode="decimal" value={state.vbtVel} onChange={e=>setState(s=>({...s, vbtVel:e.target.value}))} placeholder="м/с" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
                 </div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background: benchRes.level==='beginner'?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -643,10 +648,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
         {tab==='wrist' && (
           <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Локоть°<br/><input value={state.elbowDeg} onChange={e=>setState(s=>({...s, elbowDeg:e.target.value}))} placeholder="110" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Предплечье°<br/><input value={state.forearmDeg} onChange={e=>setState(s=>({...s, forearmDeg:e.target.value}))} placeholder="90" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Кисть°<br/><input value={state.wristDeg} onChange={e=>setState(s=>({...s, wristDeg:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
+              <label style={{ fontSize:11, color:DIM }}>Локоть°<br/><input inputMode="decimal" value={state.elbowDeg} onChange={e=>setState(s=>({...s, elbowDeg:e.target.value}))} placeholder="110" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Предплечье°<br/><input inputMode="decimal" value={state.forearmDeg} onChange={e=>setState(s=>({...s, forearmDeg:e.target.value}))} placeholder="90" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Кисть°<br/><input inputMode="decimal" value={state.wristDeg} onChange={e=>setState(s=>({...s, wristDeg:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
               <label style={{ fontSize:11, color:DIM }}>Направление<br/>
                 <select value={state.direction} onChange={e=>setState(s=>({...s, direction:e.target.value as any}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }}>
                   <option value="to_little">К мизинцу</option><option value="to_middle">К среднему</option><option value="to_thumb">К большому</option>
@@ -667,6 +672,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео (BlazePose/HANDS) — опционально</div>
               <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки.</div>
+              {!isOnline() && <div style={{ fontSize:10, color:'#f59e0b', marginTop:4 }}>📴 Офлайн (APK): Hands-модель грузится из CDN и недоступна — камера покажет картинку без live-углов, вводи углы вручную или JSON.</div>}
               <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' }}>
                 <button onClick={()=> setShowCam(v=>!v)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid', borderColor: showCam?'#22c55e':'#1f3a5f', background: showCam?'rgba(34,197,94,0.14)':'#0a1629', color: showCam?'#22c55e':DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</button>
                 <label style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:11 }}>📁 JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
@@ -825,7 +831,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b' }}>4 теста Bezkorovainyi — ARM1 Device FB5k (патент #43082)</div>
               <div style={{ fontSize:10, color:DIM }}>finger_flex (сгибание пальцев) · hammer (разгиб. молот) · hook (крюк) · cup (сгибание кисти). Введи силу кг + время достижения макс мс → получи F/t, F100, F500, градиент, F/m.</div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:8 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
               {[
                 ['fingerKg','fingerMs','Finger flex кг/мс'],
                 ['hammerKg','hammerMs','Hammer кг/мс'],
@@ -834,8 +840,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
               ].map(([kKg,kMs,label])=> (
                 <div key={kKg} style={{ padding:'8px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                   <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{label}</div>
-                  <input value={(state as any)[kKg]} onChange={e=>setState(s=>({...s, [kKg]:e.target.value}))} placeholder="кг" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11, marginBottom:4 }} />
-                  <input value={(state as any)[kMs]} onChange={e=>setState(s=>({...s, [kMs]:e.target.value}))} placeholder="мс" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                  <input inputMode="decimal" value={(state as any)[kKg]} onChange={e=>setState(s=>({...s, [kKg]:e.target.value}))} placeholder="кг" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11, marginBottom:4 }} />
+                  <input inputMode="numeric" value={(state as any)[kMs]} onChange={e=>setState(s=>({...s, [kMs]:e.target.value}))} placeholder="мс" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
                 </div>
               ))}
             </div>
@@ -857,11 +863,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}% — ${(dynamicReport as any).asymmetry.advice}` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}% ${forceVecPro.asymmetryPct>=12?'🔴':forceVecPro.asymmetryPct>=7?'🟠':'🟢'}` : 'Введи left/right хват или finger/hook обе руки')}</div>
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Wrist curl lb<br/><input value={state.wristCurlLb} onChange={e=>setState(s=>({...s, wristCurlLb:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Pron hold с<br/><input value={state.pronHoldSec} onChange={e=>setState(s=>({...s, pronHoldSec:e.target.value}))} placeholder="20" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Cup hold с<br/><input value={state.cupHoldSec} onChange={e=>setState(s=>({...s, cupHoldSec:e.target.value}))} placeholder="25" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>CoC lvl<br/><input value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
+              <label style={{ fontSize:11, color:DIM }}>Wrist curl lb<br/><input inputMode="decimal" value={state.wristCurlLb} onChange={e=>setState(s=>({...s, wristCurlLb:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Pron hold с<br/><input inputMode="numeric" value={state.pronHoldSec} onChange={e=>setState(s=>({...s, pronHoldSec:e.target.value}))} placeholder="20" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Cup hold с<br/><input inputMode="numeric" value={state.cupHoldSec} onChange={e=>setState(s=>({...s, cupHoldSec:e.target.value}))} placeholder="25" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>CoC lvl<br/><input inputMode="decimal" value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
             </div>
             <div style={{ padding:'8px 10px', borderRadius:8, background: benchRes.level==='competitive'?'rgba(34,197,94,0.08)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
               <div style={{ fontSize:11, fontWeight:700, color: benchRes.level==='competitive'?'#22c55e':'#fff' }}>Авто-уровень: {benchRes.level} · score {benchRes.avgScore} · {benchAdviceForLevel(benchRes.level)}</div>

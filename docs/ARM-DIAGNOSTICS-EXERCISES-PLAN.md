@@ -309,6 +309,21 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - Полный прогон arm-области: 37 файлов / 329 тестов зелёные (было 320 — чужие +9 тоже проходят, регрессий от моих изменений нет).
 - Функциональных правок не потребовалось — движок и хаб консистентны (ревью `arm-diagnostics-hub.engine.ts:85-132`).
 
+## 9. APK-адаптация (Capacitor WebView) — анализ и внедрение
+
+Контекст: `src/core/app-platform.ts` (`isCapacitorNative`) + `src/core/native-bridge.ts` (`haptics/shareText/saveTextFile/isOnline`, все Capacitor-импорты ленивые, контракт «без throw наружу»). Аудит своих файлов:
+
+| Точка | Статус в APK | Решение |
+|---|---|---|
+| Камера + Hands CDN (`ensureHandsModel` грузит jsdelivr) | Офлайн = CDN мёртв; раньше молчаливый fallback-тост | Офлайн-хинт в видеоблоке («Hands недоступна — ручные ползунки/JSON»), камера не блокируется (getUserMedia локален) |
+| Печать/`window.open`/Blob-скачивание | В хабе НЕТ (живут в чужом `ArmAutoConstructor` — не трогаем); мост уже даёт `saveTextFile/shareText` | Не требуется |
+| Тапы по чипам | Без отклика на телефоне | `haptics('light')` в `toggleWeakPoint/toggleLegacy` (fire-and-forget; web → vibrate/no-op, тесты целы) |
+| Сетки 5/4/3 колонок (grip/wrist/strength) | На 360px — давка (~60px/поле) | `repeat(auto-fit, minmax(...))`: 5→110px, 4→140px, 3→160px; 2-колоночные оставлены (166px — норма) |
+| Числовой ввод | Текстовая клавиатура на Android | `inputMode="decimal"` (кг/мс/углы/CoC) / `"numeric"` (повторы, секунды, мс) на всех 18 числовых полях хаба |
+| localStorage-персист (v4) | В WebView работает, quota ок для JSON-состояния | Без изменений |
+
+Внедрено только в своих файлах (`ArmDiagnosticsHub.tsx` + тесты). Тесты: inputMode-атрибуты, офлайн-хинт через `navigator.onLine=false` (с восстановлением).
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).
