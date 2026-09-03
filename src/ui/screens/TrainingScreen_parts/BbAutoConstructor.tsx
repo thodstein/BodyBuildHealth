@@ -619,6 +619,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [exerciseSwaps, setExerciseSwaps] = useState<Array<{ oldId: string; newId: string }>>(() => {
     try { const raw = localStorage.getItem('he_bb_exercise_swaps'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
   });
+  const [executionCorrections, setExecutionCorrections] = useState<Array<any>>(() => {
+    try { const raw = localStorage.getItem('he_bb_execution_corrections'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
+  });
   // Epic A: персональная калибровка MEV (личный минимум объёма). Хранится в he_bb_mev_calibration.
   const [mevCal, setMevCal] = useState<MEVCalibration | null>(() => loadMEVCalibration());
   const [mevDraft, setMevDraft] = useState<MEVSignal>({ pump: 4, soreness: 2, performance: 4 });
@@ -1360,6 +1363,16 @@ export const BbAutoConstructor: React.FC = () => {
         if (labDiag) {
           try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
         }
+        const labCorr = (payload.data as any).labCorrection;
+        if (labCorr && labCorr.type) {
+          setExecutionCorrections(prev => {
+            const next = [...prev.filter(p => p.type !== labCorr.type || p.targetId !== labCorr.targetId), labCorr].slice(-8);
+            try { localStorage.setItem('he_bb_execution_corrections', JSON.stringify(next)); } catch {}
+            return next;
+          });
+          setBridgeMsg((prev: string) => prev ? `${prev} · корр ${labCorr.type}` : `🔗 Коррекция → ББ-авто: ${labCorr.type}${labCorr.targetName ? ` ${labCorr.targetName}` : ''}`);
+          setTimeout(() => setBridgeMsg(''), 5000);
+        }
       } else if (payload.kind === 'pm' && payload.data) {
         const d: any = payload.data;
         const patch: Record<string, number> = {};
@@ -1941,8 +1954,8 @@ export const BbAutoConstructor: React.FC = () => {
     if (dupMode !== 'none') {
       plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
     }
-    // Лаборатория ББ-диагностики: замены упражнений + предпочитаемые (PROF) — применяются поверх плана до finalize-валидации
-    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0) {
+    // Лаборатория ББ-диагностики: замены + предпочитаемые + PROF-коррекции выполнения (темп/ROM/техника) — поверх плана
+    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0) {
       const swaps = exerciseSwaps.slice();
       // preferred как swap если упражнения нет в плане — добавим в первую неделю
       for (const pid of preferredExerciseIds) {
@@ -1993,7 +2006,23 @@ export const BbAutoConstructor: React.FC = () => {
           }
         }
       }
-      plan.rationale = [...(plan.rationale || []), `🧬 Лаб ББ: применены ${preferredExerciseIds.length ? `предпочтения ${preferredExerciseIds.join(', ')}` : ''}${preferredExerciseIds.length && exerciseSwaps.length ? ' · ' : ''}${exerciseSwaps.length ? `замены ${exerciseSwaps.map(s => `${s.oldId}→${s.newId}`).join(', ')}` : ''}`];
+      // PROF-коррекции выполнения (темп/ROM/техника) — меняем tempo/pause/comment у существующих упражнений
+      for (const corr of executionCorrections) {
+        const t = String(corr.type || '').toLowerCase();
+        if (t === 'modifytempo' && corr.tempo) {
+          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).tempo = corr.tempo; (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF темп ${corr.tempo}`; }
+        } else if (t === 'modifyrom') {
+          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).pauseSeconds = 1; (ex as any).stretchPhase = true; (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF ${corr.rom || 'пауза 1с в растянутой'}`; }
+        } else if (t === 'modifyexecution' && Array.isArray(corr.execCues)) {
+          const cues = corr.execCues.slice(0, 2).join(' · ');
+          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF ${cues}`; }
+        }
+      }
+      const profParts: string[] = [];
+      if (preferredExerciseIds.length) profParts.push(`предпочтения ${preferredExerciseIds.join(', ')}`);
+      if (exerciseSwaps.length) profParts.push(`замены ${exerciseSwaps.map(s => `${s.oldId}→${s.newId}`).join(', ')}`);
+      if (executionCorrections.length) profParts.push(`PROF ${executionCorrections.map(c => c.type).join(', ')}`);
+      plan.rationale = [...(plan.rationale || []), `🧬 Лаб ББ: ${profParts.join(' · ')}`];
     }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 

@@ -277,15 +277,15 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   const handleExport = () => {
-    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level });
+    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт');
+    setToast('✓ HTML экспорт (с упражнениями)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
-    const csv = buildBBDiagnosticsCsv(report);
+    const csv = buildBBDiagnosticsCsv(report, bbPlan as any);
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт');
+    setToast('✓ CSV экспорт (с упражнениями)');
     setTimeout(() => setToast(''), 2000);
   };
 
