@@ -35,7 +35,7 @@ Actions → `android-apk` → Run workflow (или push тега `v*`).
 на вашем ПК не нужны.
 
 **B. Локально терминалом (без Studio).**
-Нужны только JDK 17 + Android SDK command-line tools:
+Нужны только JDK 21 + Android SDK command-line tools:
 
 ```bash
 # разово: поставить platform-tools, platforms;android-35, build-tools;35.0.0
