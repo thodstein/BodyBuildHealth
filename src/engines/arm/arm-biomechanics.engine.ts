@@ -342,7 +342,8 @@ export function phaseForArmAngle(input: { elbowDeg: number; wristDeg: number; fo
   if (wristDeg < -5 || wristDeg > 30) return wristDeg < 0 ? 'cup_start' : 'cup_hold';
   if (forearmDeg > 130) return 'pron_lock';
   if (forearmDeg < 60) return 'sup_cup';
-  if (technique === 'press' && elbowDeg >= 120) return 'side_pin';
+  // press+120° → side_mid, а не side_pin: авто-хинт не должен первым предлагать humerus-рискованное дожимание (side_pin выбирается только вручную)
+  if (technique === 'press' && elbowDeg >= 120) return 'side_mid';
   if (technique === 'toproll' && forearmDeg >= 110) return 'pron_open';
   if (technique === 'hook' && forearmDeg <= 80) return 'sup_drag';
   return null;

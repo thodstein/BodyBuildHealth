@@ -280,6 +280,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 ### 8.4 Что осознанно НЕ тронуто
 - `exercise-catalog-arm.ts`, `arm-vbt-capture.engine.ts`, `planner-bridge-handlers.ts`, `ArmAutoConstructor.tsx`, чужие `arm-*` движки/тесты (bilateral/competition-prep/video/waf и т.д.) — границы по `git status`, кодировка только через edit-инструмент.
 
+### 8.5 Раунд 3 — чистка и безопасность хинтов
+- Хаб: удалён мёртвый `forceVec` memo (использовался только `forceVecPro`) и неиспользуемые импорты (`diagnoseArmWeakPoint`, `calcDynamicMetrics`, `ARM_BENCHMARKS`, `buildArmAcwr`, `weakPointsForTechnique`, `angleBetween`, `recordGripForce`) — все были только в import-строках, рендер не менялся.
+- `phaseForArmAngle`: press+120° теперь хинтит `side_mid`, а не `side_pin` — авто-подсказка не должна первой предлагать humerus-рискованное дожимание (`side_pin` — только ручной выбор). Тест добавлен.
+- Проверено: вся arm-область 37 файлов / 320 тестов зелёные (включая чужие PRO A-J), свои 7 файлов — 68/68.
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).

@@ -68,4 +68,7 @@ describe('arm-biomechanics 12 точек', () => {
     expect(phaseForArmAngle({ elbowDeg: 110, wristDeg: 10, forearmDeg: 140 })).toBe('pron_lock');
     expect(phaseForArmAngle({ elbowDeg: 110, wristDeg: 10, forearmDeg: 90 })).toBe(null);
   });
+  it('phaseForArmAngle для press предлагает side_mid, а не рискованный side_pin', () => {
+    expect(phaseForArmAngle({ elbowDeg: 120, wristDeg: 10, forearmDeg: 90, technique: 'press' })).toBe('side_mid');
+  });
 });

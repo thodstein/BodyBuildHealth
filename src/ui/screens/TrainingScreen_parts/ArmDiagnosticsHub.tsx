@@ -6,22 +6,21 @@
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { diagnoseArmWeakPoint, diagnoseArmWeakDetailed, expandLegacyWeakPoints } from '../../../engines/arm/arm-weakpoint.engine';
+import { diagnoseArmWeakDetailed, expandLegacyWeakPoints } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
-import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, createHandsProcessor, isAnglesVerified, angleBetween } from '../../../engines/arm/arm-motion-capture.engine';
-import { recordGripForce, estimateForceVector, getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
+import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, createHandsProcessor, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
+import { estimateForceVector, getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
-import { buildDynamicReport, calcDynamicMetrics } from '../../../engines/arm/arm-dynamic-force.engine';
+import { buildDynamicReport } from '../../../engines/arm/arm-dynamic-force.engine';
 import { loadForceTrials, addForceTrial, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
-import { resolveArmLevelByTests, ARM_BENCHMARKS, wafWeightClassFor, benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
-import { buildArmAcwr } from '../../../engines/arm/arm-acwr.engine';
+import { resolveArmLevelByTests, wafWeightClassFor, benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
-import { ARM_BIOMECH, type ArmWeakPoint, weakPointsForTechnique, isValidAngleForArmWeakPoint, angleJointForWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
+import { ARM_BIOMECH, type ArmWeakPoint, isValidAngleForArmWeakPoint, angleJointForWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -192,18 +191,6 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const bwNum = parseFloat(state.bwKg) || 80;
   const weightClassAuto = state.weightClass || wafWeightClassFor(bwNum);
-
-  const forceVec = useMemo(() => estimateForceVector(recordGripForce({
-    rtKg: state.rtKg ? parseFloat(state.rtKg) : undefined,
-    axleKg: state.axleKg ? parseFloat(state.axleKg) : undefined,
-    pinchSec: state.pinchSec ? parseFloat(state.pinchSec) : undefined,
-    sideKg: state.sideKg ? parseFloat(state.sideKg) : undefined,
-    backKg: state.backKg ? parseFloat(state.backKg) : undefined,
-    // @ts-ignore
-    leftKg: state.leftKg ? parseFloat(state.leftKg) : undefined,
-    // @ts-ignore
-    rightKg: state.rightKg ? parseFloat(state.rightKg) : undefined,
-  }) as any & { bodyWeightKg?: number; sex?: string; weightClass?: string }), [state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, bwNum, state.sex, weightClassAuto]);
 
   // локально с bw/sex/weightClass для корректного sideRef
   const forceVecPro = useMemo(() => estimateForceVector({
