@@ -48,6 +48,14 @@ export interface BBInjectionOpts {
   budget?: number;
   workMax?: Record<string, number>;
   level?: string;
+  /** MAX PRO: целевой объём сетов/нед на зону (из spec-block) */
+  targetSets?: Record<string, number>;
+  /** MAX PRO: PROF-темп на зону */
+  profTempo?: Record<string, string>;
+  /** MAX PRO: инъецировать во все недели (по умолчанию только weeks[0]) */
+  allWeeks?: boolean;
+  /** MAX PRO: предпочитаемые id упражнений (из correction-rank топ-1) */
+  preferredIds?: Record<string, string>;
 }
 
 export interface BBInjectionResult {
@@ -75,64 +83,73 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
   const uniq = [...new Set(weakZones.map(s => String(s).toLowerCase().trim()).filter(Boolean))].slice(0, 2);
 
   for (const wp of uniq) {
+    const preferred = opts.preferredIds?.[wp] || opts.preferredIds?.[canonicalMuscle(wp)];
     const corrList = BB_WEAK_CORRECTION[wp] || BB_WEAK_CORRECTION[canonicalMuscle(wp)] || [];
-    const corrId = corrList[0];
+    const corrId = preferred || corrList[0];
     if (!corrId) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
     const cat = findCatalog(corrId);
     const catName = cat ? cat.name : corrId;
     const catId = cat ? cat.id : corrId;
     const catType = cat ? cat.type : 'isolation';
-    const week = copy.weeks[0] as any;
-    if (!week || week.deload) { notes.push(`⚠ ${wp} — делод`); continue; }
-    const configuredDays = opts.dayMap?.[wp];
-    let targetSession: BBSession | null = null;
-    if (configuredDays && configuredDays.length) {
-      const dayIdx = configuredDays[0] - 1;
-      targetSession = (week.sessions as BBSession[])[dayIdx] ?? null;
-    }
-    if (!targetSession) targetSession = sessionForInjection(week, wp);
-    if (!targetSession) { notes.push(`⚠ ${wp} — нет сессии`); continue; }
-    const already = (targetSession.exercises || []).some(e => {
-      const n = String(e.exerciseName || e.name || '').toLowerCase();
-      const id = String((e as any).exerciseName || '').toLowerCase();
-      const low = corrId.toLowerCase();
-      const catNameLow = String(catName || '').toLowerCase();
-      return n === low || n === catNameLow || id === low || id === catId.toLowerCase();
-    });
-    if (already) { skippedDup++; notes.push(`⊘ ${wp} → ${catName} уже есть в дне ${targetSession.day}`); continue; }
-
-    const weeklySets = (copy.weeks[0] as any).sessions.reduce((a: number, s: any) => a + (s.exercises || []).reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-    const addSets = 3;
-    if (weeklySets + addSets > budget) { skippedBudget++; notes.push(`⊘ ${wp} → ${cat.name} превысит Budget ${budget} (сейчас ${weeklySets}+${addSets})`); continue; }
-
-    const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
+    // MAX PRO: недели — все не-делоадные при allWeeks, иначе только weeks[0]
+    const weekIdxs = opts.allWeeks
+      ? (copy.weeks as any[]).map((w, i) => ({ w, i })).filter(({ w }) => w && !w.deload).map(({ i }) => i)
+      : [0].filter((i) => (copy.weeks as any[])[i] && !(copy.weeks as any[])[i].deload);
+    if (weekIdxs.length === 0) { notes.push(`⚠ ${wp} — делод`); continue; }
     const muscleKey = canonicalMuscle(wp);
+    const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const base = wm[muscleKey] ?? wm[wp] ?? 50;
     const weight = Math.round(base * 0.65 / 2.5) * 2.5; // 65% для изоляции
     const reps = muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10;
     const rir = 2;
-    const tempo = '2-1-1-0';
+    const tempo = opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
     const rest = 90;
-    const ex: BBExercise = {
-      muscle: muscleKey,
-      name: catName,
-      role: 'accessory' as const,
-      character: 'pump' as any,
-      sets: addSets,
-      repsRange: [reps, reps + 2] as [number, number],
-      rir,
-      workSets: Array.from({ length: addSets }, () => ({ reps, rir, weight, tempo, restSeconds: rest } as any)),
-      exerciseName: catId,
-      exerciseType: catType,
-      tempoSpec: tempo,
-      restSeconds: rest,
-      comment: `🩺 ББ-диагностика: ${wp} → ${catName} 3×${reps} @65%`,
-      warmupSets: [],
-    } as any;
-    targetSession.exercises.push(ex);
-    if (typeof week.totalSets === 'number') week.totalSets += addSets;
-    injected++;
-    notes.push(`✓ ${wp} → ${catName} в день ${targetSession.day} 3×${reps} @65%`);
+    const wantSets = Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
+    for (const wi of weekIdxs) {
+      const week = (copy.weeks as any[])[wi] as any;
+      const configuredDays = opts.dayMap?.[wp] || opts.dayMap?.[muscleKey];
+      let targetSession: BBSession | null = null;
+      if (configuredDays && configuredDays.length) {
+        const dayIdx = configuredDays[0] - 1;
+        targetSession = (week.sessions as BBSession[])[dayIdx] ?? null;
+      }
+      if (!targetSession) targetSession = sessionForInjection(week, wp);
+      if (!targetSession) { notes.push(`⚠ ${wp} — нед ${wi + 1}: нет сессии`); continue; }
+      const already = (targetSession.exercises || []).some(e => {
+        const n = String(e.exerciseName || e.name || '').toLowerCase();
+        const id = String((e as any).exerciseName || '').toLowerCase();
+        const low = corrId.toLowerCase();
+        const catNameLow = String(catName || '').toLowerCase();
+        return n === low || n === catNameLow || id === low || id === catId.toLowerCase();
+      });
+      if (already) { skippedDup++; continue; }
+
+      const weeklySets = (week as any).sessions.reduce((a: number, s: any) => a + (s.exercises || []).reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
+      const addSets = wantSets;
+      if (weeklySets + addSets > budget) { skippedBudget++; notes.push(`⊘ ${wp} нед ${wi + 1} → ${catName} превысит Budget ${budget} (сейчас ${weeklySets}+${addSets})`); continue; }
+
+      const ex: BBExercise = {
+        muscle: muscleKey,
+        name: catName,
+        role: 'accessory' as const,
+        character: 'pump' as any,
+        sets: addSets,
+        repsRange: [reps, reps + 2] as [number, number],
+        rir,
+        workSets: Array.from({ length: addSets }, () => ({ reps, rir, weight, tempo, restSeconds: rest } as any)),
+        exerciseName: catId,
+        exerciseType: catType,
+        tempoSpec: tempo,
+        restSeconds: rest,
+        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}`,
+        warmupSets: [],
+      } as any;
+      targetSession.exercises.push(ex);
+      if (typeof week.totalSets === 'number') week.totalSets += addSets;
+      injected++;
+      if (!opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в день ${targetSession.day} ${addSets}×${reps} @65%`);
+    }
+    if (opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в ${weekIdxs.length} нед по ${wantSets} сетов (${tempo})`);
   }
 
   if (injected > 0) {

@@ -24,6 +24,7 @@ export type DiagnosisFlag =
   | 'romGap'
   | 'executionGap'
   | 'mindMuscleGap'
+  | 'tutGap'
   | 'profGap';
 
 export interface DiagnosisCtx {
@@ -36,8 +37,10 @@ export interface DiagnosisCtx {
   asymPct?: number | null;
   planTempo?: string | null;
   planPauseSeconds?: number | null;
+  planReps?: number | null;
   singleAngleMuscle?: string | null; // если мышца имеет 1 угол при ≥6 сетов
   uncoveredSubregions?: string[]; // из аудита
+  strictMissing?: string[]; // строгие группы мышцы, отсутствующие в плане
 }
 
 export interface ExerciseDiagnosis {
@@ -96,19 +99,24 @@ export function diagnoseExercise(
     issues.push(`Сустав high + ограничение мобильности ${muscle}`);
   }
 
-  // 4 uncoveredSubregion
+  // 4 uncoveredSubregion — только если упражнение реально не закрывает missing (по имени/углу)
   if (ctx.uncoveredSubregions && ctx.uncoveredSubregions.length && muscle) {
-    // если упражнение не закрывает ни один uncovered — флаг (упростим: всегда флаг если есть uncovered)
-    flags.push('uncoveredSubregion');
-    issues.push(`Подрегионы не покрыты: ${ctx.uncoveredSubregions.slice(0, 3).join(', ')}`);
+    const nm = String(effect.name || '').toLowerCase();
+    const closes = ctx.uncoveredSubregions.some((r) => nm.includes(String(r).toLowerCase()) || String(effect.angleClass || '').toLowerCase().includes(String(r).toLowerCase()));
+    if (!closes) {
+      flags.push('uncoveredSubregion');
+      issues.push(`Подрегионы не покрыты: ${ctx.uncoveredSubregions.slice(0, 3).join(', ')}`);
+    }
   }
 
-  // 5 missingStrict
-  if (effect.strictGroup === null && muscle) {
-    // проверим что мышца вообще имеет строгие группы
-    // если у мышцы есть строгие но упражнение вне них
+  // 5 missingStrict — только если у мышцы есть missing и упражнение не из missing-группы
+  if (muscle) {
     const hasStrict = ['chest', 'back', 'hamstrings', 'quads'].includes(muscle);
-    if (hasStrict) {
+    const missing = ctx.strictMissing || [];
+    if (missing.length > 0 && (!effect.strictGroup || !missing.map((s) => s.toLowerCase()).includes(String(effect.strictGroup.key).toLowerCase()))) {
+      flags.push('missingStrict');
+      issues.push(`Нет строгой группы: ${missing.slice(0, 2).join(', ')} — ротация внутри группы обязательна`);
+    } else if (missing.length === 0 && effect.strictGroup === null && hasStrict) {
       flags.push('missingStrict');
       issues.push(`Вне строгой группы ${muscle} — ротация внутри группы обязательна`);
     }
@@ -209,6 +217,20 @@ export function diagnoseExercise(
     }
   }
 
+  // 13 tutGap: TUT подхода вне 30-70с (Schoenfeld 2015: >10с/повт хуже; Wilk 2021: эксцентрик 2-4с)
+  try {
+    const reps = Number((ex as any).reps ?? ctx.planReps ?? 10);
+    const tt = String(actualTempo || '').trim();
+    if (tt && tt.includes('-') && Number.isFinite(reps) && reps > 0) {
+      const per = tt.split('-').map((p) => Number(p.trim())).reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
+      const tut = per * reps;
+      if (tut > 0 && (tut < 30 || tut > 70)) {
+        flags.push('tutGap');
+        issues.push(`TUT ${tut}с вне 30-70с — ${tut < 30 ? 'добавь паузу/эксцентрику' : 'снизь темп/повторы'}`);
+      }
+    }
+  } catch { /* noop */ }
+
   // prof gaps
   const profGaps = diagnoseExecutionProf(ex as any, muscle || '', { tempo: actualTempo || undefined, pauseSeconds: Number(ex.pauseSeconds ?? ctx.planPauseSeconds ?? 0) || 0 } as any);
   if (profGaps.length) {
@@ -216,13 +238,18 @@ export function diagnoseExercise(
     for (const g of profGaps) issues.push(g.issue);
   }
 
-  // score 0-100: 100 - 8*flags - profGaps*6 - joint high penalty
+  // score 0-100: взвешенный (критичные тяжелее шума)
+  const WEIGHTS: Record<string, number> = {
+    lowSFRHighFatigue: 12, jointRisk: 12, patternMismatch: 10, unilateralGap: 8,
+    wrongProfileForGoal: 8, singleAngle: 7, missingStrict: 6, tempoMismatch: 6,
+    romGap: 6, mindMuscleGap: 7, executionGap: 6, profGap: 6, tutGap: 4, uncoveredSubregion: 4,
+  };
+  const uniq = [...new Set(flags)];
   let score = 100;
-  score -= flags.length * 8;
-  score -= profGaps.length * 6;
+  for (const f of uniq) score -= WEIGHTS[f] ?? 6;
   if (effect.jointStress === 'high') score -= 6;
   if (effect.sfr != null && effect.sfr <= 2) score -= 8;
   score = Math.max(0, Math.min(100, Math.round(score)));
 
-  return { effect, flags: [...new Set(flags)], issues: [...new Set(issues)].slice(0, 8), score, profGaps };
+  return { effect, flags: uniq, issues: [...new Set(issues)].slice(0, 8), score, profGaps };
 }

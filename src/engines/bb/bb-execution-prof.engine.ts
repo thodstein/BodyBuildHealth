@@ -131,6 +131,30 @@ const PROF_DB: Record<string, ProfExecutionProfile> = {
     errors: ['Короткая амплитуда', 'Пружинишь'],
     mindMuscle: 'Растяни внизу, сожми вверху',
   },
+  traps: {
+    muscle: 'traps', label: 'Трапеции',
+    angle: 'Шраги вертикально', elbow: 'Руки прямые', scapula: 'Лопатки вверх-назад, пауза 2с',
+    tempo: '2-2-1-1', rom: 'Пауза 2с вверху в сокращении',
+    cues: ['Руки прямые, тяни плечами к ушам', 'Пауза 2с вверху', '2с негатив, без рывка', 'Шея нейтраль, взгляд вперёд'],
+    errors: ['Рывок корпусом', 'Крутишь плечами', 'Нет паузы'],
+    mindMuscle: 'Подними плечи к ушам и сожми на 2с',
+  },
+  forearms: {
+    muscle: 'forearms', label: 'Предплечья',
+    angle: 'Сгибание кистей/пронация', elbow: 'Предплечья на скамье', scapula: '-',
+    tempo: '2-1-1-1', rom: 'Полная амплитуда кисти, пауза 1с',
+    cues: ['Предплечья фиксированы на скамье', 'Полная амплитуда кисти', 'Пауза 1с в пике', 'Молот нейтрально для брахиорадиалиса'],
+    errors: ['Читинг локтями', 'Короткая амплитуда'],
+    mindMuscle: 'Только кисти движутся',
+  },
+  abs: {
+    muscle: 'abs', label: 'Пресс',
+    angle: 'Скручивание таза к груди', elbow: '-', scapula: 'Поясница прижата',
+    tempo: '2-1-1-1', rom: 'Пиковое сокращение 1с, без рывка',
+    cues: ['Поясница прижата к полу/скамье', 'Скручивай таз к груди, не тяни шею', 'Пауза 1с в пике, 2с негатив', 'Выдох на усилии'],
+    errors: ['Тянешь шею', 'Рывок/инерция', 'Прогиб поясницы'],
+    mindMuscle: 'Сожми пресс как гармошку',
+  },
 };
 
 export function getProfExecutionProfile(muscle: string): ProfExecutionProfile | null {
@@ -149,6 +173,16 @@ export function getProfExecutionProfile(muscle: string): ProfExecutionProfile | 
 
 export function listProfMuscles(): string[] {
   return Object.keys(PROF_DB);
+}
+
+/** TUT подхода: сумма фаз темпа × повторы (MAX PRO). tempo "3-1-1-0" = 5с/повт. */
+export function tutFor(tempo: string | null | undefined, reps: number): number | null {
+  if (!tempo || !Number.isFinite(reps) || reps <= 0) return null;
+  const parts = String(tempo).split('-').map((p) => Number(p.trim()));
+  if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  const per = parts.reduce((a, b) => a + b, 0);
+  if (per <= 0) return null;
+  return Math.round(per * reps);
 }
 
 export interface ProfGap {

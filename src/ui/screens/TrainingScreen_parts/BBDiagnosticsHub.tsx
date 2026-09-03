@@ -29,6 +29,10 @@ import { getProfExecutionProfile } from '../../../engines/bb/bb-execution-prof.e
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { sfrOf } from '../../../engines/bb/bb-sfr-db';
+import { diagnoseWeakCause } from '../../../engines/bb/bb-weak-cause.engine';
+import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
+import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
+import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../../../engines/bb/bb-symmetry.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
@@ -44,6 +48,11 @@ type BBState = {
   exerciseFilterSfr: number;
   exerciseFilterProfile: string;
   exerciseFilterUnilateral: boolean;
+  wristCm: string;
+  sex: '' | 'male' | 'female';
+  sleepHours: string;
+  specWeeks: string;
+  showSpecBlock: boolean;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -57,6 +66,11 @@ const DEFAULT_STATE: BBState = {
   exerciseFilterSfr: 0,
   exerciseFilterProfile: 'all',
   exerciseFilterUnilateral: false,
+  wristCm: '',
+  sex: '',
+  sleepHours: '',
+  specWeeks: '8',
+  showSpecBlock: false,
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -216,6 +230,27 @@ export const BBDiagnosticsHub: React.FC = () => {
   const sLevel = report.score.level;
   const sColor = bbScoreColor(sLevel);
 
+  // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
+  const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
+  const mcCallum = useMemo(() => (Number.isFinite(wristNum) && wristNum > 0 ? idealMcCallumMap(wristNum) : null), [wristNum]);
+  const triadDev = useMemo(() => {
+    try {
+      const n = (k: string): number | null => { const v = parseFloat((state.circ as any)[k] || ''); return Number.isFinite(v) && v > 0 ? v : null; };
+      const b = n('bicepL') ?? n('bicepR') ?? (measNum as any).bicep ?? null;
+      const c = n('calfL') ?? n('calfR') ?? null;
+      const nk = n('neck');
+      return symmetryTriadDeviation({ neck: nk, bicep: b, calf: c });
+    } catch { return null; }
+  }, [state.circ, measNum]);
+  const femaleNotes = useMemo(() => {
+    try {
+      if (state.sex !== 'female') return [];
+      const w = parseFloat(state.circ.waist || ''); const h = parseFloat(state.circ.hips || '');
+      return femaleSymmetryNotes({ waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: null });
+    } catch { return []; }
+  }, [state.sex, state.circ]);
+  const sleepNum = state.sleepHours ? parseFloat(state.sleepHours) : null;
+
   const toggleWeak = (id: string) => {
     setState(s => {
       const has = s.weakManual.includes(id);
@@ -240,9 +275,35 @@ export const BBDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
       return;
     }
+    // MAX PRO payload: причины + топ-3 + спец-блок (лениво, без TDZ — считается внутри хендлера)
+    let weakCausesPayload: Record<string, unknown> = {};
+    let topIds: string[] = [];
+    let specPayload: unknown = null;
+    try {
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const lm = getVolumeLandmarks(level, z);
+        const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
+        const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
+        weakCausesPayload[z] = diagnoseWeakCause({
+          zone: z,
+          factHistory: fact != null ? [fact] : [],
+          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
+          acwrZone: acwrZ,
+          sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+          vbtLossPct: vbt?.lossPct ?? null,
+        });
+      }
+    } catch { /* noop */ }
+    try {
+      const f: Record<string, number> = {};
+      for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
+      specPayload = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const first = report.weakZonesGranular[0];
+      if (first) topIds = rankCorrectionsForWeak(first, null, { level, sex: state.sex || undefined }).slice(0, 1).map((r) => r.id);
+    } catch { /* noop */ }
     applyToPlanner({
       kind: 'weakpoints',
-      label: `ББ диагностика: ${report.weakZonesGranular.join(', ')}`,
+      label: `ББ диагностика MAX PRO: ${report.weakZonesGranular.join(', ')}`,
       data: {
         groups: report.weakZonesGranular,
         weakPoints: report.weakZonesGranular,
@@ -252,6 +313,10 @@ export const BBDiagnosticsHub: React.FC = () => {
         symmetry: report.symmetry, stimulus: report.stimulus, perMuscleAcwr,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         vbt: vbt ? { lossPct: vbt.lossPct, zone: vbt.zone } : null,
+        weakCauses: weakCausesPayload,
+        preferredExerciseIds: topIds,
+        specBlock: specPayload,
+        sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
       } as any,
       source: 'intellectual',
     });
@@ -295,9 +360,19 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   const handleExport = () => {
-    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan } as any);
+    let causes: Record<string, unknown> = {};
+    let spec: unknown = null;
+    try {
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const lm = getVolumeLandmarks(level, z);
+        causes[z] = diagnoseWeakCause({ zone: z, mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null });
+      }
+      const f: Record<string, number> = {};
+      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+    } catch { /* noop */ }
+    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakCauses: causes as any, specBlock: spec as any } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт (с упражнениями)');
+    setToast('✓ HTML экспорт (причины + спец-блок + упражнения)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
@@ -328,6 +403,67 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { return bbPlan ? auditPlanExercises(bbPlan) : null; } catch { return null; }
   }, [bbPlan]);
 
+  // ── MAX PRO: причины + спец-блок + топ-3 (после planAudit/bbPlan — порядок важен) ──
+  const weakCauses = useMemo(() => {
+    const out: Record<string, ReturnType<typeof diagnoseWeakCause>> = {};
+    for (const z of report.weakZonesGranular.slice(0, 2)) {
+      try {
+        const lm = getVolumeLandmarks(level, z);
+        const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
+        const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
+        const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+        out[z] = diagnoseWeakCause({
+          zone: z,
+          factHistory: fact != null ? [fact] : [],
+          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
+          e1rmDeltaPct: null, e1rmSessions: 0,
+          acwrZone: acwrZ,
+          sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+          vbtLossPct: vbt?.lossPct ?? null,
+          hasLengthened: aud ? aud.lengthened > 0 : undefined,
+          singleAngle: aud ? (aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6) : false,
+          missingStrict: aud ? aud.strictCoverage.missing.length > 0 : false,
+          tempoMismatch: false,
+          avgSfr: aud?.avgSfr ?? null,
+          idealDeltaPct: null,
+          weeksAtMavClean: 0,
+        });
+      } catch { /* noop */ }
+    }
+    return out;
+  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit]);
+  const specBlock = useMemo(() => {
+    try {
+      if (!report.weakZonesGranular.length) return null;
+      const f: Record<string, number> = {};
+      for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
+      return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+    } catch { return null; }
+  }, [report.weakZonesGranular, factVolume, level, state.specWeeks, state.sex]);
+  const top3ByZone = useMemo(() => {
+    const out: Record<string, ReturnType<typeof rankCorrectionsForWeak>> = {};
+    for (const z of report.weakZonesGranular.slice(0, 2)) {
+      try {
+        const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+        const asym = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
+        const inPlan: string[] = [];
+        try {
+          if (bbPlan) for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) inPlan.push(String((ex as any).exerciseName || (ex as any).name || ''));
+        } catch { /* noop */ }
+        out[z] = rankCorrectionsForWeak(z, null, {
+          cause: weakCauses[z]?.cause,
+          asymPct: asym,
+          level,
+          missingAngles: aud?.angleCoverage.missing || [],
+          missingStrict: aud?.strictCoverage.missing || [],
+          inPlanIds: inPlan,
+          sex: state.sex || undefined,
+        }).slice(0, 3);
+      } catch { out[z] = []; }
+    }
+    return out;
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, state.sex, planAudit, bbPlan]);
+
   const selectedExRaw = useMemo(() => {
     const id = state.exerciseSelectedId;
     if (!id) return null;
@@ -352,18 +488,23 @@ export const BBDiagnosticsHub: React.FC = () => {
       })();
       const singleAngleMuscle = planAudit ? Object.entries(planAudit.byMuscle).find(([, bm]) => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6)?.[0] || null : null;
       const uncovered = planAudit?.byMuscle[selectedExRaw.muscle || '']?.regionalCoverage.missing || [];
+      const strictMissing = planAudit?.byMuscle[selectedExRaw.muscle || '']?.strictCoverage.missing || [];
       return diagnoseExercise(selectedExRaw as any, {
         goal: 'hypertrophy', level, weakZones: report.weakZonesGranular, weakMusclesCanonical: report.weakMusclesCanonical,
-        muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null,
-        singleAngleMuscle, uncoveredSubregions: uncovered,
+        muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null, planReps: 10,
+        singleAngleMuscle, uncoveredSubregions: uncovered, strictMissing,
       } as any);
     } catch { return null; }
   }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit]);
 
   const selectedCorrections = useMemo(() => {
     if (!selectedDiagnosis || !selectedExRaw) return [];
-    try { return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle }); } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level]);
+    try {
+      const asym = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
+      const aud = (() => { try { return planAudit?.byMuscle?.[selectedExRaw.muscle || '']; } catch { return null; } })();
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, asymPct: asym, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
+    } catch { return []; }
+  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, planAudit, state.sex]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -440,6 +581,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые зоны + упражнение → диагноз 12 флагов + PROF «как дать в мышцу» → Δ-эффект. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны + технику/темп/замену в конструктор (SFR + lengthened + паттерн).
         </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 10 }}>
+          <span style={{ padding: '4px 8px', borderRadius: 999, background: Object.keys(measNum).length >= 3 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: Object.keys(measNum).length >= 3 ? '#22c55e' : '#f59e0b' }}>1.Замеры {Object.keys(measNum).length >= 3 ? '✓' : '→ Симметрия'}</span>
+          <span style={{ padding: '4px 8px', borderRadius: 999, background: diarySessions.length >= 4 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: diarySessions.length >= 4 ? '#22c55e' : '#f59e0b' }}>2.Дневник/план {diarySessions.length >= 4 ? `✓ ${diarySessions.length}` : '→ введи тренировки'}</span>
+          <span style={{ padding: '4px 8px', borderRadius: 999, background: report.weakZonesGranular.length ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: report.weakZonesGranular.length ? '#22c55e' : DIM }}>3.Коррекция {report.weakZonesGranular.length ? `→ ${report.weakZonesGranular.join(', ')}` : '— выбери зону'}</span>
+          <label style={{ marginLeft: 'auto', color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>Пол <select value={state.sex} onChange={e => setState(s => ({ ...s, sex: e.target.value as any }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '3px 6px', fontSize: 10 }}><option value="">—</option><option value="male">М</option><option value="female">Ж</option></select></label>
+          <label style={{ color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>Сон <input value={state.sleepHours} onChange={e => setState(s => ({ ...s, sleepHours: e.target.value }))} placeholder="7.5" style={{ width: 44, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '3px 6px', fontSize: 10 }} /></label>
+        </div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
 
@@ -465,6 +613,29 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: DIM, background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>
               Выбрано: {report.weakZonesGranular.join(', ') || '—'} → канонические: {report.weakMusclesCanonical.join(', ') || '—'} (×1.15 объём + бонус упражнения в ББ-авто)
             </div>
+            {report.weakZonesGranular.length > 0 && (
+              <div style={{ marginTop: 6, display: 'grid', gap: 6 }}>
+                {report.weakZonesGranular.slice(0, 2).map((z) => {
+                  const c = weakCauses[z];
+                  if (!c) return null;
+                  const col = c.cause === 'recovery' ? '#ef4444' : c.cause === 'volume' ? '#f59e0b' : '#a78bfa';
+                  return (
+                    <div key={z} style={{ padding: '8px 10px', borderRadius: 8, background: `${col}0f`, border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
+                      <b style={{ color: col }}>{z}: причина — {c.cause} ({Math.round(c.confidence * 100)}%)</b>
+                      <div style={{ color: DIM }}>{c.evidence.join(' · ') || '—'}</div>
+                      <div style={{ color: '#fff' }}>Чинить: {c.fix}</div>
+                      {top3ByZone[z] && top3ByZone[z].length > 0 && (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {top3ByZone[z].map((r, i) => (
+                            <span key={r.id} title={r.reason} style={{ padding: '2px 7px', borderRadius: 20, background: i === 0 ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${i === 0 ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.08)'}`, color: i === 0 ? '#00e68a' : '#fff', fontWeight: 700 }}>#{i + 1} {r.name} · {r.reason}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ fontSize: 10, color: '#fff', marginTop: 6, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', borderRadius: 8, padding: '8px 10px' }}>
               Подсказка: две зоны одной мышцы (delt_mid+delt_rear) — можно, плечи+delt_mid — конфликт.
             </div>
@@ -473,7 +644,7 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'symmetry' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Симметрия — замеры (см) + идеал Reeves</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Симметрия — замеры (см) + идеал Reeves/McCallum</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               {['heightCm', 'weightKg', 'chest', 'waist', 'shoulderWidth', 'neck'].map(k => (
                 <label key={k} style={{ fontSize: 10, color: DIM }}>{k}<br /><input value={state.circ[k] || ''} onChange={e => setState(s => ({ ...s, circ: { ...s.circ, [k]: e.target.value } }))} placeholder={k} style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
@@ -484,6 +655,13 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <label key={k} style={{ fontSize: 10, color: DIM }}>{k}<br /><input value={state.circ[k] || ''} onChange={e => setState(s => ({ ...s, circ: { ...s.circ, [k]: e.target.value } }))} placeholder={k} style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
               ))}
             </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+              <label style={{ fontSize: 10, color: DIM }}>Запястье см (McCallum)<br /><input value={state.wristCm} onChange={e => setState(s => ({ ...s, wristCm: e.target.value }))} placeholder="17.5" style={{ width: 110, marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
+              <label style={{ fontSize: 10, color: DIM }}>Пол<br /><select value={state.sex} onChange={e => setState(s => ({ ...s, sex: e.target.value as any }))} style={{ marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}><option value="">—</option><option value="male">М</option><option value="female">Ж</option></select></label>
+              {mcCallum && <span style={{ fontSize: 10, color: '#60a5fa', alignSelf: 'end' }}>McCallum: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}
+              {triadDev != null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: triadDev >= 12 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: triadDev >= 12 ? '#ef4444' : '#22c55e', alignSelf: 'end' }}>Триада шея=биц=икры Δ {triadDev}%</span>}
+            </div>
+            {femaleNotes.length > 0 && <div style={{ fontSize: 10, color: '#f9a8d4', background: 'rgba(249,168,212,0.06)', border: '1px solid rgba(249,168,212,0.14)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>{femaleNotes.join(' · ')}</div>}
             <div style={{ padding: '8px 10px', borderRadius: 8, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${report.symmetry.score < 70 ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
               <div style={{ fontSize: 10, color: DIM }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${k} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
@@ -702,7 +880,12 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'recovery' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Восстановление — per-muscle ACWR + Unified snapshot</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Восстановление — per-muscle ACWR + сон/VBT + Unified snapshot</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ fontSize: 10, color: DIM }}>Сон ч/ночь <input value={state.sleepHours} onChange={e => setState(s => ({ ...s, sleepHours: e.target.value }))} placeholder="7.5" style={{ width: 52, marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }} /></label>
+              {sleepNum != null && Number.isFinite(sleepNum) && sleepNum < 6.5 && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>Сон {sleepNum}ч — сначала сон, +объём запрещён</span>}
+              {vbt && vbt.lossPct > 30 && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b' }}>VBT −{vbt.lossPct}% → RIR+1, делоад</span>}
+            </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {Object.entries(perMuscleAcwr).length ? Object.entries(perMuscleAcwr).map(([m, v]) => {
                 const col = v.zone === 'dangerous' ? '#ef4444' : v.zone === 'caution' ? '#f59e0b' : v.zone === 'undertrained' ? '#3b82f6' : '#22c55e';
@@ -766,6 +949,17 @@ export const BBDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {report.weakZonesGranular.join(' · ') || '— баланс'} · score {score} · ver {report.score.verification} {report.score.floors.join(' · ')}</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{report.findings.slice(0, 3).join(' · ') || '—'}</div>
         {sLevel === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>⚠️ CRITICAL — урезание MRV и коррекция до пика. Проверь OHS + объём.</div>}
+        {specBlock && (
+          <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 10, lineHeight: 1.5 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+              <b style={{ color: '#a78bfa' }}>Спец-блок {specBlock.lengthWeeks} нед: {report.weakZonesGranular.join(', ')}</b>
+              <label style={{ marginLeft: 'auto', color: DIM }}>нед <input value={state.specWeeks} onChange={e => setState(s => ({ ...s, specWeeks: e.target.value }))} style={{ width: 36, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '2px 6px', fontSize: 10 }} /></label>
+              <button onClick={() => setState(s => ({ ...s, showSpecBlock: !s.showSpecBlock }))} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>{state.showSpecBlock ? 'Скрыть' : 'Недели'}</button>
+            </div>
+            <div style={{ color: DIM }}>{specBlock.rationale.join(' · ')}</div>
+            {state.showSpecBlock && <div style={{ marginTop: 4, color: '#fff' }}>{specBlock.weeks.slice(0, 8).map((w) => `Н${w.week}: ${Object.entries(w.targetSets).map(([k, v]) => `${k} ${v}`).join(', ')} ×${Object.entries(w.frequency).map(([, f]) => `${f}`).join('/')}/нед`).join(' · ')}</div>}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ББ-авто ({report.weakZonesGranular.join(', ') || 'баланс'})</button>
           <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>

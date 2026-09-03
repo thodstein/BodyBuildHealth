@@ -9,6 +9,7 @@ import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import type { ExerciseDiagnosis } from './bb-exercise-diagnosis.engine';
 import { sfrOf } from './bb-sfr-db';
 import { isMobilityRestricted } from './bb-mobility.engine';
+import { rankCorrectionsForWeak } from './bb-correction-rank.engine';
 
 export type CorrectionType =
   | 'substitute'
@@ -41,10 +42,23 @@ function findCatalog(idOrName: string) {
 function rankSubstituteCandidates(
   ex: { id?: string | null; name: string; muscle?: string | null },
   diagnosis: ExerciseDiagnosis,
-  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null },
+  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string },
 ): Array<{ id: string; name: string; score: number; reason: string }> {
   const muscle = String(ctx.muscle || ex.muscle || '').toLowerCase();
   const curId = ex.id || '';
+  // MAX PRO ранжир (статический импорт, без require — ESM/browser-safe)
+  try {
+    const ranked = rankCorrectionsForWeak(muscle, null, {
+      asymPct: ctx.asymPct ?? null,
+      equipment: ctx.equipment,
+      level: ctx.level,
+      missingAngles: ctx.missingAngles,
+      missingStrict: ctx.missingStrict,
+      inPlanIds: [...(ctx.inPlanIds || []), ...(curId ? [curId] : [])],
+      sex: ctx.sex,
+    });
+    if (ranked.length > 0) return ranked.map((r) => ({ id: r.id, name: r.name, score: r.score, reason: r.reason }));
+  } catch { /* fallback ниже */ }
   const pool = EXERCISE_CATALOG.filter(c => {
     if (muscle && c.group !== muscle) return false;
     if (c.id === curId) return false;
@@ -79,7 +93,7 @@ function rankSubstituteCandidates(
 export function prescribeCorrections(
   diagnosis: ExerciseDiagnosis,
   ex: { id?: string | null; name: string; muscle?: string | null; tempo?: string; pauseSeconds?: number },
-  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[] } = {},
+  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[]; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string } = {},
 ): CorrectionAction[] {
   const out: CorrectionAction[] = [];
   const muscle = String(ctx.muscle || ex.muscle || diagnosis.effect.muscle || '').toLowerCase();

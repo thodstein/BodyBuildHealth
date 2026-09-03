@@ -1374,6 +1374,20 @@ export const BbAutoConstructor: React.FC = () => {
           setBridgeMsg((prev: string) => prev ? `${prev} · корр ${labCorr.type}` : `🔗 Коррекция → ББ-авто: ${labCorr.type}${labCorr.targetName ? ` ${labCorr.targetName}` : ''}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
+        // MAX PRO: спец-блок из диагностики (недели/доноры/dayMap) + причины
+        const spec = (payload.data as any).specBlock as { lengthWeeks?: number; donors?: string[]; dayMap?: Record<string, number[]> } | undefined;
+        if (spec && normalized.length > 0) {
+          const wks = Math.max(3, Math.min(6, Math.round(spec.lengthWeeks ?? 5)));
+          const donors = Array.isArray(spec.donors) ? spec.donors.map((d) => String(d)).slice(0, 2) : [];
+          setSpecBlocks([{ id: 'spec-block-1', weeks: wks, targets: normalized, tradeoffMode: donors.length ? 'reduce_direct_to_floor' as const : 'none' as const, donors }]);
+          try { localStorage.setItem('he_bb_last_spec_block', JSON.stringify(spec)); } catch {}
+          setBridgeMsg((prev: string) => prev ? `${prev} · спец-блок ${wks} нед` : `🔗 Спец-блок → ББ-авто: ${wks} нед`);
+          setTimeout(() => setBridgeMsg(''), 5000);
+        }
+        const causes = (payload.data as any).weakCauses;
+        if (causes && typeof causes === 'object') {
+          try { localStorage.setItem('he_bb_last_weak_causes', JSON.stringify(causes)); } catch {}
+        }
       } else if (payload.kind === 'pm' && payload.data) {
         const d: any = payload.data;
         const patch: Record<string, number> = {};

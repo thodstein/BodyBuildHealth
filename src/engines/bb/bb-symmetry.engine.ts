@@ -164,3 +164,46 @@ export function idealReevesMap(heightCm: number): Record<string, number> {
     neck: idealFor('neck', heightCm),
   };
 }
+
+/**
+ * Идеалы McCallum по запястью (канон классики, MAX PRO).
+ * chest=wrist×6.5, waist×4.5, thigh×3.0, neck/bicep×2.5, calf×2.0, forearm×1.8.
+ */
+export function idealMcCallumMap(wristCm: number): Record<string, number> {
+  if (!Number.isFinite(wristCm) || wristCm <= 0) return {};
+  const r1 = (v: number): number => Math.round(v * 10) / 10;
+  const chest = wristCm * 6.5;
+  return {
+    chest: r1(chest),
+    waist: r1(wristCm * 4.5),
+    hips: r1(chest * 0.85),
+    thigh: r1(wristCm * 3.0),
+    neck: r1(wristCm * 2.5),
+    bicep: r1(wristCm * 2.5),
+    calf: r1(wristCm * 2.0),
+    forearm: r1(wristCm * 1.8),
+  };
+}
+
+/** Триада симметрии Reeves: шея ≈ бицепс ≈ икры. Возвращает макс. отклонение %. */
+export function symmetryTriadDeviation(meas: { neck?: number | null; bicep?: number | null; calf?: number | null }): number | null {
+  const vals = [meas.neck, meas.bicep, meas.calf].map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  if (vals.length < 2) return null;
+  const mx = Math.max(...vals);
+  const mn = Math.min(...vals);
+  if (mx <= 0) return null;
+  return Math.round(((mx - mn) / mx) * 1000) / 10;
+}
+
+/** Female-ориентиры: талия/бёдра ~0.7, акцент glute/thigh (health+aesthetics, не жёсткий floor). */
+export function femaleSymmetryNotes(meas: { waist?: number | null; hips?: number | null; thigh?: number | null }): string[] {
+  const out: string[] = [];
+  const w = Number(meas.waist);
+  const h = Number(meas.hips);
+  if (Number.isFinite(w) && Number.isFinite(h) && h > 0) {
+    const r = w / h;
+    if (r > 0.8) out.push(`Талия/бёдра ${r.toFixed(2)} > 0.80 — акцент glute + дефицит мягкий`);
+    else if (r < 0.6) out.push(`Талия/бёдра ${r.toFixed(2)} < 0.60 — держим верх (спина/дельты) для баланса`);
+  }
+  return out;
+}

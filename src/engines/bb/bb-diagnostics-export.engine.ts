@@ -10,7 +10,7 @@ function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any }): string {
+export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null }): string {
   const date = meta?.date || new Date().toISOString().slice(0, 10);
   const level = meta?.level || '';
   const rowsWeak = report.weakCandidates.map(c => `<tr><td>${esc(c.muscle)}</td><td>${esc(c.granular || '')}</td><td>${esc(c.source)}</td><td>${c.deltaPct}%</td><td>${esc(c.reason)}</td></tr>`).join('') || '<tr><td colspan="5">— баланс</td></tr>';
@@ -63,6 +63,8 @@ export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { dat
 <div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · verification ${report.score.verification} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>
 ${floors ? `<div style="margin-top:8px;color:#ef4444;font-size:11px"><b>Floors:</b><ul>${floors}</ul></div>` : ''}
 <h2>Слабые (топ-2 → в ББ-авто)</h2><table><tr><th>Мышца</th><th>Зона</th><th>Источник</th><th>Δ%</th><th>Причина</th></tr>${rowsWeak}</table>
+${(meta as any)?.weakCauses ? `<h2>Причины отставания (MAX PRO)</h2><table><tr><th>Зона</th><th>Причина</th><th>Уверенность</th><th>Доказательства</th><th>Чинить</th></tr>${Object.entries((meta as any).weakCauses as Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>).map(([z, c]) => `<tr><td>${esc(z)}</td><td>${esc(c.cause)}</td><td>${Math.round(c.confidence * 100)}%</td><td>${esc(c.evidence.join(' · '))}</td><td>${esc(c.fix)}</td></tr>`).join('')}</table>` : ''}
+${(meta as any)?.specBlock ? `<h2>Спец-блок ${(meta as any).specBlock.lengthWeeks} нед</h2><div style="font-size:11px;color:#666">${esc(((meta as any).specBlock.rationale || []).join(' · '))} · доноры: ${esc((((meta as any).specBlock as any).donors || []).join(', ') || '—')}</div><table><tr><th>Нед</th><th>Цели (сеты)</th><th>Частота</th><th>Заметка</th></tr>${((meta as any).specBlock.weeks || []).map((w: { week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }) => `<tr><td>${w.week}</td><td>${esc(Object.entries(w.targetSets).map(([k, v]) => `${k} ${v}`).join(', '))}</td><td>${esc(Object.entries(w.frequency).map(([k, v]) => `${k} ×${v}`).join(', '))}</td><td>${esc(w.note)}</td></tr>`).join('')}</table>` : ''}
 <h2>Симметрия</h2><table><tr><th>Рацио</th><th>Значение</th></tr>${rowsSym}</table><ul>${issuesSym}</ul>
 <h2>Стимул</h2><ul>${issuesStim}</ul><div style="font-size:11px;color:#666">lengthened ${report.stimulus.global.lengthened} · mid ${report.stimulus.global.midRange} · shortened ${report.stimulus.global.shortened} · compound ${report.stimulus.global.compound} / iso ${report.stimulus.global.isolation}</div>
 ${exerciseSection}

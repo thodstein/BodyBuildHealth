@@ -223,3 +223,54 @@ export function mergeBBWeakCandidates(
   }
   return Array.from(byMuscle.values()).sort((x, y) => x.deltaPct - y.deltaPct);
 }
+
+/**
+ * 28-дневная история объёма per-muscle из сессий дневника (MAX PRO).
+ * Возвращает понедельные effective-сеты (4 недели: старые → новые) для причины volume/genetics.
+ */
+export function volumeHistory28d(
+  sessions: Array<{ date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<unknown> }> }>,
+): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  if (!Array.isArray(sessions) || sessions.length === 0) return out;
+  const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const lastT = sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : Date.now();
+  const DAY = 24 * 3600 * 1000;
+  const weeks: Array<Record<string, number>> = [{}, {}, {}, {}];
+  for (const s of sorted) {
+    const t = s.date ? new Date(s.date).getTime() : 0;
+    if (!t || lastT - t > 28 * DAY) continue;
+    const wi = Math.min(3, Math.max(0, 3 - Math.floor((lastT - t) / (7 * DAY))));
+    for (const ex of (s.exercises || []) as any[]) {
+      const raw = (ex as any).muscleGroup || (ex as any).muscle || '';
+      const m = normMuscleKey(String(raw || '').toLowerCase());
+      if (!m) continue;
+      const cnt = Array.isArray(ex.sets) ? ex.sets.length : 0;
+      weeks[wi][m] = (weeks[wi][m] || 0) + cnt;
+    }
+  }
+  const muscles = new Set<string>();
+  for (const w of weeks) for (const k of Object.keys(w)) muscles.add(k);
+  for (const m of muscles) out[m] = weeks.map((w) => w[m] || 0);
+  return out;
+}
+
+/** Кандидаты по 28д-стабильности: 3+ нед ниже MAV → слабый (довесок к detectBBWeakByVolume). */
+export function detectBBWeakByVolumeStable(
+  history: Record<string, number[]>,
+  level: string,
+): BBWeakCandidate[] {
+  const out: BBWeakCandidate[] = [];
+  for (const [m, hist] of Object.entries(history)) {
+    if (hist.length < 3) continue;
+    const lm = getVolumeLandmarks(level, m);
+    if (!lm) continue;
+    const below = hist.filter((v) => v < lm.mav * 0.85).length;
+    if (below >= 3) {
+      const last = hist[hist.length - 1];
+      const delta = lm.mav > 0 ? Math.round(((last - lm.mav) / lm.mav) * 100) : -50;
+      out.push({ muscle: normMuscleKey(m), reason: `28д стабильно ниже MAV (${hist.join('/')}) vs MAV ${lm.mav}`, deltaPct: delta, source: 'volume' });
+    }
+  }
+  return out.sort((a, b) => a.deltaPct - b.deltaPct);
+}
