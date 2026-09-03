@@ -139,4 +139,15 @@ describe('bb-quality-weekly: свойства', () => {
       }
     }
   });
+
+  it('PRO: строка паттернов arms покрывает руки (детали карточки)', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2, workMax: baseWM } as any);
+    const pro = scoreProWeek(plan as any, 1);
+    const arms = pro.patterns.find(p => p.muscle === 'arms');
+    expect(arms).toBeDefined();
+    expect(arms!.expected).toContain('isolation_arms');
+    // Руки реально тренируются — строка непустая.
+    expect(arms!.distinct).toBeGreaterThan(0);
+    expect(arms!.ok).toBe(true);
+  });
 });

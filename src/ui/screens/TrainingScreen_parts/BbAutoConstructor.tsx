@@ -1576,6 +1576,9 @@ export const BbAutoConstructor: React.FC = () => {
         ...selVolume.issues.filter(i => i.severity !== 'info').slice(0, 4).map(i => `→ ${i.message} [${i.source}]`),
         ...selPro.totalRecommendations.slice(0, 2),
       ];
+      // Фактический делод из плана (не тоггл autoDeload) — читает экспортная карточка.
+      const hasDeloadActual = builtPlan.weeks.some((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload');
+      const deloadWeeksActual = builtPlan.weeks.filter((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload').map((w: any) => w.week).filter(Boolean);
       return {
         mode: qw, viewTag,
         avgVolume: avg.avgVolume, volumeLabel: gradeFor(avg.avgVolume),
@@ -1584,6 +1587,7 @@ export const BbAutoConstructor: React.FC = () => {
         viewVolume: selVolume.score, viewPro: selPro.score,
         selVolume, selPro,
         recommendations,
+        hasDeloadActual, deloadWeeksActual,
         // back-compat для мест, читающих старые поля:
         score: selVolume.score, label: selVolume.grade,
         details: selVolume.issues.map(i => i.message),

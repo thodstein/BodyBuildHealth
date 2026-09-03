@@ -584,6 +584,7 @@ const BB_PATTERN_EXPECT: Record<string, string[]> = {
   back: ['vertical_pull', 'horizontal_pull', 'isolation_back', 'hinge'],
   legs: ['squat', 'hinge', 'lunge', 'isolation_legs_quad', 'isolation_legs_ham', 'glute_squat'],
   shoulders: ['vertical_push', 'isolation_shoulders'],
+  arms: ['isolation_arms'],
 };
 
 const BB_ANGLE_EXPECT: Record<string, string[]> = {
@@ -689,10 +690,12 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
   };
 
   // Паттерны — только для существенно нагруженных групп скоупа.
+  // 'arms' агрегирует бицепс+трицепс (паритет со старым PRO-анализом: per-muscle
+  // детали карточки ищут p.muscle==='arms' для рук).
   const patterns: BBProPatternRow[] = [];
-  for (const mu of ['chest', 'back', 'legs', 'shoulders']) {
+  for (const mu of ['chest', 'back', 'legs', 'shoulders', 'arms']) {
     const pool = collectWeekPro({ sessions: scopeWeeks.flatMap((w: any) => w.sessions || []) })
-      .filter(e => e.muscle === mu && e.pattern);
+      .filter(e => (mu === 'arms' ? ['biceps', 'triceps', 'arms'].includes(e.muscle) : e.muscle === mu) && e.pattern);
     const distinct = Array.from(new Set(pool.map(e => e.pattern)));
     const expected = BB_PATTERN_EXPECT[mu] || [];
     const substantial = mu === 'legs'
