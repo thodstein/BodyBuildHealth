@@ -3410,3 +3410,29 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
     filter:none !important;
   }
 }
+/* ═══ PLATFORM-SPECIFIC ТЕМЫ (app-platform: html.app-telegram / .app-native / .app-web) ═══
+ * Telegram Mini App (.app-telegram) — БЕЗ переопределений: текущий вид 1-в-1.
+ * Расширенный дизайн APK — только под .app-native. Как добавить отличие версии:
+ *   html.app-native .my-block { ... } — только APK;
+ *   html.app-telegram .my-block { ... } — только Mini App. */
+html.app-native {
+  --bg: #0a1628;
+  --bg-secondary: #0e1d33;
+  --bg-tertiary: #14263f;
+  --bg-primary: #0a1628;
+  --card-bg: #101f36;
+  --card-bg-hover: #16294a;
+  --card-bg-active: #1d3358;
+  --border: #1e3a5f;
+  --border-light: #2a4a75;
+  --nav-height: 72px;
+  --radius: 16px;
+  --radius-lg: 24px;
+}
+html.app-native .tabs {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+html.app-native .screen,
+html.app-native main {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -16,6 +16,8 @@ import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
+import { isNativeApp } from './core/app-platform';
+import { setupNativeBackButton } from './core/native-bridge';
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
@@ -89,6 +91,21 @@ export default function App() {
     } catch (e) {
       console.warn('[App] BackButton init failed:', e);
     }
+  }, [tab]);
+
+  // Native APK: системная кнопка «назад» Android.
+  // В Telegram Mini App эта ветка не выполняется — там свой BackButton выше.
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let off: (() => void) | undefined;
+    void setupNativeBackButton(() => {
+      if (tab !== 'home') {
+        setTab('home');
+        return true;
+      }
+      return false; // на главной — свернуть приложение штатно
+    }).then((fn) => { off = fn; });
+    return () => { try { off?.(); } catch { /* ignore */ } };
   }, [tab]);
 
   const go = (t: Tab, st: string | null = null) => {

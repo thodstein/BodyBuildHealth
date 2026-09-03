@@ -8,6 +8,8 @@ import { db } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
 import { onViewportChanged, hapticImpact, onKeyboardClose } from './core/telegram';
+import { applyPlatformAttributes } from './core/app-platform';
+import { initNativeChrome } from './core/native-bridge';
 import { initCloudSync } from './core/cloud-sync';
 import { processQueue } from './core/sync-queue';
 import { initEncryption } from './core/db-encryption';
@@ -101,10 +103,20 @@ async function bootstrap() {
 
   try { fixMobileViewport(); } catch (e) { console.warn('fixMobileViewport failed:', e); }
 
+  // Платформа запуска: native (APK) | telegram (Mini App) | web.
+  // Telegram-ветка ниже не меняется: в Mini App всё как раньше.
+  let platform: 'telegram' | 'native' | 'web' = 'web';
+  try { platform = applyPlatformAttributes(); } catch (e) { console.warn('applyPlatformAttributes failed:', e); }
+  if (platform === 'native') {
+    try { await initNativeChrome(); } catch (e) { console.warn('initNativeChrome failed:', e); }
+  }
+
   let isTg = false;
   try { isTg = initTelegramWebApp(); } catch (e) { console.warn('initTelegramWebApp failed:', e); }
 
-  if (!isTg) {
+  // PWA-баннер и ServiceWorker — только чистый web: в Telegram свой хром,
+  // в Capacitor WebView SW ненадёжен (там свои сплэш/статус-бар/пуши).
+  if (!isTg && platform !== 'native') {
     try { initPWA(); } catch (e) { console.warn('initPWA failed:', e); }
   }
 
@@ -140,7 +152,7 @@ async function bootstrap() {
   try { initErrorHandler('app'); } catch (e) { console.warn('initErrorHandler failed:', e); }
   try { optimizeDBSpace(db, 50); } catch (e) { console.warn('optimizeDBSpace failed:', e); }
 
-  if (!isTg) {
+  if (!isTg && platform !== 'native') {
     try { registerSW(); } catch (e) { console.warn('registerSW failed:', e); }
   }
 

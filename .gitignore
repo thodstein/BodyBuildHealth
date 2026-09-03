@@ -94,3 +94,10 @@ training-periodization.engine_from_backup.ts
 training.engine_from_backup.ts
 .tmp/
 supabase/.temp/
+
+# Native APK: секреты подписи и локальные артефакты (никогда в git)
+android/keystore.properties
+android/app/*.keystore
+android/app/*.jks
+*.apk
+*.aab

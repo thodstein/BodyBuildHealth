@@ -1,0 +1,43 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+/**
+ * Capacitor-обёртка для APK.
+ * Web-актив общий: webDir = dist (тот же билд, что уезжает в Telegram Mini App / Vercel).
+ * Ничего платформозависимого в конфиге движка нет — отличия версий живут
+ * в src/core/app-config.ts + src/core/native-bridge.ts.
+ */
+const config: CapacitorConfig = {
+  appId: 'com.healthengine.app',
+  appName: 'Health Engine',
+  webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+  },
+  android: {
+    allowMixedContent: false,
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1200,
+      backgroundColor: '#0a1628',
+      showSpinner: false,
+    },
+    StatusBar: {
+      style: 'dark',
+      backgroundColor: '#0a1628',
+    },
+    Keyboard: {
+      // WebView не схлопывается под клавиатуру (проблема известна по TG WebView).
+      resize: 'body',
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_default',
+      iconColor: '#00e68a',
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
+};
+
+export default config;
