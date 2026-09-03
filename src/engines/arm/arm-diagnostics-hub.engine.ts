@@ -133,12 +133,17 @@ export function buildArmDiagnosticsReport(input: {
     humerusWarnings = checkHumerusGuard(input.actualPlan);
     balanceWarnings = checkWristBalance(input.actualPlan);
   } else {
+    // чипы 12 точек тоже зажигают гварды, а не только legacy-чекбоксы (иначе side_pin в одиночку молчит)
+    const wpsEarly: ArmWeakPoint[] = detailed.weakPoints || [];
+    const hasSideEarly = !!input.weakTest.sidePressureFails || wpsEarly.some(wp => wp === 'side_mid' || wp === 'side_pin');
+    const pronFailsEarly = !!input.weakTest.pronationFails || wpsEarly.some(wp => wp === 'pron_open' || wp === 'pron_lock');
+    const supFailsEarly = !!input.weakTest.supinationFails || wpsEarly.some(wp => wp === 'sup_cup' || wp === 'sup_drag');
     const mockPlan: any = {
       weeks: [
-        { week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: input.weakTest.pronationFails ? 6 : 4 }, { muscle: 'supinators', sets: input.weakTest.supinationFails ? 2 : 4 }] }] },
+        { week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: pronFailsEarly ? 6 : 4 }, { muscle: 'supinators', sets: supFailsEarly ? 2 : 4 }] }] },
       ],
     };
-    humerusWarnings = checkHumerusGuard({ weeks: input.weakTest.sidePressureFails ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
+    humerusWarnings = checkHumerusGuard({ weeks: hasSideEarly ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
     balanceWarnings = checkWristBalance(mockPlan);
   }
   for (const w of humerusWarnings) findings.push({ level: 'critical', text: w, exercise: 'side_press_table' });
@@ -164,10 +169,11 @@ export function buildArmDiagnosticsReport(input: {
     const hasGripHistory = !!input.hasGripHistory;
     if (hasVideo || hasVbt || hasGripHistory || corrections.length>0) {
       const sideSets = (input.actualPlan?.weeks?.[0]?.sessions || []).reduce((a: number, s: any) => a + s.exercises.filter((e: any)=> e.muscle==='side_pressure').reduce((aa:number,e:any)=>aa+(e.sets||0),0),0);
+      const sidePlanned = input.weakTest.sidePressureFails || weakPoints.some(wp => wp === 'side_mid' || wp === 'side_pin');
       scoring = scoreArm({
         weakCount: weakPoints.length,
         asymmetryPct: fv.asymmetryPct ?? null,
-        sideSetsWeek1: sideSets || (input.weakTest.sidePressureFails ? 8 : 0),
+        sideSetsWeek1: sideSets || (sidePlanned ? 8 : 0),
         tendonSets: input.tendonSets,
         tendonLimit: tendonWeeklyLimit(input.level),
         gripLevel: undefined,

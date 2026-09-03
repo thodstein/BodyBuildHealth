@@ -6,7 +6,7 @@
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { diagnoseArmWeakDetailed, expandLegacyWeakPoints } from '../../../engines/arm/arm-weakpoint.engine';
+import { diagnoseArmWeakDetailed, expandLegacyWeakPoints, LEGACY_TO_DETAILED } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
@@ -435,7 +435,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
     setTimeout(()=>setToast(''),2500);
   };
 
-  const toggle = (k: keyof ArmDiagState) => setState(s => ({ ...s, [k]: !s[k] as any }));
+  // legacy-чекбокс зеркалится в чипы 12 точек (единый видимый выбор): вкл — добавляет развёртку (до 3), выкл — убирает её
+  const toggleLegacy = (k: 'cup' | 'rising' | 'pron' | 'sup' | 'side' | 'back') => setState(s => {
+    const turningOn = !(s as any)[k];
+    const legacyKey = k === 'pron' ? 'pronation' : k === 'sup' ? 'supination' : k;
+    const expanded = LEGACY_TO_DETAILED[legacyKey] || [];
+    let wp = [...s.weakPoints];
+    if (turningOn) {
+      for (const p of expanded) if (!wp.includes(p)) wp.push(p);
+      wp = wp.slice(0, 3);
+    } else {
+      wp = wp.filter(p => !expanded.includes(p));
+    }
+    return { ...s, [k]: turningOn, weakPoints: wp } as ArmDiagState;
+  });
 
   const tablePreview = Array.from({ length: 6 }, (_, i) => {
     const wk = i + 1;
@@ -732,7 +745,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 ['pron','Топролл не держит (pron)'],
                 ['sup','Хук проваливается (sup)'],
               ].map(([k,label]) => (
-                <button key={k} onClick={()=>toggle(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'5px 8px', borderRadius:999, border:'1px dashed', borderColor:(state as any)[k] ? '#f59e0b' : '#1f3a5f', background:(state as any)[k] ? 'rgba(245,158,11,0.10)' : '#0a1629', color:(state as any)[k] ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:500 }}>
+                <button key={k} onClick={()=>toggleLegacy(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'5px 8px', borderRadius:999, border:'1px dashed', borderColor:(state as any)[k] ? '#f59e0b' : '#1f3a5f', background:(state as any)[k] ? 'rgba(245,158,11,0.10)' : '#0a1629', color:(state as any)[k] ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:500 }}>
                   {label}
                 </button>
               ))}
@@ -751,7 +764,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 ['side','Не дожимает боком (side)'],
                 ['back','Тяга слабая (back)'],
               ].map(([k,label]) => (
-                <button key={k} onClick={()=>toggle(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor:(state as any)[k] ? '#ef4444' : '#1f3a5f', background:(state as any)[k] ? 'rgba(239,68,68,0.12)' : '#0a1629', color:(state as any)[k] ? '#ef4444' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
+                <button key={k} onClick={()=>toggleLegacy(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor:(state as any)[k] ? '#ef4444' : '#1f3a5f', background:(state as any)[k] ? 'rgba(239,68,68,0.12)' : '#0a1629', color:(state as any)[k] ? '#ef4444' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
                   {label}
                 </button>
               ))}

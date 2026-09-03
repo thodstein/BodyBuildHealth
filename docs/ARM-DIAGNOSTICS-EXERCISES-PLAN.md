@@ -290,6 +290,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - `arm-scoring.engine.ts`: убран недостижимый `if (>22)` внутри ветки `>lim` (ветка `>22` выше перехватывает первой).
 - Поведение не менялось, только чистка.
 
+### 8.7 Раунд 5 — чипы сами зажигают гварды + единый выбор
+- Баг: `side_pin`/`pron_*` чипы в одиночку не давали humerus/balance-файндингов и RSS-штрафа — мок-план и `sideSetsWeek1` смотрели только на legacy-чекбоксы. Фикс в `arm-diagnostics-hub.engine.ts`: `hasSide/pronFails/supFails` учитывают и `detailed.weakPoints`.
+- Два источника выбора (legacy-чекбоксы + чипы) слиты в один видимый: `toggleLegacy` зеркалит чекбокс в чипы (вкл — добавляет развёртку до 3, выкл — убирает), мёртвый `toggle` удалён.
+- Тесты: side_pin в одиночку → critical humerus; legacy cup → «Выбрано: cup_start, cup_hold» → снятие.
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).

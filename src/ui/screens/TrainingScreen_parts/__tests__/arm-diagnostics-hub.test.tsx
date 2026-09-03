@@ -41,6 +41,17 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('wrist_flexors');
   });
 
+  it('legacy cup зеркалится в чипы 12 точек', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    const cupBtn = () => screen.getAllByText(/Кисть открывается/).find(el=> el.tagName==='BUTTON')!;
+    fireEvent.click(cupBtn());
+    expect(document.body.textContent).toContain('Выбрано: cup_start, cup_hold');
+    // повторный клик снимает и чипы, и чекбокс
+    fireEvent.click(cupBtn());
+    expect(document.body.textContent).toContain('Выбрано: —');
+  });
+
   it('кнопка применить отправляет в planner-bridge', async () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);

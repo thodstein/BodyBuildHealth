@@ -46,6 +46,14 @@ describe('arm diagnostics detailed 12 точек', () => {
     } as any);
     expect(r.findings.some(f=> f.text.includes('Side') || f.text.includes('side'))).toBe(true);
   });
+  it('side_pin чип в одиночку → humerus finding (без legacy)', () => {
+    const r = buildArmDiagnosticsReport({
+      weakTest:{}, weakPoints:['side_pin'] as any,
+      grip:{} as any, level:'intermediate', technique:'press', tableSessions:2, totalSessions:4, tendonSets:8,
+    } as any);
+    expect(r.humerusWarnings.length).toBeGreaterThan(0);
+    expect(r.findings.some(f=> f.level==='critical' && f.text.includes('side_pressure'))).toBe(true);
+  });
   it('support RT<60 → contain_fingers с support-коррекцией', () => {
     const r = buildArmDiagnosticsReport({
       weakTest:{ gripSupportMaxKg: 50 } as any, grip:{} as any, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8,
