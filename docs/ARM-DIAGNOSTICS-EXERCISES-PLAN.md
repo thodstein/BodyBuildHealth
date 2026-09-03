@@ -304,6 +304,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - Баг: превью-боксы Humerus/Balance в табе «Давление» (`mockGuard`) смотрели только на legacy-чекбоксы — чип `side_pin` в одиночку не зажигал превью (движок отчёта уже учитывал). Фикс: `sideOn/pronOn/supOn` включают и чипы (`side_mid/side_pin`, `pron_*`, `sup_*`), паритет с движком.
 - Тест: чип `side_pin` → бокс `Humerus (side)` содержит `humerus risk` (изолирован от движковых файндингов через parentElement).
 
+### 8.10 Раунд 8 — реверификация после чужих пушей
+- Чужие коммиты (arm WAF-фолы/превью, cardio round 5, native APK, CI-фикс) моих файлов не коснулись, wiring инъекции в конструкторе цел.
+- Полный прогон arm-области: 37 файлов / 329 тестов зелёные (было 320 — чужие +9 тоже проходят, регрессий от моих изменений нет).
+- Функциональных правок не потребовалось — движок и хаб консистентны (ревью `arm-diagnostics-hub.engine.ts:85-132`).
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).
