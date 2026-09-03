@@ -17,6 +17,8 @@ import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor } from '../../../engines/arm/arm-platform.engine';
+import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
+import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -469,6 +471,16 @@ export function ArmAutoConstructor() {
               const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any });
               return <div style={{ ...SMALL, marginTop: 8, color: ACCENT }}>WAF {card.ageGroup} · кат. {card.weightClass.label} кг · {card.weighInNote}</div>;
             } catch { return null; } })()}
+            {proSupermatch && (()=>{
+              const sm = buildSupermatchPlan({ level });
+              return <div style={{ ...SMALL, marginTop: 6, color: '#e6a23c' }}>Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с · TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.</div>;
+            })()}
+            <div style={{ marginTop: 8 }}>
+              <div style={{ ...SMALL, marginBottom: 4 }}>WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: 11, cursor: 'help' }}>{f.name}</span>)}
+              </div>
+            </div>
           </div>
 
           <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop: 14 }}>⚡ Собрать план</button>
