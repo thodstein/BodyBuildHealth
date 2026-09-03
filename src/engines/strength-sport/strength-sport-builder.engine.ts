@@ -235,8 +235,7 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     // щадящий: +2 повтора, меньше отказ
     finalReps = [reps[0]+1, reps[1]+2] as [number, number];
   }
-  // P0-2 closed-loop: VBT EWMA weight adjust (k×0.6 эквивалент)
-  // histLoss уже посчитан из velocityHistory 3 точек; также пробуем EWMA
+  // P0-2 closed-loop: VBT EWMA weight adjust (k×0.6 эквивалент) + HRV k×0.6
   {
     let ewmaLoss: number | null = null;
     try {
@@ -252,6 +251,19 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     if (wFactor < 1) {
       finalWeight = Math.round(finalWeight * wFactor / 2.5) * 2.5;
     }
+    // HRV dangerous → вес ×0.85 (k×0.6 эквивалент), caution → ×0.94
+    try {
+      const hrvRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_hrv_log') : null;
+      if (hrvRaw) {
+        const hArr = JSON.parse(hrvRaw);
+        const vals = Array.isArray(hArr) ? hArr.map((s:any)=> s.hrvMs ?? s.hrv ?? s.value).filter((v:any)=> Number.isFinite(v)) as number[] : [];
+        if (vals.length >= 7) {
+          const rep = hrvReport(vals);
+          if (rep?.zone === 'dangerous') finalWeight = Math.round(finalWeight * 0.85 / 2.5) * 2.5;
+          else if (rep?.zone === 'caution') finalWeight = Math.round(finalWeight * 0.94 / 2.5) * 2.5;
+        }
+      }
+    } catch {}
   }
   let tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
   if (preConjugate === 'dynamic') tempo = 'X-0-X-0';
@@ -272,7 +284,16 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     (ws as any).rpe = rpe;
     if (evMeta?.defaultDistanceM) (ws as any).distanceM = evMeta.defaultDistanceM;
     if (evMeta?.defaultTimeCapS) (ws as any).timeCapS = evMeta.defaultTimeCapS;
-    if (isCarryEvent(id)) ws.reps = 1;
+    if (isCarryEvent(id)) {
+      ws.reps = 1;
+      // Carry dynamic — только уменьшение при тяжёлом (не ломает matrix, totalDist cap 80 medley)
+      try {
+        const bwDyn = (input as any).bodyweight ?? 80;
+        const typeDyn: any = id.includes('yoke') ? 'yoke' : id.includes('farmers') ? 'farmers' : id.includes('frame') ? 'frame' : 'other';
+        const dyn = dynamicCarryDistance(finalWeight, bwDyn, typeDyn, (ws as any).timeCapS ?? 60);
+        if (Number.isFinite(dyn) && dyn >= 10 && dyn < (ws as any).distanceM) (ws as any).distanceM = dyn;
+      } catch {}
+    }
     // P1: stone moment — аннотация в tempo если высокий момент (>250)
     if (['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar'].includes(id)) {
       try {
