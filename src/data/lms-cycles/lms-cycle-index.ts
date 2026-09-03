@@ -105,6 +105,8 @@ import { BULGARIAN } from './bulgarian';
 import { LILLIEBRIDGE } from './lilliebridge';
 import { RUSSIAN_SQUAT } from './russian-squat';
 import { GZCL_UHF } from './gzcl-uhf';
+import { COAN_DEADLIFT } from './coan-deadlift';
+import { KIZEN_SHEIKO } from './kizen-sheiko';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -206,6 +208,8 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     LILLIEBRIDGE,
     RUSSIAN_SQUAT,
     GZCL_UHF,
+    COAN_DEADLIFT,
+    KIZEN_SHEIKO,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {

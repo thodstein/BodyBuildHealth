@@ -5,6 +5,11 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
   if (!plan || !plan.weeks.length) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
   const weeks = plan.weeks;
   const maxDays = Math.max(...weeks.map(w => w.days.length));
+  // e1RM тренд по неделям (средний по всем lifts, для velocity cap)
+  const e1rmTrend = weeks.map(w => {
+    const avg = w.days.reduce((a,d)=>a+d.exercises.reduce((aa,e)=>aa+e.workSets.reduce((aaa,ws)=>aaa+ws.weight/(ws.pct||0.7),0)/e.workSets.length,0)/d.exercises.length,0)/w.days.length;
+    return Math.round(avg);
+  });
   return (
     <div style={{ overflowX: 'auto', marginTop: 8 }}>
       <div style={{ display: 'grid', gridTemplateColumns: `80px repeat(${weeks.length}, 1fr)`, gap: 4, minWidth: 600 }}>
@@ -34,7 +39,8 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
           </React.Fragment>
         ))}
       </div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>PowerSheets-стиль: недели side-by-side, RPE/RIR/%/вес в одной строке. Прокрутите горизонтально.</div>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>PowerSheets-стиль: недели side-by-side, RPE/RIR/%/вес в одной строке. e1RM тренд: {e1rmTrend.join(' → ')} кг. Прокрутите горизонтально.</div>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>First-rep velocity cap: падение &gt;8% от нед 1 → volume -20% (VBT). MVT squat 0.25 м/с.</div>
     </div>
   );
 };
