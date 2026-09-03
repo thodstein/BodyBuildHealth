@@ -412,16 +412,19 @@ html.app-native .native-home-kicker {
   color: #c9f73a;
   text-shadow: 0 0 16px rgba(201, 247, 58, 0.5);
   margin-bottom: 6px;
+  /* Верхние системные кнопки (синк + язык) — не налезают на строку */
+  padding-right: 112px;
 }
 
 html.app-native .native-home-title {
   margin: 0;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 900;
   letter-spacing: -1px;
-  line-height: 1.05;
+  line-height: 1.08;
   color: #fff;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8);
+  overflow-wrap: anywhere;
 }
 
 html.app-native .native-home-title::after {
@@ -438,6 +441,7 @@ html.app-native .native-home-title::after {
 html.app-native .native-home-date {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
   font-size: 13px;
@@ -455,15 +459,12 @@ html.app-native .native-home-streak {
   box-shadow: 0 4px 14px rgba(201, 247, 58, 0.4);
 }
 
-/* Статистика — горизонтальный snap-ряд */
+/* Статистика — компактная сетка 2×2, всё помещается без скролла */
 html.app-native .native-home-rail {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-top: 18px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 4px;
-  scrollbar-width: none;
+  margin-top: 16px;
 }
 
 html.app-native .native-home-rail::-webkit-scrollbar {
@@ -471,10 +472,9 @@ html.app-native .native-home-rail::-webkit-scrollbar {
 }
 
 html.app-native .native-home-stat {
-  flex: 0 0 138px;
-  scroll-snap-align: start;
+  min-width: 0;
   border-radius: 20px;
-  padding: 14px 12px;
+  padding: 12px;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.78), rgba(12, 23, 40, 0.78));
   border: 1px solid rgba(140, 190, 255, 0.14);
   border-top: 2px solid rgba(201, 247, 58, 0.45);
@@ -484,11 +484,14 @@ html.app-native .native-home-stat {
 }
 
 html.app-native .native-home-stat-v {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
   letter-spacing: -0.5px;
   color: #fff;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 html.app-native .native-home-stat-l {
@@ -497,6 +500,9 @@ html.app-native .native-home-stat-l {
   color: rgba(226, 236, 255, 0.65);
   margin-top: 2px;
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 html.app-native .native-home-stat-s {
@@ -505,6 +511,9 @@ html.app-native .native-home-stat-s {
   color: #c9f73a;
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Последняя тренировка — широкая CTA-карточка */

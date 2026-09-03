@@ -19,9 +19,6 @@ import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { consumeWidgetLaunchTarget } from '../../core/widget-bridge';
 import { syncAllWidgets } from '../native/widget-sync';
-import { WidgetsSetupCard } from '../native/WidgetsSetupCard';
-import { BiometrySetupCard } from '../native/BiometrySetupCard';
-import { NativeFeaturesCard } from '../native/NativeFeaturesCard';
 
 export type DashboardNativeNavId =
   | 'training' | 'nutrition' | 'labs' | 'risks' | 'pharma' | 'support'
@@ -301,11 +298,6 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
             <div className="native-home-warn-s">{widgetMsg}</div>
           </div>
         )}
-
-        <div className="native-home-section">Телефон · APK</div>
-        <WidgetsSetupCard />
-        <BiometrySetupCard />
-        <NativeFeaturesCard />
       </div>
     </div>
   );

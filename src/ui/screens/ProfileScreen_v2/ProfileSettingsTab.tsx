@@ -6,6 +6,10 @@ import React, { useState } from 'react';
 import { useProfileRefresh, updateProfile, clearSnapshots } from '../../../core/profile-manager';
 import type { UnifiedSettings } from '../../../core/types';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from './ui';
+import { isNativeApp } from '../../../core/app-platform';
+import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
+import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
+import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
 
 const PRIVACY = [
   { id: 'private', label: 'Только я' },
@@ -218,6 +222,24 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           }}>⚠ Сбросить профиль</button>
         </div>
       </AccordionSection>
+
+      {/* 4.4 — только APK: виджеты, биометрия, возможности телефона.
+          В Telegram Mini App этот раздел не рендерится вообще. */}
+      {isNativeApp() && (
+        <AccordionSection
+          title="4.4 Телефон · APK"
+          subtitle="Виджеты рабочего стола, биометрия, уведомления и камера"
+          icon="📱"
+          color={colors.primary}
+          id="phone-apk"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <WidgetsSetupCard />
+            <BiometrySetupCard />
+            <NativeFeaturesCard />
+          </div>
+        </AccordionSection>
+      )}
     </div>
   );
 };

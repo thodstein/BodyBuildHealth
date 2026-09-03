@@ -66,6 +66,10 @@ describe('DashboardScreen platform branching', () => {
     ]) {
       expect(screen.getByText(label)).not.toBeNull();
     }
+    // Герой чистый: настроек телефона тут нет — они в Профиле → Настройки
+    expect(document.querySelector('.native-feature-card')).toBeNull();
+    expect(screen.queryByText('Виджеты на рабочий стол')).toBeNull();
+    expect(screen.queryByText('Возможности APK')).toBeNull();
   });
 
   it('2. native → клик по плитке ведёт в раздел', async () => {
