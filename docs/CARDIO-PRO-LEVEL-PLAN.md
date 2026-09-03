@@ -111,6 +111,18 @@ apply taper + cut; CP МНК + журнал тестов; extractFitRecords.
   (отмена — «↩ Вернуть версию», как у остальных авто-подстроек).
 - **Тесты**: NEW `cardio-taper-step.test.tsx` 6/6 (план/применение/F-OR/overload/пусто/идемпотентность + таб в Manage).
 
+## Продолжение — раунд 4 (журнал замеров в UI)
+
+- **Персистентность**: `FIELD_TEST_LOG_KEY = 'he_cardio_field_tests_v1'` +
+  `load/save/remove/clearFieldTestLog` (валидация формы, сортировка, кап 24, quota-тихо).
+  `FieldTestLogEntry` += `talkHr` (потолок Z2); ftp20 хранит FTP (= P20×0.95).
+- **NEW `CardioFieldTestLog.tsx`** — карточка «🔬 Контрольные замеры» во вкладке «Журнал»
+  дневника (`CardioDiaryStep`): виды AeT 60'/LTHR 30'/FTP 20'/talk-test с условными полями,
+  inline-валидация (alert), бейдж Responder/Non-responder, удаление, персистентность
+  при перемонтировании. Свой state — родитель не тронут.
+- **Тесты**: storage 2/2 (roundtrip + битый JSON) в `cardio-pro-level.test.ts` (34/34);
+  NEW `cardio-field-test-log.test.tsx` 7/7 (пусто/добавление/Responder/валидация/LTHR/FTP/удаление/ремонт).
+
 ## Осознанные остатки (не баги)
 
 - ML VGP responder — lite-эвристика (два теста), не обучение на истории.

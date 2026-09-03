@@ -2,7 +2,7 @@
  * cardio-pro-level.test.ts — PRO-эпики A/B/D/E/F/G + FIT-детали.
  * Чистые функции новых движков + интеграция buildCardioCycle (LTHR/жара).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ftpFrom20MinTest,
   criticalPowerFrom3And12,
@@ -380,5 +380,37 @@ describe('PRO A2 cp-fit + log', () => {
     let big = log;
     for (let i = 0; i < 30; i++) big = appendFieldTestLog(big, { date: `2026-03-${String((i % 28) + 1).padStart(2, '0')}`, kind: 'talk' });
     expect(big.length).toBeLessThanOrEqual(24);
+  });
+});
+
+// ─── A3: персистентность журнала тестов ───
+describe('PRO A3 field-test storage', () => {
+  const KEY = 'he_cardio_field_tests_v1';
+  beforeEach(() => {
+    try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  });
+  it('save/load/remove/clear roundtrip', async () => {
+    const mod = await import('../cardio-field-tests.engine');
+    expect(mod.loadFieldTestLog()).toEqual([]);
+    mod.saveFieldTestLogEntry({ date: '2026-01-01', kind: 'lthr30', lthr: 170 });
+    mod.saveFieldTestLogEntry({ date: '2026-02-01', kind: 'ftp20', ftpWatts: 250 });
+    let log = mod.loadFieldTestLog();
+    expect(log.length).toBe(2);
+    expect(log[0].date).toBe('2026-01-01');
+    mod.removeFieldTestLogEntry('2026-01-01', 'lthr30');
+    log = mod.loadFieldTestLog();
+    expect(log.length).toBe(1);
+    mod.clearFieldTestLog();
+    expect(mod.loadFieldTestLog()).toEqual([]);
+  });
+  it('битый JSON → [], чужеродные записи отфильтровываются', async () => {
+    const mod = await import('../cardio-field-tests.engine');
+    localStorage.setItem(KEY, 'not-json{{{');
+    expect(mod.loadFieldTestLog()).toEqual([]);
+    localStorage.setItem(KEY, JSON.stringify([{ date: '2026-01-01', kind: 'aet60' }, { nope: 1 }, null, 'x']));
+    const log = mod.loadFieldTestLog();
+    expect(log.length).toBe(1);
+    expect(log[0].kind).toBe('aet60');
+    mod.clearFieldTestLog();
   });
 });

@@ -20,6 +20,7 @@ import { CardioDayCard } from './CardioDayCard';
 import { Tabs } from './CardioUI';
 import { CardioImportPanel } from './CardioImportPanel';
 import { CardioAnalyticsDashboard } from './CardioAnalyticsDashboard';
+import { CardioFieldTestLog } from './CardioFieldTestLog';
 
 function todayIso(): string {
   const d = new Date();
@@ -100,6 +101,7 @@ export const CardioDiaryStep: React.FC<{
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <CardioImportPanel onImported={reloadLog} />
           <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
+          <CardioFieldTestLog />
         </div>
       )}
     </div>

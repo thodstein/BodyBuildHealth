@@ -208,7 +208,10 @@ export interface FieldTestLogEntry {
   driftPct?: number;
   decouplingPct?: number;
   lthr?: number;
+  /** FTP в ваттах (для ftp20 — уже ×0.95 от средней 20'). */
   ftpWatts?: number;
+  /** Потолок Z2 talk-test, уд/мин. */
+  talkHr?: number;
 }
 
 export const FIELD_TEST_LOG_CAP = 24;
@@ -233,4 +236,47 @@ export function responderFromLog(log: FieldTestLogEntry[]): { responder: boolean
   if (driftBetter && decBetter) return { responder: true, note: `Responder (${prev.date} → ${curr.date}): drift и decoupling улучшились.` };
   if (!driftBetter && !decBetter) return { responder: false, note: `Non-responder (${prev.date} → ${curr.date}): проверьте восстановление/объём/железо.` };
   return { responder: false, note: 'Частичный отклик: повторите AeT-тест через 4 нед.' };
+}
+
+// ─── Персистентность журнала (localStorage, кап 24) ───
+
+export const FIELD_TEST_LOG_KEY = 'he_cardio_field_tests_v1';
+
+function isLogEntryShape(e: unknown): e is FieldTestLogEntry {
+  if (!e || typeof e !== 'object') return false;
+  const o = e as Record<string, unknown>;
+  return typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date)
+    && (o.kind === 'lthr30' || o.kind === 'ftp20' || o.kind === 'aet60' || o.kind === 'talk');
+}
+
+/** Загрузить журнал полевых тестов (валидация формы, сортировка, кап). */
+export function loadFieldTestLog(): FieldTestLogEntry[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(FIELD_TEST_LOG_KEY) ?? '[]');
+    if (!Array.isArray(v)) return [];
+    return v.filter(isLogEntryShape).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-FIELD_TEST_LOG_CAP);
+  } catch { return []; }
+}
+
+function persistFieldTestLog(log: FieldTestLogEntry[]): void {
+  try { localStorage.setItem(FIELD_TEST_LOG_KEY, JSON.stringify(log.slice(-FIELD_TEST_LOG_CAP))); } catch { /* quota — тихо */ }
+}
+
+/** Сохранить замер (дедуп по дате+kind через appendFieldTestLog). Возвращает новый журнал. */
+export function saveFieldTestLogEntry(entry: FieldTestLogEntry): FieldTestLogEntry[] {
+  const next = appendFieldTestLog(loadFieldTestLog(), entry);
+  persistFieldTestLog(next);
+  return next;
+}
+
+/** Удалить замер по дате+kind. Возвращает новый журнал. */
+export function removeFieldTestLogEntry(date: string, kind: FieldTestLogEntry['kind']): FieldTestLogEntry[] {
+  const next = loadFieldTestLog().filter(e => !(e.date === date && e.kind === kind));
+  persistFieldTestLog(next);
+  return next;
+}
+
+/** Очистить журнал (сброс). */
+export function clearFieldTestLog(): void {
+  try { localStorage.removeItem(FIELD_TEST_LOG_KEY); } catch { /* ignore */ }
 }
