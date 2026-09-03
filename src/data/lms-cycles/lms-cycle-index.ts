@@ -111,6 +111,8 @@ import { TEN_TWENTY_LIFE } from './ten-twenty-life';
 import { BASE_BUILDING } from './base-building';
 import { TSA_9 } from './tsa-9';
 import { BRIDGE } from './bridge';
+import { PHUL } from './phul';
+import { PHAT } from './phat';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -218,6 +220,8 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     BASE_BUILDING,
     TSA_9,
     BRIDGE,
+    PHUL,
+    PHAT,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
