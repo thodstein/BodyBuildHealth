@@ -181,30 +181,39 @@ export function buildRecipeMealItems(recipe: Recipe): PlanItemLike[] | null {
 }
 
 /**
- * Масштабирует декомпозицию рецепта под ЦЕЛЬ приёма по КБЖУ (порции автора растут/сжимаются
- * пропорционально). Атлет 100 кг и 80 кг получают РАЗНЫЕ граммовки одного рецепта:
- * цель приёма у тяжа крупнее → порция ×больше. Масштаб клампуется в 0.7–2.2 (3.0 для 120кг+),
- * капится по белку (1.2×) и жиру (1.5×) — перебор макроса хуже лёгкого недобора ккал.
- * Возвращает null при пустой декомпозиции, иначе {items, scale}.
+ * Масштабирует декомпозицию рецепта под ЦЕЛЬ приёма ПОРЦИЯМИ (исходный рецепт = 1 порция):
+ * идеальный непрерывный масштаб (ккал-дистанция с капами Б/Ж/У) квантуется в человеческий
+ * ряд ×0.5 / ×1 / ×1.5 / ×2 / ×2.5 / ×3 — «Рецепт ×1.5 порции», а не «×1.37». Атлет 100 кг
+ * и 80 кг получают РАЗНОЕ число порций одного рецепта. Возвращает null при пустой
+ * декомпозиции, иначе {items, scale, portions}.
  */
 export function scaleRecipeToTarget(
   recipe: Recipe,
   target: { kcal: number; p?: number; f?: number; c?: number },
   athleteWeightKg: number = 80,
-): { items: PlanItemLike[]; scale: number } | null {
+): { items: PlanItemLike[]; scale: number; portions: number } | null {
   const built = buildRecipeMealItems(recipe);
   if (!built || built.length === 0) return null;
   const t = sumMealTotals(built);
   const kcal = Math.max(50, t.kcal || 1);
   const heavyScaleMax = athleteWeightKg >= 120 ? 3.0 : athleteWeightKg >= 110 ? 2.8 : athleteWeightKg >= 100 ? 2.5 : 2.2;
   const tp = target.p ?? 30, tf = target.f ?? 15, tc = target.c ?? 40;
-  let s = Math.max(0.7, Math.min(heavyScaleMax, target.kcal / kcal));
+  let s = Math.max(0.5, Math.min(heavyScaleMax, target.kcal / kcal));
   if (t.p > 0) s = Math.min(s, (1.2 * tp) / t.p);
   if (t.f > 0) s = Math.min(s, (1.5 * tf) / t.f);
   if (t.c > 0) s = Math.min(s, (1.2 * tc) / t.c);
-  s = Math.max(0.7, Math.round(s * 20) / 20);
+  // Чистка-2026: квантование в порционный ряд (исходный рецепт = 1 порция)
+  const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
+  let best = PORTION_STEPS[0];
+  let bestDist = Infinity;
+  for (const st of PORTION_STEPS) {
+    if (st > Math.max(0.5, s) + 1e-9) break;
+    const d = Math.abs(st - s);
+    if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) < 1e-9 && st > best)) { bestDist = d; best = st; }
+  }
+  s = best;
   const scaled = built.map(it => scaleItem(it, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)));
-  return { items: scaled, scale: s };
+  return { items: scaled, scale: s, portions: s };
 }
 
 export function sumMealTotals(items: PlanItemLike[]): PlanTotalsLike {
@@ -277,15 +286,26 @@ function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
     .filter((f): f is FoodItem => !!f && !(excludedIds && excludedIds.has(f.id)));
 }
 
-function flexMealIndex(meals: PlanMealLike[]): number {
+function flexMealIndex(meals: PlanMealLike[], excludePresleep = false): number {
   for (let i = meals.length - 1; i >= 0; i--) {
     const l = meals[i]?.label || '';
     const t = (meals[i] as any)?.type;
+    // Чистка-2026: Pre-sleep — 0 углеводов по дизайну (казеин/творог); карб-топ-ап туда не идёт
+    // («булгур 110 г на ночь» при 800 г углей — жалоба распределения).
+    if (excludePresleep && (t === 'presleep' || /Перед сном|Pre-sleep/i.test(l))) continue;
     if (/Перекус|Полдник|Второй завтрак|Пост-трен|Перед сном|Pre-sleep/i.test(l)) return i;
     if (t && ['snack', 'snack2', 'snack3', 'snack4', 'postworkout', 'presleep'].includes(t)) return i;
   }
   // нет перекусов — берём последний приём, который НЕ собран из рецепта (не портим авторские порции)
   for (let i = meals.length - 1; i >= 0; i--) {
+    // Чистка-2026: fallback тоже уважает excludePresleep — карб-топ-ап не льётся
+    // в peri-окна и pre-sleep («мёд 69 г в предтрен» / «булгур на ночь»).
+    if (excludePresleep) {
+      const l = meals[i]?.label || '';
+      const t = (meals[i] as any)?.type;
+      if (t === 'presleep' || t === 'preworkout' || t === 'postworkout' || t === 'intra') continue;
+      if (/Предтрен|Пост-трен|Перед сном|Pre-sleep|Intra/i.test(l)) continue;
+    }
     if (!meals[i]?.recipeApplied) return i;
   }
   return -1; // все приёмы из рецептов — вызывающий код создаст «Добор»
@@ -311,7 +331,7 @@ function carbMealIndex(meals: PlanMealLike[], iter: number): number {
     const room = tC - (m.totals?.c || 0);
     if (room >= 8) mains.push({ i, room });
   }
-  if (mains.length === 0) return flexMealIndex(meals);
+  if (mains.length === 0) return flexMealIndex(meals, true);
   // round-robin по порядку приёмов (распределяем, не копим в одном)
   mains.sort((a, b) => a.i - b.i);
   return mains[iter % mains.length].i;
@@ -387,7 +407,7 @@ export function rebalanceDayAfterRecipes(
       const dominant = Math.max(relP, relC, relF);
       if (dominant <= 0) break; // все дефициты закрыты — дальше резаем перебор
       const chosenRole: 'p' | 'c' | 'f' = (relP >= relC && relP >= relF) ? 'p' : (relC >= relF) ? 'c' : 'f';
-      let fi = chosenRole === 'c' ? carbMealIndex(work, iter) : flexMealIndex(work);
+      let fi = chosenRole === 'c' ? carbMealIndex(work, iter) : flexMealIndex(work, true);
       if (fi < 0 || !work[fi]) {
         // Все приёмы из рецептов — создаём «Добор», чтобы не портить основные приёмы
         // (раньше флекс падал на последний РЕЦЕПТУРНЫЙ приём и «ужимал» обед).
@@ -603,6 +623,73 @@ export function rebalanceDayAfterRecipes(
         notes.push(`➖ ${it.name}: ${it.amount} → ${bc.newAmount} г (перебор калорий)`);
       }
       continue;
+    }
+  }
+
+  // Чистка-2026: ОЖИВЛЕНИЕ ПУСТЫХ ПЕРЕКУСОВ — резка перебора могла вычистить перекус
+  // («чиа 18 г» / «арония + орехи» при цели Б15/У41), а добив ушёл в основные приёмы.
+  // Пустой приём = сорванный MPS-интервал. Заполняем белково-фруктовой парой в комнате ккал.
+  {
+    const _topupOk = (f: FoodItem) => !opts?.excludedIds?.has(f.id);
+    for (const m of work) {
+      const l = m?.label || '';
+      if (!/Перекус|Полдник|Второй завтрак/i.test(l)) continue;
+      if (m.recipeApplied) continue;
+      const tk = m.target ? ((m.target as any).p || 0) * 4 + ((m.target as any).f || 0) * 9 + ((m.target as any).c || 0) * 4 : 0;
+      const ak = m.totals?.kcal || 0;
+      if (tk < 150 || ak > 130) continue;
+      const roomK = tk - ak;
+      const added: string[] = [];
+      // 1) белковый пункт (до ~25 г белка или комнаты ккал)
+      const prot = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds)
+        .filter(_topupOk)
+        .sort((a, b) => (b.protein || 0) - (a.protein || 0))[0];
+      if (prot && (prot.protein || 0) > 0 && !m.items?.some(it => it.id === prot.id)) {
+        const gP = Math.min(Math.round(roomK / Math.max(1, prot.kcal || 1) * 100 / 10) * 10, Math.round(25 / prot.protein * 100 / 10) * 10);
+        if (gP >= 30) {
+          m.items = [...(m.items || []), scaleItem({ name: prot.name, id: prot.id, amount: 100, kcal: Math.round(prot.kcal || 0), p: prot.protein || 0, f: prot.fat || 0, c: prot.carbs || 0, fiber: prot.fiber || 0 } as any, gP)];
+          added.push(`${prot.name} ${gP} г`);
+        }
+      }
+      // 2) карб-плотный фрукт (микронутриенты + углеводное окно), если комната осталась
+      const ak2 = sumMealTotals(m.items || []).kcal;
+      const roomK2 = tk - ak2;
+      if (roomK2 > 120) {
+        const fruit = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds)
+          .filter(f => _topupOk(f) && f.category === 'veg_fruit' && (f.carbs || 0) >= 10)
+          .sort((a, b) => (b.carbs || 0) - (a.carbs || 0))[0]
+          // Чистка-2026: топап-пул карбов — крупы; фрукт берём из FOOD_DB напрямую
+          // (пустой пул не должен оставлять перекус без углеводной части при 800 г углей дня)
+          || FOOD_DB.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 10 && _topupOk(f))
+            .sort((a, b) => (b.carbs || 0) - (a.carbs || 0))[0];
+        if (fruit) {
+          const gF = Math.min(150, Math.round(roomK2 / Math.max(1, fruit.kcal || 1) * 100 / 10) * 10);
+          if (gF >= 60) {
+            m.items = [...(m.items || []), scaleItem({ name: fruit.name, id: fruit.id, amount: 100, kcal: Math.round(fruit.kcal || 0), p: fruit.protein || 0, f: fruit.fat || 0, c: fruit.carbs || 0, fiber: fruit.fiber || 0 } as any, gF)];
+            added.push(`${fruit.name} ${gF} г`);
+          }
+        }
+      }
+      // 3) крупяной топ-ап в комнате (при 700-800 г углей дня перекусы несут угли,
+      // иначе основные приёмы перегружаются «тортилья 374 г»)
+      const ak3 = sumMealTotals(m.items || []).kcal;
+      const roomK3 = tk - ak3;
+      if (roomK3 > 180) {
+        const carb = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds)
+          .filter(f => _topupOk(f) && f.category !== 'veg_fruit' && (f.carbs || 0) >= 15)
+          .sort((a, b) => (b.carbs || 0) / Math.max(1, b.kcal || 1) - (a.carbs || 0) / Math.max(1, a.kcal || 1))[0];
+        if (carb) {
+          const gC = Math.min(200, Math.round(roomK3 / Math.max(1, carb.kcal || 1) * 100 / 10) * 10);
+          if (gC >= 40) {
+            m.items = [...(m.items || []), scaleItem({ name: carb.name, id: carb.id, amount: 100, kcal: Math.round(carb.kcal || 0), p: carb.protein || 0, f: carb.fat || 0, c: carb.carbs || 0, fiber: carb.fiber || 0 } as any, gC)];
+            added.push(`${carb.name} ${gC} г`);
+          }
+        }
+      }
+      if (added.length > 0) {
+        m.totals = sumMealTotals(m.items || []);
+        notes.push(`🍽 Перекус «${l}» заполнен (был пуст после резки): ${added.join(' + ')}`);
+      }
     }
   }
 
@@ -1007,12 +1094,28 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // цели приёма — иначе день систематически перебирает белок (+18%) и недобирает угли.
     const heavyProteinCap = 1.2;
     const heavyCarbCap = 1.2;
+    // Чистка-2026: МАСШТАБ В ПОРЦИЯХ — исходный рецепт = 1 порция. Идеальный непрерывный
+    // масштаб (ккал-дистанция с капами Б/Ж/У) квантуется в человеческий ряд: ×0.5 / ×1 /
+    // ×1.5 / ×2 / ×2.5 / ×3 («Мюсли ×1.5 порции»), а не «×1.37» — граммовки ингредиентов
+    // остаются пропорцией авторского рецепта. Остаток цели закрывают сайды/посадка.
+    const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
     const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
-      let s = Math.max(0.7, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
-      if (p > 0) s = Math.min(s, (heavyProteinCap * (tgt.p || 30)) / p);
-      if (f > 0) s = Math.min(s, (1.5 * (tgt.f || 15)) / f);
-      if (c > 0) s = Math.min(s, (heavyCarbCap * (tgt.c || 40)) / c);
-      return Math.max(0.7, Math.round(s * 20) / 20);
+      const ideal = Math.max(0.5, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
+      let capS = heavyScaleMax;
+      if (p > 0) capS = Math.min(capS, (heavyProteinCap * (tgt.p || 30)) / p);
+      if (f > 0) capS = Math.min(capS, (1.5 * (tgt.f || 15)) / f);
+      if (c > 0) capS = Math.min(capS, (heavyCarbCap * (tgt.c || 40)) / c);
+      capS = Math.max(0.5, capS);
+      const hi = Math.min(ideal, capS);
+      // ближайший шаг ряда к идеалу (tie — больший, сайд добьёт остаток)
+      let best = PORTION_STEPS[0];
+      let bestDist = Infinity;
+      for (const st of PORTION_STEPS) {
+        if (st > capS + 1e-9) break; // шаг выше капа Б/Ж/У — не берём
+        const d = Math.abs(st - hi);
+        if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) < 1e-9 && st > best)) { bestDist = d; best = st; }
+      }
+      return best;
     };
     const rankCands = (candidatePool: Recipe[]): Recipe[] => candidatePool
       .map(r => {
@@ -1072,7 +1175,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const f = flattenRecipeOption(r);
       const t = decomposedFacts(r).totals;
       if (t && t.kcal > 0 && targetKcal > 0) {
-        f.fitPct = Math.round(scaleOf(t.kcal, t.p, t.f, t.c) * t.kcal / Math.max(50, targetKcal) * 100);
+        // Чистка-2026: fitPct и порционный масштаб (×0.5/×1/×1.5/…) — из квантованного ряда
+        const _ps = scaleOf(t.kcal, t.p, t.f, t.c);
+        f.fitPct = Math.round(_ps * t.kcal / Math.max(50, targetKcal) * 100);
+        (f as any).portionScale = _ps;
       }
       return f;
     });
@@ -1087,8 +1193,19 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const tryBuild = (cand: Recipe): { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null; rawCarbs: number } | null => {
       const flat = flattenRecipeOption(cand);
       const built = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
+      try { if ((globalThis as any).__DBG_VARIETY) console.log(`[DBG] tryBuild ${cand.name}: built=${built?.length ?? 'null'}`); } catch {}
       if (!built || built.length === 0) return null;
       const decompTot = sumMealTotals(built);
+      // Чистка-2026: МАСШТАБ В ПОРЦИЯХ. ГЕЙТ приёмки оценивается на непрерывном масштабе
+      // (sCont — «рецепт способен закрыть приём»), а граммовки квантуются в порционный ряд
+      // (×0.5/×1/×1.5/×2/×2.5/×3): остаток добирают сайды + посадка дня.
+      const sCont = (() => {
+        let s = Math.max(0.5, Math.min(heavyScaleMax, targetKcal / Math.max(50, decompTot.kcal || 1)));
+        if (decompTot.p > 0) s = Math.min(s, (heavyProteinCap * (tgt.p || 30)) / decompTot.p);
+        if (decompTot.f > 0) s = Math.min(s, (1.5 * (tgt.f || 15)) / decompTot.f);
+        if (decompTot.c > 0) s = Math.min(s, (heavyCarbCap * (tgt.c || 40)) / decompTot.c);
+        return Math.max(0.5, s);
+      })();
       const s = scaleOf(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
       let finalItems: PlanItemLike[] = (s !== 1)
         ? built.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
@@ -1096,6 +1213,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       // rawCarbs: угли ЧИСТОГО рецепта (после масштаба, до сайд-добивки) — по ним carb-гейт.
       const rawCarbs = sumMealTotals(finalItems).c || 0;
       flat.appliedScale = s;
+      // Чистка-2026: порционный масштаб сохраняется в данные рецепта — UI показывает «×N порции»
+      (flat as any).portionScale = s;
       // Р-2.1: пол реалистичных порций в рецептурном ядре («18 г каши» — нет),
       // бюджет строго ×1.03 от цели приёма — пол не рушит сходимость дня ±3%.
       const _mealkT = (tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9;
@@ -1106,8 +1225,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       {
         let tNow = sumMealTotals(finalItems);
         let kcalNow = tNow.kcal || 0;
-        // Сайд добивка — пока <0.90 (для тяжей до 2 сайдов)
-        const maxSides = (args.athleteWeightKg ?? 80) >= 100 ? 2 : 1;
+        // Сайд добивка — порционный ряд даёт шаг до ±25% ккал: остаток порции добирают
+        // сайды (до 2 везде — иначе недобор после кванта не закрыть).
+        const maxSides = 2;
         let sidesAdded = 0;
         while (sidesAdded < maxSides) {
           const dP = (tgt.p || 0) - tNow.p;
@@ -1170,21 +1290,27 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     };
     // C5 (Эпик C): ккал-гейт приёмки ±25% пропускал ПОЛОВИННЫЙ недобор (рецепт = 50%
     // приёма, остальное — сайды) — снижаем до ±15% (перекусы ±20%: их догоняет ребаланс).
-    const kcalTol = isSnackSlot ? 0.20 : 0.15;
+    // Чистка-2026: с ПОРЦИОННЫМ рядом (шаги ×0.5) гейт ослаблен до ±22% — остаток порции
+    // добирают сайды (maxSides=2) и посадка дня; гейты Б/Ж/У ослаблены пропорционально.
+    const kcalTol = 0.22;
     const _passesGate = (built: { totals: PlanTotalsLike }): boolean => {
       const tk = built.totals.kcal || 1;
       return Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
-        && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
-        && built.totals.p <= 1.25 * (tgt.p || 30) + 0.5
-        && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
-        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5
-        && built.totals.c <= 1.30 * (tgt.c || 40) + 0.5;
+        && built.totals.p >= 0.72 * (tgt.p || 30) - 0.5
+        && built.totals.p <= 1.30 * (tgt.p || 30) + 0.5
+        && built.totals.f <= 1.40 * (tgt.f || 15) + 0.5
+        && built.totals.c >= 0.62 * (tgt.c || 40) - 0.5
+        && built.totals.c <= 1.35 * (tgt.c || 40) + 0.5;
     };
     for (const cand of ranked) {
       const built = tryBuild(cand);
       if (!built) continue;
-      if (!_carbGateOk(built)) continue;
+      // Чистка-2026: fallback — ЛУЧШИЙ ПО ДИСТАНЦИИ кандидат ДО гейтов. Порционный ряд
+      // (×0.5/×1/×1.5) выводит rawCarbs из ±коридора carb-гейта, и если fallback ставить
+      // после гейтов — приём остаётся ПУСТЫМ (d4-d6 недели без рецептов). Пустой приём
+      // хуже рецепта «не точно в цель»: его дотягивают сайды/корректор/посадка.
       if (!fallback) fallback = built;
+      if (!_carbGateOk(built)) continue;
       if (_passesGate(built)) { chosen = built; break; }
     }
     // C1 второй проход: чистые кандидаты не закрыли приём по строгому гейту —
@@ -1212,6 +1338,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     mealAny.totals = use.totals;
     mealAny.recipeApplied = chosenFlat.name;
     mealAny.recipeAppliedData = chosenFlat;
+    const _ps = (chosenFlat as any).portionScale || 1;
+    mealAny.rationale = [...(mealAny.rationale || []), `🍽 Рецепт «${chosenFlat.name}» — ×${_ps} ${_ps === 1 ? 'порция' : (_ps < 2 ? 'порции' : 'порций')} (исходный = 1 порция)`];
     if (use.sideNote) mealAny.rationale = [...(mealAny.rationale || []), use.sideNote];
     if (!chosen) mealAny.rationale = [...(mealAny.rationale || []), `⚠ Рецепт «${chosenFlat.name}» не закрывает приём точно (${Math.round(use.totals.kcal)} из ~${Math.round(targetKcal)} ккал) — проверьте варианты`];
     dayUsedNames.add(chosenFlat.name);

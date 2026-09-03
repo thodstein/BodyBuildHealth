@@ -209,6 +209,16 @@ export function correctDayToTargets(
               if (isCoreRecipeItem(m, it.id)) return;
               const food = FOOD_DB.find(f => f.id === it.id);
               if (!food) return;
+              // Чистка-2026 (распределение КБЖУ): свап не убивает белковый пункт приёма.
+              // Завтрак — канон «яйца/творог/сыворотка» (D1, без мяса и без замены на углеводы);
+              // в остальных приёмах единственный белковый пункт не трогаем («батат 290 г без белка»).
+              const _vr = it.role || '';
+              const _isProtRole = _vr === 'protein' || _vr === 'fast_protein' || _vr === 'slow_protein';
+              if (_isProtRole) {
+                if (m.type === 'breakfast') return;
+                const _protCount = m.items.filter(x => x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein').length;
+                if (_protCount <= 1) return;
+              }
               const ov = overFor(food);
               if (ov < 2) return;
               const k = Math.max(1, food.kcal || 1);
@@ -336,6 +346,9 @@ export function correctDayToTargets(
       const cands: Cand[] = [];
       meals.forEach((m, mi) => {
         if (m.type === 'presleep' || m.type === 'intra') return;
+        // Чистка-2026: недобор закрываем ТОЛЬКО в полноценные приёмы — пери-окна (предтрен/
+        // пост-трен) имеют фиксированные капы углей и 0 жиров («мёд 69 г в предтрен» — баг).
+        if (m.type === 'preworkout' || m.type === 'postworkout') return;
         // на недобор Ж не трогаем ужин-morningLoad и пост-трен (как в основном движке)
         if (eff === 'f' && (m.type === 'postworkout')) return;
         (m.items || []).forEach((it, ii) => {

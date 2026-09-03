@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
-import type { Recipe } from '../../../../../engines/nutrition-periodization.engine';
+import { getRecipes, type Recipe } from '../../../../../engines/nutrition-periodization.engine';
 import {
   kbjuFormulaDeviationPct,
   isMainMealLabel,
@@ -17,6 +17,7 @@ import {
   collectAppliedRecipes,
   RECIPE_PRESETS,
   recipeMatchesPreset,
+  scaleRecipeToTarget,
 } from '../planner-recipe-mode';
 import { snapPortionG } from '../meal-plan-engine';
 
@@ -28,6 +29,47 @@ const mkRecipe = (over: Partial<Recipe> = {}): Recipe => ({
   ingredients: ['Куриная грудка 150 г', 'Рис 60 г'],
   instructions: ['Готовить'], tags: ['тест'],
   ...over,
+});
+
+// ─── Чистка-2026: ПОРЦИОННОЕ МАСШТАБИРОВАНИЕ (исходный рецепт = 1 порция) ──
+describe('scaleRecipeToTarget: порции (×0.5/×1/×1.5/×2/×2.5/×3)', () => {
+  // Реальный рецепт из БД с ingredientIds — декомпозированные ккал = калорийность 1 порции
+  const realRecipe = getRecipes().find(r => r.meal === 'lunch' && (r.ingredientIds?.length ?? 0) >= 3)!;
+
+  it('цель = калорийности 1 порции (декомпозиции) → ровно ×1 порция', () => {
+    const base = sumMealTotals(buildRecipeMealItems(realRecipe)!);
+    const r = scaleRecipeToTarget(realRecipe, { kcal: base.kcal, p: base.p, f: base.f, c: base.c }, 90);
+    expect(r).toBeTruthy();
+    expect(r!.portions).toBe(1);
+    expect(r!.scale).toBe(1);
+  });
+
+  it('цель ~1.5 порции → квант ×1.5 (граммовки = авторская пропорция ×1.5)', () => {
+    const base = sumMealTotals(buildRecipeMealItems(realRecipe)!);
+    const r = scaleRecipeToTarget(realRecipe, { kcal: base.kcal * 1.5, p: base.p * 1.5, f: base.f * 1.5, c: base.c * 1.5 }, 110);
+    expect(r).toBeTruthy();
+    expect(r!.portions).toBe(1.5);
+    // граммовка масштабируется ровно в 1.5 порции (крупнейший ингредиент ×1.5)
+    const top = [...buildRecipeMealItems(realRecipe)!].sort((a, b) => (b.amount || 0) - (a.amount || 0))[0];
+    const scaledTop = r!.items.find(i => i.id === top.id)!;
+    expect(scaledTop).toBeTruthy();
+    expect(scaledTop.amount).toBe(Math.round((top.amount * 1.5) / 5) * 5);
+  });
+
+  it('цель меньше половины порции → квант ×0.5 (не «×0.61»)', () => {
+    const base = sumMealTotals(buildRecipeMealItems(realRecipe)!);
+    const r = scaleRecipeToTarget(realRecipe, { kcal: base.kcal * 0.42, p: base.p * 0.42, f: base.f * 0.42, c: base.c * 0.42 }, 80);
+    expect(r).toBeTruthy();
+    expect(r!.portions).toBe(0.5);
+  });
+
+  it('цель ~2 порции → ×2; тяж 125 кг дотягивается до ×3', () => {
+    const base = sumMealTotals(buildRecipeMealItems(realRecipe)!);
+    const r2 = scaleRecipeToTarget(realRecipe, { kcal: base.kcal * 2, p: base.p * 2, f: base.f * 2, c: base.c * 2 }, 110);
+    expect(r2!.portions).toBe(2);
+    const r3 = scaleRecipeToTarget(realRecipe, { kcal: base.kcal * 3, p: base.p * 3, f: base.f * 3, c: base.c * 3 }, 125);
+    expect(r3!.portions).toBe(3);
+  });
 });
 
 describe('kbjuFormulaDeviationPct', () => {

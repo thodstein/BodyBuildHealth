@@ -12,7 +12,7 @@ const mkRecipe = (over: Partial<Recipe> & { ingredientIds?: string[]; portions?:
 });
 
 describe('scaleRecipeToTarget (порции под КБЖУ приёма)', () => {
-  it('тяжелее атлет (больше цель приёма) → больше граммовки того же рецепта', () => {
+  it('тяжелее атлет (больше цель приёма) → не меньше граммовки того же рецепта (порционный ряд: 80кг → ×0.5, 110кг → ×1)', () => {
     const r = mkRecipe({ ingredientIds: ['chicken_breast', 'rice_white'], portions: { chicken_breast: 150, rice_white: 60 } });
     const small = scaleRecipeToTarget(r, { kcal: 400, p: 35, f: 12, c: 40 }, 80);
     const big = scaleRecipeToTarget(r, { kcal: 800, p: 60, f: 18, c: 90 }, 110);
@@ -20,20 +20,21 @@ describe('scaleRecipeToTarget (порции под КБЖУ приёма)', () =
     expect(big).not.toBeNull();
     const smallKcal = sumMealTotals(small!.items).kcal;
     const bigKcal = sumMealTotals(big!.items).kcal;
-    expect(bigKcal).toBeGreaterThan(smallKcal);
-    // обе порции в рамках клампа масштаба
-    expect(small!.scale).toBeGreaterThanOrEqual(0.7);
-    expect(big!.scale).toBeLessThanOrEqual(2.8);
+    expect(bigKcal).toBeGreaterThanOrEqual(smallKcal);
+    // Чистка-2026: масштаб в ПОРЦИЯХ (ряд ×0.5/×1/×1.5/×2/×2.5/×3, исходный = 1 порция)
+    expect(small!.portions).toBeGreaterThanOrEqual(0.5);
+    expect(small!.portions).toBeLessThan(big!.portions + 0.01);
+    expect(big!.portions).toBeLessThanOrEqual(2.8);
   });
 
-  it('масштаб в допустимых рамках + items непустые', () => {
+  it('масштаб в допустимых рамках порционного ряда + items непустые', () => {
     const r = mkRecipe({ ingredientIds: ['chicken_breast'], portions: { chicken_breast: 200 } });
     const res = scaleRecipeToTarget(r, { kcal: 250, p: 30, f: 8, c: 10 }, 80);
     expect(res).not.toBeNull();
     expect(res!.items.length).toBeGreaterThan(0);
-    expect(res!.scale).toBeGreaterThanOrEqual(0.7);
-    expect(res!.scale).toBeLessThanOrEqual(2.2);
-    // граммовки положительны
+    // Чистка-2026: ряд порций начинается с ×0.5 (полпорции — «×0.61» не бывает)
+    expect(res!.portions).toBeGreaterThanOrEqual(0.5);
+    expect(res!.portions).toBeLessThanOrEqual(2.2);
     expect(res!.items.every(it => (it.amount || 0) >= 5)).toBe(true);
   });
 
