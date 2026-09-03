@@ -107,6 +107,8 @@ import { RUSSIAN_SQUAT } from './russian-squat';
 import { GZCL_UHF } from './gzcl-uhf';
 import { COAN_DEADLIFT } from './coan-deadlift';
 import { KIZEN_SHEIKO } from './kizen-sheiko';
+import { TEN_TWENTY_LIFE } from './ten-twenty-life';
+import { BASE_BUILDING } from './base-building';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -210,6 +212,8 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     GZCL_UHF,
     COAN_DEADLIFT,
     KIZEN_SHEIKO,
+    TEN_TWENTY_LIFE,
+    BASE_BUILDING,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
