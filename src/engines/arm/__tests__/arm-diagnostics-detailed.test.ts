@@ -54,6 +54,13 @@ describe('arm diagnostics detailed 12 точек', () => {
     expect(r.humerusWarnings.length).toBeGreaterThan(0);
     expect(r.findings.some(f=> f.level==='critical' && f.text.includes('side_pressure'))).toBe(true);
   });
+  it('benchLevel beginner + 2 точки → Bench-файндинг в scoring', () => {
+    const r = buildArmDiagnosticsReport({
+      weakTest:{}, weakPoints:['cup_start','pron_lock'] as any, benchLevel:'beginner',
+      grip:{} as any, level:'intermediate', technique:'toproll', tableSessions:2, totalSessions:4, tendonSets:8,
+    } as any);
+    expect(r.scoring?.findings.some(f=> f.text.includes('Bench'))).toBe(true);
+  });
   it('support RT<60 → contain_fingers с support-коррекцией', () => {
     const r = buildArmDiagnosticsReport({
       weakTest:{ gripSupportMaxKg: 50 } as any, grip:{} as any, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:8,

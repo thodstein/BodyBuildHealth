@@ -341,7 +341,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
     sex: state.sex,
     weightClass: weightClassAuto,
     bodyWeightKg: bwNum,
-  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, forceHistoryTick]);
+    benchLevel: benchRes.level,
+  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
 
   const mockGuard = useMemo(() => {
     const mockPlan: any = {

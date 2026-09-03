@@ -72,6 +72,7 @@ export function buildArmDiagnosticsReport(input: {
   hasVideo?: boolean;
   hasVbt?: boolean;
   hasGripHistory?: boolean;
+  benchLevel?: string; // уровень бенчмарков (beginner..elite) → grip-ветка scoring
 }): ArmDiagnosticsReport {
   const detailed = diagnoseArmWeakDetailed({ weakTest: input.weakTest, weakPoints: input.weakPoints, technique: input.technique });
   const diag = detailed; // detailed расширяет base (weakMuscles/priorities/rationale сохранены)
@@ -176,7 +177,7 @@ export function buildArmDiagnosticsReport(input: {
         sideSetsWeek1: sideSets || (sidePlanned ? 8 : 0),
         tendonSets: input.tendonSets,
         tendonLimit: tendonWeeklyLimit(input.level),
-        gripLevel: undefined,
+        gripLevel: input.benchLevel,
         hasVideo, hasVbt, hasGripHistory,
         level: input.level,
       });

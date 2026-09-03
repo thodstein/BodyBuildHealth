@@ -35,4 +35,13 @@ describe('arm-scoring RSS (PRO оверлей)', () => {
     const s = scoreArm({ weakCount:0, sideSetsWeek1:10 });
     expect(s.score).toBeLessThanOrEqual(49);
   });
+  it('grip-ветка: bench beginner + 2 точки → warn', () => {
+    const s = scoreArm({ weakCount: 2, gripLevel: 'beginner' });
+    expect(s.findings.some(f => f.text.includes('Bench'))).toBe(true);
+    expect(s.score).toBeLessThan(88);
+  });
+  it('grip-ветка молчит при advanced и при 1 точке', () => {
+    expect(scoreArm({ weakCount: 2, gripLevel: 'advanced' }).findings.some(f => f.text.includes('Bench'))).toBe(false);
+    expect(scoreArm({ weakCount: 1, gripLevel: 'beginner' }).findings.some(f => f.text.includes('Bench'))).toBe(false);
+  });
 });

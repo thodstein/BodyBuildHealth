@@ -295,6 +295,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
 - Два источника выбора (legacy-чекбоксы + чипы) слиты в один видимый: `toggleLegacy` зеркалит чекбокс в чипы (вкл — добавляет развёртку до 3, выкл — убирает), мёртвый `toggle` удалён.
 - Тесты: side_pin в одиночку → critical humerus; legacy cup → «Выбрано: cup_start, cup_hold» → снятие.
 
+### 8.8 Раунд 6 — оживлена grip-ветка scoring
+- В `scoreArm` была мёртвая ветка: `gripLevel` никто не передавал (всегда `undefined`). Проброшен `benchLevel` (beginner..elite из `resolveArmLevelByTests`) через `buildArmDiagnosticsReport` → `scoreArm(gripLevel)`: bench beginner/intermediate + ≥2 точек → warn «Bench …».
+- Хаб передаёт `benchRes.level` (deps memo обновлены). Чужие `arm-benchmarks`/`arm-vbt-capture` не тронуты.
+- Тесты: grip warn при beginner+2, тишина при advanced/1 точке, сквозной passthrough через detailed-отчёт.
+
 ## 7. Источники (для ссылок в коде)
 
 - Brismar 1975 + Holstein-Lewis — торсия humerus при internal rotation плеча → spiral fracture (PMC 10315927, SciDirect S2666639).
