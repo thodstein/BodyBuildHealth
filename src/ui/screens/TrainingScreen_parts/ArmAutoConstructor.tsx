@@ -16,6 +16,7 @@ import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
+import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
@@ -534,7 +535,6 @@ export function ArmAutoConstructor() {
                   try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
                   // fatigue/trend из force-history если есть
                   try {
-                    const { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } = require('../../../engines/arm/arm-force-history.store');
                     const trials = loadForceTrials();
                     const stats = buildWeeklyStats(trials, 12);
                     const ft = fatigueTrend(stats);
