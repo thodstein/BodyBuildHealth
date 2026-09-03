@@ -29,7 +29,7 @@ import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechni
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
 import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
-import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
+import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import { computeRegimeMrvMult, sessionLimitsFor, aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
@@ -72,7 +72,6 @@ import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine
 
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, getPhaseConfig, type PhaseDistribution } from '../../../engines/periodization';
-import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
@@ -672,6 +671,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
+  // Понедельный просмотр качества: номер недели или 'avg' (среднее по неделям).
+  const [qualityWeek, setQualityWeek] = useState<number | 'avg'>('avg');
   const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
@@ -1542,74 +1543,58 @@ export const BbAutoConstructor: React.FC = () => {
       goal: bbGoal,
     });
   }, [builtPlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
-  // FIX-6: Единый источник качества — validatePlanQuality + pro-quality-analysis (паттерны/углы/растяжка)
+  // Понедельная оценка качества: факт выдачи × параметры плана (две шкалы, не суммируются).
+  // A «Объём и соответствие» — факт недели vs собственные цели/капы/параметры плана.
+  // B «PRO-техника» — факт исполнения недели (паттерны/углы/растяжка/техники).
+  // Вид: конкретная неделя (по правилам её фазы) или 'avg' (среднее понедельных).
   const quality = useMemo(() => {
     if (!builtPlan) return null;
-    // Фактический делод по неделям плана (а не тоггл autoDeload)
-    const hasDeloadActual = builtPlan.weeks.some((w:any) => (w as any).deload || (w as any).phase === 'deload');
-    const deloadWeeksActual = builtPlan.weeks.filter((w:any) => (w as any).deload || (w as any).phase === 'deload').map((w:any) => w.week).filter(Boolean);
-    const input = bbPlanToQualityInput(builtPlan, {
-      level: bbLevel,
-      weakPoints,
-      hasDeload: hasDeloadActual,
-      deloadWeeks: deloadWeeksActual,
-      onCourse: peds.length > 0,
-      trainingYears: bbTrainingYears,
-      pedMultiplier: pedAdapt.combinedMrvMultiplier,
-      injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
-      goal: bbGoal,
-      trainingFocus: bbTrainingFocus,
-      methodology: bbMethodology,
-      volumeGoal: bbVolGoal,
-      specialization: specializationMode,
-      focusGroup: '',
-      splitPattern: builtPlan.pattern?.id,
-    });
-    const result = validatePlanQuality(input);
-    // PRO-качество из интеллектуальных — паттерны/углы/растяжка/техники (читает технику из workSets)
-    let proDelta = 0;
-    let proIssues: string[] = [];
-    let proResult: ReturnType<typeof analyzeProQuality> | null = null;
     try {
-      // Передаём технику честно: маппим workSets с technique, иначе PRO всегда 0%
-      const dummyProgram: any = {
-        bb: {
-          weeks: builtPlan.weeks.map((w:any) => ({
-            sessions: w.sessions.map((s:any) => ({
-              blocks: s.exercises.map((e:any) => {
-                const ws = e.workSets || [{ reps: e.repsRange?.[0] || 10, rir: e.rir || 2 }];
-                // Техника — из workSets с technique, иначе из коммента/parent
-                const tech = (ws[0] as any)?.technique || (e as any).technique || 'none';
-                return { exerciseName: e.name, muscle: e.muscle, sets: ws.map((x:any) => ({ reps: x.reps, rir: x.rir ?? e.rir, technique: x.technique || tech })), technique: tech };
-              }),
-            })),
-          })),
-        },
-        pl: { customWeeks: [] },
-        goal: bbGoal,
-        level: bbLevel,
+      const totalW = builtPlan.weeks.length || 1;
+      const qw: number | 'avg' = qualityWeek === 'avg' ? 'avg' : Math.min(Math.max(1, qualityWeek), totalW);
+      const avg = averageWeeklyScores(builtPlan as any);
+      let selVolume: ReturnType<typeof scoreVolumeWeek>;
+      let selPro: ReturnType<typeof scoreProWeek>;
+      let viewTag: string;
+      if (qw === 'avg') {
+        viewTag = `среднее · ${avg.weeks} нед`;
+        selVolume = {
+          week: 0, phase: 'среднее', isDeload: false, isTaper: false,
+          score: avg.avgVolume, grade: gradeFor(avg.avgVolume),
+          issues: avg.recurringVolumeIssues, muscles: avg.avgMuscles, balance: [],
+          recommendations: avg.recurringVolumeIssues.filter(i => i.severity !== 'info').slice(0, 5).map(i => `→ ${i.message} [${i.source}]`),
+        };
+        const meso = scoreProWeek(builtPlan as any, 'meso');
+        // Число — среднее понедельных PRO; детали — агрегат мезоцикла (факт).
+        selPro = { ...meso, score: avg.avgPro, grade: gradeFor(avg.avgPro) };
+      } else {
+        viewTag = `нед ${qw}/${totalW}`;
+        selVolume = scoreVolumeWeek(builtPlan as any, qw);
+        selPro = scoreProWeek(builtPlan as any, qw);
+      }
+      const recommendations = [
+        ...selVolume.issues.filter(i => i.severity !== 'info').slice(0, 4).map(i => `→ ${i.message} [${i.source}]`),
+        ...selPro.totalRecommendations.slice(0, 2),
+      ];
+      return {
+        mode: qw, viewTag,
+        avgVolume: avg.avgVolume, volumeLabel: gradeFor(avg.avgVolume),
+        avgPro: avg.avgPro, proLabel: gradeFor(avg.avgPro),
+        perWeek: avg.perWeek,
+        viewVolume: selVolume.score, viewPro: selPro.score,
+        selVolume, selPro,
+        recommendations,
+        // back-compat для мест, читающих старые поля:
+        score: selVolume.score, label: selVolume.grade,
+        details: selVolume.issues.map(i => i.message),
+        perMuscle: selVolume.muscles.map(m => ({
+          muscle: m.muscle, sets: m.directSets, mev: m.mev, mav: m.mav, mrv: m.mrv,
+          pct: m.mav > 0 ? Math.round((m.effectiveSets / m.mav) * 100) : 0, status: m.status, contextNote: m.note,
+        })),
+        proResult: selPro,
       };
-      const basePerMuscle = result.muscles.map(m => ({ muscle: m.muscle, peakSets: m.weeklySets, mrv: m.mrv }));
-      proResult = analyzeProQuality(dummyProgram, 'bb', bbLevel, bbGoal, basePerMuscle);
-      proDelta = proResult.scoreDelta;
-      proIssues = proResult.totalIssues.slice(0, 2);
-    } catch {}
-    const finalScore = Math.max(0, Math.min(100, result.score + proDelta));
-    const finalGrade = finalScore >= 85 ? '🟢 Отлично' : finalScore >= 65 ? '🟡 Хорошо' : finalScore >= 45 ? '🟠 Средне' : '🔴 Слабо';
-    return {
-      score: finalScore,
-      label: finalGrade,
-      details: [...result.issues.map(i => i.message), ...proIssues],
-      perMuscle: result.muscles.map(m => ({
-        muscle: m.muscle, sets: m.weeklySets, mev: m.mev, mav: m.mav, mrv: m.mrv,
-        pct: m.pctOfMav, status: m.status, contextNote: m.contextNote,
-      })),
-      recommendations: [...result.recommendations, ...(proDelta < 0 ? [`PRO: ${proIssues.join('; ')}`] : [])],
-      proResult,
-      hasDeloadActual,
-      deloadWeeksActual,
-    };
-  }, [builtPlan, bbLevel, weakPoints, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier, bbGoal, injuries]);
+    } catch { return null; }
+  }, [builtPlan, qualityWeek]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
@@ -2234,7 +2219,8 @@ export const BbAutoConstructor: React.FC = () => {
     const exportPlan = applyEditsToPlan(builtPlan);
     if (!exportPlan.validation?.valid) { flash('⚠ Есть ошибки валидации — сохраняем вариант с предупреждением.'); }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
-    const exportQuality = validatePlanQuality(bbPlanToQualityInput(exportPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 }));
+    // Скор варианта — среднее понедельных «Объём» (факт выдачи × параметры плана).
+    const exportQualityScore = (() => { try { return averageWeeklyScores(exportPlan as any).avgVolume; } catch { return 0; } })();
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`;
     setNamePrompt({
       title: '💾 Название варианта',
@@ -2263,7 +2249,7 @@ export const BbAutoConstructor: React.FC = () => {
            avgRir: exportMetrics.avgRir,
            sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
           phases: phases.map(p => p.phase),
-           qualityScore: exportQuality.score,
+            qualityScore: exportQualityScore,
            muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
           mrvMult: pedAdapt.combinedMrvMultiplier,
            peakWeek: exportPlan.report?.peakWeek,
@@ -4971,7 +4957,7 @@ export const BbAutoConstructor: React.FC = () => {
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
-<CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${quality.score}/100 ${quality.label}`}>
+<CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`Объём ${quality.viewVolume}/100 · PRO ${quality.viewPro}/100 · ${quality.viewTag}`}>
           <div style={{ display:'grid', gap:8, fontSize:11 }}>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.14)', color:'#a855f7' }}>{builtPlan.pattern?.name || '—'} · {W.length} нед · {builtPlan.weeks[0]?.sessions.length || bbDays}×/нед</span>
@@ -4989,6 +4975,54 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize:10, color:'#fff', opacity:0.6, display:'flex', flexWrap:'wrap', gap:6 }}>
               <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {ratio ? ratio.ratio.toFixed(2) : '—'}</span>
             </div>
+          </div>
+        </CollapsibleCard>
+        <CollapsibleCard title="⭐ Качество плана — объём и PRO (понедельно)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`Объём ${quality.viewVolume}/100 · PRO ${quality.viewPro}/100 · ${quality.viewTag}`}>
+          <div style={{ display:'grid', gap:8, fontSize:11 }}>
+            <div style={{ fontSize:10, color:'#fff', opacity:0.6, lineHeight:1.35 }}>
+              Две отдельные шкалы (не суммируются): «Объём» — факт недели vs собственные цели/капы/параметры плана; «PRO» — факт исполнения (паттерны/углы/растяжка/техники). Каждая неделя — по правилам своей фазы; «Среднее» — среднее понедельных.
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center' }}>
+              <button type="button" onClick={() => setQualityWeek('avg')} aria-pressed={quality.mode === 'avg'} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border: quality.mode === 'avg' ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: quality.mode === 'avg' ? 'rgba(168,85,247,0.15)' : 'transparent', color: quality.mode === 'avg' ? '#a855f7' : '#fff', fontWeight: quality.mode === 'avg' ? 800 : 400 }}>Среднее</button>
+              {builtPlan.weeks.map((w:any) => (
+                <button key={w.week} type="button" onClick={() => setQualityWeek(w.week)} aria-pressed={quality.mode === w.week} title={`Нед ${w.week}: ${(w as any).phase || ''}${(w as any).deload ? ' (делод)' : ''}${(w as any).taper ? ' (taper)' : ''}`} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border: quality.mode === w.week ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: quality.mode === w.week ? 'rgba(168,85,247,0.15)' : 'transparent', color: quality.mode === w.week ? '#a855f7' : '#fff', fontWeight: quality.mode === w.week ? 800 : 400 }}>{w.week}</button>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:3, alignItems:'flex-end', flexWrap:'wrap' }} title="Понедельные скоры: зелёный — объём, голубой — PRO">
+              {quality.perWeek.map((p:any) => (
+                <button key={p.week} type="button" onClick={() => setQualityWeek(p.week)} title={`Нед ${p.week}: объём ${p.volume}, PRO ${p.pro}`} style={{ background:'transparent', border: quality.mode === p.week ? '1px solid #a855f7' : '1px solid transparent', borderRadius:6, padding:2, cursor:'pointer', display:'flex', gap:2, alignItems:'flex-end' }}>
+                  <span style={{ display:'block', width:8, height: Math.max(3, Math.round(p.volume / 4)), borderRadius:2, background: p.volume >= 85 ? '#22c55e' : p.volume >= 65 ? '#eab308' : p.volume >= 45 ? '#f97316' : '#ef4444' }} />
+                  <span style={{ display:'block', width:8, height: Math.max(3, Math.round(p.pro / 4)), borderRadius:2, background:'#60a5fa', opacity:0.85 }} />
+                </button>
+              ))}
+              <span style={{ fontSize:9, color:'#fff', opacity:0.5, marginLeft:6 }}>🟩 объём · 🟦 PRO · клик — неделя</span>
+            </div>
+            <div style={{ display:'grid', gap:4 }}>
+              {quality.selVolume.muscles.map((m:any) => {
+                const stColor = m.status === 'ok' ? '#22c55e' : m.status === 'by_design' ? '#60a5fa' : m.status === 'low' ? '#f59e0b' : m.status === 'high' ? '#eab308' : m.status === 'over' ? '#ef4444' : '#888';
+                const stLabel = m.status === 'ok' ? 'в цели' : m.status === 'by_design' ? 'по дизайну' : m.status === 'low' ? 'ниже' : m.status === 'high' ? 'выше цели' : m.status === 'over' ? 'перебор' : '—';
+                return (
+                  <div key={m.muscle} style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1.4fr', gap:6, alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', fontSize:10 }}>
+                    <span style={{ fontWeight:700, color:'#fff' }}>{m.label || m.muscle}</span>
+                    <span style={{ color:'#fff' }}>{m.effectiveSets} эфф <span style={{ opacity:0.55 }}>({m.directSets} прям · цель {m.targetSets})</span></span>
+                    <span style={{ color: stColor, fontWeight:700 }}>{stLabel} <span style={{ opacity:0.7, fontWeight:400 }}>· MEV {m.mev}/MAV {m.mav}/MRV {m.mrv}{m.note ? ` · ${m.note}` : ''}</span></span>
+                  </div>
+                );
+              })}
+            </div>
+            {(quality.selVolume.issues.length > 0 || quality.selPro.totalIssues.length > 0) && (
+              <div style={{ display:'grid', gap:3, fontSize:10 }}>
+                {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').slice(0, 5).map((i:any, idx:number) => (
+                  <div key={'v' + idx} style={{ color:'#fff' }}>{i.severity === 'error' ? '🔴' : '🟡'} {i.message} <span style={{ opacity:0.55 }}>[{i.source}]</span></div>
+                ))}
+                {quality.selPro.totalIssues.slice(0, 3).map((iss:string, idx:number) => (
+                  <div key={'p' + idx} style={{ color:'#fff' }}>🔵 {iss}</div>
+                ))}
+                {quality.selVolume.issues.filter((i:any) => i.severity !== 'info').length === 0 && quality.selPro.totalIssues.length === 0 && (
+                  <div style={{ color:'#22c55e' }}>✅ Неделя в целях плана — отклонений нет</div>
+                )}
+              </div>
+            )}
           </div>
         </CollapsibleCard>
         <CollapsibleCard title="📊 Общие сведения о нагрузке" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${metrics.totalSets} сетов · тяж ${(metrics.тяжPct*100).toFixed(0)}% · памп ${(metrics.пампPct*100).toFixed(0)}%`}>
@@ -5009,10 +5043,10 @@ export const BbAutoConstructor: React.FC = () => {
                     <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Растяжка:</b> {proQ.stretches.filter((s:any)=>s.ok).length}/{proQ.stretches.length} в норме</div>
                     <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
                   </div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Цель «{proQ.goalAlignment?.goal || bbGoal}» — объём {proQ.goalAlignment?.volumePctAvg || 0}% MRV · техники {proQ.technique.pct}% · растяжка {Math.round((proQ.goalAlignment?.stretchCoverage||0)*100)}% {proQ.goalAlignment?.ok ? '✅' : '⚠️ ' + (proQ.goalAlignment?.issue || '')}</div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Цель «{proQ.goalAlignment?.goal || bbGoal}» — {proQ.goalAlignment?.ok ? 'согласована с фокусом ✅' : '⚠️ ' + (proQ.goalAlignment?.issue || '')} · техники {proQ.technique.pct}%{proQ.goalAlignment?.recommendation ? ' · ' + proQ.goalAlignment.recommendation : ''}</div>
                   {proQ.totalIssues.length > 0 && <div style={{ fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss:any,i:number)=><div key={i}>• {iss}</div>)}</div>}
                   {proQ.totalRecommendations.length > 0 && <div style={{ fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec:any,i:number)=><div key={i}>→ {rec}</div>)}</div>}
-                  <div style={{ fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
+                  <div style={{ fontSize:10, color:'#22c55e' }}>PRO-скор {quality.viewTag}: {quality.viewPro}/100 {quality.proLabel} (отдельная шкала по факту исполнения — в скор объёма не входит)</div>
                 </div>
               );
             })()}

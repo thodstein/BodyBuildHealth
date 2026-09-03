@@ -9,10 +9,10 @@ import React, { useMemo, useState } from 'react';
 import {
   validatePlanQuality,
   manualToQualityInput,
-  bbPlanToQualityInput,
   type PlanQualityResult,
   type PlanQualityInput,
 } from '../../../engines/plan-quality.engine';
+import { averageWeeklyScores, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import type { ManualResult, ManualDay } from './program-types';
 import { GROUP_RU, LEVELS, GOALS } from './program-types';
 
@@ -155,6 +155,14 @@ function generateExportText(
   // Качество
   lines.push('── ОЦЕНКА КАЧЕСТВА ──');
   lines.push(`Балл: ${result.score}/100 ${result.grade}`);
+  const proAvg = (result as any).proAvg;
+  const perWeek = (result as any).perWeek as Array<{ week: number; volume: number; pro: number }> | undefined;
+  if (typeof proAvg === 'number') {
+    lines.push(`PRO-техника (среднее): ${proAvg}/100 — отдельная шкала, в балл объёма не входит`);
+  }
+  if (perWeek && perWeek.length > 1) {
+    lines.push(`Понедельно (объём/PRO): ${perWeek.map(p => `н${p.week} ${p.volume}/${p.pro}`).join(' · ')}`);
+  }
   lines.push('');
   lines.push('Сеты по группам:');
   for (const m of result.muscles.sort((a, b) => b.weeklySets - a.weeklySets)) {
@@ -216,13 +224,38 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
       return validatePlanQuality(input);
     }
     if (bbPlan) {
-      const input = bbPlanToQualityInput(bbPlan, {
-        level,
-        weakPoints,
-        hasDeload,
-        onCourse: profile?.onCourse,
+      // BB-план: понедельная оценка (факт выдачи × параметры плана), две шкалы.
+      // Ручной конструктор ниже — по-прежнему через validatePlanQuality.
+      const avg = averageWeeklyScores(bbPlan as any);
+      const statusOf = (s: string) => s === 'over' ? 'exceeding_mrv' : s === 'high' ? 'approaching_mrv' : s === 'low' ? 'below_mev' : 'in_mav';
+      const muscles = avg.avgMuscles.map(m => ({
+        muscle: m.muscle, weeklySets: m.directSets, frequency: m.frequency,
+        mev: m.mev, mav: m.mav, mrv: m.mrv,
+        pctOfMav: m.mav > 0 ? Math.round((m.effectiveSets / m.mav) * 100) : 0,
+        status: statusOf(m.status) as PlanQualityResult['muscles'][number]['status'],
+        weakPoint: weakPoints.includes(m.muscle),
+      }));
+      const issues = avg.recurringVolumeIssues.map(i => ({
+        id: `${i.code}_${i.muscle || ''}_${i.week}`, severity: (i.severity === 'error' ? 'critical' : i.severity) as 'critical' | 'warning' | 'info',
+        category: 'volume' as const, message: i.message, muscle: i.muscle, detail: i.source,
+      }));
+      const weeks = (bbPlan as any).weeks || [];
+      const hasDeload = weeks.some((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload');
+      const weakCovered = weakPoints.filter(wp => {
+        const row = avg.avgMuscles.find(m => m.muscle === wp);
+        return row ? row.effectiveSets >= row.mev * 0.7 : true;
       });
-      return validatePlanQuality(input);
+      const totalSets = Math.round(avg.avgMuscles.reduce((a, m) => a + m.directSets, 0));
+      const compat: PlanQualityResult = {
+        score: avg.avgVolume, grade: gradeFor(avg.avgVolume), issues, muscles,
+        summary: [`Среднее по ${avg.weeks} нед (рабочих ${avg.workingWeeks}): объём ${avg.avgVolume}, PRO ${avg.avgPro}`],
+        recommendations: avg.recurringVolumeIssues.filter(i => i.severity !== 'info').slice(0, 5).map(i => `${i.message} [${i.source}]`),
+        metadata: {
+          totalExercises: muscles.length, totalSets, totalVolume: totalSets * 8, avgSetsPerDay: totalSets,
+          pushPullRatio: '—', hasDeload, weakPointCoverage: weakPoints.length ? Math.round((weakCovered.length / weakPoints.length) * 100) : 100,
+        },
+      };
+      return { ...compat, proAvg: avg.avgPro, perWeek: avg.perWeek } as PlanQualityResult;
     }
     return {
       score: 0, grade: '—', issues: [], muscles: [],
@@ -296,6 +329,12 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
             {qualityResult.grade}
           </span>
         </div>
+        {(qualityResult as any).proAvg != null && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: 11 }}>
+            <span style={{ color: DIM, opacity: 0.7 }}>PRO-техника (среднее, отдельная шкала)</span>
+            <span style={{ fontWeight: 800, color: '#60a5fa' }}>{(qualityResult as any).proAvg}/100</span>
+          </div>
+        )}
         {/* Progress bar */}
         <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
           <div style={{
