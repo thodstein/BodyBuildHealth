@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildArmPlan } from '../arm-builder.engine';
 import { validateArmPlan } from '../arm-validator.engine';
-import { applyArmPro } from '../arm-pro-integration.engine';
+import { applyArmPro, buildArmProSummary } from '../arm-pro-integration.engine';
 
 const BASE: any = {
   discipline: 'armwrestling',
@@ -87,5 +87,39 @@ describe('arm-pro-integration (A–J сквозной)', () => {
     const p: any = buildArmPlan({ ...BASE, patternId: 'arm_2_table_support', weeks: 1 });
     const v = validateArmPlan(p, 'intermediate');
     expect(v.valid).toBe(true);
+  });
+  it('сводка тренеру: все секции структурой', () => {
+    const s = buildArmProSummary({
+      ...BASE,
+      bodyWeightKg: 84.5,
+      ageYears: 30,
+      arm: 'both',
+      sex: 'male',
+      leftKg: 80,
+      rightKg: 100,
+      competitionDateIso: '2026-10-15',
+      targetWeightKg: 85,
+      supermatch: true,
+      sparring: { intensityPct: 70, partnerDeltaKg: 2 },
+      diary: [{ dateIso: '2026-09-01', srpe: 6 }],
+      trackCsv: 't,x,y\n0,4,8\n0.1,6,7\n0.2,8,6\n0.3,10,5',
+    } as any);
+    expect(s.waf?.weightClass).toBe('85');
+    expect(s.waf?.entries).toBe(2);
+    expect(s.bilateral?.asymmetryPct).toBe(20);
+    expect(s.bilateral?.weakArm).toBe('left');
+    expect(s.cut).not.toBeNull();
+    expect(s.supermatch?.rounds).toBeGreaterThanOrEqual(3);
+    expect(s.sparring?.allowed).toBe(true);
+    expect(s.video?.trajectory).toBe('outside_toproll');
+    expect(s.autoreg?.volumeMult).toBe(1);
+    expect(s.attempts).toBeNull(); // armwrestling — помоста нет
+  });
+  it('сводка пустая без PRO-ввода; попытки для лифтинга', () => {
+    const empty = buildArmProSummary({ ...BASE } as any);
+    expect(empty).toEqual({ waf: null, bilateral: null, cut: null, supermatch: null, sparring: null, attempts: null, video: null, autoreg: null });
+    const lift = buildArmProSummary({ ...BASE, discipline: 'armlifting', workMax: { grip_support: 100 }, sex: 'male' } as any);
+    expect(lift.attempts?.attempts).toEqual([90, 96, 102]);
+    expect(lift.attempts?.wrPct).toBeCloseTo((100 / 130.5) * 100, 0);
   });
 });
