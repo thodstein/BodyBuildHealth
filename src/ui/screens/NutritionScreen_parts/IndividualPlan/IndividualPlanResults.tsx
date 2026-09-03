@@ -1359,8 +1359,9 @@ const doImportPlan = (raw: string): boolean => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
                             {data.batchCook && <span title={data.batchCook} style={{ fontSize: 6, color: '#22c55e', fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>🍳{data.dayCount}д</span>}
-                            <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }} title={data.buyAmount && data.buyAmount !== Math.round(data.amount) ? `Купить сухим: ${data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}` : 'Вес как на тарелке'}>
                               {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
+                              {data.buyAmount && data.buyAmount !== Math.round(data.amount) && <span style={{ color: '#60a5fa' }}> · купить {data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}</span>}
                             </span>
                             <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
                           </div>
@@ -2143,6 +2144,7 @@ const doImportPlan = (raw: string): boolean => {
 
       {mealPrepPlan && (
         <GlassCard title="План готовки" icon="👨‍🍳" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
+          {(mealPrepPlan as any)._stale && <div style={{ fontSize: 8, color: '#fbbf24', marginBottom: 6 }}>↻ План изменился — готовка устарела, нажмите «🍳 Готовка» для пересборки</div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>
             <span>⏱ {mealPrepPlan.totalTime} мин</span>
             <span>📦 {mealPrepPlan.containers} контейнеров</span>

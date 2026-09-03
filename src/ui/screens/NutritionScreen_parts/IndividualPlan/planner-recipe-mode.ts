@@ -21,6 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
+import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
 
 // ─── Типы формы плана (совместимо с форматом IndividualPlanContext) ────
@@ -700,36 +701,70 @@ export function rebalanceDayAfterRecipes(
   // items применённых рецептов в КУМУЛЯТИВНОМ коридоре ±10% (пропорции/вкус не меняются —
   // это компенсация небольшого дрейфа декомпозиции, а не правка авторских порций).
   if (devFinal > 3) {
-    const cumScale = new Map<number, number>();
+    // G3: ключ — номер приёма (один рецепт) или `${mi}:1`/`${mi}:2` (два рецепта раздельно).
+    const cumScale = new Map<number | string, number>();
       for (let iter = 0; iter < 8 && devFinal > 3; iter++) {
       let improved = false;
       for (let mi = 0; mi < work.length; mi++) {
         const m = work[mi];
         if (!m.recipeApplied || !m.items?.length) continue;
-        const used = cumScale.get(mi) ?? 1;
-        let bestS = 1; let bestDev = devFinal;
-        for (let sPct = -10; sPct <= 10; sPct += 1) {
-          const s = 1 + sPct / 100;
-          if (s === 1) continue;
-          const nextCum = used * s;
-          if (nextCum < 0.9 || nextCum > 1.1) continue; // общий коридор посадки
-          const ntMealTotals = {
-            kcal: m.totals.kcal * s, p: m.totals.p * s, f: m.totals.f * s, c: m.totals.c * s,
-          };
-          const ntDay = {
-            kcal: finalTotals.kcal - m.totals.kcal + ntMealTotals.kcal,
-            p: finalTotals.p - m.totals.p + ntMealTotals.p,
-            f: finalTotals.f - m.totals.f + ntMealTotals.f,
-            c: finalTotals.c - m.totals.c + ntMealTotals.c,
-          };
-          const dv = maxDeviationPct(ntDay as any, validTargets);
-          if (dv < bestDev - 0.0005) { bestDev = dv; bestS = s; }
+        // G3: два рецепта в приёме — раздельные коридоры ±10% на КАЖДЫЙ рецепт
+        // (раньше весь приём масштабировался целиком под одним счётчиком — пропорции
+        // второго рецепта плыли вместе с первым).
+        const _idsOf = (d: any): Set<string> | null =>
+          d && Array.isArray(d.ingredientIds) && d.ingredientIds.length > 0 ? new Set<string>(d.ingredientIds) : null;
+        const _ids1 = _idsOf((m as any).recipeAppliedData);
+        const _ids2 = _idsOf((m as any).recipeAppliedData2);
+        const _groups: Array<{ key: string | number; name: string; idx: number[] }> = [];
+        if ((m as any).recipeApplied2) {
+          const _in1 = (id: string) => !!_ids1 && _ids1.has(id);
+          const _in2 = (id: string) => !!_ids2 && _ids2.has(id);
+          const _g1: number[] = []; const _g2: number[] = [];
+          (m.items || []).forEach((it: any, ii: number) => {
+            // Без ids рецепт считается ядром всего приёма: делим спорные пункты пополам
+            // (чётные — первому, нечётные — второму), чтобы посадка не встала.
+            const in1 = _ids1 ? _in1(it.id) : ii % 2 === 0;
+            const in2 = _ids2 ? _in2(it.id) : ii % 2 === 1;
+            if (in1 && !in2) _g1.push(ii);
+            else if (in2 && !in1) _g2.push(ii);
+            else if (in1 && in2) { (_g1.length <= _g2.length ? _g1 : _g2).push(ii); }
+          });
+          if (_g1.length > 0) _groups.push({ key: `${mi}:1`, name: (m as any).recipeApplied, idx: _g1 });
+          if (_g2.length > 0) _groups.push({ key: `${mi}:2`, name: (m as any).recipeApplied2, idx: _g2 });
+          if (_groups.length === 0) _groups.push({ key: mi, name: (m as any).recipeApplied, idx: (m.items || []).map((_: any, ii: number) => ii) });
+        } else {
+          _groups.push({ key: mi, name: (m as any).recipeApplied, idx: (m.items || []).map((_: any, ii: number) => ii) });
         }
-        if (bestS !== 1) {
-          const scaledItems = m.items.map(it => scaleItem(it, Math.max(5, Math.round((it.amount || 0) * bestS))));
+        let bestG: (typeof _groups)[number] | null = null;
+        let bestS = 1; let bestDev = devFinal;
+        for (const g of _groups) {
+          const used = cumScale.get(g.key) ?? 1;
+          const gTotals = g.idx.reduce((acc: any, ii: number) => {
+            const it = (m.items || [])[ii];
+            return { kcal: acc.kcal + (it?.kcal || 0), p: acc.p + (it?.p || 0), f: acc.f + (it?.f || 0), c: acc.c + (it?.c || 0) };
+          }, { kcal: 0, p: 0, f: 0, c: 0 });
+          for (let sPct = -10; sPct <= 10; sPct += 1) {
+            const s = 1 + sPct / 100;
+            if (s === 1) continue;
+            const nextCum = used * s;
+            if (nextCum < 0.9 || nextCum > 1.1) continue; // коридор посадки на рецепт
+            const ntDay = {
+              kcal: finalTotals.kcal - gTotals.kcal + gTotals.kcal * s,
+              p: finalTotals.p - gTotals.p + gTotals.p * s,
+              f: finalTotals.f - gTotals.f + gTotals.f * s,
+              c: finalTotals.c - gTotals.c + gTotals.c * s,
+            };
+            const dv = maxDeviationPct(ntDay as any, validTargets);
+            if (dv < bestDev - 0.0005) { bestDev = dv; bestS = s; bestG = g; }
+          }
+        }
+        if (bestG && bestS !== 1) {
+          const inSet = new Set(bestG.idx);
+          const scaledItems = (m.items || []).map((it: any, ii: number) =>
+            inSet.has(ii) ? scaleItem(it, Math.max(5, Math.round((it.amount || 0) * bestS))) : it);
           work[mi] = { ...m, items: scaledItems, totals: sumMealTotals(scaledItems) };
-          cumScale.set(mi, (cumScale.get(mi) ?? 1) * bestS);
-          notes.push(`⚖️ Порция «${m.recipeApplied}» ×${Math.round(bestS * 100)}% для сходимости КБЖУ дня`);
+          cumScale.set(bestG.key, (cumScale.get(bestG.key) ?? 1) * bestS);
+          notes.push(`⚖️ Порция «${bestG.name}» ×${Math.round(bestS * 100)}% для сходимости КБЖУ дня`);
           improved = true;
           break; // пересчитать тоталы и попробовать ещё
         }
@@ -773,7 +808,9 @@ export function buildShoppingFromPlans(allDayPlans: any[]): any[] {
     const dayCount = e.daySet ? e.daySet.size : 1;
     const batchCookable = SHOPPING_BATCH_COOKABLE.has(e.id);
     const batchCook = batchCookable && dayCount >= 2 ? `Готовить сразу ${dayCount}-дневную партию (${Math.round(e.amount)}г)` : undefined;
-    return { name: e.name, id: e.id, amount: e.amount, kcal: e.kcal, p: e.p, f: e.f, c: e.c, category: e.category, dayCount, batchCook };
+    // G1 (сырое/готовое): «купить» — сырой вес (крупу покупаем сухой), amount — как на тарелке.
+    const buyAmount = toRawPurchaseAmount(e.id, e.amount);
+    return { name: e.name, id: e.id, amount: e.amount, buyAmount, kcal: e.kcal, p: e.p, f: e.f, c: e.c, category: e.category, dayCount, batchCook };
   }).sort((a: any, b: any) => b.amount - a.amount);
 }
 

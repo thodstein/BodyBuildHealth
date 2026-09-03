@@ -127,6 +127,7 @@ export const IndividualPlanSettings: React.FC = () => {
     histamineSensitive, setHistamineSensitive,
     plannerMode, setPlannerMode,
     generationMode, setGenerationMode,
+    weightMode, setWeightMode,
     dietPrefs, setDietPrefs,
     userRecipes, labAnalysis, labs,
     errorMsg, setErrorMsg,
@@ -467,6 +468,13 @@ export const IndividualPlanSettings: React.FC = () => {
           {generationMode === 'recipes'
             ? '🍲 Генерация будет ТОЛЬКО по рецептам: каждый основной приём — цельное блюдо с ингредиентами и пошаговой готовкой. После выбора варианта рацион автоматически перестраивается (без недобора и перебора), закупки и процесс готовки обновятся под рецепты.'
             : '✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин'}
+        </div>
+        {/* G1 (сырое/готовое): единый режим веса плана — математика КБЖУ не меняется, только отображение граммовок */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {([
+            { id: 'cooked' as const, label: '🍚 Вес готовый', hint: 'Граммовки как на тарелке' },
+            { id: 'raw' as const, label: '🌾 Вес сухой', hint: 'Крупу взвешивать сухой' },
+          ]).map(m => <button key={m.id} onClick={() => setWeightMode(m.id)} aria-pressed={weightMode === m.id} title={m.hint} style={{ flex: 1, padding: '7px 3px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: weightMode === m.id ? 'rgba(96,165,250,0.14)' : '#202023', border: weightMode === m.id ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.06)', color: weightMode === m.id ? '#60a5fa' : 'rgba(255,255,255,0.7)' }}>{m.label}</button>)}
         </div>
         <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
           width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',

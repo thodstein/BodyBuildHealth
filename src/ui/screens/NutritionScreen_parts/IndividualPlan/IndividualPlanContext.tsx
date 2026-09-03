@@ -25,6 +25,7 @@ import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
 import { usePlannerReportState } from "./planner-report-state"; // Хвост-1: состояние отчётов вынесено в под-хук
+import { usePlannerDerivedSync } from "./planner-derived-sync"; // G2: единый конвергер закупок/готовки/рекомендаций
 import { usePlannerSpecialMealState } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
@@ -221,6 +222,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean; overrides?: { mealsCount?: number } }) => void;
   /** Режим генерации: продукты (классика) или рецепты (основные приёмы из готовых рецептов). */
   generationMode: 'products' | 'recipes'; setGenerationMode: (v: 'products' | 'recipes') => void;
+  /** G1 (сырое/готовое): режим отображения веса — 'cooked' (как на тарелке) / 'raw' (как взвешивать сухим). */
+  weightMode: 'cooked' | 'raw'; setWeightMode: (v: 'cooked' | 'raw') => void;
   /** ⭐ Избранные рецепты: имена + тумблер + проверка (бейдж в чипах, бонус скоринга). */
   favoriteRecipes: Set<string>; toggleFavoriteRecipe: (name: string) => void; isFavoriteRecipe: (name: string) => boolean;
   /** Выбрать один из 2–3 вариантов рецепта для приёма (режим «по рецептам») — приём пересобирается с авторскими порциями, день ребалансится до ±3%. */
@@ -1346,6 +1349,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const generationModeRef = useRef<'products' | 'recipes'>(generationMode);
   useEffect(() => { generationModeRef.current = generationMode; }, [generationMode]);
    useEffect(() => { try { localStorage.setItem('he_planner_gen_mode', generationMode); } catch {} }, [generationMode]);
+  // G1 (сырое/готовое): режим отображения веса — 'cooked' (как на тарелке, дефолт) / 'raw' (как взвешивать сухим)
+  const [weightMode, setWeightMode] = useState<'cooked' | 'raw'>(() => {
+    try { return localStorage.getItem('he_planner_weight_mode') === 'raw' ? 'raw' : 'cooked'; } catch { return 'cooked'; }
+  });
+   useEffect(() => { try { localStorage.setItem('he_planner_weight_mode', weightMode); } catch {} }, [weightMode]);
   // ⭐ Избранные рецепты (B5): имена рецептов, бейдж в чипах/вариантах + бонус к скорингу
   const [favoriteRecipes, setFavoriteRecipes] = useState<Set<string>>(() => {
     try { const v = JSON.parse(localStorage.getItem('he_recipe_fav') || '[]'); return new Set<string>(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set(); }
@@ -2219,6 +2227,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    * второй масштабируется к ОСТАТКУ (цель приёма − факт первого рецепта), совместимость
    * проверяется (не дубль, не тот же белковый/углеводный профиль). Продукты обоих рецептов
    * объединяются, приём помечается recipeApplied2/recipeAppliedData2.
+   * G3: количественный гейт (нет принудительных +150 при закрытом приёме), вычитание
+   * старого второго при замене, запрет в peri/presleep, закупки из пропатченных дней.
    */
   const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number) => {
     const resolveMeals = (): { meals: any[]; plan: 'day' | 'three' | 'week'; day: number } | null => {
@@ -2233,6 +2243,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!resolved || mealIdx < 0 || mealIdx >= resolved.meals.length) { setRecipePickerMeal(null); return; }
     const m = resolved.meals[mealIdx];
     if (!m || !m.recipeApplied) { setRecipePickerMeal(null); return; }
+    // G3: одно окно = одно блюдо — второй рецепт запрещён в peri/presleep.
+    const _mType = String((m as any).type || '');
+    const _mLabel = String(m.label || '');
+    if (['preworkout', 'postworkout', 'intra', 'presleep'].includes(_mType) || /предтрен|пост-трен|intra|перед сном|pre-sleep/i.test(_mLabel)) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ В peri-окно и на ночь — одно блюдо: второй рецепт сюда нельзя', 'warning');
+      setRecipePickerMeal(null);
+      return;
+    }
     // Совместимость
     const comp = recipeCompatibility(m.recipeAppliedData as any, recipe as any);
     if (!comp.compatible) {
@@ -2241,18 +2259,37 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return;
     }
     saveUndo();
-    // Масштабирование ВТОРОГО рецепта к ОСТАТКУ цели приёма (цель − факт первого).
-    // Оба рецепта остаются и оба масштабируются под КБЖУ приёма атлета. Если первый уже
-    // закрыл/перебрал приём — второй берётся минимальной порцией (право пользователя,
-    // не «выдавливаем» первый рецепт).
+    // G3: замена второго — сначала вычитаем продукты СТАРОГО второго (по его ingredientIds),
+    // иначе повторная «замена» копит третий слой поверх (накопление items).
+    const _isReplace = !!(m as any).recipeApplied2;
+    let _baseItems: any[] = [...(m.items || [])];
+    if (_isReplace) {
+      const _oldIds: string[] | undefined = (m as any).recipeAppliedData2?.ingredientIds;
+      if (Array.isArray(_oldIds) && _oldIds.length > 0) {
+        const _oldSet = new Set(_oldIds);
+        const _filtered = _baseItems.filter(it => !_oldSet.has(it.id));
+        // Защита: если фильтр съел бы весь приём (старый разбор без ids-совпадений) — не трогаем.
+        if (_filtered.length > 0) _baseItems = _filtered;
+      }
+    }
+    // G3: количественный гейт — второй как ДОЛЯ приёма, а не «плюс 150».
+    // Первый уже закрыл приём → честное предупреждение + мини-порция (право пользователя).
     const _mt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
     const _targetKcal = Math.round((_mt.p || 0) * 4 + (_mt.f || 0) * 9 + (_mt.c || 0) * 4) || m?.totals?.kcal || 300;
-    const _firstKcal = m?.totals?.kcal || 0;
-    const _roomKcal = Math.max(150, _targetKcal - _firstKcal);
+    const _firstKcal = sumMealTotals(_baseItems as any).kcal || 0;
+    const _rawRoom = _targetKcal - _firstKcal;
+    let _roomKcal = _rawRoom;
+    if (_rawRoom <= 0) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём уже закрыт первым рецептом — «${recipe.name}» влезет только мини-порцией, день может перебрать`, 'warning');
+      _roomKcal = 150;
+    } else if (_rawRoom < 0.25 * _targetKcal) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`ℹ️ Места под второй рецепт мало (~${Math.round(_rawRoom)} ккал) — берём мини-порцию`, 'info' as any);
+      _roomKcal = _rawRoom;
+    }
     const scaled2 = scaleRecipeToTarget(recipe, { kcal: _roomKcal, p: _mt.p || 30, f: _mt.f || 15, c: _mt.c || 40 }, weight);
     const items2 = scaled2 ? scaled2.items : buildRecipeMealItems(recipe);
     if (!items2 || items2.length === 0) { setRecipePickerMeal(null); return; }
-    const mergedItems = [...(m.items || []), ...items2];
+    const mergedItems = [..._baseItems, ...items2];
     const flat2 = flattenRecipeOption(recipe);
     if (scaled2) flat2.appliedScale = scaled2.scale;
     const patched = resolved.meals.map((x: any, i: number) => i === mealIdx
@@ -2269,21 +2306,28 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // Пересчёт «карточки разнообразия» — после замены/добавления рецепта уникальные продукты
     // изменились, иначе карточки (таймлайн/разнообразие/качество) показывали бы stale-цифры.
     const _newDiversity = (() => { const ids = new Set<string>(); resMeals.forEach((mm: any) => (mm.items || []).forEach((it: any) => { if (it?.id) ids.add(it.id); })); const uf = ids.size; return { uniqueFoods: uf, totalPortions: 0, categories: {}, score: Math.min(10, uf), note: `${uf} уникальных продуктов` }; })();
+    const _resDay = { ...(resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan!.days[resolved.day] : weekPlan!.days[resolved.day]), meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
+    let _visiblePlans: any[];
     if (resolved.plan === 'day') {
-      setDayPlan({ ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity });
+      setDayPlan(_resDay);
+      _visiblePlans = [_resDay];
     } else if (resolved.plan === 'three') {
       const days = [...threeDayPlan!.days];
-      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
+      days[resolved.day] = _resDay;
       setThreeDayPlan({ ...threeDayPlan!, days, totals: sumMultiTotals(days) });
-      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day] as any);
+      _visiblePlans = days;
     } else {
       const days = [...weekPlan!.days];
-      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
+      days[resolved.day] = _resDay;
       setWeekPlan({ ...weekPlan!, days, totals: sumMultiTotals(days) });
-      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day] as any);
+      _visiblePlans = days;
     }
-    setShoppingList(buildShoppingFromPlans(resolved.plan === 'day' ? [ { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) } ] : (resolved.plan === 'three' ? threeDayPlan!.days : weekPlan!.days)));
-    if (typeof (window as any).showToast === 'function') (window as any).showToast(`🍳 Второй рецепт «${recipe.name}» добавлен в приём`, 'success');
+    // G3: закупки из ПРОПАТЧЕННЫХ дней (раньше three/week брались из старых days — список врал).
+    setShoppingList(buildShoppingFromPlans(_visiblePlans));
+    refreshRecipeCookingCardIfActive(resolved.plan === 'day' ? _resDay : dayPlan, resolved.plan === 'three' ? { days: _visiblePlans } : threeDayPlan, resolved.plan === 'week' ? { days: _visiblePlans } : weekPlan);
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(_isReplace ? `🍳 Второй рецепт заменён на «${recipe.name}»` : `🍳 Второй рецепт «${recipe.name}» добавлен в приём`, 'success');
     setRecipePickerMeal(null);
   };
 
@@ -3310,6 +3354,21 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     } catch {}
   };
 
+  // G2: единый конвергер производных карточек (закупки/готовка/рекомендации) —
+  // любая правка плана (граммы/замена/удаление/рецепты/время/дубль) сходится без кнопок.
+  // Явные setShoppingList-вызовы остаются немедленным путём (то же чистое значение).
+  usePlannerDerivedSync(
+    { planDays, dayPlan, threeDayPlan, weekPlan, selectedDayIndex, weekEditDay, mealPrepDays, generated },
+    {
+      setShoppingList,
+      refreshRecipeCookingCardIfActive,
+      recipeCookingActive: () => recipeCookingActiveRef.current,
+      setMealPrepPlan: (v: any) => setMealPrepPlan(v),
+      getMealPrepPlan: () => mealPrepPlan,
+      generateRecommendations,
+    },
+  );
+
   // FatSecret-уровень: 1-клик в дневник — берёт видимый план (1 день / выбранный день 3/7) и пишет в nutrition_diary_v2
   // При planDays===7/3 добавляет ВСЮ неделю/3 дня на последовательные даты (FatSecret-замена: недельный план разом)
   const addPlanToDiary = useCallback((dateISO?: string): boolean => {
@@ -3453,6 +3512,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, addSecondRecipeToMeal, generatePlan,
     generationMode, setGenerationMode,
+    weightMode, setWeightMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,
     updateMealTime, duplicateMeal,
@@ -3496,7 +3556,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, weightMode, setWeightMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, weightMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);
   return (
     <PlanContext.Provider value={finalCtx}>
       {children}
