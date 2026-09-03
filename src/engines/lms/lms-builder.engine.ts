@@ -98,6 +98,8 @@ export interface LMSBuildInput {
   taperWeeks?: number;
   /** Пиковый цикл ПЛ для тапера (если задан — кривая из цикла, интеграция пиковых циклов). */
   peakCycleId?: string;
+  /** DUP-волна внутри микроцикла: heavy/light/medium дни (если задан — переопределяет % из шаблона). */
+  dupWave?: 'heavy' | 'light' | 'medium';
 }
 
 
