@@ -7,7 +7,10 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { TA_BIOMECH, diagnoseTAWeakPoint } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
-import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
+import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
+import { loadBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
+import { optimalFvSlopeForPmax, vbtEwma } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -79,6 +82,10 @@ type WLState = {
   peakVelMs: string;
   // E3: предпочитаемая коррекция на фазу (идёт первой в инъекцию E6)
   preferredCorr: Record<string, string>;
+  // E7: jerk dip метрики + bfPCA сводка
+  jerkDipCm: string;
+  jerkDipMs: string;
+  bfPattern: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -95,6 +102,7 @@ const DEFAULT_STATE: WLState = {
   imtpKg: '', isppKg: '',
   xLoopCm: '', yMaxCm: '', peakVelMs: '',
   preferredCorr: {},
+  jerkDipCm: '', jerkDipMs: '', bfPattern: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -228,6 +236,36 @@ export const WLDiagnosticsHub: React.FC = () => {
     if (!Number.isFinite(imtp) || !Number.isFinite(ispp) || !imtp) return null;
     return ispp / imtp;
   }, [state.imtpKg, state.isppKg]);
+
+  // E7: вес из профиля (для drivePower толчка) + jerk dip + FvR-оптимум + VBT-тренд истории
+  const profileWeightKg = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const w = p?.settings?.personal?.weight ?? p?.personal?.weight;
+      return Number.isFinite(w) && w > 0 ? w : undefined;
+    } catch { return undefined; }
+  }, []);
+  const jerkDip = useMemo(() => {
+    const cm = parseFloat(state.jerkDipCm), ms = parseFloat(state.jerkDipMs);
+    if (!Number.isFinite(cm) || !Number.isFinite(ms)) return null;
+    return diagnoseJerkDip(cm, ms, profileWeightKg);
+  }, [state.jerkDipCm, state.jerkDipMs, profileWeightKg]);
+  const fvrOptimal = useMemo(() => {
+    if (!fvr) return null;
+    const opt = optimalFvSlopeForPmax(fvr.Pmax);
+    const diff = Math.round((fvr.slope - opt) * 100) / 100;
+    return { opt, diff, forceDom: fvr.slope < opt };
+  }, [fvr]);
+  const barTrend = useMemo(() => {
+    try {
+      const hist = loadBarTracking();
+      if (!hist.length) return null;
+      const vels = hist.map(h => h.vmax).filter(v => Number.isFinite(v) && v > 0);
+      if (vels.length < 2) return null;
+      const last = vels.slice(-5);
+      return { from: last[0], to: last[last.length - 1], ewma: vbtEwma(vels), n: vels.length };
+    } catch { return null; }
+  }, [csvText]);
 
   const scoring = useMemo(() => scoreTA({
     weakCount: weakPoints.length,
@@ -494,7 +532,13 @@ export const WLDiagnosticsHub: React.FC = () => {
     if (!pts) { setToast('CSV не распознан'); setTimeout(()=>setToast(''),2000); return; }
     const res = analyzeBarTracking(pts);
     if (!res) { setToast('Нет точек'); return; }
-    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc) }));
+    let bf = '';
+    try {
+      const pats = extractBfPCAPatterns(pts.map(p => p.x), pts.map(p => p.y));
+      const p1 = pats.find(p => p.pattern === 1), p3 = pats.find(p => p.pattern === 3);
+      if (p1 && p3) bf = `bfPCA P1 ${p1.score} (r ${p1.correlationWithPerformance}) · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'}`;
+    } catch { /* noop */ }
+    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf }));
     setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
   };
@@ -684,6 +728,15 @@ export const WLDiagnosticsHub: React.FC = () => {
               const bio = diagnoseTAWeakPoint(wp);
               return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}{top3Block(wp)}</div>;
             })}
+            {/* E7: jerk dip метрики (Zhang: оптимум 8-12см за 0.15-0.25с) */}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Dip-метрика толчка</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: DIM }}>Глубина dip см<br /><input value={state.jerkDipCm} onChange={e => setState(s => ({ ...s, jerkDipCm: e.target.value }))} placeholder="10" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Время dip мс<br /><input value={state.jerkDipMs} onChange={e => setState(s => ({ ...s, jerkDipMs: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              </div>
+              {jerkDip && <div style={{ fontSize: 10, color: jerkDip.isOptimal ? '#22c55e' : '#f59e0b', marginTop: 6 }}>Dip {jerkDip.dipCm}см за {jerkDip.dipTimeMs}мс · скорость {jerkDip.dipVelocityMs} м/с{jerkDip.drivePowerW ? ` · drive ~${jerkDip.drivePowerW}Вт` : ''} — {jerkDip.recommendation}</div>}
+            </div>
           </div>
         )}
 
@@ -711,6 +764,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 10, color: DIM }}>Vthres м/с<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               </div>
               {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres snatch {TA_VTHRES_NORMS.snatch.min}-{TA_VTHRES_NORMS.snatch.max} (opt {TA_VTHRES_NORMS.snatch.optimal}), clean {TA_VTHRES_NORMS.clean.min}-{TA_VTHRES_NORMS.clean.max}</div>}
+              {fvr && fvrOptimal && <div style={{ fontSize: 10, color: fvrOptimal.forceDom ? '#f59e0b' : '#22c55e', marginTop: 4 }}>FvR-профиль: slope {fvr.slope} vs оптимум {fvrOptimal.opt} (Δ {fvrOptimal.diff > 0 ? '+' : ''}{fvrOptimal.diff}) — {fvrOptimal.forceDom ? 'force-доминантен → приоритет скорость (вис/прыжки)' : 'сбалансирован ✓'}</div>}
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)' }}>
@@ -745,12 +799,14 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button onClick={handleCsvParse} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
               <span style={{ fontSize: 10, color: DIM, alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
             </div>
+            {state.bfPattern && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6 }}>📐 {state.bfPattern} (Kipp 2024: P1 +0.42 лучше, P3 −0.38 хуже)</div>}
+            {barTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>📈 История трекинга ({barTrend.n}): vmax {barTrend.from} → {barTrend.to} м/с · EWMA {barTrend.ewma}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
               <label style={{ fontSize: 11, color: DIM }}>xLoop см<br /><input value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} placeholder="3.2" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
               <label style={{ fontSize: 11, color: DIM }}>yMax см<br /><input value={state.yMaxCm} onChange={e => setState(s => ({ ...s, yMaxCm: e.target.value }))} placeholder="85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
               <label style={{ fontSize: 11, color: DIM }}>vMax м/с<br /><input value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} placeholder="1.85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             </div>
-            {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD turnover 4см catch 6см — {isRealChange(barMetrics.xLoop) ? 'реально >SRD' : 'в пределах шума'}</div></div>}
+            {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD: turnover {isRealChange(barMetrics.xLoop, 'turnover') ? 'реально >4см' : '≤4см норма'} · catch {isRealChange(barMetrics.xLoop, 'catch') ? 'реально >6см' : '≤6см норма'}</div></div>}
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
             <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>

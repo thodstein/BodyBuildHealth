@@ -109,4 +109,21 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('восстановлен до инъекции'), { timeout: 2000 });
     expect(localStorage.getItem('he_strength_sport_plan_v1')).not.toContain('pause_snatch');
   });
+  it('E7 jerk dip метрика: оптимум 10см/200мс', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Толчок/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="10"]')!, { target: { value: '10' } });
+    fireEvent.change(container.querySelector('input[placeholder="200"]')!, { target: { value: '200' } });
+    await waitFor(() => expect(container.textContent).toContain('Dip 10см за 200мс'), { timeout: 2000 });
+    expect(container.textContent).toContain('оптимален');
+  });
+  it('E7 Kinovea CSV → метрики + bfPCA', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Видео/)[0]);
+    const ta = container.querySelector('textarea')!;
+    fireEvent.change(ta, { target: { value: 't,x,y\n0,0,0\n0.033,0.5,10\n0.066,1,25\n0.1,0.5,45\n0.133,0,60' } });
+    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
+    await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
+    expect(container.textContent).toContain('bfPCA P1');
+  });
 });
