@@ -2564,3 +2564,57 @@ html.app-native .train-sessionmodal > div {
     animation: none;
   }
 }
+
+/* ─── 38. NATIVE DEEP-6 — автотюн, лаборатория, протоколы ───── */
+html.app-native .train-autotune,
+html.app-native .train-cardioimport,
+html.app-native .train-exlabcatalog,
+html.app-native .train-jsi,
+html.app-native .train-limiter,
+html.app-native .train-mixdiary,
+html.app-native .train-peakproto,
+html.app-native .train-prognotes,
+html.app-native .train-videocap {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-autotune,
+html.app-native .train-cardioimport,
+html.app-native .train-jsi,
+html.app-native .train-limiter,
+html.app-native .train-mixdiary,
+html.app-native .train-prognotes {
+  border-radius: 20px !important;
+}
+
+/* Поддержка: биодоступность и протоколы */
+html.app-native .sup-bio,
+html.app-native .sup-proto-sleep,
+html.app-native .sup-proto-joints,
+html.app-native .sup-proto-neuro,
+html.app-native .sup-proto-cardio,
+html.app-native .sup-proto-e2,
+html.app-native .sup-proto-gh {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-autotune,
+  html.app-native .train-cardioimport,
+  html.app-native .train-exlabcatalog,
+  html.app-native .train-jsi,
+  html.app-native .train-limiter,
+  html.app-native .train-mixdiary,
+  html.app-native .train-peakproto,
+  html.app-native .train-prognotes,
+  html.app-native .train-videocap,
+  html.app-native .sup-bio,
+  html.app-native .sup-proto-sleep,
+  html.app-native .sup-proto-joints,
+  html.app-native .sup-proto-neuro,
+  html.app-native .sup-proto-cardio,
+  html.app-native .sup-proto-e2,
+  html.app-native .sup-proto-gh {
+    animation: none;
+  }
+}

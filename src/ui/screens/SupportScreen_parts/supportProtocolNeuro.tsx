@@ -1,13 +1,13 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolNeuro: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [neuroTab, setNeuroTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Нейропротекция">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-neuro" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               {/* Header */}
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#06b6d4', marginBottom:2 }}>🧠 Нейротоксичность ААС</div>

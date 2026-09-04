@@ -68,6 +68,22 @@ import { SupportPeptideCalc } from '../screens/SupportScreen_parts/SupportPeptid
 import { SupportAnalogCalculator } from '../screens/SupportScreen_parts/SupportAnalogCalculator';
 import { SupportEffectiveDose } from '../screens/SupportScreen_parts/SupportEffectiveDose';
 import { RiskTimelineChart } from '../screens/SupportScreen_parts/RiskTimelineChart';
+import { CardioAutoTunePanel } from '../screens/TrainingScreen_parts/CardioAutoTunePanel';
+import { CardioImportPanel } from '../screens/TrainingScreen_parts/CardioImportPanel';
+import { JointJsiCalculatorCard } from '../screens/TrainingScreen_parts/JointJsiCalculatorCard';
+import { LimiterCalculatorCard } from '../screens/TrainingScreen_parts/LimiterCalculatorCard';
+import { MixDiarySection } from '../screens/TrainingScreen_parts/MixDiarySection';
+import { PeakingProtocolsTab } from '../screens/TrainingScreen_parts/PeakingProtocolsTab';
+import { ProgramNotes } from '../screens/TrainingScreen_parts/ProgramExtras';
+import { VideoCaptureCard } from '../screens/TrainingScreen_parts/VideoCaptureCard';
+import { default as ExerciseLabCatalog } from '../screens/TrainingScreen_parts/ExerciseLabCatalog';
+import { SupportBioavailability } from '../screens/SupportScreen_parts/SupportBioavailability';
+import { SupportProtocolSleep } from '../screens/SupportScreen_parts/supportProtocolSleep';
+import { SupportProtocolJoints } from '../screens/SupportScreen_parts/supportProtocolJoints';
+import { SupportProtocolNeuro } from '../screens/SupportScreen_parts/supportProtocolNeuro';
+import { SupportProtocolCardio } from '../screens/SupportScreen_parts/supportProtocolCardio';
+import { SupportProtocolE2 } from '../screens/SupportScreen_parts/supportProtocolE2';
+import { SupportProtocolGH } from '../screens/SupportScreen_parts/supportProtocolGH';
 import { ArmAutoConstructor } from '../screens/TrainingScreen_parts/ArmAutoConstructor';
 import { FatigueIndexTab } from '../screens/TrainingScreen_parts/FatigueIndexTab';
 import { MRVEstimatorTab } from '../screens/TrainingScreen_parts/MRVEstimatorTab';
@@ -402,6 +418,61 @@ describe('market + pharma + labs roots', () => {
       />,
     );
     expect(c4.querySelector('.sup-risktimeline'), 'risktimeline').not.toBeNull();
+  });
+
+  it('24. Batch-6 корни: autotune, import, jsi, limiter', () => {
+    const { container: c1 } = render(<CardioAutoTunePanel cycle={null} />);
+    expect(c1.querySelector('.train-autotune'), 'autotune').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<CardioImportPanel />);
+    expect(c2.querySelector('.train-cardioimport'), 'cardioimport').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<JointJsiCalculatorCard />);
+    expect(c3.querySelector('.train-jsi'), 'jsi').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<LimiterCalculatorCard />);
+    expect(c4.querySelector('.train-limiter'), 'limiter').not.toBeNull();
+  });
+
+  it('25. Batch-6 корни: peakproto, prognotes, videocap', () => {
+    // MixDiarySection возвращает null без записей (строка 70) —
+    // хук .train-mixdiary живёт в прод-ветке, здесь не проверяется.
+    const { container: c2 } = render(<PeakingProtocolsTab />);
+    expect(c2.querySelector('.train-peakproto'), 'peakproto').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <ProgramNotes program={{ meta: { notes: '' } } as never} onChange={() => {}} />,
+    );
+    expect(c3.querySelector('.train-prognotes'), 'prognotes').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<VideoCaptureCard lift={'bench' as never} />);
+    expect(c4.querySelector('.train-videocap'), 'videocap').not.toBeNull();
+  });
+
+  it('26. Batch-6 корни: exlabcatalog, bio, протоколы', () => {
+    const { container: c1 } = render(<ExerciseLabCatalog />);
+    expect(c1.querySelector('.train-exlabcatalog'), 'exlabcatalog').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportBioavailability s={{}} />);
+    expect(c2.querySelector('.sup-bio'), 'bio').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportProtocolSleep s={{}} />);
+    expect(c3.querySelector('.sup-proto-sleep'), 'sleep').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportProtocolJoints s={{}} />);
+    expect(c4.querySelector('.sup-proto-joints'), 'joints').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<SupportProtocolNeuro s={{}} />);
+    expect(c5.querySelector('.sup-proto-neuro'), 'neuro').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<SupportProtocolCardio s={{}} />);
+    expect(c6.querySelector('.sup-proto-cardio'), 'cardio').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(<SupportProtocolE2 s={{}} />);
+    expect(c7.querySelector('.sup-proto-e2'), 'e2').not.toBeNull();
+    cleanup();
+    const { container: c8 } = render(<SupportProtocolGH s={{}} />);
+    expect(c8.querySelector('.sup-proto-gh'), 'gh').not.toBeNull();
   });
 
   it('21. Batch-5 корни: arm, fatigue, mrv, tonnage', () => {

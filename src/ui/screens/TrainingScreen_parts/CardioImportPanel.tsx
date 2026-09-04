@@ -163,7 +163,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
     window.setTimeout(() => setFlash(null), 4000);
   };
   return (
-    <div style={CARD}>
+    <div className="train-cardioimport" style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📥 Импорт GPX/TCX</span>
         <span style={HINT_SM}>часы / Strava → факт в дневник</span>

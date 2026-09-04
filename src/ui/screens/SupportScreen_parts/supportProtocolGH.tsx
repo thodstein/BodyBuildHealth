@@ -7,7 +7,7 @@ export const SupportProtocolGH: React.FC<{ s: Record<string, any> }> = ({ s }) =
   const [ghTab, setGhTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="GH/IGF-1">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-gh" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#2dd4bf', marginBottom:2 }}>🫀 Поддержка оси GH/IGF-1</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Оптимизация секреции гормона роста, IGF-1 и их метаболических эффектов. Протокол для курсов с соматотропином, GHRP/GHRH и природной стимуляции.</p>

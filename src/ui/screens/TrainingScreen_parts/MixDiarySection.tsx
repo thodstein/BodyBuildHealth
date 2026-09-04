@@ -80,7 +80,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
   const anyTakenToday = Object.values(todayIntake).some(m => Object.values(m || {}).some(v => v));
 
   return (
-    <div style={CARD}>
+    <div className="train-mixdiary" style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>💊 Тренировочные миксы и пресеты ({records.length})</div>
         <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'#fff', background: 'none', border: 'none', cursor: 'pointer' }}>

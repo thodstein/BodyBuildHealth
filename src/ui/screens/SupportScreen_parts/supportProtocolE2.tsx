@@ -7,7 +7,7 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
   const [e2Tab, setE2Tab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Эстрадиол">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-e2" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>🔬 Контроль эстрадиола на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержание оптимального уровня эстрадиола (E2). Профилактика гинекомастии, контроль ароматизации, управление эстроген-зависимыми побочными эффектами.</p>

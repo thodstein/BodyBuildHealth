@@ -191,7 +191,7 @@ export const CardioAutoTunePanel: React.FC<{
   const hasVersion = cycle ? latestCardioCycleVersion(cycle.id) != null : false;
 
   return (
-    <div style={CARD}>
+    <div className="train-autotune" style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>🔄 Авто-режим</span>
         <button

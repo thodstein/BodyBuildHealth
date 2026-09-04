@@ -92,7 +92,7 @@ const ExerciseLabCatalog: React.FC<{
   const filterReset = () => setVisible(40);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+    <div className="train-exlabcatalog" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🏋️ Каталог упражнений</div>
       <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         Полный каталог упражнений (~500+) с фильтрами, биомеханикой, техникой и распределением нагрузки.

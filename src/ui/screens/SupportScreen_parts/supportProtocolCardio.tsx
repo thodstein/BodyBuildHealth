@@ -7,7 +7,7 @@ export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s 
   const [cardioTab, setCardioTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Кардио">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-cardio" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>❤️ Кардиопротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Протокол защиты сердечно-сосудистой системы: АД, липидный профиль, ремоделирование миокарда, тромбоз. Фазовый подход.</p>

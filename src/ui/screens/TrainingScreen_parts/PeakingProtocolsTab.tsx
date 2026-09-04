@@ -52,7 +52,7 @@ export const PeakingProtocolsTab: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-peakproto" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>📈 Пик-протоколы</div>
       <div style={{ fontSize: 11, color: DIM, marginBottom: 12 }}>
         Три проверенных протокола пиковой фазы для соревнований. Выберите протокол, соответствующий вашей цели, и примените к планировщику.

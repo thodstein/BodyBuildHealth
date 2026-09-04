@@ -270,7 +270,7 @@ export const LimiterCalculatorCard: React.FC<{ dayCount?: number }> = ({ dayCoun
   const selectedCount = Object.values(selected).reduce((s, n) => s + n.length, 0);
 
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
+    <div className="train-limiter" style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT }}>🎯 Калькулятор лимитирующих факторов движения</div>
       <div style={{ fontSize: 10, color: DIM, marginTop: 3, lineHeight: 1.45 }}>
         Сначала выберите <b>калькулятор (категорию-фактор)</b> — внутри для КАЖДОГО из 6 движений (жим лёжа, присед,

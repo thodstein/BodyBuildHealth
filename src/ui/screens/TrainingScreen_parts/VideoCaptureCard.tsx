@@ -179,7 +179,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   const g = LIFT_GUIDE[lift] ?? LIFT_GUIDE.bench;
 
   return (
-    <div style={{ padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px dashed rgba(56,189,248,0.25)', marginTop:8 }}>
+    <div className="train-videocap" style={{ padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px dashed rgba(56,189,248,0.25)', marginTop:8 }}>
       <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>📹 Видео-анализ · {g.title}</div>
       <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>
         {isTg ? 'Telegram Mini App — камера по клику, HTTPS.' : 'Браузер — камера по клику.'} {g.cam}

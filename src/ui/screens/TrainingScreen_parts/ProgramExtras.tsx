@@ -22,7 +22,7 @@ export const ProgramNotes: React.FC<{
 }> = ({ program, onChange }) => {
   const note = program.meta.notes ?? '';
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
+    <div className="train-prognotes" style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📝 Тренерские заметки</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{note.length} символов</span>

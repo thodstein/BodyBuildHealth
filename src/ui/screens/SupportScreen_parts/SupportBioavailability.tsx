@@ -89,7 +89,7 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
 
   return (
     <InfoErrorBoundary label="Калькулятор биодоступности">
-      <div style={{ padding: '4px 0 80px' }}>
+      <div className="sup-bio" style={{ padding: '4px 0 80px' }}>
         <div style={{ marginBottom: 8 }}>
           <div style={S.h2}>🧬 Калькулятор биодоступности</div>
           <div style={{ ...S.sub, marginBottom: 6 }}>

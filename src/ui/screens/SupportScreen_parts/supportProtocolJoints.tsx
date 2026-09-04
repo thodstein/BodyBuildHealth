@@ -9,7 +9,7 @@ export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s 
   const jointScore = Math.min(100, Math.round(jointPain * 10 + injuryHistory * 5 + trainLoad * 3));
   return (
           <InfoErrorBoundary label="Суставы">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-joints" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:2 }}>🦴 Калькулятор суставов и связок</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Оценка риска суставной патологии и фазовый протокол поддержки хрящевой и соединительной ткани.</p>
