@@ -20,7 +20,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
   const totalW = display.reduce((s, i) => s + i.weightG, 1);
 
   return (
-    <div style={{ marginTop: 8, textAlign: 'center' }}>
+    <div className="nut-visualizer" style={{ marginTop: 8, textAlign: 'center' }}>
       <ModernHero icon="🍽️" title="Визуализатор" subtitle="Наглядная тарелка — баланс белков, жиров и углеводов." />
       <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>🍽 Визуализатор блюда</div>
       <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.03)' }}>

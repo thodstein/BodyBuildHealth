@@ -64,7 +64,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
   })();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="nut-weekview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Weekly summary — enhanced */}
       <div style={{ padding: 16, borderRadius: 18, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 6px 24px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom: 12 }}>

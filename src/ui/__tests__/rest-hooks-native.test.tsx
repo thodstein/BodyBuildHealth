@@ -175,6 +175,16 @@ import { StorageErrorBanner } from '../screens/NutritionScreen_parts/diary/Stora
 import { LabsInvestigations } from '../screens/LabsScreen_parts/LabsInvestigations';
 import LabsProblemPanelsTab from '../screens/LabsScreen_parts/LabsProblemPanelsTab';
 import { CombatConstructor } from '../screens/combat/CombatConstructor';
+import { LabsDueBanner } from '../screens/Calculator/LabsDueBanner';
+import { CalcSubstanceManager } from '../screens/Calculator/CalcSubstanceManager';
+import { SafetyGuardrails } from '../screens/Calculator/CalcSafetyLayer';
+import { DayMealsList } from '../screens/NutritionScreen_parts/diary/DayMealsList';
+import { QualityInsights } from '../screens/NutritionScreen_parts/diary/QualityInsights';
+import { WeekView } from '../screens/NutritionScreen_parts/diary/WeekView';
+import { NutritionCustomFood } from '../screens/NutritionScreen_parts/NutritionCustomFood';
+import { NutriAdvisor } from '../screens/NutritionScreen_parts/NutriAdvisor';
+import { MealVisualizer } from '../screens/NutritionScreen_parts/MealVisualizer';
+import { NutritionOverview } from '../screens/NutritionScreen_parts/NutritionOverview';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1029,5 +1039,95 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c3 } = render(<CombatConstructor />);
     expect(c3.querySelector('.combat-constructor'), 'combat').not.toBeNull();
+  });
+
+  it('44. Batch-14 корни: калькулятор (баннер, менеджер, безопасность)', () => {
+    const { container: c1 } = render(
+      <LabsDueBanner systems={[{ count: 2 } as never]} />,
+    );
+    expect(c1.querySelector('.calc-labsdue'), 'labsdue').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <CalcSubstanceManager finalRec={{ subs: [] } as never} onApplyChanges={() => {}} />,
+    );
+    expect(c2.querySelector('.calc-substmanager'), 'substmanager').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <SafetyGuardrails rec={{ guardrails: [{ level: 'medium', reason: 'тест' }] } as never} />,
+    );
+    expect(c3.querySelector('.calc-safety'), 'safety').not.toBeNull();
+  });
+
+  it('45. Batch-14 корни: дневник (список, качество, неделя, своё)', () => {
+    const mealProps = {
+      onEditItem: () => {},
+      onDeleteItem: () => {},
+      onCopyMeal: () => {},
+      onSavePreset: () => {},
+      onImportFromPlan: () => {},
+      onClearDay: () => {},
+      onFillMicros: () => {},
+      selectedDate: '2026-01-01',
+      copySource: null,
+      onPasteMeal: () => {},
+      onCancelCopy: () => {},
+    };
+    const { container: c1 } = render(
+      <DayMealsList dayMeals={{ 'Завтрак': [] }} {...mealProps} />,
+    );
+    expect(c1.querySelector('.nut-daymeals'), 'daymeals').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<DayMealsList dayMeals={{}} {...mealProps} />);
+    expect(c2.querySelector('.nut-daymeals-empty'), 'daymeals-empty').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <QualityInsights
+        mealQuality={null}
+        selectedDate="2026-01-01"
+        dayMeals={{ 'Завтрак': [] }}
+        foodPatterns={{}}
+        foodTriggers={{}}
+        onSavePattern={() => {}}
+        onSaveTrigger={() => {}}
+        mealMood={{}}
+        onSaveMealMood={() => {}}
+      />,
+    );
+    expect(c3.querySelector('.nut-qualityins'), 'qualityins').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <WeekView
+        diaryData={{}}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-01-01"
+      />,
+    );
+    expect(c4.querySelector('.nut-weekview'), 'weekview').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<NutritionCustomFood />);
+    expect(c5.querySelector('.nut-customfood'), 'customfood').not.toBeNull();
+  });
+
+  it('46. Batch-14 корни: нутри-вид (советник, визуализатор, обзор) и combat-план', () => {
+    const { container: c1 } = render(<NutriAdvisor />);
+    expect(c1.querySelector('.nut-advisor'), 'advisor').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MealVisualizer items={[{ id: 'chicken_breast', name: 'Курица', weightG: 150 }]} />,
+    );
+    expect(c2.querySelector('.nut-visualizer'), 'visualizer').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <NutritionOverview
+        profile={null}
+        avgDailyKcal={2000}
+        avgDailyProtein={150}
+        avgDailyFat={70}
+        avgDailyCarbs={220}
+      />,
+    );
+    expect(c3.querySelector('.nutrition-overview'), 'overview').not.toBeNull();
+    // CombatPlanView требует полный план движка (buildCombatReport) —
+    // хук .combat-planview живёт в прод-ветке, здесь не проверяется.
   });
 });

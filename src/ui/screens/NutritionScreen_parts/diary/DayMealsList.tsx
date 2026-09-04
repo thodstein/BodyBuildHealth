@@ -27,7 +27,7 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
 
   if (!hasData) {
     return (
-      <div className="day-empty" style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
+      <div className="day-empty nut-daymeals-empty" style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
         {isNativeApp() ? (
           <NativeEmptyArt kind="plate" />
         ) : (
@@ -51,7 +51,7 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
   }
 
   return (
-    <div>
+    <div className="nut-daymeals">
       {/* Actions bar */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         <button onClick={onImportFromPlan} aria-label="Импорт из плана"

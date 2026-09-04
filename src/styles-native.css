@@ -2677,6 +2677,50 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 46. NATIVE DEEP-14 — калькулятор, дневник, нутри-вид, combat ─ */
+html.app-native .calc-labsdue,
+html.app-native .calc-substmanager,
+html.app-native .calc-safety,
+html.app-native .nut-daymeals,
+html.app-native .nut-daymeals-empty,
+html.app-native .nut-qualityins,
+html.app-native .nut-weekview,
+html.app-native .nut-customfood,
+html.app-native .nut-advisor,
+html.app-native .nut-visualizer,
+html.app-native .nutrition-overview,
+html.app-native .combat-planview {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .calc-safety,
+html.app-native .nut-daymeals,
+html.app-native .nut-customfood,
+html.app-native .nut-advisor {
+  border-radius: 20px !important;
+}
+
+html.app-native .nut-daymeals-empty {
+  gap: 10px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .calc-labsdue,
+  html.app-native .calc-substmanager,
+  html.app-native .calc-safety,
+  html.app-native .nut-daymeals,
+  html.app-native .nut-daymeals-empty,
+  html.app-native .nut-qualityins,
+  html.app-native .nut-weekview,
+  html.app-native .nut-customfood,
+  html.app-native .nut-advisor,
+  html.app-native .nut-visualizer,
+  html.app-native .nutrition-overview,
+  html.app-native .combat-planview {
+    animation: none;
+  }
+}
+
 /* ─── 45. NATIVE DEEP-13 — калькулятор, дневник, лабы, combat ─ */
 html.app-native .calc-system,
 html.app-native .calc-tzrisk,

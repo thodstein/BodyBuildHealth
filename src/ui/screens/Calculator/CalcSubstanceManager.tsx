@@ -265,7 +265,7 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
   if (!showControls) return null;
 
   return (
-    <div style={{ marginTop: 4 }}>
+    <div className="calc-substmanager" style={{ marginTop: 4 }}>
       {/* ══ Кнопки управления ══ */}
       {mode === 'idle' && (
         <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>

@@ -55,7 +55,7 @@ export const CombatPlanView: React.FC<Props> = ({
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Верхняя панель действий */}
       <div style={{ ...CARD, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

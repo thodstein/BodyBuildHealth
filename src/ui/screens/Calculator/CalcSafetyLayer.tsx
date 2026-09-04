@@ -41,7 +41,7 @@ export const SafetyGuardrails: React.FC<{ rec: SupportRecommendation }> = ({ rec
   const guardrails = rec.guardrails || [];
   if (guardrails.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safety" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>🛡️ Проактивное управление рисками</div>
       {guardrails.map((g: any, i: number) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: `${guardColor(g.level)}0c`, border: `1px solid ${guardColor(g.level)}30` }}>

@@ -105,7 +105,7 @@ export const NutritionCustomFood: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="nut-customfood">
       {/* Custom КБЖУ targets */}
       <div className="card" style={{ padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

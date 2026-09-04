@@ -21,7 +21,7 @@ export const QualityInsights: React.FC<QualityInsightsProps> = ({
   if (!hasData) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="nut-qualityins" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Quality score */}
       {mealQuality && (() => {
         const q = mealQuality;

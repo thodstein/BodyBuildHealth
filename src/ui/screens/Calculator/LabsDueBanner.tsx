@@ -22,6 +22,7 @@ export const LabsDueBanner: React.FC<LabsDueBannerProps> = ({ systems, onOpenLab
 
   return (
     <div
+      className="calc-labsdue"
       role="alert"
       style={{
         position: 'sticky',

@@ -28,7 +28,7 @@ export const NutriAdvisor: React.FC = () => {
   const items = filterTag ? FAQ.filter(f => f.tag === filterTag) : FAQ;
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="nut-advisor" style={{ paddingBottom: 80 }}>
       <ModernHero icon="🧑‍⚕️" title="Нутрициолог" subtitle="Персональные рекомендации на основе профиля и анализов." />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>🧑‍⚕️ Нутрициолог</div>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
