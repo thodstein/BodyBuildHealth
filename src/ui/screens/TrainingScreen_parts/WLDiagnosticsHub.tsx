@@ -32,6 +32,7 @@ import { simulateTACorrection } from '../../../engines/strength-sport/strength-s
 import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport-ta-spec-block.engine';
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
+import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -97,6 +98,12 @@ type WLState = {
   // E11: split-jerk ноги (левая/правая впереди)
   jerkLeftFwd: string;
   jerkRightFwd: string;
+  // E12: заявки и скорости стандарта для попыток
+  taSnatchMax: string;
+  taCjMax: string;
+  taVelStd: string;
+  taVelToday: string;
+  taStrategy: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -120,6 +127,8 @@ const DEFAULT_STATE: WLState = {
   anthroHeight: '', anthroArmSpan: '', anthroShoulder: '',
   // E11: split-jerk ноги
   jerkLeftFwd: '', jerkRightFwd: '',
+  // E12: заявки/скорости/стратегия
+  taSnatchMax: '', taCjMax: '', taVelStd: '', taVelToday: '', taStrategy: 'balanced',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -290,6 +299,29 @@ export const WLDiagnosticsHub: React.FC = () => {
     const diff = Math.round((fvr.slope - opt) * 100) / 100;
     return { opt, diff, forceDom: fvr.slope < opt };
   }, [fvr]);
+
+  // E12: попытки на старт (заявка; рывок по умолчанию из FvR snatchTh)
+  const attemptArgs = useMemo(() => {
+    const strat = state.taStrategy === 'conservative' || state.taStrategy === 'aggressive' ? state.taStrategy : 'balanced';
+    const std = state.taVelStd ? parseFloat(state.taVelStd) : null;
+    const today = state.taVelToday ? parseFloat(state.taVelToday) : null;
+    return { strat, std, today };
+  }, [state.taStrategy, state.taVelStd, state.taVelToday]);
+  const snatchAttempts = useMemo(() => {
+    try {
+      const manual = state.taSnatchMax ? parseFloat(state.taSnatchMax) : NaN;
+      const base = Number.isFinite(manual) && manual > 0 ? manual : fvr?.snatchTh ?? null;
+      if (base == null) return null;
+      return planTAAttempts({ declaredMaxKg: base, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today });
+    } catch { return null; }
+  }, [state.taSnatchMax, fvr, attemptArgs]);
+  const cjAttempts = useMemo(() => {
+    try {
+      const manual = state.taCjMax ? parseFloat(state.taCjMax) : NaN;
+      if (!Number.isFinite(manual) || manual <= 0) return null;
+      return planTAAttempts({ declaredMaxKg: manual, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today });
+    } catch { return null; }
+  }, [state.taCjMax, attemptArgs]);
   const barTrend = useMemo(() => {
     try {
       const hist = loadBarTracking();
@@ -887,6 +919,25 @@ export const WLDiagnosticsHub: React.FC = () => {
               </div>
               {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} snatch {taVthresNorms(profileSex).snatch.min}-{taVthresNorms(profileSex).snatch.max} (opt {taVthresNorms(profileSex).snatch.optimal}), clean {taVthresNorms(profileSex).clean.min}-{taVthresNorms(profileSex).clean.max}</div>}
               {fvr && fvrOptimal && <div style={{ fontSize: 10, color: fvrOptimal.forceDom ? '#f59e0b' : '#22c55e', marginTop: 4 }}>FvR-профиль: slope {fvr.slope} vs оптимум {fvrOptimal.opt} (Δ {fvrOptimal.diff > 0 ? '+' : ''}{fvrOptimal.diff}) — {fvrOptimal.forceDom ? 'force-доминантен → приоритет скорость (вис/прыжки)' : 'сбалансирован ✓'}</div>}
+            {/* E12: попытки на старт 90/96/102 + readiness −2.5 */}
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🏁 Попытки на старт{fvr ? ` · рывок из FvR: ${fvr.snatchTh}кг` : ''}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 10, color: DIM }}>Заявка рывок кг<br /><input value={state.taSnatchMax} onChange={e => setState(s => ({ ...s, taSnatchMax: e.target.value }))} placeholder={fvr ? String(fvr.snatchTh) : '100'} style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Заявка толчок кг<br /><input value={state.taCjMax} onChange={e => setState(s => ({ ...s, taCjMax: e.target.value }))} placeholder="125" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Пик стандарт м/с<br /><input value={state.taVelStd} onChange={e => setState(s => ({ ...s, taVelStd: e.target.value }))} placeholder="1.90" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Пик сегодня м/с<br /><input value={state.taVelToday} onChange={e => setState(s => ({ ...s, taVelToday: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {(['conservative', 'balanced', 'aggressive'] as const).map(st => (
+                  <button key={st} onClick={() => setState(s => ({ ...s, taStrategy: st }))} aria-pressed={attemptArgs.strat === st} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: attemptArgs.strat === st ? '#3b82f6' : '#1f3a5f', background: attemptArgs.strat === st ? 'rgba(59,130,246,0.14)' : '#0a1629', color: attemptArgs.strat === st ? '#3b82f6' : DIM, fontSize: 10 }}>{st === 'conservative' ? 'Осторожно' : st === 'balanced' ? 'Баланс' : 'Риск'}</button>
+                ))}
+              </div>
+              {snatchAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Рывок: {snatchAttempts.attempts[0]} / {snatchAttempts.attempts[1]} / {snatchAttempts.attempts[2]}{snatchAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
+              {cjAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 4 }}>Толчок: {cjAttempts.attempts[0]} / {cjAttempts.attempts[1]} / {cjAttempts.attempts[2]}{cjAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
+              {(snatchAttempts?.readinessNote || cjAttempts?.readinessNote) && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {snatchAttempts?.readinessNote || cjAttempts?.readinessNote}</div>}
+              {!snatchAttempts && !cjAttempts && <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Введи заявку (рывок подтянется из FvR) — получишь 90/96/102. Просадка пика &gt;0.15 м/с срежет −2.5кг.</div>}
+            </div>
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)' }}>

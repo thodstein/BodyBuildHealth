@@ -160,4 +160,10 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText(/Снимок ножниц/));
     expect(JSON.parse(localStorage.getItem('he_ta_split_jerk_hist') || '[]').length).toBe(1);
   });
+  it('E12 попытки: заявка 100 → 90/96/102', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    fireEvent.change(container.querySelector('input[placeholder="125"]')!, { target: { value: '100' } });
+    await waitFor(() => expect(container.textContent).toContain('Толчок: 90 / 96 / 102'), { timeout: 2000 });
+  });
 });
