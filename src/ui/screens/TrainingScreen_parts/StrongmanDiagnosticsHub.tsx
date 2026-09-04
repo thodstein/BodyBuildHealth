@@ -36,6 +36,7 @@ import { buildSMIcs, downloadSMIcs } from '../../../engines/strength-sport/stren
 import { buildSMAnnualOverlay, saveSMAnnualOverlay } from '../../../engines/strength-sport/strength-sport-sm-annual-bridge.engine';
 import { calibrateSMLVP, smLvpPointsFromRamp, saveSMLVPProfile, loadSMLVPProfile, smLvpLiftFor } from '../../../engines/strength-sport/strength-sport-sm-lvp-calibration.engine';
 import { diagnoseLogDip } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
+import { smPoseCheckFromCsv } from '../../../engines/strength-sport/strength-sport-sm-pose-check.engine';
 import { carryPhysics } from '../../../engines/strength-sport/strength-sport-carry-physics.engine';
 import { stoneMoment } from '../../../engines/strength-sport/strength-sport-stone-moment.engine';
 import { buildSMGripProfile, smGripFailsCalibrated, loadSMGripProfile, saveSMGripProfile } from '../../../engines/strength-sport/strength-sport-sm-grip-calibration.engine';
@@ -118,6 +119,8 @@ type SMState = {
   annualStartWeek: string;
   mixGrip: string;
   armsBent: boolean;
+  poseCsv: string;
+  poseLift: string;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -136,6 +139,7 @@ const DEFAULT_STATE: SMState = {
   progYoke20m: '', progFarmers40m: '', progLogMax: '', progStoneLadder: '', progBw: '',
   strategy: 'balanced', pinchWidth: '3in', cocLevel: 'coc1_5', fatGripMm: '50',
   specWeeks: '6', annualStartWeek: '1', mixGrip: 'overhand', armsBent: false,
+  poseCsv: '', poseLift: 'yoke_walk',
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -183,6 +187,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const [tab, setTab] = useState<SMTab>('press');
   const [toast, setToast] = useState<string>('');
   const [csvText, setCsvText] = useState<string>('');
+  const [poseResult, setPoseResult] = useState<{ verdict: string; lines: string[]; n: number } | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -688,6 +693,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
+  const handlePoseParse = () => {
+    const r = smPoseCheckFromCsv(state.poseCsv, state.poseLift);
+    if (!r) { setToast('Углы не распознаны (t,hip,knee,ankle,shoulder)'); setTimeout(() => setToast(''), 2000); return; }
+    setPoseResult({ verdict: r.result.verdict, lines: r.result.lines, n: r.result.n });
+    setToast(`✓ Углы: n=${r.result.n} → ${r.result.verdict.toUpperCase()}`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
   const handleCsvParse = () => {
     const pts = parseKinoveaCSV(csvText);
     if (!pts) { setToast('CSV не распознан'); setTimeout(()=>setToast(''),2000); return; }
@@ -1096,6 +1109,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
             <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
+            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Углы суставов с видео (Hindle-нормы)</div>
+              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Трекер поз → экспорт CSV (t,hip,knee,ankle,shoulder) → вставь ниже. Йок: hip ROM [30,46] / knee [43,65]; лог: shoulder ≥150°.</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:6, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Лифт<br/><select value={state.poseLift} onChange={e=>setState(s=>({...s, poseLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="log_press">log</option></select></label>
+                <div style={{ display:'flex', alignItems:'flex-end' }}><button onClick={handlePoseParse} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.25)', color:'#a78bfa', fontSize:11, cursor:'pointer' }}>🦿 Разобрать углы</button></div>
+              </div>
+              <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'t,hip,knee,ankle,shoulder\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'8px', fontSize:11, fontFamily:'monospace' }} />
+              {poseResult && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color: poseResult.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>n={poseResult.n} · {poseResult.verdict.toUpperCase()} · {poseResult.lines.join(' · ')}</div>}
+            </div>
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>LVP-калибровка SM (Wood PLOS 2026: population ±0.15 — нужен ramp)</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginTop:6 }}>
