@@ -55,7 +55,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
   const [researchDbQuery, setResearchDbQuery] = useState('');
 
   return (
-                <div>
+                <div className="sup-research">
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
                   <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed, PubChem, Google Scholar, OpenFDA, Каталог и база исследований</div>
 

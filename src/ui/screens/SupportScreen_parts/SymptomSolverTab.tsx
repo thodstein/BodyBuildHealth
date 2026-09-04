@@ -427,7 +427,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
 
   // ═══ СПИСОК СИМПТОМОВ ═══
   return (
-    <div style={{ padding: '0 0 80px' }}>
+    <div className="sup-solver" style={{ padding: '0 0 80px' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 2 }}>
         🩺 Симптом → Проблема → Анализ → Решение
       </div>

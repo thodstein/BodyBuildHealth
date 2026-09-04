@@ -167,7 +167,7 @@ export const ProPanelCollapsible: React.FC<{
  */
 export const ProPanelsGroup: React.FC<{ sections: ProPanelSection[] }> = ({ sections }) => {
   return (
-    <div role="region" aria-label="Профессиональные панели" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div className="train-propanels" role="region" aria-label="Профессиональные панели" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {sections.map((s, i) => (
         <ProPanelCollapsible key={s.id} section={s} defaultExpanded={i === 0} />
       ))}

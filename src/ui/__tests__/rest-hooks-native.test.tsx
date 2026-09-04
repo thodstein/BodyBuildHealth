@@ -249,6 +249,16 @@ import { SessionEditorModal } from '../screens/TrainingScreen_parts/SessionEdito
 import { StrengthDiaryPanel } from '../screens/TrainingScreen_parts/StrengthDiaryPanel';
 import { SupportManualPicker } from '../screens/SupportScreen_parts/SupportManualPicker';
 import { LabsOverview } from '../screens/LabsScreen_parts/LabsOverview';
+import { SupportResearch } from '../screens/SupportScreen_parts/SupportResearch';
+import { ProPanelsGroup, ProPanelCollapsible } from '../screens/TrainingScreen_parts/ProPanelSection';
+import { SymptomSolverTab } from '../screens/SupportScreen_parts/SymptomSolverTab';
+import { ProgramRevisionsDiff } from '../screens/TrainingScreen_parts/ProgramRevisions';
+import { PKPDSimulationTab } from '../screens/PharmaScreen_parts/PKPDSimulationTab';
+import { RiskMatrix } from '../screens/RiskScreen_parts/RiskMatrix';
+import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
+import { SupportInteractionsView } from '../screens/SupportScreen_parts/SupportInteractionsView';
+import { RiskVerificationList } from '../screens/RiskScreen_parts/RiskVerificationList';
+import { DiagnosticsTab as PharmaDiagnosticsTab } from '../screens/PharmaScreen_parts/DiagnosticsTab';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1731,5 +1741,128 @@ describe('market + pharma + labs roots', () => {
       <LabsOverview labs={[]} hasLabs={false} forceNoLabs={false} setForceNoLabs={() => {}} />,
     );
     expect(c7.querySelector('.labs-overview'), 'labsoverview').not.toBeNull();
+  });
+
+  it('59. Batch-21 корни: исследования, панели, солвер, ревизии, pkpd, матрица', () => {
+    const researchMocks = {
+      pubMedQuery: '',
+      setPubMedQuery: () => {},
+      pubMedResults: [],
+      setPubMedResults: () => {},
+      pubMedLoading: false,
+      setPubMedLoading: () => {},
+      pubMedError: null,
+      pubchemResults: [],
+      setPubchemResults: () => {},
+      pubchemLoading: false,
+      pubchemError: null,
+      fdaResults: [],
+      setFdaResults: () => {},
+      fdaLoading: false,
+      fdaError: null,
+      pharmaSearchQ: '',
+      pharmaSearchResults: [],
+      researchSource: 'pubmed',
+      setResearchSource: () => {},
+      setTab: () => {},
+      handlePubMedSearch: () => {},
+      doPharmaSearch: () => {},
+      handlePubchemSearch: () => {},
+      handleFDASearch: () => {},
+    };
+    const { container: c1 } = render(<SupportResearch s={researchMocks} />);
+    expect(c1.querySelector('.sup-research'), 'research').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <ProPanelsGroup sections={[{ id: 't', title: 'Тест', content: 'текст' } as never]} />,
+    );
+    expect(c2.querySelector('.train-propanels'), 'propanels').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SymptomSolverTab s={{}} />);
+    expect(c3.querySelector('.sup-solver'), 'solver').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <ProgramRevisionsDiff program={{ meta: { id: 't' } } as never} />,
+    );
+    expect(c4.querySelector('.train-revisions'), 'revisions').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<PKPDSimulationTab />);
+    expect(c5.querySelector('.pharma-pkpd'), 'pkpd').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <RiskMatrix riskResult={{ mechanismDetail: {} } as never} />,
+    );
+    expect(c6.querySelector('.risk-matrix'), 'matrix').not.toBeNull();
+  });
+
+  it('60. Batch-21 корни: покрытие hooked-без-тестов (обзор, панели, интеракт, верификация, диагност, спец)', () => {
+    const { container: c1 } = render(
+      <RiskOverview
+        riskResult={{ overallNet: 10, systemBreakdown: {} } as never}
+        globalNoLabs={true}
+        noLabsSystems={[]}
+        labRiskContributions={null}
+      />,
+    );
+    expect(c1.querySelector('.risk-overview'), 'overview').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <ProPanelCollapsible section={{ id: 't', title: 'Тест', content: 'текст' } as never} />,
+    );
+    expect(c2.querySelector('.pro-panel-section'), 'propanel').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <SupportInteractionsView
+        s={{
+          mergedInteractions: [],
+          infoSynergySeverity: 'all',
+          setInfoSynergySeverity: () => {},
+          synergyCountFilter: 0,
+          setSynergyCountFilter: () => {},
+          synergyOrganFilter: '',
+          setSynergyOrganFilter: () => {},
+          ORGAN_CATEGORY_MAP: {},
+          synergySubTab: 'all',
+          setSynergySubTab: () => {},
+          synergySearch: '',
+          setSynergySearch: () => {},
+          synergiesContent: () => null,
+          expandedCategories: {},
+          interactTab: 'all',
+          setInteractTab: () => {},
+          interactionIds: [],
+          setInteractionIds: () => {},
+          updateInteraction: () => {},
+          interactionSearch: '',
+          setInteractionSearch: () => {},
+          interactionSearchIdx: 0,
+          setInteractionSearchIdx: () => {},
+          addInteraction: () => {},
+          maxInteractionsReached: false,
+          allSupport: [],
+          catalogSubstances: [],
+          validInteractionIds: [],
+          hasSupportInteractions: false,
+          supportSynergiesList: [],
+          supportConflicts: [],
+          supportCautions: [],
+          resolveSubName: (id: string) => id,
+          showEffect: false,
+          pharmaInteractIds: [],
+          setPharmaInteractIds: () => {},
+          pharmaInteractSearch: '',
+          setPharmaInteractSearch: () => {},
+        }}
+      />,
+    );
+    expect(c3.querySelector('.sup-interact'), 'interact').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<RiskVerificationList labMap={{}} />);
+    expect(c4.querySelector('.risk-verify'), 'verify').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<PharmaDiagnosticsTab />);
+    expect(c5.querySelector('.pharma-diag'), 'pharmadiag').not.toBeNull();
+    // RiskSpecMethod требует сохранённый курс (null без него) —
+    // хук .risk-spec живёт в прод-ветке, здесь не проверяется.
   });
 });

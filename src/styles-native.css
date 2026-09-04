@@ -2677,6 +2677,44 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 53. NATIVE DEEP-21 — исследования, панели, риски, фарма ── */
+html.app-native .sup-research,
+html.app-native .train-propanels,
+html.app-native .sup-solver,
+html.app-native .train-revisions,
+html.app-native .pharma-pkpd,
+html.app-native .risk-matrix,
+html.app-native .risk-overview,
+html.app-native .pro-panel-section,
+html.app-native .sup-interact,
+html.app-native .risk-verify,
+html.app-native .pharma-diag,
+html.app-native .risk-spec {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .sup-research,
+html.app-native .train-propanels {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .sup-research,
+  html.app-native .train-propanels,
+  html.app-native .sup-solver,
+  html.app-native .train-revisions,
+  html.app-native .pharma-pkpd,
+  html.app-native .risk-matrix,
+  html.app-native .risk-overview,
+  html.app-native .pro-panel-section,
+  html.app-native .sup-interact,
+  html.app-native .risk-verify,
+  html.app-native .pharma-diag,
+  html.app-native .risk-spec {
+    animation: none;
+  }
+}
+
 /* ─── 52. NATIVE DEEP-20 — миксы, строки плана, свитчи, покрытие ─ */
 html.app-native .train-mixhub,
 html.app-native .train-badgelegend,
