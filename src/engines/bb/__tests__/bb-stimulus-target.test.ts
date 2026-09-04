@@ -448,3 +448,28 @@ describe('трицепс-база: жим узким и брусья', () => {
     expect(found).toEqual(new Set(['close_grip_bench', 'dips_tricep']));
   });
 });
+
+describe('становая и отжимания', () => {
+  it('классика бьёт в бицепс бедра', () => {
+    expect(headsHitOf({ id: 'deadlift' })).toContain('hamstrings');
+    expect(headsHitOf({ name: 'Становая тяга (классика)' })).toContain('hamstrings');
+  });
+  it('отжимания бьют в середину груди', () => {
+    expect(headsHitOf({ id: 'pushup' })).toContain('chest_mid');
+    expect(headsHitOf({ name: 'Отжимания от пола' })).toContain('chest_mid');
+  });
+  it('кругление в становой → диски', () => {
+    const d = diagnoseStimulusTarget({ id: 'deadlift' }, { setupIssues: ['круглю поясницу, кругление'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toMatch(/диски/);
+  });
+  it('локти 90° в отжиманиях → плечи', () => {
+    const d = diagnoseStimulusTarget({ id: 'pushup' }, { setupIssues: ['локти строго 90° в стороны'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toMatch(/плечевой сустав/);
+  });
+  it('отжимания при weakHead=chest_upper → wrongHead', () => {
+    const d = diagnoseStimulusTarget({ id: 'pushup' }, { weakHead: 'chest_upper' });
+    expect(d.flags).toContain('wrongHead');
+  });
+});
