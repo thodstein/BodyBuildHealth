@@ -22,7 +22,8 @@ import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '.
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -111,6 +112,12 @@ type WLState = {
   imtpRfd: string;
   imtpDur: string;
   imtpCountermove: boolean;
+  // V3: MediaPipe live-статус + прогресс двоеборья
+  poseLive: '' | 'loading' | 'ok' | 'fail';
+  progBw: string;
+  progSnatch: string;
+  progCj: string;
+  progSex: '' | 'male' | 'female';
 };
 
 const DEFAULT_STATE: WLState = {
@@ -138,6 +145,9 @@ const DEFAULT_STATE: WLState = {
   taSnatchMax: '', taCjMax: '', taVelStd: '', taVelToday: '', taStrategy: 'balanced',
   // E13: IMTP/RFD
   imtpRfd: '', imtpDur: '', imtpCountermove: false,
+  // V3: live-статус + прогресс
+  poseLive: '' as '' | 'loading' | 'ok' | 'fail',
+  progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -297,6 +307,56 @@ export const WLDiagnosticsHub: React.FC = () => {
       return s === 'female' || s === 'male' ? s : null;
     } catch { return null; }
   }, []);
+
+  // V3: прогресс двоеборья + Sinclair
+  const [progHist, setProgHist] = useState<TAProgressEntry[]>(() => {
+    try { return loadTAProgress(); } catch { return []; }
+  });
+  const progSexEff = state.progSex || profileSex || 'male';
+  const progCalc = useMemo(() => {
+    try {
+      const bw = state.progBw ? parseFloat(state.progBw) : (profileWeightKg ?? NaN);
+      const sn = state.progSnatch ? parseFloat(state.progSnatch) : NaN;
+      const cj = state.progCj ? parseFloat(state.progCj) : NaN;
+      if (!Number.isFinite(bw) || bw <= 0 || !Number.isFinite(sn) || !Number.isFinite(cj) || sn <= 0 || cj <= 0) return null;
+      const total = Math.round((sn + cj) * 10) / 10;
+      return { bw, sn, cj, total, coeff: sinclairCoefficient(bw, progSexEff), sinclair: sinclairTotal(total, bw, progSexEff) };
+    } catch { return null; }
+  }, [state.progBw, state.progSnatch, state.progCj, progSexEff, profileWeightKg]);
+  const progTrend = useMemo(() => {
+    try { return taProgressTrend(progHist, progSexEff); } catch { return null; }
+  }, [progHist, progSexEff]);
+  const takeProgSnapshot = () => {
+    if (!progCalc) {
+      setToast('Введи вес + рывок + толчок — снимать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const entry: TAProgressEntry = {
+      date: new Date().toISOString().slice(0, 10),
+      bodyweightKg: progCalc.bw, snatchKg: progCalc.sn, cleanJerkKg: progCalc.cj,
+    };
+    setProgHist(prev => {
+      const next = appendTAProgress(prev, entry);
+      try { saveTAProgress(next); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок ${entry.date}: сумма ${progCalc.total} · Sinclair ${progCalc.sinclair ?? '—'}`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  // V3: MediaPipe live-проверка (честно: только наличие модели, углы — после загрузки)
+  const checkPoseLive = async () => {
+    setState(s => ({ ...s, poseLive: 'loading' }));
+    try {
+      const ok = await ensurePoseModel();
+      setState(s => ({ ...s, poseLive: ok ? 'ok' : 'fail' }));
+      setToast(ok ? '✓ MediaPipe доступен — live-углы следующим шагом' : '✕ MediaPipe недоступен (нет сети/CDN)');
+      setTimeout(() => setToast(''), 2500);
+    } catch {
+      setState(s => ({ ...s, poseLive: 'fail' }));
+    }
+  };
   const jerkDip = useMemo(() => {
     const cm = parseFloat(state.jerkDipCm), ms = parseFloat(state.jerkDipMs);
     if (!Number.isFinite(cm) || !Number.isFinite(ms)) return null;
@@ -1087,8 +1147,13 @@ export const WLDiagnosticsHub: React.FC = () => {
               {state.poseCsv.trim() && !poseSummary && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>CSV не распознан — нужно ≥2 строк t,hip,knee,ankle,shoulder</div>}
             </div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — следующий шаг</div>
-              <div style={{ marginTop: 6, width: '100%', height: 60, background: 'rgba(255,255,255,0.03)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIM, fontSize: 11, border: '1px solid rgba(255,255,255,0.04)' }}>video preview — PRO: углы hip/knee/ankle/shoulder в реальном времени</div>
+              <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — live-проверка</div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+                <button onClick={checkPoseLive} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📡 Проверить MediaPipe</button>
+                {state.poseLive === 'loading' && <span style={{ fontSize: 10, color: DIM }}>проверяем CDN…</span>}
+                {state.poseLive === 'ok' && <span style={{ fontSize: 10, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
+                {state.poseLive === 'fail' && <span style={{ fontSize: 10, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
+              </div>
             </div>
           </div>
         )}
@@ -1191,6 +1256,23 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
           </div>
         )}
+        {/* V3: прогресс двоеборья + Sinclair */}
+        <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📈 Прогресс двоеборья + Sinclair (IWF 2021–2024)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+            <label style={{ fontSize: 11, color: DIM }}>Вес кг<br /><input value={state.progBw} onChange={e => setState(s => ({ ...s, progBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '80'} style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            <label style={{ fontSize: 11, color: DIM }}>Рывок кг<br /><input value={state.progSnatch} onChange={e => setState(s => ({ ...s, progSnatch: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            <label style={{ fontSize: 11, color: DIM }}>Толчок кг<br /><input value={state.progCj} onChange={e => setState(s => ({ ...s, progCj: e.target.value }))} placeholder="125" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+            {(['male', 'female'] as const).map(sx => (
+              <button key={sx} onClick={() => setState(s => ({ ...s, progSex: sx }))} aria-pressed={progSexEff === sx} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: progSexEff === sx ? '#3b82f6' : '#1f3a5f', background: progSexEff === sx ? 'rgba(59,130,246,0.14)' : '#0a1629', color: progSexEff === sx ? '#3b82f6' : DIM, fontSize: 10 }}>{sx === 'male' ? 'Муж' : 'Жен'}</button>
+            ))}
+            <button onClick={takeProgSnapshot} style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
+          </div>
+          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair}</div>}
+          {progTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
           <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>

@@ -201,4 +201,22 @@ describe('WLDiagnosticsHub PRO', () => {
     expect(localStorage.getItem('he_ta_annual_sync_v1')).toContain('snatch_off_floor');
     expect(localStorage.getItem('he_strength_annual_sync_v1')).toBeNull();
   });
+  it('V3 прогресс: сумма + Sinclair + снимок', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.change(container.querySelector('input[placeholder="80"]')!, { target: { value: '81' } });
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    const snatchInputs = Array.from(container.querySelectorAll('input[placeholder="100"]'));
+    fireEvent.change(snatchInputs[snatchInputs.length - 1], { target: { value: '100' } });
+    const cjInputs = Array.from(container.querySelectorAll('input[placeholder="125"]'));
+    fireEvent.change(cjInputs[cjInputs.length - 1], { target: { value: '125' } });
+    await waitFor(() => expect(container.textContent).toContain('Sinclair 285'), { timeout: 2000 });
+    fireEvent.click(screen.getByText(/📸 Снимок/));
+    expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]').length).toBe(1);
+  });
+  it('V3 MediaPipe: кнопка проверки', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
+    fireEvent.click(screen.getByText(/Проверить MediaPipe/));
+    await waitFor(() => expect(container.textContent).toMatch(/проверяем|модель доступна|нет сети/), { timeout: 5000 });
+  });
 });
