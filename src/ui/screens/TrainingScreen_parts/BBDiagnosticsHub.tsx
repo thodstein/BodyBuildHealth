@@ -19,7 +19,7 @@ import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-s
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
-import { isSpecializationTargetConflict } from '../../../engines/bb/bb-specialization.engine';
+import { isSpecializationTargetConflict, canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
 import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
 import { auditPlanExercises } from '../../../engines/bb/bb-plan-exercise-audit.engine';
 import { diagnoseExercise } from '../../../engines/bb/bb-exercise-diagnosis.engine';
@@ -29,7 +29,8 @@ import { getProfExecutionProfile } from '../../../engines/bb/bb-execution-prof.e
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { sfrOf } from '../../../engines/bb/bb-sfr-db';
-import { diagnoseWeakCause } from '../../../engines/bb/bb-weak-cause.engine';
+import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../../../engines/bb/bb-weak-cause.engine';
+import { volumeHistory28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../../../engines/bb/bb-symmetry.engine';
@@ -287,18 +288,41 @@ export const BBDiagnosticsHub: React.FC = () => {
     let topIds: string[] = [];
     let weakHeads: string[] = [];
     let specPayload: unknown = null;
+    // 28д-история + замеры — внутри хендлера (мемы ниже по коду недоступны из-за TDZ)
+    let histLazy: Record<string, number[]> = {};
+    let measLazy: Record<string, number> = {};
+    try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
+    try {
+      measLazy = {};
+      for (const [k, v] of Object.entries(state.circ)) {
+        const n = parseFloat(v as string);
+        if (Number.isFinite(n) && n > 0) measLazy[k] = n;
+      }
+    } catch { /* noop */ }
     try {
       for (const z of report.weakZonesGranular.slice(0, 2)) {
         const lm = getVolumeLandmarks(level, z);
         const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
         const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
+        let hist: number[] = [];
+        try { hist = (histLazy as any)[z] || (histLazy as any)[canonicalMuscle(z)] || []; } catch { /* noop */ }
+        if (!hist.length && fact != null) hist = [fact];
+        const mavN = lm?.mav ?? null;
         weakCausesPayload[z] = diagnoseWeakCause({
           zone: z,
-          factHistory: fact != null ? [fact] : [],
-          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
+          factHistory: hist,
+          mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
           acwrZone: acwrZ,
           sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
           vbtLossPct: vbt?.lossPct ?? null,
+          idealDeltaPct: (() => {
+            try {
+              const h = measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
+              const w = state.wristCm ? parseFloat(state.wristCm) : null;
+              return idealDeltaForZone(z, measLazy as any, h, w);
+            } catch { return null; }
+          })(),
+          weeksAtMavClean: weeksAtMav(hist, mavN),
         });
       }
     } catch { /* noop */ }
@@ -426,6 +450,9 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [bbPlan]);
 
   // ── MAX PRO: причины + спец-блок + топ-3 (после planAudit/bbPlan — порядок важен) ──
+  const hist28 = useMemo(() => {
+    try { return volumeHistory28d(diarySessions as any); } catch { return {}; }
+  }, [diarySessions]);
   const weakCauses = useMemo(() => {
     const out: Record<string, ReturnType<typeof diagnoseWeakCause>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
@@ -434,10 +461,20 @@ export const BBDiagnosticsHub: React.FC = () => {
         const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
         const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
         const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+        // 28д-история по канонической мышце (фолбэк — факт 7д)
+        let hist: number[] = [];
+        try {
+          hist = (hist28 as any)[z] || (hist28 as any)[canonicalMuscle(z)] || [];
+        } catch { /* noop */ }
+        if (!hist.length && fact != null) hist = [fact];
+        const single = aud ? (aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6) : false;
+        const missStrict = aud ? aud.strictCoverage.missing.length > 0 : false;
+        const techClean = !single && !missStrict;
+        const mavN = lm?.mav ?? null;
         out[z] = diagnoseWeakCause({
           zone: z,
-          factHistory: fact != null ? [fact] : [],
-          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
+          factHistory: hist,
+          mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
           e1rmDeltaPct: null, e1rmSessions: 0,
           acwrZone: acwrZ,
           sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
@@ -447,13 +484,19 @@ export const BBDiagnosticsHub: React.FC = () => {
           missingStrict: aud ? aud.strictCoverage.missing.length > 0 : false,
           tempoMismatch: false,
           avgSfr: aud?.avgSfr ?? null,
-          idealDeltaPct: null,
-          weeksAtMavClean: 0,
+          idealDeltaPct: (() => {
+            try {
+              const h = measNum.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
+              const w = state.wristCm ? parseFloat(state.wristCm) : null;
+              return idealDeltaForZone(z, measNum as any, h, w);
+            } catch { return null; }
+          })(),
+          weeksAtMavClean: techClean ? weeksAtMav(hist, mavN) : 0,
         });
       } catch { /* noop */ }
     }
     return out;
-  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit]);
+  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit, hist28, measNum, state.circ.heightCm, state.wristCm]);
   const specBlock = useMemo(() => {
     try {
       if (!report.weakZonesGranular.length) return null;
@@ -542,9 +585,21 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       const asym = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
       const aud = (() => { try { return planAudit?.byMuscle?.[selectedExRaw.muscle || '']; } catch { return null; } })();
-      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, asymPct: asym, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
+      // слабая головка под мышцу — замены целятся в неё
+      let weakHead: string | null = null;
+      try {
+        const m = String(selectedExRaw.muscle || '').toLowerCase();
+        const LEGS = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'legs']);
+        for (const z of report.weakZonesGranular) {
+          const h = weakHeadForZone(z);
+          if (!h) continue;
+          const hm = HEAD_FUNCTIONS[h]?.muscle || '';
+          if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { weakHead = h; break; }
+        }
+      } catch { /* noop */ }
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, planAudit, state.sex]);
+  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, state.sex]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;

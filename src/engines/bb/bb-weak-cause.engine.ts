@@ -165,3 +165,77 @@ export function diagnoseWeakCauses(
   }
   return out;
 }
+
+function num(v: unknown): number | null {
+  const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function avg(...vs: Array<unknown>): number | null {
+  const xs = vs.map(num).filter((n): n is number => n != null);
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+/**
+ * Дельта замера vs идеала McCallum (по запястью, приоритет) / Reeves (по росту) — % (отриц = меньше идеала).
+ * meas: ключи окружностей (chest, bicepL/R, thighL/R, calfL/R, forearmL/R, neck, shoulderWidth, waist, hips).
+ * abs → null (талия меньше ≠ отставание).
+ */
+export function idealDeltaForZone(
+  zone: string,
+  meas: Record<string, unknown>,
+  heightCm?: number | null,
+  wristCm?: number | null,
+): number | null {
+  const z = String(zone || '').toLowerCase().trim();
+  if (!z || z === 'abs') return null;
+  const h = num(heightCm);
+  const w = num(wristCm);
+  const scaleH = h ? h / 175 : 1;
+  // [ключи замера, идеал Reeves при 175см, множитель McCallum от запястья]
+  const table: Record<string, { keys: string[]; reeves: number; mcCallum?: number }> = {
+    chest: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    chest_upper: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    chest_mid: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    chest_lower: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    back: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    back_width: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    back_thickness: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
+    shoulders: { keys: ['shoulderWidth'], reeves: 50 },
+    delt_mid: { keys: ['shoulderWidth'], reeves: 50 },
+    delt_rear: { keys: ['shoulderWidth'], reeves: 50 },
+    delt_front: { keys: ['shoulderWidth'], reeves: 50 },
+    biceps: { keys: ['bicepL', 'bicepR', 'bicep'], reeves: 40, mcCallum: 2.5 },
+    triceps: { keys: ['bicepL', 'bicepR', 'bicep'], reeves: 40, mcCallum: 2.5 },
+    brachialis: { keys: ['forearmL', 'forearmR', 'forearm'], reeves: 32, mcCallum: 1.8 },
+    forearms: { keys: ['forearmL', 'forearmR', 'forearm'], reeves: 32, mcCallum: 1.8 },
+    quads: { keys: ['thighL', 'thighR', 'thigh'], reeves: 60, mcCallum: 3.0 },
+    hamstrings: { keys: ['thighL', 'thighR', 'thigh'], reeves: 60, mcCallum: 3.0 },
+    glutes: { keys: ['hips'], reeves: 96 },
+    calves: { keys: ['calfL', 'calfR', 'calf'], reeves: 38, mcCallum: 2.0 },
+    traps: { keys: ['neck'], reeves: 40, mcCallum: 2.5 },
+  };
+  const row = table[z];
+  if (!row) return null;
+  let fact: number | null = null;
+  for (const k of row.keys) {
+    const v = num((meas as Record<string, unknown>)[k]);
+    if (v != null) { fact = fact == null ? v : Math.min(fact, v); }
+  }
+  // среднее L/R когда оба заданы — точнее минимума для парных
+  if (row.keys.length > 1) {
+    const m = avg(...row.keys.map((k) => (meas as Record<string, unknown>)[k]));
+    if (m != null) fact = m;
+  }
+  if (fact == null) return null;
+  const ideal = w && row.mcCallum ? w * row.mcCallum : row.reeves * scaleH;
+  if (!ideal || ideal <= 0) return null;
+  return Math.round(((fact - ideal) / ideal) * 1000) / 10;
+}
+
+/** Сколько недель истории на ≥85% MAV (для genetics-ветки). */
+export function weeksAtMav(history: number[] | undefined, mav: number | null | undefined): number {
+  if (!Array.isArray(history) || mav == null || mav <= 0) return 0;
+  return history.filter((v) => Number.isFinite(v) && v >= mav * 0.85).length;
+}

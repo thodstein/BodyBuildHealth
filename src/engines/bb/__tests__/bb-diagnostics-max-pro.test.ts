@@ -3,7 +3,7 @@
  * Причины / 28д / McCallum / ранжир / спец-блок / PROF+TUT / диагноз / инъекция / экспорт.
  */
 import { describe, it, expect } from 'vitest';
-import { diagnoseWeakCause } from '../bb-weak-cause.engine';
+import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../bb-weak-cause.engine';
 import { volumeHistory28d, detectBBWeakByVolumeStable } from '../bb-weak-detection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../bb-symmetry.engine';
 import { rankCorrectionsForWeak, top3CorrectionsForWeak } from '../bb-correction-rank.engine';
@@ -295,5 +295,74 @@ describe('max-pro extra', () => {
   });
   it('McCallum forearm формула', () => {
     expect(idealMcCallumMap(20).forearm).toBeCloseTo(36, 0);
+  });
+});
+
+// ── idealDeltaForZone + weeksAtMav (оживление genetics-ветки) ──
+describe('ideal-delta + weeks-at-mav', () => {
+  it('грудь vs McCallum: 100см при wrist 17.5 → −12.1%', () => {
+    expect(idealDeltaForZone('chest', { chest: 100 }, 175, 17.5)).toBeCloseTo(-12.1, 0);
+  });
+  it('грудь vs Reeves без запястья: 114 при 175 → 0%', () => {
+    expect(idealDeltaForZone('chest', { chest: 114 }, 175, null)).toBe(0);
+  });
+  it('бицепс среднее L/R vs McCallum', () => {
+    // wrist 16 → идеал 40; среднее (36+38)/2=37 → −7.5%
+    expect(idealDeltaForZone('biceps', { bicepL: 36, bicepR: 38 }, 175, 16)).toBeCloseTo(-7.5, 0);
+  });
+  it('abs → null (талия не лаггинг)', () => {
+    expect(idealDeltaForZone('abs', { waist: 90 }, 175, 17.5)).toBe(null);
+  });
+  it('неизвестная зона → null', () => {
+    expect(idealDeltaForZone('neck', { neck: 40 }, 175, 17.5)).toBe(null);
+  });
+  it('без замеров → null', () => {
+    expect(idealDeltaForZone('chest', {}, 175, 17.5)).toBe(null);
+  });
+  it('спина через грудь-прокси', () => {
+    expect(idealDeltaForZone('back_width', { chest: 100 }, 175, 17.5)).toBeCloseTo(-12.1, 0);
+  });
+  it('weeksAtMav считает недели ≥85% MAV', () => {
+    expect(weeksAtMav([16, 14, 18, 10], 16)).toBe(3);
+    expect(weeksAtMav([], 16)).toBe(0);
+    expect(weeksAtMav([16], null)).toBe(0);
+  });
+  it('genetics через живые входы (идеал + история)', () => {
+    const hist = [16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16];
+    const r = diagnoseWeakCause({
+      zone: 'calves', factHistory: hist, mev: 8, mav: 16,
+      idealDeltaPct: idealDeltaForZone('calves', { calfL: 30, calfR: 30 }, 175, 17.5),
+      weeksAtMavClean: weeksAtMav(hist, 16),
+    });
+    // идеал 35, факт 30 → −14.3%: порог genetics (−15) не пробит → не genetics
+    expect(r.cause).not.toBe('genetics');
+    const r2 = diagnoseWeakCause({
+      zone: 'calves', factHistory: hist, mev: 8, mav: 16,
+      idealDeltaPct: -20, weeksAtMavClean: 12,
+    });
+    expect(r2.cause).toBe('genetics');
+  });
+});
+
+// ── prescribeCorrections weakHead ──
+describe('corrections weakHead', () => {
+  it('замены целятся в слабую головку', async () => {
+    const mod = await import('../bb-exercise-correction.engine');
+    const diag: any = {
+      effect: { id: 'tricep_pushdown_rope', name: 'Разгибание на блоке', muscle: 'triceps', sfr: 5, profile: 'short' },
+      flags: ['lowSFRHighFatigue'], issues: [], score: 80, profGaps: [],
+    };
+    const out = mod.prescribeCorrections(diag, { name: 'Разгибание на блоке', muscle: 'triceps' }, { muscle: 'triceps', weakHead: 'triceps_long' });
+    const subs = out.filter((a) => (a.type === 'substitute' || a.type === 'mobilitySwap') && a.targetId);
+    expect(subs.length).toBeGreaterThan(0);
+  });
+  it('без weakHead — прежнее поведение', async () => {
+    const mod = await import('../bb-exercise-correction.engine');
+    const diag: any = {
+      effect: { id: 'tricep_pushdown_rope', name: 'Разгибание на блоке', muscle: 'triceps', sfr: 5, profile: 'short' },
+      flags: ['lowSFRHighFatigue'], issues: [], score: 80, profGaps: [],
+    };
+    const out = mod.prescribeCorrections(diag, { name: 'Разгибание на блоке', muscle: 'triceps' }, { muscle: 'triceps' });
+    expect(out.length).toBeGreaterThan(0);
   });
 });

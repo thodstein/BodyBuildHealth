@@ -42,13 +42,14 @@ function findCatalog(idOrName: string) {
 function rankSubstituteCandidates(
   ex: { id?: string | null; name: string; muscle?: string | null },
   diagnosis: ExerciseDiagnosis,
-  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string },
+  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string },
 ): Array<{ id: string; name: string; score: number; reason: string }> {
   const muscle = String(ctx.muscle || ex.muscle || '').toLowerCase();
   const curId = ex.id || '';
   // MAX PRO ранжир (статический импорт, без require — ESM/browser-safe)
   try {
     const ranked = rankCorrectionsForWeak(muscle, null, {
+      weakHead: ctx.weakHead ?? null,
       asymPct: ctx.asymPct ?? null,
       equipment: ctx.equipment,
       level: ctx.level,
@@ -93,7 +94,7 @@ function rankSubstituteCandidates(
 export function prescribeCorrections(
   diagnosis: ExerciseDiagnosis,
   ex: { id?: string | null; name: string; muscle?: string | null; tempo?: string; pauseSeconds?: number },
-  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[]; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string } = {},
+  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[]; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string } = {},
 ): CorrectionAction[] {
   const out: CorrectionAction[] = [];
   const muscle = String(ctx.muscle || ex.muscle || diagnosis.effect.muscle || '').toLowerCase();
