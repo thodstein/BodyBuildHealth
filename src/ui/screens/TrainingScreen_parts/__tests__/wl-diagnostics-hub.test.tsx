@@ -192,4 +192,13 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(await screen.findByText(/📅 ICS/));
     await waitFor(() => expect(container.textContent).toContain('ICS календарь'), { timeout: 2000 });
   });
+  it('E16 годовой синк своим ключом', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.click(await screen.findByText(/В годовой синк/));
+    await waitFor(() => expect(container.textContent).toContain('Годовой синк ТА'), { timeout: 2000 });
+    expect(localStorage.getItem('he_ta_annual_sync_v1')).toContain('snatch_off_floor');
+    expect(localStorage.getItem('he_strength_annual_sync_v1')).toBeNull();
+  });
 });

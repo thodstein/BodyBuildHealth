@@ -35,6 +35,7 @@ import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, ty
 import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
 import { diagnoseTAImtp } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
+import { buildTAAnnualOverlay, saveTAAnnualOverlay } from '../../../engines/strength-sport/strength-sport-ta-annual-bridge.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -666,6 +667,23 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2000);
   };
 
+  // E16: годовой синк (overlay своим ключом, чужой annual не трогаем)
+  const handleAnnualSync = () => {
+    if (!specPreview || !specPreview.weeks.length) {
+      setToast('Выбери слабые фазы — синкать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const weeks = buildTAAnnualOverlay(specPreview);
+    if (!weeks || !saveTAAnnualOverlay(weeks, 1)) {
+      setToast('Годовой синк не записан');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    setToast(`✓ Годовой синк ТА: ${weeks.length} нед (he_ta_annual_sync_v1)`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
   const applyToConstructor = () => {
     if (weakPoints.length === 0) {
       setToast('Слабые фазы не выбраны — нечего применять');
@@ -1168,6 +1186,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
               <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
+              <button onClick={handleAnnualSync} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
               {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>
           </div>
