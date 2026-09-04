@@ -103,4 +103,27 @@ describe('BBDiagnosticsHub', () => {
     // incline бьёт в chest_upper → маркер цели
     expect(screen.getAllByText(/🎯/)[0]).toBeInTheDocument();
   });
+  it('setup taps reset when exercise changes (no leak into next diagnosis)', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [
+      { exerciseName: 'tricep_pushdown_rope', name: 'Разгибание на блоке', muscle: 'triceps', sets: 3, rir: 2 },
+      { exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 3, rir: 2 },
+    ] }] }] }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    const chips = Array.from(document.querySelectorAll('[title*="SFR"]'));
+    fireEvent.click(chips.find((el) => /блок/i.test(el.getAttribute('title') || ''))!);
+    fireEvent.click(screen.getByLabelText(/читинг\/раскачка/));
+    expect(screen.getByLabelText(/читинг\/раскачка/)).toBeChecked();
+    // переключаемся на другое упражнение — тапы сброшены
+    fireEvent.click(chips.find((el) => /Жим штанги лёжа/i.test(el.getAttribute('title') || ''))!);
+    expect(screen.getByLabelText(/читинг\/раскачка/)).not.toBeChecked();
+    expect(screen.queryByText('stabilityGap')).toBeNull();
+  });
+  it('past analysis from BB-auto can be restored with one click', () => {
+    localStorage.setItem('he_bb_last_weak_heads', JSON.stringify(['chest_upper']));
+    render(<BBDiagnosticsHub />);
+    expect(screen.getAllByText(/Прошлый разбор/)[0]).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText(/Вернуть в работу/)[0]);
+    expect(screen.getAllByText('Верх груди')[0].getAttribute('aria-pressed')).toBe('true');
+  });
 });

@@ -630,6 +630,17 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return []; }
   }, [report.weakZonesGranular]);
 
+  // Прошлый разбор из ББ-авто (he_bb_last_weak_heads) — вернуть в работу одной кнопкой
+  const lastWeakHeads = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_last_weak_heads');
+      const arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) return [];
+      const valid = new Set(GRANULAR_OPTS.map((o) => o.id));
+      return arr.map((h) => String(h)).filter((h) => valid.has(h)).slice(0, 2);
+    } catch { return []; }
+  }, []);
+
   const selectedExRaw = useMemo(() => {
     const id = state.exerciseSelectedId;
     if (!id) return null;
@@ -831,6 +842,12 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: DIM, background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>
               Выбрано: {report.weakZonesGranular.join(', ') || '—'} → канонические: {report.weakMusclesCanonical.join(', ') || '—'} (×1.15 объём + бонус упражнения в ББ-авто)
             </div>
+            {report.weakZonesGranular.length === 0 && lastWeakHeads.length > 0 && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>Прошлый разбор: {lastWeakHeads.join(', ')}</span>
+                <button onClick={() => setState((s) => ({ ...s, weakManual: lastWeakHeads.slice(0, 2) }))} style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>↩ Вернуть в работу</button>
+              </div>
+            )}
             {report.weakZonesGranular.length > 0 && (
               <div style={{ marginTop: 6, display: 'grid', gap: 6 }}>
                 {report.weakZonesGranular.slice(0, 2).map((z) => {
@@ -977,7 +994,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                           const sc = exerciseEffectScore(eff);
                           const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
                           return (
-                            <span key={i} title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name }))}>
+                            <span key={i} title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
                               {eff.name} · SFR{eff.sfr ?? '—'} {eff.profile === 'lengthened' ? '📐' : eff.profile === 'short' ? '🔹' : '▪'} {eff.unilateral ? '↔' : ''} {eff.angleClass ? `·${eff.angleClass}` : ''} {eff.strictGroup ? `·${eff.strictGroup.key}` : ''} ·{sc}
                             </span>
                           );
@@ -993,11 +1010,11 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ padding: '10px', borderRadius: 10, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                <select value={state.exerciseSelectedId || ''} onChange={e => setState(s => ({ ...s, exerciseSelectedId: e.target.value || null }))} style={{ flex: 1, minWidth: 180, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
+                <select value={state.exerciseSelectedId || ''} onChange={e => setState(s => ({ ...s, exerciseSelectedId: e.target.value || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} style={{ flex: 1, minWidth: 180, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
                   <option value="">— выбери упражнение —</option>
                   {EXERCISE_CATALOG.slice(0, 80).map(c => <option key={c.id} value={c.id}>{c.name} · {c.group} · SFR{sfrOf(c as any) ?? '—'}</option>)}
                 </select>
-                <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.04)', color: DIM, fontSize: 11, cursor: 'pointer' }}>Сброс</button>
+                <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.04)', color: DIM, fontSize: 11, cursor: 'pointer' }}>Сброс</button>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 10, color: DIM }}>Как выполняешь:</span>
@@ -1149,7 +1166,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const hitsWeak = heads.some((h) => libWeakHeads.includes(h));
                   const bcol = hitsWeak ? '#00e68a' : col;
                   return (
-                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id }))}>
+                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
                       {hitsWeak ? '🎯 ' : ''}{c.name} · SFR{eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
                     </span>
                   );
