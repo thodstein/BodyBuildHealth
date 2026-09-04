@@ -1,6 +1,6 @@
 # Metabolic Hub Pro — Evidence & Formulas
 
-**17 в 1**: Вода · Шаги · КБЖУ · Жир · Stress Load (SLI) · Кровь · EA RED-S CAT2 · Алко · Белок · Поиск Adaptive v2 · NEAT · AT MATADOR · Thyroid/HOMA · Lipid/FLI · Пот-тест · MetS/TyG/FIB-4 · WHtR/ABSI/BAI
+**PRO v4**: Вода · Шаги · КБЖУ · Жир · Stress Load (SLI) · Кровь · EA RED-S CAT2 (LEAF/LEAM/EDE-Q) · Алко (остро+хроника) · Белок DIAAS · Adaptive TDEE v3 · NEATpro · AT-range · Thyroid/HOMA · Lipid/FLI · Пот-тест V2/BHI · MetS/TyG/FIB-4/LAP/VAI · WHtR/ABSI/BAI/FMI
 
 Канон — `src/engines/metabolic-hub.engine.ts:1`, `src/core/metabolic-constants.ts:1`, UI `src/ui/screens/Shared/MetabolicHub.tsx:1`. Источник истины — профиль `he_profile_v2` + дневник `he_nutrition_v2`.
 
@@ -82,5 +82,13 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 - **NEATpro/AT-range/reverse-auto/goalV2**: профессия в NEAT, AT диапазоном 5–15% + персист Biggest Loser, reverse шаг по trend (150/100/60), goal rate-caps Helms (cut 0.5–1%/нед, bulk 0.25–0.5%) + diet-break удлинение.
 - **One-answer PRO + diff**: `buildOneAnswerPro` (adaptive-v3/formula + DLW-range + targets + беременность) + `diffMetabolicSnapshots` (⇄ Сравнить сценариев) + snapshot v5 расширен (профессия/триместр/DIAAS/CAT2/пот).
 
+## PRO v4.3 — дедуп поколений (Sep 2026)
+- **Единые точки UI**: adaptive v3 / CAT2 / sweatV2+BHI / proteinPro / reverseAuto / goalV2 — v1-панели удалены из хаба (движок v1 оставлен для совместимости тестов и планировщика).
+- **PAL-паритет**: `calcPALPro` учитывает тоннаж/кардио той же шкалой, что `getEffectivePal` (±0.01 в тесте).
+- **DIAAS в целях**: `0.95/diaas` кап ×1.3, животный не урезается (mixed ×1.0 — дефолт неизменен), пометка в note.
+- **Вода IOM**: триместр +300мл, лактация +700/+400мл (бар в табe воды + breakdown.pregnancy).
+- **Гипо-гард достижим**: чекбокс «Нелечёный гипотиреоз» → `untreatedHypothyroid` в BMR (−12%); T3-низ — чекбокс в CAT2 (secondary).
+- **Персист**: снапшот хранит LEAF/LEAM-ответы, compareIds, t3Low, untreatedHypo.
+
 ## Тесты
-`metabolic-hub.test.ts:1` 114 тестов (84→114 +30 v4/v4-2: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность/лактация, CAT2/LEAM/return-to-play, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2/aggressive-cap, one-answer/diff-truncate, парсер PRO), `nutrition-v2-audit` 4, `rest-hooks-native` 60, `tSC` свои 0.
+`metabolic-hub.test.ts:1` 119 тестов (84→114 +30 v4/v4-2: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность/лактация, CAT2/LEAM/return-to-play, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2/aggressive-cap, one-answer/diff-truncate, парсер PRO), `nutrition-v2-audit` 4, `rest-hooks-native` 60, `tSC` свои 0.

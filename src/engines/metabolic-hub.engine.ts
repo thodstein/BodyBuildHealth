@@ -70,9 +70,9 @@ import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
 
 export type WeightPoint = WeightPointBase;
 // Доменные типы — декомпозиция монстра MetabolicInput (backward compat: MetabolicInput = пересечение всех)
-export type WaterInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'climate'|'humidity'|'sweatRate'|'sweatSodiumMgPerL'|'trainingHours'|'trainingDays'|'cardioMin'|'standingHours'|'creatineUse'>;
-export type StepsInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'steps'|'activityLevel'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'>;
-export type KBJUInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'activityLevel'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'|'goal'|'onAAS'|'aasDose'|'menstrualPhase'|'tsh'|'ft4'>;
+export type WaterInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'climate'|'humidity'|'sweatRate'|'sweatSodiumMgPerL'|'trainingHours'|'trainingDays'|'cardioMin'|'standingHours'|'creatineUse'|'trimester'|'lactating'>;
+export type StepsInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'steps'|'activityLevel'|'profession'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'|'trimester'|'lactating'|'ethnicity'|'postBariatric'|'untreatedHypothyroid'>;
+export type KBJUInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyFat'|'activityLevel'|'profession'|'trainingDays'|'cardioMin'|'standingHours'|'fidgetLevel'|'weeklyVolumeTons'|'metHoursPerWeek'|'goal'|'onAAS'|'aasDose'|'menstrualPhase'|'tsh'|'ft4'|'proteinSource'|'trimester'|'lactating'|'ethnicity'|'postBariatric'|'untreatedHypothyroid'>;
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
@@ -180,16 +180,25 @@ export function getEffectivePal(input: MetabolicInput): { palEff:number; palBase
   if (input.standingHours && input.standingHours>4) palEff = clamp(palEff + (input.standingHours - 4)*0.008, 1.25, 2.40);
   return { palEff, palBase, trainAdd, cardioAdd };
 }
-/** PRO-обёртка: computePalFromActivity как единый источник (дедуп computePalSimple/computePalFull) */
+/** PRO-обёртка: computePalFromActivity как единый источник (дедуп computePalSimple/computePalFull).
+ * Паритет с getEffectivePal: тоннаж/кардио учитываются той же шкалой (MET-калибровка 2026). */
 export function calcPALPro(input: MetabolicInput): number {
-  return computePalFromActivity({
+  const trainAdd = typeof input.metHoursPerWeek === 'number' && input.metHoursPerWeek > 0
+    ? palFromMetHours(input.metHoursPerWeek)
+    : input.weeklyVolumeTons && input.weeklyVolumeTons > 2
+      ? clamp(input.weeklyVolumeTons * 0.018, 0.02, 0.24)
+      : palTrainingAdd(input.trainingDays);
+  // computePalFromActivity не знает тонны/кардио — добавляем train/cardio той же шкалой, что getEffectivePal
+  const base = computePalFromActivity({
     profession: (input as any).profession,
     basePal: (input as any).profession ? undefined : ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high'] ?? 1.55,
-    metHoursPerWeek: input.metHoursPerWeek,
+    metHoursPerWeek: (typeof input.metHoursPerWeek === 'number' && input.metHoursPerWeek > 0) ? input.metHoursPerWeek : undefined,
     standingHours: input.standingHours,
     fidgetLevel: input.fidgetLevel,
     dailySteps: input.steps,
   });
+  const extra = ((typeof input.metHoursPerWeek === 'number' && input.metHoursPerWeek > 0) ? 0 : trainAdd) + palCardioAdd(input.cardioMin);
+  return clamp(Math.round((base + extra) * 100) / 100, 1.25, 2.40);
 }
 
 // ——— Вода ——— (EFSA 2010 + IOM 2004 + Baker 2017)
@@ -205,6 +214,8 @@ export function calcWater(input: MetabolicInput) {
   const baseLeanModel = hasBF ? Math.round(lean*40 + fatMass*20) : baseIOM;
   // По умолчанию — IOM (доказательно), lean-модель — справка (Pro)
   const base = baseIOM;
+  // IOM вода: беременность +300мл, лактация +700мл (эксклюзив) / +400мл (смешанная)
+  const pregWaterAdd = (input as any).trimester ? 300 : (input as any).lactating === 'exclusive' ? 700 : (input as any).lactating === 'mixed' ? 400 : 0;
   const hours = input.trainingHours ?? (input.trainingDays ?? 3) * 1.1;
   const sweat = input.sweatRate ?? 600;
   const training = Math.round(hours * sweat * 0.85 + (input.cardioMin ?? 0) * 7);
@@ -218,7 +229,7 @@ export function calcWater(input: MetabolicInput) {
   // креатин: Powers 2003 — задержка 0.5-1л только 1ю неделю, не постоянно. Даем только если явно указано loading
   const creatineAdd = input.creatineUse ? 300 : 0;
   const creatineNote = input.creatineUse ? ' (1я нед загрузки)' : '';
-  const nat = Math.round(base + training + climateAdd + standingAdd + creatineAdd);
+  const nat = Math.round(base + training + climateAdd + standingAdd + creatineAdd + pregWaterAdd);
   const boost = aasMult(input, 0.12) - 1; // experimental
   const aas = Math.round(nat * (1 + boost));
   const perHour = Math.round(nat / 16);
@@ -239,8 +250,8 @@ export function calcWater(input: MetabolicInput) {
     baseIOM, baseLeanModel, iomPerKg,
     note: input.onAAS
       ? `ААС EXP: +${Math.round(boost*100)}% (Na/H2O) ${AAS_EXPERIMENTAL_NOTE}. Na ~${sweatNaG}г/тр, K ${sweatKG}г`
-      : `IOM ${iomPerKg}мл/кг → ${baseIOM}мл + пот ${sweat}мл/ч. Lean-модель ${baseLeanModel}мл (эксп.). Жара ${climateAdd}мл${standingAdd? `, стоя +${standingAdd}`:''}${creatineAdd? `, креатин +${creatineAdd}${creatineNote}`:''}`,
-    breakdown: { base: Math.round(base), training: Math.round(training), climate: climateAdd, standing: standingAdd, creatine: creatineAdd, lean: Math.round(lean), fatMass: Math.round(fatMass), sweatNaG, sweatClG, sweatKG, sweatMgMg, baseIOM, baseLeanModel }
+      : `IOM ${iomPerKg}мл/кг → ${baseIOM}мл + пот ${sweat}мл/ч. Lean-модель ${baseLeanModel}мл (эксп.). Жара ${climateAdd}мл${standingAdd? `, стоя +${standingAdd}`:''}${creatineAdd? `, креатин +${creatineAdd}${creatineNote}`:''}${pregWaterAdd? `, беременность/лактация +${pregWaterAdd} (IOM)`:''}`,
+    breakdown: { base: Math.round(base), training: Math.round(training), climate: climateAdd, standing: standingAdd, creatine: creatineAdd, pregnancy: pregWaterAdd, lean: Math.round(lean), fatMass: Math.round(fatMass), sweatNaG, sweatClG, sweatKG, sweatMgMg, baseIOM, baseLeanModel }
   };
 }
 
@@ -347,6 +358,11 @@ export function calcKBJU(input: MetabolicInput) {
   }
   // коррекция по возрасту >45л +0.15г (саркопения — Morton/ISSN)
   if ((input.age ?? 30) > 45) protNat += 0.15;
+  // DIAAS PRO (FAO 2013): низкокачественный белок требует надбавки; mixed 0.95 → ×1.0 (дефолт неизменен),
+  // whey/мясо ≥1.0 → без снижения (не урезаем животный), горох 0.58 → ×1.3 кап
+  const diaasSrc = (DIAAS_TABLE as any)[(input as any).proteinSource] ?? (DIAAS_TABLE as any).mixed;
+  const diaasMult = clamp(0.95 / diaasSrc.diaas, 1, 1.3);
+  protNat = Math.round(protNat * diaasMult * 10) / 10;
   // AAS: антикатаболик — Helms 2014/ISSN Позволяет *не* повышать белок, но на практике +0.3г/кг для безопасности MPS при дефиците
   // Ранее +0.4-1.2 было завышено (Bhasin: AAS улучшает N-баланс). Снижено до +0.2-0.5 и помечено EXP
   const aasProtAdd = input.onAAS ? 0.2 + clamp((input.aasDose ?? 500)/1500, 0, 0.3) : 0;
@@ -406,7 +422,7 @@ export function calcKBJU(input: MetabolicInput) {
     delta: { kcal: Math.round(kcalAASFinal - kcalNatFinal), p: pAAS - pNat, c: cAAS - cNat },
     carbTiming, fiber: { nat: fiberNat, aas: fiberAAS }, tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
     adaptive, periodization, lutealAdd, thyroidMult,
-    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)} EXP)${AAS_EXPERIMENTAL_NOTE}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote} · TEF ${tefNat}ккал (инфо, в PAL уже)` : `Натурал: белок ${protNat}г/кг (LBM ${Math.round(lbmForProt)}кг), TEF ${tefNat}ккал (инфо), PAL ${palEff.toFixed(2)}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}`
+    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)} EXP)${AAS_EXPERIMENTAL_NOTE}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} (${diaasSrc.label})` : ''} · TEF ${tefNat}ккал (инфо, в PAL уже)` : `Натурал: белок ${protNat}г/кг (LBM ${Math.round(lbmForProt)}кг)${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} ${diaasSrc.label}` : ''}, TEF ${tefNat}ккал (инфо), PAL ${palEff.toFixed(2)}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}`
   };
 }
 

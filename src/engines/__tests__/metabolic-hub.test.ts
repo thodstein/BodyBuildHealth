@@ -876,3 +876,51 @@ describe('metabolic-hub PRO v4-2 — гарды, CAT2-return, AT-персист,
     expect(p!.find(x=> x.key==='cycling')!.hours).toBeCloseTo(1.0, 0.05);
   });
 });
+
+describe('metabolic-hub PRO v4-3 — дедуп поколений: PAL-паритет, DIAAS-цели, вода-IOM, гипо, T3', () => {
+  const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
+  it('PALpro паритет с формульным PAL при тоннах и кардио', async () => {
+    const { calcPALPro, calcSteps } = await import('../metabolic-hub.engine');
+    const input = { ...base, activityLevel:'medium', trainingDays:4, cardioMin:90, weeklyVolumeTons:12 } as any;
+    expect(Math.abs(calcPALPro(input) - calcSteps(input).pal)).toBeLessThanOrEqual(0.01);
+    const met = calcPALPro({ ...base, activityLevel:'medium', metHoursPerWeek:18 } as any);
+    expect(met).toBeCloseTo(1.55 + 18 * 0.0067, 0.02);
+  });
+  it('DIAAS в целях: mixed без изменений, горох +надбавка с пометкой', async () => {
+    const { calcKBJU } = await import('../metabolic-hub.engine');
+    const def = calcKBJU({ ...base });
+    const mixed = calcKBJU({ ...base, proteinSource:'mixed' } as any);
+    expect(mixed.nat.p).toBe(def.nat.p);
+    expect(mixed.note).not.toContain('DIAAS');
+    const pea = calcKBJU({ ...base, proteinSource:'pea' } as any);
+    expect(pea.nat.p).toBeGreaterThan(def.nat.p);
+    expect(pea.nat.protPerKg).toBeCloseTo(+(2.1 * 1.3).toFixed(1), 0.05);
+    expect(pea.note).toContain('DIAAS');
+    const whey = calcKBJU({ ...base, proteinSource:'whey' } as any);
+    expect(whey.nat.p).toBe(def.nat.p); // животный не урезаем
+  });
+  it('Вода IOM: триместр +300мл, лактация +700мл', async () => {
+    const { calcWater } = await import('../metabolic-hub.engine');
+    const a = calcWater({ ...base, trainingDays:0, cardioMin:0 });
+    const p = calcWater({ ...base, trainingDays:0, cardioMin:0, trimester:2 } as any);
+    expect(p.nat - a.nat).toBe(300);
+    expect(p.breakdown.pregnancy).toBe(300);
+    const l = calcWater({ ...base, trainingDays:0, cardioMin:0, lactating:'exclusive' } as any);
+    expect(l.nat - a.nat).toBe(700);
+    expect(p.note).toContain('+300');
+  });
+  it('Нелечёный гипотиреоз: BMR/TDEE −12% сквозно', async () => {
+    const { calcSteps } = await import('../metabolic-hub.engine');
+    const a = calcSteps({ ...base, activityLevel:'medium', bodyFat:15 });
+    const h = calcSteps({ ...base, activityLevel:'medium', bodyFat:15, untreatedHypothyroid:true } as any);
+    expect(h.tdeeNat).toBeLessThan(a.tdeeNat);
+    expect(a.tdeeNat - h.tdeeNat).toBeGreaterThanOrEqual(Math.round(a.tdeeNat * 0.10));
+  });
+  it('CAT2: T3-низ даёт secondary-балл', async () => {
+    const { calcRedsCAT2 } = await import('../metabolic-hub.engine');
+    const a = calcRedsCAT2({ ea:40, sex:'male' } as any);
+    const b = calcRedsCAT2({ ea:40, sex:'male', t3Low:true } as any);
+    expect(b.secondary).toBe(a.secondary + 1);
+    expect(b.flags.join(' ')).toContain('T3');
+  });
+});

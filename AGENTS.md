@@ -1,8 +1,8 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Метаболик-хаб: PRO v4 — Adaptive v3 + MET-60 + CAT2 + Sweat V2 + DIAAS + AT-range (Sep 04 2026, 357c0cd2 + f661cf77 + 5363463b TS2741-fix)
+## Метаболик-хаб: PRO v4 — Adaptive v3 + MET-60 + CAT2 + Sweat V2 + DIAAS + AT-range (Sep 04 2026, 357c0cd2 + f661cf77 + 5363463b TS2741-fix + v4-3 дедуп)
 
-Полная PRO-доработка хаба калькуляторов метаболики в питании по бенчмарку 2026 (MacroFactor rolling-28д, IOC REDs CAT2 2023, ACSM/Periard, Maughan BHI, Calorique DLW). Файлы: NEW `src/core/activity-catalog.ts`, `src/core/metabolic-constants.ts`, `src/engines/metabolic-hub.engine.ts`, `src/ui/screens/Shared/MetabolicHub.tsx`, `__tests__/metabolic-hub.test.ts`, `docs/METABOLIC-HUB-PRO.md`. **114/114 тестов хаба + nutrition-v2-audit 4/4 + rest-hooks-native 60/60, tsc 0 по всему проекту** (NODE_OPTIONS=6GB; чужой `meal-plan-engine.ts` починен владельцем).
+Полная PRO-доработка хаба калькуляторов метаболики в питании по бенчмарку 2026 (MacroFactor rolling-28д, IOC REDs CAT2 2023, ACSM/Periard, Maughan BHI, Calorique DLW). Файлы: NEW `src/core/activity-catalog.ts`, `src/core/metabolic-constants.ts`, `src/engines/metabolic-hub.engine.ts`, `src/ui/screens/Shared/MetabolicHub.tsx`, `__tests__/metabolic-hub.test.ts`, `docs/METABOLIC-HUB-PRO.md`. **119/119 тестов хаба + nutrition-v2-audit 4/4 + rest-hooks-native 60/60 + потребители 138/138, tsc 0 по всему проекту** (NODE_OPTIONS=6GB; чужой `meal-plan-engine.ts` починен владельцем).
 
 - **Adaptive v3** (`calcAdaptiveTDEEv3`): rolling-28д + EMA 0.25 против воды, best R² из 7/14/21/28, гейт плотности MacroFactor (≥10 логов + ≥10 взвешиваний, иначе high→medium), DLW-range ±12%, targets mildCut−250/cut−500/bulk+300, EMA-серия.
 - **MET-60 + PALpro**: 60 активностей Ainsworth, профессии 1.40/1.55/1.75, `computePalFromActivity` — единая точка (дедуп трёх PAL-функций); парсер v2 RU+EN, км (бег/10, вело/22), `2×`.
@@ -10,6 +10,7 @@
 - **CAT2**: LEAM-Q (М) + EDE-Q + severity primary×2/secondary (green/yellow/orange/red) + return-to-play; скрининг, не диагноз.
 - **Sweat V2**: измеренный + оценка ACSM ±30% + акклиматизация (Na −40%) + BHI Maughan; **MetS-добивка**: TG/HDL, LAP, VAI, FMI, алко-хроника WHO 14 units.
 - **Белок DIAAS** (12 источников FAO, ceiling 0.60 после 60л); **NEATpro** (профессия) + **AT диапазоном 5–15%** + персист Biggest Loser + reverse-auto по trend; **Goal V2** (Helms caps + diet-break); One-answer PRO + ⇄ diff сценариев.
+- **v4-3 дедуп**: UI показывает одно поколение (v1-панели удалены, движок v1 оставлен для совместимости); PAL-паритет ±0.01; DIAAS ×1.0–1.3 в целях белка; вода +300/+700 (беременность/лактация); гипо-чекбокс и T3 в CAT2; персист опросников.
 - **Процесс**: только edit-инструмент, перечитывание перед каждым edit, коммиты строго pathspec своих 6 файлов; чужие `meal-plan-engine/TA-PRO-PLAN` не тронуты, откатов/чекаутов нет.
 
 ## Планировщик питания: распределение КБЖУ по приёмам + большие КБЖУ + рецепты в порциях (Sep 3 2026, 2558cfe0)
