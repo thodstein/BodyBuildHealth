@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DRUG_INTERACTIONS } from '../../data/drug-interactions';
+import { SUPPORT_DOSING } from '../../data/support-dosing';
 import {
   PRE_CYCLE_LABS,
   STOP_COURSE_TABLE,
@@ -181,5 +182,65 @@ describe('support-protocol-audit: P2 shared', () => {
     expect(PRE_CYCLE_LABS.length).toBeGreaterThanOrEqual(10);
     expect(STOP_COURSE_TABLE.length).toBeGreaterThanOrEqual(8);
     expect(EVIDENCE_LEGEND).toContain('C —');
+  });
+});
+
+describe('support-protocol-audit: реестр доз синхронен с протоколами', () => {
+  it('анастрозол: макс. 0.5 мг, без ежедневной частоты', () => {
+    expect(SUPPORT_DOSING.anastrozole.doseRange.max).toBe(0.5);
+    expect(SUPPORT_DOSING.anastrozole.doseRange.frequency).not.toMatch(/daily/);
+    expect(SUPPORT_DOSING.anastrozole.warnings.join(' ')).toContain('no_1mg_daily');
+  });
+  it('каберголин: кап лейбла + эхо/импульсивность в варнингах', () => {
+    const w = SUPPORT_DOSING.cabergoline.warnings.join(' ');
+    expect(SUPPORT_DOSING.cabergoline.doseRange.max).toBe(1);
+    expect(w).toContain('max_1mg_2x_weekly_FDA');
+    expect(w).toContain('baseline_echo');
+    expect(w).toContain('impulse_control');
+  });
+  it('TUDCA: вес, разнос, продление в варнингах; фаза 3 — не bid', () => {
+    const r = SUPPORT_DOSING.tudca;
+    const w = r.warnings.join(' ');
+    expect(w).toContain('weight_based_13_15');
+    expect(w).toContain('separate_from_oral_AAS');
+    expect(w).toContain('continue_2_4_weeks');
+    expect(r.phaseDosing?.Hepatic_Phase3.frequency).not.toBe('bid');
+  });
+  it('аспирин 75-100 + ИПП-гейт; NAC с кросс-капом; берберин кап 1500; RYR вторая линия', () => {
+    expect(SUPPORT_DOSING.aspirin.doseRange.min).toBe(75);
+    expect(SUPPORT_DOSING.aspirin.warnings.join(' ')).toContain('ppi_mandatory');
+    expect(SUPPORT_DOSING.nac.warnings.join(' ')).toContain('cross_module_cap_4000');
+    expect(SUPPORT_DOSING.berberine.warnings.join(' ')).toContain('max_1500_mg_day');
+    expect(SUPPORT_DOSING.red_yeast_rice.warnings.join(' ')).toContain(
+      'second_line_after_ezetimibe',
+    );
+  });
+  it('мелатонин: старт 0.5, кап 5 без врача', () => {
+    expect(SUPPORT_DOSING.melatonin.doseRange.min).toBe(0.5);
+    expect(SUPPORT_DOSING.melatonin.doseRange.max).toBe(5);
+    expect(SUPPORT_DOSING.melatonin.warnings.join(' ')).toContain('cap_5mg');
+  });
+});
+
+describe('support-protocol-audit: добивка monitoring-дыр', () => {
+  it('тиамазол: агранулоцитоз + ОАК/АЛТ', () => {
+    const t = P('supportProtocolThyroid.tsx');
+    expect(t).toContain('Агранулоцитоз');
+    expect(t).toContain('ОАК');
+  });
+  it('renal-D3: курсом + Ca-контроль', () => {
+    const t = P('supportProtocolRenal.tsx');
+    expect(t).toContain('≤4000 МЕ/сут');
+    expect(t).toContain('Ca²⁺');
+  });
+  it('адаптоген-ашваганда: печень + суммарный кап', () => {
+    const t = P('supportProtocolAdaptogen.tsx');
+    expect(t).toContain('DILI');
+    expect(t).toContain('≤600 мг/сут');
+  });
+  it('оксандролон женщинам: не «условно», а под врачом + голос база', () => {
+    const t = P('supportProtocolWomen.tsx');
+    expect(t).toContain('гинекологом-эндокринологом');
+    expect(t).toContain('запись голоса');
   });
 });
