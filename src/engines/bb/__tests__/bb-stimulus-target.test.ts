@@ -1,6 +1,7 @@
 /**
- * bb-stimulus-target.test.ts — «стимул в цель» (пилот руки+дельты).
+ * bb-stimulus-target.test.ts — «стимул в цель» (руки + дельты + грудь/спина/ноги).
  * Головки / сетап / линия / читинг / RIR / синергисты / скор + интеграция в диагноз и ранжир.
+ * Финал — сверка консистентности всей базы (id каталога, семьи, weakHeadForZone).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -11,6 +12,9 @@ import {
   diagnoseStimulusTarget,
   headsForMuscle,
   HEAD_FUNCTIONS,
+  HEADS_BY_MUSCLE,
+  EXERCISE_STIMULUS_DB,
+  weakHeadForZone,
 } from '../bb-stimulus-target.engine';
 import { diagnoseExercise } from '../bb-exercise-diagnosis.engine';
 import { rankCorrectionsForWeak } from '../bb-correction-rank.engine';
@@ -471,5 +475,93 @@ describe('становая и отжимания', () => {
   it('отжимания при weakHead=chest_upper → wrongHead', () => {
     const d = diagnoseStimulusTarget({ id: 'pushup' }, { weakHead: 'chest_upper' });
     expect(d.flags).toContain('wrongHead');
+  });
+});
+
+// ── Полная сверка базы (ловит гниение данных: битые id, висячие головки, дыры weakHead) ──
+describe('consistency sweep', () => {
+  it('все ids записей резолвятся в свою запись (учитывая дедуп каталога по имени P0.3)', () => {
+    // ВНИМАНИЕ: EXERCISE_CATALOG в рантайме меньше файла — IIFE normalizeExerciseCatalog
+    // сливает одноимённые дубликаты (23 пары). Поэтому инвариант — не «id есть в каталоге»,
+    // а «resolveStimulus({id}) находит именно свою запись» (id-прямо или name-fallback).
+    const bad: string[] = [];
+    for (const rec of EXERCISE_STIMULUS_DB) {
+      for (const id of rec.ids) {
+        const r = resolveStimulus({ id });
+        if (r?.key !== rec.key) bad.push(`${rec.key}:${id} -> ${r?.key ?? 'null'}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+  it('ранжир непуст для каждой семьи головок (дедуп не съел весь пул)', () => {
+    const zones: Record<string, string> = {
+      chest: 'chest_upper', back: 'back_width', shoulders: 'delt_mid',
+      triceps: 'triceps_long', biceps: 'biceps_long', quads: 'quads',
+      hamstrings: 'hamstrings', glutes: 'glutes', calves: 'calves',
+      traps: 'traps', forearms: 'forearms', abs: 'abs',
+    };
+    const empty: string[] = [];
+    for (const [zone, head] of Object.entries(zones)) {
+      const r = rankCorrectionsForWeak(zone, null, { weakHead: head } as any);
+      if (!r.length) empty.push(zone);
+    }
+    expect(empty).toEqual([]);
+  });
+  it('ключи записей уникальны', () => {
+    const keys = EXERCISE_STIMULUS_DB.map((r) => r.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+  it('семьи головок ↔ HEAD_FUNCTIONS обе стороны', () => {
+    const heads = Object.keys(HEAD_FUNCTIONS);
+    // каждая головка ровно в одной семье
+    for (const h of heads) {
+      const fams = Object.entries(HEADS_BY_MUSCLE).filter(([, list]) => list.includes(h));
+      expect(fams.map(([m]) => m)).toHaveLength(1);
+    }
+    // каждая запись семьи определена и её muscle совпадает
+    for (const [m, list] of Object.entries(HEADS_BY_MUSCLE)) {
+      for (const h of list) {
+        expect(HEAD_FUNCTIONS[h]).toBeDefined();
+        expect(HEAD_FUNCTIONS[h].muscle).toBe(m);
+      }
+      // headsForMuscle возвращает то же множество
+      expect(new Set(headsForMuscle(m))).toEqual(new Set(list));
+    }
+  });
+  it('headsHit/partial/alternatives ссылаются только на определённые головки', () => {
+    const bad: string[] = [];
+    for (const rec of EXERCISE_STIMULUS_DB) {
+      for (const h of [...rec.headsHit, ...(rec.headsPartial || [])]) {
+        if (!HEAD_FUNCTIONS[h]) bad.push(`${rec.key}:${h}`);
+      }
+      for (const h of Object.keys(rec.alternativesForMissed || {})) {
+        if (!HEAD_FUNCTIONS[h]) bad.push(`${rec.key}:alt:${h}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+  it('weakHeadForZone покрывает все зоны хаба (GRANULAR_OPTS)', () => {
+    // зеркало GRANULAR_OPTS из BBDiagnosticsHub.tsx
+    const zones = ['delt_mid', 'delt_rear', 'delt_front', 'chest_upper', 'chest_lower', 'back_width', 'back_thickness', 'quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'traps', 'forearms'];
+    for (const z of zones) {
+      expect(weakHeadForZone(z)).not.toBeNull();
+    }
+    expect(weakHeadForZone('')).toBe(null);
+    expect(weakHeadForZone('nope')).toBe(null);
+  });
+  it('у каждой записи: сетап/линия/ROM/RIR-кортеж/пик валидны', () => {
+    for (const rec of EXERCISE_STIMULUS_DB) {
+      expect(rec.setup.length, `${rec.key} setup`).toBeGreaterThan(0);
+      expect(rec.cheating.length, `${rec.key} cheating`).toBeGreaterThan(0);
+      expect(rec.resistanceLine.length, `${rec.key} line`).toBeGreaterThan(0);
+      expect(rec.rom.length, `${rec.key} rom`).toBeGreaterThan(0);
+      expect(['lengthened', 'mid', 'short']).toContain(rec.peakPoint);
+      expect(['low', 'med', 'high']).toContain(rec.stability);
+      const [lo, hi] = rec.rirTarget;
+      expect(lo).toBeLessThanOrEqual(hi);
+      expect(lo).toBeGreaterThanOrEqual(0);
+      expect(hi).toBeLessThanOrEqual(5);
+      expect(rec.headsHit.length, `${rec.key} headsHit`).toBeGreaterThan(0);
+    }
   });
 });

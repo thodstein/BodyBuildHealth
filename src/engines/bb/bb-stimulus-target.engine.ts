@@ -855,7 +855,7 @@ export interface StimulusDiagnosis {
   breakdown: StimulusBreakdown | null;
 }
 
-const HEADS_BY_MUSCLE: Record<string, string[]> = {
+export const HEADS_BY_MUSCLE: Record<string, string[]> = {
   triceps: ['triceps_long', 'triceps_lateral'],
   biceps: ['biceps_long', 'biceps_short', 'brachialis'],
   shoulders: ['delt_mid', 'delt_rear', 'delt_front'],
