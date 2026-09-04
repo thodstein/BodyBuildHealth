@@ -24,6 +24,10 @@ export interface BBQualityIssue {
   message: string;
   week?: number;
   muscle?: string;
+  /** Сколько инстансов свернуто в эту строку (1 = одиночное). */
+  count?: number;
+  /** Недели инстансов (отсортированы, для детализации). */
+  weeks?: number[];
 }
 
 export interface BBQualityReport {
@@ -75,9 +79,49 @@ function toIssue(source: BBQualitySource, raw: AnyIssueLike | string): BBQuality
   };
 }
 
-/** Сигнатура для дедупа (code|week|muscle|message). */
-function issueKey(i: BBQualityIssue): string {
-  return `${i.code}|${i.week ?? ''}|${i.muscle ?? ''}|${i.message}`;
+/** Штраф за УНИКАЛЬНЫЙ код замечания (не за инстанс — валидатор спамит сотни копий). */
+export const BB_QUALITY_ERR_CODE_PENALTY = 8;
+export const BB_QUALITY_ERR_CODE_CAP = 16;
+export const BB_QUALITY_WARN_CODE_PENALTY = 3;
+export const BB_QUALITY_WARN_CODE_CAP = 15;
+
+/** Штраф по множествам уникальных кодов (чистая функция, тестируется отдельно). */
+export function penaltyForUniqueCodes(errCodes: string[], warnCodes: string[]): number {
+  const err = Math.min(BB_QUALITY_ERR_CODE_CAP, new Set(errCodes).size * BB_QUALITY_ERR_CODE_PENALTY);
+  const warn = Math.min(BB_QUALITY_WARN_CODE_CAP, new Set(warnCodes).size * BB_QUALITY_WARN_CODE_PENALTY);
+  return err + warn;
+}
+
+const LEVEL_RANK: Record<BBQualityLevel, number> = { error: 0, warning: 1, info: 2 };
+
+/** Свернуть список замечаний по коду: одна строка на вид + счётчик инстансов и недели. */
+export function consolidateQualityIssues(list: BBQualityIssue[]): BBQualityIssue[] {
+  const byCode = new Map<string, BBQualityIssue[]>();
+  for (const i of list) {
+    if (!byCode.has(i.code)) byCode.set(i.code, []);
+    byCode.get(i.code)!.push(i);
+  }
+  const out: BBQualityIssue[] = [];
+  for (const [code, items] of byCode) {
+    const worst = items.slice().sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level])[0];
+    const weeks = Array.from(new Set(items.map(i => i.week).filter((w): w is number => typeof w === 'number'))).sort((a, b) => a - b);
+    // Репрезентативное сообщение — самое короткое (компактно), плюс счётчик.
+    const rep = items.slice().sort((a, b) => a.message.length - b.message.length)[0].message;
+    out.push({
+      source: items.some(i => i.source === 'validation') ? 'validation' : worst.source,
+      level: worst.level,
+      code,
+      message: items.length > 1 ? `${rep} (×${items.length})` : rep,
+      week: weeks.length ? weeks[0] : worst.week,
+      weeks,
+      count: items.length,
+    });
+  }
+  // Ошибки первыми (по числу инстансов), затем предупреждения (по числу), затем info.
+  out.sort((a, b) =>
+    (LEVEL_RANK[a.level] - LEVEL_RANK[b.level]) || ((b.count ?? 0) - (a.count ?? 0)),
+  );
+  return out;
 }
 
 interface QualityPlanLike {
@@ -111,30 +155,25 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
     balanceReport: (plan.balanceReport as unknown as import('./bb-balance.engine').BBBalanceReport) ?? null,
   });
 
-  const issues: BBQualityIssue[] = [];
-  const seen = new Set<string>();
-
+  const raw: BBQualityIssue[] = [];
   const push = (i: BBQualityIssue | null) => {
-    if (!i) return;
-    const k = issueKey(i);
-    if (seen.has(k)) return;
-    seen.add(k);
-    issues.push(i);
+    if (i) raw.push(i);
   };
 
-  for (const raw of plan.validation?.issues ?? []) push(toIssue('validation', raw));
-  for (const raw of plan.balanceReport?.issues ?? []) push(toIssue('balance', raw));
-  for (const raw of plan.rotationReport?.issues ?? []) push(toIssue('rotation', raw));
-  for (const raw of safety.issues ?? []) push(toIssue('safety', raw));
+  for (const item of plan.validation?.issues ?? []) push(toIssue('validation', item));
+  for (const item of plan.balanceReport?.issues ?? []) push(toIssue('balance', item));
+  for (const item of plan.rotationReport?.issues ?? []) push(toIssue('rotation', item));
+  for (const item of safety.issues ?? []) push(toIssue('safety', item));
 
-  // Единый скор: база — safety.score (0-100), штрафы за validation error/warning.
-  let score = safety.score;
-  for (const raw of plan.validation?.issues ?? []) {
-    const i = toIssue('validation', raw);
-    if (!i) continue;
-    score -= i.level === 'error' ? 10 : 3;
-  }
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  // Читаемый список: одна строка на вид замечания (со счётчиком ×N).
+  const issues = consolidateQualityIssues(raw);
+
+  // Единый скор: база — safety.score; штраф ТОЛЬКО за уникальные коды validation
+  // (safety-внутренности — суставы/MRV/частота/баланс — уже учтены в safety.score,
+  // повторный штраф был бы двойным учётом и давал 0 на обычных планах).
+  const errCodes = raw.filter(i => i.source === 'validation' && i.level === 'error').map(i => i.code);
+  const warnCodes = raw.filter(i => i.source === 'validation' && i.level === 'warning').map(i => i.code);
+  const score = Math.max(0, Math.min(100, Math.round(safety.score - penaltyForUniqueCodes(errCodes, warnCodes))));
   const riskLevel: BBQualityReport['riskLevel'] = score < 60 ? 'danger' : score < 75 ? 'caution' : 'ok';
 
   const totalWorkingSets = typeof plan.expandedSummary?.totalWorkingSets === 'number'
@@ -155,9 +194,13 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   const peakWeek = perWeek.length ? perWeek.reduce((a, b) => (b.plannedSets > a.plannedSets ? b : a)).week : 0;
 
   const recommendations: string[] = [...(safety.recommendations ?? [])];
-  for (const raw of plan.validation?.issues ?? []) {
-    const i = toIssue('validation', raw);
-    if (i && i.level === 'error') recommendations.push(i.message);
+  // По одному представителю на уникальный код ошибки (не каждый инстанс).
+  const seenErrCodes = new Set<string>();
+  for (const i of raw) {
+    if (i.source === 'validation' && i.level === 'error' && !seenErrCodes.has(i.code)) {
+      seenErrCodes.add(i.code);
+      recommendations.push(i.message);
+    }
   }
 
   return {

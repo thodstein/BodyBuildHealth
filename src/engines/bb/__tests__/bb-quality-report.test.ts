@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../bb-quality-report.engine';
+import {
+  buildBBQualityReport, bbQualityReportSummary, bbQualityBadge,
+  consolidateQualityIssues, penaltyForUniqueCodes,
+  BB_QUALITY_ERR_CODE_PENALTY, BB_QUALITY_WARN_CODE_PENALTY,
+  BB_QUALITY_ERR_CODE_CAP, BB_QUALITY_WARN_CODE_CAP,
+} from '../bb-quality-report.engine';
 
 const basePlan = {
   weeks: [{ week: 1, sessions: [{ exercises: [] }] }, { week: 2, sessions: [{ exercises: [] }] }],
@@ -20,7 +25,7 @@ describe('bb-quality-report', () => {
     expect(r.peakWeek).toBe(1); // неделя 1 с 26 сетами — пик
   });
 
-  it('validation-замечания вычитаются из скора', () => {
+  it('штраф идёт за уникальные коды (не за инстансы)', () => {
     const plan = {
       ...basePlan,
       validation: { valid: false, issues: [
@@ -31,16 +36,62 @@ describe('bb-quality-report', () => {
     const clean = buildBBQualityReport(basePlan as any, {});
     const bad = buildBBQualityReport(plan as any, {});
     expect(bad.validationValid).toBe(false);
-    expect(bad.score).toBe(clean.score - 13); // -10 error, -3 warning
+    expect(bad.score).toBe(clean.score - (BB_QUALITY_ERR_CODE_PENALTY + BB_QUALITY_WARN_CODE_PENALTY));
   });
 
-  it('много ошибок → danger-уровень', () => {
+  it('десятки копий одного кода не роняют скор в 0 (кап на код, не на инстанс)', () => {
     const plan = {
       ...basePlan,
-      validation: { valid: false, issues: Array.from({ length: 6 }, () => ({ level: 'error', code: 'empty_plan', message: 'План пуст' })) },
+      validation: { valid: false, issues: Array.from({ length: 30 }, (_, i) => ({ level: 'warning', code: 'session_muscle_leak', message: `упр ${i}`, week: (i % 8) + 1 })) },
     };
     const r = buildBBQualityReport(plan as any, {});
-    expect(r.riskLevel).toBe('danger');
+    // 30 инстансов одного кода → штраф только за вид (кап 15), скор не в нуле
+    expect(r.score).toBeGreaterThan(0);
+    // список свернут в одну строку со счётчиком
+    const leak = r.issues.find(i => i.code === 'session_muscle_leak');
+    expect(leak?.count).toBe(30);
+    expect(leak?.message).toContain('×30');
+    expect(Array.isArray(leak?.weeks)).toBe(true);
+  });
+
+  it('penaltyForUniqueCodes: капы на вид, дубли кодов не считаются дважды', () => {
+    expect(penaltyForUniqueCodes(['a'], ['b'])).toBe(BB_QUALITY_ERR_CODE_PENALTY + BB_QUALITY_WARN_CODE_PENALTY);
+    expect(penaltyForUniqueCodes(['a', 'a', 'a'], ['b', 'b'])).toBe(BB_QUALITY_ERR_CODE_PENALTY + BB_QUALITY_WARN_CODE_PENALTY);
+    expect(penaltyForUniqueCodes(['e1', 'e2', 'e3', 'e4'], [])).toBe(BB_QUALITY_ERR_CODE_CAP);
+  });
+
+  it('consolidateQualityIssues: одинаковый worst-уровень, порядок error→warning→info', () => {
+    const list = consolidateQualityIssues([
+      { source: 'validation', level: 'warning', code: 'w1', message: 'w' },
+      { source: 'validation', level: 'error', code: 'e1', message: 'e1' },
+      { source: 'validation', level: 'error', code: 'e1', message: 'e1', week: 2 },
+      { source: 'balance', level: 'info', code: 'i1', message: 'i' },
+    ]);
+    expect(list).toHaveLength(3);
+    expect(list[0].code).toBe('e1');
+    expect(list[0].count).toBe(2);
+    expect(list[1].code).toBe('w1');
+    expect(list[2].code).toBe('i1');
+  });
+
+  it('много РАЗНЫХ кодов ошибок → danger-уровень', () => {
+    const plan = {
+      ...basePlan,
+      validation: { valid: false, issues: [
+        { level: 'error', code: 'e1', message: 'err 1' },
+        { level: 'error', code: 'e2', message: 'err 2' },
+        { level: 'warning', code: 'w1', message: 'w 1' },
+        { level: 'warning', code: 'w2', message: 'w 2' },
+        { level: 'warning', code: 'w3', message: 'w 3' },
+        { level: 'warning', code: 'w4', message: 'w 4' },
+        { level: 'warning', code: 'w5', message: 'w 5' },
+      ] },
+    };
+    const clean = buildBBQualityReport(basePlan as any, {});
+    const r = buildBBQualityReport(plan as any, {});
+    // 2 вида ошибок (−16 кап) + 5 видов предупреждений (−15 кап) = −31
+    expect(r.score).toBe(clean.score - 31);
+    if (clean.score <= 90) expect(r.riskLevel).toBe('danger');
   });
 
   it('дедуп дублирующихся замечаний', () => {
