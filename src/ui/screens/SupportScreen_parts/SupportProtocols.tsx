@@ -44,7 +44,7 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const isReferenceModule = activeCard?.kind === 'reference';
 
   return (
-    <div style={{ padding:'0 0 24px' }}>
+    <div className="sup-protocols" style={{ padding:'0 0 24px' }}>
       {protocolView === 'menu' ? (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div style={{ padding:'16px', borderRadius:16, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.08))', border:'1px solid rgba(139,92,246,0.18)', backdropFilter:'blur(14px)' }}>

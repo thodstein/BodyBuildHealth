@@ -64,7 +64,7 @@ export const JointMasterCard: React.FC = () => {
   const weekPlan = useMemo(()=> distributeWeeklyLoad({ weeklySessions, goal: weekGoal, volumeCapacity: 1, intensityCapacity: 1, priScore: 0.5, riskLevel: diag.phase==='acute'?'high': diag.phase==='subacute'?'medium':'low' }), [weeklySessions, weekGoal, diag.phase]);
 
   return (
-    <div style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:760, margin:'0 auto' }}>
+    <div className="train-joint" style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:760, margin:'0 auto' }}>
       {/* header — как в Интеллекте/Объёме/Силе */}
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(244,63,94,0.10),rgba(168,85,247,0.07))', border:'1px solid rgba(244,63,94,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(244,63,94,0.14),transparent 70%)', pointerEvents:'none' }} />

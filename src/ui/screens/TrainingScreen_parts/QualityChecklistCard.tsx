@@ -136,7 +136,7 @@ export const QualityChecklistCard: React.FC<Props> = ({ program, onChange, showT
   const barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${barColor}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="train-quality" style={{ ...CARD, padding: 10, borderLeft: `3px solid ${barColor}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: barColor }}>✅ Чек-лист качества</span>
         <span style={{ fontSize: 11, fontWeight: 800, color: barColor }}>{okCount}/{total} · {pct}%</span>

@@ -54,6 +54,7 @@ export const RIRCalibrationCard: React.FC = () => {
 
   if (!stats || stats.totalSets === 0) {
     return (
+      <div className="train-rir">
       <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc="Нет данных. Заполняйте RPE или введите вручную">
         <div style={{ display:'flex', gap:6, marginBottom:8 }}>
           <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
@@ -92,6 +93,7 @@ export const RIRCalibrationCard: React.FC = () => {
           {reprocessing ? '⏳ Обработка...' : '🔄 Переобработать из истории (дневник)'}
         </button>
       </CalcSection>
+    </div>
     );
   }
 
@@ -99,6 +101,7 @@ export const RIRCalibrationCard: React.FC = () => {
   const topConsistent = [...stats.exercises].sort((a, b) => b.consistencyScore - a.consistencyScore).slice(0, 3);
 
   return (
+    <div className="train-rir">
     <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc={`${stats.totalSets} записанных подходов`}>
       <div style={{ display:'flex', gap:6, marginBottom:8 }}>
         <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
@@ -185,5 +188,6 @@ export const RIRCalibrationCard: React.FC = () => {
         </button>
       </div>
     </CalcSection>
+    </div>
   );
 };

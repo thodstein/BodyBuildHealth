@@ -28,7 +28,7 @@ export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) 
   } = s;
 
   return (
-        <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
+    <div className="sup-pepcalc" style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Расчёт дозировок, баков, разведения и протоколов пептидов.</p>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>

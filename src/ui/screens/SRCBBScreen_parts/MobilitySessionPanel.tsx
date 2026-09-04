@@ -95,7 +95,7 @@ export const MobilitySessionPanel: React.FC = () => {
   const pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
 
   return (
-    <div style={{ ...CARD, border: '1px solid rgba(96,165,250,0.35)', background: 'rgba(96,165,250,0.06)' }}>
+    <div className="pl-mobility" style={{ ...CARD, border: '1px solid rgba(96,165,250,0.35)', background: 'rgba(96,165,250,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>🧘 Мобильность: {protocol.name}</div>
         <span style={{ fontSize: 9, color: pct === 100 ? '#22c55e' : DIM }}>{doneCount}/{total} шагов · {pct}%</span>

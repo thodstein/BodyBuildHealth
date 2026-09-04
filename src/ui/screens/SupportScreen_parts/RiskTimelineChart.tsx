@@ -76,7 +76,7 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
   }, [allDrugs]);
 
   return (
-    <div style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.04)' }}>
+    <div className="sup-risktimeline" style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.04)' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>📈 Динамика риска по неделям</span>

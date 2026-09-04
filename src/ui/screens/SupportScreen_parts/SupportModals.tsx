@@ -76,7 +76,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
     setModalWantBoost(false);
   };
 
-  return (<div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
+  return (<div className="sup-modals" style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
     <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:16 }}>
       {showModal === 'intel' && !modalLevel && (
         <>

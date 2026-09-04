@@ -37,7 +37,7 @@ export const TrainingLoadCalculator: React.FC = () => {
   const maxLoad = Math.max(1, ...last7.map(d => d.load));
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-loadcalc" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📊 Калькулятор тренировочной нагрузки (sRPE / ACWR / Banister)</div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Нагрузка сессии = sRPE × длительность (AU). Острая — EWMA за 7 дней, хроническая — за 28 дней. ACWR — отношение острой к хронической. Монотонность — однообразие недели, strain — общий стресс.

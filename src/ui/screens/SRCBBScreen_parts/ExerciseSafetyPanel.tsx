@@ -82,7 +82,7 @@ export const ExerciseSafetyPanel: React.FC = () => {
   const exerciseLabel = EXERCISE_OPTIONS.find(o => o.id === exercise)?.label || exercise;
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+    <div className="pl-safety" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 2px' }}>🛡 Быстрая оценка упражнения</div>
       <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, marginBottom: 10 }}>
         Проверка техники и противопоказаний для одного движения. Для глубокого анализа сустава (JSI, тепловая карта, 8 блоков, FMS) → вкладка <b style={{ color: '#f43f5e' }}>«Суставы и ортопедия»</b> (единый инструмент, без дублей).

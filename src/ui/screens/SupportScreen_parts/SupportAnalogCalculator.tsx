@@ -85,7 +85,7 @@ export const SupportAnalogCalculator: React.FC = () => {
   }, [replacement]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="sup-analog" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
         Поиск клинически обоснованной замены препарата на основе механизмов действия, терапевтического класса и грейда доказательности.
       </div>

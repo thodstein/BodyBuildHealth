@@ -2418,3 +2418,87 @@ html.app-native .nut-usefulness {
     animation: none;
   }
 }
+
+/* ─── 36. NATIVE DEEP-4 — карточки, безопасность, протоколы ─── */
+html.app-native .train-injury,
+html.app-native .train-joint,
+html.app-native .train-lift,
+html.app-native .train-loadsafety,
+html.app-native .train-quality,
+html.app-native .train-rir,
+html.app-native .train-splitgen,
+html.app-native .train-qualitycalc,
+html.app-native .train-deload,
+html.app-native .train-loadcalc {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-loadsafety-tabs button {
+  min-height: 40px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .train-quality,
+html.app-native .train-rir {
+  border-radius: 20px !important;
+}
+
+/* ПЛ: безопасность, мобильность, психология, метрики */
+html.app-native .pl-safety,
+html.app-native .pl-mobility,
+html.app-native .pl-mindset,
+html.app-native .pl-metrics {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-mobility,
+html.app-native .pl-mindset {
+  border-radius: 20px !important;
+}
+
+/* Поддержка: модалки, протоколы, калькуляторы */
+html.app-native .sup-modals > div,
+html.app-native .sup-protocols,
+html.app-native .sup-pepcalc,
+html.app-native .sup-manualpick > div,
+html.app-native .sup-analog,
+html.app-native .sup-effdose,
+html.app-native .sup-risktimeline {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .sup-modals > div,
+html.app-native .sup-manualpick > div {
+  border-radius: 22px !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+
+html.app-native .sup-risktimeline {
+  border-radius: 18px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-injury,
+  html.app-native .train-joint,
+  html.app-native .train-lift,
+  html.app-native .train-loadsafety,
+  html.app-native .train-quality,
+  html.app-native .train-rir,
+  html.app-native .train-splitgen,
+  html.app-native .train-qualitycalc,
+  html.app-native .train-deload,
+  html.app-native .train-loadcalc,
+  html.app-native .pl-safety,
+  html.app-native .pl-mobility,
+  html.app-native .pl-mindset,
+  html.app-native .pl-metrics,
+  html.app-native .sup-modals > div,
+  html.app-native .sup-protocols,
+  html.app-native .sup-pepcalc,
+  html.app-native .sup-manualpick > div,
+  html.app-native .sup-analog,
+  html.app-native .sup-effdose,
+  html.app-native .sup-risktimeline {
+    animation: none;
+  }
+}

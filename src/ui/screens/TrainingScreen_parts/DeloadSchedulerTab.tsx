@@ -145,7 +145,7 @@ export const DeloadSchedulerTab: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-deload" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🧘 Планировщик делода</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>
         Авто-расписание разгрузочных недель по накопленной усталости (sRPE ACWR, HRV, сон, восстановление).

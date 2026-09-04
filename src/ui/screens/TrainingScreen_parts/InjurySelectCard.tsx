@@ -124,7 +124,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
   };
 
   return (
-    <>
+    <div className="train-injury">
       <button onClick={() => setOpen(true)} style={{
         width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700,
         textAlign: 'left' as const, boxSizing: 'border-box' as const,
@@ -373,6 +373,6 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };

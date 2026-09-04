@@ -72,7 +72,7 @@ export const MindsetPreSessionCard: React.FC<{ focus: string; dayLabel: string }
   const pct = items.length > 0 ? Math.round(doneCount / items.length * 100) : 0;
 
   return (
-    <div style={{ ...CARD, border: '1px solid rgba(167,139,250,0.35)', background: 'rgba(167,139,250,0.06)' }}>
+    <div className="pl-mindset" style={{ ...CARD, border: '1px solid rgba(167,139,250,0.35)', background: 'rgba(167,139,250,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa' }}>🧠 Психология: {protocol.name}</div>
         <span style={{ fontSize: 9, color: pct === 100 ? '#22c55e' : DIM }}>{doneCount}/{items.length} шагов · {pct}%</span>

@@ -384,7 +384,7 @@ export const LiftMasterCard: React.FC<{
   }, [template, weakMuscleSubs]);
 
   return (
-    <div style={{ padding:12, color:'#fff', maxWidth:760, margin:'0 auto' }}>
+    <div className="train-lift" style={{ padding:12, color:'#fff', maxWidth:760, margin:'0 auto' }}>
       <div style={{ background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(96,165,250,0.10))', border:'1px solid rgba(0,230,138,0.18)', borderRadius:14, padding:'14px 14px 12px', position:'relative', overflow:'hidden', marginBottom:8 }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>

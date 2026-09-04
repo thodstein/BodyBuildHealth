@@ -164,8 +164,8 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
+    <div className="train-loadsafety" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <div className="train-loadsafety-tabs" style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
         {SUBTABS.map(s => (
           <button key={s.id} onClick={() => setSubTab(s.id)} style={{
             padding: '6px 12px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',

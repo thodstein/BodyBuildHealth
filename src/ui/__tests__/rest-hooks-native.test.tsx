@@ -51,6 +51,23 @@ import { LabDiaryTab } from '../screens/LabsScreen_parts/LabDiaryTab';
 import { default as LabsCatalogTab } from '../screens/LabsScreen_parts/LabsCatalogTab';
 import { RiskInfo } from '../screens/RiskScreen_parts/RiskInfo';
 import { ProductUsefulnessPlanner } from '../screens/NutritionScreen_parts/ProductUsefulnessPlanner';
+import { InjurySelectCard } from '../screens/TrainingScreen_parts/InjurySelectCard';
+import { JointMasterCard } from '../screens/TrainingScreen_parts/JointMasterCard';
+import { LiftMasterCard } from '../screens/TrainingScreen_parts/LiftMasterCard';
+import { LoadSafetyCard } from '../screens/TrainingScreen_parts/LoadSafetyCard';
+import { QualityChecklistCard } from '../screens/TrainingScreen_parts/QualityChecklistCard';
+import { RIRCalibrationCard } from '../screens/TrainingScreen_parts/RIRCalibrationCard';
+import { SplitGenCard } from '../screens/TrainingScreen_parts/SplitGenCard';
+import { CalcQualityTab } from '../screens/TrainingScreen_parts/CalcQualityTab';
+import { DeloadSchedulerTab } from '../screens/TrainingScreen_parts/DeloadSchedulerTab';
+import { TrainingLoadCalculator } from '../screens/TrainingScreen_parts/TrainingLoadCalculator';
+import { ExerciseSafetyPanel } from '../screens/SRCBBScreen_parts/ExerciseSafetyPanel';
+import { MobilitySessionPanel } from '../screens/SRCBBScreen_parts/MobilitySessionPanel';
+import { TrainingMetricsChart } from '../screens/SRCBBScreen_parts/TrainingMetricsChart';
+import { SupportPeptideCalc } from '../screens/SupportScreen_parts/SupportPeptideCalc';
+import { SupportAnalogCalculator } from '../screens/SupportScreen_parts/SupportAnalogCalculator';
+import { SupportEffectiveDose } from '../screens/SupportScreen_parts/SupportEffectiveDose';
+import { RiskTimelineChart } from '../screens/SupportScreen_parts/RiskTimelineChart';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -282,5 +299,97 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c4 } = render(<ProductUsefulnessPlanner />);
     expect(c4.querySelector('.nut-usefulness'), 'usefulness').not.toBeNull();
+  });
+
+  it('17. Карточки тренинга несут корни', () => {
+    const { container: c1 } = render(
+      <InjurySelectCard injuries={[]} onChange={() => {}} />,
+    );
+    expect(c1.querySelector('.train-injury'), 'injury').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<JointMasterCard />);
+    expect(c2.querySelector('.train-joint'), 'joint').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<LoadSafetyCard />);
+    expect(c3.querySelector('.train-loadsafety'), 'loadsafety').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <QualityChecklistCard
+        program={
+          {
+            meta: { direction: 'bb', weeks: 4, daysPerWeek: 3, title: 'Test program' },
+            bb: { weeks: [] },
+          } as never
+        }
+        onChange={() => {}}
+        showToast={() => {}}
+        tprofile={{} as never}
+        labMrv={1}
+      />,
+    );
+    expect(c4.querySelector('.train-quality'), 'quality').not.toBeNull();
+  });
+
+  it('18. RIR, сплит, качество, делоад, нагрузка несут корни', () => {
+    const { container: c1 } = render(<RIRCalibrationCard />);
+    expect(c1.querySelector('.train-rir'), 'rir').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SplitGenCard />);
+    expect(c2.querySelector('.train-splitgen'), 'splitgen').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<DeloadSchedulerTab />);
+    expect(c3.querySelector('.train-deload'), 'deload').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TrainingLoadCalculator />);
+    expect(c4.querySelector('.train-loadcalc'), 'loadcalc').not.toBeNull();
+  });
+
+  it('19. SRCBB safety/mobility/metrics несут корни', () => {
+    const { container: c1 } = render(<ExerciseSafetyPanel />);
+    expect(c1.querySelector('.pl-safety'), 'safety').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<TrainingMetricsChart />);
+    expect(c2.querySelector('.pl-metrics'), 'metrics').not.toBeNull();
+  });
+
+  it('20. Support calc/protocols несут корни', () => {
+    const { container: c1 } = render(
+      <SupportPeptideCalc
+        s={{
+          peptideId: '',
+          pepAmount: '',
+          pepDose: '',
+          pepDilution: '',
+          pepSyringe: '',
+          pepProtocol: '',
+          pepSchedule: [],
+          pepTotalDays: 0,
+        }}
+      />,
+    );
+    expect(c1.querySelector('.sup-pepcalc'), 'pepcalc').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportAnalogCalculator />);
+    expect(c2.querySelector('.sup-analog'), 'analog').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportEffectiveDose />);
+    expect(c3.querySelector('.sup-effdose'), 'effdose').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <RiskTimelineChart
+        timeline={[
+          {
+            week: 1,
+            activeDrugs: [],
+            drugConcentrations: {},
+            organPercents: {},
+            organAfterPercents: {},
+            overallRaw: 10,
+            overallAfter: 8,
+          },
+        ]}
+      />,
+    );
+    expect(c4.querySelector('.sup-risktimeline'), 'risktimeline').not.toBeNull();
   });
 });

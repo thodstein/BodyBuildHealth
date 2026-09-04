@@ -196,7 +196,7 @@ export const SupportEffectiveDose: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="sup-effdose" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* ─── Header card ─── */}
       <div style={{ ...S.cardAccent, position: 'relative', overflow: 'hidden' }}>
         <div style={{

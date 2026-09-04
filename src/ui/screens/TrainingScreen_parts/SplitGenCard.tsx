@@ -224,7 +224,7 @@ export const SplitGenCard: React.FC = () => {
 
   // ── Рендер ──
   return (
-    <div style={{ maxWidth: 800, margin:'0 auto', padding:12, color:'#fff' }}>
+    <div className="train-splitgen" style={{ maxWidth: 800, margin:'0 auto', padding:12, color:'#fff' }}>
       {/* ── Заголовок + навигация режимов ── */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2, flexWrap:'wrap', gap:8 }}>
         <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>

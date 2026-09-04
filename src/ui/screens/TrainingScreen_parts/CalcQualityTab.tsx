@@ -478,7 +478,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
 
   if (!hasAnyProgram) {
     return (
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <div className="train-qualitycalc" style={{ maxWidth: 760, margin: '0 auto', padding: 12, color: '#fff' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор качества программ — PRO</div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
           {(['bb', 'pl'] as Division[]).map(d => (

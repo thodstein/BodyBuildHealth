@@ -229,7 +229,7 @@ function BBChart({ data }: { data: BBMuscleMetric[] }) {
 }
 
 export const TrainingMetricsChart: React.FC<{ lms?: LMSWeekMetric[]; bb?: BBMuscleMetric[] }> = ({ lms, bb }) => (
-  <div>
+  <div className="pl-metrics">
     {lms && lms.length > 0 && (
       <>
         <div style={CARD}><div style={H}>📈 Тоннаж по неделям</div><div style={SUB}>кг·пов — суммарная нагрузка (вес × повторы × подходы)</div><BarChart data={lms.map(d => ({ week: d.week, v: d.tonnage }))} title="Тоннаж" color="#00e68a" color2="#00a86b" unit="кг·пов" icon="🏋️" /></div>

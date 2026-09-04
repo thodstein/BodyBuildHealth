@@ -91,7 +91,7 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
   );
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
+    <div className="sup-manualpick" style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
       <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:460, width:'100%', maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
         
         {/* Header */}
