@@ -63,4 +63,16 @@ describe('BBDiagnosticsHub', () => {
     render(<BBDiagnosticsHub />);
     expect(screen.getAllByText(/SFR/)[0]).toBeInTheDocument();
   });
+  it('weak zone card shows e1RM trend chip from diary', () => {
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-07-20', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },
+      { date: '2026-08-21', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
+      { date: '2026-08-22', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
+      { date: '2026-08-22', exercises: [{ muscleGroup: 'back', sets: [{ weightKg: 80, reps: 8 }] }] },
+    ]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    expect(screen.getAllByText(/Дневник e1RM \(28д\)/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/-10/)[0]).toBeInTheDocument();
+  });
 });

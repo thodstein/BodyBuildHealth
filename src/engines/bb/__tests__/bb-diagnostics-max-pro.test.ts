@@ -259,6 +259,18 @@ describe('export MAX', () => {
   it('HTML без meta не падает', () => {
     expect(buildBBDiagnosticsHtml(rep() as any).includes('ББ-диагностика')).toBe(true);
   });
+  it('HTML включает покрытие головок при плане', () => {
+    const plan = { weeks: [{ sessions: [{ exercises: [{ exerciseName: 'incline_db', name: 'Жим' }] }] }] };
+    const html = buildBBDiagnosticsHtml(rep() as any, { plan, weakHeads: ['chest_upper', 'chest_lower'] } as any);
+    expect(html).toContain('Покрытие слабых головок');
+    expect(html).toContain('chest_upper');
+    expect(html).toContain('✓ есть');
+    expect(html).toContain('✗ нет');
+  });
+  it('HTML без головок — без секции покрытия', () => {
+    const html = buildBBDiagnosticsHtml(rep() as any, {} as any);
+    expect(html).not.toContain('Покрытие слабых головок');
+  });
 });
 
 // ── Доп. покрытие до 50+ ──
@@ -501,5 +513,23 @@ describe('head coverage', () => {
     expect(empty[0].covered).toBe(false);
     expect(mod.auditHeadCoverage(plan as any, [])).toEqual([]);
     expect(mod.auditHeadCoverage(plan as any, ['nope'])).toEqual([]);
+  });
+});
+
+// ── Ранжир: фильтр оборудования ──
+describe('rank equipment', () => {
+  it('без фильтра блок в пуле', () => {
+    const r = rankCorrectionsForWeak('triceps', null, {});
+    expect(r.some((c) => c.id === 'tricep_pushdown_rope')).toBe(true);
+  });
+  it('только гантели — блока нет, кикбэк есть', () => {
+    const r = rankCorrectionsForWeak('triceps', null, { equipment: ['dumbbell'] });
+    expect(r.some((c) => c.id === 'tricep_pushdown_rope')).toBe(false);
+    expect(r.length).toBeGreaterThan(0);
+  });
+  it('пустое оборудование = без фильтра', () => {
+    const a = rankCorrectionsForWeak('triceps', null, {});
+    const b = rankCorrectionsForWeak('triceps', null, { equipment: [] });
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
   });
 });

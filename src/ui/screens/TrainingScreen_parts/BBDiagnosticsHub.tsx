@@ -133,6 +133,19 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}'); return p?.settings?.training?.level || p?.training?.level || 'intermediate'; } catch { return 'intermediate'; }
   }, []);
 
+  // Оборудование зала из профиля — фильтр кандидатов (без него — весь каталог)
+  const profileEquipment = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const eq = p?.settings?.training?.equipment ?? p?.training?.equipment;
+      if (Array.isArray(eq)) {
+        const clean = eq.map((s) => String(s)).filter(Boolean);
+        return clean.length ? clean : undefined;
+      }
+      return undefined;
+    } catch { return undefined; }
+  }, []);
+
   const diarySessions: any[] = useMemo(() => {
     try {
       const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v2') || '[]';
@@ -353,7 +366,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         const wh = weakHeadForZone(z);
         if (wh && !heads.includes(wh)) heads.push(wh);
         try {
-          for (const r of rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: wh }).slice(0, 3)) {
+          for (const r of rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: wh, equipment: profileEquipment }).slice(0, 3)) {
             const id = String(r.id).toLowerCase();
             if (!seen.has(id)) { seen.add(id); topIds.push(r.id); }
           }
@@ -424,15 +437,18 @@ export const BBDiagnosticsHub: React.FC = () => {
   const handleExport = () => {
     let causes: Record<string, unknown> = {};
     let spec: unknown = null;
+    const heads: string[] = [];
     try {
       for (const z of report.weakZonesGranular.slice(0, 2)) {
         const lm = getVolumeLandmarks(level, z);
         causes[z] = diagnoseWeakCause({ zone: z, mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null });
+        const wh = weakHeadForZone(z);
+        if (wh && !heads.includes(wh)) heads.push(wh);
       }
       const f: Record<string, number> = {};
       spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
     } catch { /* noop */ }
-    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakCauses: causes as any, specBlock: spec as any } as any);
+    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
     setToast('✓ HTML экспорт (причины + спец-блок + упражнения)');
     setTimeout(() => setToast(''), 2000);
@@ -587,6 +603,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           weakHead: weakHeadForZone(z),
           asymPct: asym,
           level,
+          equipment: profileEquipment,
           missingAngles: aud?.angleCoverage.missing || [],
           missingStrict: aud?.strictCoverage.missing || [],
           inPlanIds: inPlan,
@@ -595,7 +612,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, state.sex, planAudit, bbPlan]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, state.sex, planAudit, bbPlan, profileEquipment]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -673,9 +690,9 @@ export const BBDiagnosticsHub: React.FC = () => {
           if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { weakHead = h; break; }
         }
       } catch { /* noop */ }
-      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, state.sex]);
+  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, state.sex, profileEquipment]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -817,6 +834,14 @@ export const BBDiagnosticsHub: React.FC = () => {
                     <div key={z} style={{ padding: '8px 10px', borderRadius: 8, background: `${col}0f`, border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
                       <b style={{ color: col }}>{z}: причина — {c.cause} ({Math.round(c.confidence * 100)}%)</b>
                       <div style={{ color: DIM }}>{c.evidence.join(' · ') || '—'}</div>
+                      {(() => {
+                        let t: { deltaPct: number; sessions: number } | null = null;
+                        try { t = (e1rmTrend as any)[z] || (e1rmTrend as any)[canonicalMuscle(z)] || null; } catch { /* noop */ }
+                        if (!t || !Number.isFinite(t.deltaPct)) return null;
+                        const arrow = t.deltaPct <= -5 ? '▼' : t.deltaPct <= 1 ? '►' : '▲';
+                        const tcol = t.deltaPct <= -5 ? '#ef4444' : t.deltaPct <= 1 ? '#f59e0b' : '#22c55e';
+                        return <div style={{ color: tcol }}>Дневник e1RM (28д): {arrow} {t.deltaPct}% · {t.sessions} зам.</div>;
+                      })()}
                       <div style={{ color: '#fff' }}>Чинить: {c.fix}</div>
                       {top3ByZone[z] && top3ByZone[z].length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
