@@ -1,6 +1,6 @@
 /**
  * bb-exercise-diagnosis.engine.ts — диагностика одного упражнения (ББ-проработка).
- * 12 флагов: sfr/профиль/сустав/подрегион/строгая/угол/unilateral + паттерн/темп/ROM/техника/mindMuscle + profGap.
+ * 14 базовых флагов + 7 «стимул в цель» (wrongHead/setupRisk/resistanceLineGap/romShort/stabilityGap/rirMismatch/synergistTakeover).
  */
 import { calcExerciseEffect, type BBExerciseEffect } from './bb-exercise-effect.engine';
 import { getResistanceProfile } from '../../ui/screens/TrainingScreen_parts/ExerciseLabShared';
@@ -10,6 +10,7 @@ import { getProfExecutionProfile, diagnoseExecutionProf } from './bb-execution-p
 import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getExerciseBio } from '../../data/exercise-biomechanics-db';
+import { diagnoseStimulusTarget, type StimulusDiagnosis, type StimulusFlag } from './bb-stimulus-target.engine';
 
 export type DiagnosisFlag =
   | 'lowSFRHighFatigue'
@@ -25,22 +26,28 @@ export type DiagnosisFlag =
   | 'executionGap'
   | 'mindMuscleGap'
   | 'tutGap'
-  | 'profGap';
+  | 'profGap'
+  | StimulusFlag;
 
 export interface DiagnosisCtx {
   goal?: string; // hypertrophy | strength | endurance
   level?: string;
   weakZones?: string[];
   weakMusclesCanonical?: string[];
+  weakHead?: string | null; // слабая головка пилота (triceps_long и т.д.)
   muscle?: string; // каноническая мышца упражнения
   mobilityFails?: number;
   asymPct?: number | null;
   planTempo?: string | null;
   planPauseSeconds?: number | null;
   planReps?: number | null;
+  planRir?: number | null; // RIR по факту/плану — для rirMismatch
   singleAngleMuscle?: string | null; // если мышца имеет 1 угол при ≥6 сетов
   uncoveredSubregions?: string[]; // из аудита
   strictMissing?: string[]; // строгие группы мышцы, отсутствующие в плане
+  setupIssues?: string[]; // тапы отклонений сетапа (необязательно)
+  cheating?: boolean | null; // читинг по факту (необязательно)
+  rangeFull?: boolean | null; // полная ли амплитуда (необязательно)
 }
 
 export interface ExerciseDiagnosis {
@@ -49,6 +56,7 @@ export interface ExerciseDiagnosis {
   issues: string[];
   score: number; // 0-100
   profGaps: ReturnType<typeof diagnoseExecutionProf>;
+  stimulus?: StimulusDiagnosis | null; // «стимул в цель» с breakdown
 }
 
 function isWeakFor(muscle: string, weakZones?: string[], weakCanon?: string[]): boolean {
@@ -238,11 +246,35 @@ export function diagnoseExercise(
     for (const g of profGaps) issues.push(g.issue);
   }
 
+  // 14 «стимул в цель» — доля нагрузки в целевую головку (пилот руки+дельты; остальные — silent neutral)
+  let stimulus: StimulusDiagnosis | null = null;
+  try {
+    const hasPause = Number(ex.pauseSeconds ?? ctx.planPauseSeconds ?? 0) > 0;
+    stimulus = diagnoseStimulusTarget(
+      { id: effect.id || (ex as any).id, name: effect.name, muscle: muscle || undefined },
+      {
+        weakHead: ctx.weakHead ?? null,
+        setupIssues: ctx.setupIssues,
+        cheating: ctx.cheating,
+        rirActual: ex.rir ?? ctx.planRir ?? null,
+        rangeFull: ctx.rangeFull,
+        tempoHasPause: hasPause || undefined,
+      },
+    );
+    if (stimulus && stimulus.flags.length > 0) {
+      for (const f of stimulus.flags) flags.push(f);
+      // стимул-проблемы — первыми, это суть ББ-оценки
+      issues.unshift(...stimulus.issues);
+    }
+  } catch { /* noop */ }
+
   // score 0-100: взвешенный (критичные тяжелее шума)
   const WEIGHTS: Record<string, number> = {
     lowSFRHighFatigue: 12, jointRisk: 12, patternMismatch: 10, unilateralGap: 8,
     wrongProfileForGoal: 8, singleAngle: 7, missingStrict: 6, tempoMismatch: 6,
     romGap: 6, mindMuscleGap: 7, executionGap: 6, profGap: 6, tutGap: 4, uncoveredSubregion: 4,
+    wrongHead: 14, synergistTakeover: 9, setupRisk: 6, resistanceLineGap: 6,
+    romShort: 6, stabilityGap: 8, rirMismatch: 5,
   };
   const uniq = [...new Set(flags)];
   let score = 100;
@@ -251,5 +283,5 @@ export function diagnoseExercise(
   if (effect.sfr != null && effect.sfr <= 2) score -= 8;
   score = Math.max(0, Math.min(100, Math.round(score)));
 
-  return { effect, flags: uniq, issues: [...new Set(issues)].slice(0, 8), score, profGaps };
+  return { effect, flags: uniq, issues: [...new Set(issues)].slice(0, 10), score, profGaps, stimulus };
 }

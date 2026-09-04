@@ -1,16 +1,18 @@
 /**
  * bb-correction-rank.engine.ts — ранжир коррекций для слабой зоны (MAX PRO).
- * Формула: sfr×2 + lengthened×4 + angleGap×3 + unilateral×5 (при asym≥7) + strict + lowFatigue.
+ * Формула: sfr×2 + lengthened×4 + angleGap×3 + unilateral×5 (при asym≥7) + strict + lowFatigue + слабая головка×6.
  * Жёсткие фильтры: оборудование + мобильность + уровень. Без мутаций плана.
  */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { sfrOf, resistanceProfileOf, isUnilateralExercise } from './bb-sfr-db';
 import { ANGLE_CLASSES, STRICT_EXERCISE_GROUPS, strictGroupForExercise } from './bb-exercise-selection.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
+import { headsHitOf } from './bb-stimulus-target.engine';
 import type { WeakCause } from './bb-weak-cause.engine';
 
 export interface RankCtx {
   cause?: WeakCause;
+  weakHead?: string | null; // слабая головка пилота — кандидат, грузящий её, получает +6
   asymPct?: number | null;
   equipment?: string[];
   level?: string;
@@ -31,6 +33,7 @@ export interface RankedCorrection {
   closesStrict: string | null;
   unilateral: boolean;
   jointStress: string | null;
+  headsHit: string[]; // головки, получающие стимул (пилот руки+дельты)
   reason: string;
 }
 
@@ -54,7 +57,14 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     const g = norm(c.group);
     const LEGS = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'legs']);
     const same = g === muscle || (LEGS.has(muscle) && g === 'legs') || (muscle === 'legs' && LEGS.has(g));
-    if (muscle && !same) return false;
+    // каталог держит руки в группе arms — маппим triceps/biceps на arms с keyword-фильтром
+    const ARMS: Record<string, RegExp> = {
+      triceps: /трицепс|tricep|француз|french|skull|кикбэк|kickback|pushdown/i,
+      biceps: /бицепс|bicep|curl|сгибание|молот|hammer|скотт|preacher|пауч|spider|концентр|байес|bayesian|драг|drag/i,
+    };
+    const armsRe = (ARMS as Record<string, RegExp>)[muscle];
+    const armsOk = armsRe && g === 'arms' && armsRe.test(`${c.id} ${c.name}`);
+    if (muscle && !same && !armsOk) return false;
     if (inPlan.has(norm(c.id)) || inPlan.has(norm(c.name))) return false;
     if (!levelAllows(ctx.level, String(c.name))) return false;
     if (ctx.equipment && ctx.equipment.length > 0) {
@@ -100,6 +110,16 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     }
     if (unilateral && (ctx.asymPct ?? 0) >= 7) score += 5;
     else if (unilateral) score += 1;
+    // слабая головка: кандидат, грузящий её напрямую, — первым
+    let hitsHead = false;
+    let heads: string[] = [];
+    try {
+      heads = headsHitOf({ id, name });
+      if (ctx.weakHead && heads.includes(ctx.weakHead)) {
+        score += 6;
+        hitsHead = true;
+      }
+    } catch { /* noop */ }
     const js = String(c.jointStress || '').toLowerCase() || null;
     if (js === 'low') score += 2;
     else if (js === 'high') score -= 3;
@@ -108,6 +128,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     if (ctx.sex === 'female' && muscle === 'glutes' && /хип|траст|мост|hip.?thrust/i.test(name)) score += 2;
 
     const why: string[] = [];
+    if (hitsHead && ctx.weakHead) why.push(`бьёт в слабую головку ${ctx.weakHead}`);
     if (sfr != null) why.push(`SFR ${sfr}`);
     if (lengthened) why.push('lengthened');
     if (closesAngle) why.push(`закрывает угол ${closesAngle}`);
@@ -117,7 +138,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
 
     return {
       id, name, muscle, score: Math.round(score * 10) / 10, sfr, lengthened,
-      closesAngle, closesStrict, unilateral, jointStress: js,
+      closesAngle, closesStrict, unilateral, jointStress: js, headsHit: heads,
       reason: why.length ? why.join(' · ') : 'альтернатива в пуле',
     };
   });
