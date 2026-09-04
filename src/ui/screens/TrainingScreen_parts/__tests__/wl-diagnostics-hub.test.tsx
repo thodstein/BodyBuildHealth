@@ -136,4 +136,13 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('Кадров: 3'), { timeout: 2000 });
     expect(container.textContent).toContain('OHS-прогноз по углам');
   });
+  it('E9 антропометрия → хват + в профиль', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Мобильность/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="180"]')!, { target: { value: '180' } });
+    fireEvent.change(container.querySelector('input[placeholder="182"]')!, { target: { value: '190' } });
+    await waitFor(() => expect(container.textContent).toContain('Длинные руки'), { timeout: 2000 });
+    fireEvent.click(screen.getByText(/Размах\/плечи в профиль/));
+    expect(JSON.parse(localStorage.getItem('he_profile_v2') || '{}').personal?.armSpanCm).toBe(190);
+  });
 });

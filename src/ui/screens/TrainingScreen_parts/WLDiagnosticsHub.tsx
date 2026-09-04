@@ -30,6 +30,7 @@ import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/stre
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
 import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport-ta-spec-block.engine';
+import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -88,6 +89,10 @@ type WLState = {
   bfPattern: string;
   // E8: углы суставов с видео (CSV трекера поз)
   poseCsv: string;
+  // E9: антропометрия ТА
+  anthroHeight: string;
+  anthroArmSpan: string;
+  anthroShoulder: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -107,6 +112,8 @@ const DEFAULT_STATE: WLState = {
   jerkDipCm: '', jerkDipMs: '', bfPattern: '',
   // E8: углы суставов с видео (CSV трекера поз)
   poseCsv: '',
+  // E9: антропометрия ТА
+  anthroHeight: '', anthroArmSpan: '', anthroShoulder: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -122,7 +129,16 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<WLState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+      const merged = { ...DEFAULT_STATE, ...(raw ? JSON.parse(raw) : {}) };
+      // E9: пустые антропо-поля — из профиля (разово, ручной ввод приоритетнее)
+      try {
+        const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+        const personal = p?.personal ?? p?.settings?.personal ?? {};
+        if (!merged.anthroArmSpan && Number.isFinite(personal.armSpanCm)) merged.anthroArmSpan = String(personal.armSpanCm);
+        if (!merged.anthroShoulder && Number.isFinite(personal.shoulderWidthCm)) merged.anthroShoulder = String(personal.shoulderWidthCm);
+        if (!merged.anthroHeight && Number.isFinite(personal.height)) merged.anthroHeight = String(personal.height);
+      } catch { /* noop */ }
+      return merged;
     } catch {}
     return DEFAULT_STATE;
   });
@@ -290,6 +306,17 @@ export const WLDiagnosticsHub: React.FC = () => {
       return autoOHSFromPose(avgAnglesOfSummary(poseSummary));
     } catch { return null; }
   }, [poseSummary]);
+
+  // E9: антропометрия → хват/старт
+  const anthro = useMemo(() => {
+    try {
+      return diagnoseTAAnthro({
+        heightCm: state.anthroHeight ? parseFloat(state.anthroHeight) : null,
+        armSpanCm: state.anthroArmSpan ? parseFloat(state.anthroArmSpan) : null,
+        shoulderCm: state.anthroShoulder ? parseFloat(state.anthroShoulder) : null,
+      });
+    } catch { return null; }
+  }, [state.anthroHeight, state.anthroArmSpan, state.anthroShoulder]);
 
   const scoring = useMemo(() => scoreTA({
     weakCount: weakPoints.length,
@@ -565,6 +592,25 @@ export const WLDiagnosticsHub: React.FC = () => {
     setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf }));
     setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
+  };
+
+  // E9: размах/плечи → профиль (рост остаётся вводом хаба)
+  const applyAnthroToProfile = () => {
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      const p = raw ? JSON.parse(raw) : {};
+      const personal = p.personal ?? p.settings?.personal ?? {};
+      const span = parseFloat(state.anthroArmSpan), sho = parseFloat(state.anthroShoulder);
+      if (Number.isFinite(span) && span > 0) personal.armSpanCm = span;
+      if (Number.isFinite(sho) && sho > 0) personal.shoulderWidthCm = sho;
+      if (p.personal) p.personal = personal;
+      else if (p.settings?.personal) p.settings.personal = personal;
+      else p.personal = personal;
+      localStorage.setItem('he_profile_v2', JSON.stringify(p));
+      try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
+      setToast('✓ Размах/плечи → профиль');
+      setTimeout(() => setToast(''), 2000);
+    } catch { /* noop */ }
   };
 
   const applyMobilityToProfile = () => {
@@ -889,6 +935,19 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize: 10, color: DIM }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
               </div>
             )}
+            {/* E9: антропометрия → хват/старт */}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📏 Антропометрия — хват рывка</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: DIM }}>Рост см<br /><input value={state.anthroHeight} onChange={e => setState(s => ({ ...s, anthroHeight: e.target.value }))} placeholder="180" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Размах см<br /><input value={state.anthroArmSpan} onChange={e => setState(s => ({ ...s, anthroArmSpan: e.target.value }))} placeholder="182" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Плечи см<br /><input value={state.anthroShoulder} onChange={e => setState(s => ({ ...s, anthroShoulder: e.target.value }))} placeholder="42" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              </div>
+              {anthro
+                ? <div style={{ marginTop: 6 }}><div style={{ fontSize: 10, color: '#a78bfa' }}>Размах {anthro.diffCm > 0 ? '+' : ''}{anthro.diffCm}см → {anthro.gripAdvice}</div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{anthro.startAdvice}</div></div>
+                : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Введи рост + размах — посчитаем хват (Everett: широкий хват = риск промаха назад).</div>}
+              <button onClick={applyAnthroToProfile} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Размах/плечи в профиль</button>
+            </div>
             <button onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
             {/* Legacy compat fields hidden but synced */}
             <div style={{ display: 'none' }}><input value={state.overheadSquat} readOnly /><input value={state.ankleDorsiflex} readOnly /></div>
