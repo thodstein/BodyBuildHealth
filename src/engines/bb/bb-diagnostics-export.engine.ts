@@ -102,6 +102,14 @@ export function buildBBDiagnosticsCsv(
   lines.push(['weakCanonical', report.weakMusclesCanonical.join('|')].map(escCsv).join(','));
   lines.push(['weakGranular', report.weakZonesGranular.join('|')].map(escCsv).join(','));
   if (meta?.weakHeads?.length) lines.push(['weakHeads', meta.weakHeads.join('|')].map(escCsv).join(','));
+  try {
+    const cov = meta?.weakHeads?.length && plan?.weeks ? auditHeadCoverage(plan, meta.weakHeads) : [];
+    if (cov.length) {
+      lines.push('');
+      lines.push(['head', 'covered', 'by'].map(escCsv).join(','));
+      for (const c of cov) lines.push([c.head, c.covered ? '1' : '0', c.by.join('|')].map(escCsv).join(','));
+    }
+  } catch { /* noop */ }
   if (meta?.weakCauses) {
     lines.push('');
     lines.push(['zone', 'cause', 'confidence', 'evidence', 'fix'].map(escCsv).join(','));

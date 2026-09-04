@@ -34,7 +34,7 @@ import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-dete
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
-import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage } from '../../../engines/bb/bb-stimulus-target.engine';
+import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
@@ -623,6 +623,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return []; }
   }, [report.weakZonesGranular, bbPlan]);
 
+  // Слабые головки для подсветки библиотеки (🎯 бьёт в цель)
+  const libWeakHeads = useMemo(() => {
+    try {
+      return report.weakZonesGranular.map(weakHeadForZone).filter(Boolean) as string[];
+    } catch { return []; }
+  }, [report.weakZonesGranular]);
+
   const selectedExRaw = useMemo(() => {
     const id = state.exerciseSelectedId;
     if (!id) return null;
@@ -1138,9 +1145,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const eff = (() => { try { return calcExerciseEffect(c as any, {}); } catch { return null; } })();
                   const sc = eff ? exerciseEffectScore(eff) : 50;
                   const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
+                  const heads = (() => { try { return headsHitOf({ id: c.id, name: c.name }); } catch { return []; } })();
+                  const hitsWeak = heads.some((h) => libWeakHeads.includes(h));
+                  const bcol = hitsWeak ? '#00e68a' : col;
                   return (
-                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}12`, border: `1px solid ${col}22`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id }))}>
-                      {c.name} · SFR{eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
+                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id }))}>
+                      {hitsWeak ? '🎯 ' : ''}{c.name} · SFR{eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
                     </span>
                   );
                 })}

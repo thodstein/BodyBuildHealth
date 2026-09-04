@@ -426,6 +426,15 @@ describe('csv meta', () => {
     expect(csv).toContain('volume');
     expect(csv).toContain('spec_weeks');
   });
+  it('CSV покрытие головок при плане', async () => {
+    const mod = await import('../bb-diagnostics-export.engine');
+    const plan = { weeks: [{ sessions: [{ exercises: [{ exerciseName: 'incline_db', name: 'Жим' }] }] }] };
+    const csv = mod.buildBBDiagnosticsCsv(rep() as any, plan, { weakHeads: ['chest_upper', 'chest_lower'] } as any);
+    expect(csv).toContain('head');
+    expect(csv).toContain('chest_upper');
+    expect(csv).toContain('"1"');
+    expect(csv).toContain('"0"');
+  });
   it('CSV без meta — как раньше', async () => {
     const mod = await import('../bb-diagnostics-export.engine');
     const csv = mod.buildBBDiagnosticsCsv(rep() as any);

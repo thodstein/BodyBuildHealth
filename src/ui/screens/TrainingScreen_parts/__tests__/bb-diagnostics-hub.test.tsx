@@ -93,4 +93,14 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getAllByText(/Дневник e1RM \(28д\)/)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/-10/)[0]).toBeInTheDocument();
   });
+  it('library marks weak-head hitters with target chip', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    // тултипы библиотеки теперь несут головки
+    const withHeads = document.querySelector('[title*="бьёт:"]');
+    expect(withHeads).not.toBeNull();
+    // incline бьёт в chest_upper → маркер цели
+    expect(screen.getAllByText(/🎯/)[0]).toBeInTheDocument();
+  });
 });
