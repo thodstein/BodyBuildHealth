@@ -109,6 +109,39 @@ export function detectSMWeakFromDiary(logs: any[]): Array<{ lift: string; label:
   return out;
 }
 
+/** LVP-e1RM для стронга: при наличии скорости — через LVP, иначе epley/вес (SM PRO). */
+export function estimateSME1RM(weight: number, reps: number, velocity?: number | null, eventId?: string): number | null {
+  if (!Number.isFinite(weight) || weight <= 0) return null;
+  try {
+    if (velocity != null && Number.isFinite(velocity) && velocity > 0.15 && eventId) {
+      // Динамический импорт избегаем — пробуем общий LVP-стор напрямую через localStorage-кэш
+      const keys = ['he_lv_sm_v1', 'he_lv_profile_ss_v1'];
+      for (const k of keys) {
+        try {
+          const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null;
+          if (!raw) continue;
+          const all = JSON.parse(raw) as Record<string, { intercept: number; slope: number; valid?: boolean }>;
+          const liftKeys = [String(eventId).toLowerCase(), 'yoke_walk', 'farmers_walk', 'stone_load', 'log_press'];
+          for (const lk of liftKeys) {
+            const prof = all[lk];
+            if (prof && Number.isFinite(prof.slope) && prof.slope < 0) {
+              const pct = (velocity - prof.intercept) / prof.slope;
+              if (Number.isFinite(pct) && pct > 0.3 && pct <= 1.05) return Math.round((weight / pct) * 10) / 10;
+            }
+          }
+        } catch { /* noop */ }
+      }
+    }
+  } catch { /* noop */ }
+  const key = String(eventId || '').toLowerCase();
+  // carries: e1RM = вес (дистанция-метрика, не формула)
+  if (key.includes('carry') || key.includes('yoke') || key.includes('farmer')) return Math.round(weight * 10) / 10;
+  // stone/log: только при reps ≤ 3, иначе пропуск (формула врёт на многоповторке)
+  if ((key.includes('stone') || key.includes('log') || key.includes('sandbag')) && reps > 3) return null;
+  const r = Math.min(reps || 1, 5);
+  return Math.round(weight * (1 + r / 30) * 10) / 10;
+}
+
 // Кандидат слабых фаз по reps/весу (аналог TA candidateTAWeakPointsFromDiary)
 export function candidateSMWeakPointsFromDiary(logs: any[], eventId: string): string[] {
   // Для стронга нет фаз по reps как в ТА, но можно эвристикой: если change < -5 → lap/pickup, если grip fail → grip

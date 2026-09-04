@@ -353,3 +353,38 @@ export function isValidSMWeakPoint(v: string): v is SMWeakPoint {
 export function normalizeSMWeakPoints(input: string[]): SMWeakPoint[] {
   return input.map(s=> String(s).trim()).filter(isValidSMWeakPoint).slice(0,4) as SMWeakPoint[];
 }
+
+/** Нормы лога-дипа (SM PRO): глубина 8-12см, время дипа ~0.20с (Zhang jerk-dip). */
+export const SM_LOG_DIP_NORMS = { depthMinCm: 8, depthMaxCm: 12, dipTimeS: 0.2 };
+
+export interface SMLogDipResult {
+  depthCm: number;
+  dipTimeS: number | null;
+  drivePowerW: number | null;
+  verdict: 'ok' | 'warn' | 'critical';
+  text: string;
+}
+
+/**
+ * Диагностика дипа лога по глубине + времени (Renals braking/propulsion:
+ * глубокий/медленный дип теряет упругость и уводит лог вперёд).
+ */
+export function diagnoseLogDip(depthCm: number, dipTimeS?: number | null, bodyweightKg?: number | null, logKg?: number | null): SMLogDipResult | null {
+  if (!Number.isFinite(depthCm) || depthCm <= 0) return null;
+  const t = dipTimeS != null && Number.isFinite(dipTimeS) && dipTimeS > 0 ? dipTimeS : null;
+  let drivePowerW: number | null = null;
+  if (t != null && bodyweightKg != null && logKg != null && bodyweightKg > 0 && logKg > 0) {
+    // Грубая оценка мощности драйва: m*g*h/t (h = глубина дипа)
+    const m = bodyweightKg * 0.7 + logKg;
+    drivePowerW = Math.round((m * 9.81 * (depthCm / 100)) / t);
+  }
+  let verdict: SMLogDipResult['verdict'] = 'ok';
+  if (depthCm < SM_LOG_DIP_NORMS.depthMinCm || depthCm > SM_LOG_DIP_NORMS.depthMaxCm) verdict = 'warn';
+  if (depthCm < 5 || depthCm >= 16) verdict = 'critical';
+  if (t != null && t > 0.35) verdict = verdict === 'ok' ? 'warn' : verdict;
+  const text =
+    verdict === 'ok'
+      ? `Дип ${depthCm}см в норме 8-12см${t != null ? `, время ${t}с (≈0.20с)` : ''} — пружина жёсткая`
+      : `Дип ${depthCm}см вне 8-12см${t != null ? `, время ${t}с (норма ~0.20с)` : ''} — пауза-дип 2с + фронт-присед`;
+  return { depthCm, dipTimeS: t, drivePowerW, verdict, text };
+}

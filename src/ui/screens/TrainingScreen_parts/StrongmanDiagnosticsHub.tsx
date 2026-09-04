@@ -22,6 +22,23 @@ import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } fro
 import { validatePassport, validateContestPassports } from '../../../engines/strength-sport/strength-sport-passport.engine';
 import { correctEnodeByVariable } from '../../../engines/strength-sport/strength-sport-barpath.engine';
 import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
+import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-sm-weak-cause.engine';
+import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
+import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
+import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
+import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
+import { diagnoseSMAnthro } from '../../../engines/strength-sport/strength-sport-sm-anthro.engine';
+import { diagnoseSMGripAsymmetry, appendSMGripSnapshot, smGripTrend } from '../../../engines/strength-sport/strength-sport-sm-asymmetry.engine';
+import { diagnoseSMHold } from '../../../engines/strength-sport/strength-sport-sm-hold.engine';
+import { appendSMProgress, smProgressTrend, loadSMProgress, saveSMProgress } from '../../../engines/strength-sport/strength-sport-sm-progress.engine';
+import { buildSMIcs, downloadSMIcs } from '../../../engines/strength-sport/strength-sport-sm-ics.engine';
+import { buildSMAnnualOverlay, saveSMAnnualOverlay } from '../../../engines/strength-sport/strength-sport-sm-annual-bridge.engine';
+import { calibrateSMLVP, smLvpPointsFromRamp, saveSMLVPProfile, loadSMLVPProfile, smLvpLiftFor } from '../../../engines/strength-sport/strength-sport-sm-lvp-calibration.engine';
+import { diagnoseLogDip } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
+import { carryPhysics } from '../../../engines/strength-sport/strength-sport-carry-physics.engine';
+import { stoneMoment } from '../../../engines/strength-sport/strength-sport-stone-moment.engine';
+import { buildSMGripProfile, smGripFailsCalibrated, loadSMGripProfile, saveSMGripProfile } from '../../../engines/strength-sport/strength-sport-sm-grip-calibration.engine';
+import { heazlewoodCheck, axialMomentCheck, mixedGripCheck } from '../../../engines/strength-sport/strength-sport-sm-safety.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -71,6 +88,35 @@ type SMState = {
   contestId: string;
   turnNeeded: boolean;
   conditioningFail: boolean;
+  // SM PRO: LVP ramp + log-dip + hold + anthro + progress + attempts/strategy + grip-calib
+  lvpLift: string;
+  lvp50: string;
+  lvp65: string;
+  lvp75: string;
+  lvp90: string;
+  lvpResult: string;
+  logDipCm: string;
+  logDipMs: string;
+  logHoldSec: string;
+  farmersHoldSec: string;
+  axleDohKg: string;
+  bodyweightKg: string;
+  deadliftKg: string;
+  anthroHeight: string;
+  anthroArmSpan: string;
+  progYoke20m: string;
+  progFarmers40m: string;
+  progLogMax: string;
+  progStoneLadder: string;
+  progBw: string;
+  strategy: string;
+  pinchWidth: string;
+  cocLevel: string;
+  fatGripMm: string;
+  specWeeks: string;
+  annualStartWeek: string;
+  mixGrip: string;
+  armsBent: boolean;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -83,6 +129,12 @@ const DEFAULT_STATE: SMState = {
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
   contestId: '', turnNeeded: false, conditioningFail: false,
+  lvpLift: 'yoke_walk', lvp50: '', lvp65: '', lvp75: '', lvp90: '', lvpResult: '',
+  logDipCm: '', logDipMs: '', logHoldSec: '', farmersHoldSec: '', axleDohKg: '',
+  bodyweightKg: '', deadliftKg: '', anthroHeight: '', anthroArmSpan: '',
+  progYoke20m: '', progFarmers40m: '', progLogMax: '', progStoneLadder: '', progBw: '',
+  strategy: 'balanced', pinchWidth: '3in', cocLevel: 'coc1_5', fatGripMm: '50',
+  specWeeks: '6', annualStartWeek: '1', mixGrip: 'overhand', armsBent: false,
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -304,6 +356,123 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   const enodeCorrected = useMemo(() => swayCm != null ? correctEnodeByVariable(swayCm, 'xLoop') : null, [swayCm]);
 
+  // ── SM PRO: физика переноски/камня + симулятор + попытки + причины/ранжир/спек + hold/anthro/safety ──
+  const bwKg = useMemo(() => { const v = parseFloat(state.bodyweightKg); return Number.isFinite(v) && v > 0 ? v : null; }, [state.bodyweightKg]);
+  const carryPhys = useMemo(() => {
+    const yW = parseFloat(state.yokeKg);
+    if (!Number.isFinite(yW) || !yW || bwKg == null) return null;
+    return carryPhysics({ loadKg: yW, bodyweightKg: bwKg, type: 'yoke', distanceM: 20 });
+  }, [state.yokeKg, bwKg]);
+  const stoneMom = useMemo(() => {
+    const sW = parseFloat(state.stoneKg);
+    if (!Number.isFinite(sW) || !sW) return null;
+    const diam = parseFloat(state.diameterCm);
+    const h = parseFloat(state.platformHeightCm);
+    return stoneMoment({ loadKg: sW, diameterCm: Number.isFinite(diam) ? diam : 40, torsoAngleDeg: 45, heightCm: Number.isFinite(h) ? h : 140, athleteHeightCm: bwKg != null && state.anthroHeight ? parseFloat(state.anthroHeight) : 178 });
+  }, [state.stoneKg, state.diameterCm, state.platformHeightCm, state.anthroHeight, bwKg]);
+  const workMaxForSim = useMemo(() => ({
+    yokeWalk: parseFloat(state.yokeKg) || 0,
+    farmersWalk: parseFloat(state.farmersKg) || 0,
+    atlasStone: parseFloat(state.stoneKg) || 0,
+    logPress: parseFloat(state.logKg) || 0,
+    axlePress: parseFloat(state.axleKg) || 0,
+  }), [state.yokeKg, state.farmersKg, state.stoneKg, state.logKg, state.axleKg]);
+  const contestSim = useMemo(() => {
+    if (!contest) return null;
+    try { return simulateContest(contest as any, workMaxForSim as any, (state.strategy as any) || 'balanced'); } catch { return null; }
+  }, [contest, workMaxForSim, state.strategy]);
+  const attemptsBridge = useMemo(() => {
+    try {
+      return buildSMAttemptsForContest(state.contestId || null, {
+        yokeKg: parseFloat(state.yokeKg) || null,
+        farmersKg: parseFloat(state.farmersKg) || null,
+        stoneKg: parseFloat(state.stoneKg) || null,
+        logKg: parseFloat(state.logKg) || null,
+        axleKg: parseFloat(state.axleKg) || null,
+      }, (state.strategy as any) || 'balanced', contest as any);
+    } catch { return null; }
+  }, [state.contestId, state.yokeKg, state.farmersKg, state.stoneKg, state.logKg, state.axleKg, state.strategy, contest]);
+  const smCauses = useMemo(() => smWeakPoints.map((wp) => diagnoseSMWeakCause({
+    zone: wp as any,
+    factSetsPerWeek: null,
+    e1rmDeltaPct: diaryWeaks.find((d) => String(d.lift).toLowerCase().includes(String(wp).split('_')[0]))?.deltaPct ?? null,
+    e1rmSessions: 2,
+    acwrZone: acwr ? (acwr as { zone?: string }).zone ?? null : null,
+    vbtLossPct: vbtLoss?.lossPct ?? null,
+    ohsFailed: ohs.failed,
+    gripFails,
+    swayCm,
+    asymmetryPct: asymmetry?.diff ?? null,
+  })), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry]);
+  const smRankTop = useMemo(() => {
+    const wp = smWeakPoints[0] as any;
+    if (!wp) return [];
+    try {
+      let profile: string[] = [];
+      try {
+        const raw = localStorage.getItem('he_profile_v2');
+        const p = raw ? JSON.parse(raw) : null;
+        profile = p?.training?.mobilityRestrictions || p?.health?.mobilityRestrictions || [];
+      } catch { /* noop */ }
+      return rankCorrectionsForSM(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: profile });
+    } catch { return []; }
+  }, [smWeakPoints, smCauses]);
+  const smSpec = useMemo(() => {
+    if (!smWeakPoints.length) return null;
+    try { return buildSMSpecBlock({ weakPoints: smWeakPoints as any, weeks: parseInt(state.specWeeks) || 6 }); } catch { return null; }
+  }, [smWeakPoints, state.specWeeks]);
+  const logDipDiag = useMemo(() => {
+    const d = parseFloat(state.logDipCm);
+    if (!Number.isFinite(d) || !d) return null;
+    const t = state.logDipMs ? parseFloat(state.logDipMs) / 1000 : null;
+    return diagnoseLogDip(d, t, bwKg, parseFloat(state.logKg) || null);
+  }, [state.logDipCm, state.logDipMs, bwKg, state.logKg]);
+  const holdDiag = useMemo(() => diagnoseSMHold({
+    bodyweightKg: bwKg,
+    deadliftKg: parseFloat(state.deadliftKg) || null,
+    logHoldSec: state.logHoldSec ? parseFloat(state.logHoldSec) : null,
+    farmersHoldSec: state.farmersHoldSec ? parseFloat(state.farmersHoldSec) : null,
+    farmersHoldKg: parseFloat(state.farmersKg) || null,
+    axleDohKg: state.axleDohKg ? parseFloat(state.axleDohKg) : null,
+  }), [bwKg, state.deadliftKg, state.logHoldSec, state.farmersHoldSec, state.farmersKg, state.axleDohKg]);
+  const anthroDiag = useMemo(() => diagnoseSMAnthro({
+    heightCm: state.anthroHeight ? parseFloat(state.anthroHeight) : null,
+    armSpanCm: state.anthroArmSpan ? parseFloat(state.anthroArmSpan) : null,
+    platformCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
+  }), [state.anthroHeight, state.anthroArmSpan, state.platformHeightCm]);
+  const gripAsymDiag = useMemo(() => diagnoseSMGripAsymmetry({
+    leftKg: state.leftMax ? parseFloat(state.leftMax) : null,
+    rightKg: state.rightMax ? parseFloat(state.rightMax) : null,
+  }), [state.leftMax, state.rightMax]);
+  const gripProfile = useMemo(() => {
+    try { return loadSMGripProfile(); } catch { return null; }
+  }, [state.pinchWidth, state.cocLevel, state.fatGripMm]);
+  const gripFailsCal = useMemo(() => smGripFailsCalibrated({
+    supportSec: state.gripHoldSec ? parseFloat(state.gripHoldSec) : null,
+    pinchSec: state.pinchHoldSec ? parseFloat(state.pinchHoldSec) : null,
+    crushSec: state.axleHoldSec ? parseFloat(state.axleHoldSec) : null,
+  }, gripProfile), [state.gripHoldSec, state.pinchHoldSec, state.axleHoldSec, gripProfile]);
+  const axialQuant = useMemo(() => axialMomentCheck({
+    yokeKg: parseFloat(state.yokeKg) || null,
+    bodyweightKg: bwKg,
+    carryMeters: (parseFloat(state.yokeKg) > 0 ? 20 : 0) + (parseFloat(state.farmersKg) > 0 ? 40 : 0),
+    stoneMomentNm: stoneMom?.momentNm ?? null,
+    axialSets: (parseFloat(state.yokeKg) > 0 ? 6 : 0) + (parseFloat(state.farmersKg) > 0 ? 6 : 0),
+  }), [state.yokeKg, state.farmersKg, bwKg, stoneMom]);
+  const bicepsWarn = useMemo(() => {
+    const out: string[] = [];
+    const c1 = heazlewoodCheck({ eventId: 'atlas_stone_load', armsBent: state.armsBent || undefined, loadPct: 95 });
+    out.push(...c1.warnings);
+    const mg = mixedGripCheck(state.mixGrip, 'axle_deadlift');
+    if (mg) out.push(mg);
+    return out.slice(0, 3);
+  }, [state.armsBent, state.mixGrip]);
+  const smProgressHist = useMemo(() => { try { return loadSMProgress(); } catch { return []; } }, []);
+  const smTrend = useMemo(() => { try { return smProgressTrend(smProgressHist); } catch { return null; } }, [smProgressHist]);
+  const smLvpStored = useMemo(() => {
+    try { return loadSMLVPProfile(smLvpLiftFor(state.lvpLift) || state.lvpLift); } catch { return null; }
+  }, [state.lvpLift, state.lvpResult]);
+
   const toggle = (key: keyof Pick<SMState, 'pressWeak'|'carryWeak'|'loadWeak'|'gripWeak'>, id: string) => {
     setState(s => {
       const arr = (s as any)[key] as string[];
@@ -365,7 +534,21 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       smBiomech: biomechDetails,
       ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
       gripFails,
+      gripFailsCalibrated: gripFailsCal,
       asymmetry: asymmetry?.diff ?? null,
+      gripAsymmetry: gripAsymDiag,
+      hold: holdDiag,
+      anthro: anthroDiag,
+      causes: smCauses,
+      rankTop: smRankTop,
+      specBlock: smSpec,
+      contestSim,
+      attempts: attemptsBridge,
+      carryPhysics: carryPhys,
+      stoneMoment: stoneMom,
+      axialQuant,
+      logDip: logDipDiag,
+      lvp: smLvpStored,
       weakPointsSM: smWeakPoints,
     };
     applyToPlanner({
@@ -381,6 +564,95 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       localStorage.setItem('he_training_planning_track', 'strength');
       localStorage.setItem('he_strength_sport_mode', 'strongman');
     } catch {}
+  };
+
+  const handleLvpFit = () => {
+    const v = (s: string): number | null => {
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n > 0.15 ? n : null;
+    };
+    const pts = smLvpPointsFromRamp(v(state.lvp50) ?? NaN, v(state.lvp65) ?? NaN, v(state.lvp75) ?? NaN, v(state.lvp90) ?? NaN);
+    if (!pts) { setToast('LVP: нужно ≥3 точек 50/65/75/90%'); setTimeout(() => setToast(''), 2000); return; }
+    const lift = smLvpLiftFor(state.lvpLift) || state.lvpLift;
+    const { calibrateSMLVP: fit } = { calibrateSMLVP: calibrateSMLVP };
+    const prof = fit(lift, pts.map((p, i) => ({ ...p, loadKg: undefined })));
+    if (!prof) { setToast('LVP не сошёлся — скорость должна падать с весом'); setTimeout(() => setToast(''), 2500); return; }
+    try { saveSMLVPProfile(prof); } catch { /* noop */ }
+    setState((s) => ({ ...s, lvpResult: `r² ${prof.r2} ${prof.valid ? '✓ valid' : '⚠ проверь'} · slope ${prof.slope}` }));
+    setToast(`✓ LVP ${lift}: r² ${prof.r2}${prof.valid ? '' : ' — проверь измерения'}`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const handleSaveProgress = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const entry = {
+      date: today,
+      bodyweightKg: parseFloat(state.progBw || state.bodyweightKg) || 0,
+      yoke20mS: state.progYoke20m ? parseFloat(state.progYoke20m) : null,
+      farmers40mS: state.progFarmers40m ? parseFloat(state.progFarmers40m) : null,
+      logKg: state.progLogMax ? parseFloat(state.progLogMax) : null,
+      stoneLadderKg: state.progStoneLadder ? parseFloat(state.progStoneLadder) : null,
+    };
+    try {
+      const hist = loadSMProgress();
+      saveSMProgress(appendSMProgress(hist, entry as never));
+      try {
+        const raw = localStorage.getItem('he_workout_log');
+        void raw;
+      } catch { /* noop */ }
+      setToast('✓ Прогресс сохранён (60 кап)');
+      setTimeout(() => setToast(''), 2000);
+    } catch { /* noop */ }
+  };
+
+  const handleSaveGripProfile = () => {
+    try {
+      const p = buildSMGripProfile({
+        pinchWidth: (state.pinchWidth as never) || '3in',
+        cocLevel: (state.cocLevel as never) || 'coc1_5',
+        fatGripMm: parseInt(state.fatGripMm) || 50,
+      });
+      saveSMGripProfile(p);
+      setToast(`✓ Grip-профиль: pinch ${p.pinchSec}с / crush ${p.crushSec}с / support ${p.supportSec}с`);
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
+  const handleSaveGripSnap = () => {
+    try {
+      const l = parseFloat(state.leftMax);
+      const r = parseFloat(state.rightMax);
+      if (!Number.isFinite(l) || !Number.isFinite(r) || !l || !r) { setToast('Введи L/R макс'); setTimeout(() => setToast(''), 2000); return; }
+      const d = diagnoseSMGripAsymmetry({ leftKg: l, rightKg: r });
+      if (!d) return;
+      const key = 'he_sm_grip_hist_v1';
+      const raw = localStorage.getItem(key);
+      const hist = raw ? JSON.parse(raw) : [];
+      const today = new Date().toISOString().slice(0, 10);
+      const next = appendSMGripSnapshot(hist, { date: today, left: l, right: r, diffPct: d.diffPct, metric: 'kg' });
+      localStorage.setItem(key, JSON.stringify(next));
+      const tr = smGripTrend(next);
+      setToast(`✓ Grip-снапшот ${d.diffPct}%${tr && tr.n >= 2 ? ` · тренд ${tr.deltaPp}п.п.` : ''}`);
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
+  const handleExportIcs = () => {
+    if (!smSpec) { setToast('Нет спец-блока — выбери слабые фазы'); setTimeout(() => setToast(''), 2000); return; }
+    const ics = buildSMIcs(smSpec, { title: 'Стронг спец-блок' });
+    if (!ics) return;
+    downloadSMIcs(ics, `sm-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+    setToast('✓ ICS спец-блока');
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const handleSaveAnnual = () => {
+    if (!smSpec) { setToast('Нет спец-блока'); setTimeout(() => setToast(''), 2000); return; }
+    const weeks = buildSMAnnualOverlay(smSpec, { startWeek: parseInt(state.annualStartWeek) || 1 });
+    if (!weeks) return;
+    saveSMAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1);
+    setToast(`✓ Годовой overlay: ${weeks.length} нед → he_sm_annual_sync_v1`);
+    setTimeout(() => setToast(''), 2500);
   };
 
   const handleCsvParse = () => {
@@ -420,6 +692,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
+  const proSnapExtra = () => ({
+    carryPhysics: carryPhys ? carryPhys.note : null,
+    stoneMoment: stoneMom ? stoneMom.note : null,
+    contestSim: contestSim ? `${contestSim.predictedPlace} место/10 · слабые ${contestSim.weakEvents.join(', ') || '—'} · ${contestSim.recOrder.join(' → ')}` : null,
+    attempts: attemptsBridge ? attemptsBridge.rationale.slice(0, 8) : null,
+    progress: smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · лог ${smTrend.logDeltaKg ?? '—'}кг · йок ${smTrend.yokeDeltaS ?? '—'}с` : null,
+    causes: smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`),
+    specBlock: smSpec ? `${smSpec.weakPoints.join(', ')} × ${smSpec.totalWeeks}нед` : null,
+  });
+
   const handleExport = () => {
     const snap: any = {
       weakPoints,
@@ -434,6 +716,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tacky: state.tackyUsed,
       findings: scoring.findings.map(f => f.text),
+      ...proSnapExtra(),
     };
     const html = buildSMDiagnosticsHtml(snap);
     downloadSMHtml(html, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.html`);
@@ -454,6 +737,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tacky: state.tackyUsed,
       findings: scoring.findings.map(f => f.text),
+      ...proSnapExtra(),
     };
     downloadSMCsv(snap, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.csv`);
     setToast('✓ CSV экспорт');
@@ -475,7 +759,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️‍♂️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Стронгмен-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>13 фаз (лог 4 + carry 6 + stone 3) × углы + биомеханика + VBT carry 15% + OHS 6 + grip tri-modal + sway + контест.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>16 фаз (лог 4 + carry 6 + stone 3 + grip/core/cond) × углы + биомеханика + VBT carry 15% + LVP + OHS 6 + hold + grip tri-modal + sway + симулятор + попытки + физика.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
@@ -499,7 +783,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 10, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
         {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 10, color: '#60a5fa' }}>Enode xLoop {swayCm}см → {enodeCorrected}см (Chavda 2024 bias) · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin}</div>}
-        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM }}>Axial {axialProgress.curM}м / {axialProgress.mrv}м MRV ({axialProgress.pct}%) · cond {state.conditioningFail? 'FAIL — prowler 10×100ft' : 'ok — alactic 8×10с/50с'} · {swayDiag? `sway ${swayDiag.swayCm}см` : 'sway —'}</div>
+        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM }}>Axial {axialProgress.curM}м / {axialProgress.mrv}м MRV ({axialProgress.pct}%) · {axialQuant.text} · {axialQuant.recipe} · cond {state.conditioningFail? 'FAIL — prowler 10×100ft' : 'ok — alactic 8×10с/50с'} · {swayDiag? `sway ${swayDiag.swayCm}см` : 'sway —'}</div>
+        {carryPhys && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 10, color: '#60a5fa' }}>🚜 Йок-физика (Legg/Hindle): {carryPhys.note}</div>}
+        {stoneMom && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 10, color: '#f59e0b' }}>🪨 Камень-момент (Harris): {stoneMom.note}</div>}
+        {contestSim && <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>🏆 Симулятор: {contestSim.predictedPlace} место из 10 · total {contestSim.totalPoints}pts · слабые {contestSim.weakEvents.join(', ') || '—'} · порядок {contestSim.recOrder.join(' → ')}</div>}
+        {attemptsBridge && attemptsBridge.rationale.length > 1 && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 10, color: '#22c55e' }}>🎯 Попытки: {attemptsBridge.rationale.slice(1, 4).join(' · ')}{attemptsBridge.medley ? ` · Medley ${attemptsBridge.medley.totalTimeS}с/cap ${attemptsBridge.medley.timeCapS}с` : ''}</div>}
+        {smCauses.length > 0 && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff' }}>🧬 Причины: {smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`).join(' · ')}</div>}
+        {smRankTop.length > 0 && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(94,234,212,0.08)', border: '1px solid rgba(94,234,212,0.18)', fontSize: 10, color: '#5ee' }}>⭐ Топ-коррекция: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%`).join(' · ')}</div>}
+        {smSpec && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', fontSize: 10, color: '#fca5a5' }}>📅 Спец-блок: {smSpec.weakPoints.join(', ')} × {smSpec.totalWeeks}нед · {smSpec.weeks[0]?.note || ''} · dayMap event-день</div>}
+        {bicepsWarn.length > 0 && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 10, color: '#ef4444' }}>🦾 Безопасность: {bicepsWarn.join(' · ')}</div>}
+        {holdDiag && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 10, color: '#22c55e' }}>✊ Hold: {holdDiag.verdict}</div>}
+        {anthroDiag && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM }}>📏 Антро: {anthroDiag.loadAdvice} {anthroDiag.pickupAdvice}</div>}
+        {logDipDiag && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: logDipDiag.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>📐 Лог-дип: {logDipDiag.text}{logDipDiag.drivePowerW != null ? ` · drive ~${logDipDiag.drivePowerW}Вт` : ''}</div>}
+        {gripAsymDiag && gripAsymDiag.isAsym && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 10, color: '#f59e0b' }}>⚖️ Grip-асимметрия: {gripAsymDiag.text}</div>}
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button onClick={handleExport} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>🖨 HTML</button>
@@ -562,6 +858,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize:11, color:DIM }}>Диаметр лога см<br/><input value={state.diameterCm} onChange={e=>setState(s=>({...s, diameterCm:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
                 <label style={{ fontSize:11, color:DIM }}>Покрытие<br/><select value={state.surface} onChange={e=>setState(s=>({...s, surface:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="">—</option><option value="резина">резина</option><option value="трава">трава</option><option value="асфальт">асфальт</option><option value="песок">песок</option></select></label>
               </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Дип см (8-12)<br/><input value={state.logDipCm} onChange={e=>setState(s=>({...s, logDipCm:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Дип мс (~200)<br/><input value={state.logDipMs} onChange={e=>setState(s=>({...s, logDipMs:e.target.value}))} placeholder="200" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Вес тела кг<br/><input value={state.bodyweightKg} onChange={e=>setState(s=>({...s, bodyweightKg:e.target.value}))} placeholder="105" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Тяга кг (axle)<br/><input value={state.deadliftKg} onChange={e=>setState(s=>({...s, deadliftKg:e.target.value}))} placeholder="250" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              </div>
+              {logDipDiag && <div style={{ fontSize:10, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{logDipDiag.text} (Renals braking/propulsion, Zhang dip 0.20с)</div>}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Стратегия попыток<br/><select value={state.strategy} onChange={e=>setState(s=>({...s, strategy:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="conservative">conservative 85/92/98</option><option value="balanced">balanced 88/95/100</option><option value="aggressive">aggressive 90/97/102</option></select></label>
+                <label style={{ fontSize:11, color:DIM }}>Хват тяги<br/><select value={state.mixGrip} onChange={e=>setState(s=>({...s, mixGrip:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="overhand">overhand/hook</option><option value="mixed">mixed (риск)</option><option value="straps">straps</option></select></label>
+              </div>
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:DIM, marginTop:6 }}><input type="checkbox" checked={state.armsBent} onChange={e=>setState(s=>({...s, armsBent:e.target.checked}))}/> Руки согнуты на камне/шине (риск бицепса)</label>
+              {attemptsBridge && attemptsBridge.rationale.length > 0 && <div style={{ fontSize:10, color:'#22c55e', marginTop:4 }}>{attemptsBridge.rationale.slice(0, 4).join(' · ')}</div>}
             </div>
           </div>
         )}
@@ -595,7 +904,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <label style={{ fontSize:11, color:DIM }}>VBT йок last м/с<br/><input value={state.vbtYokeLast} onChange={e=>setState(s=>({...s, vbtYokeLast:e.target.value}))} placeholder="1.20" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
             </div>
             {swayDiag && <div style={{ fontSize:10, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444', marginTop:4 }}>{swayDiag.text} · SRD 3/5см · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
-            {vbtLoss && <div style={{ fontSize:10, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry</div>}
+            {vbtLoss && <div style={{ fontSize:10, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
+            {carryPhys ? <div style={{ fontSize:10, color:'#60a5fa', marginTop:4 }}>Физика: {carryPhys.note} · Hindle 1.69м/с stride 1.14м rate 1.62Hz</div> : <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Физика йока: введи вес тела (таб Жим) + йок кг → speed/stride/cadence/feasible</div>}
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео переноски — sway из Kinovea (xLoop)</div>
               <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Сними сбоку 30fps → Kinovea CSV → вкладка Видео → sway автоматически</div>
@@ -652,8 +962,23 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <label style={{ fontSize:11, color:DIM }}>Планка сек<br/><input value={state.corePlankSec} onChange={e=>setState(s=>({...s, corePlankSec:e.target.value}))} placeholder="120" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
               <label style={{ fontSize:11, color:DIM, display:'flex', alignItems:'center', gap:6, marginTop:16 }}><input type="checkbox" checked={state.conditioningFail} onChange={e=>setState(s=>({...s, conditioningFail:e.target.checked}))}/> Кондиция провал (medley &gt;60с)</label>
             </div>
-            <div style={{ fontSize:10, color: gripFails>=2?'#ef4444':'#22c55e', marginTop:4 }}>Grip fails {gripFails}/3 {gripFails>=2?'— prehab hammer 3×12 + pinch 2×15': '— норма'} · axial {axialOverload?'перегруз ≥12 сетов+300м — QL suitcase 2×20м': 'норм'}</div>
+            <div style={{ fontSize:10, color: gripFails>=2?'#ef4444':'#22c55e', marginTop:4 }}>Grip fails {gripFails}/3 (калибр {gripFailsCal}/3) {gripFails>=2?'— prehab hammer 3×12 + pinch 2×15': '— норма'} · axial {axialOverload?'перегруз ≥12 сетов+300м — QL suitcase 2×20м': 'норм'} · {axialQuant.text}</div>
             <div style={{ fontSize:10, color:DIM, marginTop:6 }}>ACWR {acwr? `${acwr.ratio.toFixed(2)} ${acwr.zone}` : '—'} · conditioning как в strength-sport-conditioning (alactic 8×10с/50с)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:8 }}>
+              <label style={{ fontSize:11, color:DIM }}>Pinch-блок<br/><select value={state.pinchWidth} onChange={e=>setState(s=>({...s, pinchWidth:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="2in">2″ (норма 30с)</option><option value="3in">3″ (норма 20с)</option><option value="4in">4″ (норма 15с)</option></select></label>
+              <label style={{ fontSize:11, color:DIM }}>CoC<br/><select value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="coc1">CoC 1 (20с)</option><option value="coc1_5">CoC 1.5 (30с)</option><option value="coc2">CoC 2 (40с)</option></select></label>
+              <label style={{ fontSize:11, color:DIM }}>FatGrip мм<br/><select value={state.fatGripMm} onChange={e=>setState(s=>({...s, fatGripMm:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="38">38 (стандарт)</option><option value="50">50 (axle)</option><option value="60">60 (толстый)</option></select></label>
+            </div>
+            <div style={{ display:'flex', gap:6, marginTop:6 }}>
+              <button onClick={handleSaveGripProfile} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.25)', color:'#a78bfa', fontSize:11, cursor:'pointer' }}>💾 Grip-профиль</button>
+              <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>SBS r=0.40 — support/pinch/crush раздельно</span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:8 }}>
+              <label style={{ fontSize:11, color:DIM }}>Лог-hold сек<br/><input value={state.logHoldSec} onChange={e=>setState(s=>({...s, logHoldSec:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Фермер-hold сек<br/><input value={state.farmersHoldSec} onChange={e=>setState(s=>({...s, farmersHoldSec:e.target.value}))} placeholder="60" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Axle DOH кг<br/><input value={state.axleDohKg} onChange={e=>setState(s=>({...s, axleDohKg:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            </div>
+            {holdDiag && <div style={{ fontSize:10, color: holdDiag.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
             {weakPoints.map(id=>{
               const bio = smBiomechForWeak(id);
               if (!bio || !['grip_support','core_brace','conditioning','farmers_grip'].includes(bio.weakPoint)) return null;
@@ -695,9 +1020,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {asymmetry && (
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: asymmetry.isCrit?'rgba(239,68,68,0.08)': asymmetry.isAsym?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${asymmetry.isCrit?'rgba(239,68,68,0.2)': asymmetry.isAsym?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
                 <div style={{ fontSize:11, fontWeight:700, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'CRITICAL ≥12%': asymmetry.isAsym?'WARN ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker}`:''}</div>
-                <div style={{ fontSize:10, color:DIM }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood).</div>
+                <div style={{ fontSize:10, color:DIM }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood). {gripAsymDiag ? gripAsymDiag.text : ''}</div>
+                <button onClick={handleSaveGripSnap} style={{ marginTop:6, padding:'6px 12px', borderRadius:8, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.25)', color:'#f59e0b', fontSize:11, cursor:'pointer' }}>📸 Grip-снапшот L/R</button>
               </div>
             )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+              <label style={{ fontSize:11, color:DIM }}>Рост см (антро)<br/><input value={state.anthroHeight} onChange={e=>setState(s=>({...s, anthroHeight:e.target.value}))} placeholder="182" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              <label style={{ fontSize:11, color:DIM }}>Размах рук см<br/><input value={state.anthroArmSpan} onChange={e=>setState(s=>({...s, anthroArmSpan:e.target.value}))} placeholder="186" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+            </div>
+            {anthroDiag && <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{anthroDiag.loadAdvice} {anthroDiag.pickupAdvice} (tacky ≈{anthroDiag.tackyHeightCm}см)</div>}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
               <label style={{ fontSize:11, color:DIM }}>Sway см (lateral)<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="2.5" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
               <label style={{ fontSize:11, color:DIM }}>Tacky<br/><select value={state.tackyUsed?'yes':'no'} onChange={e=>setState(s=>({...s, tackyUsed:e.target.value==='yes'}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }}><option value="no">нет</option><option value="yes">есть</option></select></label>
@@ -728,6 +1059,34 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
             <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
+            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>LVP-калибровка SM (Wood PLOS 2026: population ±0.15 — нужен ramp)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Лифт<br/><select value={state.lvpLift} onChange={e=>setState(s=>({...s, lvpLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="stone_load">stone</option><option value="log_press">log</option></select></label>
+                <label style={{ fontSize:11, color:DIM }}>50% м/с<br/><input value={state.lvp50} onChange={e=>setState(s=>({...s, lvp50:e.target.value}))} placeholder="1.90" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>65% м/с<br/><input value={state.lvp65} onChange={e=>setState(s=>({...s, lvp65:e.target.value}))} placeholder="1.60" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>75% м/с<br/><input value={state.lvp75} onChange={e=>setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.40" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>90% м/с<br/><input value={state.lvp90} onChange={e=>setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              </div>
+              <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
+                <button onClick={handleLvpFit} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(59,130,246,0.14)', border:'1px solid #1f3a5f', color:'#60a5fa', fontSize:11, cursor:'pointer' }}>📈 Fit LVP</button>
+                <span style={{ fontSize:10, color:DIM }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'ramp 50/65/75/90 → r²≥0.85')}</span>
+              </div>
+            </div>
+            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Прогресс стронга (йок 20м / фермер 40м / лог / лестница)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginTop:6 }}>
+                <label style={{ fontSize:11, color:DIM }}>Йок 20м с<br/><input value={state.progYoke20m} onChange={e=>setState(s=>({...s, progYoke20m:e.target.value}))} placeholder="12.0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Фермер 40м с<br/><input value={state.progFarmers40m} onChange={e=>setState(s=>({...s, progFarmers40m:e.target.value}))} placeholder="28.0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Лог кг<br/><input value={state.progLogMax} onChange={e=>setState(s=>({...s, progLogMax:e.target.value}))} placeholder="110" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Лестница кг<br/><input value={state.progStoneLadder} onChange={e=>setState(s=>({...s, progStoneLadder:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+                <label style={{ fontSize:11, color:DIM }}>Вес кг<br/><input value={state.progBw} onChange={e=>setState(s=>({...s, progBw:e.target.value}))} placeholder="105" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+              </div>
+              <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
+                <button onClick={handleSaveProgress} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(34,197,94,0.14)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:11, cursor:'pointer' }}>💾 Снапшот прогресса</button>
+                <span style={{ fontSize:10, color:DIM }}>{smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · best ${smTrend.bestScore} (${smTrend.bestDate})` : `история ${smProgressHist.length}/60`}</span>
+              </div>
+            </div>
             <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
               <div style={{ fontSize:11, color:DIM }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>
               <div style={{ marginTop:6, width:'100%', height:60, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)' }}>preview — sway 3см норма, &gt;5см критично (McGill lateral bend)</div>
@@ -740,10 +1099,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize:10, color:DIM, marginBottom:6 }}>Findings: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
         {scoring.floors.length>0 && <div style={{ fontSize:10, color:'#ef4444', marginBottom:6 }}>Floors: {scoring.floors.join(' · ')}</div>}
         <div style={{ fontSize:11, color:DIM, marginBottom:6 }}>Выбрано: {weakPoints.length? weakPoints.join(' · ') : '— баланс'} {smWeakPoints.length? `→ ${smWeakPoints.join(' · ')}` : ''}</div>
+        {smRankTop.length > 0 && <div style={{ fontSize:10, color:'#5ee', marginBottom:6 }}>Ранжир: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}% (score ${c.score})`).join(' · ')}</div>}
+        {smSpec && <div style={{ fontSize:10, color:DIM, marginBottom:6 }}>Спец-блок {smSpec.totalWeeks}нед: {smSpec.weeks.slice(0, 3).map((w) => `нед${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}… · {smSpec.rationale[0]}</div>}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+          <label style={{ fontSize:11, color:DIM }}>Спец-блок нед (4-8)<br/><input value={state.specWeeks} onChange={e=>setState(s=>({...s, specWeeks:e.target.value}))} placeholder="6" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+          <label style={{ fontSize:11, color:DIM }}>Год: старт-неделя<br/><input value={state.annualStartWeek} onChange={e=>setState(s=>({...s, annualStartWeek:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
+        </div>
         <button onClick={applyToConstructor} style={{ width:'100%', padding:'10px 14px', borderRadius:8, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
         <div style={{ display:'flex', gap:6, marginTop:8 }}>
           <button onClick={handleExport} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>🖨 HTML</button>
           <button onClick={handleExportCsv} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>📥 CSV</button>
+          <button onClick={handleExportIcs} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>📅 ICS</button>
+          <button onClick={handleSaveAnnual} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>🗓 Год</button>
         </div>
       </div>
     </div>

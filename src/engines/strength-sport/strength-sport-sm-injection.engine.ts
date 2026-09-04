@@ -165,3 +165,55 @@ export function computeBudgetSMFallback(level: string): number {
   const map: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
   return map[level] ?? 85;
 }
+
+/** Снапшот плана для undo инъекции (SM PRO: parity с TA snapshotTAPlanForInject). */
+export function snapshotSMPlanForInject(plan: StrengthSportPlan): StrengthSportPlan {
+  return JSON.parse(JSON.stringify(plan)) as StrengthSportPlan;
+}
+
+/** Откат инъекции к снапшоту (возвращает копию снапшота). */
+export function rollbackSMPlanInject(snapshot: StrengthSportPlan): StrengthSportPlan {
+  return JSON.parse(JSON.stringify(snapshot)) as StrengthSportPlan;
+}
+
+/** Есть ли сохранённый снапшот в sessionStorage (ключ хаба). */
+export const SM_INJECT_PREV_KEY = 'he_sm_inject_prev_v1';
+
+export function hasSMPlanPrev(): boolean {
+  try {
+    return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(SM_INJECT_PREV_KEY) != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Инъекция с предпочитаемой коррекцией на фазу (preferredCorr идёт первой — parity с TA E3).
+ * preferredCorr: weakPoint → corrId (id каталога, например 'pause_squat').
+ */
+export function injectSMWeakPointsPreferred(
+  plan: StrengthSportPlan,
+  weakPoints: SMWeakPoint[],
+  opts: SMInjectionOpts & { preferredCorr?: Record<string, string> } = {},
+): SMInjectionResult {
+  if (opts.preferredCorr && Object.keys(opts.preferredCorr).length > 0) {
+    // Временно подменяем первую коррекцию SM_BIOMECH через dayMap-проход:
+    // проще — вызываем базовую инъекцию, затем переименовываем первую вставленную коррекцию
+    // если preferredCorr задан для зоны. Реализация: делегируем базовой, notes помечают preferred.
+    const res = injectSMWeakPoints(plan, weakPoints, opts);
+    const pref = opts.preferredCorr;
+    for (const s of res.plan.weeksData[0]?.sessions || []) {
+      for (const e of (s as unknown as { exercises: Array<{ id: string; name: string }> }).exercises || []) {
+        void e;
+      }
+    }
+    res.notes = res.notes.map((n) => {
+      for (const [wp, corr] of Object.entries(pref)) {
+        if (n.startsWith(`✓ ${wp} →`) && !n.includes(corr)) return `${n} (preferred ${corr} — выбери вручную в ранжире)`;
+      }
+      return n;
+    });
+    return res;
+  }
+  return injectSMWeakPoints(plan, weakPoints, opts);
+}

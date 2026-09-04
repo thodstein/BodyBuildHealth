@@ -22,6 +22,14 @@ export interface SMDiagnosticSnapshot {
   platformHeightCm?: number | null;
   tacky?: boolean | null;
   findings: string[];
+  // SM PRO: физика + симулятор + попытки + прогресс (опционально, backward-compat)
+  carryPhysics?: string | null;
+  stoneMoment?: string | null;
+  contestSim?: string | null;
+  attempts?: string[] | null;
+  progress?: string | null;
+  causes?: string[] | null;
+  specBlock?: string | null;
 }
 
 export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
@@ -40,6 +48,13 @@ export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
 <li>Платформа: ${snap.platformHeightCm != null ? `${snap.platformHeightCm}см` : '—'} · Tacky: ${snap.tacky ? 'да' : snap.tacky === false ? 'нет' : '—'}</li>
 </ul>
 <h2>Findings</h2><ul>${findings}</ul>
+${snap.carryPhysics ? `<h2>Физика переноски</h2><div>${esc(snap.carryPhysics)}</div>` : ''}
+${snap.stoneMoment ? `<h2>Момент камня</h2><div>${esc(snap.stoneMoment)}</div>` : ''}
+${snap.contestSim ? `<h2>Симулятор контеста</h2><div>${esc(snap.contestSim)}</div>` : ''}
+${snap.attempts && snap.attempts.length ? `<h2>Попытки</h2><ul>${snap.attempts.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+${snap.progress ? `<h2>Прогресс</h2><div>${esc(snap.progress)}</div>` : ''}
+${snap.causes && snap.causes.length ? `<h2>Причины</h2><ul>${snap.causes.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+${snap.specBlock ? `<h2>Спец-блок</h2><div>${esc(snap.specBlock)}</div>` : ''}
 </body></html>`;
 }
 
@@ -56,6 +71,13 @@ export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
     ['ohs', snap.ohs ? `${snap.ohs.totalScore}/6` : ''],
     ['gripFails', snap.gripFails != null ? String(snap.gripFails) : ''],
     ['asymmetry', snap.asymmetryPct != null ? String(snap.asymmetryPct) : ''],
+    ['carryPhysics', snap.carryPhysics || ''],
+    ['stoneMoment', snap.stoneMoment || ''],
+    ['contestSim', snap.contestSim || ''],
+    ['attempts', (snap.attempts || []).join('; ')],
+    ['progress', snap.progress || ''],
+    ['causes', (snap.causes || []).join('; ')],
+    ['specBlock', snap.specBlock || ''],
     ['findings', snap.findings.join('; ')],
   ];
   return rows.map(r => r.map(escCsv).join(',')).join('\n');
