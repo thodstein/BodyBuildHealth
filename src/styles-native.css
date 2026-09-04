@@ -2677,6 +2677,49 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 49. NATIVE DEEP-17 — хват, прогнозы, планы, рекомендации ── */
+html.app-native .train-armgrip,
+html.app-native .train-contestactive,
+html.app-native .train-volbudget,
+html.app-native .train-stdforecast,
+html.app-native .train-readinessfc,
+html.app-native .train-rirhub,
+html.app-native .train-progresstab,
+html.app-native .train-mytraining,
+html.app-native .train-trainrec,
+html.app-native .train-toolshub,
+html.app-native .train-sticking,
+html.app-native .calc-safetyconf {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-armgrip,
+html.app-native .train-volbudget,
+html.app-native .train-stdforecast,
+html.app-native .train-readinessfc,
+html.app-native .train-progresstab,
+html.app-native .train-trainrec,
+html.app-native .train-sticking {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armgrip,
+  html.app-native .train-contestactive,
+  html.app-native .train-volbudget,
+  html.app-native .train-stdforecast,
+  html.app-native .train-readinessfc,
+  html.app-native .train-rirhub,
+  html.app-native .train-progresstab,
+  html.app-native .train-mytraining,
+  html.app-native .train-trainrec,
+  html.app-native .train-toolshub,
+  html.app-native .train-sticking,
+  html.app-native .calc-safetyconf {
+    animation: none;
+  }
+}
+
 /* ─── 48. NATIVE DEEP-16 — тренды, уровни, сравнение, техника ─── */
 html.app-native .train-sparkline,
 html.app-native .train-volchart,

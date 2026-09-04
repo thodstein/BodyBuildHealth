@@ -171,7 +171,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
   }, [mode, manualLift, manualWeight, manualReps, manualRir]);
 
   if (mode==='diary' && !analysis.length) return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+    <div className="card train-sticking" style={{ padding: '8px 10px', marginBottom: 8 }}>
       <div style={{ display:'flex', gap:6, marginBottom:6 }}>
         <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
         <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника ✓</button>
@@ -188,7 +188,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
   const active = analysis.find(a => a.lift === selectedLift) || analysis[0];
 
   return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+    <div className="card train-sticking" style={{ padding: '8px 10px', marginBottom: 8 }}>
       <div style={{ display:'flex', gap:6, marginBottom:6 }}>
         <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
         <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>

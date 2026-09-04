@@ -16,7 +16,7 @@ export const ReadinessForecastCard: React.FC = () => {
   const forecast = useMemo(() => recs.length >= 3 ? generateReadinessForecast(recs) : null, [recs]);
 
   if (recs.length < 3) {
-    return <div className="card" style={{ padding: 12 }}>
+    return <div className="card train-readinessfc" style={{ padding: 12 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>📈 Прогноз готовности</h3>
       <div style={{ ...SMALL, color: '#fff' }}>Недостаточно данных ({recs.length}/3 дней). Открывайте приложение ежедневно — готовность записывается в историю, и прогноз появится.</div>
     </div>;
@@ -31,7 +31,7 @@ export const ReadinessForecastCard: React.FC = () => {
   const fcPts = (forecast?.values || []).map((v: number, i: number) => `${px(recs.length - 1 + i)},${py(v)}`).join(' ');
 
   return (
-    <div className="card" style={{ padding: 12, marginBottom: 8 }}>
+    <div className="card train-readinessfc" style={{ padding: 12, marginBottom: 8 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>📈 Прогноз готовности (Хольт, {recs.length} дн истории)</h3>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '4px auto', display: 'block' }}>
         <polyline points={histPts} fill="none" stroke="#60a5fa" strokeWidth={1.6} />

@@ -122,7 +122,7 @@ const StandardForecastCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }
   if (!forecasts || !forecasts.lifts.length) return null;
 
   return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+    <div className="card train-stdforecast" style={{ padding: '8px 10px', marginBottom: 8 }}>
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
         🏆 Прогноз достижения нормативов (IPF, {forecasts.bw} кг)
       </div>

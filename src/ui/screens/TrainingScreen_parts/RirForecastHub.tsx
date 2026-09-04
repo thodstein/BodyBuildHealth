@@ -18,7 +18,7 @@ export const RirForecastHub: React.FC<{ initialMode?: RirForecastHubMode }> = ({
   const [mode, setMode] = useState<RirForecastHubMode>(initialMode ?? 'rir');
 
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
+    <div className="train-rirhub" style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🎯 RIR + Прогноз — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
         Без дублей: <b style={{ color: '#fff' }}>RIR-калибратор</b> (факт RPE vs план RIR → bias и сдвиг RIR) + <b style={{ color: '#fff' }}>прогноз готовности</b> (Хольт, 3+ дня истории → 95% ДИ) — в одном месте. Ранее разнесены в `rir_calibration` и `readiness_forecast` с дублем логики дневника — теперь единый расчёт. Источники: Helms RPE/RIR, Zatsiorsky, Holt (1957) — без выдумок.

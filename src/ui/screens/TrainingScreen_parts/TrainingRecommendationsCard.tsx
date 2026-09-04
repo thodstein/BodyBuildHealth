@@ -30,7 +30,7 @@ export const TrainingRecommendationsCard: React.FC<{
   const hasAlert = recs.some(r => r.severity !== 'info');
 
   return (
-    <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid ' + (hasAlert ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)'), marginBottom: 8 }}>
+    <div className="train-trainrec" style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid ' + (hasAlert ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)'), marginBottom: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: hasAlert ? '#f59e0b' : ACCENT, marginBottom: 8 }}>🤖 Рекомендации по тренировкам</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {recs.map(r => {

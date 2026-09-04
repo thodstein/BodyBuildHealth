@@ -102,7 +102,7 @@ export const SafetyConflicts: React.FC<{ rec: SupportRecommendation; planResult?
   const rows = planConflicts.filter((c: any) => c.severity && c.severity !== 'LOW');
   if (rows.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetyconf" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>⚠️ Взаимодействия текущего плана</div>
       {rows.slice(0, 12).map((c: any, i: number) => (
         <div key={`${c.a}-${c.b}-${i}`} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.08)', border: `1px solid ${c.severity === 'HIGH' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.24)'}`, color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>

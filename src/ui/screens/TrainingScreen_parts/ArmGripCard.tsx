@@ -34,7 +34,7 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
   const apply = () => { if (onApplyWeak) onApplyWeak(diag.weakMuscles.slice(0,2)); };
 
   return (
-    <div style={{ border: '1px solid #1f3a5f', borderRadius: 12, padding: 12, background: '#0f1e35' }}>
+    <div className="train-armgrip" style={{ border: '1px solid #1f3a5f', borderRadius: 12, padding: 12, background: '#0f1e35' }}>
       <h3 style={{ margin: '0 0 8px', color: '#fff' }}>✊ Хват — диагностика</h3>
       <p style={{ color: '#9ab', fontSize: 13, margin: '0 0 8px' }}>Введи максимумы — увидишь слабые зоны хвата.</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>

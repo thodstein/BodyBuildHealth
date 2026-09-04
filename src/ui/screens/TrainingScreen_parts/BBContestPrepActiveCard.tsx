@@ -39,7 +39,7 @@ export const BBContestPrepActiveCard: React.FC<{ onOpen?: () => void }> = ({ onO
           : { text: `⏳ ${daysLeft} дн`, color: '#4ade80' };
 
   return (
-    <div style={{
+    <div className="train-contestactive" style={{
       marginBottom: 8, padding: 10, borderRadius: 12, cursor: onOpen ? 'pointer' : 'default',
       background: 'linear-gradient(135deg, rgba(236,72,153,0.10), rgba(24,24,27,0.5))',
       border: '1px solid rgba(236,72,153,0.25)', fontSize: 11, color: '#fff', lineHeight: 1.5,

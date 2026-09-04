@@ -205,6 +205,18 @@ import { VolumeTrendCard } from '../screens/TrainingScreen_parts/VolumeTrendCard
 import { TrainingProfileCard } from '../screens/TrainingScreen_parts/TrainingProfileCard';
 import { PlNormsCalcTab } from '../screens/TrainingScreen_parts/PlNormsCalcTab';
 import { BBMetricsSummaryCard } from '../screens/TrainingScreen_parts/BBMetricsSummaryCard';
+import { ArmGripCard } from '../screens/TrainingScreen_parts/ArmGripCard';
+import { BBContestPrepActiveCard } from '../screens/TrainingScreen_parts/BBContestPrepActiveCard';
+import { VolumeBudgetCard } from '../screens/TrainingScreen_parts/VolumeBudgetCard';
+import { default as StandardForecastCard } from '../screens/TrainingScreen_parts/StandardForecastCard';
+import { ReadinessForecastCard } from '../screens/TrainingScreen_parts/ReadinessForecastCard';
+import { RirForecastHub } from '../screens/TrainingScreen_parts/RirForecastHub';
+import { ProgressTab } from '../screens/TrainingScreen_parts/ProgressTab';
+import { MyTrainingTab } from '../screens/TrainingScreen_parts/MyTrainingTab';
+import { TrainingRecommendationsCard } from '../screens/TrainingScreen_parts/TrainingRecommendationsCard';
+import { ToolsHub } from '../screens/TrainingScreen_parts/ToolsHub';
+import { default as StickingPointAnalysisCard } from '../screens/TrainingScreen_parts/StickingPointAnalysisCard';
+import { SafetyConflicts } from '../screens/Calculator/CalcSafetyLayer';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1340,5 +1352,84 @@ describe('market + pharma + labs roots', () => {
       />,
     );
     expect(c7.querySelector('.train-bbmetrics'), 'bbmetrics').not.toBeNull();
+  });
+
+  it('51. Batch-17 корни: хват, бюджет, прогнозы, хаб', () => {
+    const { container: c1 } = render(<ArmGripCard />);
+    expect(c1.querySelector('.train-armgrip'), 'armgrip').not.toBeNull();
+    cleanup();
+    const metricsMock = {
+      тяжPct: 0.5,
+      пампPct: 0.3,
+      avgRir: 2,
+      totalSets: 40,
+      hardSets: 4,
+      hardSetWarning: null,
+      sessionsPerRotation: 4,
+      mrvMultiplier: 1,
+      perMuscle: [
+        {
+          muscle: 'chest',
+          totalSets: 10,
+          directSets: 8,
+          effectiveSets: 9,
+          тяжSets: 6,
+          пампSets: 4,
+          лёгSets: 0,
+          avgRir: 2,
+          frequencyPerRotation: 2,
+          mev: 6,
+          mav: 12,
+          mrv: 20,
+          status: 'optimal',
+        },
+      ],
+    } as never;
+    const { container: c2 } = render(<VolumeBudgetCard metrics={metricsMock} />);
+    expect(c2.querySelector('.train-volbudget'), 'volbudget').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <StandardForecastCard
+        sessions={[
+          { date: '2026-01-01', exercises: [{ exerciseName: 'Жим лёжа', sets: [{ weight: 80, reps: 8 }] }] },
+          { date: '2026-01-08', exercises: [{ exerciseName: 'Жим лёжа', sets: [{ weight: 82.5, reps: 8 }] }] },
+        ] as never}
+      />,
+    );
+    expect(c3.querySelector('.train-stdforecast'), 'stdforecast').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<ReadinessForecastCard />);
+    expect(c4.querySelector('.train-readinessfc'), 'readinessfc').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<RirForecastHub />);
+    expect(c5.querySelector('.train-rirhub'), 'rirhub').not.toBeNull();
+    // BBContestPrepActiveCard возвращает null без сохранённого плана —
+    // хук .train-contestactive живёт в прод-ветке, здесь не проверяется.
+  });
+
+  it('52. Batch-17 корни: замеры, моё, рекомендации, редирект, срывы, конфликты', () => {
+    const { container: c1 } = render(<ProgressTab historyWorkouts={[]} />);
+    expect(c1.querySelector('.train-progresstab'), 'progresstab').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MyTrainingTab customExercises={[]} setCustomExercises={() => {}} />,
+    );
+    expect(c2.querySelector('.train-mytraining'), 'mytraining').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <TrainingRecommendationsCard historyWorkouts={[]} level="intermediate" weakPoints={[]} />,
+    );
+    expect(c3.querySelector('.train-trainrec'), 'trainrec').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<ToolsHub />);
+    expect(c4.querySelector('.train-toolshub'), 'toolshub').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<StickingPointAnalysisCard sessions={[]} />);
+    expect(c5.querySelector('.train-sticking'), 'sticking').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <SafetyConflicts rec={{ conflicts: [{ a: 'x', b: 'y', reason: 'тест', level: 'warn' }] } as never} />,
+    );
+    expect(c6.querySelector('.calc-safetyconf'), 'safetyconf').not.toBeNull();
   });
 });

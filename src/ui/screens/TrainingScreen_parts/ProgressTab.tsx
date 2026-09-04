@@ -50,7 +50,7 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
     }
   }, [historyWorkouts]);
 
-  return (<div>
+  return (<div className="train-progresstab">
     <div className="card" style={{ marginBottom:8, padding:10 }}>
       <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📏 Замеры тела</h4>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>

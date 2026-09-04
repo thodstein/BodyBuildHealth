@@ -136,7 +136,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const groupOptions = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
 
   return (
-    <div>
+    <div className="train-mytraining">
       <div style={{fontSize:14,fontWeight:700,color:'#00e68a',marginBottom:4}}>⭐ Моя тренировка</div>
       <div style={{fontSize:11,color:'#fff',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
 
