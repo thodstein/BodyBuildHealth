@@ -22,7 +22,7 @@ import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, pars
 import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
-import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
+import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
@@ -57,6 +57,8 @@ type WLState = {
   fvrLoad110: string;
   fvrVmax110: string;
   fvrHAcc: string;
+  // V7-A: движение FvR-замера (рывковая/толчковая тяга)
+  fvrLift: 'snatch' | 'clean';
   // LVP ramp 50/65/75/90
   lvpLift: string;
   lvp50: string;
@@ -126,6 +128,8 @@ const DEFAULT_STATE: WLState = {
   leftMax: '', rightMax: '',
   vbtWeight: '', vbtVel: '', vbtBest: '', vbtLast: '', vbtVthres: '',
   fvrLoad80: '', fvrVmax80: '', fvrLoad110: '', fvrVmax110: '', fvrHAcc: '0.8',
+  // V7-A: движение FvR-замера
+  fvrLift: 'snatch' as 'snatch' | 'clean',
   lvpLift: 'snatch', lvp50: '2.70', lvp65: '2.15', lvp75: '1.80', lvp90: '1.55', lvpResult: '',
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   overheadSquat: '', ankleDorsiflex: '',
@@ -193,6 +197,8 @@ export const WLDiagnosticsHub: React.FC = () => {
   });
   // V5-B: стартовая неделя годового синка
   const [annualStartWeek, setAnnualStartWeek] = useState('1');
+  // V7-C: конечная неделя годового синка (пусто = длина спец-блока)
+  const [annualEndWeek, setAnnualEndWeek] = useState('');
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -387,11 +393,13 @@ export const WLDiagnosticsHub: React.FC = () => {
   const snatchAttempts = useMemo(() => {
     try {
       const manual = state.taSnatchMax ? parseFloat(state.taSnatchMax) : NaN;
-      const base = Number.isFinite(manual) && manual > 0 ? manual : fvr?.snatchTh ?? null;
+      // V7-A: FvR-дефолт только из рывковой тяги (clean-замер — другая модель)
+      const fvrBase = state.fvrLift === 'snatch' ? fvr?.snatchTh ?? null : null;
+      const base = Number.isFinite(manual) && manual > 0 ? manual : fvrBase;
       if (base == null) return null;
       return planTAAttempts({ declaredMaxKg: base, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today });
     } catch { return null; }
-  }, [state.taSnatchMax, fvr, attemptArgs]);
+  }, [state.taSnatchMax, state.fvrLift, fvr, attemptArgs]);
   const cjAttempts = useMemo(() => {
     try {
       const manual = state.taCjMax ? parseFloat(state.taCjMax) : NaN;
@@ -795,7 +803,12 @@ export const WLDiagnosticsHub: React.FC = () => {
     }
     const start = parseInt(annualStartWeek, 10);
     const startWeek = Number.isFinite(start) && start >= 1 && start <= 52 ? start : 1;
-    const weeks = buildTAAnnualOverlay(specPreview, { startWeek });
+    // V7-C: явный конец года (иначе длина спец-блока); хвост — «поддержание фаз»
+    const endRaw = parseInt(annualEndWeek, 10);
+    const totalYearWeeks = Number.isFinite(endRaw) && endRaw > startWeek
+      ? Math.min(52 - startWeek + 1, endRaw - startWeek + 1)
+      : undefined;
+    const weeks = buildTAAnnualOverlay(specPreview, { startWeek, ...(totalYearWeeks != null ? { totalYearWeeks } : {}) });
     if (!weeks || !saveTAAnnualOverlay(weeks, startWeek)) {
       setToast('Годовой синк не записан');
       setTimeout(() => setToast(''), 2000);
@@ -1151,7 +1164,12 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {vbtLoss && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: vbtLoss.exceeded ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${vbtLoss.exceeded ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: vbtLoss.exceeded ? '#ef4444' : '#22c55e' }}>Потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} {vbtLoss.e1RMByVelocity ? `· e1RM ${vbtLoss.e1RMByVelocity}кг` : ''}</div><div style={{ fontSize: 10, color: DIM }}>Порог {thresholdForTALift(state.barLift)}% для ТА-power (vs 20% для силы). {vbtRecommendationSS(vbtLoss.lossPct, state.barLift).action}</div></div>}
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>FvR2 — прогноз рывка ±1.5кг (Sandau)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>FvR2 — прогноз {state.fvrLift === 'clean' ? 'взятия (оценка)' : 'рывка ±1.5кг'} (Sandau)</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {(['snatch', 'clean'] as const).map(lf => (
+                  <button key={lf} onClick={() => setState(s => ({ ...s, fvrLift: lf }))} aria-pressed={state.fvrLift === lf} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.fvrLift === lf ? '#3b82f6' : '#1f3a5f', background: state.fvrLift === lf ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.fvrLift === lf ? '#3b82f6' : DIM, fontSize: 10 }}>{lf === 'snatch' ? 'Рывковая тяга' : 'Толчковая тяга'}</button>
+                ))}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
                 <label style={{ fontSize: 10, color: DIM }}>Нагр80 кг<br /><input value={state.fvrLoad80} onChange={e => setState(s => ({ ...s, fvrLoad80: e.target.value }))} placeholder="80" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Vmax80 м/с<br /><input value={state.fvrVmax80} onChange={e => setState(s => ({ ...s, fvrVmax80: e.target.value }))} placeholder="1.95" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
@@ -1160,13 +1178,13 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 10, color: DIM }}>Vmax110 м/с<br /><input value={state.fvrVmax110} onChange={e => setState(s => ({ ...s, fvrVmax110: e.target.value }))} placeholder="1.45" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Vthres м/с<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               </div>
-              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} snatch {taVthresNorms(profileSex).snatch.min}-{taVthresNorms(profileSex).snatch.max} (opt {taVthresNorms(profileSex).snatch.optimal}), clean {taVthresNorms(profileSex).clean.min}-{taVthresNorms(profileSex).clean.max}</div>}
+              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{state.fvrLift === 'clean' ? 'CleanTh' : 'SnatchTh'} {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}{state.fvrLift === 'clean' ? ' · оценка (валидировано только для рывка, Sandau 2021)' : ''}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} {state.fvrLift}: {taVthresNorms(profileSex)[state.fvrLift].min}-{taVthresNorms(profileSex)[state.fvrLift].max} (opt {taVthresNorms(profileSex)[state.fvrLift].optimal})</div>}
               {fvr && fvrOptimal && <div style={{ fontSize: 10, color: fvrOptimal.forceDom ? '#f59e0b' : '#22c55e', marginTop: 4 }}>FvR-профиль: slope {fvr.slope} vs оптимум {fvrOptimal.opt} (Δ {fvrOptimal.diff > 0 ? '+' : ''}{fvrOptimal.diff}) — {fvrOptimal.forceDom ? 'force-доминантен → приоритет скорость (вис/прыжки)' : 'сбалансирован ✓'}</div>}
             {/* E12: попытки на старт 90/96/102 + readiness −2.5 */}
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🏁 Попытки на старт{fvr ? ` · рывок из FvR: ${fvr.snatchTh}кг` : ''}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🏁 Попытки на старт{fvr && state.fvrLift === 'snatch' ? ` · рывок из FvR: ${fvr.snatchTh}кг` : ''}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <label style={{ fontSize: 10, color: DIM }}>Заявка рывок кг<br /><input value={state.taSnatchMax} onChange={e => setState(s => ({ ...s, taSnatchMax: e.target.value }))} placeholder={fvr ? String(fvr.snatchTh) : '100'} style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: DIM }}>Заявка рывок кг<br /><input value={state.taSnatchMax} onChange={e => setState(s => ({ ...s, taSnatchMax: e.target.value }))} placeholder={fvr && state.fvrLift === 'snatch' ? String(fvr.snatchTh) : '100'} style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Заявка толчок кг<br /><input value={state.taCjMax} onChange={e => setState(s => ({ ...s, taCjMax: e.target.value }))} placeholder="125" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Пик стандарт м/с<br /><input value={state.taVelStd} onChange={e => setState(s => ({ ...s, taVelStd: e.target.value }))} placeholder="1.90" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Пик сегодня м/с<br /><input value={state.taVelToday} onChange={e => setState(s => ({ ...s, taVelToday: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
@@ -1346,6 +1364,16 @@ export const WLDiagnosticsHub: React.FC = () => {
               })}
             </div>
           )}
+          {/* V7-B: вспомогательные фазы (присед/тяги/жим) — только покрытие, без разбора */}
+          {planAudit.hasPlan && (
+            <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>
+              Вспомогательные: {TA_AUX_PHASES.map(wp => {
+                const c = planAudit.byPhase[wp];
+                const short = ({ squat_bottom: 'прис.низ', squat_mid: 'прис.серед', pull_start: 'тяга.старт', pull_lockout: 'тяга.замок', press_start: 'жим.старт' } as Record<string, string>)[wp] || wp;
+                return `${short} ${c.sets}`;
+              }).join(' · ')} (разбор — через OHS/VBT)
+            </div>
+          )}
           {planAudit.hasPlan && planAudit.worstPhase && (
             <button onClick={selectWorstPhase} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({planAudit.byPhase[planAudit.worstPhase].sets} сетов) → разобрать
@@ -1362,6 +1390,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
               <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>с нед<input value={annualStartWeek} onChange={e => setAnnualStartWeek(e.target.value)} placeholder="1" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>по<input value={annualEndWeek} onChange={e => setAnnualEndWeek(e.target.value)} placeholder="—" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               <button onClick={handleAnnualSync} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
               {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>
@@ -1370,6 +1399,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         {/* V3: прогресс двоеборья + Sinclair */}
         <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📈 Прогресс двоеборья + Sinclair (IWF 2021–2024)</div>
+          <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>Коэффициенты олимпийского цикла 2021–2024 — при смене цикла сверь на iwf.sport</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
             <label style={{ fontSize: 11, color: DIM }}>Вес кг<br /><input value={state.progBw} onChange={e => setState(s => ({ ...s, progBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '80'} style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             <label style={{ fontSize: 11, color: DIM }}>Рывок кг<br /><input value={state.progSnatch} onChange={e => setState(s => ({ ...s, progSnatch: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>

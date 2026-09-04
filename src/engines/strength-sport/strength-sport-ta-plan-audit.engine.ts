@@ -26,6 +26,11 @@ export const TA_ALL_PHASES: WLWeakPoint[] = [
   'squat_bottom', 'squat_mid', 'pull_start', 'pull_lockout', 'press_start',
 ];
 
+// V7-B: вспомогательные фазы (присед/тяги/жим — вне CORE-11 двоеборья, только инфо)
+export const TA_AUX_PHASES: WLWeakPoint[] = [
+  'squat_bottom', 'squat_mid', 'pull_start', 'pull_lockout', 'press_start',
+];
+
 // Инверсия WL_WEAKPOINT_CORRECTION: corrId → фазы (один corr может закрывать 2 фазы)
 const CORR_TO_WP: Record<string, WLWeakPoint[]> = (() => {
   const out: Record<string, WLWeakPoint[]> = {};

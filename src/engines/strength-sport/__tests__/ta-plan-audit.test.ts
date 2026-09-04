@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
 import {
-  auditTAPlan, phasesForExercise, hubTabForPhase, TA_CORE_PHASES,
+  auditTAPlan, phasesForExercise, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES, TA_ALL_PHASES,
 } from '../strength-sport-ta-plan-audit.engine';
 
 describe('TA plan audit E1', () => {
@@ -51,5 +51,11 @@ describe('TA plan audit E1', () => {
     expect(hubTabForPhase('jerk_dip')).toBe('jerk');
     expect(hubTabForPhase('squat_bottom')).toBeNull();
     expect(hubTabForPhase('pull_start')).toBeNull();
+  });
+  it('V7-B TA_AUX_PHASES: 5 фаз, дополнение CORE до ALL', () => {
+    expect(TA_AUX_PHASES.length).toBe(5);
+    expect(TA_ALL_PHASES.length).toBe(TA_CORE_PHASES.length + TA_AUX_PHASES.length);
+    expect(TA_AUX_PHASES.every(wp => !TA_CORE_PHASES.includes(wp))).toBe(true);
+    expect(TA_AUX_PHASES.every(wp => (TA_ALL_PHASES as string[]).includes(wp))).toBe(true);
   });
 });

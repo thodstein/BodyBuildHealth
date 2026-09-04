@@ -174,6 +174,21 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('рыв.отрыв 3'), { timeout: 2000 });
     expect(container.textContent).toContain('рыв.серед 0');
   });
+  it('V7-B aux-строка: присед виден в аудите', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 1, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'strength_day', character: 'тяж', exercises: [{ id: 'back_squat', name: 'Присед', group: 'legs', pattern: 'squat', role: 'primary', character: 'тяж', sets: 4, reps: '5', rir: 2, weight: 100, workSets: [{ reps: 5, rir: 2, weight: 100 }], warmupSets: [] }] }] },
+      ],
+      workMax: {}, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    // back_squat по каталогу WL_WEAKPOINT_CORRECTION закрывает только squat_mid (corr-приоритет)
+    await waitFor(() => expect(container.textContent).toContain('прис.серед 4'), { timeout: 2000 });
+    expect(container.textContent).toContain('прис.низ 0');
+    expect(container.textContent).toContain('тяга.старт 0');
+  });
   it('V4-C LVP-sparkline рисуется из ramp-ввода', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
@@ -293,6 +308,18 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('нед 5–'), { timeout: 2000 });
     expect(JSON.parse(localStorage.getItem('he_ta_annual_sync_v1') || '{}').weeks?.[0]?.week).toBe(5);
   });
+  it('V7-C конец года: хвост «поддержание фаз»', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="1"]')!, { target: { value: '1' } });
+    fireEvent.change(container.querySelector('input[placeholder="—"]')!, { target: { value: '8' } });
+    fireEvent.click(await screen.findByText(/В годовой синк/));
+    await waitFor(() => expect(container.textContent).toContain('нед 1–8'), { timeout: 2000 });
+    const stored = JSON.parse(localStorage.getItem('he_ta_annual_sync_v1') || '{}');
+    expect(stored.weeks?.length).toBe(8);
+    expect(stored.weeks?.[7]?.focus).toEqual([]);
+  });
   it('V3 прогресс: сумма + Sinclair + снимок', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.change(container.querySelector('input[placeholder="80"]')!, { target: { value: '81' } });
@@ -310,6 +337,16 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
     fireEvent.click(screen.getByText(/Проверить MediaPipe/));
     await waitFor(() => expect(container.textContent).toMatch(/проверяем|модель доступна|нет сети/), { timeout: 5000 });
+  });
+  it('V7-A FvR: рывок ±1.5кг, взятие — оценка', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    const fill = (ph: string, v: string) => fireEvent.change(container.querySelector(`input[placeholder="${ph}"]`)!, { target: { value: v } });
+    fill('80', '80'); fill('1.95', '1.95'); fill('0.8', '0.8'); fill('110', '110'); fill('1.45', '1.45'); fill('1.85', '1.85');
+    await waitFor(() => expect(container.textContent).toContain('SnatchTh'), { timeout: 2000 });
+    fireEvent.click(screen.getByText(/Толчковая тяга/));
+    await waitFor(() => expect(container.textContent).toContain('CleanTh'), { timeout: 2000 });
+    expect(container.textContent).toContain('оценка');
   });
   it('V6-B3 IMTP ручной вес без профиля', async () => {
     const { container } = render(<WLDiagnosticsHub />);
