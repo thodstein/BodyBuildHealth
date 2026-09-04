@@ -442,6 +442,49 @@ describe('e1rm wide window + batch', () => {
     const out = mod.diagnoseWeakCausesBatch(['chest'], { level: 'intermediate' });
     expect(out.chest.cause).toBe('volume');
   });
+  it('batch тянет историю через canonicalOf (гранулярная зона)', async () => {
+    const mod = await import('../bb-weak-cause.engine');
+    const out = mod.diagnoseWeakCausesBatch(['chest_upper'], {
+      level: 'intermediate',
+      factVolume: {},
+      hist28: { chest: [3, 3] },
+      canonicalOf: (z: string) => (z === 'chest_upper' ? 'chest' : z),
+    });
+    expect(out.chest_upper.cause).toBe('volume');
+    expect(out.chest_upper.evidence.join(' ')).toMatch(/Объём/);
+  });
+  it('батч маппит ориентиры/факт/ACWR на канонику (иначе volume слепнет)', async () => {
+    const mod = await import('../bb-weak-cause.engine');
+    const asm = mod.assembleWeakCauseInput('chest_upper', {
+      level: 'intermediate',
+      factVolume: { chest: { effectiveSets: 2 } },
+      perMuscleAcwr: { chest: { zone: 'caution' } },
+      canonicalOf: (z: string) => (z === 'chest_upper' ? 'chest' : z),
+    });
+    expect(asm.mev).not.toBeNull();
+    expect(asm.mav).not.toBeNull();
+    expect(asm.factHistory).toEqual([2]);
+    expect(asm.acwrZone).toBe('caution');
+  });
+  it('HTML-экспорт с батчем несёт доказательства, а не заглушку', async () => {
+    const causeMod = await import('../bb-weak-cause.engine');
+    const expMod = await import('../bb-diagnostics-export.engine');
+    const causes = causeMod.diagnoseWeakCausesBatch(['chest_upper'], {
+      level: 'intermediate',
+      factVolume: {},
+      hist28: { chest: [2, 2] },
+      canonicalOf: (z: string) => (z === 'chest_upper' ? 'chest' : z),
+    });
+    const rep = {
+      weakCandidates: [], weakMusclesCanonical: ['chest'], weakZonesGranular: ['chest_upper'],
+      symmetry: { ratios: {}, issues: [], score: 80 },
+      stimulus: { global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} }, issues: [] },
+      score: { score: 80, level: 'warn', floors: [], verification: 0.5, penalties: {}, raw: 5 },
+      findings: [], priorities: [],
+    };
+    const html = expMod.buildBBDiagnosticsHtml(rep as any, { weakCauses: causes } as any);
+    expect(html).toContain('Объём');
+  });
 });
 
 // ── CSV meta-паритет ──

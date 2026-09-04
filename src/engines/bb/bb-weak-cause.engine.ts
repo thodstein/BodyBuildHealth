@@ -189,22 +189,36 @@ export interface WeakCauseAssembleDeps {
   canonicalOf?: (zone: string) => string;
 }
 
-function factSetsOf(factVolume: WeakCauseAssembleDeps['factVolume'], zone: string): number | null {
+function factSetsOf(factVolume: WeakCauseAssembleDeps['factVolume'], zone: string, canon?: string): number | null {
   if (!factVolume) return null;
-  const v: any = (factVolume as any)[zone];
-  if (v == null) return null;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  const n = v.effectiveSets ?? v.directSets ?? null;
-  return n == null || !Number.isFinite(n) ? null : n;
+  const pick = (k: string): number | null => {
+    const v: any = (factVolume as any)[k];
+    if (v == null) return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const n = v.effectiveSets ?? v.directSets ?? null;
+    return n == null || !Number.isFinite(n) ? null : n;
+  };
+  return pick(zone) ?? (canon && canon !== zone ? pick(canon) : null);
+}
+
+function landmarksOf(level: string, zone: string, canon?: string): { mev: number; mav: number; mrv: number } | null {
+  // Ориентиры keyed каноническими мышцами — гранулярную зону маппим (иначе volume слепнет)
+  const tryKey = (k: string) => { try { return getVolumeLandmarks(level || 'intermediate', k); } catch { return null; } };
+  return (canon && canon !== zone ? tryKey(canon) : null) || tryKey(zone);
 }
 
 /** Единая сборка входов причины на зону (хаб, мост и экспорт используют одно и то же). */
 export function assembleWeakCauseInput(zone: string, deps: WeakCauseAssembleDeps): Omit<WeakCauseInput, 'zone'> {
   const z = zone;
   const canon = (() => { try { return deps.canonicalOf ? deps.canonicalOf(z) : z; } catch { return z; } })();
-  const lm = (() => { try { return getVolumeLandmarks(deps.level || 'intermediate', z); } catch { return null; } })();
-  const fact = factSetsOf(deps.factVolume, z);
-  const acwrZ = (() => { try { return (deps.perMuscleAcwr as any)?.[z]?.zone ?? null; } catch { return null; } })();
+  const lm = landmarksOf(deps.level || 'intermediate', z, canon);
+  const fact = factSetsOf(deps.factVolume, z, canon);
+  const acwrZ = (() => {
+    try {
+      const m = deps.perMuscleAcwr as any;
+      return m?.[z]?.zone ?? (canon !== z ? m?.[canon]?.zone : null) ?? null;
+    } catch { return null; }
+  })();
   let hist: number[] = [];
   try { hist = (deps.hist28 as any)?.[z] || (deps.hist28 as any)?.[canon] || []; } catch { /* noop */ }
   if (!hist.length && fact != null) hist = [fact];

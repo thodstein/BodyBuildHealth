@@ -426,9 +426,29 @@ export const BBDiagnosticsHub: React.FC = () => {
     let spec: unknown = null;
     const heads: string[] = [];
     try {
+      // те же живые входы, что в меме и CSV (мемы ниже недоступны из-за TDZ)
+      let histLazy: Record<string, number[]> = {};
+      let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
+      try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
+      try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
+      const measLazy: Record<string, number> = {};
+      try {
+        for (const [k, v] of Object.entries(state.circ)) {
+          const n = parseFloat(v as string);
+          if (Number.isFinite(n) && n > 0) measLazy[k] = n;
+        }
+      } catch { /* noop */ }
       causes = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
         level,
         factVolume: factVolume as any,
+        perMuscleAcwr: perMuscleAcwr as any,
+        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        hist28: histLazy as any,
+        e1rmTrend: trendLazy as any,
+        meas: measLazy as any,
+        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
+        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
         canonicalOf: canonicalMuscle,
       });
       for (const z of report.weakZonesGranular.slice(0, 2)) {
