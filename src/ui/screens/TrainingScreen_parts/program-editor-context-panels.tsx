@@ -75,7 +75,7 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
 
   if (totalSessions === 0) {
     return (
-      <div style={{ ...CARD, padding: 10, borderLeft: '2px solid rgba(255,255,255,0.1)' }}>
+      <div className="train-bbctx" style={{ ...CARD, padding: 10, borderLeft: '2px solid rgba(255,255,255,0.1)' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📋 Текущая программа</div>
         <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>
           Нет ни одной сессии. Добавьте первую сессию и упражнения — панель покажет MRV-баланс и ссылки на инструменты.
@@ -88,7 +88,7 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
   }
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '2px solid rgba(0,230,138,0.2)' }}>
+    <div className="train-bbctx" style={{ ...CARD, padding: 10, borderLeft: '2px solid rgba(0,230,138,0.2)' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📋 Состояние ББ-программы</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6, marginBottom: 8 }}>

@@ -569,7 +569,7 @@ export const MetabolicHub: React.FC = () => {
   };
 
   return (
-    <div style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:780, margin:'0 auto' }}>
+    <div className="nut-metabolic" style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:780, margin:'0 auto' }}>
       {toast && <div style={{ position:'fixed', left:'50%', bottom:18, transform:'translateX(-50%)', zIndex:60, maxWidth:520, padding:'10px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 8px 24px rgba(0,0,0,0.35)', fontSize:11, fontWeight:600, color:'#fff', textAlign:'center' }}>{toast}</div>}
       <ModernHero icon="⚖️" title="Метаболика Pro" subtitle="17 в 1 · TDEE Adaptive v2 · MET-часы · KBJU · Navy/JP/BIA · StressLoad · HCT · EA RED-S CAT2 · Пот-тест · MetS/TyG/FIB-4 · NEAT · AT MATADOR · Evidence A/B/C/E · DLW ±12%" />
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(96,165,250,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(96,165,250,0.18)', position:'relative', overflow:'hidden' }}>

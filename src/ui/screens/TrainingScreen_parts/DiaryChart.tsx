@@ -42,7 +42,7 @@ export const MiniLineChart: React.FC<{
     );
   };
   return (
-    <div>
+    <div className="train-minilinechart">
       <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', maxWidth: width }}>
         {[0.25, 0.5, 0.75].map(p => (
           <line key={p} x1={4} x2={width - 4} y1={height - 4 - p * (height - 12)} y2={height - 4 - p * (height - 12)}
@@ -73,7 +73,7 @@ export const MiniBarChart: React.FC<{
   const max = Math.max(1, ...data.map(d => d.value));
   const bw = Math.max(2, (width - 8) / data.length - 3);
   return (
-    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', maxWidth: width }}>
+    <svg className="train-minibarchart" width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', maxWidth: width }}>
       {data.map((d, i) => {
         const h = Math.max(2, (d.value / max) * (height - 16));
         const x = 4 + i * ((width - 8) / data.length);

@@ -33,7 +33,7 @@ const MMCTrackingCard: React.FC = () => {
   const selEx = EXERCISE_CATALOG.find(e => e.id === exId) || EXERCISE_CATALOG[0];
 
   return (
-    <div>
+    <div className="train-mmctrack">
       {/* ═══ Быстрый ввод MMC/Пампинг/Суставы ═══ */}
       <div style={GLASS}>
         <div style={H}>✍️ Ввод MMC/Пампинг/Суставы</div>

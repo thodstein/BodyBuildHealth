@@ -51,6 +51,7 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
       {children}
       {state.open && (
         <div
+          className="train-confirm"
           onClick={(e) => { if (e.target === e.currentTarget) handleClose(false); }}
           style={{
             position: 'fixed', inset: 0, zIndex: 10000,
@@ -59,6 +60,7 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
           }}
         >
           <div
+            className="train-confirm-card"
             style={{
               background: 'rgba(26,28,38,0.95)', backdropFilter: 'blur(20px) saturate(160%)',
               border: `1px solid ${confirmColor}44`, borderRadius: 16, padding: 20,

@@ -29,6 +29,7 @@ export const ExerciseLabPicker: React.FC<{
     <>
       <button
         type="button"
+        className="train-exlabpicker"
         onClick={() => setOpen(true)}
         style={{
           flex: '1 1 160px',
@@ -59,6 +60,7 @@ export const ExerciseLabPicker: React.FC<{
       
       {open && ReactDOM.createPortal(
         <div 
+          className="train-exlabpicker-modal"
           style={{ 
             position: 'fixed', 
             inset: 0, 

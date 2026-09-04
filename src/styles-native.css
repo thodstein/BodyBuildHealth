@@ -2677,6 +2677,55 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 44. NATIVE DEEP-12 — атомы, строки, пикеры, киты ───── */
+html.app-native .train-diarysetrow,
+html.app-native .train-exlabpicker,
+html.app-native .train-exlabpicker-modal,
+html.app-native .train-confirm,
+html.app-native .train-confirm-card,
+html.app-native .train-minilinechart,
+html.app-native .train-minibarchart,
+html.app-native .train-bbctx,
+html.app-native .pl-warmupcheckin,
+html.app-native .pl-cooldowncheckin,
+html.app-native .sup-phaselabel,
+html.app-native .sup-itemrow,
+html.app-native .nut-metabolic {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-diarysetrow,
+html.app-native .train-bbctx,
+html.app-native .train-confirm-card {
+  border-radius: 20px !important;
+}
+
+html.app-native .train-exlabpicker {
+  min-height: 48px !important;
+}
+
+html.app-native .sup-itemrow {
+  gap: 8px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-diarysetrow,
+  html.app-native .train-exlabpicker,
+  html.app-native .train-exlabpicker-modal,
+  html.app-native .train-confirm,
+  html.app-native .train-confirm-card,
+  html.app-native .train-minilinechart,
+  html.app-native .train-minibarchart,
+  html.app-native .train-bbctx,
+  html.app-native .pl-warmupcheckin,
+  html.app-native .pl-cooldowncheckin,
+  html.app-native .sup-phaselabel,
+  html.app-native .sup-itemrow,
+  html.app-native .nut-metabolic {
+    animation: none;
+  }
+}
+
 /* ─── 43. NATIVE DEEP-11 — планировщики, оверлеи, вкладки ───── */
 html.app-native .train-armtech,
 html.app-native .train-microcyc,

@@ -41,7 +41,7 @@ export const WarmupCheckinInline: React.FC<{ date: string; sessionId?: string; o
   const labelStyle: React.CSSProperties = { fontSize: 9, color: '#fff', marginBottom: 3 };
 
   return (
-    <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.2)' }}>
+    <div className="pl-warmupcheckin" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.2)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: WARMUP_COLOR }}>🔥 Разминка</span>
         {saved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено</span>}

@@ -49,11 +49,11 @@ export const pillInactive = (): React.CSSProperties => ({
 });
 
 export const PhaseLabel: React.FC<{ label: string; color: string }> = ({ label, color }) => (
-  <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}30` }}>{label}</span>
+  <span className="sup-phaselabel" style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}30` }}>{label}</span>
 );
 
 export const ItemRow: React.FC<{ name: string; dose: string; timing: string; note: string; color: string }> = ({ name, dose, timing, note, color }) => (
-  <div style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+  <div className="sup-itemrow" style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{name}</span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>

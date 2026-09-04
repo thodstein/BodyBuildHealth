@@ -154,6 +154,15 @@ import { PlannerToolsPanel } from '../screens/TrainingScreen_parts/PlannerToolsP
 import ConjugateDesigner from '../screens/TrainingScreen_parts/ConjugateDesigner';
 import { MesocycleProgressionCard } from '../screens/TrainingScreen_parts/MesocycleProgressionCard';
 import { PedInputPanel } from '../screens/TrainingScreen_parts/PedCoursePanel';
+import { DiarySetRow } from '../screens/TrainingScreen_parts/DiarySetRow';
+import { ExerciseLabPicker } from '../screens/TrainingScreen_parts/ExerciseLabPicker';
+import { ConfirmDialogProvider, useConfirmDialog } from '../screens/TrainingScreen_parts/ConfirmDialog';
+import { MiniLineChart, MiniBarChart } from '../screens/TrainingScreen_parts/DiaryChart';
+import { BbContextPanel } from '../screens/TrainingScreen_parts/program-editor-context-panels';
+import { WarmupCheckinInline } from '../screens/SRCBBScreen_parts/WarmupSessionPanel';
+import { CooldownCheckinInline } from '../screens/SRCBBScreen_parts/CooldownSessionPanel';
+import { PhaseLabel, ItemRow } from '../screens/SupportScreen_parts/supportProtocolsShared';
+import { MetabolicHub } from '../screens/Shared/MetabolicHub';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -846,5 +855,93 @@ describe('market + pharma + labs roots', () => {
     const { container: c6 } = render(<DailyQuests />);
     expect(c6.querySelector('.nut-quests'), 'quests').not.toBeNull();
     // PlanFeedbackCard требует plan/feedback — хук живёт в прод-ветке.
+  });
+
+  it('38. Batch-12 атомы: строки подходов и пикер лаборатории', () => {
+    const { container: c1 } = render(
+      <DiarySetRow
+        set={{ weight: 0, reps: 0, rir: 2, rpe: 7, completed: false }}
+        setNumber={1}
+        isCurrent={true}
+        isBodyweight={false}
+        prevData={null}
+        onComplete={() => {}}
+        onSkip={() => {}}
+      />,
+    );
+    expect(c1.querySelector('.train-diarysetrow'), 'diarysetrow-active').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <DiarySetRow
+        set={{ weight: 80, reps: 8, rir: 2, rpe: 8, completed: true }}
+        setNumber={2}
+        isCurrent={false}
+        isBodyweight={false}
+        prevData={null}
+        onComplete={() => {}}
+        onSkip={() => {}}
+      />,
+    );
+    expect(c2.querySelector('.train-diarysetrow'), 'diarysetrow-done').not.toBeNull();
+    cleanup();
+    const { container: c3, unmount: unmountPicker } = render(
+      <ExerciseLabPicker value="" muscle="chest" onSelect={() => {}} />,
+    );
+    expect(c3.querySelector('.train-exlabpicker'), 'exlabpicker').not.toBeNull();
+    fireEvent.click(c3.querySelector('.train-exlabpicker') as HTMLElement);
+    // Портал модалки уходит в document.body, а не в container
+    expect(document.body.querySelector('.train-exlabpicker-modal'), 'exlabpicker-modal').not.toBeNull();
+    unmountPicker();
+  });
+
+  it('39. Batch-12 атомы: диалог подтверждения и мини-графики', () => {
+    const ConfirmHarness = () => {
+      const { confirm } = useConfirmDialog();
+      return <button onClick={() => confirm({ message: 'Удалить?' })}>ask-confirm</button>;
+    };
+    const { container: c1 } = render(
+      <ConfirmDialogProvider>
+        <ConfirmHarness />
+      </ConfirmDialogProvider>,
+    );
+    fireEvent.click(c1.querySelector('button') as HTMLElement);
+    expect(
+      c1.querySelector('.train-confirm') ?? document.body.querySelector('.train-confirm'),
+      'confirm-overlay',
+    ).not.toBeNull();
+    expect(
+      c1.querySelector('.train-confirm-card') ?? document.body.querySelector('.train-confirm-card'),
+      'confirm-card',
+    ).not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<MiniLineChart data={[1, 2, 3, 2]} />);
+    expect(c2.querySelector('.train-minilinechart'), 'miniline').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<MiniBarChart data={[{ value: 5 }, { value: 3 }]} />);
+    expect(c3.querySelector('.train-minibarchart'), 'minibar').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <BbContextPanel program={{ bb: { weeks: [{ sessions: [] }] } } as never} level="intermediate" />,
+    );
+    expect(c4.querySelector('.train-bbctx'), 'bbctx-empty').not.toBeNull();
+  });
+
+  it('40. Batch-12 атомы: чек-ины, строки протоколов, метаболика', () => {
+    const { container: c1 } = render(<WarmupCheckinInline date="2026-01-01" />);
+    expect(c1.querySelector('.pl-warmupcheckin'), 'warmupcheckin').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<CooldownCheckinInline date="2026-01-01" />);
+    expect(c2.querySelector('.pl-cooldowncheckin'), 'cooldowncheckin').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<PhaseLabel label="Фаза" color="#00e68a" />);
+    expect(c3.querySelector('.sup-phaselabel'), 'phaselabel').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <ItemRow name="NAC" dose="600мг" timing="утро" note="тест" color="#00e68a" />,
+    );
+    expect(c4.querySelector('.sup-itemrow'), 'itemrow').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<MetabolicHub />);
+    expect(c5.querySelector('.nut-metabolic'), 'metabolic').not.toBeNull();
   });
 });

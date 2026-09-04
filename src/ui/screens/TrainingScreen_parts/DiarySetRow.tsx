@@ -52,7 +52,7 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
 
   if (set.completed) {
     return (
-      <div style={{
+      <div className="train-diarysetrow" style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: compact ? '3px 0' : '6px 0',
         borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: compact ? 10 : 11,
       }}>
@@ -81,7 +81,7 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
   };
 
   return (
-    <div style={{
+    <div className="train-diarysetrow" style={{
       padding: compact ? '4px 0' : '8px 0',
       borderBottom: '1px solid rgba(255,255,255,0.03)',
       background: isCurrent ? 'rgba(0,230,138,0.03)' : 'transparent',
