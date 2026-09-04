@@ -250,7 +250,7 @@ export const TrainingMixTab: React.FC = () => {
   const stackTitle = mixTiming === 'pre' ? '🔥 Пред-тренировочный стек' : mixTiming === 'intra' ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
 
   return (
-    <div style={{ padding: '0 12px 80px', maxWidth: 600, margin: '0 auto' }}>
+    <div className="train-mix" style={{ padding: '0 12px 80px', maxWidth: 600, margin: '0 auto' }}>
       <h2 style={{ margin: '0 0 2px', fontSize: 18, fontWeight: 800, color: '#fff' }}>💪 Тренировочные миксы</h2>
       <p style={{ fontSize: 12, color: '#fff', margin: '0 0 12px' }}>
         Подбор пред-/интра-/пост-тренировочных стеков по цели и весу

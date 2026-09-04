@@ -168,7 +168,7 @@ export const SupportTimingPlanner: React.FC = () => {
   const suppEntries = catalog.filter(e => e.source === 'catalog');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="sup-timing" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ ...S.card }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>Тайминг-планировщик приёма БАД</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите свои добавки — система распределит их по времени суток с учётом конкуренции и совместимости.</div>

@@ -40,7 +40,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
   const filtered = favSearch ? favSubstances.filter((sub: any) => (sub?.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
 
   return (
-    <div>
+    <div className="sup-fav">
       <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
         {[['favorites','⭐ Избранное'],['mySubstances','💊 Мои препараты'],['myStacks','📦 Мои стеки'],['calculator','🧮 Расчёты'],['mixes','🎯 Миксы'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]:any) => (
           <button key={id} onClick={() => setFavTab(id)} style={{

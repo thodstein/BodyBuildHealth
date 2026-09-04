@@ -236,7 +236,7 @@ export const VolumeOptimizerTab: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-volopt" style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' }}>
         📐 Качество программы + объём PRO
       </div>

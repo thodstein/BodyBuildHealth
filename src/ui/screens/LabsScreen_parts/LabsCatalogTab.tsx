@@ -316,7 +316,7 @@ export default function LabsCatalogTab({
   }, [filtered]);
 
   return (
-    <div>
+    <div className="labs-labscatalog">
       {/* Header — premium */}
       <div style={{ ...LABS_CARD, padding:12, marginBottom:10, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', gap:10 }}>
         <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background: catalogMode==='markers'? 'rgba(0,230,138,0.14)' : 'rgba(168,85,247,0.14)', border:`1px solid ${catalogMode==='markers'?'rgba(0,230,138,0.18)':'rgba(168,85,247,0.18)'}`, fontSize:16 }}>{catalogMode === 'markers' ? '📖' : '🩺'}</div>

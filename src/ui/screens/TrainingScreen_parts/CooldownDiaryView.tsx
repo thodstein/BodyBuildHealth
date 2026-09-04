@@ -121,7 +121,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
   const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
+    <div className="train-cooldowndiary" style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
       {/* ── Заголовок ── */}
       <div style={{ ...CARD, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>

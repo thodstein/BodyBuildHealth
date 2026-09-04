@@ -114,7 +114,7 @@ export const MesocycleTrackerTab: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-meso" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>📈 Трекер мезоциклов: Мезо 1→2→3</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>
         Отслеживайте прогрессию между мезоциклами: рост объёма, интенсивности и снижение RIR.

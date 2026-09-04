@@ -31,6 +31,26 @@ import { PeakingPanel } from '../screens/SRCBBScreen_parts/PeakingPanel';
 import { RecoveryPanel } from '../screens/SRCBBScreen_parts/RecoveryPanel';
 import { NutritionCharts } from '../screens/NutritionScreen_parts/NutritionCharts';
 import { NutritionReference } from '../screens/NutritionScreen_parts/NutritionReference';
+import { DiaryRecordingForm } from '../screens/TrainingScreen_parts/DiaryRecordingForm';
+import { QuickEntry } from '../screens/TrainingScreen_parts/QuickEntry';
+import { PlDeadpointsBarPathCard } from '../screens/TrainingScreen_parts/PlDeadpointsBarPathCard';
+import { WarmupDiaryView } from '../screens/TrainingScreen_parts/WarmupDiaryView';
+import { CooldownDiaryView } from '../screens/TrainingScreen_parts/CooldownDiaryView';
+import { TrainingMixTab } from '../screens/TrainingScreen_parts/TrainingMixTab';
+import { VolumeOptimizerTab } from '../screens/TrainingScreen_parts/VolumeOptimizerTab';
+import { MesocycleTrackerTab } from '../screens/TrainingScreen_parts/MesocycleTrackerTab';
+import { CardioAnalyticsDashboard } from '../screens/TrainingScreen_parts/CardioAnalyticsDashboard';
+import { MobilityTab } from '../screens/TrainingScreen_parts/MobilityTab';
+import { BBContestPrepCard } from '../screens/SRCBBScreen_parts/BBContestPrepCard';
+import { TaperCoachCard } from '../screens/SRCBBScreen_parts/TaperCoachCard';
+import { StrengthDiary } from '../../engines/strength-diary.engine';
+import { SupportFavoritesView } from '../screens/SupportScreen_parts/SupportFavoritesView';
+import { SupportTimingPlanner } from '../screens/SupportScreen_parts/SupportTimingPlanner';
+import { WeeklyPlanView } from '../screens/SupportScreen_parts/WeeklyPlanView';
+import { LabDiaryTab } from '../screens/LabsScreen_parts/LabDiaryTab';
+import { default as LabsCatalogTab } from '../screens/LabsScreen_parts/LabsCatalogTab';
+import { RiskInfo } from '../screens/RiskScreen_parts/RiskInfo';
+import { ProductUsefulnessPlanner } from '../screens/NutritionScreen_parts/ProductUsefulnessPlanner';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -179,5 +199,88 @@ describe('market + pharma + labs roots', () => {
     expect(c2.querySelector('.labs-tzrisk'), 'tzrisk').not.toBeNull();
     // DailyDietDashboard рендерится только при наличии плана (null без него) —
     // хук .nut-dailydiet живёт в прод-ветке, здесь не проверяется.
+  });
+
+  it('12. Training deep-3 несут корни', () => {
+    const { container: c1 } = render(
+      <QuickEntry
+        diary={new StrengthDiary()}
+        historyWorkouts={[]}
+        selectedWeek={1}
+        onSave={() => {}}
+      />,
+    );
+    expect(c1.querySelector('.train-quickentry'), 'quickentry').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<WarmupDiaryView historyWorkouts={[]} />);
+    expect(c2.querySelector('.train-warmupdiary'), 'warmup').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<CooldownDiaryView />);
+    expect(c3.querySelector('.train-cooldowndiary'), 'cooldown').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TrainingMixTab />);
+    expect(c4.querySelector('.train-mix'), 'mix').not.toBeNull();
+  });
+
+  it('13. Volume, meso, cardio-stats, mobility несут корни', () => {
+    const { container: c1 } = render(<VolumeOptimizerTab />);
+    expect(c1.querySelector('.train-volopt'), 'volopt').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<MesocycleTrackerTab />);
+    expect(c2.querySelector('.train-meso'), 'meso').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <CardioAnalyticsDashboard cycle={null} log={[]} />,
+    );
+    expect(c3.querySelector('.train-cardiostats'), 'cardiostats').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<MobilityTab />);
+    expect(c4.querySelector('.train-mobility'), 'mobility').not.toBeNull();
+  });
+
+  it('14. Contest/taper несут корни (season — тяжёлый, хук в проде)', () => {
+    const { container: c2 } = render(<BBContestPrepCard />);
+    expect(c2.querySelector('.pl-contestprep'), 'contestprep').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <TaperCoachCard
+        builtSrc={null}
+        hasTaper={false}
+        buildCtx={() => ({}) as never}
+        applyRamp={() => {}}
+      />,
+    );
+    expect(c3.querySelector('.pl-tapercoach'), 'tapercoach').not.toBeNull();
+    // PLSeasonBuilder требует полный LMSSelectorInput — хук .pl-season
+    // живёт в прод-ветке, здесь не проверяется.
+  });
+
+  it('15. Support fav/timing/weekplan несут корни', () => {
+    const { container: c1 } = render(<SupportFavoritesView s={{}} />);
+    expect(c1.querySelector('.sup-fav'), 'fav').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportTimingPlanner />);
+    expect(c2.querySelector('.sup-timing'), 'timing').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <WeeklyPlanView planResult={{ schedule: [] } as never} courseWeek={1} />,
+    );
+    expect(c3.querySelector('.sup-weekplan'), 'weekplan').not.toBeNull();
+  });
+
+  it('16. LabDiary, LabsCatalog, RiskInfo, Usefulness несут корни', () => {
+    const { container: c1 } = render(<LabDiaryTab labs={[]} />);
+    expect(c1.querySelector('.labs-labdiary'), 'labdiary').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <LabsCatalogTab labs={[]} selectedPhase="baseline" onPhaseChange={() => {}} tick={0} />,
+    );
+    expect(c2.querySelector('.labs-labscatalog'), 'labscatalog').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<RiskInfo />);
+    expect(c3.querySelector('.risk-info'), 'riskinfo').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<ProductUsefulnessPlanner />);
+    expect(c4.querySelector('.nut-usefulness'), 'usefulness').not.toBeNull();
   });
 });

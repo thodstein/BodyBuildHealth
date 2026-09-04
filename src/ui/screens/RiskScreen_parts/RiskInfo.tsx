@@ -382,7 +382,7 @@ export const RiskInfo: React.FC = () => {
   const toggle = (id: string) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
   return (
-    <div>
+    <div className="risk-info">
       {/* ─── REFERENCE INFO ─── */}
       <div style={{ padding:'8px 0' }}>
         <span style={{ fontSize:16, fontWeight:700 }}>ℹ️ Справочная информация</span>

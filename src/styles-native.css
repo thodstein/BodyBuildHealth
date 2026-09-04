@@ -2330,3 +2330,91 @@ html.app-native .nut-diarycharts {
     animation: none;
   }
 }
+
+/* ─── 35. NATIVE DEEP-3 — третий уровень всех блоков ─────────── */
+html.app-native .train-recordform,
+html.app-native .train-quickentry,
+html.app-native .train-deadpoints,
+html.app-native .train-warmupdiary,
+html.app-native .train-cooldowndiary,
+html.app-native .train-mix,
+html.app-native .train-volopt,
+html.app-native .train-meso,
+html.app-native .train-cardiostats,
+html.app-native .train-mobility {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-recordform,
+html.app-native .train-quickentry {
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.66), rgba(12, 23, 40, 0.66)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ПЛ: план, сезон, контест, тапер-коуч */
+html.app-native .pl-planview,
+html.app-native .pl-season,
+html.app-native .pl-contestprep,
+html.app-native .pl-tapercoach {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-planview {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+/* Поддержка: избранное, тайминги, недельный план */
+html.app-native .sup-fav,
+html.app-native .sup-timing,
+html.app-native .sup-weekplan {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Анализы: дневник и каталог */
+html.app-native .labs-labdiary,
+html.app-native .labs-labscatalog {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Риски: инфо */
+html.app-native .risk-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Питание: планировщик полезности */
+html.app-native .nut-usefulness {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-recordform,
+  html.app-native .train-quickentry,
+  html.app-native .train-deadpoints,
+  html.app-native .train-warmupdiary,
+  html.app-native .train-cooldowndiary,
+  html.app-native .train-mix,
+  html.app-native .train-volopt,
+  html.app-native .train-meso,
+  html.app-native .train-cardiostats,
+  html.app-native .train-mobility,
+  html.app-native .pl-planview,
+  html.app-native .pl-season,
+  html.app-native .pl-contestprep,
+  html.app-native .pl-tapercoach,
+  html.app-native .sup-fav,
+  html.app-native .sup-timing,
+  html.app-native .sup-weekplan,
+  html.app-native .labs-labdiary,
+  html.app-native .labs-labscatalog,
+  html.app-native .risk-info,
+  html.app-native .nut-usefulness {
+    animation: none;
+  }
+}

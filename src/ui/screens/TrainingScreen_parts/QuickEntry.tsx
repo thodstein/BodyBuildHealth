@@ -303,7 +303,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const totalVolume = exercises.reduce((s, e) => s + e.sets.filter(st => st.completed).reduce((ss, st) => ss + st.weight * st.reps, 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: isMobile ? 8 : 12 }}>
+    <div className="train-quickentry" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: isMobile ? 8 : 12 }}>
       {/* PR celebration overlay */}
       {showPR && (
         <div style={{

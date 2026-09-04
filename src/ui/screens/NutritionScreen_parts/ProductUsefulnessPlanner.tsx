@@ -423,7 +423,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   ];
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="nut-usefulness" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <ModernHero icon="🧮" title="Полезность продуктов" subtitle="Оценка FOOD_DB по трём модулям — нутриенты, контекст, цена. Сравни продукты, собери приём, найди слабые звенья." count={scored.length} stats={[
         { k:'Продуктов', v: scored.length, sub:'в базе', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
         { k:'Ср. скор', v: scored.length>0 ? Math.round(scored.reduce((s,x)=>s+(useV2 ? (v2Scored.get(x.food.id)?.total||0) : x.score.total),0)/scored.length) : 0, sub:'из 100', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },

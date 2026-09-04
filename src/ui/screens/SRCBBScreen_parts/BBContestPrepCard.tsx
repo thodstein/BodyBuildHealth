@@ -84,7 +84,7 @@ export const BBContestPrepCard: React.FC<{
         : { text: `⏳ ${daysLeft} дн`, color: '#4ade80' };
 
   return (
-    <div style={{
+    <div className="pl-contestprep" style={{
       marginTop: 6, padding: 10, borderRadius: 10,
       background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(24,24,27,0.5))',
       border: '1px dashed rgba(245,158,11,0.4)',

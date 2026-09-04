@@ -499,7 +499,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   };
 
   return (
-    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
+    <div className="train-deadpoints" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
       <div style={{ ...POLISHED_CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(168,85,247,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(168,85,247,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>

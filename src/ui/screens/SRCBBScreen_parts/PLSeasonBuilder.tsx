@@ -613,7 +613,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
   };
 
   return (
-    <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}>
+    <div className="pl-season" style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🧩 Сезон по микроциклам</div>
         <div style={{ display: 'flex', gap: 4 }}>

@@ -108,7 +108,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10, paddingBottom:80 }}>
+    <div className="labs-labdiary" style={{ display:'flex', flexDirection:'column', gap:10, paddingBottom:80 }}>
       {/* Header stats — premium */}
       <div style={{ ...GLASS, padding:14 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>

@@ -155,7 +155,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   };
 
   return (
-    <>
+    <div className="pl-planview">
           {builtSrc && (() => {
              const W = builtSrc.weeks;
              const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
@@ -1186,7 +1186,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               })()}
             </div>;
           })()}
-    </>
+    </div>
   );
 };
 

@@ -311,7 +311,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   }, [active, insights]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
+    <div className="train-mobility" style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
       {/* ── Заголовок ── */}
       <div style={{ ...CARD, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>

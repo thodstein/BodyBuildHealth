@@ -52,7 +52,7 @@ const copyText = (text: string, done: () => void) => {
 export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTaper, buildCtx, applyRecommendation, attemptStrategy, onStrategyChange, diarySessions, onNote }) => {
   const ctx = buildCtx();
   return (
-    <div style={{ padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.18)' }}>
+    <div className="pl-tapercoach" style={{ padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.18)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>🧠 Тренерская работа</div>
         <button

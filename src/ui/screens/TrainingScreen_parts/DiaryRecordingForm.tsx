@@ -370,7 +370,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const isMobile = typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
   return (
-    <div style={{ padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.42)', backdropFilter: 'blur(12px)' as any, border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
+    <div className="train-recordform" style={{ padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.42)', backdropFilter: 'blur(12px)' as any, border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 10, color: '#fff', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase' }}>📝 Записать тренировку</div>

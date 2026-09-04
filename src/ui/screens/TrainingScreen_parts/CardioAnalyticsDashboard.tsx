@@ -174,7 +174,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
   }, [cycle]);
 
   return (
-    <div style={CARD}>
+    <div className="train-cardiostats" style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>Аналитика 7д / 28д</span>
         <Badge bg={delta >= 10 ? 'rgba(239,68,68,0.12)' : delta <= -10 ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)'} border={delta >= 10 ? 'rgba(239,68,68,0.24)' : delta <= -10 ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.08)'} color={delta >= 10 ? '#f87171' : delta <= -10 ? '#4ade80' : '#fff'}>{delta > 0 ? '+' + delta + '%' : delta + '%'} к 28д</Badge>

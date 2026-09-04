@@ -28,7 +28,7 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
   const weeks = Array.from({ length: totalWeeks }, (_, i) => i + 1);
 
   return (
-    <div style={{ padding: '0' }}>
+    <div className="sup-weekplan" style={{ padding: '0' }}>
       {/* Week Timeline Bar */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
