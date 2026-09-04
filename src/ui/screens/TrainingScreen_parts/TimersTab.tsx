@@ -145,7 +145,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     }
   }, [initialSettings, isRunning]);
 
-  return (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+  return (<div className="train-timers" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={{
       padding: 16, borderRadius: 16, textAlign: 'center',
       background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.07)',

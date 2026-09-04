@@ -204,7 +204,7 @@ export const InteractionCheckerTab: React.FC = () => {
   }, [validIds, doseMgWk, unifiedOnlyCritical, unifiedSeverity]);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-interact" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <div style={{ padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.06))', border:'1px solid rgba(239,68,68,0.12)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.18)', fontSize:12 }}>⚡</span>

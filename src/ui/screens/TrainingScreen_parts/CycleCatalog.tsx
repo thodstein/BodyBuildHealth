@@ -220,7 +220,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const focusLabel = cat === 'strength' ? 'Направление' : cat === 'bodybuilding' ? 'Специализация' : 'Специализация / направление';
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ background:'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(0,230,138,0.08))', border:'1px solid rgba(245,158,11,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}><span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.25)', fontSize:16 }}>📖</span><div><div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Каталог циклов</div><div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>Готовые циклы ПЛ и ББ с фильтрами и раскладкой</div></div></div><span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>каталог</span></div>
       <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 2 }}>📖 Каталог тренировочных циклов</div>

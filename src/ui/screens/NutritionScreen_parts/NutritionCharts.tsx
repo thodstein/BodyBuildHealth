@@ -143,7 +143,7 @@ export const NutritionCharts: React.FC<{
   const trendKcal = realDailyData.length>=2 && realDailyData[realDailyData.length-1].kcal>0 && realDailyData[0].kcal>0 ? ((realDailyData[realDailyData.length-1].kcal - realDailyData[0].kcal)/Math.max(realDailyData[0].kcal,1)*100) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="nut-charts" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <ModernHero icon="📈" title="Графики" subtitle="Динамика КБЖУ и веса • цели, тренды и календарь прогресса. Выбери период и режим." stats={[
         { k:'Дней', v: range, sub:'период', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
         { k:'Ккал', v: avgKcal, sub:'среднее', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },

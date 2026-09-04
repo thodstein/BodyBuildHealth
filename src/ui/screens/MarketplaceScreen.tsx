@@ -85,9 +85,9 @@ export const MarketplaceScreen: React.FC = () => {
   }
 
   return (
-    <div className="screen marketplace" style={{ paddingBottom: 0, fontFamily: FONT, background:'transparent' }}>
+    <div className="screen marketplace market-root" style={{ paddingBottom: 0, fontFamily: FONT, background:'transparent' }}>
       {/* premium header */}
-      <div style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:2, background:'rgba(10,10,15,0.58)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', margin:'-6px -6px 0', paddingLeft:12, paddingRight:12, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+      <div className="market-head" style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:2, background:'rgba(10,10,15,0.58)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', margin:'-6px -6px 0', paddingLeft:12, paddingRight:12, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ width:34, height:34, borderRadius:11, background:'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,230,138,0.06))', border:'1px solid rgba(0,230,138,0.20)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, boxShadow:'0 4px 16px rgba(0,230,138,0.18)' }}>🛍️</div>
         <div style={{ flex:1, minWidth:0 }}>
           <h2 style={{ margin:0, fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.03em', lineHeight:1 }}>Магазин</h2>
@@ -97,8 +97,8 @@ export const MarketplaceScreen: React.FC = () => {
       </div>
 
       {/* Tab pills — premium */}
-      <div style={{ padding:'10px 12px 8px', display:'flex', gap:8 }}>
-        <button onClick={() => setShopTab('catalog')} style={{
+      <div className="market-tabs" style={{ padding:'10px 12px 8px', display:'flex', gap:8 }}>
+        <button onClick={() => setShopTab('catalog')} className="market-tab" data-active={shopTab === 'catalog'} style={{
           flex:1, padding:'11px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT, letterSpacing:'-0.01em',
           background: shopTab === 'catalog' ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))' : 'rgba(255,255,255,0.05)',
           border: shopTab === 'catalog' ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.07)',
@@ -107,7 +107,7 @@ export const MarketplaceScreen: React.FC = () => {
           boxShadow: shopTab === 'catalog' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
         }}>📋 Каталог</button>
-        <button onClick={() => setShopTab('cart')} style={{
+        <button onClick={() => setShopTab('cart')} className="market-tab" data-active={shopTab === 'cart'} style={{
           flex:1, padding:'11px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT, letterSpacing:'-0.01em',
           background: shopTab === 'cart' ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))' : 'rgba(255,255,255,0.05)',
           border: shopTab === 'cart' ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.07)',
@@ -119,14 +119,14 @@ export const MarketplaceScreen: React.FC = () => {
       </div>
 
       {shopTab === 'catalog' && (
-        <div style={{ padding:'0 12px 84px', overflowY:'auto' }}>
+        <div className="market-body" style={{ padding:'0 12px 84px', overflowY:'auto' }}>
           {/* Filters — premium chips */}
-          <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+          <div className="market-filters" style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
             {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map(key => {
               const active = filter === key;
               const grad = CATEGORY_GRAD[key] || CATEGORY_GRAD.all;
               return (
-                <button key={key} onClick={() => setFilter(key)} style={{
+                <button key={key} onClick={() => setFilter(key)} className="market-filter" data-active={active} style={{
                   padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight: active ? 800 : 600, fontFamily: FONT,
                   background: active ? `${grad}` : 'rgba(255,255,255,0.05)',
                   border: active ? '1px solid rgba(255,255,255,0.14)' : '1px solid rgba(255,255,255,0.07)',
@@ -160,7 +160,7 @@ export const MarketplaceScreen: React.FC = () => {
               const inCart = cart.some((c: any) => c.id === item.id);
               const catGrad = CATEGORY_GRAD[item.category] || CATEGORY_GRAD.all;
               return (
-                <div key={item.id} style={{
+                <div key={item.id} className="market-card" data-expanded={isExpanded} style={{
                   background:'rgba(255,255,255,0.04)', borderRadius:16, padding:0, overflow:'hidden',
                   border: isExpanded ? '1px solid rgba(0,230,138,0.24)' : '1px solid rgba(255,255,255,0.07)',
                   backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',

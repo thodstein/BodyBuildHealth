@@ -2060,3 +2060,182 @@ html.app-native .kit-empty {
     animation: none;
   }
 }
+
+/* ─── 32. NATIVE REST — фарма-вкладки, анализы, маркет, поддержка */
+html.app-native .pharma-mapper,
+html.app-native .pharma-diag,
+html.app-native .pharma-pep,
+html.app-native .pharma-reports,
+html.app-native .pharma-pkpd,
+html.app-native .pharma-interact,
+html.app-native .pharma-catalog,
+html.app-native .pharma-dose,
+html.app-native .labs-overview,
+html.app-native .labs-schedule,
+html.app-native .labs-results {
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Маркет: шапка, табы, фильтры, карточки */
+html.app-native .market-head {
+  background: rgba(9, 18, 34, 0.8) !important;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+
+html.app-native .market-tab {
+  min-height: 46px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .market-tab[data-active='true'] {
+  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.25) !important;
+}
+
+html.app-native .market-filter {
+  min-height: 38px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .market-filter[data-active='true'] {
+  box-shadow: 0 4px 14px rgba(201, 247, 58, 0.25) !important;
+}
+
+html.app-native .market-card {
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.66), rgba(12, 23, 40, 0.66)) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.app-native .market-card[data-expanded='true'] {
+  border-color: rgba(201, 247, 58, 0.4) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(201, 247, 58, 0.15) !important;
+}
+
+html.app-native .market-body {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+}
+
+/* Поддержка: топбары и пилюли */
+html.app-native .support-topbar {
+  background: rgba(9, 18, 34, 0.85) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html.app-native .support-pill {
+  min-height: 40px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .support-pill[data-active='true'] {
+  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  border-color: transparent !important;
+  color: #0a1a08 !important;
+  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pharma-mapper,
+  html.app-native .pharma-diag,
+  html.app-native .pharma-pep,
+  html.app-native .pharma-reports,
+  html.app-native .pharma-pkpd,
+  html.app-native .pharma-interact,
+  html.app-native .pharma-catalog,
+  html.app-native .pharma-dose,
+  html.app-native .labs-overview,
+  html.app-native .labs-schedule,
+  html.app-native .labs-results {
+    animation: none;
+  }
+}
+
+/* ─── 33. NATIVE FULL — все вкладки всех блоков ───────────────── */
+/* Тренинг: калькуляторы, каталоги, таймеры, программы */
+html.app-native .train-timers,
+html.app-native .train-plates,
+html.app-native .train-onerm,
+html.app-native .train-vbt,
+html.app-native .train-cycles,
+html.app-native .train-calendar,
+html.app-native .train-cardiotimer,
+html.app-native .train-programs {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-plates,
+html.app-native .train-onerm,
+html.app-native .train-vbt,
+html.app-native .train-calendar {
+  max-width: 720px !important;
+}
+
+/* Крупные цифры калькуляторов — табличные, не прыгают */
+html.app-native .train-timers [style*='font-size: 40'],
+html.app-native .train-timers [style*='font-size:40'] {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Фильтры программ — крупные чипы */
+html.app-native .train-programs-filters button {
+  min-height: 40px !important;
+  border-radius: 999px !important;
+}
+
+/* ПЛ-панели */
+html.app-native .pl-peak,
+html.app-native .pl-recovery {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-peak {
+  max-width: 720px !important;
+}
+
+html.app-native .pl-recovery {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+/* Поддержка: каталог, дневник, решатель */
+html.app-native .sup-catalog,
+html.app-native .sup-diary,
+html.app-native .sup-solver {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Риски: обзор и ТЗ-метод */
+html.app-native .risk-overview,
+html.app-native .risk-spec {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Питание: графики и справочник */
+html.app-native .nut-charts,
+html.app-native .nut-ref {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-timers,
+  html.app-native .train-plates,
+  html.app-native .train-onerm,
+  html.app-native .train-vbt,
+  html.app-native .train-cycles,
+  html.app-native .train-calendar,
+  html.app-native .train-cardiotimer,
+  html.app-native .train-programs,
+  html.app-native .pl-peak,
+  html.app-native .pl-recovery,
+  html.app-native .sup-catalog,
+  html.app-native .sup-diary,
+  html.app-native .sup-solver,
+  html.app-native .risk-overview,
+  html.app-native .risk-spec,
+  html.app-native .nut-charts,
+  html.app-native .nut-ref {
+    animation: none;
+  }
+}

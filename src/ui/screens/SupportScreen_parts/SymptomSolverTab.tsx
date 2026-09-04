@@ -251,7 +251,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
       .filter(Boolean) as SymptomEntry[];
 
     return (
-      <div style={{ padding: '0 0 80px' }}>
+      <div className="sup-solver" style={{ padding: '0 0 80px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <button onClick={() => setSelectedSymptom(null)} style={{
             ...pillBtn(false), fontSize: 11, background: 'transparent',

@@ -192,7 +192,7 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-vbt" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>⚡ ВПТ / Калькулятор скорости штанги (тренировка по скорости, VBT)</div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Тренировка по скорости штанги: нагрузка связана с %1RM через профиль «нагрузка–скорость» (load-velocity profile, Gonzalez-Badillo / Jovanovic).

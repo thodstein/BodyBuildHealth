@@ -55,7 +55,7 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
 
 export const LabsSchedule: React.FC = () => {
   return (
-    <div>
+    <div className="labs-schedule">
       <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)' }}>
         <LabsSectionHeader icon="📅" title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
         <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:12, lineHeight:1.4, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>

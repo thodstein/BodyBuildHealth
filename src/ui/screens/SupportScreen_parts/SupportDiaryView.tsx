@@ -720,7 +720,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   }, [entries]);
 
   return (
-    <div style={{
+    <div className="sup-diary" style={{
       display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 80,
       background: theme === 'dark' ? 'transparent' : '#f8fafc',
       color: theme === 'dark' ? 'inherit' : '#0f172a',

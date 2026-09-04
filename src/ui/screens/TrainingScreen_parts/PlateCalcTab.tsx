@@ -142,7 +142,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   }, [onApply, plates.actualWeight, exerciseOptions, selectedExercise]);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-plates" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       {/* Заголовок + Apply */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={H}>🧮 Калькулятор блинов</div>

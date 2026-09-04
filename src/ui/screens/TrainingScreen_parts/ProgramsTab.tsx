@@ -127,8 +127,8 @@ export const ProgramsTab: React.FC<{
     } catch {}
   };
 
-  return (<div>
-    <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+  return (<div className="train-programs" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-programs-filters" style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       {GOAL_FILTER_OPTIONS.map(g => (
         <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
           style={{

@@ -235,7 +235,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   };
 
   return (
-    <div style={CARD}>
+    <div className="train-cardiotimer" style={CARD}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={LABEL}>⚡ Быстрый старт сессии</span>
         <span style={HINT_SM}>таймер · фазы · ЧСС-зона · аудио</span>

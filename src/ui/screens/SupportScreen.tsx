@@ -3097,15 +3097,15 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   // ── Нижняя навигация: компактная 52 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался, херо фиксирован на весь экран
   const BOTTOM_NAV_H = 56;
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div className="screen support-screen support-root" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
+          <div className="support-pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
@@ -3113,7 +3113,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
                 info: ()=>{},
               };
               a[id]?.();
-            }} style={{
+            }} className="support-pill" data-active={genTab === id} style={{
               padding:'8px 14px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:34,
               background: genTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
               color: genTab === id ? '#000' : 'rgba(255,255,255,0.72)',
@@ -3128,7 +3128,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== PROTOCOLS HEADER (glass) ===== */}
       {section === 'protocols' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
@@ -3137,16 +3137,16 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== INFO HEADER (glass, readable pills) ===== */}
       {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
+          <div className="support-pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['calc_tools','🧮 Расчёты'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
-              }} style={{
+              }} className="support-pill" data-active={infoTab === id} style={{
                 padding:'8px 14px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:34,
                 background: infoTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
                 color: infoTab === id ? '#000' : 'rgba(255,255,255,0.72)',

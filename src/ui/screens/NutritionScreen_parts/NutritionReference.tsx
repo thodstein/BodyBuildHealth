@@ -234,7 +234,7 @@ export const NutritionReference: React.FC = () => {
     : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="nut-ref" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <ModernHero icon="📖" title="Справочник питания" subtitle="35 правил, 27 синергий, 15 категорий продуктов и оценки качества — всё для осознанного питания. Поиск по всему контенту." stats={[
         { k:'Правил', v: 35, sub:'питания', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
         { k:'Синергий', v: 27, sub:'пар', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },

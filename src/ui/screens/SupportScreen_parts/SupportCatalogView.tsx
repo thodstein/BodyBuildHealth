@@ -433,7 +433,7 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
   return (
     <>
       {(section === 'home' || section === 'info') && tab === 'catalog' && catalogSubTab !== 'stack' && (<InfoErrorBoundary label="Каталог">
-        <div>
+        <div className="sup-catalog">
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
           </div>

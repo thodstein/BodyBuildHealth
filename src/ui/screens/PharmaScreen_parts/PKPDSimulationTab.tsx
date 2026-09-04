@@ -205,7 +205,7 @@ export const PKPDSimulationTab: React.FC = () => {
   }, [simResult, showAllDrugs, visibleDrugs]);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-pkpd" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <div style={{ padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))', border:'1px solid rgba(139,92,246,0.16)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:12 }}>⚗️</span>

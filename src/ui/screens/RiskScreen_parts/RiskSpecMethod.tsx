@@ -287,7 +287,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   }
 
   return (
-    <div style={{ padding: '4px 0 80px' }}>
+    <div className="risk-spec" style={{ padding: '4px 0 80px' }}>
 
       {/* ── HERO CARD: интегральный риск ── */}
       <div style={{

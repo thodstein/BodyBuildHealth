@@ -526,7 +526,7 @@ export const CatalogTab: React.FC = () => {
   const handleSelect = useCallback((id: string) => setSelectedId(id), []);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-catalog" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {/* search */}
       <div style={{ position:'relative' }}>
         <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:13, opacity:0.5, pointerEvents:'none' }}>🔍</span>

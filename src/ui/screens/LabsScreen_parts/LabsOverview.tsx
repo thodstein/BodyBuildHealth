@@ -60,7 +60,7 @@ export const LabsOverview: React.FC<{
   const pctNormal = labs.length ? Math.round(normalCount / labs.length * 100) : 0;
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="labs-overview" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {!hasLabs && !forceNoLabs && (
         <div style={{ ...LABS_CARD, background:'rgba(234,179,8,0.08)', border:'1px solid rgba(234,179,8,0.16)', display:'flex', gap:10, alignItems:'center' }}>
           <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(234,179,8,0.14)', border:'1px solid rgba(234,179,8,0.18)', fontSize:14 }}>💡</span>

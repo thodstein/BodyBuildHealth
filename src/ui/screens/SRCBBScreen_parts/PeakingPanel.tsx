@@ -284,7 +284,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       }
     };
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <div className="pl-peak" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
         <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc={`${bbCountdownText} · Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы`}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             <div>
@@ -484,7 +484,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="pl-peak" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <CalcSection icon="🏋️" title="Соревнование + Taper (ПЛ)" accent={ACCENT} desc="Полный инструмент: тренировочный пик, стратегия подходов, таймлайн, восстановление">
         <PopupNumber label="Присед (1ПМ)" value={squat} min={20} max={500} suffix=" кг" onChange={setSquat} />
         <PopupNumber label="Жим лёжа (1ПМ)" value={bench} min={20} max={400} suffix=" кг" onChange={setBench} />

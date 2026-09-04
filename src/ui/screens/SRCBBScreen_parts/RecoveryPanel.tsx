@@ -104,7 +104,7 @@ export const RecoveryPanel: React.FC = () => {
   const verdict = useMemo(() => out ? shouldTrain(out.overallRecoveryIndex, fatigue / 100) : null, [out, fatigue]);
 
   return (
-    <div>
+    <div className="pl-recovery">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         <div><div style={LABEL}>Сон, часы</div><input style={IN} type="number" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(+e.target.value)} /></div>
         <div><div style={LABEL}>Качество сна 1-5</div><input style={IN} type="number" min={1} max={5} value={sleepQuality} onChange={e => setSleepQuality(+e.target.value)} /></div>

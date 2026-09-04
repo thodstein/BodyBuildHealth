@@ -111,7 +111,7 @@ export const PharmaReportsTab: React.FC = () => {
   const card: React.CSSProperties = { background:'rgba(22,22,26,0.62)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, padding:14, boxShadow:'0 6px 18px rgba(0,0,0,0.18)' };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-reports" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <div style={{ padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(139,92,246,0.06))', border:'1px solid rgba(245,158,11,0.14)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.18)', fontSize:12 }}>📊</span>

@@ -51,7 +51,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   const abnormalCount = useMemo(()=> filteredLabs.filter(l=> { const s=getLabStatus(l); return s==='high'||s==='low'; }).length, [filteredLabs]);
 
   return (
-    <div>
+    <div className="labs-results">
       {/* Filters — premium pills */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
         <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? { ...sysPillStyle(true, LABS_ACCENT), padding:'6px 12px' } : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>

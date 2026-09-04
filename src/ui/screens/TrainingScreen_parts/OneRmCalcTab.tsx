@@ -88,7 +88,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
   const hubChip = snapshot ? `${snapshot.squat}/${snapshot.bench}/${snapshot.dead} кг (П/Ж/Т) · ${snapshot.bw} кг` : null;
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-onerm" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор 1ПМ (оценка максимума)</div>
       <div style={{ fontSize: 12, color: '#fff', marginBottom: 10, lineHeight: 1.5 }}>
         Введите вес и повторения в рабочем сете — оценка 1ПМ по 7 формулам + консенсус (медиана применимых, не среднее) и таблица %1ПМ. Один снапшот хаба показан для сверки.

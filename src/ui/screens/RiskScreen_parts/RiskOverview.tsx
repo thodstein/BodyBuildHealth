@@ -89,7 +89,7 @@ export const RiskOverview: React.FC<{
   );
 
   return (
-    <div>
+    <div className="risk-overview">
       {/* Overall Risk + Penalty */}
       <Section id="overall" icon="📊" title="Общий риск">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>

@@ -231,7 +231,7 @@ export const DosageCalculatorTab: React.FC = () => {
   }, [allPharma]);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="pharma-dose" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {esterPopup && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.64)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }} onClick={() => setEsterPopup(null)}>
           <div style={{ background:'linear-gradient(180deg, #1a1a1f, #111113)', borderRadius:16, padding:14, maxWidth:340, width:'100%', maxHeight:'72vh', overflowY:'auto', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e => e.stopPropagation()}>

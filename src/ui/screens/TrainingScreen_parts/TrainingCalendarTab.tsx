@@ -259,11 +259,11 @@ export const TrainingCalendarTab: React.FC = () => {
   const formatVol = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}K` : `${v}`;
 
   if (loading) {
-    return <div style={{ padding: 20, color: DIM, textAlign: 'center' }}>Загрузка календаря...</div>;
+    return <div className="train-calendar" style={{ padding: 20, color: DIM, textAlign: 'center' }}>Загрузка календаря...</div>;
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-calendar" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       {/* Водный баланс — вода из training-calendar.engine (ранее неиспользуемая) */}
       <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
