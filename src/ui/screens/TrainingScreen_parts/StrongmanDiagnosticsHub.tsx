@@ -11,7 +11,8 @@ import { CONTEST_PRESETS } from '../../../engines/strength-sport/strength-sport-
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { SM_BIOMECH, diagnoseSMWeakPoint, SM_WEAKPOINT_CORRECTION, type SMWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
 import { scoreSM, smScoreColor } from '../../../engines/strength-sport/strength-sport-sm-scoring.engine';
-import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { buildSMBackup, downloadSMBackup, smStorageBytes, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
 import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
@@ -469,6 +470,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   }, [state.armsBent, state.mixGrip]);
   const smProgressHist = useMemo(() => { try { return loadSMProgress(); } catch { return []; } }, []);
   const smTrend = useMemo(() => { try { return smProgressTrend(smProgressHist); } catch { return null; } }, [smProgressHist]);
+  const SM_OHS_HIST_KEY = 'he_sm_ohs_hist_v1';
+  const smOhsHist = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(SM_OHS_HIST_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
+  }, [ohs.totalScore, ohs.failed]);
+  const smOhsTrend = useMemo(() => { try { return ohsScoreTrend(smOhsHist); } catch { return null; } }, [smOhsHist]);
+  const smStoreBytes = useMemo(() => { try { return smStorageBytes(); } catch { return { total: 0, byKey: {} }; } }, [csvText, state.lvpResult]);
   const smLvpStored = useMemo(() => {
     try { return loadSMLVPProfile(smLvpLiftFor(state.lvpLift) || state.lvpLift); } catch { return null; }
   }, [state.lvpLift, state.lvpResult]);
@@ -614,6 +625,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       });
       saveSMGripProfile(p);
       setToast(`✓ Grip-профиль: pinch ${p.pinchSec}с / crush ${p.crushSec}с / support ${p.supportSec}с`);
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
+  const handleSaveOHSSnap = () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const raw = localStorage.getItem(SM_OHS_HIST_KEY);
+      const hist = raw ? JSON.parse(raw) : [];
+      const next = appendOHSSnapshot(hist, { date: today, score: ohs.totalScore, failed: ohs.failed, level: ohs.level });
+      localStorage.setItem(SM_OHS_HIST_KEY, JSON.stringify(next));
+      const tr = ohsScoreTrend(next);
+      setToast(`✓ OHS-снапшот ${ohs.totalScore}/6${tr && tr.n >= 2 ? ` · тренд ${tr.delta >= 0 ? '+' : ''}${tr.delta}` : ''}`);
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
+  const handleSMBackup = () => {
+    try {
+      const b = buildSMBackup();
+      downloadSMBackup(`sm-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      setToast(`✓ Бэкап SM: ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)}КБ`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -1002,6 +1035,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize:11, fontWeight:700, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver? `· драйвер ${ohs.primaryDriver}`:''}</div>
               <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{ohs.recommendation} {ohs.needsPhysio?'· нужен физио':''}</div>
               <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Нормы knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}</div>
+              <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
+                <button onClick={handleSaveOHSSnap} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(34,197,94,0.14)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:11, cursor:'pointer' }}>📸 OHS-снапшот</button>
+                <span style={{ fontSize:10, color:DIM }}>{smOhsTrend && smOhsTrend.n >= 2 ? `тренд ${smOhsTrend.delta >= 0 ? '+' : ''}${smOhsTrend.delta} за ${smOhsTrend.n} зам.` : `история ${smOhsHist.length}/10`}</span>
+              </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
               <label style={{ fontSize:11, color:DIM }}>Knee-to-wall см<br/><input value={state.kneeToWallCm} onChange={e=>setState(s=>({...s, kneeToWallCm:e.target.value}))} placeholder="12" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
@@ -1111,7 +1148,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <button onClick={handleExportCsv} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>📥 CSV</button>
           <button onClick={handleExportIcs} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>📅 ICS</button>
           <button onClick={handleSaveAnnual} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>🗓 Год</button>
+          <button onClick={handleSMBackup} style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:DIM, fontSize:11, cursor:'pointer' }}>📦 Бэкап</button>
         </div>
+        <div style={{ fontSize:10, color:DIM, marginTop:6 }}>SM-storage: {(smStoreBytes.total / 1024).toFixed(1)}КБ · quota-safe (истории урезаются при переполнении, чужие ключи не трогаем)</div>
       </div>
     </div>
   );
