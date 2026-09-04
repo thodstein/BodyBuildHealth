@@ -37,7 +37,7 @@ import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, snapPortionG, type DayPlanV2, type MealPlanInput, type BreakfastStyle, type BreakfastTemplateId } from "./meal-plan-engine";
-import { stapleFamilyOf } from "./food-availability";
+import { stapleFamilyOf, isPeriLikeMeal } from "./food-availability";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { autoCyclePhase, CYCLE_PHASE_RU } from "./planner-cycle-calendar";
@@ -1410,6 +1410,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // чтобы undo не рассинхронизировал план со списком покупок и водным балансом.
     if (shoppingList) snap.shoppingList = JSON.parse(JSON.stringify(shoppingList));
     if (waterCalc) snap.waterCalc = JSON.parse(JSON.stringify(waterCalc));
+    // P5 (HIGH-VOLUME): туда же mealPrepPlan — иначе отмена правит план, а готовка врёт.
+    if (mealPrepPlan) snap.mealPrepPlan = JSON.parse(JSON.stringify(mealPrepPlan));
     if (recommendations) snap.recommendations = JSON.parse(JSON.stringify(recommendations));
     setUndoStack(prev => [snap, ...prev].slice(0, 5));
   };
@@ -1427,6 +1429,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (snap.shoppingList) setShoppingList(snap.shoppingList);
     if (snap.waterCalc) setWaterCalc(snap.waterCalc);
     if (snap.recommendations) setRecommendations(snap.recommendations);
+    if (snap.mealPrepPlan) setMealPrepPlan(snap.mealPrepPlan);
     setUndoStack(prev => prev.slice(1));
   };
 
@@ -2244,10 +2247,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const m = resolved.meals[mealIdx];
     if (!m || !m.recipeApplied) { setRecipePickerMeal(null); return; }
     // G3: одно окно = одно блюдо — второй рецепт запрещён в peri/presleep.
-    // Итерация C: инсулин-окна тоже (маркер или метка «инсулин»).
-    const _mType = String((m as any).type || '');
+    // Итерация C: инсулин-окна тоже (isPeriLikeMeal покрывает маркер; метка — на всякий случай).
     const _mLabel = String(m.label || '');
-    if (['preworkout', 'postworkout', 'intra', 'presleep'].includes(_mType) || /предтрен|пост-трен|intra|перед сном|pre-sleep|инсулин/i.test(_mLabel) || (m as any)._insulinWindow) {
+    if (isPeriLikeMeal(m as any) || /предтрен|пост-трен|intra|перед сном|pre-sleep|инсулин/i.test(_mLabel)) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ В peri-окно и на ночь — одно блюдо: второй рецепт сюда нельзя', 'warning');
       setRecipePickerMeal(null);
       return;

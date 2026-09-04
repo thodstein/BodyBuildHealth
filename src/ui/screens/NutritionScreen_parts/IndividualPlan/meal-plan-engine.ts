@@ -3281,13 +3281,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const t0 = _igfInjs[0];
     const wantBefore = t0.trainTiming !== 'after' && t0.trainTiming !== 'none';
     const wantAfter = t0.trainTiming === 'after' || t0.trainTiming === 'both';
+    // Маркер _insulinWindow = общий лок dosed-окон (не только инсулин): точные граммы,
+    // коррекции/вторые рецепты их не трогают.
     if (wantBefore && !_hasMealNear(input.trainStartMin - 45, 30)) {
       const min = input.trainStartMin - 45;
-      _injectMealAt(min, '⚡ ИГФ-1 до тренировки (белок+декстроза)', 'ИГФ-1 до трены — изолят + быстрые углеводы (потенцирует анаболическое окно)');
+      _injectMealAt(min, '⚡ ИГФ-1 до тренировки (белок+декстроза)', 'ИГФ-1 до трены — изолят + быстрые углеводы (потенцирует анаболическое окно)', 40, 25, { insulinWindow: true });
     }
     if (wantAfter && !_hasMealNear(input.trainStartMin + 60, 30)) {
       const min = input.trainStartMin + 60;
-      _injectMealAt(min, '⚡ ИГФ-1 после тренировки (белок+декстроза)', 'ИГФ-1 после трены — изолят + быстрые углеводы (анаболическое окно)');
+      _injectMealAt(min, '⚡ ИГФ-1 после тренировки (белок+декстроза)', 'ИГФ-1 после трены — изолят + быстрые углеводы (анаболическое окно)', 40, 25, { insulinWindow: true });
     }
   }
 
@@ -3299,7 +3301,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // Если укол в окне пре-сна — пре-сн приём уже есть (казенн), не дублируем.
       const _preSleepMin = _toMinOf(tPreSleep);
       if (!(_preSleepMin !== null && Math.abs(_preSleepMin - ghMin) <= 40)) {
-        _injectMealAt(ghMin, '🌙 ГР: белковый приём на ночь', 'ГР (соматотропин) на ночь — белок без жиров для пика секреции и ночного восстановления');
+        _injectMealAt(ghMin, '🌙 ГР: белковый приём на ночь', 'ГР (соматотропин) на ночь — белок без жиров для пика секреции и ночного восстановления', 40, 25, { insulinWindow: true });
       }
     }
   }
@@ -4877,9 +4879,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const cap = carbPortionCap(fd, mealCapScaleOf(m));
             const needG = Math.ceil(_curDev / fd.carbs * 100);
             let addG = Math.min(needG, cap - (it.amount || 0));
-            // компенсация не поднимает жиры дня за цель ×1.08 (гарнир несёт внедрённый жир)
+            // компенсация не поднимает жиры дня за цель ×1.08 (гарнир несёт внедрённый жир).
+            // Потолок — от ЦЕЛИ (goalFatG ×1.08), а не от adjusted fatTotal: иначе adjusted
+            // выше цели разрешал добивку жирными носителями (отруби 20.9Ж) сверх теста ×1.12.
             if (addG > 0 && (fd.fat || 0) > 0) {
-              const _fatRoom = Math.max(0, fatTotal * 1.08 - totals.f);
+              const _fatRoom = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
               const _maxByFat = Math.floor(_fatRoom / fd.fat * 100);
               if (_maxByFat < 10) continue;
               addG = Math.min(addG, _maxByFat);
@@ -4999,17 +5003,58 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const fd = FOOD_DB.find((f: any) => f.id === _cand.it.id);
           if (!fd || !(fd.protein || 0)) break;
           if (_pDev > 0) {
-            // недобор: мердж в самый крупный белок (кап 300 г)
-            if ((_cand.it.amount || 0) >= 300) break;
-            const needG = Math.ceil(_pDev / fd.protein * 100);
-            const addG = Math.min(needG, 300 - (_cand.it.amount || 0));
-            if (addG < 10) break;
-            const _r = ((_cand.it.amount || 0) + addG) / (_cand.it.amount || 1);
-            _cand.it.amount = (_cand.it.amount || 0) + addG;
-            _cand.it.p = +(_cand.it.p * _r).toFixed(1); _cand.it.f = +(_cand.it.f * _r).toFixed(1); _cand.it.c = +(_cand.it.c * _r).toFixed(1);
-            _cand.it.kcal = Math.round(4 * _cand.it.p + 9 * _cand.it.f + 4 * _cand.it.c);
-            _cand.m.totals = mealTotalsOf(_cand.m.items);
-            recalcDayTotals(meals, totals);
+            // недобор: мердж в самый крупный белок с комнатой до 300 г (раньше break
+            // на первом же 300 г останавливал ВЕСЬ добор — остальные пункты с комнатой
+            // не добивались; видно на 400 г+ целях).
+            let _merged = false;
+            for (const _c2 of _pItems) {
+              if ((_c2.it.amount || 0) >= 300) continue;
+              const _fd2 = FOOD_DB.find((f: any) => f.id === _c2.it.id);
+              if (!_fd2 || !(_fd2.protein || 0)) continue;
+              // Жирный белок (яйца 10Ж/100) не доливаем, когда жиры дня уже у цели, —
+              // иначе мердж чинит белок ценой перебора жиров (кейс: ужин +200 г яиц = +20 г Ж).
+              if ((_fd2.fat || 0) >= 6 && totals.f > (input.goalFatG || 0)) continue;
+              const _needG = Math.ceil(_pDev / _fd2.protein * 100);
+              const _addG = Math.min(_needG, 300 - (_c2.it.amount || 0));
+              if (_addG < 10) continue;
+              const _r2 = ((_c2.it.amount || 0) + _addG) / (_c2.it.amount || 1);
+              _c2.it.amount = (_c2.it.amount || 0) + _addG;
+              _c2.it.p = +(_c2.it.p * _r2).toFixed(1); _c2.it.f = +(_c2.it.f * _r2).toFixed(1); _c2.it.c = +(_c2.it.c * _r2).toFixed(1);
+              _c2.it.kcal = Math.round(4 * _c2.it.p + 9 * _c2.it.f + 4 * _c2.it.c);
+              _c2.m.totals = mealTotalsOf(_c2.m.items);
+              recalcDayTotals(meals, totals);
+              _merged = true;
+              break;
+            }
+            if (!_merged) {
+              // Мерджу некуда лить (все по 300 г), а недобор >40 г — добавляем НОВЫЙ
+              // белковый пункт (творог/яйца 100 г) в самый недогруженный flex-приём.
+              // Срабатывает только на экстремальных целях (400 г+): обычные дни выходят
+              // из цикла через |dev| ≤ 12 задолго до этого. Кап — 3 добавления на день.
+              if (_pDev <= 40 || ((meals as any)._pAddsCount || 0) >= 3) break;
+              // Lean-источники (без жирового хвоста — иначе чиним белок ценой перебора жиров).
+              const _npFood = FOOD_DB.find((f: any) => f.id === 'egg_white')
+                || FOOD_DB.find((f: any) => f.id === 'cottage_cheese_0')
+                || FOOD_DB.find((f: any) => f.id === 'cottage_cheese_5')
+                || FOOD_DB.find((f: any) => f.category === 'protein' && (f.protein || 0) >= 15);
+              const _npTarget = meals.filter((m: any) => _flexMeal(m) && (m.items || []).length < 8)
+                .sort((a: any, b: any) => (a.totals?.p || 0) - (b.totals?.p || 0))[0];
+              if (!_npFood || !_npTarget) break;
+              const _npG = 100, _npR = 1;
+              const _np = {
+                id: _npFood.id, name: _npFood.name, amount: _npG, role: 'protein',
+                p: Math.round((_npFood.protein || 0) * _npR * 10) / 10,
+                f: Math.round((_npFood.fat || 0) * _npR * 10) / 10,
+                c: Math.round((_npFood.carbs || 0) * _npR * 10) / 10,
+                kcal: 0, fiber: Math.round((_npFood.fiber || 0) * _npR * 10) / 10, leucine_mg: 0,
+              } as any;
+              _np.kcal = Math.round(4 * _np.p + 9 * _np.f + 4 * _np.c);
+              (_npTarget.items || []).push(_np);
+              _npTarget.totals = mealTotalsOf(_npTarget.items);
+              recalcDayTotals(meals, totals);
+              (meals as any)._pAddsCount = ((meals as any)._pAddsCount || 0) + 1;
+              notes.push(`🥩 Белковый недобор: +${_npFood.name} 100 г в «${_npTarget.label}» (цель ${input.goalProteinG} г)`);
+            }
           } else {
             // перебор: резка самого крупного белка. Пол 80 г блокировал сходимость
             // («все белки ровно по 80 г» — −31 г перебора не доставался), поэтому
