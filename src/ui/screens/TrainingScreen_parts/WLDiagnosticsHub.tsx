@@ -5,23 +5,19 @@
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
-import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
+import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose, diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
-import { loadBarTracking, saveBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
-import { optimalFvSlopeForPmax, vbtEwma } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { loadBarTracking, saveBarTracking, parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { optimalFvSlopeForPmax, vbtEwma, TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift, diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
 import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
-import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
-import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
@@ -189,6 +185,8 @@ export const WLDiagnosticsHub: React.FC = () => {
   });
   // V4-B: ноты последней инъекции (идут в экспорт)
   const [lastInjectNotes, setLastInjectNotes] = useState<string[]>([]);
+  // V5-B: стартовая неделя годового синка
+  const [annualStartWeek, setAnnualStartWeek] = useState('1');
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -784,13 +782,15 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    const weeks = buildTAAnnualOverlay(specPreview);
-    if (!weeks || !saveTAAnnualOverlay(weeks, 1)) {
+    const start = parseInt(annualStartWeek, 10);
+    const startWeek = Number.isFinite(start) && start >= 1 && start <= 52 ? start : 1;
+    const weeks = buildTAAnnualOverlay(specPreview, { startWeek });
+    if (!weeks || !saveTAAnnualOverlay(weeks, startWeek)) {
       setToast('Годовой синк не записан');
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    setToast(`✓ Годовой синк ТА: ${weeks.length} нед (he_ta_annual_sync_v1)`);
+    setToast(`✓ Годовой синк ТА: нед ${startWeek}–${startWeek + weeks.length - 1} (he_ta_annual_sync_v1)`);
     setTimeout(() => setToast(''), 2500);
   };
 
@@ -820,6 +820,9 @@ export const WLDiagnosticsHub: React.FC = () => {
         taSpecBlock: specPreview,
         taPreferredCorr: state.preferredCorr || {},
         taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
+        // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
+        ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
+        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair } } : {}),
       } as any,
       source: 'intellectual',
     });
@@ -1345,6 +1348,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
               <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>с нед<input value={annualStartWeek} onChange={e => setAnnualStartWeek(e.target.value)} placeholder="1" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               <button onClick={handleAnnualSync} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
               {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>

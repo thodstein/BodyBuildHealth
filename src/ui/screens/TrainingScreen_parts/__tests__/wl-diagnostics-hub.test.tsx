@@ -191,6 +191,24 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText(/🖨 Печать/));
     await waitFor(() => expect(container.textContent).toMatch(/Всплывающие окна|Печать недоступна/), { timeout: 2000 });
   });
+  it('V5-A bridge несёт попытки + Sinclair', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.change(container.querySelector('input[placeholder="80"]')!, { target: { value: '81' } });
+    const snI = Array.from(container.querySelectorAll('input[placeholder="100"]'));
+    fireEvent.change(snI[snI.length - 1], { target: { value: '100' } });
+    const cjI = Array.from(container.querySelectorAll('input[placeholder="125"]'));
+    fireEvent.change(cjI[cjI.length - 1], { target: { value: '125' } });
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    fireEvent.change(container.querySelector('input[placeholder="125"]')!, { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: /🏋️ Рывок/ }));
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    const btns = screen.getAllByText(/Применить в ТА-конструктор/);
+    fireEvent.click(btns[btns.length - 1]);
+    await waitFor(() => expect(container.textContent).toContain('Применено'), { timeout: 2000 });
+    const payload = localStorage.getItem('he_planner_apply') || '';
+    expect(payload).toContain('taAttempts');
+    expect(payload).toContain('taSinclair');
+  });
   it('E8 углы с видео → сводка + валидация фаз', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/Рывок/)[0]);
@@ -265,6 +283,15 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('Годовой синк ТА'), { timeout: 2000 });
     expect(localStorage.getItem('he_ta_annual_sync_v1')).toContain('snatch_off_floor');
     expect(localStorage.getItem('he_strength_annual_sync_v1')).toBeNull();
+  });
+  it('V5-B стартовая неделя синка учитывается', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="1"]')!, { target: { value: '5' } });
+    fireEvent.click(await screen.findByText(/В годовой синк/));
+    await waitFor(() => expect(container.textContent).toContain('нед 5–'), { timeout: 2000 });
+    expect(JSON.parse(localStorage.getItem('he_ta_annual_sync_v1') || '{}').weeks?.[0]?.week).toBe(5);
   });
   it('V3 прогресс: сумма + Sinclair + снимок', async () => {
     const { container } = render(<WLDiagnosticsHub />);
