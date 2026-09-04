@@ -2618,3 +2618,61 @@ html.app-native .sup-proto-gh {
     animation: none;
   }
 }
+
+/* ─── 39. NATIVE DEEP-7 — диагностика, лаборатория, протоколы ── */
+html.app-native .train-armdiag,
+html.app-native .train-wldiag,
+html.app-native .train-strongdiag,
+html.app-native .train-mindset,
+html.app-native .train-strengthanalytics,
+html.app-native .train-loadguard,
+html.app-native .train-plandiag,
+html.app-native .train-exlabmerged,
+html.app-native .train-exlabpresc {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-armdiag,
+html.app-native .train-wldiag,
+html.app-native .train-strongdiag {
+  max-width: 860px !important;
+}
+
+html.app-native .train-loadguard,
+html.app-native .train-plandiag {
+  border-radius: 20px !important;
+}
+
+/* Протоколы поддержки, вторая волна */
+html.app-native .sup-proto-acne,
+html.app-native .sup-proto-immune,
+html.app-native .sup-proto-hepatic,
+html.app-native .sup-proto-renal,
+html.app-native .sup-proto-thyroid,
+html.app-native .sup-proto-metabolic,
+html.app-native .sup-proto-hemato,
+html.app-native .sup-proto-detox {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armdiag,
+  html.app-native .train-wldiag,
+  html.app-native .train-strongdiag,
+  html.app-native .train-mindset,
+  html.app-native .train-strengthanalytics,
+  html.app-native .train-loadguard,
+  html.app-native .train-plandiag,
+  html.app-native .train-exlabmerged,
+  html.app-native .train-exlabpresc,
+  html.app-native .sup-proto-acne,
+  html.app-native .sup-proto-immune,
+  html.app-native .sup-proto-hepatic,
+  html.app-native .sup-proto-renal,
+  html.app-native .sup-proto-thyroid,
+  html.app-native .sup-proto-metabolic,
+  html.app-native .sup-proto-hemato,
+  html.app-native .sup-proto-detox {
+    animation: none;
+  }
+}

@@ -273,7 +273,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+    <div className="train-exlabpresc" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       {/* QUICK GENERATOR */}
       <div onClick={() => setShowGenerator(v => !v)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 700, color: ACCENT }}>
         <span>{showGenerator ? '▲' : '▼'}</span> ⚡ Быстрый генератор упражнений

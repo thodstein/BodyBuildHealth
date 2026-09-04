@@ -76,7 +76,7 @@ export const LoadGuardPanel: React.FC<GuardPanelProps> = ({ program }) => {
   if (monotony && monotony.strain > 1000) recs.push(`⚠ Strain ${Math.round(monotony.strain)} > 1000 — высокая нагрузка. Снизьте объём или добавьте отдых.`);
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + zoneColor }}>
+    <div className="train-loadguard" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + zoneColor }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🛡 Охрана нагрузки</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: zoneColor }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span>

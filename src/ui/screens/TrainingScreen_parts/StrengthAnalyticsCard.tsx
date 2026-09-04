@@ -155,7 +155,7 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-strengthanalytics" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💪 Аналитика силы {snapshot ? <span style={{ fontSize: 10, color: ACCENT, border: '1px solid rgba(0,230,138,0.2)', borderRadius: 6, padding: '2px 6px', marginLeft: 6 }}>из хаба · {hubSex === 'female' ? '♀' : '♂'} {bw} кг</span> : null}</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         Процентиль силы (sex-aware), уровень, соотношения, дисбалансы, тоннаж, динамика из дневника, ACWR, объёмные ориентиры (MEV/MAV/MRV). Источники: Rippetoe/Kilgore + StrengthLevel.com (sex-коррекция ×0.62 для женщин); Helms et al. 2016; Israetel MEV/MAV/MRV.

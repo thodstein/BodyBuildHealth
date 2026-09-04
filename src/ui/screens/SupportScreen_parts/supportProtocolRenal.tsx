@@ -7,7 +7,7 @@ export const SupportProtocolRenal: React.FC<{ s: Record<string, any> }> = ({ s }
   const [renalTab, setRenalTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Почки">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-renal" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>💧 Нефропротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Защита почек: гемодинамика, гиперфильтрация, протеинурия, электролитный баланс. Фазовый подход.</p>

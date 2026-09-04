@@ -343,7 +343,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   }, [weakPoints]);
 
   return (
-    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
+    <div className="train-wldiag" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(59,130,246,0.22)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(59,130,246,0.14),transparent 70%)', pointerEvents: 'none' }} />

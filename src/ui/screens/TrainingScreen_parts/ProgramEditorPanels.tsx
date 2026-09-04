@@ -50,7 +50,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
   const barColor = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + barColor, background: 'linear-gradient(135deg, ' + barColor + '08, rgba(167,139,250,0.04))' }}>
+    <div className="train-plandiag" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + barColor, background: 'linear-gradient(135deg, ' + barColor + '08, rgba(167,139,250,0.04))' }}>
       {/* Заголовок: score + сводка */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔬 Диагностика программы</span>

@@ -334,7 +334,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
+    <div className="train-mindset" style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
       {/* ── Заголовок ── */}
       <div style={{ ...CARD, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>

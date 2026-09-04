@@ -84,6 +84,19 @@ import { SupportProtocolNeuro } from '../screens/SupportScreen_parts/supportProt
 import { SupportProtocolCardio } from '../screens/SupportScreen_parts/supportProtocolCardio';
 import { SupportProtocolE2 } from '../screens/SupportScreen_parts/supportProtocolE2';
 import { SupportProtocolGH } from '../screens/SupportScreen_parts/supportProtocolGH';
+import { ArmDiagnosticsHub } from '../screens/TrainingScreen_parts/ArmDiagnosticsHub';
+import { WLDiagnosticsHub } from '../screens/TrainingScreen_parts/WLDiagnosticsHub';
+import { StrongmanDiagnosticsHub } from '../screens/TrainingScreen_parts/StrongmanDiagnosticsHub';
+import { default as ExerciseLabMerged } from '../screens/TrainingScreen_parts/ExerciseLabMerged';
+import { default as ExerciseLabPrescription } from '../screens/TrainingScreen_parts/ExerciseLabPrescription';
+import { SupportProtocolAcne } from '../screens/SupportScreen_parts/supportProtocolAcne';
+import { SupportProtocolImmune } from '../screens/SupportScreen_parts/supportProtocolImmune';
+import { SupportProtocolHepatic } from '../screens/SupportScreen_parts/supportProtocolHepatic';
+import { SupportProtocolRenal } from '../screens/SupportScreen_parts/supportProtocolRenal';
+import { SupportProtocolThyroid } from '../screens/SupportScreen_parts/supportProtocolThyroid';
+import { SupportProtocolMetabolic } from '../screens/SupportScreen_parts/supportProtocolMetabolic';
+import { SupportProtocolHemato } from '../screens/SupportScreen_parts/supportProtocolHemato';
+import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProtocolDetox';
 import { ArmAutoConstructor } from '../screens/TrainingScreen_parts/ArmAutoConstructor';
 import { FatigueIndexTab } from '../screens/TrainingScreen_parts/FatigueIndexTab';
 import { MRVEstimatorTab } from '../screens/TrainingScreen_parts/MRVEstimatorTab';
@@ -523,5 +536,50 @@ describe('market + pharma + labs roots', () => {
       />,
     );
     expect(c4.querySelector('.train-pedinput'), 'pedinput').not.toBeNull();
+  });
+
+  it('27. Batch-7 корни: диагностика и лаборатория', () => {
+    const { container: c1 } = render(<ArmDiagnosticsHub />);
+    expect(c1.querySelector('.train-armdiag'), 'armdiag').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<WLDiagnosticsHub />);
+    expect(c2.querySelector('.train-wldiag'), 'wldiag').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<StrongmanDiagnosticsHub />);
+    expect(c3.querySelector('.train-strongdiag'), 'strongdiag').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<ExerciseLabMerged />);
+    expect(c4.querySelector('.train-exlabmerged'), 'exlabmerged').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<ExerciseLabPrescription />);
+    expect(c5.querySelector('.train-exlabpresc'), 'exlabpresc').not.toBeNull();
+    // MindsetTab/StrengthAnalyticsCard/LoadGuardPanel/PlanDiagnosticsPanel
+    // требуют hub/snapshot/program — хуки живут в прод-ветках.
+  });
+
+  it('28. Batch-7 корни: протоколы, вторая волна', () => {
+    const { container: c1 } = render(<SupportProtocolAcne s={{}} />);
+    expect(c1.querySelector('.sup-proto-acne'), 'acne').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportProtocolImmune s={{}} />);
+    expect(c2.querySelector('.sup-proto-immune'), 'immune').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportProtocolHepatic s={{}} />);
+    expect(c3.querySelector('.sup-proto-hepatic'), 'hepatic').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportProtocolRenal s={{}} />);
+    expect(c4.querySelector('.sup-proto-renal'), 'renal').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<SupportProtocolThyroid s={{}} />);
+    expect(c5.querySelector('.sup-proto-thyroid'), 'thyroid').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<SupportProtocolMetabolic s={{}} />);
+    expect(c6.querySelector('.sup-proto-metabolic'), 'metabolic').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(<SupportProtocolHemato s={{}} />);
+    expect(c7.querySelector('.sup-proto-hemato'), 'hemato').not.toBeNull();
+    cleanup();
+    const { container: c8 } = render(<SupportProtocolDetox s={{}} />);
+    expect(c8.querySelector('.sup-proto-detox'), 'detox').not.toBeNull();
   });
 });

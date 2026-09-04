@@ -7,7 +7,7 @@ export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s 
   const [immuneTab, setImmuneTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Иммунитет">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-immune" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#6366f1', marginBottom:2 }}>🛡️ Иммунная поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Укрепление иммунитета, профилактика инфекций на фоне иммуносупрессии от высоких доз ААС, коррекция микробиома и L-глутаминового статуса.</p>
