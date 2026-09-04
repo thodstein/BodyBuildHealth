@@ -45,7 +45,7 @@ export const VolumeByWeekChart: React.FC<{
   const barGap = chartW / data.length * 0.3;
 
   return (
-    <svg viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+    <svg className="train-volchart" viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map(pct => (
         <line key={pct}
@@ -120,7 +120,7 @@ export const RirDriftChart: React.FC<{
   data.forEach(d => { if (!exLines[d.exercise]) exLines[d.exercise] = []; exLines[d.exercise].push(d); });
 
   return (
-    <svg viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+    <svg className="train-rirdrift" viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Grid */}
       {[0, 0.25, 0.5, 0.75, 1].map(pct => (
         <line key={pct}

@@ -16,7 +16,7 @@ export const VolumeTrendCard: React.FC<{ sessions: WorkoutLog[]; weeks?: number 
   const barW = 100 / weeks;
 
   return (
-    <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 }}>
+    <div className="train-voltrend" style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>📊 Объём по неделям (сеты по группам)</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>Стек-бары по неделям — видно рост/снижение объёма и распределение по группам тела.</div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, marginBottom: 6 }}>

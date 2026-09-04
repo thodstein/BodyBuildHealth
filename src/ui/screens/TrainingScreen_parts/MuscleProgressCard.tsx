@@ -33,7 +33,7 @@ const MuscleProgressCardBase: React.FC<{ sessions: Session[]; level: string }> =
   const yline = (val: number) => y(val * 1000);
 
   return (
-    <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 }}>
+    <div className="train-muscleprog" style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>📈 Прогресс по мышцам</div>
         <select value={group} onChange={e => setGroup(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 11 }}>

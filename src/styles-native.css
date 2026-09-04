@@ -2677,6 +2677,50 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 48. NATIVE DEEP-16 — тренды, уровни, сравнение, техника ─── */
+html.app-native .train-sparkline,
+html.app-native .train-volchart,
+html.app-native .train-rirdrift,
+html.app-native .train-alltrend,
+html.app-native .train-strengthlevel,
+html.app-native .train-muscleprog,
+html.app-native .train-weekcompare,
+html.app-native .train-whatif,
+html.app-native .train-techcalc,
+html.app-native .train-voltrend,
+html.app-native .train-profilecard,
+html.app-native .train-plnorms,
+html.app-native .train-bbmetrics {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-alltrend,
+html.app-native .train-strengthlevel,
+html.app-native .train-muscleprog,
+html.app-native .train-weekcompare,
+html.app-native .train-whatif,
+html.app-native .train-voltrend {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sparkline,
+  html.app-native .train-volchart,
+  html.app-native .train-rirdrift,
+  html.app-native .train-alltrend,
+  html.app-native .train-strengthlevel,
+  html.app-native .train-muscleprog,
+  html.app-native .train-weekcompare,
+  html.app-native .train-whatif,
+  html.app-native .train-techcalc,
+  html.app-native .train-voltrend,
+  html.app-native .train-profilecard,
+  html.app-native .train-plnorms,
+  html.app-native .train-bbmetrics {
+    animation: none;
+  }
+}
+
 /* ─── 47. NATIVE DEEP-15 — калькулятор-мелочь, свои продукты, рецепты ─ */
 html.app-native .calc-riskbar,
 html.app-native .calc-mechview,

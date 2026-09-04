@@ -35,7 +35,7 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
   if (!progressions.length) return null;
 
   return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+    <div className="card train-alltrend" style={{ padding: '8px 10px', marginBottom: 8 }}>
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#fff' }}>
         📊 Сводная таблица прогрессии e1RM по всем упражнениям
         {totalTrend !== null && (

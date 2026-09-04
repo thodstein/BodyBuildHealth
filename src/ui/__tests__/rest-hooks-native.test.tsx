@@ -193,6 +193,18 @@ import { SafetyAlerts } from '../screens/Calculator/CalcSafetyLayer';
 import { CustomProducts } from '../screens/NutritionScreen_parts/CustomProducts';
 import { RecipesTabModern } from '../screens/NutritionScreen_parts/RecipesTabModern';
 import { NutritionDiary } from '../screens/NutritionScreen_parts/NutritionDiary';
+import { Sparkline } from '../screens/TrainingScreen_parts/Sparkline';
+import { VolumeByWeekChart, RirDriftChart } from '../screens/TrainingScreen_parts/PlanCharts';
+import AllExercisesTrendCard from '../screens/TrainingScreen_parts/AllExercisesTrendCard';
+import { StrengthLevelCard } from '../screens/TrainingScreen_parts/StrengthLevelCard';
+import { MuscleProgressCard } from '../screens/TrainingScreen_parts/MuscleProgressCard';
+import { WeekCompareCard } from '../screens/TrainingScreen_parts/WeekCompareCard';
+import { WhatIfCard } from '../screens/TrainingScreen_parts/WhatIfCard';
+import { TechniqueCalcTab } from '../screens/TrainingScreen_parts/TechniqueCalcTab';
+import { VolumeTrendCard } from '../screens/TrainingScreen_parts/VolumeTrendCard';
+import { TrainingProfileCard } from '../screens/TrainingScreen_parts/TrainingProfileCard';
+import { PlNormsCalcTab } from '../screens/TrainingScreen_parts/PlNormsCalcTab';
+import { BBMetricsSummaryCard } from '../screens/TrainingScreen_parts/BBMetricsSummaryCard';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1205,5 +1217,128 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c5 } = render(<NutritionDiary foodEntries={[]} />);
     expect(c5.querySelector('.food-diary'), 'fooddiary').not.toBeNull();
+  });
+
+  it('49. Batch-16 корни: спарклайны, графики, тренды, уровни', () => {
+    const { container: c1 } = render(<Sparkline data={[1, 2, 3, 2]} />);
+    expect(c1.querySelector('.train-sparkline'), 'sparkline').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <VolumeByWeekChart
+        data={[
+          { week: 1, totalSets: 10, muscles: { chest: 10 } },
+          { week: 2, totalSets: 12, muscles: { chest: 12 } },
+        ] as never}
+      />,
+    );
+    expect(c2.querySelector('.train-volchart'), 'volchart').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <RirDriftChart
+        data={[
+          { week: 1, exercise: 'Жим', rir: 2 },
+          { week: 2, exercise: 'Жим', rir: 1 },
+        ] as never}
+      />,
+    );
+    expect(c3.querySelector('.train-rirdrift'), 'rirdrift').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <AllExercisesTrendCard
+        sessions={[
+          {
+            date: '2026-01-01',
+            exercises: [
+              {
+                exerciseName: 'Жим лёжа',
+                sets: [
+                  { setIndex: 1, weight: 80, reps: 8 },
+                  { setIndex: 2, weight: 85, reps: 6 },
+                ],
+              },
+            ],
+          },
+        ] as never}
+      />,
+    );
+    expect(c4.querySelector('.train-alltrend'), 'alltrend').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<StrengthLevelCard />);
+    expect(c5.querySelector('.train-strengthlevel'), 'strengthlevel').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <MuscleProgressCard sessions={[]} level="intermediate" />,
+    );
+    expect(c6.querySelector('.train-muscleprog'), 'muscleprog').not.toBeNull();
+  });
+
+  it('50. Batch-16 корни: сравнение, сценарий, техника, тренд, профиль, нормы, метрики', () => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const diarySessions = [
+      {
+        date: todayIso,
+        exercises: [
+          { exerciseId: 'squat', sets: [{}, {}], totalVolume: 1000 },
+          { exerciseId: 'bench_press', sets: [{}, {}], totalVolume: 1000 },
+        ],
+      },
+    ] as never;
+    const { container: c1 } = render(<WeekCompareCard sessions={diarySessions} />);
+    expect(c1.querySelector('.train-weekcompare'), 'weekcompare').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<WhatIfCard baseRisk={30} baseReadiness={70} />);
+    expect(c2.querySelector('.train-whatif'), 'whatif').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<TechniqueCalcTab />);
+    expect(c3.querySelector('.train-techcalc'), 'techcalc').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<VolumeTrendCard sessions={diarySessions} />);
+    expect(c4.querySelector('.train-voltrend'), 'voltrend').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <TrainingProfileCard
+        profile={{ weakPoints: [], equipment: [], workMax: {} } as never}
+        update={() => {}}
+      />,
+    );
+    expect(c5.querySelector('.train-profilecard'), 'profilecard').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<PlNormsCalcTab />);
+    expect(c6.querySelector('.train-plnorms'), 'plnorms').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(
+      <BBMetricsSummaryCard
+        metrics={
+          {
+            тяжPct: 0.5,
+            пампPct: 0.3,
+            avgRir: 2,
+            totalSets: 40,
+            hardSets: 4,
+            hardSetWarning: null,
+            sessionsPerRotation: 4,
+            mrvMultiplier: 1,
+            perMuscle: [
+              {
+                muscle: 'chest',
+                totalSets: 10,
+                directSets: 8,
+                effectiveSets: 9,
+                тяжSets: 6,
+                пампSets: 4,
+                лёгSets: 0,
+                avgRir: 2,
+                frequencyPerRotation: 2,
+                mev: 6,
+                mav: 12,
+                mrv: 20,
+                status: 'optimal',
+              },
+            ],
+          } as never
+        }
+      />,
+    );
+    expect(c7.querySelector('.train-bbmetrics'), 'bbmetrics').not.toBeNull();
   });
 });

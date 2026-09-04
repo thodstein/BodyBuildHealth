@@ -36,7 +36,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
   const trendUp = trend > 0;
 
   return (
-    <svg width={width} height={height + 4} style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+    <svg className="train-sparkline" width={width} height={height + 4} style={{ display: 'inline-block', verticalAlign: 'middle' }}>
       {showArea && (
         <path d={areaD} fill={color} opacity={0.12} />
       )}

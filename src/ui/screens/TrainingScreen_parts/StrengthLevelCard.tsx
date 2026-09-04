@@ -7,7 +7,7 @@ export const StrengthLevelCard: React.FC = () => {
   const [sl1RM, setSl1RM] = React.useState(140);
   const level = getStrengthLevel(slEx, slWt, sl1RM) as string;
   const next = getNextLevelTarget(slEx, slWt, level as any);
-  return (<div className="card" style={{ marginTop:8, padding:10 }}>
+  return (<div className="card train-strengthlevel" style={{ marginTop:8, padding:10 }}>
     <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📊 Уровень силы</h4>
     <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
       <div><label style={{ fontSize:10 }}>Упражнение</label><select value={slEx || ''} onChange={e=>setSlEx(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11 }}><option value="squat">Присед</option><option value="bench">Жим</option><option value="deadlift">Тяга</option></select></div>

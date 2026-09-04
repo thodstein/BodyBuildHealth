@@ -149,7 +149,7 @@ export const TechniqueCalcTab: React.FC = () => {
   const toggleExpand = (id: string) => setExpandedEx(prev => prev === id ? null : id);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-techcalc" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       {/* ── Заголовок ── */}
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧬 Калькулятор техники</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>

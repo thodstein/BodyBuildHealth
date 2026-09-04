@@ -25,7 +25,7 @@ export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> =
   const readColor = res.readinessDelta > 0 ? '#22c55e' : res.readinessDelta < 0 ? '#ef4444' : '#fff';
 
   return (
-    <div className="card" style={{ padding: '12px 14px', background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, marginBottom: 8 }}>
+    <div className="card train-whatif" style={{ padding: '12px 14px', background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, marginBottom: 8 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>🔮 Сценарий «что-если» (прогноз риск/готовность)</h3>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 10 }}>База: риск {Math.round(baseRisk)}, готовность {Math.round(baseReadiness)}. Меняйте параметры — увидите дельту. Источник: предиктивная модель readines/риска — без выдумок, только дельта.</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>

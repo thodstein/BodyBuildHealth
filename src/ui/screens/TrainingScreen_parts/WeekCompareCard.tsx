@@ -30,7 +30,7 @@ export const WeekCompareCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions
   const opt = (i: number) => <option key={i} value={i}>Неделя -{i} ({i === 0 ? 'текущая' : i + ' нед назад'})</option>;
 
   return (
-    <div style={{ padding: 12, borderRadius: 12, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.18)', marginBottom: 10 }}>
+    <div className="train-weekcompare" style={{ padding: 12, borderRadius: 12, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.18)', marginBottom: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7', marginBottom: 6 }}>⚖️ Сравнение двух недель</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <select value={a} onChange={e => setA(+e.target.value)} style={{ flex: 1, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }}>{[0,1,2,3,4,5,6,7].map(opt)}</select>
