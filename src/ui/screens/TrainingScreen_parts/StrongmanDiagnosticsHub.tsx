@@ -37,6 +37,7 @@ import { buildSMAnnualOverlay, saveSMAnnualOverlay } from '../../../engines/stre
 import { calibrateSMLVP, smLvpPointsFromRamp, saveSMLVPProfile, loadSMLVPProfile, smLvpLiftFor } from '../../../engines/strength-sport/strength-sport-sm-lvp-calibration.engine';
 import { diagnoseLogDip } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
 import { smPoseCheckFromCsv } from '../../../engines/strength-sport/strength-sport-sm-pose-check.engine';
+import { smCondSessionFor, allSMCondSessions } from '../../../engines/strength-sport/strength-sport-sm-conditioning.engine';
 import { carryPhysics } from '../../../engines/strength-sport/strength-sport-carry-physics.engine';
 import { stoneMoment } from '../../../engines/strength-sport/strength-sport-stone-moment.engine';
 import { buildSMGripProfile, smGripFailsCalibrated, loadSMGripProfile, saveSMGripProfile } from '../../../engines/strength-sport/strength-sport-sm-grip-calibration.engine';
@@ -739,6 +740,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   };
 
   const proSnapExtra = () => ({
+    conditioning: (() => {
+      const s = smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null });
+      return `${s.goal}: ${s.modality} ${s.sets}×${s.work}/${s.rest}`;
+    })(),
     carryPhysics: carryPhys ? carryPhys.note : null,
     stoneMoment: stoneMom ? stoneMom.note : null,
     contestSim: contestSim ? `${contestSim.predictedPlace} место/10 · слабые ${contestSim.weakEvents.join(', ') || '—'} · ${contestSim.recOrder.join(' → ')}` : null,
@@ -1010,6 +1015,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ fontSize:10, color: gripFails>=2?'#ef4444':'#22c55e', marginTop:4 }}>Grip fails {gripFails}/3 (калибр {gripFailsCal}/3) {gripFails>=2?'— prehab hammer 3×12 + pinch 2×15': '— норма'} · axial {axialOverload?'перегруз ≥12 сетов+300м — QL suitcase 2×20м': 'норм'} · {axialQuant.text}</div>
             <div style={{ fontSize:10, color:DIM, marginTop:6 }}>ACWR {acwr? `${acwr.ratio.toFixed(2)} ${acwr.zone}` : '—'} · conditioning как в strength-sport-conditioning (alactic 8×10с/50с)</div>
+            {(() => {
+              const sess = smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null });
+              return (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa' }}>Кондиция → {sess.modality}</div>
+                  <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{sess.sets}× {sess.work} / отдых {sess.rest} · {sess.hrZone} · {sess.note}</div>
+                  <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Все системы: {allSMCondSessions().map((s) => `${s.goal} ${s.sets}×${s.work}`).join(' · ')}</div>
+                </div>
+              );
+            })()}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:8 }}>
               <label style={{ fontSize:11, color:DIM }}>Pinch-блок<br/><select value={state.pinchWidth} onChange={e=>setState(s=>({...s, pinchWidth:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="2in">2″ (норма 30с)</option><option value="3in">3″ (норма 20с)</option><option value="4in">4″ (норма 15с)</option></select></label>
               <label style={{ fontSize:11, color:DIM }}>CoC<br/><select value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}><option value="coc1">CoC 1 (20с)</option><option value="coc1_5">CoC 1.5 (30с)</option><option value="coc2">CoC 2 (40с)</option></select></label>

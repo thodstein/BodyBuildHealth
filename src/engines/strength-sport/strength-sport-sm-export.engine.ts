@@ -23,6 +23,7 @@ export interface SMDiagnosticSnapshot {
   tacky?: boolean | null;
   findings: string[];
   // SM PRO: физика + симулятор + попытки + прогресс (опционально, backward-compat)
+  conditioning?: string | null;
   carryPhysics?: string | null;
   stoneMoment?: string | null;
   contestSim?: string | null;
@@ -48,6 +49,7 @@ export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
 <li>Платформа: ${snap.platformHeightCm != null ? `${snap.platformHeightCm}см` : '—'} · Tacky: ${snap.tacky ? 'да' : snap.tacky === false ? 'нет' : '—'}</li>
 </ul>
 <h2>Findings</h2><ul>${findings}</ul>
+${snap.conditioning ? `<h2>Кондиция</h2><div>${esc(snap.conditioning)}</div>` : ''}
 ${snap.carryPhysics ? `<h2>Физика переноски</h2><div>${esc(snap.carryPhysics)}</div>` : ''}
 ${snap.stoneMoment ? `<h2>Момент камня</h2><div>${esc(snap.stoneMoment)}</div>` : ''}
 ${snap.contestSim ? `<h2>Симулятор контеста</h2><div>${esc(snap.contestSim)}</div>` : ''}
@@ -71,6 +73,7 @@ export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
     ['ohs', snap.ohs ? `${snap.ohs.totalScore}/6` : ''],
     ['gripFails', snap.gripFails != null ? String(snap.gripFails) : ''],
     ['asymmetry', snap.asymmetryPct != null ? String(snap.asymmetryPct) : ''],
+    ['conditioning', snap.conditioning || ''],
     ['carryPhysics', snap.carryPhysics || ''],
     ['stoneMoment', snap.stoneMoment || ''],
     ['contestSim', snap.contestSim || ''],
