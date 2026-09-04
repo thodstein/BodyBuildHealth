@@ -207,3 +207,48 @@ export function femaleSymmetryNotes(meas: { waist?: number | null; hips?: number
   }
   return out;
 }
+
+/** Снимок замеров для трекинга («перепроверка через 4 нед»). Чистые функции — IO в хабе. */
+export interface MeasureSnapshot {
+  date: string; // ISO yyyy-mm-dd
+  meas: Record<string, number>;
+}
+
+/** Добавить снимок (дедуп по дате — перезаписывает, кап N последних). */
+export function appendMeasureSnapshot(
+  history: MeasureSnapshot[],
+  entry: MeasureSnapshot,
+  cap = 12,
+): MeasureSnapshot[] {
+  const list = Array.isArray(history) ? history.filter((s) => s && typeof s.date === 'string' && s.meas) : [];
+  const cleanMeas: Record<string, number> = {};
+  for (const [k, v] of Object.entries(entry.meas || {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) cleanMeas[k] = Math.round(n * 10) / 10;
+  }
+  if (!Object.keys(cleanMeas).length) return list;
+  const next = [...list.filter((s) => s.date !== entry.date), { date: entry.date, meas: cleanMeas }];
+  next.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return next.slice(-Math.max(1, cap));
+}
+
+export interface MeasureDelta {
+  from: number;
+  to: number;
+  deltaPct: number;
+}
+
+/** Дельты замеров old → recent по общим ключам (для ленты «было/стало»). */
+export function measureDeltas(
+  oldSnap: MeasureSnapshot | null | undefined,
+  recentMeas: Record<string, number>,
+): Record<string, MeasureDelta> {
+  const out: Record<string, MeasureDelta> = {};
+  if (!oldSnap || !oldSnap.meas) return out;
+  for (const [k, from] of Object.entries(oldSnap.meas)) {
+    const to = Number((recentMeas as Record<string, number>)[k]);
+    if (!Number.isFinite(from) || from <= 0 || !Number.isFinite(to) || to <= 0) continue;
+    out[k] = { from, to, deltaPct: Math.round(((to - from) / from) * 1000) / 10 };
+  }
+  return out;
+}

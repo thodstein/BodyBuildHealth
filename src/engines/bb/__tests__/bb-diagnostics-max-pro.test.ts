@@ -444,3 +444,62 @@ describe('corrections weakHead', () => {
     expect(out.length).toBeGreaterThan(0);
   });
 });
+
+// ── Снимки замеров + дельты ──
+describe('measure snapshots', () => {
+  it('append: добавление + сортировка + кап', async () => {
+    const mod = await import('../bb-symmetry.engine');
+    let h: any[] = [];
+    h = mod.appendMeasureSnapshot(h, { date: '2026-08-20', meas: { chest: 100 } });
+    h = mod.appendMeasureSnapshot(h, { date: '2026-07-20', meas: { chest: 98 } });
+    expect(h.map((s) => s.date)).toEqual(['2026-07-20', '2026-08-20']);
+    h = mod.appendMeasureSnapshot(h, { date: '2026-08-20', meas: { chest: 101 } });
+    expect(h.length).toBe(2); // дедуп по дате
+    expect(h[1].meas.chest).toBe(101);
+    const big = mod.appendMeasureSnapshot(
+      Array.from({ length: 15 }, (_, i) => ({ date: `2026-01-${String(i + 1).padStart(2, '0')}`, meas: { chest: 90 + i } })),
+      { date: '2026-02-01', meas: { chest: 110 } },
+      12,
+    );
+    expect(big.length).toBe(12);
+  });
+  it('append: мусор отбрасывается', async () => {
+    const mod = await import('../bb-symmetry.engine');
+    expect(mod.appendMeasureSnapshot([], { date: '2026-08-20', meas: { chest: NaN } })).toEqual([]);
+    expect(mod.appendMeasureSnapshot(null as any, { date: '2026-08-20', meas: { chest: 100 } }).length).toBe(1);
+  });
+  it('deltas: было/стало в %', async () => {
+    const mod = await import('../bb-symmetry.engine');
+    const d = mod.measureDeltas({ date: '2026-07-20', meas: { chest: 100, waist: 80 } }, { chest: 102, waist: 78 });
+    expect(d.chest.deltaPct).toBeCloseTo(2, 0);
+    expect(d.waist.deltaPct).toBeCloseTo(-2.5, 0);
+  });
+  it('deltas: без старого — пусто', async () => {
+    const mod = await import('../bb-symmetry.engine');
+    expect(mod.measureDeltas(null, { chest: 100 })).toEqual({});
+  });
+});
+
+// ── auditHeadCoverage ──
+describe('head coverage', () => {
+  const plan = {
+    weeks: [{ sessions: [{ exercises: [{ exerciseName: 'incline_db', name: 'Жим гантелей' }, { exerciseName: 'bench_bar', name: 'Жим' }] }] }],
+  };
+  it('покрытые и непокрытые головки', async () => {
+    const mod = await import('../bb-stimulus-target.engine');
+    const out = mod.auditHeadCoverage(plan as any, ['chest_upper', 'chest_lower']);
+    const up = out.find((c) => c.head === 'chest_upper');
+    const low = out.find((c) => c.head === 'chest_lower');
+    expect(up?.covered).toBe(true);
+    expect(low?.covered).toBe(false);
+    expect(up?.by.length).toBeGreaterThan(0);
+  });
+  it('пустой план → непокрыто; пустые/чужие головки → []', async () => {
+    const mod = await import('../bb-stimulus-target.engine');
+    const empty = mod.auditHeadCoverage(null, ['chest_upper']);
+    expect(empty.length).toBe(1);
+    expect(empty[0].covered).toBe(false);
+    expect(mod.auditHeadCoverage(plan as any, [])).toEqual([]);
+    expect(mod.auditHeadCoverage(plan as any, ['nope'])).toEqual([]);
+  });
+});

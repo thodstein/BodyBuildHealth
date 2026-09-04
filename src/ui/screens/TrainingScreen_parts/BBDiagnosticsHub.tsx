@@ -33,8 +33,8 @@ import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../../../engin
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
-import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../../../engines/bb/bb-symmetry.engine';
-import { weakHeadForZone, HEAD_FUNCTIONS } from '../../../engines/bb/bb-stimulus-target.engine';
+import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
+import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage } from '../../../engines/bb/bb-stimulus-target.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
@@ -119,6 +119,13 @@ export const BBDiagnosticsHub: React.FC = () => {
   });
   const [tab, setTab] = useState<BBTab>('weak');
   const [toast, setToast] = useState<string>('');
+  const [measureHist, setMeasureHist] = useState<MeasureSnapshot[]>(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_measure_history');
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((s) => s && typeof s.date === 'string' && s.meas) : [];
+    } catch { return []; }
+  });
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
 
@@ -590,6 +597,15 @@ export const BBDiagnosticsHub: React.FC = () => {
     return out;
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, state.sex, planAudit, bbPlan]);
 
+  // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
+  const headCoverage = useMemo(() => {
+    try {
+      const heads = report.weakZonesGranular.slice(0, 2).map(weakHeadForZone).filter(Boolean) as string[];
+      if (!heads.length || !bbPlan) return [];
+      return auditHeadCoverage(bbPlan as any, heads);
+    } catch { return []; }
+  }, [report.weakZonesGranular, bbPlan]);
+
   const selectedExRaw = useMemo(() => {
     const id = state.exerciseSelectedId;
     if (!id) return null;
@@ -709,6 +725,29 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any)); localStorage.setItem('he_training_planning_track', 'bb'); } catch {}
   };
 
+  const takeMeasureSnapshot = () => {
+    let meas: Record<string, number> = {};
+    try {
+      for (const [k, v] of Object.entries(state.circ)) {
+        const n = parseFloat(v as string);
+        if (Number.isFinite(n) && n > 0) meas[k] = n;
+      }
+    } catch { /* noop */ }
+    if (!Object.keys(meas).length) {
+      setToast('Введи хотя бы один замер — снимать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const entry = { date: new Date().toISOString().slice(0, 10), meas };
+    setMeasureHist((prev) => {
+      const next = appendMeasureSnapshot(prev, entry);
+      try { localStorage.setItem('he_bb_measure_history', JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок замеров ${entry.date} сохранён`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
   return (
     <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(0,230,138,0.22)', position: 'relative', overflow: 'hidden' }}>
@@ -794,6 +833,18 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: '#fff', marginTop: 6, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', borderRadius: 8, padding: '8px 10px' }}>
               Подсказка: две зоны одной мышцы (delt_mid+delt_rear) — можно, плечи+delt_mid — конфликт.
             </div>
+            {report.weakZonesGranular.length > 0 && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, lineHeight: 1.5 }}>
+                <b style={{ color: ACCENT }}>Покрытие головок планом:</b>
+                {!bbPlan && <div style={{ color: DIM }}>Нет плана ББ — собери в ББ-авто, покрытие появится здесь.</div>}
+                {bbPlan && headCoverage.length === 0 && <div style={{ color: DIM }}>—</div>}
+                {headCoverage.map((hc) => (
+                  <div key={hc.head} style={{ color: hc.covered ? '#22c55e' : '#f59e0b', marginTop: 2 }}>
+                    {hc.covered ? '✓' : '✗'} {hc.head}{hc.covered ? ` — ${hc.by.join(', ')}` : ' — нет упражнения в плане (см. топ-3 выше)'}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -821,6 +872,34 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
               <div style={{ fontSize: 10, color: DIM }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${k} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
               <div style={{ fontSize: 10, color: report.symmetry.score < 70 ? '#ef4444' : DIM, marginTop: 4 }}>{report.symmetry.issues.join(' · ') || 'Пропорции в норме'}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                <b style={{ fontSize: 11, color: '#fff' }}>📸 Трекинг замеров</b>
+                <button onClick={takeMeasureSnapshot} style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
+                <span style={{ fontSize: 10, color: DIM }}>снимков: {measureHist.length} · перепроверка через ~4 нед</span>
+              </div>
+              {measureHist.length === 0 && <div style={{ fontSize: 10, color: DIM }}>Пока пусто — введи замеры и нажми «Снимок», дельты появятся здесь и в причинах (genetics).</div>}
+              {measureHist.length > 0 && (() => {
+                const last = measureHist[measureHist.length - 1];
+                const deltas = measureDeltas(last, measNum as any);
+                const keys = Object.keys(deltas);
+                if (!keys.length) return <div style={{ fontSize: 10, color: DIM }}>Снимок {last.date} — введи новые замеры для дельты.</div>;
+                return (
+                  <div>
+                    <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>vs {last.date}:</div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {keys.map((k) => {
+                        const d = deltas[k];
+                        const goodUp = k !== 'waist';
+                        const good = d.deltaPct === 0 ? null : (d.deltaPct > 0) === goodUp;
+                        const col = good == null ? DIM : good ? '#22c55e' : '#f59e0b';
+                        return <span key={k} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: col }}>{k} {d.from}→{d.to} ({d.deltaPct > 0 ? '+' : ''}{d.deltaPct}%)</span>;
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

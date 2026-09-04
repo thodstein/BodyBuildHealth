@@ -716,6 +716,41 @@ export function setupGuideFor(headOrMuscle: string): { checklist: string[]; leak
   return { checklist: checklist.slice(0, 5), leaks: leaks.slice(0, 4) };
 }
 
+export interface HeadCoverage {
+  head: string;
+  covered: boolean;
+  by: string[]; // имена упражнений плана, бьющих в головку
+}
+
+/**
+ * Покрытие слабых головок текущим планом: есть ли хоть одно упражнение, бьющее в головку.
+ * Чистая функция — план не мутирует. Пустой план/головки → [].
+ */
+export function auditHeadCoverage(
+  plan: { weeks?: Array<{ sessions?: Array<{ exercises?: Array<{ exerciseName?: string; name?: string; id?: string }> }> }> } | null | undefined,
+  weakHeads: string[],
+): HeadCoverage[] {
+  const heads = [...new Set((weakHeads || []).map((h) => String(h).toLowerCase().trim()).filter((h) => HEAD_FUNCTIONS[h]))];
+  if (!heads.length) return [];
+  const byHead: Record<string, string[]> = {};
+  for (const h of heads) byHead[h] = [];
+  try {
+    const sessions = Array.isArray(plan?.weeks) ? (plan as NonNullable<typeof plan>).weeks!.flatMap((w) => w.sessions || []) : [];
+    for (const s of sessions) {
+      for (const ex of s.exercises || []) {
+        const id = String((ex as any).exerciseName || (ex as any).id || '');
+        const nm = String((ex as any).name || id);
+        let hits: string[] = [];
+        try { hits = headsHitOf({ id: id || undefined, name: nm }); } catch { /* noop */ }
+        for (const h of hits) {
+          if (byHead[h] && !byHead[h].includes(nm)) byHead[h].push(nm);
+        }
+      }
+    }
+  } catch { /* noop */ }
+  return heads.map((h) => ({ head: h, covered: byHead[h].length > 0, by: byHead[h].slice(0, 4) }));
+}
+
 export interface StimulusCtx {
   weakHead?: string | null;
   setupIssues?: string[]; // свободные метки отклонений, напр. ['локти вперёд']
