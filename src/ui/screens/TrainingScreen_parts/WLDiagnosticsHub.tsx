@@ -24,6 +24,7 @@ import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
+import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -73,6 +74,8 @@ type WLState = {
   xLoopCm: string;
   yMaxCm: string;
   peakVelMs: string;
+  // E3: предпочитаемая коррекция на фазу (идёт первой в инъекцию E6)
+  preferredCorr: Record<string, string>;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -88,6 +91,7 @@ const DEFAULT_STATE: WLState = {
   heelRetest: '',
   imtpKg: '', isppKg: '',
   xLoopCm: '', yMaxCm: '', peakVelMs: '',
+  preferredCorr: {},
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -293,6 +297,55 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   };
 
+  // E3: оборудование и мобильность из профиля — фильтр ранжира (parity BB profileEquipment)
+  const profileEquipment = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const eq = p?.settings?.training?.equipment ?? p?.training?.equipment;
+      if (Array.isArray(eq)) { const c = eq.map((s: any) => String(s)).filter(Boolean); return c.length ? c : undefined; }
+      return undefined;
+    } catch { return undefined; }
+  }, []);
+  const profileMobility = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const m = p?.settings?.training?.mobilityRestrictions ?? p?.training?.mobilityRestrictions ?? p?.health?.mobilityRestrictions;
+      return Array.isArray(m) ? m.map((s: any) => String(s)) : [];
+    } catch { return []; }
+  }, []);
+
+  // E3: топ-3 коррекции фазы + выбор предпочитаемой (идёт первой в E6)
+  const top3For = (wp: WLWeakPoint) => {
+    try {
+      const c = causeFor(wp);
+      return rankCorrectionsForTA(wp, { equipment: profileEquipment, mobilityRestrictions: profileMobility, cause: c?.cause ?? null });
+    } catch { return []; }
+  };
+  const togglePreferredCorr = (wp: WLWeakPoint, id: string) => {
+    setState(s => {
+      const cur = { ...(s.preferredCorr || {}) };
+      if (cur[wp] === id) delete cur[wp];
+      else cur[wp] = id;
+      return { ...s, preferredCorr: cur };
+    });
+  };
+  const top3Block = (wp: WLWeakPoint) => {
+    const top = top3For(wp);
+    if (!top.length) return null;
+    const pref = (state.preferredCorr || {})[wp];
+    return (
+      <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🏋️ Топ-3 коррекции {pref ? '· ⭐ выбрана' : '· нажми ⭐ — пойдёт первой в план'}</div>
+        {top.map(c => (
+          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+            <button onClick={() => togglePreferredCorr(wp, c.id)} aria-pressed={pref === c.id} style={{ minWidth: 24, height: 24, borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)', background: pref === c.id ? '#3b82f6' : 'transparent', color: pref === c.id ? '#fff' : '#60a5fa', fontSize: 11, fontWeight: 800 }}>{pref === c.id ? '⭐' : '☆'}</button>
+            <div style={{ flex: 1, fontSize: 10, color: '#fff' }}>{c.name} <span style={{ color: '#60a5fa', fontWeight: 700 }}>{c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%</span></div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const applyToConstructor = () => {
     if (weakPoints.length === 0) {
       setToast('Слабые фазы не выбраны — нечего применять');
@@ -456,6 +509,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
                   {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
+                  {top3Block(wp)}
                 </div>
               );
             })}
@@ -496,6 +550,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>
                   {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
+                  {top3Block(wp)}
                 </div>
               );
             })}
@@ -518,7 +573,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {state.jerkWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
-              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}</div>;
+              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}{top3Block(wp)}</div>;
             })}
           </div>
         )}

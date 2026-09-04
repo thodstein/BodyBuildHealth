@@ -63,4 +63,15 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(await screen.findByText(/Рывок: отрыв/));
     await waitFor(() => expect(container.textContent).toContain('Причина:'), { timeout: 2000 });
   });
+  it('E3 топ-3 коррекции + выбор ⭐', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(await screen.findByText(/Рывок: отрыв/));
+    await waitFor(() => expect(container.textContent).toContain('Топ-3 коррекции'), { timeout: 2000 });
+    const stars = container.querySelectorAll('button[aria-pressed]');
+    const star = Array.from(stars).find(b => b.textContent === '☆');
+    expect(star).toBeTruthy();
+    fireEvent.click(star!);
+    expect(JSON.parse(localStorage.getItem('he_wl_diagnostics_hub_v1') || '{}').preferredCorr?.snatch_off_floor).toBeTruthy();
+  });
 });
