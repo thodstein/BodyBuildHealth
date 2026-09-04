@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PRO-палитра APK (Health Engine): глубокий navy + лайм/минт акценты.
+     Закрывает ссылки styles.xml (@color/colorPrimary*), которых не хватало
+     для assembleDebug/assembleRelease. Значения 1-в-1 с токенами
+     src/styles-native.css (html.app-native) и capacitor.config.ts
+     (SplashScreen/StatusBar #0a1628). Telegram/web не затрагиваются. -->
+<resources>
+    <color name="colorPrimary">#0a1628</color>
+    <color name="colorPrimaryDark">#050b16</color>
+    <color name="colorAccent">#00e68a</color>
+    <color name="pro_navy">#0a1628</color>
+    <color name="pro_navy_deep">#050b16</color>
+    <color name="pro_accent">#c9f73a</color>
+    <color name="pro_accent_2">#00e68a</color>
+    <color name="ic_launcher_background">#0a1628</color>
+</resources>

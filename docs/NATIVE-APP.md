@@ -153,10 +153,17 @@ keytool -genkeypair -v -keystore he-release.keystore -alias he -keyalg RSA -keys
 
 Секреты репозитория (Settings → Secrets → Actions):
 `ANDROID_KEYSTORE_BASE64` (base64 файла), `ANDROID_KEYSTORE_PASSWORD`,
-`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Когда keystore будет готов —
-скажите, добавлю release-шаги в workflow (приёмная сторона уже есть:
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Release-шаги уже в workflow
+(`android-apk.yml` job `release`: keystore из секретов → `keystore.properties`
+→ `bundleRelease` + `assembleRelease`, артефакты `he-release-aab`/`he-release-apk`;
+без секретов job пропускается, debug не страдает; приёмная сторона:
 `android/app/build.gradle` читает `android/keystore.properties`, которого нет
-в git; текущий workflow собирает только debug и секретов не касается).
+в git).
+
+Версии: `package.json` (3.0.0) и `android/app/build.gradle`
+(`versionCode 2` / `versionName "3.0.0"`) сведены; дальше поднимать парой.
+PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с токенами
+`styles-native.css` + `capacitor.config.ts` (#0a1628/#050b16).
 
 Перед публикацией: поднять `versionCode`/`versionName` в `android/app/build.gradle`,
 проверить `applicationId` (`com.healthengine.app`), иконку (`android/app/src/main/res`),

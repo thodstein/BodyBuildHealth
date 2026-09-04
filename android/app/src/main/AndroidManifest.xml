@@ -7,6 +7,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
 
         <activity
@@ -15,6 +16,7 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>
@@ -87,6 +89,14 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Камера: только для pickPhoto() (фото тела/чеков/анализов).
+         required=false — фильтр Play по наличию камеры не включается.
+         Галерея идёт через системный picker и отдельных разрешений не требует. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Уведомления/точные тики: задекларированы плагином local-notifications
+         (POST_NOTIFICATIONS/SCHEDULE_EXACT_ALARM/RECEIVE_BOOT_COMPLETED),
+         здесь не дублируются — merge из библиотеки. -->
     <!-- Точные тики таймера отдыха (на Android 12+ без гранта тикают неточно — таймер самокорректируется по endAt) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Биометрия через WebAuthn platform authenticator (см. native-bridge authenticateWithBiometrics) -->

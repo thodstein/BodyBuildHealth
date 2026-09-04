@@ -1,0 +1,84 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * styles-native-pro.css — PRO-оболочка APK (Capacitor shell-уровень).
+ *
+ * Правило: КАЖДЫЙ селектор начинается с `html.app-native`.
+ * Telegram Mini App (html.app-telegram) и web — не затрагиваются.
+ *
+ * Граница с блочным агентом: здесь ТОЛЬКО shell (safe-area, клавиатура,
+ * тач-таргеты, скролл, фокус, модальный бэкдроп). Контент блоков
+ * (research/panels/risks/pharma/§50-53) живёт в styles-native.css и тут
+ * не дублируется.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── SHELL: edge-to-edge + клавиатура ─────────────────────────── */
+html.app-native body {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.app-native #app {
+  min-height: var(--app-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Нижний отступ под плавающий навбар уже есть в shell; здесь — страховка
+   от перекрытия системной навигацией Android (3-кнопки/жесты). */
+html.app-native .screen:last-child {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+}
+
+/* ─── ТАЧ-ТАРГЕТЫ: минимум 44px на интерактиве ──────────────────── */
+html.app-native button,
+html.app-native [role='button'],
+html.app-native input[type='checkbox'],
+html.app-native input[type='radio'] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+html.app-native input,
+html.app-native select,
+html.app-native textarea {
+  font-size: max(16px, 1em);
+}
+
+/* ─── ФОКУС: видимый только с клавиатуры/тв-пульта ─────────────── */
+html.app-native :focus {
+  outline: none;
+}
+
+html.app-native :focus-visible {
+  outline: 2px solid var(--accent-2, #00e68a);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ─── МОДАЛКИ: бэкдроп под статус-бар ──────────────────────────── */
+html.app-native .modal-backdrop,
+html.app-native [data-modal-backdrop] {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── СКРОЛЛ: стабильный, без отскока цепочки ──────────────────── */
+html.app-native main {
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+/* ─── КЛАВИАТУРА: поле ввода не прячется за навбар ─────────────── */
+html.app-native input:focus,
+html.app-native textarea:focus,
+html.app-native select:focus {
+  scroll-margin-bottom: calc(var(--nav-height, 76px) + 24px);
+}
+
+/* ─── REDUCED MOTION: уважаем системную настройку ──────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native *,
+  html.app-native *::before,
+  html.app-native *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

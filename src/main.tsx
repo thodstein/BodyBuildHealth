@@ -20,6 +20,7 @@ import { optimizeDBSpace } from './core/performance-optimizer';
 import { ensureAdmin } from './core/auth-manager';
 import './styles.css';
 import './styles-native.css';
+import './styles-native-pro.css';
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

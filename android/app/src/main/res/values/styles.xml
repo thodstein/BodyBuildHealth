@@ -13,6 +13,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- PRO: системные бары в фирменный navy (мост initNativeChrome дублирует в рантайме) -->
+        <item name="android:statusBarColor">@color/pro_navy_deep</item>
+        <item name="android:navigationBarColor">@color/pro_navy_deep</item>
     </style>
 
 
