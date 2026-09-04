@@ -406,3 +406,45 @@ describe('трапеции / предплечья / пресс', () => {
     expect(getProfExecutionProfile('abs')?.leakTo).toMatch(/сгибатели бедра|шея/i);
   });
 });
+
+describe('трицепс-база: жим узким и брусья', () => {
+  it('жим узким бьёт в латеральную', () => {
+    expect(headsHitOf({ id: 'bench_closegrip' })).toContain('triceps_lateral');
+    expect(headsHitOf({ name: 'Жим узким хватом' })).toContain('triceps_lateral');
+  });
+  it('вертикальные брусья бьют в латеральную', () => {
+    expect(headsHitOf({ id: 'dips_tricep' })).toContain('triceps_lateral');
+    expect(headsHitOf({ name: 'Отжимания на брусьях (трицепсовый стиль)' })).toContain('triceps_lateral');
+  });
+  it('грудные брусья остались за низом груди', () => {
+    expect(headsHitOf({ id: 'dips_chest' })).toContain('chest_lower');
+    expect(headsHitOf({ name: 'Отжимания на брусьях (грудной стиль)' })).toContain('chest_lower');
+  });
+  it('жим узким при weakHead=chest_mid → wrongHead (плохой строитель груди)', () => {
+    const d = diagnoseStimulusTarget({ id: 'close_grip_bench' }, { weakHead: 'chest_mid' });
+    expect(d.flags).toContain('wrongHead');
+  });
+  it('наклон вперёд на трицепсовых брусьях → утечка в низ груди', () => {
+    const d = diagnoseStimulusTarget({ id: 'dips_tricep' }, { setupIssues: ['наклоняюсь вперёд'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toMatch(/низ груди/);
+  });
+  it('локти в стороны в жиме узким → грудь вместо трицепса', () => {
+    const d = diagnoseStimulusTarget({ id: 'bench_closegrip' }, { setupIssues: ['локти разъезжаются в стороны'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toMatch(/середина груди|плечи/);
+  });
+  it('ранжир трицепса не выкидывает базу фильтром (постранично)', () => {
+    const seen = new Set<string>();
+    const found = new Set<string>();
+    for (let i = 0; i < 8; i++) {
+      const page = rankCorrectionsForWeak('triceps', null, { inPlanIds: [...seen] });
+      if (!page.length) break;
+      for (const c of page) {
+        seen.add(c.id);
+        if (c.id === 'close_grip_bench' || c.id === 'dips_tricep') found.add(c.id);
+      }
+    }
+    expect(found).toEqual(new Set(['close_grip_bench', 'dips_tricep']));
+  });
+});

@@ -65,7 +65,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     const same = g === muscle || (LEGS.has(muscle) && g === 'legs') || (muscle === 'legs' && LEGS.has(g));
     // каталог держит руки в группе arms, трапеции в back, пресс в core — маппим с keyword-фильтром
     const ALIAS: Record<string, { group: string; re: RegExp }> = {
-      triceps: { group: 'arms', re: /трицепс|tricep|француз|french|skull|кикбэк|kickback|pushdown/i },
+      triceps: { group: 'arms', re: /трицепс|tricep|француз|french|skull|кикбэк|kickback|pushdown|close.?grip|узким хватом|bench_dips|dips_tricep|обратные отжимания/i },
       biceps: { group: 'arms', re: /бицепс|bicep|curl|сгибание|молот|hammer|скотт|preacher|пауч|spider|концентр|байес|bayesian|драг|drag/i },
       forearms: { group: 'arms', re: /запяст|кист|wrist|предплеч|forearm|валик|roller/i },
       traps: { group: 'back', re: /шраг|shrug|трапеци|trap|келсо|kelso/i },
