@@ -237,6 +237,18 @@ import { SupportCatalogView, SupportCatalogTab } from '../screens/SupportScreen_
 import { ComplaintsTab } from '../screens/SupportScreen_parts/ComplaintsTab';
 import { SupportHomeView } from '../screens/SupportScreen_parts/SupportHomeView';
 import { SupportDiaryView } from '../screens/SupportScreen_parts/SupportDiaryView';
+import { MixHub } from '../screens/TrainingScreen_parts/MixHub';
+import { BadgeLegend, ExerciseRow } from '../screens/TrainingScreen_parts/PlanOutput';
+import { ThemeToggle } from '../screens/TrainingScreen_parts/ProPanelSection';
+import { VolumeHub } from '../screens/TrainingScreen_parts/VolumeHub';
+import { DiagnosticsHub } from '../screens/TrainingScreen_parts/DiagnosticsHub';
+import TrainingIntelligenceDashboard from '../screens/TrainingScreen_parts/TrainingIntelligenceDashboard';
+import { StrengthAnalyticsCard } from '../screens/TrainingScreen_parts/StrengthAnalyticsCard';
+import { ProgramTimeline } from '../screens/TrainingScreen_parts/ProgramTimeline';
+import { SessionEditorModal } from '../screens/TrainingScreen_parts/SessionEditorModal';
+import { StrengthDiaryPanel } from '../screens/TrainingScreen_parts/StrengthDiaryPanel';
+import { SupportManualPicker } from '../screens/SupportScreen_parts/SupportManualPicker';
+import { LabsOverview } from '../screens/LabsScreen_parts/LabsOverview';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1620,5 +1632,104 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c6 } = render(<ComplaintsTab />);
     expect(c6.querySelector('.sup-complaints'), 'complaints').not.toBeNull();
+  });
+
+  it('57. Batch-20 корни: микс, строки плана, свитч, волюм, диагност', () => {
+    const { container: c1 } = render(<MixHub />);
+    expect(c1.querySelector('.train-mixhub'), 'mixhub').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<BadgeLegend />);
+    expect(c2.querySelector('.train-badgelegend'), 'badgelegend').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<ExerciseRow ex={{ name: 'Жим' } as never} />);
+    expect(c3.querySelector('.train-exerciserow'), 'exerciserow').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<ThemeToggle />);
+    expect(c4.querySelector('.train-themetoggle'), 'themetoggle').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<VolumeHub />);
+    expect(c5.querySelector('.train-volumehub'), 'volumehub').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <DiagnosticsHub
+        sessions={[]}
+        tprofile={{} as never}
+        readinessRecovery={70}
+        readinessFatigue={30}
+        mesoWeeks={8}
+        missedSessions={0}
+        currentVolume={40}
+        currentRir={2}
+      />,
+    );
+    expect(c6.querySelector('.hub-diag'), 'hubdiag').not.toBeNull();
+  });
+
+  it('58. Batch-20 корни: покрытие hooked-без-тестов (интеллект, аналитика, таймлайн, модалка, дневник, пикер, обзор)', () => {
+    const { container: c1 } = render(
+      <TrainingIntelligenceDashboard
+        manualResult={null}
+        level="intermediate"
+        historyWorkouts={[]}
+        tprofile={{}}
+        readinessRecovery={70}
+        readinessFatigue={30}
+        mesoLength={8}
+        onBuildPlan={() => {}}
+        onOpenTool={() => {}}
+      />,
+    );
+    expect(c1.querySelector('.train-inteldash'), 'inteldash').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<StrengthAnalyticsCard />);
+    expect(c2.querySelector('.train-strengthanalytics'), 'strengthanalytics').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <ProgramTimeline
+        program={{ bb: { weeks: [{ sessions: [{ blocks: [{ muscle: 'chest', sets: [{ reps: 10 }] }] }] }] } } as never}
+        selectedWeek={1}
+        onSelectWeek={() => {}}
+      />,
+    );
+    expect(c3.querySelector('.train-progtimeline'), 'progtimeline').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <SessionEditorModal
+        workout={{ date: '2026-01-01', exercises: [] } as never}
+        onClose={() => {}}
+        onSave={() => {}}
+      />,
+    );
+    expect(c4.querySelector('.train-sessionmodal'), 'sessionmodal').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <StrengthDiaryPanel
+        program={{ bb: { weeks: [{ sessions: [{ blocks: [{ exerciseName: 'Жим', muscle: 'chest', sets: [{ reps: 10 }] }] }] }] } } as never}
+        dir="bb"
+      />,
+    );
+    expect(c5.querySelector('.train-strengthdiary'), 'strengthdiary').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <SupportManualPicker
+        onClose={() => {}}
+        enhancedSubs={[]}
+        setEnhancedSubs={() => {}}
+        catalogSubstances={[]}
+        allSupport={[]}
+        ALL_STACKS={[]}
+        catalogSupport={[]}
+        SUPPORT_LEVELS={{}}
+        supportLevel="base"
+        MECH_TRANSLATIONS_RU={{}}
+        MECH_LABELS={{}}
+      />,
+    );
+    expect(c6.querySelector('.sup-manualpick'), 'manualpick').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(
+      <LabsOverview labs={[]} hasLabs={false} forceNoLabs={false} setForceNoLabs={() => {}} />,
+    );
+    expect(c7.querySelector('.labs-overview'), 'labsoverview').not.toBeNull();
   });
 });

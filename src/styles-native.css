@@ -2677,6 +2677,46 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 52. NATIVE DEEP-20 — миксы, строки плана, свитчи, покрытие ─ */
+html.app-native .train-mixhub,
+html.app-native .train-badgelegend,
+html.app-native .train-exerciserow,
+html.app-native .train-themetoggle,
+html.app-native .train-volumehub,
+html.app-native .hub-diag,
+html.app-native .train-inteldash,
+html.app-native .train-strengthanalytics,
+html.app-native .train-progtimeline,
+html.app-native .train-sessionmodal,
+html.app-native .train-strengthdiary,
+html.app-native .sup-manualpick,
+html.app-native .labs-overview {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-mixhub,
+html.app-native .train-exerciserow {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-mixhub,
+  html.app-native .train-badgelegend,
+  html.app-native .train-exerciserow,
+  html.app-native .train-themetoggle,
+  html.app-native .train-volumehub,
+  html.app-native .hub-diag,
+  html.app-native .train-inteldash,
+  html.app-native .train-strengthanalytics,
+  html.app-native .train-progtimeline,
+  html.app-native .train-sessionmodal,
+  html.app-native .train-strengthdiary,
+  html.app-native .sup-manualpick,
+  html.app-native .labs-overview {
+    animation: none;
+  }
+}
+
 /* ─── 51. NATIVE DEEP-19 — блоки, протоколы-хвосты, вьюхи ────── */
 html.app-native .pl-blockview,
 html.app-native .sup-proto-steatosis,

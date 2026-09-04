@@ -192,6 +192,7 @@ export const ThemeToggle: React.FC<{ compact?: boolean }> = ({ compact = false }
 
   return (
     <button
+      className="train-themetoggle"
       onClick={toggle}
       aria-label={`Переключить тему (текущая: ${theme === 'dark' ? 'тёмная' : 'светлая'})`}
       title={`Тема: ${theme === 'dark' ? 'тёмная' : 'светлая'}`}

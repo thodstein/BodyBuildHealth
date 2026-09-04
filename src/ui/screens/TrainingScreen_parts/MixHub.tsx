@@ -21,7 +21,7 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
   const active = MODE_DEFS.find(d=> d.m===mode)!;
 
   return (
-    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
+    <div className="train-mixhub" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(236,72,153,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(236,72,153,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(236,72,153,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
