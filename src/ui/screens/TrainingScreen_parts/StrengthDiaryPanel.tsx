@@ -74,7 +74,7 @@ export const StrengthDiaryPanel: React.FC<{ program: UserProgram; dir: string }>
   }).length;
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
+    <div className="train-strengthdiary" style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📊 Дневник: реальный прогресс</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{sorted.length} упражнений · {plateauCount} возможный плато</span>

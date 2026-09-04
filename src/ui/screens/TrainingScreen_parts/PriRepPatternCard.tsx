@@ -69,7 +69,7 @@ export const PriRepPatternCard: React.FC = () => {
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-prirep" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🧠 PRI-авторегуляция + схема повторений</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         PRI (Physiological Readiness Index) — готовность к тренировке; схема повторений по цели/паттерну/сложности. Ранее autoregulation.engine/rep-pattern не использовались в UI.

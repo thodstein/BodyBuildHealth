@@ -56,7 +56,7 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
   };
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a' }}>
+    <div className="train-armheatmap" style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔥 Тепловая карта — арм</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weeks} нед × {ARM_MUSCLES.length} групп</span>

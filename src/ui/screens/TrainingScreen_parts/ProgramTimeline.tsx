@@ -63,7 +63,7 @@ export const ProgramTimeline: React.FC<Props> = ({ program, selectedWeek, onSele
   const labelW = 70;
 
   return (
-    <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(26,28,38,0.4)', border: '1px solid rgba(255,255,255,0.06)', margin: '8px 0' }}>
+    <div className="train-progtimeline" style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(26,28,38,0.4)', border: '1px solid rgba(255,255,255,0.06)', margin: '8px 0' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
         📊 Timeline объёма
         <span style={{ fontSize: 10, color: DIM, fontWeight: 500 }}>({weeks.length} нед · {muscles.length} групп)</span>

@@ -66,7 +66,7 @@ export const InsightsCard: React.FC = () => {
   const last1RM = useMemo(() => ctx ? Object.entries(ctx.last1RMs).sort((a, b) => b[1] - a[1]).slice(0, 6) : [], [ctx]);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-insights" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💡 Авто-инсайты дневника</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         Автоматический анализ тренировочного дневника: тренды силы, усталости, техники, объёма, регулярности и восстановления. Ранее diary-engine (generateInsights/buildHistoryContext) не использовался в UI.

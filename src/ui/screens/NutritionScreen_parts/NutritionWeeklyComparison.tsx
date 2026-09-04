@@ -74,8 +74,8 @@ export const NutritionWeeklyComparison: React.FC<Props> = ({ diaryData, selected
   const { current, previous, targets: tg } = comparison;
 
   if (current.days === 0 && previous.days === 0) {
-    return (
-      <div style={{ ...cardStyle, textAlign: 'center', padding: 16 }}>
+  return (
+    <div className="nut-weekcomp" style={{ ...cardStyle, textAlign: 'center', padding: 16 }}>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>📊 Сравнение недель</div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Недостаточно данных — заполняйте дневник</div>
       </div>
@@ -90,7 +90,7 @@ export const NutritionWeeklyComparison: React.FC<Props> = ({ diaryData, selected
   ];
 
   return (
-    <div style={cardStyle}>
+    <div className="nut-weekcomp" style={cardStyle}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📊 Сравнение: эта неделя vs прошлая</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>

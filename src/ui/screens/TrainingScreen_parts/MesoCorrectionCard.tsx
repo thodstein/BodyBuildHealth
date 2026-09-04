@@ -48,7 +48,7 @@ const MesoCorrectionCard: React.FC<Props> = ({
   };
 
   return (
-    <div style={GLASS}>
+    <div className="train-mesocorr" style={GLASS}>
       <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🔄 Анализ и коррекция мезоцикла</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>{output.comment}</div>
 

@@ -54,7 +54,7 @@ export const ProgramRevisionsDiff: React.FC<{
 
   if (revisions.length < 2) {
     return (
-      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #94a3b8' }}>
+      <div className="train-revisions" style={{ ...CARD, padding: 10, borderLeft: '3px solid #94a3b8' }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>📜 История правок</div>
         <div style={{ fontSize: 11, color: DIM }}>
           {revisions.length === 0
@@ -100,7 +100,7 @@ export const ProgramRevisionsDiff: React.FC<{
   }, [leftRev, rightRev]);
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #94a3b8' }}>
+    <div className="train-revisions" style={{ ...CARD, padding: 10, borderLeft: '3px solid #94a3b8' }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📜 Сравнение ревизий</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
         <EditorPopupSelect value={leftId} options={[{ id: '', label: '— исходная (auto) —' }, ...revOptions]}

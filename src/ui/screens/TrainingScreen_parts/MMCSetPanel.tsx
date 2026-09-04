@@ -70,7 +70,7 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
   const filled = hasMMCValues(values);
 
   return (
-    <div style={{
+    <div className="train-mmcset" style={{
       padding: compact ? '8px' : '10px 12px', borderRadius: 10,
       background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)',
     }}>

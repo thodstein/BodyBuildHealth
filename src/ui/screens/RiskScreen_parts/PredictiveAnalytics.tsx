@@ -35,7 +35,7 @@ export const PredictiveAnalytics: React.FC = () => {
   }, [linked.labs, marker]);
 
   return (
-    <div style={{ ...GLASS, marginTop: 10 }}>
+    <div className="risk-predictive" style={{ ...GLASS, marginTop: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>📈 Предиктивная аналитика</div>

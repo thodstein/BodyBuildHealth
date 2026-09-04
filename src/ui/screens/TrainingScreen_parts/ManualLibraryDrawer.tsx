@@ -55,7 +55,7 @@ export const ManualLibraryDrawer: React.FC<{
   }, [allBB, favIds, search]);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap: 10 }}>
+    <div className="train-manlibdrawer" style={{ display:'flex', flexDirection:'column', gap: 10 }}>
       {/* Tabs */}
       <div style={{ display:'flex', gap: 4, overflowX:'auto', paddingBottom: 4, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
         {(Object.keys(TAB_LABELS) as TabKey[]).map(k => {

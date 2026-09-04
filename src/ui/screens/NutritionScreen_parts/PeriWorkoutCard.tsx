@@ -30,7 +30,7 @@ export const PeriWorkoutCard: React.FC = () => {
 
   const hasData = sessionVolume > 0 || durationMin > 0;
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="nut-peri" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <ModernHero icon="🥤" title="Пери-воркаут" subtitle="Углеводы/белок/жидкость до/во время/после — на основе тоннажа, длительности и массы тела. Авто-тянет последнюю тренировку." stats={[
         { k:'Масса', v: bw+'кг', sub: goal, col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
         { k:'Тоннаж', v: sessionVolume ? Math.round(sessionVolume/1000)+'т' : '—', sub:'кг·повт', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },

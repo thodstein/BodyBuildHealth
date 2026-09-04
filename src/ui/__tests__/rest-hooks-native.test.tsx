@@ -97,6 +97,15 @@ import { SupportProtocolThyroid } from '../screens/SupportScreen_parts/supportPr
 import { SupportProtocolMetabolic } from '../screens/SupportScreen_parts/supportProtocolMetabolic';
 import { SupportProtocolHemato } from '../screens/SupportScreen_parts/supportProtocolHemato';
 import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProtocolDetox';
+import { default as MMCTrackingCard } from '../screens/TrainingScreen_parts/MMCTrackingCard';
+import { HysteresisChart } from '../screens/RiskScreen_parts/HysteresisChart';
+import { PredictiveAnalytics } from '../screens/RiskScreen_parts/PredictiveAnalytics';
+import { PeriWorkoutCard } from '../screens/NutritionScreen_parts/PeriWorkoutCard';
+import { ProgressTracker } from '../screens/NutritionScreen_parts/ProgressTracker';
+import { VisualTab } from '../screens/TrainingScreen_parts/VisualTab';
+import { MMCSetPanel } from '../screens/TrainingScreen_parts/MMCSetPanel';
+import { ManualLibraryDrawer } from '../screens/TrainingScreen_parts/ManualLibraryDrawer';
+import { default as MesoCorrectionCard } from '../screens/TrainingScreen_parts/MesoCorrectionCard';
 import { CardioDayCard } from '../screens/TrainingScreen_parts/CardioDayCard';
 import { CardioDiaryStep } from '../screens/TrainingScreen_parts/CardioDiaryStep';
 import { CheckinMetricsCard } from '../screens/TrainingScreen_parts/CheckinMetricsCard';
@@ -606,6 +615,61 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c8 } = render(<SupportProtocolDetox s={{}} />);
     expect(c8.querySelector('.sup-proto-detox'), 'detox').not.toBeNull();
+  });
+
+  it('34. Batch-10 корни: трекинг, предикт, пери, прогресс', () => {
+    const { container: c1 } = render(<MMCTrackingCard />);
+    expect(c1.querySelector('.train-mmctrack'), 'mmctrack').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<HysteresisChart />);
+    expect(c2.querySelector('.risk-hysteresis'), 'hysteresis').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<PredictiveAnalytics />);
+    expect(c3.querySelector('.risk-predictive'), 'predictive').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<PeriWorkoutCard />);
+    expect(c4.querySelector('.nut-peri'), 'peri').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<ProgressTracker />);
+    expect(c5.querySelector('.nut-progress'), 'progress').not.toBeNull();
+  });
+
+  it('35. Batch-10 корни: visual, mmcset, manlibdrawer, mesocorr', () => {
+    const { container: c1 } = render(<VisualTab sessions={[]} />);
+    expect(c1.querySelector('.train-visual'), 'visual').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MMCSetPanel
+        exerciseId="bench"
+        exerciseName="Жим"
+        setNumber={1}
+        date="2026-01-01"
+      />,
+    );
+    expect(c2.querySelector('.train-mmcset'), 'mmcset').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <ManualLibraryDrawer onSelectBB={() => {}} onSelectPL={() => {}} onAddTemplate={() => {}} />,
+    );
+    expect(c3.querySelector('.train-manlibdrawer'), 'manlibdrawer').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <MesoCorrectionCard
+        profile={{} as never}
+        acwr={1}
+        monotony={1}
+        avgReadiness={70}
+        mesoWeeks={4}
+        missedSessions={0}
+        exercises={[]}
+        currentVolume={10}
+        currentRir={2}
+      />,
+    );
+    expect(c4.querySelector('.train-mesocorr'), 'mesocorr').not.toBeNull();
+    // ArmHeatmap/InsightsCard/PriRepPatternCard/ProgramRevisions/
+    // ProgramTimeline/StrengthDiaryPanel/VolumeHub/ExerciseLabCompare
+    // требуют сложные входные объекты — хуки живут в прод-ветках.
   });
 
   it('31. Batch-9 корни: кардио-шаги и чекин', () => {

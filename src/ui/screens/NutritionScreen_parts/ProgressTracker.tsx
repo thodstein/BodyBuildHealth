@@ -38,7 +38,7 @@ export const ProgressTracker: React.FC = () => {
   const barH = (w: number): number => Math.max(10, ((w - minW + 0.5) / (range + 1)) * 80);
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="nut-progress" style={{ paddingBottom: 80 }}>
       <ModernHero icon="📈" title="Прогресс" subtitle="Отслеживание динамики веса, измерений и достижений." />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>📈 Трекер прогресса</div>
 

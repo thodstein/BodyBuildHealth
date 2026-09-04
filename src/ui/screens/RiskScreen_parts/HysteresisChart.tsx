@@ -49,7 +49,7 @@ export const HysteresisChart: React.FC = () => {
   }, [drugs, selectedIdx]);
 
   if (!result || !result.points.length) {
-    return <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>Добавьте препараты в курс для симуляции гистерезиса</div>;
+    return <div className="risk-hysteresis" style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>Добавьте препараты в курс для симуляции гистерезиса</div>;
   }
 
   // SVG chart
@@ -73,7 +73,7 @@ export const HysteresisChart: React.FC = () => {
     .join(' ');
 
   return (
-    <div style={{ marginTop: 10, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, overflowX: 'hidden' }}>
+    <div className="risk-hysteresis" style={{ marginTop: 10, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, overflowX: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>🧪 Гистерезис — PK/PD</div>
         <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>dMarker/dt = (E−Marker)/τ</div>

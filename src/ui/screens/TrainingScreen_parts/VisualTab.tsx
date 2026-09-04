@@ -41,7 +41,7 @@ export const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
   const prog = React.useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
 
   if (sessions.length < 2) return (
-    <div style={{ padding:24, textAlign:'center', background:'rgba(24,24,27,0.08)', borderRadius:16, border:'1px solid rgba(255,255,255,0.04)' }}>
+    <div className="train-visual" style={{ padding:24, textAlign:'center', background:'rgba(24,24,27,0.08)', borderRadius:16, border:'1px solid rgba(255,255,255,0.04)' }}>
       <div style={{ fontSize:28, marginBottom:6 }}>📊</div>
       <div style={{ fontSize:12, color:'#fff' }}>Нужно минимум 2 тренировки для визуализации</div>
     </div>
@@ -50,7 +50,7 @@ export const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
   const glassCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:10 };
   const gLabel: React.CSSProperties = { fontSize:10, color:'#fff', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
 
-  return (<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+  return (<div className="train-visual" style={{ display:'flex', flexDirection:'column', gap:4 }}>
     {/* Weekly Volume - Apple Bar Chart */}
     {dashboard && <div style={glassCard}>
       <div style={gLabel}>📈 Недельный объём</div>

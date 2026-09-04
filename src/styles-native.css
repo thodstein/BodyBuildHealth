@@ -2677,6 +2677,65 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 42. NATIVE DEEP-10 — шаги, строки, графики ─────────────── */
+html.app-native .train-armheatmap,
+html.app-native .train-insights,
+html.app-native .train-prirep,
+html.app-native .train-revisions,
+html.app-native .train-progtimeline,
+html.app-native .train-strengthdiary,
+html.app-native .train-volumehub,
+html.app-native .train-exlabcompare,
+html.app-native .train-visual,
+html.app-native .train-mmcset,
+html.app-native .train-mmctrack,
+html.app-native .train-manlibdrawer,
+html.app-native .train-mesocorr,
+html.app-native .risk-hysteresis,
+html.app-native .risk-predictive,
+html.app-native .nut-weekcomp,
+html.app-native .nut-peri,
+html.app-native .nut-progress {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-armheatmap,
+html.app-native .train-revisions,
+html.app-native .train-strengthdiary,
+html.app-native .train-mmcset,
+html.app-native .nut-weekcomp {
+  border-radius: 20px !important;
+}
+
+html.app-native .train-visual {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armheatmap,
+  html.app-native .train-insights,
+  html.app-native .train-prirep,
+  html.app-native .train-revisions,
+  html.app-native .train-progtimeline,
+  html.app-native .train-strengthdiary,
+  html.app-native .train-volumehub,
+  html.app-native .train-exlabcompare,
+  html.app-native .train-visual,
+  html.app-native .train-mmcset,
+  html.app-native .train-mmctrack,
+  html.app-native .train-manlibdrawer,
+  html.app-native .train-mesocorr,
+  html.app-native .risk-hysteresis,
+  html.app-native .risk-predictive,
+  html.app-native .nut-weekcomp,
+  html.app-native .nut-peri,
+  html.app-native .nut-progress {
+    animation: none;
+  }
+}
+
 /* ─── 41. NATIVE DEEP-9 — шаги, карточки, протоколы ──────────── */
 html.app-native .train-cardiocomps,
 html.app-native .train-cardioday,
