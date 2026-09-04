@@ -130,6 +130,8 @@ export const BBDiagnosticsHub: React.FC = () => {
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return !!localStorage.getItem('he_bb_plan_saved_prev'); } catch { return false; }
   });
+  // Нонс перечитывания плана из хранилища (инъекция/откат меняют его мимо мемов)
+  const [planNonce, setPlanNonce] = useState(0);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
 
@@ -520,7 +522,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       if (j?.weeks) return j;
       return null;
     } catch { return null; }
-  }, [diarySessions, state.exerciseSelectedId]);
+  }, [diarySessions, state.exerciseSelectedId, planNonce]);
 
   const planAudit = useMemo(() => {
     try { return bbPlan ? auditPlanExercises(bbPlan) : null; } catch { return null; }
@@ -872,6 +874,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       return;
     }
     setHasInjectPrev(true);
+    setPlanNonce((n) => n + 1);
     try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
     setToast(`✓ Вставлено коррекций: ${injected} (нед: ${nWeeks}) · открыт ББ-авто`);
     setTimeout(() => setToast(''), 3000);
@@ -889,6 +892,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       localStorage.removeItem('he_bb_plan_saved_prev');
     } catch { /* noop */ }
     setHasInjectPrev(false);
+    setPlanNonce((n) => n + 1);
     try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
     setToast('↩ План восстановлен до инъекции');
     setTimeout(() => setToast(''), 2500);

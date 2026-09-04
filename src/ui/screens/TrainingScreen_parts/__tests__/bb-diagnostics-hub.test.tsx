@@ -140,6 +140,9 @@ describe('BBDiagnosticsHub', () => {
       .filter((e: any) => String(e.comment || '').includes('ББ-диагностика'));
     expect(injected.length).toBeGreaterThan(0);
     expect(localStorage.getItem('he_bb_plan_saved_prev')).toBe(saved);
+    // аудит перечитал план: покрытие головок обновилось без remount
+    expect(screen.getAllByText(/Покрытие головок планом/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/✓ chest_upper/)[0]).toBeInTheDocument();
     // откат возвращает исходник
     fireEvent.click(screen.getByRole('button', { name: /Откатить инъекцию/ }));
     expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
