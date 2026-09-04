@@ -28,7 +28,7 @@ const PeakingProtocolTab: React.FC = () => {
   const protocol = getPeakingProtocol(selected);
 
   return (
-    <div>
+    <div className="train-peakprotocol">
       <div style={GLASS}>
         <div style={H}>📈 Протоколы пиковой фазы</div>
         <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>

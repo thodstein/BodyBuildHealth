@@ -561,7 +561,7 @@ export const WhatIfGuardPanel: React.FC<GuardPanelProps> = () => {
   const readColor = result.readinessDelta > 5 ? '#22c55e' : result.readinessDelta < -5 ? '#ef4444' : '#f59e0b';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
+    <div className="train-whatifguard" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔮 What-if прогноз</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>база: риск {Math.round(baseRisk)}, готовность {Math.round(baseReadiness)}</span>

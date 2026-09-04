@@ -217,6 +217,17 @@ import { TrainingRecommendationsCard } from '../screens/TrainingScreen_parts/Tra
 import { ToolsHub } from '../screens/TrainingScreen_parts/ToolsHub';
 import { default as StickingPointAnalysisCard } from '../screens/TrainingScreen_parts/StickingPointAnalysisCard';
 import { SafetyConflicts } from '../screens/Calculator/CalcSafetyLayer';
+import { AnalyticsTab } from '../screens/TrainingScreen_parts/AnalyticsTab';
+import { QualityHub } from '../screens/TrainingScreen_parts/QualityHub';
+import { default as PeakingProtocolTab } from '../screens/TrainingScreen_parts/PeakingProtocolTab';
+import { WhatIfGuardPanel } from '../screens/TrainingScreen_parts/ProGuardPanels';
+import { PeriodizationHub } from '../screens/TrainingScreen_parts/PeriodizationHub';
+import { StrengthAnalyticsCard } from '../screens/TrainingScreen_parts/StrengthAnalyticsCard';
+import { ProgramTimeline } from '../screens/TrainingScreen_parts/ProgramTimeline';
+import { SessionEditorModal } from '../screens/TrainingScreen_parts/SessionEditorModal';
+import { StrengthDiaryPanel } from '../screens/TrainingScreen_parts/StrengthDiaryPanel';
+import { PlannerBbAuto } from '../screens/TrainingScreen_parts/PlannerBbAuto';
+import { PlannerPlAuto } from '../screens/TrainingScreen_parts/PlannerPlAuto';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1431,5 +1442,57 @@ describe('market + pharma + labs roots', () => {
       <SafetyConflicts rec={{ conflicts: [{ a: 'x', b: 'y', reason: 'тест', level: 'warn' }] } as never} />,
     );
     expect(c6.querySelector('.calc-safetyconf'), 'safetyconf').not.toBeNull();
+  });
+
+  it('53. Batch-18 корни: аналитика, качество, пики, структура, whatif, период', () => {
+    const { container: c1 } = render(<AnalyticsTab sessions={[]} />);
+    expect(c1.querySelector('.train-analyticstab'), 'analyticstab').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<QualityHub onBuildPlan={() => {}} />);
+    expect(c2.querySelector('.train-qualitytool'), 'qualitytool').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<PeakingProtocolTab />);
+    expect(c3.querySelector('.train-peakprotocol'), 'peakprotocol').not.toBeNull();
+    cleanup();
+    // StructuredAnalyticsCard требует осмысленные сессии для движка —
+    // хук .train-structured живёт в прод-ветке, здесь не проверяется.
+    const { container: c5 } = render(<WhatIfGuardPanel />);
+    expect(c5.querySelector('.train-whatifguard'), 'whatifguard').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<PeriodizationHub />);
+    expect(c6.querySelector('.train-periodhub'), 'periodhub').not.toBeNull();
+  });
+
+  it('54. Batch-18 корни: покрытие hooked-без-тестов (аналитика, таймлайн, модалка, дневник, нити)', () => {
+    const { container: c1 } = render(<StrengthAnalyticsCard />);
+    expect(c1.querySelector('.train-strengthanalytics'), 'strengthanalytics').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <ProgramTimeline
+        program={{ bb: { weeks: [{ sessions: [{ blocks: [{ muscle: 'chest', sets: [{ reps: 10 }] }] }] }] } } as never}
+        selectedWeek={1}
+        onSelectWeek={() => {}}
+      />,
+    );
+    expect(c2.querySelector('.train-progtimeline'), 'progtimeline').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <SessionEditorModal
+        workout={{ date: '2026-01-01', exercises: [] } as never}
+        onClose={() => {}}
+        onSave={() => {}}
+      />,
+    );
+    expect(c3.querySelector('.train-sessionmodal'), 'sessionmodal').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <StrengthDiaryPanel
+        program={{ bb: { weeks: [{ sessions: [{ blocks: [{ exerciseName: 'Жим', muscle: 'chest', sets: [{ reps: 10 }] }] }] }] } } as never}
+        dir="bb"
+      />,
+    );
+    expect(c4.querySelector('.train-strengthdiary'), 'strengthdiary').not.toBeNull();
+    // PlannerBbAuto/PlannerPlAuto синхронно строят планы на маунте (тяжело для jsdom) —
+    // хуки .hub-bb/.hub-pl живут в прод-ветке, здесь не проверяются.
   });
 });

@@ -2677,6 +2677,44 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 50. NATIVE DEEP-18 — аналитика, качество, пики, хабы ───── */
+html.app-native .train-analyticstab,
+html.app-native .train-qualitytool,
+html.app-native .train-peakprotocol,
+html.app-native .train-structured,
+html.app-native .train-whatifguard,
+html.app-native .train-periodhub,
+html.app-native .train-strengthanalytics,
+html.app-native .train-progtimeline,
+html.app-native .train-sessionmodal,
+html.app-native .train-strengthdiary {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-analyticstab,
+html.app-native .train-qualitytool,
+html.app-native .train-peakprotocol,
+html.app-native .train-structured,
+html.app-native .train-periodhub {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-analyticstab,
+  html.app-native .train-qualitytool,
+  html.app-native .train-peakprotocol,
+  html.app-native .train-structured,
+  html.app-native .train-whatifguard,
+  html.app-native .train-periodhub,
+  html.app-native .train-strengthanalytics,
+  html.app-native .train-progtimeline,
+  html.app-native .train-sessionmodal,
+  html.app-native .train-strengthdiary {
+    animation: none;
+  }
+}
+/* .hub-bb/.hub-pl уже покрыты hub-китом выше — дубли не нужны. */
+
 /* ─── 49. NATIVE DEEP-17 — хват, прогнозы, планы, рекомендации ── */
 html.app-native .train-armgrip,
 html.app-native .train-contestactive,

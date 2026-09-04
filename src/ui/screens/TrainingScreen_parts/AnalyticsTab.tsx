@@ -66,7 +66,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
 
   if (!analytics || sessions.length === 0) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: 30 }}>
+      <div className="card train-analyticstab" style={{ textAlign: 'center', padding: 30 }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
         <div style={{ fontSize: 13, color: '#fff', marginBottom: 8 }}>
           {sessions.length === 0
@@ -86,7 +86,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
   const { volume, intensity, strength, fatigue, recovery } = analytics;
 
   return (
-    <div>
+    <div className="train-analyticstab">
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
