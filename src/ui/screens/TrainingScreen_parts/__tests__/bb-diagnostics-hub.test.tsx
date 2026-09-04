@@ -154,4 +154,22 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
     expect(screen.getAllByText(/Нет плана ББ/)[0]).toBeInTheDocument();
   });
+  it('worst-in-plan button selects lowest-scored exercise', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [
+      { exerciseName: 'tricep_pushdown_rope', name: 'Разгибание на блоке', muscle: 'triceps', sets: 3, rir: 2 },
+      { exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 3, rir: 2 },
+    ] }] }] }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Худшее в плане/ }));
+    // плоский жим мимо верха (wrongHead −14) — хуже блока
+    expect(screen.getAllByText(/Худшее в плане: Жим штанги лёжа/)[0]).toBeInTheDocument();
+  });
+  it('worst-in-plan without plan shows hint, does not crash', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Худшее в плане/ }));
+    expect(screen.getAllByText(/Нет плана ББ/)[0]).toBeInTheDocument();
+  });
 });

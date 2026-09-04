@@ -766,6 +766,55 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any)); localStorage.setItem('he_training_planning_track', 'bb'); } catch {}
   };
 
+  // 🎯 Худшее упражнение плана по полному диагнозу (со слабыми головками) — открыть на разбор
+  const selectWorstExercise = () => {
+    if (!bbPlan) {
+      setToast('Нет плана ББ — собери в ББ-авто');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    let worst: { id: string; name: string; score: number } | null = null;
+    try {
+      const LEGS = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'legs']);
+      for (const w of (bbPlan.weeks || [])) {
+        for (const s of (w.sessions || [])) {
+          for (const ex of (s.exercises || [])) {
+            const id = String((ex as any).exerciseName || (ex as any).id || '');
+            const name = String((ex as any).name || id);
+            const muscle = String((ex as any).muscle || '');
+            if (!id && !name) continue;
+            let wh: string | null = null;
+            try {
+              const m = muscle.toLowerCase();
+              for (const z of report.weakZonesGranular) {
+                const h = weakHeadForZone(z);
+                if (!h) continue;
+                const hm = HEAD_FUNCTIONS[h]?.muscle || '';
+                if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { wh = h; break; }
+              }
+            } catch { /* noop */ }
+            let sc = 100;
+            try {
+              sc = diagnoseExercise(
+                { id: id || undefined, name, muscle, rir: (ex as any).rir ?? 2, tempo: (ex as any).tempo, pauseSeconds: (ex as any).pauseSeconds } as any,
+                { muscle, weakHead: wh, level } as any,
+              ).score;
+            } catch { /* noop */ }
+            if (!worst || sc < worst.score) worst = { id: id || name, name, score: sc };
+          }
+        }
+      }
+    } catch { /* noop */ }
+    if (!worst) {
+      setToast('В плане нет упражнений');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    setState((st) => ({ ...st, exerciseSelectedId: worst!.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }));
+    setToast(`🎯 Худшее в плане: ${worst.name} (${worst.score}/100) — разбираем`);
+    setTimeout(() => setToast(''), 3000);
+  };
+
   const takeMeasureSnapshot = () => {
     let meas: Record<string, number> = {};
     try {
@@ -1129,7 +1178,10 @@ export const BBDiagnosticsHub: React.FC = () => {
 
             {/* Секция 2: Диагноз выбранного */}
             <div style={{ padding: '10px', borderRadius: 10, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
+                <button onClick={selectWorstExercise} style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>🎯 Худшее в плане</button>
+              </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
                 <select value={state.exerciseSelectedId || ''} onChange={e => setState(s => ({ ...s, exerciseSelectedId: e.target.value || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} style={{ flex: 1, minWidth: 180, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
                   <option value="">— выбери упражнение —</option>
