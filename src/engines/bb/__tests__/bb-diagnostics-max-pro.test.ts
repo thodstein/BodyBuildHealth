@@ -525,9 +525,21 @@ describe('head coverage', () => {
   });
 });
 
+// ── Ранжир: гранулярные зоны маппятся на каталог ──
+describe('rank granular zones', () => {
+  it('chest_upper даёт пул груди с бонусом головки', () => {
+    const r = rankCorrectionsForWeak('chest_upper', null, { weakHead: 'chest_upper' } as any);
+    expect(r.length).toBeGreaterThan(0);
+    expect(r[0].headsHit).toContain('chest_upper');
+  });
+  it('delt_mid даёт пул плеч', () => {
+    const r = rankCorrectionsForWeak('delt_mid', null, {});
+    expect(r.length).toBeGreaterThan(0);
+  });
+});
+
 // ── Ранжир: фильтр оборудования ──
-describe('rank equipment', () => {
-  it('без фильтра блок в пуле', () => {
+describe('rank equipment', () => {  it('без фильтра блок в пуле', () => {
     const r = rankCorrectionsForWeak('triceps', null, {});
     expect(r.some((c) => c.id === 'tricep_pushdown_rope')).toBe(true);
   });

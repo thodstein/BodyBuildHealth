@@ -33,6 +33,7 @@ import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../../../engin
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
+import { injectBBWeakPoints } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 
@@ -125,6 +126,9 @@ export const BBDiagnosticsHub: React.FC = () => {
       const arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr.filter((s) => s && typeof s.date === 'string' && s.meas) : [];
     } catch { return []; }
+  });
+  const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
+    try { return !!localStorage.getItem('he_bb_plan_saved_prev'); } catch { return false; }
   });
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
@@ -783,6 +787,113 @@ export const BBDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
+  // 💉 Инъекция коррекций в сохранённый план (лениво — мемы ниже недоступны из-за TDZ).
+  // Пишет he_bb_plan_saved (+снапшот he_bb_plan_saved_prev) и будит конструктор событием he-bb-plan-saved.
+  const handleInjectToPlan = () => {
+    const zones = report.weakZonesGranular.slice(0, 2);
+    if (!zones.length) {
+      setToast('Выбери 1-2 слабые зоны — нечего вставлять');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    let raw: string | null = null;
+    try { raw = localStorage.getItem('he_bb_plan_saved'); } catch { /* noop */ }
+    if (!raw) {
+      setToast('Нет плана ББ — собери в ББ-авто, потом вставляй коррекции');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch {
+      setToast('План в хранилище битый — пересобери в ББ-авто');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    const plan = parsed?.plan?.weeks ? parsed.plan : parsed?.weeks ? parsed : null;
+    if (!plan) {
+      setToast('План не распознан — пересобери в ББ-авто');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    try { localStorage.setItem('he_bb_plan_saved_prev', raw); } catch { /* noop */ }
+    // dayMap/targetSets из спец-блока, темп из PROF, упражнения из топ-3
+    let dayMap: Record<string, number[]> | undefined;
+    let specWeeks: Array<{ targetSets: Record<string, number> }> = [];
+    try {
+      const f: Record<string, number> = {};
+      const sb = buildSpecBlock({ weakZones: zones, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      dayMap = sb.dayMap;
+      specWeeks = sb.weeks || [];
+    } catch { /* noop */ }
+    const profTempo: Record<string, string> = {};
+    for (const z of zones) {
+      try {
+        const p = getProfExecutionProfile(z) || getProfExecutionProfile(canonicalMuscle(z));
+        if (p?.tempo) profTempo[z] = p.tempo;
+      } catch { /* noop */ }
+    }
+    const preferredIds: Record<string, string> = {};
+    for (const z of zones) {
+      try {
+        const top = rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: weakHeadForZone(z), equipment: profileEquipment }).slice(0, 1)[0];
+        if (top) preferredIds[z] = top.id;
+      } catch { /* noop */ }
+    }
+    let working: any = plan;
+    let injected = 0;
+    let skippedBudget = 0;
+    const nWeeks = Array.isArray(working.weeks) ? working.weeks.length : 0;
+    for (let wi = 0; wi < nWeeks; wi++) {
+      if (!working.weeks[wi] || working.weeks[wi].deload) continue;
+      const sw = specWeeks[wi] || specWeeks[specWeeks.length - 1];
+      const targetSets: Record<string, number> = {};
+      if (sw) for (const z of zones) {
+        const v = Number((sw.targetSets as any)?.[z]);
+        if (Number.isFinite(v)) targetSets[z] = v;
+      }
+      try {
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi] });
+        working = r.plan;
+        injected += r.injected;
+        skippedBudget += r.skippedBudget;
+      } catch { /* noop */ }
+    }
+    if (!injected) {
+      setToast(`⊘ Не вставлено (бюджет переполнен: ${skippedBudget} · или уже есть в днях)`);
+      setTimeout(() => setToast(''), 3000);
+      return;
+    }
+    try {
+      working.rationale = [...(working.rationale || []), `ББ-диагностика: инъекция коррекций (${zones.join(', ')})`];
+      localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: working, date: new Date().toISOString() }));
+    } catch {
+      setToast('Не влезло в хранилище — очисти старые планы');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setHasInjectPrev(true);
+    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    setToast(`✓ Вставлено коррекций: ${injected} (нед: ${nWeeks}) · открыт ББ-авто`);
+    setTimeout(() => setToast(''), 3000);
+    try {
+      window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
+      localStorage.setItem('he_training_planning_track', 'bb');
+    } catch { /* noop */ }
+  };
+
+  const handleRollbackInject = () => {
+    try {
+      const prev = localStorage.getItem('he_bb_plan_saved_prev');
+      if (!prev) return;
+      localStorage.setItem('he_bb_plan_saved', prev);
+      localStorage.removeItem('he_bb_plan_saved_prev');
+    } catch { /* noop */ }
+    setHasInjectPrev(false);
+    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    setToast('↩ План восстановлен до инъекции');
+    setTimeout(() => setToast(''), 2500);
+  };
+
   return (
     <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(0,230,138,0.22)', position: 'relative', overflow: 'hidden' }}>
@@ -892,6 +1003,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                     {hc.covered ? '✓' : '✗'} {hc.head}{hc.covered ? ` — ${hc.by.join(', ')}` : ' — нет упражнения в плане (см. топ-3 выше)'}
                   </div>
                 ))}
+              </div>
+            )}
+            {report.weakZonesGranular.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                <button onClick={handleInjectToPlan} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>
+                {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откатить инъекцию</button>}
               </div>
             )}
           </div>

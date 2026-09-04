@@ -49,4 +49,21 @@ describe('bb-diagnostics-injection', () => {
     expect(computeBudgetBBFallback('beginner')).toBeGreaterThan(0);
     expect(computeBudgetBBFallback('enhanced')).toBeGreaterThan(computeBudgetBBFallback('beginner'));
   });
+  it('weekIdxs targets only listed weeks (deload skipped)', () => {
+    const plan = mockPlan() as any;
+    plan.weeks.push(JSON.parse(JSON.stringify(plan.weeks[0])));
+    plan.weeks.push(JSON.parse(JSON.stringify(plan.weeks[0])));
+    (plan.weeks[1] as any).deload = true;
+    const res = injectBBWeakPoints(plan, ['delt_mid'], { weekIdxs: [0, 1, 2, 9] });
+    expect(res.injected).toBe(2); // нед 0 и 2; делод и вне диапазона пропущены
+    expect(res.plan.weeks[0].sessions.some((s: any) => s.exercises.some((e: any) => e.exerciseName === 'lateral_raise'))).toBe(true);
+    expect(res.plan.weeks[2].sessions.some((s: any) => s.exercises.some((e: any) => e.exerciseName === 'lateral_raise'))).toBe(true);
+  });
+  it('weekIdxs all-deload → deload note, no crash', () => {
+    const plan = mockPlan() as any;
+    (plan.weeks[0] as any).deload = true;
+    const res = injectBBWeakPoints(plan, ['delt_mid'], { weekIdxs: [0] });
+    expect(res.injected).toBe(0);
+    expect(res.notes.join(' ')).toMatch(/делод/);
+  });
 });

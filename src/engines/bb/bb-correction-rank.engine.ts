@@ -8,6 +8,7 @@ import { sfrOf, resistanceProfileOf, isUnilateralExercise } from './bb-sfr-db';
 import { ANGLE_CLASSES, STRICT_EXERCISE_GROUPS, strictGroupForExercise } from './bb-exercise-selection.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { headsHitOf } from './bb-stimulus-target.engine';
+import { canonicalMuscle } from './bb-specialization.engine';
 import type { WeakCause } from './bb-weak-cause.engine';
 
 export interface RankCtx {
@@ -47,7 +48,12 @@ function levelAllows(level: string | undefined, exName: string): boolean {
 }
 
 export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: RankCtx = {}): RankedCorrection[] {
-  const muscle = norm(weakZone);
+  // Гранулярная зона (chest_upper) → каноническая мышца каталога (chest); головка для бонуса — отдельно из ctx.weakHead
+  let muscle = norm(weakZone);
+  try {
+    const canon = canonicalMuscle(muscle);
+    if (canon) muscle = norm(canon);
+  } catch { /* noop */ }
   const inPlan = new Set((ctx.inPlanIds || []).map(norm));
   const missingAngles = new Set((ctx.missingAngles || []).map(norm));
   const missingStrict = new Set((ctx.missingStrict || []).map(norm));

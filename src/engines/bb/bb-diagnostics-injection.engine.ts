@@ -54,6 +54,8 @@ export interface BBInjectionOpts {
   profTempo?: Record<string, string>;
   /** MAX PRO: инъецировать во все недели (по умолчанию только weeks[0]) */
   allWeeks?: boolean;
+  /** Инъецировать только в указанные недели (индексы); делод пропускается. Приоритетнее allWeeks. */
+  weekIdxs?: number[];
   /** MAX PRO: предпочитаемые id упражнений (из correction-rank топ-1) */
   preferredIds?: Record<string, string>;
 }
@@ -91,10 +93,13 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const catName = cat ? cat.name : corrId;
     const catId = cat ? cat.id : corrId;
     const catType = cat ? cat.type : 'isolation';
-    // MAX PRO: недели — все не-делоадные при allWeeks, иначе только weeks[0]
-    const weekIdxs = opts.allWeeks
-      ? (copy.weeks as any[]).map((w, i) => ({ w, i })).filter(({ w }) => w && !w.deload).map(({ i }) => i)
-      : [0].filter((i) => (copy.weeks as any[])[i] && !(copy.weeks as any[])[i].deload);
+    // Недели: явные weekIdxs > все не-делоадные при allWeeks > только weeks[0]
+    const all = (copy.weeks as any[]);
+    const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
+      ? opts.weekIdxs.filter((i) => Number.isInteger(i) && all[i] && !all[i].deload)
+      : opts.allWeeks
+        ? all.map((w, i) => ({ w, i })).filter(({ w }) => w && !w.deload).map(({ i }) => i)
+        : [0].filter((i) => all[i] && !all[i].deload);
     if (weekIdxs.length === 0) { notes.push(`⚠ ${wp} — делод`); continue; }
     const muscleKey = canonicalMuscle(wp);
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
