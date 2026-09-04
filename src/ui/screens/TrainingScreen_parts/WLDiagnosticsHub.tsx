@@ -745,17 +745,36 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
+  // E14: обогащённый снапshot (причины + биомеханика + топ-3 + попытки)
+  const exportSnap = () => {
+    const base = { weakPoints, score, level, verification: scoring.verification, barPath: state.barPath || null, vbt: state.vbtVel || state.vbtBest || null, ohs: { totalScore: ohs.totalScore, failed: ohs.failed }, asymmetryPct: asymmetry?.diff ?? null, fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null, findings: scoring.findings.map(f => f.text) } as any;
+    try {
+      base.sex = profileSex;
+      base.causes = Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? '']; } catch { return [wp, '']; } }));
+      base.biomech = weakPoints.map(wp => {
+        try {
+          const b = diagnoseTAWeakPoint(wp);
+          if (!b) return null;
+          return { weakPoint: wp, label: b.label, joint: b.joint, angleRange: `${b.angleRangeDeg[0]}-${b.angleRangeDeg[1]}°`, weakMuscles: b.weakMuscles.join(', '), reason: b.biomechanicalReason };
+        } catch { return null; }
+      }).filter(Boolean);
+      base.corrections = weakPoints.flatMap(wp => { try { return top3For(wp).map(c => ({ weakPoint: wp, corrId: c.id, name: c.name, protocol: `${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%` })); } catch { return []; } });
+      if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
+    } catch { /* noop — базовый снап */ }
+    return base;
+  };
+
   const handleExport = () => {
-    const snap = { weakPoints, score, level, verification: scoring.verification, barPath: state.barPath || null, vbt: state.vbtVel || state.vbtBest || null, ohs: { totalScore: ohs.totalScore, failed: ohs.failed }, asymmetryPct: asymmetry?.diff ?? null, fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null, findings: scoring.findings.map(f => f.text) } as any;
+    const snap = exportSnap();
     const html = buildWLDiagnosticsHtml(snap);
     downloadWLHtml(html, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт');
+    setToast('✓ HTML экспорт (фазы + биомеханика + коррекции)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
-    const snap = { weakPoints, score, level, verification: scoring.verification, barPath: state.barPath || null, vbt: state.vbtVel || state.vbtBest || null, ohs: { totalScore: ohs.totalScore, failed: ohs.failed }, asymmetryPct: asymmetry?.diff ?? null, fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null, findings: scoring.findings.map(f => f.text) } as any;
+    const snap = exportSnap();
     downloadWLCsv(snap, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт');
+    setToast('✓ CSV экспорт (причины + коррекции + попытки)');
     setTimeout(() => setToast(''), 2000);
   };
 

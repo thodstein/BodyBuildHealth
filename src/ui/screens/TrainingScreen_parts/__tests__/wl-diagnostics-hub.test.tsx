@@ -178,4 +178,11 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(cb);
     await waitFor(() => expect(container.textContent).toContain('невалиден'), { timeout: 2000 });
   });
+  it('E14 экспорт v2: HTML с биомеханикой', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
+    await waitFor(() => expect(container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+  });
 });
