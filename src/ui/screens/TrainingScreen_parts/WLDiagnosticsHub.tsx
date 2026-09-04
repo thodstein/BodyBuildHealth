@@ -23,6 +23,7 @@ import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } fro
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
+import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -275,6 +276,23 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
+  // E2: причина слабой фазы (объём/техника/мобильность/усталость/сила)
+  const causeFor = (wp: WLWeakPoint) => {
+    try {
+      const cov = planAudit.byPhase[wp];
+      const perWeek = cov && planAudit.workWeeks > 0 ? cov.sets / planAudit.workWeeks : null;
+      return diagnoseTAWeakCause({
+        zone: wp,
+        factSetsPerWeek: perWeek,
+        acwrZone: acwr?.zone ?? null,
+        vbtLossPct: vbtLoss?.lossPct ?? null,
+        ohsFailed: ohs.failed,
+        isppRatio,
+        barPathDeviation: state.barPath || null,
+      });
+    } catch { return null; }
+  };
+
   const applyToConstructor = () => {
     if (weakPoints.length === 0) {
       setToast('Слабые фазы не выбраны — нечего применять');
@@ -437,6 +455,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
+                  {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
                 </div>
               );
             })}
@@ -476,6 +495,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')}</div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>
+                  {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
                 </div>
               );
             })}
@@ -498,7 +518,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {state.jerkWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
-              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div></div>;
+              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}</div>;
             })}
           </div>
         )}

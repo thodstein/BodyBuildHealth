@@ -57,4 +57,10 @@ describe('WLDiagnosticsHub PRO', () => {
     const { container } = render(<WLDiagnosticsHub />);
     await waitFor(() => expect(container.textContent).toContain('план ТА не собран'), { timeout: 2000 });
   });
+  it('E2 причина фазы показана под карточкой', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(await screen.findByText(/Рывок: отрыв/));
+    await waitFor(() => expect(container.textContent).toContain('Причина:'), { timeout: 2000 });
+  });
 });
