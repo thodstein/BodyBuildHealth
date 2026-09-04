@@ -1,6 +1,8 @@
 /**
  * arm-acwr.engine.ts — ACWR для армдневника, с отдельным tendon-ACWR (сухожилия 3× медленнее).
  * Использует toDailyLoads/acuteChronicRatio из training-load.engine.
+ * D2: + per-muscle ACWR из дневника тренировок (нагрузка дня = сумма сетов),
+ * parity BB `computePerMuscleACWR` + PL ACWR-зоны ok <1.3 / caution 1.3–1.5 / danger ≥1.5.
  */
 import { toDailyLoads, acuteChronicRatio } from '../pro/training-load.engine';
 import type { ArmPlan } from './arm-types';
@@ -56,4 +58,98 @@ export function buildArmAcwr(input: ArmAcwrInput): ArmAcwrResult {
 export function acwrAdviceForPlan(acwr: ArmAcwrResult | null): string {
   if (!acwr) return 'нет данных (нужен дневник sRPE ≥2 сесс.)';
   return `ACWR ${acwr.overall.ratio} — факт`;
+}
+
+// ── D2: per-muscle ACWR ──
+
+export type ArmAcwrZone = 'ok' | 'caution' | 'danger';
+
+export interface ArmMuscleAcwr {
+  muscle: string;
+  acute: number;
+  chronic: number;
+  ratio: number;
+  zone: ArmAcwrZone;
+}
+
+export interface ArmAcwrDaySession {
+  date: string;
+  exercises: Array<{ muscleGroup?: string; muscle?: string; sets: Array<unknown> }>;
+}
+
+function dayNum(iso: string): number {
+  const t = new Date(iso + 'T12:00:00').getTime();
+  return Number.isFinite(t) ? Math.floor(t / 86400000) : NaN;
+}
+
+function muscleOf(ex: { muscleGroup?: string; muscle?: string }): string | null {
+  const m = String((ex as any)?.muscleGroup || (ex as any)?.muscle || '').toLowerCase().trim();
+  return m || null;
+}
+
+export function armAcwrZoneFor(ratio: number | null): ArmAcwrZone {
+  if (ratio == null || !Number.isFinite(ratio)) return 'ok';
+  if (ratio >= 1.5) return 'danger';
+  if (ratio >= 1.3) return 'caution';
+  return 'ok';
+}
+
+/** Дневные нагрузки по мышцам за последние 28д: muscle → dayIdx(0=сегодня) → сеты. */
+export function armDailyLoadsByMuscle(sessions: ArmAcwrDaySession[], referenceIso?: string): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  try {
+    const ref = referenceIso ? dayNum(referenceIso.slice(0, 10)) : Math.floor(Date.now() / 86400000);
+    if (!Number.isFinite(ref)) return out;
+    for (const s of sessions || []) {
+      const d = dayNum(String((s as any)?.date || '').slice(0, 10));
+      if (!Number.isFinite(d)) continue;
+      const age = ref - d;
+      if (age < 0 || age >= 28) continue;
+      for (const ex of (s as any)?.exercises || []) {
+        const m = muscleOf(ex as any);
+        if (!m) continue;
+        const cnt = Array.isArray((ex as any)?.sets) ? (ex as any).sets.length : 0;
+        if (!out[m]) out[m] = new Array(28).fill(0);
+        out[m][age] += cnt;
+      }
+    }
+  } catch { /* noop */ }
+  return out;
+}
+
+export function computeArmPerMuscleACWR(sessions: ArmAcwrDaySession[], referenceIso?: string): Record<string, ArmMuscleAcwr> {
+  const out: Record<string, ArmMuscleAcwr> = {};
+  const loads = armDailyLoadsByMuscle(sessions, referenceIso);
+  for (const [m, days] of Object.entries(loads)) {
+    const acuteDays = days.slice(0, 7);
+    const acute = acuteDays.reduce((a, b) => a + b, 0) / 7;
+    const chronic = days.reduce((a, b) => a + b, 0) / 28;
+    if (chronic <= 0) continue;
+    const ratio = Math.round((acute / chronic) * 100) / 100;
+    out[m] = { muscle: m, acute: Math.round(acute * 100) / 100, chronic: Math.round(chronic * 100) / 100, ratio, zone: armAcwrZoneFor(ratio) };
+  }
+  return out;
+}
+
+/** Худшая зона среди мышц точки (для diagnoseArmWeakCause). Нет данных → null. */
+export function worstArmAcwrZone(map: Record<string, ArmMuscleAcwr>, muscles: string[]): ArmAcwrZone | null {
+  let worst: ArmAcwrZone | null = null;
+  const rank: Record<ArmAcwrZone, number> = { ok: 0, caution: 1, danger: 2 };
+  for (const m of muscles || []) {
+    const z = map[m]?.zone;
+    if (!z) continue;
+    if (worst == null || rank[z] > rank[worst]) worst = z;
+  }
+  return worst;
+}
+
+/** Сводка для UI: сколько мышц в caution/danger. */
+export function armAcwrSummary(map: Record<string, ArmMuscleAcwr>): { danger: string[]; caution: string[] } {
+  const danger: string[] = [];
+  const caution: string[] = [];
+  for (const [m, v] of Object.entries(map)) {
+    if (v.zone === 'danger') danger.push(m);
+    else if (v.zone === 'caution') caution.push(m);
+  }
+  return { danger, caution };
 }

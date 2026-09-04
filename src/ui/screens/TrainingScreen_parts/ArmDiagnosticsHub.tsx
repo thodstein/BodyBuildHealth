@@ -31,10 +31,11 @@ import { injectArmCorrections, saveArmPlanPrev, loadArmPlanPrev, clearArmPlanPre
 import { detectArmWeakByE1rm, armVolumeHistory28d, armPointsForMuscles } from '../../../engines/arm/arm-diary-weak-detection.engine';
 import { parseArmTrackCsv, armPathMetrics, classifyArmTrajectory, isArmRealChange } from '../../../engines/arm/arm-video-analysis.engine';
 import { assessArmMobility, mobilityFailForWeakPoint, applyArmMobilityToProfile } from '../../../engines/arm/arm-mobility.engine';
-import { autoregArmFromDiary } from '../../../engines/arm/arm-diary-autoreg.engine';
+import { autoregArmFromDiary, type ArmDiaryDay } from '../../../engines/arm/arm-diary-autoreg.engine';
 import { checkUCLGuard, checkShoulderGuard, checkTendonGuard } from '../../../engines/arm/arm-injury-guard.engine';
 import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTrend } from '../../../engines/arm/arm-bilateral.engine';
-import { scorePlatform, planAttempts } from '../../../engines/arm/arm-platform.engine';
+import { scorePlatform, planAttempts, loadPlatformLog, savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
+import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
@@ -43,6 +44,16 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 import { haptics, isOnline } from '../../../core/native-bridge';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
+
+// D4: персистентность P1/P2-состояния (отдельный ключ, v4-стейт не трогаем)
+const P1_KEY = 'he_arm_diagnostics_hub_p1';
+function loadP1State(): Record<string, any> {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(P1_KEY) : null;
+    const j = raw ? JSON.parse(raw) : {};
+    return j && typeof j === 'object' ? j : {};
+  } catch { return {}; }
+}
 
 type HubTab = 'grip' | 'wrist' | 'pressure' | 'strength' | 'recovery';
 
@@ -156,24 +167,32 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [toast, setToast] = useState<string>('');
   const [forceHistoryTick, setForceHistoryTick] = useState(0);
   const [showCam, setShowCam] = useState(false);
-  const [specWeeks, setSpecWeeks] = useState('6');
+  const p1saved = useMemo(loadP1State, []);
+  const [specWeeks, setSpecWeeks] = useState(String((p1saved as any).specWeeks ?? '6'));
   const [injectMsg, setInjectMsg] = useState('');
   const [planNonce, setPlanNonce] = useState(0);
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return !!localStorage.getItem('he_arm_plan_saved_prev'); } catch { return false; }
   });
   const [bilatTick, setBilatTick] = useState(0);
-  const [trackCsv, setTrackCsv] = useState('');
+  const [trackCsv, setTrackCsv] = useState(String((p1saved as any).trackCsv ?? ''));
   const [baseXLoop, setBaseXLoop] = useState<string>(() => {
-    try { return localStorage.getItem('he_arm_track_base') || ''; } catch { return ''; }
+    try { return String((p1saved as any).baseXLoop ?? localStorage.getItem('he_arm_track_base') ?? ''); } catch { return ''; }
   });
-  const [mobWristFlex, setMobWristFlex] = useState(true);
-  const [mobWristExt, setMobWristExt] = useState(true);
-  const [mobPron, setMobPron] = useState(true);
-  const [mobSup, setMobSup] = useState(true);
-  const [mobElbow, setMobElbow] = useState(true);
-  const [mobRetest, setMobRetest] = useState<'' | 'better' | 'same'>('');
+  const [mobWristFlex, setMobWristFlex] = useState((p1saved as any).mobWristFlex !== false);
+  const [mobWristExt, setMobWristExt] = useState((p1saved as any).mobWristExt !== false);
+  const [mobPron, setMobPron] = useState((p1saved as any).mobPron !== false);
+  const [mobSup, setMobSup] = useState((p1saved as any).mobSup !== false);
+  const [mobElbow, setMobElbow] = useState((p1saved as any).mobElbow !== false);
+  const [mobRetest, setMobRetest] = useState<'' | 'better' | 'same'>(((p1saved as any).mobRetest as any) || '');
   const [mobMsg, setMobMsg] = useState('');
+  // D1: боли + сон; D4: попытка помоста
+  const [painElbow, setPainElbow] = useState(String((p1saved as any).painElbow ?? ''));
+  const [painWrist, setPainWrist] = useState(String((p1saved as any).painWrist ?? ''));
+  const [sleepHours, setSleepHours] = useState(String((p1saved as any).sleepHours ?? ''));
+  const [attKg, setAttKg] = useState('');
+  const [attOk, setAttOk] = useState(true);
+  const [attTick, setAttTick] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const handsRef = useRef<{ stop: () => void } | null>(null);
@@ -181,6 +200,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [state]);
+
+  // D4: персистентность P1/P2-полей (отдельный ключ)
+  useEffect(() => {
+    try {
+      localStorage.setItem(P1_KEY, JSON.stringify({
+        specWeeks, trackCsv, baseXLoop,
+        mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest,
+        painElbow, painWrist, sleepHours,
+      }));
+    } catch {}
+  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours]);
 
   // ACWR from diary — факт без зон
   const acwr = useMemo(() => {
@@ -466,26 +496,34 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const autoregP0 = useMemo(() => {
     try {
       const srpe: any[] = loadSRPESessions() as any;
-      const days = srpe.slice(-7).map((s: any) => ({
+      const days: ArmDiaryDay[] = srpe.slice(-7).map((s: any) => ({
         dateIso: String(s.date || '').slice(0, 10),
         srpe: Number(s.sRPE ?? s.srpe ?? 0),
         velocityLossPct: vbt.velocityLossPct,
       }));
       if (!days.length) return null;
+      // D1: ручные боли вешаем на последний день (max-правило движка)
+      const pe = parseFloat(painElbow);
+      const pw = parseFloat(painWrist);
+      const lastD = days[days.length - 1];
+      if (Number.isFinite(pe) && pe > 0) lastD.elbowPain = pe;
+      if (Number.isFinite(pw) && pw > 0) lastD.wristPain = pw;
       return autoregArmFromDiary(days);
     } catch { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vbt.velocityLossPct, forceHistoryTick]);
+  }, [vbt.velocityLossPct, forceHistoryTick, painElbow, painWrist]);
 
   const guardsP0 = useMemo(() => {
-    if (!armPlan) return { ucl: [] as string[], shoulder: [] as string[], tendon: [] as string[] };
+    const empty = { ucl: [] as string[], shoulder: [] as string[], tendon: [] as string[], humerus: [] as string[] };
+    if (!armPlan) return empty;
     try {
       return {
         ucl: checkUCLGuard({ weeks: (armPlan as any).weeks, level: state.level } as any),
         shoulder: checkShoulderGuard(armPlan as any),
         tendon: checkTendonGuard({ weeks: (armPlan as any).weeks, level: state.level } as any),
+        humerus: checkHumerusGuard(armPlan as any),
       };
-    } catch { return { ucl: [] as string[], shoulder: [] as string[], tendon: [] as string[] }; }
+    } catch { return empty; }
   }, [armPlan, state.level]);
 
   const bilatP0 = useMemo(() => {
@@ -505,6 +543,35 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try { return bilateralTrend(bilatHistP0); } catch { return null; }
   }, [bilatHistP0]);
 
+  // ── D2: per-muscle ACWR из дневника; D3: контекст профиля для ранжира ──
+  const perMuscleAcwrP0 = useMemo(() => {
+    try { return computeArmPerMuscleACWR(diarySessionsP0 as any); } catch { return computeArmPerMuscleACWR([]); }
+  }, [diarySessionsP0]);
+
+  const perMuscleAcwrSumP0 = useMemo(() => {
+    try { return armAcwrSummary(perMuscleAcwrP0); } catch { return { danger: [] as string[], caution: [] as string[] }; }
+  }, [perMuscleAcwrP0]);
+
+  const profileCtxP0 = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const eq = p?.settings?.training?.equipment ?? p?.training?.equipment;
+      const h = p?.settings?.health?.mobilityRestrictions ?? p?.health?.mobilityRestrictions;
+      const t = p?.settings?.training?.mobilityRestrictions ?? p?.training?.mobilityRestrictions;
+      return {
+        equipment: (Array.isArray(eq) ? eq.map(String).filter(Boolean) : undefined) as string[] | undefined,
+        mobility: Array.from(new Set([...(Array.isArray(h) ? h : []), ...(Array.isArray(t) ? t : [])].map(String))),
+      };
+    } catch { return { equipment: undefined as string[] | undefined, mobility: [] as string[] }; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceHistoryTick]);
+
+  // D4: журнал попыток помоста
+  const attHistP0 = useMemo(() => {
+    try { return loadPlatformLog(); } catch { return []; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attTick]);
+
   // ── P2 E13: помост %WR + попытки; E15: снапшоты замеров ──
   const platformP0 = useMemo(() => {
     const rt = parseFloat(state.rtKg);
@@ -521,15 +588,21 @@ export const ArmDiagnosticsHub: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [measureTick, forceHistoryTick]);
 
-  // E16 P2: критический side-gate активен?
+  // E16 P2 + D4: критический side-gate (scoring-floor) ИЛИ фактический humerus-гейт плана
   const criticalSideP0 = useMemo(() => {
     try {
+      const hasSide = state.weakPoints.some((p) => p === 'side_mid' || p === 'side_pin');
+      if (!hasSide) return false;
       const sc = (report as any)?.scoring;
-      if (!sc || sc.score > 49) return false;
-      const floors: string[] = sc.floors || [];
-      return floors.some((f) => /side|humerus/i.test(f)) && state.weakPoints.some((p) => p === 'side_mid' || p === 'side_pin');
+      if (sc && sc.score <= 49) {
+        const floors: string[] = sc.floors || [];
+        if (floors.some((f) => /side|humerus/i.test(f))) return true;
+      }
+      // D4: gate напрямую от плана (работает и без scoring)
+      if (guardsP0.humerus.length > 0) return true;
+      return false;
     } catch { return false; }
-  }, [report, state.weakPoints]);
+  }, [report, state.weakPoints, guardsP0]);
 
   const armCausesP0 = useMemo(() => {
     const out: Record<string, ReturnType<typeof diagnoseArmWeakCause>> = {};
@@ -542,22 +615,39 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const h = (m0 && (hist as any)[m0]) || [];
         const trend = diaryTrendsP0.find((t) => bio?.weakMuscles?.includes(t.muscle));
         const th = vbtThresholdForWeakPoint(wp);
+        // D2: худшая ACWR-зона — глобальная vs per-muscle точки
+        const gz = acwr ? (acwr.ratio >= 1.5 ? 'danger' : acwr.ratio >= 1.3 ? 'caution' : 'ok') : null;
+        const pmz = worstArmAcwrZone(perMuscleAcwrP0, bio?.weakMuscles || []);
+        const rankZ = (z: string) => (z === 'danger' || z === 'dangerous' ? 2 : z === 'caution' ? 1 : 0);
+        const acwrMerged = [gz, pmz].filter((z): z is string => !!z).sort((a, b) => rankZ(b) - rankZ(a))[0] ?? null;
+        // D1: сон; D3: бенч-уровень + side/back vs ref
+        const sleepNum = parseFloat(sleepHours);
+        const sideRef = Math.max(30, bwNum * 0.6);
+        const backRef = Math.max(40, bwNum * 0.8);
+        const sideKgNum = parseFloat(state.sideKg);
+        const backKgNum = parseFloat(state.backKg);
+        const sideR = Number.isFinite(sideKgNum) && sideKgNum > 0 ? sideKgNum / sideRef : null;
+        const backR = Number.isFinite(backKgNum) && backKgNum > 0 ? backKgNum / backRef : null;
+        const refRatio = wp.startsWith('side_') ? sideR : wp.startsWith('back_') ? backR : (sideR != null && backR != null ? Math.min(sideR, backR) : sideR ?? backR);
         out[wp] = diagnoseArmWeakCause({
           point: wp,
           factSets7d: fact,
           hist28: h.length ? h : fact != null ? [fact] : [],
           e1rmDeltaPct: trend ? trend.deltaPct : null,
           e1rmSessions: trend ? trend.sessions : 0,
-          acwrZone: acwr ? (acwr.ratio >= 1.5 ? 'danger' : acwr.ratio >= 1.3 ? 'caution' : 'ok') : null,
+          acwrZone: acwrMerged,
           tendonAcwrZone: tendonAcwr ? (tendonAcwr.ratio >= 1.5 ? 'danger' : tendonAcwr.ratio >= 1.3 ? 'caution' : 'ok') : null,
           mobilityFail: mobilityFailForWeakPoint(armMobility.fails, wp),
           vbtLossPct: vbt.velocityLossPct,
           vbtWarnPct: th.warnPct,
+          sleepHours: Number.isFinite(sleepNum) ? sleepNum : null,
+          benchLevel: benchRes.level,
+          sideBackRefRatio: refRatio,
         });
       }
     } catch { /* noop */ }
     return out;
-  }, [state.weakPoints, armAudit, diarySessionsP0, diaryTrendsP0, acwr, tendonAcwr, vbt.velocityLossPct, armMobility]);
+  }, [state.weakPoints, armAudit, diarySessionsP0, diaryTrendsP0, acwr, tendonAcwr, vbt.velocityLossPct, armMobility, perMuscleAcwrP0, sleepHours, benchRes.level, state.sideKg, state.backKg, bwNum]);
 
   const armTop3P0 = useMemo(() => {
     const out: Record<string, ReturnType<typeof rankCorrectionsForArm>> = {};
@@ -565,11 +655,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const inPlan: string[] = [];
       if (armPlan) for (const w of (armPlan as any).weeks || []) for (const s of (w as any).sessions || []) for (const ex of (s as any).exercises || []) if ((ex as any).exerciseId) inPlan.push(String((ex as any).exerciseId));
       for (const wp of state.weakPoints) {
-        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan });
+        // D3: оборудование и мобильность из профиля + локальный ROM-тест
+        const mobMerged = Array.from(new Set([...(profileCtxP0.mobility || []), ...armMobility.fails]));
+        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged });
       }
     } catch { /* noop */ }
     return out;
-  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport]);
+  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility]);
 
   const armSpecP0 = useMemo(() => {
     try {
@@ -598,12 +690,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
     let working = plan;
     let injected = 0;
     let skipped = 0;
-    // E16 P2: критический гейтинг — score≤49 с side/humerus-floor → side только ремень/изометрия
+    // E16 P2 + D4: scoring-floor ИЛИ фактический humerus-гейт плана
     const scoringFloors: string[] = ((report as any)?.scoring?.floors || []) as string[];
     const scoringScore: number | null = ((report as any)?.scoring?.score ?? null) as number | null;
-    const gatedSide = scoringScore != null && scoringScore <= 49
-      && scoringFloors.some((f) => /side|humerus/i.test(f))
-      && points.some((p) => p === 'side_mid' || p === 'side_pin');
+    const scoringGate = scoringScore != null && scoringScore <= 49
+      && scoringFloors.some((f) => /side|humerus/i.test(f));
+    let planGate = false;
+    try {
+      planGate = checkHumerusGuard(working as any).length > 0;
+    } catch { /* noop */ }
+    const gatedSide = (scoringGate || planGate) && points.some((p) => p === 'side_mid' || p === 'side_pin');
     try {
       const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide });
       working = r.plan;
@@ -974,6 +1070,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   <button onClick={() => { saveArmMeasureSnapshot({ rtKg: parseFloat(state.rtKg), sideKg: parseFloat(state.sideKg), backKg: parseFloat(state.backKg), leftKg: parseFloat(state.leftKg), rightKg: parseFloat(state.rightKg) }); setMeasureTick((x) => x + 1); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>📸 Снапшот замеров</button>
                   {measureHistP0.length > 0 && <span style={{ fontSize:9, color:DIM }}>RT: {measureHistP0.slice(-5).map((h) => h.rtKg ?? '—').join(' → ')}</span>}
                 </div>
+                {/* D4: журнал попыток помоста RT */}
+                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                  <label style={{ fontSize:9, color:DIM }}>Попытка RT кг<br /><input aria-label="Попытка помост кг" inputMode="decimal" value={attKg} onChange={(e) => setAttKg(e.target.value)} placeholder="вес" style={{ width:64, marginTop:2, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }} /></label>
+                  <button onClick={() => setAttOk((v) => !v)} aria-pressed={attOk} style={{ alignSelf:'flex-end', padding:'5px 10px', borderRadius:8, border:'1px solid', borderColor: attOk ? 'rgba(34,197,94,0.3)' : '#ef4444', background: attOk ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', color: attOk ? '#22c55e' : '#ef4444', cursor:'pointer', fontSize:10 }}>{attOk ? '✓ взята' : '✗ сорвана'}</button>
+                  <button onClick={() => { const w = parseFloat(attKg); if (Number.isFinite(w) && w > 0) { savePlatformLogEntry({ implement: 'rolling_thunder', sex: state.sex, weightKg: w, success: attOk }); setAttKg(''); setAttTick((x) => x + 1); } }} style={{ alignSelf:'flex-end', padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>💾 Попытку</button>
+                  {attHistP0.length > 0 && <span style={{ fontSize:9, color:DIM }}>Попытки: {attHistP0.slice(-5).map((h) => `${h.weightKg}${h.success ? '✓' : '✗'} ${h.wrPct}%`).join(' · ')}</span>}
+                </div>
               </div>
               <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>VBT</div>
@@ -1333,6 +1436,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
               <b style={{ color:'#fff' }}>ACWR — факт:</b> ACWR {acwr ? acwr.ratio : '—'} — факт {acwr ? '' : '(нужен дневник sRPE ≥2 сесс.)'} {tendonAcwr ? `· Tendon ACWR ${tendonAcwr.ratio} — факт` : ''}
+              {/* D2: per-muscle сводка */}
+              {(perMuscleAcwrSumP0.danger.length > 0 || perMuscleAcwrSumP0.caution.length > 0) && (
+                <span> · Per-muscle: {perMuscleAcwrSumP0.danger.length > 0 && <b style={{ color:'#ef4444' }}>🔴 {perMuscleAcwrSumP0.danger.join(', ')}</b>} {perMuscleAcwrSumP0.caution.length > 0 && <span style={{ color:'#f59e0b' }}>🟠 {perMuscleAcwrSumP0.caution.join(', ')}</span>}</span>
+              )}
             </div>
             {/* E10 P1: мобильность ROM + retest → профиль */}
             <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
@@ -1359,11 +1466,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 {mobMsg && <span style={{ fontSize:10, color:'#22c55e' }}>{mobMsg}</span>}
               </div>
             </div>
-            {/* E11 P1: авторегуляция из дневника + гварды UCL/плечо/tendon */}
+            {/* E11 P1 + D1: авторегуляция из дневника + ручные боли/сон + гварды UCL/плечо/tendon/humerus */}
             <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🔄 Авторегуляция (sRPE 7д + VBT)</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{autoregP0 ? `${autoregP0.note} · объём ×${autoregP0.volumeMult} · RIR+${autoregP0.rirShift}${autoregP0.extraRestDays ? ` · +${autoregP0.extraRestDays} дн отдыха` : ''}` : 'Нет sRPE за 7д — план без изменений'}</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:6 }}><b style={{ color:'#fff' }}>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon].slice(0, 4).join(' · ')}</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🔄 Авторегуляция (sRPE 7д + VBT + боли)</div>
+              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+                <label style={{ fontSize:10, color:DIM }}>Локоть 0-10<br /><input aria-label="Боль локоть 0-10" inputMode="decimal" value={painElbow} onChange={(e) => setPainElbow(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>Запястье 0-10<br /><input aria-label="Боль запястье 0-10" inputMode="decimal" value={painWrist} onChange={(e) => setPainWrist(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>Сон, ч<br /><input aria-label="Сон часов" inputMode="decimal" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} placeholder="8" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+              </div>
+              <div style={{ fontSize:10, color:DIM, marginTop:6 }}>{autoregP0 ? `${autoregP0.note} · объём ×${autoregP0.volumeMult} · RIR+${autoregP0.rirShift}${autoregP0.extraRestDays ? ` · +${autoregP0.extraRestDays} дн отдыха` : ''}` : 'Нет sRPE за 7д — план без изменений'}</div>
+              <div style={{ fontSize:10, color:DIM, marginTop:6 }}><b style={{ color:'#fff' }}>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length + guardsP0.humerus.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon/humerus чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon, ...guardsP0.humerus].slice(0, 5).join(' · ')}</div>
             </div>
             {showScoring && scoring && (
               <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>

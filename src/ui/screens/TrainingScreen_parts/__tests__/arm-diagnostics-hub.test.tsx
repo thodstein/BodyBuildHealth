@@ -225,4 +225,38 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText('💾 Сохранить L/R замер'));
     expect(document.body.textContent).toContain('История:');
   });
+
+  it('D1: боль локтя + sRPE → Side→изометрия', () => {
+    localStorage.setItem('he_srpe_sessions', JSON.stringify([{ date: new Date().toISOString().slice(0, 10), sRPE: 5, durationMin: 60 }]));
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    fireEvent.change(screen.getByLabelText('Боль локоть 0-10'), { target: { value: '8' } });
+    expect(document.body.textContent).toContain('Side → изометрия');
+  });
+
+  it('D4: P1-поля персистятся (remount)', () => {
+    const first = render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    fireEvent.change(screen.getByLabelText('Боль локоть 0-10'), { target: { value: '5' } });
+    first.unmount();
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect((screen.getByLabelText('Боль локоть 0-10') as HTMLInputElement).value).toBe('5');
+  });
+
+  it('D4: попытка помоста пишется в историю с %WR', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText('Попытка помост кг'), { target: { value: '68' } });
+    fireEvent.click(screen.getByText('💾 Попытку'));
+    expect(document.body.textContent).toContain('68✓ 52.1%');
+  });
+
+  it('D2: per-muscle danger виден в Recovery', () => {
+    const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([mk(ago(1), 10), mk(ago(20), 2)]));
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('pronators');
+  });
 });

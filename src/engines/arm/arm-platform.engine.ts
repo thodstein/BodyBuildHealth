@@ -78,3 +78,42 @@ export function platformRotationForWeek(week: number): 'support' | 'pinch' | 'cr
   const pos = ((Math.max(1, Math.round(week)) - 1) % 3 + 3) % 3;
   return pos === 0 ? 'support' : pos === 1 ? 'pinch' : 'crush';
 }
+
+const PLATFORM_LOG_KEY = 'he_arm_platform_log';
+
+export interface PlatformLogEntry {
+  date: string;
+  implement: string;
+  weightKg: number;
+  success: boolean;
+  wrPct: number;
+}
+
+/** Журнал попыток помоста (D4): кап 52, устойчив к битому JSON. */
+export function loadPlatformLog(): PlatformLogEntry[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(PLATFORM_LOG_KEY) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((e: any) => e && typeof e.date === 'string' && Number.isFinite(Number(e.weightKg)))
+      .slice(-52);
+  } catch { return []; }
+}
+
+export function savePlatformLogEntry(input: { implement?: string; sex?: string; weightKg: number; success: boolean; dateIso?: string }): PlatformLogEntry[] {
+  const w = Number(input.weightKg);
+  if (!Number.isFinite(w) || w <= 0) return loadPlatformLog();
+  const implement = input.implement || 'rolling_thunder';
+  const wr = platformWrFor(implement, input.sex || 'male');
+  const entry: PlatformLogEntry = {
+    date: input.dateIso || new Date().toISOString().slice(0, 10),
+    implement,
+    weightKg: Math.round(w * 10) / 10,
+    success: !!input.success,
+    wrPct: wr > 0 ? Math.round((w / wr) * 1000) / 10 : 0,
+  };
+  const next = [...loadPlatformLog(), entry].slice(-52);
+  try { localStorage.setItem(PLATFORM_LOG_KEY, JSON.stringify(next)); } catch { /* noop */ }
+  return next;
+}
