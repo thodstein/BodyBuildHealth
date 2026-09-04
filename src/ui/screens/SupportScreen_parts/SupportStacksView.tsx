@@ -13,7 +13,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
   } = s;
 
   return (
-    <div style={{ padding:'0 0 80px' }}>
+    <div className="sup-stacks" style={{ padding:'0 0 80px' }}>
       <div className="card" style={{ marginBottom:10, padding:10, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
         <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
         <div style={{ display:'flex', gap:6 }}>

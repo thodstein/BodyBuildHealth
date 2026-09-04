@@ -226,8 +226,17 @@ import { StrengthAnalyticsCard } from '../screens/TrainingScreen_parts/StrengthA
 import { ProgramTimeline } from '../screens/TrainingScreen_parts/ProgramTimeline';
 import { SessionEditorModal } from '../screens/TrainingScreen_parts/SessionEditorModal';
 import { StrengthDiaryPanel } from '../screens/TrainingScreen_parts/StrengthDiaryPanel';
-import { PlannerBbAuto } from '../screens/TrainingScreen_parts/PlannerBbAuto';
-import { PlannerPlAuto } from '../screens/TrainingScreen_parts/PlannerPlAuto';
+import { BlockView } from '../screens/SRCBBScreen_parts/BlockView';
+import { SupportProtocolSteatosis } from '../screens/SupportScreen_parts/supportProtocolSteatosis';
+import { SupportProtocolMito } from '../screens/SupportScreen_parts/supportProtocolMito';
+import { SupportProtocolAdaptogen } from '../screens/SupportScreen_parts/supportProtocolAdaptogen';
+import { SupportProtocolPostCycle } from '../screens/SupportScreen_parts/supportProtocolPostCycle';
+import { SupportProtocolProlactin } from '../screens/SupportScreen_parts/supportProtocolProlactin';
+import { SupportStacksView } from '../screens/SupportScreen_parts/SupportStacksView';
+import { SupportCatalogView, SupportCatalogTab } from '../screens/SupportScreen_parts/SupportCatalogView';
+import { ComplaintsTab } from '../screens/SupportScreen_parts/ComplaintsTab';
+import { SupportHomeView } from '../screens/SupportScreen_parts/SupportHomeView';
+import { SupportDiaryView } from '../screens/SupportScreen_parts/SupportDiaryView';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1494,5 +1503,122 @@ describe('market + pharma + labs roots', () => {
     expect(c4.querySelector('.train-strengthdiary'), 'strengthdiary').not.toBeNull();
     // PlannerBbAuto/PlannerPlAuto синхронно строят планы на маунте (тяжело для jsdom) —
     // хуки .hub-bb/.hub-pl живут в прод-ветке, здесь не проверяются.
+  });
+
+  it('55. Batch-19 корни: блоки, протоколы-хвосты, стеки, каталог, жалобы', () => {
+    const { container: c1 } = render(<BlockView plan={null} />);
+    expect(c1.querySelector('.pl-blockview'), 'blockview-empty').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportProtocolSteatosis s={{}} />);
+    expect(c2.querySelector('.sup-proto-steatosis'), 'steatosis').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportProtocolMito s={{}} />);
+    expect(c3.querySelector('.sup-proto-mito'), 'mito').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportProtocolAdaptogen s={{}} />);
+    expect(c4.querySelector('.sup-proto-adaptogen'), 'adaptogen').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<SupportProtocolPostCycle s={{}} />);
+    expect(c5.querySelector('.sup-proto-postcycle'), 'postcycle').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<SupportProtocolProlactin s={{}} />);
+    expect(c6.querySelector('.sup-proto-prolactin'), 'prolactin').not.toBeNull();
+  });
+
+  it('56. Batch-19 корни: вьюхи поддержки (дом, дневник, каталог, стеки, жалобы)', () => {
+    const homeNav = {
+      setSection: () => {},
+      setTab: () => {},
+      setSupportView: () => {},
+      setCalcView: () => {},
+      setInfoView: () => {},
+      setProtocolTab: () => {},
+    };
+    const { container: c1 } = render(<SupportHomeView s={homeNav} />);
+    expect(c1.querySelector('.support-hero'), 'homehero').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportDiaryView s={{}} />);
+    expect(c2.querySelector('.sup-diary'), 'diary').not.toBeNull();
+    cleanup();
+    const catalogMocks = {
+      catalogSubTab: 'type',
+      setCatalogSubTab: () => {},
+      searchQuery: '',
+      setSearchQuery: () => {},
+      expandedCategories: {},
+      setExpandedCategories: () => {},
+      selectedSub: null,
+      setSelectedSub: () => {},
+      enhancedSubs: [],
+      setEnhancedSubs: () => {},
+      setFavRefresh: () => {},
+      catalogSubstances: [],
+      groupedSubstances: {},
+      OrganGroupedSubstances: [],
+      typeGroupedSubstances: [],
+      SUPPORT_TIER_GROUPS: {},
+      filteredStacks: [],
+      stackSystems: [],
+      stkFilterSystem: '',
+      setStkFilterSystem: () => {},
+      stkFilterQty: '',
+      setStkFilterQty: () => {},
+      stkFilterScore: '',
+      setStkFilterScore: () => {},
+      stackExpanded: {},
+      setStackExpanded: () => {},
+      mergedInteractions: [],
+      catDetailInteractions: [],
+      renderCatalogDetail: () => null,
+      toast: null,
+    };
+    const { container: c3 } = render(<SupportCatalogView s={catalogMocks} />);
+    expect(c3.querySelector('.sup-catalogview'), 'catalogview').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <SupportCatalogTab
+        s={{
+          section: 'info',
+          tab: 'catalog',
+          catalogSubTab: 'type',
+          searchQuery: '',
+          setSearchQuery: () => {},
+          showOrganPopup: false,
+          setShowOrganPopup: () => {},
+          catalogOrgans: [],
+          setCatalogOrgans: () => {},
+          groupedSubstances: [],
+          catalogSubstances: [],
+          expandedCategories: {},
+          setExpandedCategories: () => {},
+          selectedSub: null,
+          setSelectedSub: () => {},
+          mergedInteractions: [],
+          resolveSubName: (id: string) => id,
+        }}
+      />,
+    );
+    expect(c4.querySelector('.sup-catalog'), 'catalog').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <SupportStacksView
+        s={{
+          stackName: '',
+          setStackName: () => {},
+          SUPPORT_LEVELS: {},
+          supportLevel: 'base',
+          savedStacks: [],
+          setSavedStacks: () => {},
+          expandedStack: null,
+          setExpandedStack: () => {},
+          getStackDisplayName: (id: string) => id,
+          catalogSubstances: [],
+        }}
+      />,
+    );
+    expect(c5.querySelector('.sup-stacks'), 'stacks').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<ComplaintsTab />);
+    expect(c6.querySelector('.sup-complaints'), 'complaints').not.toBeNull();
   });
 });

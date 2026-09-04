@@ -7,7 +7,7 @@ export const SupportProtocolMito: React.FC<{ s: Record<string, any> }> = ({ s })
   const [mitoTab, setMitoTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Митохондрии">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-mito" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#06b6d4', marginBottom:2 }}>⚡ Митохондриальный (NAD⁺/энергия)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Митохондриальная поддержка для энергетики, долголетия и профилактики метаболических нарушений на курсе ААС и GH.</p>

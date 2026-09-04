@@ -2677,6 +2677,46 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 51. NATIVE DEEP-19 — блоки, протоколы-хвосты, вьюхи ────── */
+html.app-native .pl-blockview,
+html.app-native .sup-proto-steatosis,
+html.app-native .sup-proto-mito,
+html.app-native .sup-proto-adaptogen,
+html.app-native .sup-proto-postcycle,
+html.app-native .sup-proto-prolactin,
+html.app-native .sup-stacks,
+html.app-native .sup-catalogview,
+html.app-native .sup-complaints,
+html.app-native .support-hero,
+html.app-native .sup-diary,
+html.app-native .sup-catalog {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-blockview,
+html.app-native .sup-stacks,
+html.app-native .sup-catalogview,
+html.app-native .sup-complaints {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pl-blockview,
+  html.app-native .sup-proto-steatosis,
+  html.app-native .sup-proto-mito,
+  html.app-native .sup-proto-adaptogen,
+  html.app-native .sup-proto-postcycle,
+  html.app-native .sup-proto-prolactin,
+  html.app-native .sup-stacks,
+  html.app-native .sup-catalogview,
+  html.app-native .sup-complaints,
+  html.app-native .support-hero,
+  html.app-native .sup-diary,
+  html.app-native .sup-catalog {
+    animation: none;
+  }
+}
+
 /* ─── 50. NATIVE DEEP-18 — аналитика, качество, пики, хабы ───── */
 html.app-native .train-analyticstab,
 html.app-native .train-qualitytool,

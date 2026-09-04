@@ -7,7 +7,7 @@ export const SupportProtocolSteatosis: React.FC<{ s: Record<string, any> }> = ({
   const [steatosisTab, setSteatosisTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Стеатоз">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-steatosis" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#84cc16', marginBottom:2 }}>🫁 Стеатоз печени (НАЖБП)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Неалкогольная жировая болезнь печени — частое осложнение ААС (оральные 17α-алкилированные, избыток калорий).</p>

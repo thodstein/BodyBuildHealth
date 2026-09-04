@@ -7,7 +7,7 @@ export const SupportProtocolProlactin: React.FC<{ s: Record<string, any> }> = ({
   const [prolactinTab, setProlactinTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Пролактин">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-prolactin" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🤱 Пролактин/Прогестерон</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Гиперпролактинемия от ААС (нандролон, тренболон) и антипсихотиков. Протокол коррекции по уровню PRL.</p>

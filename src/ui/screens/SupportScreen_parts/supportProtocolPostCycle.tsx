@@ -7,7 +7,7 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
   const [postCycleTab, setPostCycleTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Постцикл">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-postcycle" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#8b5cf6', marginBottom:2 }}>🔄 Послекурсовая реабилитация (3-6 мес)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Комплексное восстановление HPTA-оси, липидного профиля, гематокрита и нейроэндокринного статуса.</p>

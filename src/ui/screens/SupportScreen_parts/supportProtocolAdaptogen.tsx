@@ -7,7 +7,7 @@ export const SupportProtocolAdaptogen: React.FC<{ s: Record<string, any> }> = ({
   const [adaptogenTab, setAdaptogenTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Адаптогены">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-adaptogen" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:2 }}>🌿 Адаптогены/HPA-ось (кортизол)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Кортизол — главный катаболик. Высокий → мышечный катаболизм, висцеральный жир, ИР, гипертония. Низкий → усталость, гипотония.</p>

@@ -37,7 +37,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
     toast,
   } = s;
   return (
-              <div>
+              <div className="sup-catalogview">
                  {/* Sub-tabs: По типам / По органам / Стеки / Взаимодействия */}
                   <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
                     {(['type','organ','stack'] as const).map((t: any) => (

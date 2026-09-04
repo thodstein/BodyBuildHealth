@@ -2,7 +2,7 @@ import React from 'react';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 
 export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) => {
-  if (!plan || !plan.weeks.length) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
+  if (!plan || !plan.weeks.length) return <div className="pl-blockview" style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
   const weeks = plan.weeks;
   const maxDays = Math.max(...weeks.map(w => w.days.length));
   // e1RM тренд по неделям (средний по всем lifts, для velocity cap)
@@ -11,7 +11,7 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
     return Math.round(avg);
   });
   return (
-    <div style={{ overflowX: 'auto', marginTop: 8 }}>
+    <div className="pl-blockview" style={{ overflowX: 'auto', marginTop: 8 }}>
       <div style={{ display: 'grid', gridTemplateColumns: `80px repeat(${weeks.length}, 1fr)`, gap: 4, minWidth: 600 }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', padding: 6 }}>День / Нед</div>
         {weeks.map(w => (
