@@ -92,3 +92,49 @@ export function isBilateralBalanced(plan: BilateralPlan): boolean {
   if (plan.weakArm == null) return true;
   return plan.weakSets >= plan.strongSets && plan.withinMrv;
 }
+
+const BILATERAL_HIST_KEY = 'he_arm_asymmetry_hist';
+
+export interface BilateralHistEntry {
+  date: string;
+  leftKg: number;
+  rightKg: number;
+  asymmetryPct: number;
+}
+
+/** История L/R-замеров (E12 P1): кап 52, устойчив к битому JSON. */
+export function loadBilateralHist(): BilateralHistEntry[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(BILATERAL_HIST_KEY) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((e: any) => e && typeof e.date === 'string' && Number.isFinite(Number(e.asymmetryPct))).slice(-52);
+  } catch { return []; }
+}
+
+export function saveBilateralEntry(leftKg: number, rightKg: number, dateIso?: string): BilateralHistEntry[] {
+  const pct = bilateralAsymmetryPct(leftKg, rightKg);
+  if (pct == null) return loadBilateralHist();
+  const entry: BilateralHistEntry = {
+    date: dateIso || new Date().toISOString().slice(0, 10),
+    leftKg: Number(leftKg),
+    rightKg: Number(rightKg),
+    asymmetryPct: pct,
+  };
+  const next = [...loadBilateralHist(), entry].slice(-52);
+  try { localStorage.setItem(BILATERAL_HIST_KEY, JSON.stringify(next)); } catch { /* noop */ }
+  return next;
+}
+
+export function bilateralTrend(hist: BilateralHistEntry[]): { delta: number; improving: boolean; text: string } | null {
+  if (!hist || hist.length < 2) return null;
+  const first = hist[0].asymmetryPct;
+  const last = hist[hist.length - 1].asymmetryPct;
+  const delta = Math.round((last - first) * 10) / 10;
+  const improving = last < first;
+  return {
+    delta,
+    improving,
+    text: improving ? `Асимметрия ↓ ${Math.abs(delta)}% за ${hist.length} зам. — выравнивается` : `Асимметрия ↑ ${Math.abs(delta)}% — усилить слабую сторону`,
+  };
+}

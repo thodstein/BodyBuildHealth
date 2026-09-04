@@ -141,4 +141,88 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent.change(foreInput, { target: { value: '140' } });
     expect(document.body.textContent).toContain('Авто по углам');
   });
+
+  it('P0: карточка план→инъекция рендерится без плана', () => {
+    render(<ArmDiagnosticsHub />);
+    expect(document.body.textContent).toContain('P0 PRO');
+    expect(document.body.textContent).toContain('Нет плана арм');
+  });
+
+  it('P0: инъекция без точек — тост', () => {
+    render(<ArmDiagnosticsHub />);
+    const btns = screen.getAllByText(/Вставить коррекции в план/);
+    fireEvent.click(btns[0]);
+    expect(document.body.textContent).toContain('нечего вставлять');
+  });
+
+  it('P0: выбор точки показывает причину и топ-3', async () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    fireEvent.click(screen.getByText(/Pron откр/));
+    expect(document.body.textContent).toContain('Топ-3');
+  });
+
+  it('P1 E8: Kinovea CSV → метрики и тип', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    const area = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
+    expect(document.body.textContent).toContain('xLoop 8');
+    expect(document.body.textContent).toContain('toproll наружу');
+  });
+
+  it('P1 E9: пороги точки на VBT-карточке после выбора', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    fireEvent.click(screen.getByText(/Pron откр/));
+    fireEvent.click(screen.getByRole('button', { name: /Хват/ }));
+    expect(document.body.textContent).toContain('Пороги точки pron_open');
+  });
+
+  it('P1 E10+E11: мобильность и авторегуляция в Recovery', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('Мобильность');
+    expect(document.body.textContent).toContain('Авторегуляция');
+    expect(document.body.textContent).toContain('Гварды плана');
+  });
+
+  it('P1 E12: bilateral в Strength при L/R', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('50'), { target: { value: '40' } });
+    fireEvent.change(screen.getByPlaceholderText('55'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сила/ }));
+    expect(document.body.textContent).toContain('Bilateral:');
+  });
+
+  it('P2 E13: помост %WR при RT', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '68' } });
+    expect(document.body.textContent).toContain('% WR');
+    expect(document.body.textContent).toContain('Весогонка WAF');
+  });
+
+  it('P2 E14: кнопки экспорта рендерятся', () => {
+    render(<ArmDiagnosticsHub />);
+    expect(screen.getByText('🖨 HTML')).toBeTruthy();
+    expect(screen.getByText('📥 CSV')).toBeTruthy();
+  });
+
+  it('P2 E15: снапшот замеров копит историю', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '68' } });
+    fireEvent.click(screen.getByText('📸 Снапшот замеров'));
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '70' } });
+    fireEvent.click(screen.getByText('📸 Снапшот замеров'));
+    expect(document.body.textContent).toContain('68 → 70');
+  });
+
+  it('P2 E12: сохранение L/R показывает историю', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('50'), { target: { value: '40' } });
+    fireEvent.change(screen.getByPlaceholderText('55'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сила/ }));
+    fireEvent.click(screen.getByText('💾 Сохранить L/R замер'));
+    expect(document.body.textContent).toContain('История:');
+  });
 });

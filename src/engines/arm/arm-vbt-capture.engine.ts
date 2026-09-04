@@ -2,11 +2,15 @@
  * arm-vbt-capture.engine.ts — VBT для арм-движений (как vbt-engine в DiagnosticsHub).
  * Wrist curl / pronation с датчиком или ручной ввод скорости → потеря скорости, e1RM.
  */
+import { isArmWeakPoint, vbtThresholdForWeakPoint } from './arm-biomechanics.engine';
+
 export interface VbtRecord {
   weight: number;
   reps: number;
   velocityMs?: number; // м/с последнего повтора (или лучшего)
   exerciseId?: string; // wrist_curl_belt, pronation_cable etc
+  /** Мёртвая точка хаба (E9 P1): если задана — пороги из vbtThresholdForWeakPoint, иначе legacy vbtForExercise. */
+  weakPoint?: string;
 }
 
 export interface VbtAdvice {
@@ -26,18 +30,25 @@ export function estimateVbtLoss(records: VbtRecord[]): number | null {
   return Math.round(((best - last) / best) * 100);
 }
 
-export function vbtZone(lossPct: number | null, exerciseId?: string): 'ok' | 'warn' | 'stop' {
+export function vbtZone(lossPct: number | null, exerciseId?: string, weakPoint?: string): 'ok' | 'warn' | 'stop' {
   if (lossPct == null) return 'ok';
-  const { warnPct, stopPct } = vbtForExercise(exerciseId || '');
+  const { warnPct, stopPct } = thresholdsFor(exerciseId || '', weakPoint);
   if (lossPct >= stopPct) return 'stop';
   if (lossPct >= warnPct) return 'warn';
   return 'ok';
 }
 
+/** Пороги: weakPoint хаба приоритетнее (E9 P1), иначе legacy vbtForExercise (тесты пинят 20/30 wrist, 15/25 grip). */
+export function thresholdsFor(exerciseId: string, weakPoint?: string): { warnPct: number; stopPct: number } {
+  if (weakPoint && isArmWeakPoint(weakPoint)) return vbtThresholdForWeakPoint(weakPoint as any);
+  return vbtForExercise(exerciseId);
+}
+
 export function diagnoseVbt(records: VbtRecord[]): VbtAdvice {
   const loss = estimateVbtLoss(records);
   const exId = records.length ? records[records.length - 1].exerciseId || '' : '';
-  const zone = vbtZone(loss, exId);
+  const wp = records.length ? (records[records.length - 1] as VbtRecord).weakPoint : undefined;
+  const zone = vbtZone(loss, exId, wp);
   let e1RM: number | null = null;
   if (records.length > 0) {
     const last = records[records.length - 1];
@@ -46,7 +57,7 @@ export function diagnoseVbt(records: VbtRecord[]): VbtAdvice {
     }
   }
   let advice = '—';
-  const { warnPct, stopPct } = vbtForExercise(exId);
+  const { warnPct, stopPct } = thresholdsFor(exId, wp);
   if (zone === 'stop') advice = `Потеря ≥${stopPct}% — стоп, риск tendon, снизить вес`;
   else if (zone === 'warn') advice = `Потеря ${warnPct}–${stopPct}% — на грани, +1 день отдыха`;
   else if (loss != null) advice = `Потеря ${loss}% — в допуске (<${warnPct}%)`;

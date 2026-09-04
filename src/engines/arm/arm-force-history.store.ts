@@ -103,3 +103,36 @@ export function weeklyForceAdvice(stats: WeeklyForceStats[]): string[] {
   if (stats.length && stats[stats.length - 1].fatiguePct > 15) out.push('Fatigue >15% — снизить side/stress недели, +1 день отдыха');
   return out;
 }
+
+const MEASURE_HIST_KEY = 'he_arm_measure_history';
+
+export interface ArmMeasureSnapshot {
+  date: string;
+  rtKg?: number;
+  sideKg?: number;
+  backKg?: number;
+  leftKg?: number;
+  rightKg?: number;
+}
+
+/** Снапшоты замеров хвата/давления (E15 P2): кап 52, устойчив к битому JSON. */
+export function loadArmMeasureHistory(): ArmMeasureSnapshot[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MEASURE_HIST_KEY) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((e: any) => e && typeof e.date === 'string').slice(-52);
+  } catch { return []; }
+}
+
+export function saveArmMeasureSnapshot(snap: Omit<ArmMeasureSnapshot, 'date'> & { date?: string }): ArmMeasureSnapshot[] {
+  const nums: ArmMeasureSnapshot = { date: snap.date || new Date().toISOString().slice(0, 10) };
+  for (const k of ['rtKg', 'sideKg', 'backKg', 'leftKg', 'rightKg'] as const) {
+    const v = Number((snap as any)[k]);
+    if (Number.isFinite(v) && v > 0) (nums as any)[k] = Math.round(v * 10) / 10;
+  }
+  if (Object.keys(nums).length <= 1) return loadArmMeasureHistory();
+  const next = [...loadArmMeasureHistory(), nums].slice(-52);
+  try { localStorage.setItem(MEASURE_HIST_KEY, JSON.stringify(next)); } catch { /* noop */ }
+  return next;
+}

@@ -81,7 +81,10 @@ export function buildArmDiagnosticsReport(input: {
   if (input.sex) gripWithMeta.sex = input.sex;
   if (input.weightClass) gripWithMeta.weightClass = input.weightClass;
   const fv = estimateForceVector(gripWithMeta);
-  const vbt = diagnoseVbt(input.vbtRecords || []);
+  // E9 P1: пороги VBT по первой мёртвой точке (иначе legacy exerciseId-маппинг)
+  const vbtWp = (detailed.weakPoints || [])[0];
+  const vbtRecs = (input.vbtRecords || []).map((r: any) => (r && !r.weakPoint && vbtWp ? { ...r, weakPoint: vbtWp } : r));
+  const vbt = diagnoseVbt(vbtRecs);
 
   const findings: ArmDiagFinding[] = [];
   const info: string[] = [];
