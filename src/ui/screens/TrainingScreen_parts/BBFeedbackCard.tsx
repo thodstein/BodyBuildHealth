@@ -29,8 +29,8 @@ export const BBFeedbackCard: React.FC = () => {
   const fb = useMemo(() => computeBBDiaryFeedback(plan as any, sessions as any), [plan, sessions]);
 
   if (!fb.hasPlan && !fb.hasSessions) {
-    return (
-      <div style={{ ...diaryCard, border: '1px solid rgba(255,255,255,0.06)' }}>
+  return (
+    <div className="train-bbfeedback" style={{ ...diaryCard, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ ...diaryLabel, color: '#fff' }}>📊 Фидбек ББ-плана</div>
         <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>Нет плана и логов — создайте план в ББ-авто и начните логировать тренировки.</div>
       </div>
@@ -38,7 +38,7 @@ export const BBFeedbackCard: React.FC = () => {
   }
 
   return (
-    <div style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.14)' }}>
+    <div className="train-bbfeedback" style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.14)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ ...diaryLabel, color: '#00e68a', marginBottom: 0 }}>📊 Фидбек: план vs факт (дневник)</div>
         <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 8, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.25)' }}>

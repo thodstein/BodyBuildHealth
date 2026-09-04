@@ -159,7 +159,7 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
 export const DayCard: React.FC<{ day: PlanDayView }> = ({ day }) => {
   const phaseColor = day.phase ? PHASE_COLORS[day.phase] : ACCENT;
   return (
-    <div style={{
+    <div className="train-daycard" style={{
       marginTop: 10, marginBottom: 4,
       background: 'rgba(20,22,28,0.55)',
       backdropFilter: 'blur(18px) saturate(160%)',

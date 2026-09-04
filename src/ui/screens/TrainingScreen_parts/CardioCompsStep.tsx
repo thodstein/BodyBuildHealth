@@ -35,7 +35,7 @@ export const CardioCompsStep: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+    <div className="train-cardiocomps" style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
       <GroupHeading icon="🏁" text="Соревнования и старты" desc="Даты, к которым цикл строит taper и пик-неделю." />
       <SectionCard title="Старты">
         <div style={{ ...HINT, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '7px 10px' }}>

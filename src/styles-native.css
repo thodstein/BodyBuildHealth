@@ -2677,6 +2677,67 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 41. NATIVE DEEP-9 — шаги, карточки, протоколы ──────────── */
+html.app-native .train-cardiocomps,
+html.app-native .train-cardioday,
+html.app-native .train-cardiodiarystep,
+html.app-native .train-cardioprog,
+html.app-native .train-cardiotaper,
+html.app-native .train-checkin,
+html.app-native .train-deloadproto,
+html.app-native .train-exlabsub,
+html.app-native .train-mesoheatmap,
+html.app-native .train-methodology,
+html.app-native .train-daycard,
+html.app-native .train-bbfeedback,
+html.app-native .train-bbmetrics,
+html.app-native .train-bbtools,
+html.app-native .pl-tools,
+html.app-native .sup-calctools,
+html.app-native .sup-geninfo,
+html.app-native .sup-proto-electrolytes,
+html.app-native .sup-proto-interactions {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-cardioday,
+html.app-native .train-cardioprog,
+html.app-native .train-mesoheatmap,
+html.app-native .train-daycard,
+html.app-native .train-bbfeedback,
+html.app-native .train-bbmetrics {
+  border-radius: 20px !important;
+}
+
+html.app-native .pl-tools {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-cardiocomps,
+  html.app-native .train-cardioday,
+  html.app-native .train-cardiodiarystep,
+  html.app-native .train-cardioprog,
+  html.app-native .train-cardiotaper,
+  html.app-native .train-checkin,
+  html.app-native .train-deloadproto,
+  html.app-native .train-exlabsub,
+  html.app-native .train-mesoheatmap,
+  html.app-native .train-methodology,
+  html.app-native .train-daycard,
+  html.app-native .train-bbfeedback,
+  html.app-native .train-bbmetrics,
+  html.app-native .train-bbtools,
+  html.app-native .pl-tools,
+  html.app-native .sup-calctools,
+  html.app-native .sup-geninfo,
+  html.app-native .sup-proto-electrolytes,
+  html.app-native .sup-proto-interactions {
+    animation: none;
+  }
+}
+
 /* ─── 40. NATIVE DEEP-8 — библиотека, протоколы, модалки ─────── */
 html.app-native .train-bbrec,
 html.app-native .train-bblib,

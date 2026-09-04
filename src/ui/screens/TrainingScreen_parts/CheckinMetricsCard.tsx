@@ -63,7 +63,7 @@ export const CheckinMetricsCard: React.FC = () => {
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-checkin" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📋 Чек-ин метрик тела</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 10, color: DIM }}>

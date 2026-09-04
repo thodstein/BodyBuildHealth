@@ -50,7 +50,7 @@ export const CardioTaperStep: React.FC<{
   const changes = preview?.changes ?? [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-cardiotaper" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <SectionCard title="📉 Индивидуальный taper-план">
         <div style={ROW}>
           <span style={LABEL}>Пред-нагрузка 28д</span>

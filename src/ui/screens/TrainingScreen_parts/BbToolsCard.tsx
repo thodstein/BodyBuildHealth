@@ -42,7 +42,7 @@ export const BbToolsCard: React.FC = () => {
   const toggleWeak = (m: string) => setWeak(p => p.includes(m) ? p.filter(x => x !== m) : [...p, m]);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-bbtools" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💪 ББ-инструменты (гипертрофия)</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         Темп/отдых/TUT по характеру дня, техники интенсификации, планировщик слабых точек и демография (женщины/мастера). Ранее эти движки bb/* не использовались в UI.

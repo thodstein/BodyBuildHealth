@@ -61,7 +61,7 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
     : ACCENT;
 
   return (
-    <div style={CARD}>
+    <div className="train-deloadproto" style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>

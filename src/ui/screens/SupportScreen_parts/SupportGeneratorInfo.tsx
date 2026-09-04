@@ -2,7 +2,7 @@ import React from 'react';
 
 export const SupportGeneratorInfo: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   return (
-    <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
+    <div className="sup-geninfo" style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
       <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>📖 Механизм-ориентированная модель (ТЗ-28)</h2>
 
       <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>

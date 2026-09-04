@@ -7,7 +7,7 @@ export const SupportProtocolInteractions: React.FC<{ s: Record<string, any> }> =
   const [interactionsTab, setInteractionsTab] = useState('critical');
   return (
     <InfoErrorBoundary label="Взаимодействия">
-      <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+      <div className="sup-proto-interactions" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>💬 Лекарственные взаимодействия — единая матрица</div>
           <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Самые опасные комбинации препаратов и добавок на курсе ААС. Проверьте свой стек.</p>

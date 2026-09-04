@@ -97,6 +97,18 @@ import { SupportProtocolThyroid } from '../screens/SupportScreen_parts/supportPr
 import { SupportProtocolMetabolic } from '../screens/SupportScreen_parts/supportProtocolMetabolic';
 import { SupportProtocolHemato } from '../screens/SupportScreen_parts/supportProtocolHemato';
 import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProtocolDetox';
+import { CardioDayCard } from '../screens/TrainingScreen_parts/CardioDayCard';
+import { CardioDiaryStep } from '../screens/TrainingScreen_parts/CardioDiaryStep';
+import { CheckinMetricsCard } from '../screens/TrainingScreen_parts/CheckinMetricsCard';
+import { DeloadProtocolCard } from '../screens/TrainingScreen_parts/DeloadProtocolCard';
+import { MethodologyEncyclopedia } from '../screens/TrainingScreen_parts/MethodologyEncyclopedia';
+import { PLToolsCard } from '../screens/SRCBBScreen_parts/PLToolsCard';
+import { SupportCalcToolsHub } from '../screens/SupportScreen_parts/SupportCalcToolsHub';
+import { SupportGeneratorInfo } from '../screens/SupportScreen_parts/SupportGeneratorInfo';
+import { SupportProtocolElectrolytes } from '../screens/SupportScreen_parts/supportProtocolElectrolytes';
+import { SupportProtocolInteractions } from '../screens/SupportScreen_parts/supportProtocolInteractions';
+import { BBFeedbackCard } from '../screens/TrainingScreen_parts/BBFeedbackCard';
+import { BbToolsCard } from '../screens/TrainingScreen_parts/BbToolsCard';
 import { BbProgramLibraryPicker } from '../screens/TrainingScreen_parts/BbProgramLibraryPicker';
 import { default as ExerciseLabPro } from '../screens/TrainingScreen_parts/ExerciseLabPro';
 import { default as ExerciseLabProSubstitute } from '../screens/TrainingScreen_parts/ExerciseLabProSubstitute';
@@ -594,6 +606,73 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c8 } = render(<SupportProtocolDetox s={{}} />);
     expect(c8.querySelector('.sup-proto-detox'), 'detox').not.toBeNull();
+  });
+
+  it('31. Batch-9 корни: кардио-шаги и чекин', () => {
+    const { container: c1 } = render(<CardioDayCard />);
+    expect(c1.querySelector('.train-cardioday'), 'cardioday').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <CardioDiaryStep cycle={null} recoveryLow={false} onChanged={() => {}} />,
+    );
+    expect(c2.querySelector('.train-cardiodiarystep'), 'cardiodiarystep').not.toBeNull();
+    cleanup();
+    // CardioTaperStep без цикла рендерит null — хук .train-cardiotaper
+    // живёт в прод-ветке с данными, здесь не проверяется.
+    const { container: c4 } = render(<CheckinMetricsCard />);
+    expect(c4.querySelector('.train-checkin'), 'checkin').not.toBeNull();
+  });
+
+  it('32. Batch-9 корни: делоад, методология, тулы, саппорт', () => {
+    const { container: c1 } = render(
+      <DeloadProtocolCard
+        ctx={{
+          weeksSinceDeload: 5,
+          fatigue: 60,
+          recovery: 50,
+          hasCompetitionSoon: false,
+          jointPain: false,
+          cnsFatigue: false,
+          goal: 'strength',
+        }}
+      />,
+    );
+    expect(c1.querySelector('.train-deloadproto'), 'deloadproto').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<MethodologyEncyclopedia />);
+    expect(c2.querySelector('.train-methodology'), 'methodology').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <PLToolsCard
+        level="intermediate"
+        days={3}
+        totalSets={{}}
+        e1RM={{ squat: 180, bench: 140, deadlift: 200 }}
+      />,
+    );
+    expect(c3.querySelector('.pl-tools'), 'tools').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportCalcToolsHub s={{}} />);
+    expect(c4.querySelector('.sup-calctools'), 'calctools').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<SupportGeneratorInfo s={{}} />);
+    expect(c5.querySelector('.sup-geninfo'), 'geninfo').not.toBeNull();
+  });
+
+  it('33. Batch-9 корни: электролиты, взаимодействия, ББ-карточки', () => {
+    const { container: c1 } = render(<SupportProtocolElectrolytes s={{}} />);
+    expect(c1.querySelector('.sup-proto-electrolytes'), 'electrolytes').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportProtocolInteractions s={{}} />);
+    expect(c2.querySelector('.sup-proto-interactions'), 'interactions').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<BBFeedbackCard />);
+    expect(c3.querySelector('.train-bbfeedback'), 'bbfeedback').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<BbToolsCard />);
+    expect(c4.querySelector('.train-bbtools'), 'bbtools').not.toBeNull();
+    // CardioCompsStep/ExerciseLabSubstitute/MesoHeatmap/DayCard требуют
+    // сложные входные объекты — хуки живут в прод-ветках.
   });
 
   it('29. Batch-8 корни: библиотека, лаборатория, модалки', () => {

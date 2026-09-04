@@ -38,7 +38,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
   const лёгPct = Math.max(0, 100 - metrics.тяжPct * 100 - metrics.пампPct * 100);
   const rows = [...metrics.perMuscle].sort((a, b) => b.totalSets - a.totalSets);
   return (
-    <div style={{ ...CARD, marginTop: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+    <div className="train-bbmetrics" style={{ ...CARD, marginTop: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div>

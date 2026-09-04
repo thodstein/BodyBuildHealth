@@ -56,7 +56,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
   if (!cycle || !data) return null;
 
   return (
-    <div style={{ ...CARD, gap: 10 }}>
+    <div className="train-cardioprog" style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
         <span style={LABEL}>📍 Прогресс цикла</span>
         <Badge bg={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '22') : 'rgba(255,255,255,0.06)'} border={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '44') : 'rgba(255,255,255,0.08)'} color={PHASE_COLOR[data.currentPhase ?? ''] ?? '#fff'}>{data.currentPhase ? CARDIO_PHASE_LABELS[data.currentPhase] : '—'}</Badge>

@@ -63,7 +63,7 @@ export const MethodologyEncyclopedia: React.FC = () => {
   };
 
   return (
-    <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 12, margin: '6px 0' }}>
+    <div className="train-methodology" style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 12, margin: '6px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 4px' }}>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>🧠 Энциклопедия методик</span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>карточки-кнопки · человеческие пояснения · без калькулятора</span>

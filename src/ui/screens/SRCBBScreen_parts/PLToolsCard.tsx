@@ -28,7 +28,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
   const [compMax, setCompMax] = useState(200);
 
   return (
-    <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+    <div className="pl-tools" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>🏋️ OpenPowerlifting импорт</span>
         <input value={oplName} onChange={e=>setOplName(e.target.value)} placeholder="Имя атлета" style={{ flex: 1, minWidth: 120, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '4px 8px', fontSize: 10 }} />

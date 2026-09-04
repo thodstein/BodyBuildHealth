@@ -30,7 +30,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
   const active = MODE_DEFS.find(d=> d.m===mode)!;
 
   return (
-    <div style={{ padding: '8px 4px 24px', color: '#fff', maxWidth: 760, margin: '0 auto', display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="sup-calctools" style={{ padding: '8px 4px 24px', color: '#fff', maxWidth: 760, margin: '0 auto', display:'flex', flexDirection:'column', gap:12 }}>
       <div style={{ ...CARD, padding:'16px', background:'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(96,165,250,0.08), rgba(139,92,246,0.06))', border:'1px solid rgba(255,255,255,0.08)', position:'relative', overflow:'hidden', borderRadius:18 }}>
         <div style={{ position:'absolute', top:-20, right:-20, width:120, height:120, borderRadius:120, background:'radial-gradient(circle, rgba(0,230,138,0.18), transparent 68%)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', bottom:-30, left:-10, width:180, height:80, borderRadius:60, background:'radial-gradient(circle, rgba(96,165,250,0.12), transparent 70%)', pointerEvents:'none' }} />

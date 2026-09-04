@@ -46,7 +46,7 @@ const ExerciseLabSubstitute: React.FC = () => {
   const maxVisible = showAll ? 999 : 6;
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+    <div className="train-exlabsub" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🔄 Калькулятор замены упражнения</div>
       <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         Выберите упражнение — покажу допустимые замены (с причиной) и запретные замены из базы биомеханики.

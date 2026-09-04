@@ -7,7 +7,7 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
   const [electrolytesTab, setElectrolytesTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Электролиты">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-electrolytes" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>⚡ Электролиты (K⁺/Na⁺/Mg²⁺/Ca²⁺)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Летальный риск: гипер-/гипокалиемия, гипомагниемия, гипонатриемия. Коррекция электролитов обязательна при ААС, диуретиках, GLP-1.</p>

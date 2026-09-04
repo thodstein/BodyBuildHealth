@@ -39,7 +39,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
   const strengthPct = totalLoad > 0 ? 100 - cardioPct : 0;
 
   return (
-    <div style={{ ...CARD, gap: 10 }}>
+    <div className="train-cardioday" style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
         <span style={LABEL}>📅 Кардио и нагрузка дня</span>
         <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">{today.slice(5)}</Badge>

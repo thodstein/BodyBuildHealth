@@ -71,7 +71,7 @@ export const CardioDiaryStep: React.FC<{
   ] as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="train-cardiodiarystep" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => setTab(v as typeof tab)} />
 
       {tab === 'session' && (

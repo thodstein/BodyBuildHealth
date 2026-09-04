@@ -58,7 +58,7 @@ export const MesoHeatmap: React.FC<{ program: UserProgram; dir: string; onToast?
   };
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+    <div className="train-mesoheatmap" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔥 Тепловая карта мезоцикла</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weeks} нед × 6 мышц</span>
