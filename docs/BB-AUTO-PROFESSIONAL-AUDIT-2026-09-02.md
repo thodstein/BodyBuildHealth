@@ -263,6 +263,7 @@
 | Остаток: targetBodyFat-драйвер | `bb-bodycomp.engine.ts` | ✅ | (поздний коммит) |
 | Остаток: авто-суперсет-пары | `bb-fatigue.suggestSupersetPairs` | ✅ | (поздний коммит) |
 | Остаток: ручной wearable-ввод | BbAutoConstructor (he_wearable_daily) | ✅ | (поздний коммит) |
+| Фикс: «Единое качество» 0/100 | `bb-quality-report.engine.ts` (штраф за уникальные коды + свёртка ×N) | ✅ | 07dcc749 |
 
 **Новые тесты:** 72 зелёных (mev 14, plan-fact 7, quality 6, sfr 6, recovery 9, plates 6, fatigue-superset 5, cycle 3, vbt 5, dup-permuscle 3, wearable 4, bodycomp 4).
 
