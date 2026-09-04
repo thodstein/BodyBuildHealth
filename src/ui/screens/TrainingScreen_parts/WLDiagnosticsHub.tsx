@@ -25,6 +25,7 @@ import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../
 import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
+import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -239,15 +240,16 @@ export const WLDiagnosticsHub: React.FC = () => {
   const sColor = scoreColor(level);
 
   // E1: аудит текущего плана ТА (he_strength_sport_plan_v1) — покрытие фаз
-  const planAudit = useMemo(() => {
+  // E4: сам план отдельно — для симуляции Δ
+  const planData = useMemo(() => {
     try {
       const raw = localStorage.getItem('he_strength_sport_plan_v1');
-      if (!raw) return auditTAPlan(null);
+      if (!raw) return null;
       const j = JSON.parse(raw);
-      const plan = j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null;
-      return auditTAPlan(plan);
-    } catch { return auditTAPlan(null); }
+      return j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null;
+    } catch { return null; }
   }, [planNonce]);
+  const planAudit = useMemo(() => auditTAPlan(planData), [planData]);
 
   const toggleWeak = (group: 'snatch' | 'clean' | 'jerk', wp: WLWeakPoint) => {
     setState(s => {
@@ -336,12 +338,15 @@ export const WLDiagnosticsHub: React.FC = () => {
     return (
       <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🏋️ Топ-3 коррекции {pref ? '· ⭐ выбрана' : '· нажми ⭐ — пойдёт первой в план'}</div>
-        {top.map(c => (
+        {top.map(c => {
+          const d = planData ? simulateTACorrection(planData, { weakPoint: wp, corrId: c.id, sets: c.protocol.sets, reps: c.protocol.reps }) : null;
+          return (
           <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <button onClick={() => togglePreferredCorr(wp, c.id)} aria-pressed={pref === c.id} style={{ minWidth: 24, height: 24, borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)', background: pref === c.id ? '#3b82f6' : 'transparent', color: pref === c.id ? '#fff' : '#60a5fa', fontSize: 11, fontWeight: 800 }}>{pref === c.id ? '⭐' : '☆'}</button>
-            <div style={{ flex: 1, fontSize: 10, color: '#fff' }}>{c.name} <span style={{ color: '#60a5fa', fontWeight: 700 }}>{c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%</span></div>
+            <div style={{ flex: 1, fontSize: 10, color: '#fff' }}>{c.name} <span style={{ color: '#60a5fa', fontWeight: 700 }}>{c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%</span>{d ? <span style={{ color: DIM }}> · Δ {d.summary}</span> : null}</div>
           </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
