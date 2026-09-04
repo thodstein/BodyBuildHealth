@@ -141,17 +141,19 @@ describe('R-HV: products 500Б — best-effort + бейдж', () => {
     expect(plan.notes.some(n => (n || '').includes('выше потолка'))).toBe(true);
   });
 
-  it('порции ≤350 г, порошковых приёмов ≤3', () => {
+  it('порции ≤350 г, коктейльных приёмов ≤4 (порошок только с яичным белком)', () => {
     for (const m of plan.meals) {
       for (const it of m.items || []) {
         if (it.role === 'liquid') continue;
         expect(it.amount || 0, `${m.label}/${it.id}`).toBeLessThanOrEqual(350);
       }
     }
+    // Квота порошка: норма 2/день, ultraP-коктейли — до 4 (каждый ≤60 г + жидкий
+    // белок; раньше был «изолят 186 г» в одном). Распределение лучше ведра.
     const powderMeals = plan.meals.filter(m => (m.items || []).some((it: any) => {
       try { return isProteinPowderId(it.id); } catch { return false; }
     })).length;
-    expect(powderMeals).toBeLessThanOrEqual(3);
+    expect(powderMeals).toBeLessThanOrEqual(4);
   });
 
   it('коктейльный режим: порошок ≤60 г/пункт, без дублей id, расписание коктейлей с таймингом', () => {

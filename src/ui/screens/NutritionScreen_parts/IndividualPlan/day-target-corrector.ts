@@ -326,6 +326,14 @@ export function correctDayToTargets(
         (m.items || []).forEach((it, ii) => {
           if ((it as any)._fixedGrams) return;
           if ((it.amount || 0) < 15) return;
+          // convenient: единственный белковый пункт перекуса не режем — иначе снек
+          // остаётся без белка на голодном дне (R-1500: перекус с яйцом 50 г → без).
+          // (Паритет с защитой swap от съедения единственного белка приёма.)
+          if (conv && (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein')
+            && String(m.type || '').startsWith('snack')) {
+            const _pc = (m.items || []).filter(x => x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein').length;
+            if (_pc <= 1) return;
+          }
           const food = FOOD_DB.find(f => f.id === it.id);
           const per100 = food ? (eff === 'p' ? (food.protein || 0) : eff === 'c' ? (food.carbs || 0) : (food.fat || 0)) : (eff === 'p' ? it.p : eff === 'c' ? it.c : it.f) / Math.max(1, it.amount) * 100;
           if (per100 <= 0) return;
@@ -334,11 +342,17 @@ export function correctDayToTargets(
         });
       });
       if (cands.length === 0) break;
-      // приоритет: гибкие (не ядро) выше, внутри — больше макро на порцию
+      // приоритет: гибкие (не ядро) выше; при голодном дне (convenient) — сначала
+      // БОЛЬШИЕ приёмы (маленькие снеки не выедаем: «перекус с яйцом» живёт);
+      // внутри — больше макро на порцию.
       cands.sort((a, b) => {
         const aCore = isCoreRecipeItem(meals[a.mi], a.it.id) ? 1 : 0;
         const bCore = isCoreRecipeItem(meals[b.mi], b.it.id) ? 1 : 0;
         if (aCore !== bCore) return aCore - bCore;
+        if (_dayUnderKcal) {
+          const ak = meals[a.mi].totals?.kcal || 0, bk = meals[b.mi].totals?.kcal || 0;
+          if (bk !== ak) return bk - ak;
+        }
         return b.totalMacro - a.totalMacro;
       });
       let improved = false;
@@ -507,6 +521,10 @@ export function correctDayToTargets(
             return (ex ? ex.amount : 0) < POWDER_PORTION_CAP_G;
           });
           if (!_roomAny) continue;
+          // Порошковые приёмы: норма — 2/день, ultraP-коктейли — до 4.
+          const _up = safeTargets.p >= 350 || safeTargets.p / Math.max(40, weightKg) >= 3.5;
+          const _pmCnt = meals.filter(m => (m.items || []).some(it => isProteinPowderId(it.id))).length;
+          if (_pmCnt >= (_up ? 4 : 2)) continue;
         }
         best = cand;
         break;
@@ -571,7 +589,8 @@ export function correctDayToTargets(
         if (ex && !(ex as any)._fixedGrams) {
           const _growCap = COMFORT_CAP[best.id] !== undefined ? COMFORT_CAP[best.id]
             : isProteinPowderId(best.id) ? POWDER_PORTION_CAP_G
-            : (ex.role === 'protein' || ex.role === 'fast_protein' || ex.role === 'slow_protein') ? 300 : 600;
+            : (ex.role === 'protein' || ex.role === 'fast_protein' || ex.role === 'slow_protein') ? 300
+            : (conv && (ex.role === 'carb_slow' || ex.role === 'carb_fast')) ? 350 : 600;
           const _growRoom = Math.max(0, _growCap - ex.amount);
           if (_growRoom < 10) break;
           grams = Math.min(grams, _growRoom);

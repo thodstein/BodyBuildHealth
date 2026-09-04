@@ -362,7 +362,14 @@ function carbPortionCap(food: FoodItem, scale = 1): number {
   // ready-to-eat medium-density carbs keep the global 500g ceiling.
   const _budget = _pickCtx.currentBudget;
   if (carbPer100 >= 55) return maxDryGrainPerMeal(_budget, scale);   // dry grains/pasta
-  if (carbPer100 > 0 && carbPer100 < 30) return maxGrainPerMeal(_budget, scale); // cooked starch (potato)
+  // HV: низкоплотные варёные крахмалы (<25У/100: батат/картофель/булгур) — не больше
+  // 300 г в одни руки, иначе «батат 510 г» вместо тарелки. Остаток добирают плотные
+  // носители (рисовый крем/джем/пряники) через обычные добивки — тарелка меньше,
+  // углей больше. Обычные дни — legacy-кап.
+  if (carbPer100 > 0 && carbPer100 < 30) {
+    const _cap = maxGrainPerMeal(_budget, scale); // cooked starch (potato)
+    return _pickCtx.highVolumeDay ? Math.min(_cap, 300) : _cap;
+  }
   // medium density 30-55 (oat bran, muesli, bread) — realistic bowl ~300g (max 350 for max budget)
   if (carbPer100 >= 30 && carbPer100 < 55) return Math.round((_budget === 'max' || _budget === 'enhanced' ? 350 : 300) * scale);
   return maxGramPerItem(_budget, scale);
@@ -1642,9 +1649,17 @@ function buildWholeMeal(
       if (prefAdd.length) carbPickPool = [...carbPickPool, ...prefAdd];
     }
     if (carbTarget >= 60 && !lockedIds?.size && !refeedDay) {
-      const byGI = [...carbPickPool].sort((a,b) => (a.gi||55) - (b.gi||55));
-      // берём 3 самых низко-GI (fallback на полный пул, если их мало)
-      carbPickPool = byGI.slice(0, 3).length >= 2 ? byGI.slice(0, 3) : carbPickPool;
+      // HV: удобство вместо GI — иначе батат (GI 44) выигрывает у риса (GI 73) в КАЖДОМ
+      // приёме и день состоит из «батата 340–510 г ×7». Плотный носитель держит тарелку
+      // съедобной (150 г рисового крема = 123У против 510 г батата = 102У).
+      if (_pickCtx.highVolumeDay) {
+        const byConv = [...carbPickPool].sort((a, b) => ((b.carbs || 0) / (1 + (b.fiber || 0) * 2)) - ((a.carbs || 0) / (1 + (a.fiber || 0) * 2)));
+        carbPickPool = byConv.slice(0, 3).length >= 2 ? byConv.slice(0, 3) : carbPickPool;
+      } else {
+        const byGI = [...carbPickPool].sort((a,b) => (a.gi||55) - (b.gi||55));
+        // берём 3 самых низко-GI (fallback на полный пул, если их мало)
+        carbPickPool = byGI.slice(0, 3).length >= 2 ? byGI.slice(0, 3) : carbPickPool;
+      }
       // D-27: preferred carbs bypass GL-aware narrowing (user intent > GI optimisation)
       if (preferredIds && preferredIds.size > 0) { const have = new Set(carbPickPool.map((f: any) => f.id)); const prefAdd = carbPool.filter((f: any) => preferredIds.has(f.id) && !have.has(f.id) && !dayUsedPreferredIds?.has(f.id)); if (prefAdd.length) carbPickPool = [...carbPickPool, ...prefAdd]; }
     }
@@ -4202,7 +4217,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
       totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
-      totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+    totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
       recalcDayTotals(meals, totals); // B4
   }
 
@@ -4447,7 +4462,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       goals.c ? Math.abs(totals.c - goals.c)/goals.c : 0
     );
     let guard = 60;
+    // Детектор стойла: 3 итерации подряд без изменения тоталов (забитые капы,
+    // заветированные резки, пустые выборы) — выходим. Раньше каждая такая ветка
+    // роняла ВЕСЬ цикл break'ом при живом недоборе (кейс 1500У: −11% на 33 guard).
+    let _noopStreak = 0;
+    let _sigPrev = '';
     while (maxDev() > 0.0301 && guard-- > 0) {
+      const _sigNow = [totals.kcal, totals.p, totals.f, totals.c, totals.fiber].join('|');
+      if (_sigNow === _sigPrev) { if (++_noopStreak >= 3) break; }
+      else { _noopStreak = 0; _sigPrev = _sigNow; }
       const devK = goals.kcal ? (totals.kcal - goals.kcal)/goals.kcal : 0;
       const devP = goals.p ? (totals.p - goals.p)/goals.p : 0;
       const devF = goals.f ? (totals.f - goals.f)/goals.f : 0;
@@ -4461,10 +4484,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       let effWorst: 'p'|'f'|'c' = worst === 'k'
         ? (abs.p >= abs.c && abs.p >= abs.f ? 'p' : abs.c >= abs.f ? 'c' : 'f')
         : worst as any;
+      // HV: белковый перебор посадкой НЕ чинится (протеин защищён — им займётся
+      // белковая секция ниже), а резка крупы под него при голодных углях даёт
+      // пинг-понг (22 резки/5 добавок на 1500У: чиним p, ломаем c, чиним c...).
+      // Правило: p-over → чиним biggest-under; unders нет → выходим (нечего чинить).
+      if (_pickCtx.highVolumeDay && effWorst === 'p' && (goals.p ? (totals.p - goals.p) / goals.p : 0) > 0) {
+        const _uC = goals.c ? (goals.c - totals.c) / goals.c : 0;
+        const _uF = goals.f ? (goals.f - totals.f) / goals.f : 0;
+        const _uK = goals.kcal ? (goals.kcal - totals.kcal) / goals.kcal : 0;
+        const _uBest = Math.max(_uC, _uF, _uK);
+        if (_uBest > 0.03) effWorst = (_uC >= _uF && _uC >= _uK) ? 'c' : (_uF >= _uK ? 'f' : 'c');
+        // NOTE: k-under мапим на c (угли — главная энергия; жир/белок недобором не чиним здесь).
+      }
       const target = effWorst === 'p' ? goals.p : effWorst === 'f' ? goals.f : goals.c;
       const cur = effWorst === 'p' ? totals.p : effWorst === 'f' ? totals.f : totals.c;
       const need = target - cur; // >0 недобор, <0 перебор
       if (Math.abs(need) < 0.5) break;
+      // HV: p-over без unders (правило выше не перенаправило) — выходить, а не резать
+      // крупу под белковый перебор. Чинит его белковая секция ниже (резка до 60/20).
+      if (_pickCtx.highVolumeDay && effWorst === 'p' && need < 0) break;
       if (need < 0) {
         // Перебор: урезать item с НАИБОЛЬШИМ содержанием перебираемого МАКРО
         // (раньше — «самый калорийный»: при жире↑ резали крупу, а не масло → осцилляция
@@ -4487,7 +4525,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (saved > bSaved) { bSaved=saved; bMi=mi; bIi=ii; }
           });
         });
-        if (bIi<0 || bSaved < 10) break;
+        if (bIi<0 || bSaved < 10) continue;
         const meal = meals[bMi]; const it = meal.items[bIi];
         // Р-2.1: посадочная резка — пол только для БЕЛКА (40 г), углеводы/жиры свободно
         // (ккал/углеводная сходимость ±3-6% — требование трекинга ББ)
@@ -4496,6 +4534,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           ? Math.max(15, realisticFloorG(_fdL, 'protein', false) * 0.8)
           : 15;
         const na = Math.max(_flL, Math.round(it.amount * 0.85));
+        // Гейт монотонности: резка, не улучшающая maxDev дня, — чистый вред
+        // (пинг-понг add/cut сжигает guard-итерации, недобор висит — кейс 1500У).
+        const _devBeforeCut = maxDev();
         const r2 = na/(it.amount||1);
         it.p = +(it.p * r2).toFixed(1); it.f = +(it.f * r2).toFixed(1); it.c = +(it.c * r2).toFixed(1);
         it.kcal = Math.round(4*it.p + 9*it.f + 4*it.c);
@@ -4503,6 +4544,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         it.fiber = Math.round((it.fiber||0)*r2*10)/10;
         it.leucine_mg = Math.round((it.leucine_mg||0)*r2);
         meal.totals = meal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+        recalcDayTotals(meals, totals);
+        // Откат вредной резки: только явный вред (>1 п.п. maxDev) — мелкие колебания
+        // оставляем (жадный обход локальных оптимумов; строгий монотонный гейт
+        // замораживал цикл раньше времени — кейс 1500У: −10.5% вместо движения к цели).
+        if (maxDev() > _devBeforeCut + 0.01) {
+          it.amount = Math.round((it.amount || 1) / Math.max(0.01, r2));
+          it.p = +(it.p / Math.max(0.01, r2)).toFixed(1); it.f = +(it.f / Math.max(0.01, r2)).toFixed(1); it.c = +(it.c / Math.max(0.01, r2)).toFixed(1);
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          it.fiber = Math.round((it.fiber || 0) / Math.max(0.01, r2) * 10) / 10;
+          it.leucine_mg = Math.round((it.leucine_mg || 0) / Math.max(0.01, r2));
+          meal.totals = meal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+          recalcDayTotals(meals, totals);
+          continue;
+        }
       } else {
         // Недобор: добавить лучший продукт по effWorst из FOOD_DB.
         // Aug 28 (жалоба «что попало без учёта настроек»): пул добавки проходит ПОЛНЫЙ
@@ -4575,30 +4630,53 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // (его продуктом), а не новым «вторым гарниром» (иначе «рис + 30г риса» / второй гарнир).
         const _roleGroup: string[] = effWorst==='p' ? ['protein','fast_protein','slow_protein'] : effWorst==='c' ? ['carb_slow','carb_fast'] : ['fat'];
         const _mergeProteinCap = effWorst==='p' ? 999 : 6; // side-эффект белка для c/f добавок
-        const _mergeItem = targetMeal.items.find((x:any) => {
-          if (!_roleGroup.includes(x.role) || (x.amount||0) <= 0) return false;
-          const _fd = FOOD_DB.find((f:any) => f.id === x.id);
-          if (!_fd) return false;
-          return (_fd.protein||0) <= _mergeProteinCap;
-        });
         let best: any = null; let per100 = 0;
         const _needG = Math.min(need, _macroGoal * 1.03 - _macroCur);
-        if (_mergeItem) {
-          const _fd = FOOD_DB.find((f:any) => f.id === _mergeItem.id);
-          const _v = _fd ? (effWorst==='p' ? (_fd.protein||0) : effWorst==='c' ? (_fd.carbs||0) : (_fd.fat||0)) : 0;
-          if (_v > 0 && _foodAllowed(_fd)) { best = _fd; per100 = _v; }
-        }
-        if (!best) {
+        // Пробуем 3 самых недогруженных приёма: первый может быть забит под капы
+        // (мердж полон + все кандидаты у капа) — раньше !best ронял ВЕСЬ цикл while
+        // при живом недоборе (кейс 1500У: выход на −11% с неизрасходованным guard).
+        // Первая попытка = legacy-выбор (min share), поведение при успехе бит-идентично.
+        const _orderedTargets = _candMeals.length > 0
+          ? [..._candMeals].sort((a: any, b: any) => (_mealShareRatio(a) - _mealShareRatio(b))).slice(0, 3)
+          : [targetMeal];
+        // Merge-door от приёма-кандидата: добивка в существующий пункт той же роли.
+        const _mergeItemFor = (_tm: any): boolean => {
+          const _mi = _tm.items.find((x: any) => {
+            if (!_roleGroup.includes(x.role) || (x.amount || 0) <= 0) return false;
+            const _fd0 = FOOD_DB.find((f: any) => f.id === x.id);
+            if (!_fd0) return false;
+            return (_fd0.protein || 0) <= _mergeProteinCap;
+          });
+          if (!_mi) return false;
+          const _fd = FOOD_DB.find((f: any) => f.id === _mi.id);
+          const _v = _fd ? (effWorst === 'p' ? (_fd.protein || 0) : effWorst === 'c' ? (_fd.carbs || 0) : (_fd.fat || 0)) : 0;
+          if (!(_v > 0 && _fd && _foodAllowed(_fd))) return false;
+          // Anti-stall: в ПОЛНЫЙ пункт не мерджим (иначе итерация сгорает вхолостую,
+          // кандидатный путь с новым носителем не запускается и недобор висит до
+          // исчерпания guard — кейс «батат 300 забит, а джем/крем не добавляются»).
+          let _room = Infinity;
+          if (effWorst === 'p') _room = (isProteinPowderId(_mi.id) ? (SUPPLEMENT_MAX_G[_mi.id] ?? 60) : 300) - (_mi.amount || 0);
+          else if (effWorst === 'c') {
+            const _cc = COMFORT_PORTION_LIMITS[_mi.id];
+            _room = (_cc !== undefined ? _cc : (_fd ? carbPortionCap(_fd, mealCapScaleOf(_tm)) : 300)) - (_mi.amount || 0);
+          }
+          if (_room < 10) return false;
+          best = _fd; per100 = _v; targetMeal = _tm;
+          return true;
+        };
+        for (const _tm of _orderedTargets) {
+        if (_mergeItemFor(_tm)) break;
+        {
           // Эпик B: ротация кандидатов — если первый степл в приёме-цели уже у порционного
           // капа (мердж невозможен), берём следующий, иначе посадка буксует (недобор углей).
           // Коктейльный режим: в перекусе ultra-high-P дня жидкие носители
           // (яичный белок/молоко/кефир + порошок с комнатой) идут раньше твёрдого мяса —
           // 70 г белка должны выпиваться, а не жеваться третьим стейком.
-          const _candIter = (_ultraPDay && effWorst === 'p' && _isSnackSlot(targetMeal.type)) ? [...pool].sort((a: any, b: any) => {
+          const _candIter = (_ultraPDay && effWorst === 'p' && _isSnackSlot(_tm.type)) ? [...pool].sort((a: any, b: any) => {
             const _rank = (f: any) => {
               if (f.id === 'egg_white' || f.id === 'milk' || f.id === 'kefir') return 3;
               if (isProteinPowderId(f.id)) {
-                const _ex = targetMeal.items.find((x: any) => x.id === f.id);
+                const _ex = _tm.items.find((x: any) => x.id === f.id);
                 return ((_ex?.amount || 0) < (SUPPLEMENT_MAX_G[f.id] ?? 60)) ? 2 : -1;
               }
               return 1;
@@ -4606,15 +4684,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             return _rank(b) - _rank(a);
           }) : pool;
           for (const cand of _candIter) {
-            const _exC = targetMeal.items.find((x:any) => x.id === cand.id);
-            const _capC = carbPortionCap(cand, mealCapScaleOf(targetMeal));
+            const _exC = _tm.items.find((x:any) => x.id === cand.id);
+            const _capC = carbPortionCap(cand, mealCapScaleOf(_tm));
             // Порошок сверх скупа — не доливаем в тот же приём (коктейль, не ведро).
             if (isProteinPowderId(cand.id) && (_exC?.amount || 0) >= (SUPPLEMENT_MAX_G[cand.id] ?? 60)) continue;
-            if (!_exC || (_exC.amount || 0) < _capC) { best = cand; break; }
+            // Порошковые приёмы: норма — 2/день, ultraP-коктейли — до 4
+            // (каждый с яичным белком). Дальше — едой, не пятым шейком.
+            if (isProteinPowderId(cand.id) && !_exC) {
+              const _pmCap = _ultraPDay ? 4 : 2;
+              const _pmCnt = meals.filter((mm: any) => (mm.items || []).some((x: any) => isProteinPowderId(x.id))).length;
+              if (_pmCnt >= _pmCap) continue;
+            }
+            if (!_exC || (_exC.amount || 0) < _capC) { best = cand; per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0); break; }
           }
-          if (!best) break;
-          per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0);
+          if (best) { targetMeal = _tm; break; }
         }
+        }
+        if (!best) continue;
         // Aug 28: добавка не раздувает макрос за цель ×1.03 (kcal-недобор мапится в макро —
         // раньше «догон ккал» жиром вылетал за пол жиров ×1.1 → разбег КБЖУ). Флор 10 г —
         // чтобы цикл не выходил раньше времени (перебор side-эффектов режет ветка need<0).
@@ -4813,7 +4899,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
-      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40, weightKg: input.weightKg });
+      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay });
       if (_corr.meals && _corr.meals.length > 0) {
         const _beforeDev = Math.max(
           _targets.kcal ? Math.abs(totals.kcal - _targets.kcal) / _targets.kcal : 0,
@@ -4941,6 +5027,45 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
           if (!done) continue;
         }
+        // HV: существующие гарниры у капов, а недобор жив — новый ПЛОТНЫЙ пункт
+        // (рисовый крем 82У/джем 69У), а не гора низкоплотного: ~120У в ~150 г,
+        // тарелка не растёт. Обычные дни — только существующий гарнир (legacy).
+        if (_pickCtx.highVolumeDay) {
+          const _denseIds = ['cream_of_rice', 'jam'];
+          const _denseCap: Record<string, number> = { cream_of_rice: 150, jam: 55 };
+          for (const m of _flexMs) {
+            const _cDevNow = input.goalCarbsG - totals.c;
+            if (_cDevNow <= 10) break;
+            if (((m.items || []).length || 0) >= 8) continue;
+            const _have = new Set((m.items || []).map((x: any) => x.id));
+            const _df = _denseIds
+              .map((did: string) => FOOD_DB.find((f: any) => f.id === did))
+              .find((f: any) => f && !_have.has(f.id)
+                && !(input.excludedIds && input.excludedIds.has(f.id))
+                && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))
+                && foodAvailableForPlan(f));
+            if (!_df) continue;
+            const _dcap = _denseCap[_df.id] ?? 100;
+            let _dg = Math.min(_dcap, Math.floor(Math.max(0, _cDevNow) / Math.max(1, _df.carbs || 1) * 100 / 5) * 5);
+            if ((_df.fat || 0) > 0) {
+              const _fatRoom2 = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
+              const _maxByFat2 = Math.floor(_fatRoom2 / (_df.fat || 1) * 100);
+              if (_maxByFat2 < 10) continue;
+              _dg = Math.min(_dg, _maxByFat2);
+            }
+            if (_dg < 20) continue;
+            const _rr = _dg / 100;
+            const _np2 = Math.round((_df.protein || 0) * _rr), _nf2 = Math.round((_df.fat || 0) * _rr), _nc2 = Math.round((_df.carbs || 0) * _rr);
+            (m.items || []).push({
+              id: _df.id, name: _df.name, amount: _dg, role: _df.id === 'jam' ? 'carb_fast' : 'carb_slow',
+              p: _np2, f: _nf2, c: _nc2, kcal: Math.round(4 * _np2 + 9 * _nf2 + 4 * _nc2),
+              fiber: Math.round((_df.fiber || 0) * _rr), leucine_mg: 0,
+            });
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            notes.push(`🍚 Плотный добор: ${_df.name} ${_dg} г в «${m.label}» (угли без объёма тарелки)`);
+          }
+        }
         totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
       }
     }
@@ -5037,7 +5162,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         while (Math.abs(_pDev) > 12 && _pg-- > 0) {
           const _pItems = meals.flatMap((m: any) => m.items.filter((it: any) => it.role === 'protein' && !(it as any)._fixedGrams && (it.amount || 0) >= 15 && _flexMeal(m)).map((it: any) => ({ m, it })));
           if (_pItems.length === 0) break;
-          _pItems.sort((a: any, b: any) => (b.it.amount || 0) - (a.it.amount || 0));
+          // Ultra-high-P: льём в САМЫЕ ПУСТЫЕ приёмы (выравнивание), а не в самый
+          // крупный пункт (иначе «ужин 857 г»: богатые богатеют). Обычные дни — legacy.
+          const _ultraPEq = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+          if (_ultraPEq) _pItems.sort((a: any, b: any) => ((a.m.totals?.p || 0) - (b.m.totals?.p || 0)) || ((b.it.amount || 0) - (a.it.amount || 0)));
+          else _pItems.sort((a: any, b: any) => (b.it.amount || 0) - (a.it.amount || 0));
           const _cand = _pItems[0];
           const fd = FOOD_DB.find((f: any) => f.id === _cand.it.id);
           if (!fd || !(fd.protein || 0)) break;
@@ -5046,8 +5175,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // на первом же 300 г останавливал ВЕСЬ добор — остальные пункты с комнатой
             // не добивались; видно на 400 г+ целях).
             let _merged = false;
+            // Ultra-high-P: в один приём — не больше 450 г белковой еды суммарно
+            // (иначе «ужин 857 г»: яйцо 300 + творог 300 + авокадо). Недобор уходит
+            // в другие приёмы вместо горы в одном.
+            const _ultraPMeal = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+            const _protGOf = (m: any) => (m.items || []).filter((x: any) => x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein').reduce((s: number, x: any) => s + (x.amount || 0), 0);
             for (const _c2 of _pItems) {
               if ((_c2.it.amount || 0) >= 300) continue;
+              if (_ultraPMeal && _protGOf(_c2.m) >= 450) continue;
               // Коктейльный режим: порошок мерджем НЕ растим (скуп 60 г — потолок,
               // иначе «изолят 60 + 126 = 186»); добираем едой/жидким белком, а при
               // исчерпании — fallback ниже льёт яичный белок.
@@ -5078,7 +5213,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               // Lean-источники (без жирового хвоста — иначе чиним белок ценой перебора жиров).
               // Коктейльный режим: ротация носителей — не дублируем id в приёме
               // («яичный белок 300 + 300»): яичный белок → обезжиренный творог → молоко.
-              const _npTarget = meals.filter((m: any) => _flexMeal(m) && (m.items || []).length < 8)
+              const _npTarget = meals.filter((m: any) => _flexMeal(m) && (m.items || []).length < 8
+                && (!_ultraPMeal || _protGOf(m) < 450))
                 .sort((a: any, b: any) => (a.totals?.p || 0) - (b.totals?.p || 0))[0];
               if (!_npTarget) break;
               const _npHave = new Set((_npTarget.items || []).map((x: any) => x.id));

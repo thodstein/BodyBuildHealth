@@ -702,9 +702,14 @@ export function rebalanceDayAfterRecipes(
       })();
       // Итерация C: инсулин-окно целиком locked (резка дозы-углей = гипогликемия).
       const _lockedWindow = !!(m as any)._insulinWindow;
+      // HV: единственный белковый пункт перекуса не режем (паритет с corrector/swap).
+      const _snackProtCount = _hv && /Перекус|Полдник|Второй завтрак/i.test(m.label || '')
+        ? (m.items || []).filter((x: any) => x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein').length
+        : 2;
       (m.items || []).forEach((it, ii) => {
         if (_lockedWindow) return;
         if (coreIds && coreIds.has(it.id)) return;
+        if (_snackProtCount <= 1 && (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein')) return;
         if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
         const a = it.amount || 0;
         if (a < 20) return;
