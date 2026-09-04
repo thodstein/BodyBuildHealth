@@ -1,6 +1,6 @@
 # План развития хаба «Метаболика» — аудит + интернет-бенчмарк + доработки
 
-> Статус: план к реализации (Sep 02 2026). Канон — `src/engines/metabolic-hub.engine.ts:1`, `src/core/metabolic-constants.ts:1`, UI `src/ui/screens/Shared/MetabolicHub.tsx:1`.
+> Статус: ВЫПОЛНЕН в PRO v4 (Sep 04 2026, коммиты 357c0cd2 + f661cf77). Канон — `src/engines/metabolic-hub.engine.ts:1`, `src/core/metabolic-constants.ts:1`, NEW `src/core/activity-catalog.ts:1`, UI `src/ui/screens/Shared/MetabolicHub.tsx:1`.
 > Источники — профиль `he_profile_v2` + дневник `he_nutrition_v2` + дневник веса + labs `labs.summary`.
 
 ---

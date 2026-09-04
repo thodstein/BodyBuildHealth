@@ -1,6 +1,6 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Метаболик-хаб: PRO v4 — Adaptive v3 + MET-60 + CAT2 + Sweat V2 + DIAAS + AT-range (Sep 04 2026, 357c0cd2 + доводка)
+## Метаболик-хаб: PRO v4 — Adaptive v3 + MET-60 + CAT2 + Sweat V2 + DIAAS + AT-range (Sep 04 2026, 357c0cd2 + f661cf77)
 
 Полная PRO-доработка хаба калькуляторов метаболики в питании по бенчмарку 2026 (MacroFactor rolling-28д, IOC REDs CAT2 2023, ACSM/Periard, Maughan BHI, Calorique DLW). Файлы: NEW `src/core/activity-catalog.ts`, `src/core/metabolic-constants.ts`, `src/engines/metabolic-hub.engine.ts`, `src/ui/screens/Shared/MetabolicHub.tsx`, `__tests__/metabolic-hub.test.ts`, `docs/METABOLIC-HUB-PRO.md`. **114/114 тестов хаба + nutrition-v2-audit 4/4 + rest-hooks-native 60/60, tsc 0 по своим файлам** (2 ошибки в чужом `meal-plan-engine.ts` — не тронуты).
 
