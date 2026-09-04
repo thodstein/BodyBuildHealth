@@ -37,4 +37,24 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
     expect(localStorage.getItem('he_planner_apply')).toContain('weakpoints');
   });
+  it('E1 аудит плана: покрытие + худшая фаза → разбор', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 2, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+        { week: 2, phase: 'accumulation', sessions: [] },
+      ],
+      workMax: {}, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    await waitFor(() => expect(container.textContent).toContain('покрытие фаз 1/11'), { timeout: 2000 });
+    const worst = await screen.findByText(/Худшая фаза:/);
+    fireEvent.click(worst);
+    await waitFor(() => expect(container.textContent).toContain('Худшая фаза плана'), { timeout: 2000 });
+  });
+  it('E1 аудит без плана — подсказка собрать', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    await waitFor(() => expect(container.textContent).toContain('план ТА не собран'), { timeout: 2000 });
+  });
 });

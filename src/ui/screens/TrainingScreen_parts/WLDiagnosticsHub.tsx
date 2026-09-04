@@ -22,6 +22,7 @@ import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-s
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
+import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -108,6 +109,8 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [tab, setTab] = useState<WLTab>('snatch');
   const [toast, setToast] = useState<string>('');
   const [csvText, setCsvText] = useState<string>('');
+  // Нонс перечитывания плана ТА из хранилища (инъекция/откат меняют его мимо мемов)
+  const [planNonce, setPlanNonce] = useState(0);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -230,6 +233,17 @@ export const WLDiagnosticsHub: React.FC = () => {
   const level = scoring.level;
   const sColor = scoreColor(level);
 
+  // E1: аудит текущего плана ТА (he_strength_sport_plan_v1) — покрытие фаз
+  const planAudit = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_strength_sport_plan_v1');
+      if (!raw) return auditTAPlan(null);
+      const j = JSON.parse(raw);
+      const plan = j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null;
+      return auditTAPlan(plan);
+    } catch { return auditTAPlan(null); }
+  }, [planNonce]);
+
   const toggleWeak = (group: 'snatch' | 'clean' | 'jerk', wp: WLWeakPoint) => {
     setState(s => {
       const key = group === 'snatch' ? 'snatchWeak' : group === 'clean' ? 'cleanWeak' : 'jerkWeak';
@@ -238,6 +252,27 @@ export const WLDiagnosticsHub: React.FC = () => {
       const next = has ? arr.filter(x => x !== wp) : [...arr, wp].slice(0, 2);
       return { ...s, [key]: next };
     });
+  };
+
+  // E1: худшая фаза плана → открыть на разбор (parity BB selectWorstExercise)
+  const selectWorstPhase = () => {
+    const wp = planAudit.worstPhase;
+    if (!wp) return;
+    const grp = hubTabForPhase(wp);
+    if (!grp) {
+      setToast(`Худшая фаза «${wp}» — вспомогательная (присед/тяга), разбирается через OHS/VBT`);
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setTab(grp);
+    setState(s => {
+      const key = grp === 'snatch' ? 'snatchWeak' : grp === 'clean' ? 'cleanWeak' : 'jerkWeak';
+      const arr = (s as any)[key] as WLWeakPoint[];
+      if (arr.includes(wp)) return s;
+      return { ...s, [key]: [...arr, wp].slice(0, 2) };
+    });
+    setToast(`🎯 Худшая фаза плана: ${wp} — открыта на разбор`);
+    setTimeout(() => setToast(''), 2500);
   };
 
   const applyToConstructor = () => {
@@ -588,6 +623,19 @@ export const WLDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 12, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)' }}>
         <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {weakPoints.length ? weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''} · score {score} · ver {scoring.verification} {scoring.floors.join(' · ')}</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{scoring.findings.map(f => f.text).join(' · ')}</div>
+        {/* E1: аудит плана ТА */}
+        <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+            📋 Аудит плана: {planAudit.hasPlan ? `покрытие фаз ${planAudit.coveredCount}/${planAudit.totalCore} (${planAudit.coveragePct}%) · сетов ${planAudit.totalSets} · тоннаж ${(planAudit.totalTonnage / 1000).toFixed(1)}т` : 'план ТА не собран — собери в ТА-конструкторе'}
+          </div>
+          {planAudit.hasPlan && planAudit.missing.length > 0 && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>Нет в плане: {planAudit.missing.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ')}</div>}
+          {planAudit.hasPlan && planAudit.missing.length === 0 && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Все 11 фаз двоеборья покрыты ✓</div>}
+          {planAudit.hasPlan && planAudit.worstPhase && (
+            <button onClick={selectWorstPhase} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({planAudit.byPhase[planAudit.worstPhase].sets} сетов) → разобрать
+            </button>
+          )}
+        </div>
         {level === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>⚠️ CRITICAL — план будет урезан (MRV gate) и требует коррекции до пика. Рекомендуется OHS + VBT retest.</div>}
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
