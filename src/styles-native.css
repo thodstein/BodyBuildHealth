@@ -2677,6 +2677,49 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 47. NATIVE DEEP-15 — калькулятор-мелочь, свои продукты, рецепты ─ */
+html.app-native .calc-riskbar,
+html.app-native .calc-mechview,
+html.app-native .calc-schedblock,
+html.app-native .calc-labdelta,
+html.app-native .calc-card,
+html.app-native .calc-labslice,
+html.app-native .calc-fulllab,
+html.app-native .calc-substdetail,
+html.app-native .calc-safetyalerts,
+html.app-native .nut-customproducts,
+html.app-native .recipes-modern,
+html.app-native .food-diary {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .calc-riskbar,
+html.app-native .calc-card,
+html.app-native .calc-substdetail {
+  border-radius: 20px !important;
+}
+
+html.app-native .recipes-modern {
+  gap: 12px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .calc-riskbar,
+  html.app-native .calc-mechview,
+  html.app-native .calc-schedblock,
+  html.app-native .calc-labdelta,
+  html.app-native .calc-card,
+  html.app-native .calc-labslice,
+  html.app-native .calc-fulllab,
+  html.app-native .calc-substdetail,
+  html.app-native .calc-safetyalerts,
+  html.app-native .nut-customproducts,
+  html.app-native .recipes-modern,
+  html.app-native .food-diary {
+    animation: none;
+  }
+}
+
 /* ─── 46. NATIVE DEEP-14 — калькулятор, дневник, нутри-вид, combat ─ */
 html.app-native .calc-labsdue,
 html.app-native .calc-substmanager,

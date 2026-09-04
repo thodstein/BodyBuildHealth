@@ -49,7 +49,7 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   const doseMg = dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null;
 
   return (
-    <div style={{ ...GLASS, padding: 0, marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)', overflow: 'hidden' }}>
+    <div className="calc-substdetail" style={{ ...GLASS, padding: 0, marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)', overflow: 'hidden' }}>
 
       {/* Заголовок: кликабельный — разворачивает/сворачивает карточку */}
       <div

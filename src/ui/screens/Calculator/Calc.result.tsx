@@ -5,7 +5,7 @@ import { GLASS, BADGE } from './Calc.types';
 
 export function RiskBar({ label, icon, value }: { label: string; icon: string; value: number }) {
   const c = value >= 60 ? '#ef4444' : value >= 30 ? '#fbbf24' : '#22c55e';
-  return <div style={{ ...GLASS, padding: '6px 10px', marginBottom: 3 }}>
+  return <div className="calc-riskbar" style={{ ...GLASS, padding: '6px 10px', marginBottom: 3 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -27,7 +27,7 @@ export function MechanismView({ sys }: { sys: SystemRisk }) {
   const tzBadge = hasTzData
     ? <span style={{ fontSize: 7, fontWeight: 700, color: '#00e68a', background: 'rgba(0,230,138,0.1)', padding: '1px 4px', borderRadius: 4, marginRight: 4 }}>TZ</span>
     : <span style={{ fontSize: 7, fontWeight: 700, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '1px 4px', borderRadius: 4, marginRight: 4 }}>эвр</span>;
-  return <div>
+  return <div className="calc-mechview">
     <div onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 0' }}>
       {tzBadge}
       <span style={{ fontSize: 10, fontWeight: 600 }}>{sys.icon} {sys.label}</span>
@@ -57,7 +57,7 @@ export function MechanismView({ sys }: { sys: SystemRisk }) {
 
 export function SchedBlock({ items, title }: { items: ScheduleItem[]; title: string }) {
   if (items.length === 0) return null;
-  return <div style={{ marginBottom: 6 }}>
+  return <div className="calc-schedblock" style={{ marginBottom: 6 }}>
     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{title}</div>
     {items.map(item =>
       <div key={item.substanceId} style={{ ...GLASS, padding: '5px 10px', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -74,10 +74,10 @@ export function SchedBlock({ items, title }: { items: ScheduleItem[]; title: str
 }
 
 export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
-  if (deltas.length === 0) return <div style={{ ...GLASS, padding: 12, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>Нет данных</div>;
+  if (deltas.length === 0) return <div className="calc-labdelta" style={{ ...GLASS, padding: 12, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>Нет данных</div>;
   const critical = deltas.filter(d => d.trend === 'critical');
   const worsening = deltas.filter(d => d.trend === 'worsening');
-  return <div>
+  return <div className="calc-labdelta">
     {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(d => d.marker).join(', ')}</span></div>}
     {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(d => d.marker).join(', ')}</span></div>}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>

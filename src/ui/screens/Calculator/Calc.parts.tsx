@@ -34,6 +34,7 @@ export function Card({
   const [open, setOpen] = useState(defaultOpen || false);
   return (
     <div
+      className="calc-card"
       style={{
         background: 'var(--bg-secondary)',
         borderRadius: 12,

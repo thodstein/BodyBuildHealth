@@ -32,7 +32,7 @@ export const CustomProducts: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="nut-customproducts" style={{ paddingBottom: 80 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>📝 Свои продукты</div>
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4 }}>

@@ -42,7 +42,7 @@ export const LAB_MARKER_RU: Record<string, string> = {
 export const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
 
 export function LabSliceInput({ label, slice, onChange }: { label: string; slice: LabSlice | null; onChange: (v: any) => void; fullSpectrum?: boolean }) {
-  return <div style={{ marginBottom: 6 }}>
+  return <div className="calc-labslice" style={{ marginBottom: 6 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>{label}</span>
       <input type="date" value={slice?.date || ''} onChange={e => onChange(e.target.value ? { date: e.target.value, panelSex: {}, panelBiochem: {}, panelHematology: {}, panelThyroid: {} } : null)} style={{ ...INPUT, width: 130, fontSize: 9 }} />
@@ -87,7 +87,7 @@ export function FullLabInput({ values, onChange }: { values: LabSlice | null; on
     const pv = s[panel] as Record<string,string> || {};
     onChange({ ...s, [panel]: { ...pv, [marker]: val } });
   };
-  return <div>
+  return <div className="calc-fulllab">
     {FULL_PANELS.map(pan => <div key={pan.key} style={{ marginBottom:6 }}>
       <div style={{ fontSize:8, fontWeight:600, color:pan.color, marginBottom:2 }}>{pan.label}</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>

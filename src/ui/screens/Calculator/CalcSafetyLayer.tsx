@@ -61,7 +61,7 @@ export const SafetyAlerts: React.FC<{ rec: SupportRecommendation }> = ({ rec }) 
   const alerts = rec.alerts || [];
   if (alerts.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetyalerts" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>🟠 Лабораторные тревоги (по вашим анализам)</div>
       {alerts.map((a: any, i: number) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: `${tierColor(a.tier)}0c`, border: `1px solid ${tierColor(a.tier)}30` }}>

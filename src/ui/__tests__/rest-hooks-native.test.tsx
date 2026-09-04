@@ -185,6 +185,14 @@ import { NutritionCustomFood } from '../screens/NutritionScreen_parts/NutritionC
 import { NutriAdvisor } from '../screens/NutritionScreen_parts/NutriAdvisor';
 import { MealVisualizer } from '../screens/NutritionScreen_parts/MealVisualizer';
 import { NutritionOverview } from '../screens/NutritionScreen_parts/NutritionOverview';
+import { RiskBar, MechanismView, SchedBlock, LabDeltaView } from '../screens/Calculator/Calc.result';
+import { Card as CalcCard } from '../screens/Calculator/Calc.parts';
+import { LabSliceInput, FullLabInput } from '../screens/Calculator/Calc.lab';
+import { CalcSubstanceDetail } from '../screens/Calculator/CalcSubstanceDetail';
+import { SafetyAlerts } from '../screens/Calculator/CalcSafetyLayer';
+import { CustomProducts } from '../screens/NutritionScreen_parts/CustomProducts';
+import { RecipesTabModern } from '../screens/NutritionScreen_parts/RecipesTabModern';
+import { NutritionDiary } from '../screens/NutritionScreen_parts/NutritionDiary';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1129,5 +1137,73 @@ describe('market + pharma + labs roots', () => {
     expect(c3.querySelector('.nutrition-overview'), 'overview').not.toBeNull();
     // CombatPlanView требует полный план движка (buildCombatReport) —
     // хук .combat-planview живёт в прод-ветке, здесь не проверяется.
+  });
+
+  it('47. Batch-15 корни: калькулятор-мелочь (результат, карта, лабы)', () => {
+    const { container: c1 } = render(<RiskBar label="Тест" icon="🫀" value={20} />);
+    expect(c1.querySelector('.calc-riskbar'), 'riskbar').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MechanismView
+        sys={{ icon: '🫀', label: 'Тест', rawScore: 20, afterSupport: 10, mechanisms: [] } as never}
+      />,
+    );
+    expect(c2.querySelector('.calc-mechview'), 'mechview').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <SchedBlock
+        items={[{ substanceId: 'nac', name: 'NAC', instructions: 'утро', dose: '600мг' } as never]}
+        title="Утро"
+      />,
+    );
+    expect(c3.querySelector('.calc-schedblock'), 'schedblock').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <LabDeltaView deltas={[{ marker: 'ALT', trend: 'stable', sliceValues: ['20', '21'] } as never]} />,
+    );
+    expect(c4.querySelector('.calc-labdelta'), 'labdelta').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <CalcCard icon="💊" title="Тест">
+        <div>тело</div>
+      </CalcCard>,
+    );
+    expect(c5.querySelector('.calc-card'), 'card').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <LabSliceInput label="Срез" slice={null} onChange={() => {}} />,
+    );
+    expect(c6.querySelector('.calc-labslice'), 'labslice').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(<FullLabInput values={null} onChange={() => {}} />);
+    expect(c7.querySelector('.calc-fulllab'), 'fulllab').not.toBeNull();
+  });
+
+  it('48. Batch-15 корни: вещество, алерты, свои продукты, рецепты, дневник', () => {
+    const { container: c1 } = render(
+      <CalcSubstanceDetail
+        sub={{ substanceId: 'nac', mechsCovered: [] } as never}
+        rec={{} as never}
+        subNameRu={(id: string) => id}
+        subDosage={() => ({ mg: 600, timing: 'утро' })}
+        subTier={() => 'LV1'}
+        canonIdLocal={(id: string) => id}
+      />,
+    );
+    expect(c1.querySelector('.calc-substdetail'), 'substdetail').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <SafetyAlerts rec={{ alerts: [{ tier: 2, marker: 'ALT', value: '80', message: 'тест' }] } as never} />,
+    );
+    expect(c2.querySelector('.calc-safetyalerts'), 'safetyalerts').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<CustomProducts />);
+    expect(c3.querySelector('.nut-customproducts'), 'customproducts').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<RecipesTabModern />);
+    expect(c4.querySelector('.recipes-modern'), 'recipes').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<NutritionDiary foodEntries={[]} />);
+    expect(c5.querySelector('.food-diary'), 'fooddiary').not.toBeNull();
   });
 });
