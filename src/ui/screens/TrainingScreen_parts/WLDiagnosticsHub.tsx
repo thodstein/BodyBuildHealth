@@ -33,6 +33,7 @@ import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
 import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
+import { diagnoseTAImtp } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -104,6 +105,10 @@ type WLState = {
   taVelStd: string;
   taVelToday: string;
   taStrategy: string;
+  // E13: IMTP/RFD ввод
+  imtpRfd: string;
+  imtpDur: string;
+  imtpCountermove: boolean;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -129,6 +134,8 @@ const DEFAULT_STATE: WLState = {
   jerkLeftFwd: '', jerkRightFwd: '',
   // E12: заявки/скорости/стратегия
   taSnatchMax: '', taCjMax: '', taVelStd: '', taVelToday: '', taStrategy: 'balanced',
+  // E13: IMTP/RFD
+  imtpRfd: '', imtpDur: '', imtpCountermove: false,
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -460,6 +467,22 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
+  // E13: IMTP/RFD-профиль (вес тела из профиля)
+  const imtpResult = useMemo(() => {
+    try {
+      // IMTP-ввод живёт в clean-табе (кг силы), RFD/длительность — здесь же
+      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove;
+      if (!hasAny) return null;
+      return diagnoseTAImtp({
+        peakForceN: state.imtpKg ? parseFloat(state.imtpKg) * 9.81 : null,
+        bodyweightKg: profileWeightKg ?? null,
+        rfdNs: state.imtpRfd ? parseFloat(state.imtpRfd) : null,
+        durationS: state.imtpDur ? parseFloat(state.imtpDur) : null,
+        countermovement: state.imtpCountermove || null,
+      });
+    } catch { return null; }
+  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, profileWeightKg]);
+
   // E2: причина слабой фазы (объём/техника/мобильность/усталость/сила)
   const causeFor = (wp: WLWeakPoint) => {
     try {
@@ -473,6 +496,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         ohsFailed: ohs.failed,
         isppRatio,
         barPathDeviation: state.barPath || null,
+        imtpStrengthDeficit: imtpResult?.profile === 'strength_deficit',
       });
     } catch { return null; }
   };
@@ -866,6 +890,17 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {isppRatio != null && <div style={{ fontSize: 10, color: isppRatio < 0.85 ? '#f59e0b' : '#22c55e', marginTop: 4 }}>ISPP/IMTP {(isppRatio * 100).toFixed(0)}% {isppRatio < 0.85 ? '— слабый отрыв (приоритет дефицит)' : '— норма'}</div>}
             <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>ISPP предиктор 81% дисп. рывка/толчка (Essex). Норма ISPP ≥85% IMTP.</div>
+            {/* E13: IMTP/RFD-профиль */}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>IMTP/RFD — профиль силы vs взрыва{profileWeightKg ? ` · вес ${profileWeightKg}кг` : ' · вес задай в профиле'}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: DIM }}>RFD Н/с (0–200мс)<br /><input value={state.imtpRfd} onChange={e => setState(s => ({ ...s, imtpRfd: e.target.value }))} placeholder="7000" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Длительность с<br /><input value={state.imtpDur} onChange={e => setState(s => ({ ...s, imtpDur: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              </div>
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}><input type="checkbox" checked={state.imtpCountermove} onChange={e => setState(s => ({ ...s, imtpCountermove: e.target.checked }))} /> Был dip/пружина перед тягой (инвалидирует тест)</label>
+              {imtpResult && <div style={{ fontSize: 10, color: imtpResult.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>{imtpResult.relForce != null ? `${imtpResult.relForce}×BW · ` : ''}{imtpResult.verdict}</div>}
+              {imtpResult?.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>⚠️ {w}</div>)}
+            </div>
           </div>
         )}
 

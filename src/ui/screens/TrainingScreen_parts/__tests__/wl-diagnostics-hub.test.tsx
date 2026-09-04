@@ -166,4 +166,16 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.change(container.querySelector('input[placeholder="125"]')!, { target: { value: '100' } });
     await waitFor(() => expect(container.textContent).toContain('Толчок: 90 / 96 / 102'), { timeout: 2000 });
   });
+  it('E13 IMTP/RFD: dip → невалиден', async () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ personal: { weight: 90 } }));
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Взятие/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="250"]')!, { target: { value: '200' } });
+    fireEvent.change(container.querySelector('input[placeholder="220"]')!, { target: { value: '200' } });
+    fireEvent.change(container.querySelector('input[placeholder="7000"]')!, { target: { value: '4000' } });
+    await waitFor(() => expect(container.textContent).toContain('×BW'), { timeout: 2000 });
+    const cb = container.querySelector('input[type="checkbox"]')!;
+    fireEvent.click(cb);
+    await waitFor(() => expect(container.textContent).toContain('невалиден'), { timeout: 2000 });
+  });
 });

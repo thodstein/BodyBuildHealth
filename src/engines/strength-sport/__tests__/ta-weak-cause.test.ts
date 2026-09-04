@@ -40,4 +40,9 @@ describe('TA weak cause E2', () => {
     const r = diagnoseTAWeakCause({ zone: 'snatch_mid', factSetsPerWeek: NaN, ohsFailed: -1 } as any);
     expect(['volume', 'technique', 'mobility', 'fatigue', 'strength']).toContain(r.cause);
   });
+  it('E13 imtp-дефицит → strength для отрыва', () => {
+    const r = diagnoseTAWeakCause({ zone: 'clean_off_floor', imtpStrengthDeficit: true });
+    expect(r.cause).toBe('strength');
+    expect(r.signals.some(s => s.includes('IMTP'))).toBe(true);
+  });
 });

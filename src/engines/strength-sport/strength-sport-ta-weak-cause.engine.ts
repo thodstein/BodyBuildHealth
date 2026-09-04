@@ -47,6 +47,8 @@ export interface TAWeakCauseInput {
   /** ISPP/IMTP (для отрыва). */
   isppRatio?: number | null;
   barPathDeviation?: string | null;
+  /** E13: IMTP-профиль strength_deficit (из imtp-блока хаба). */
+  imtpStrengthDeficit?: boolean | null;
 }
 
 export interface TAWeakCauseResult {
@@ -74,6 +76,8 @@ export function diagnoseTAWeakCause(input: TAWeakCauseInput): TAWeakCauseResult 
   const isPullStart = zone === 'clean_off_floor' || zone === 'pull_start' || zone === 'snatch_off_floor';
   const isppBad = isPullStart && input.isppRatio != null && input.isppRatio < 0.85;
   if (isppBad) signals.push(`ISPP ${Math.round((input.isppRatio as number) * 100)}% <85%`);
+  const imtpBad = isPullStart && input.imtpStrengthDeficit === true;
+  if (imtpBad) signals.push('IMTP strength_deficit');
   const e1rmBad = input.e1rmDeltaPct != null && input.e1rmDeltaPct <= -5 && (input.e1rmSessions ?? 0) >= 2;
   if (e1rmBad) signals.push(`e1RM ${input.e1rmDeltaPct}%`);
 
@@ -94,9 +98,9 @@ export function diagnoseTAWeakCause(input: TAWeakCauseInput): TAWeakCauseResult 
   } else if (mobBad) {
     cause = 'mobility';
     confidence = 'med';
-  } else if (isppBad || (e1rmBad && isPullStart)) {
+  } else if (isppBad || imtpBad || (e1rmBad && isPullStart)) {
     cause = 'strength';
-    confidence = isppBad && e1rmBad ? 'high' : 'med';
+    confidence = (isppBad && e1rmBad) || (imtpBad && (isppBad || e1rmBad)) ? 'high' : 'med';
   } else if (e1rmBad) {
     cause = 'strength';
     confidence = 'med';
