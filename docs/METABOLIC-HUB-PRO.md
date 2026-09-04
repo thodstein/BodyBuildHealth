@@ -69,5 +69,18 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 ## AAS
 Все `aasMult` EXP ⚠️: вода +12%, TDEE +8%, КБЖУ +10%, SLI −14%, FFMI +1.8 Bhasin 600мг → +2кг воды ~3% (не +12%). Точнее через +FFM Cunningham.
 
+## PRO v4 (Sep 04 2026) — 100% выполнение плана
+Канон: `src/core/activity-catalog.ts:1` (60 MET Ainsworth + профессии + BHI + DIAAS), `src/engines/metabolic-hub.engine.ts:1054` (блок PRO v4), UI `src/ui/screens/Shared/MetabolicHub.tsx:1`.
+
+- **Adaptive v3** `calcAdaptiveTDEEv3`: rolling-28д + EMA alpha 0.25 (вода сглажена), best R² из 7/14/21/28, требование плотности MacroFactor (≥10 логов + ≥10 взвешиваний, иначе high→medium), DLW-range [×0.88/×1.12], targets mildCut−250/cut−500/bulk+300/leanBulk+250, EMA-серия для графика.
+- **MET-60 + PALpro**: `ACTIVITY_CATALOG_60` 60 записей (strength/cardio/sport/daily/work), `PROFESSION_PAL` sedentary 1.40/standing 1.55/physical 1.75, `computePalFromActivity` (профессия + MET + шаги + fidget) — единая точка, дедуп `computePalSimple/computePalFull`; парсер v2 RU+EN, км (бег/10, вело/22, ходьба/4.5), `2×`, мин/ч.
+- **BMR-гарды**: Boer-LBM fallback, adjusted-weight при BMI≥35 (IBW+0.4×excess), IOM беременность +340 Q2/+452 Q3 + лактация +500/+400 (к TDEE, не BMR), бариатрия −12% Knuth, гипотиреоз −12% Endocrine, этнос −5% (Calorique DLW 2026).
+- **CAT2**: `calcLeamScore` (М 6×2, Lundy) + `calcRedsCAT2` Step1 LEAF/LEAM/EDE-Q + RMR + кости/аменорея/BMD/тесто + Step2 primary×2/secondary traffic-light green/yellow/orange/red + Step3 return-to-play (IOC CAT2 2023, скрининг — не диагноз).
+- **Sweat V2**: измеренный (Baker) + оценка ACSM 0.5–2.0 л/ч по интенсивности/среде/весу ±30% + акклиматизация Periard (пот ×1.15, Na −40%) + BHI-рейтинг Maughan 2016 (вода 1.0/изотоник 1.1–1.3/молоко 1.5/ORS 1.5) + hypo-guard Hew-Butler.
+- **MetS-добивка**: TG/HDL ≥3.5 McLaughlin, LAP Kahn, VAI Amato, FMI Kelly, алко-хроника units/нед (WHO 14) → FLI/EA-связка.
+- **Белок DIAAS**: `DIAAS_TABLE` 12 источников FAO 2013 (whey 1.09/молоко 1.14/соя 0.90/горох 0.58), ceiling 0.60 после 60л (Moore), pre-sleep 40г при ≥90кг.
+- **NEATpro/AT-range/reverse-auto/goalV2**: профессия в NEAT, AT диапазоном 5–15% + персист Biggest Loser, reverse шаг по trend (150/100/60), goal rate-caps Helms (cut 0.5–1%/нед, bulk 0.25–0.5%) + diet-break удлинение.
+- **One-answer PRO + diff**: `buildOneAnswerPro` (adaptive-v3/formula + DLW-range + targets + беременность) + `diffMetabolicSnapshots` (⇄ Сравнить сценариев) + snapshot v5 расширен (профессия/триместр/DIAAS/CAT2/пот).
+
 ## Тесты
-`metabolic-hub.test.ts:1` 84 теста (68→84 +16 v3: adaptive v2, MET, RED-S, sweat, WHtR/ABSI/BAI, TyG/MetS/FIB-4, caffeine, MATADOR), `nutrition-v2-audit` 4, `tSC` свои 0.
+`metabolic-hub.test.ts:1` 106 тестов (84→106 +22 v4: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность, CAT2/LEAM, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2, one-answer/diff, парсер PRO), `nutrition-v2-audit` 4, `tSC` свои 0.

@@ -671,3 +671,141 @@ describe('metabolic-hub v3 — Adaptive TDEE v2, MET, RED-S, Sweat, WHtR, MetS',
     expect(s2.pal).toBeGreaterThan(s1.pal);
   });
 });
+
+describe('metabolic-hub PRO v4 — Adaptive v3, CAT2, Sweat V2, MetS-добивка, DIAAS, NEAT/AT-range', () => {
+  const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
+  it('Adaptive v3: intake 2800 trend -0.4 -> ~3200 ±AT + range + adherence', async () => {
+    const { calcAdaptiveTDEEv3 } = await import('../metabolic-hub.engine');
+    const wh = [
+      { date:'2026-01-01', kg:83},{date:'2026-01-04', kg:82.8},{date:'2026-01-08', kg:82.6},{date:'2026-01-11', kg:82.45},{date:'2026-01-14', kg:82.3},{date:'2026-01-17', kg:82.15},{date:'2026-01-20', kg:82.0},{date:'2026-01-23', kg:81.85},{date:'2026-01-26', kg:81.7},{date:'2026-01-29', kg:81.55}
+    ];
+    const r = calcAdaptiveTDEEv3({ weightHistory: wh, avgIntakeKcal: 2800, bodyFatPct: 15, goal:'cut', logDays: 12 });
+    expect(r).not.toBeNull();
+    expect(r!.tdee).toBeGreaterThan(2900); expect(r!.tdee).toBeLessThan(3600);
+    expect(r!.low).toBe(Math.round(r!.tdee*0.88)); expect(r!.high).toBe(Math.round(r!.tdee*1.12));
+    expect(r!.targets.cut).toBe(r!.tdee-500); expect(r!.targets.mildCut).toBe(r!.tdee-250);
+    expect(r!.emaSeries.length).toBe(wh.length);
+  });
+  it('Adaptive v3: мало логов -> sufficient false + confidence не high', async () => {
+    const { calcAdaptiveTDEEv3 } = await import('../metabolic-hub.engine');
+    const wh = [
+      { date:'2026-01-01', kg:80},{date:'2026-01-04', kg:79.7},{date:'2026-01-08', kg:79.5},{date:'2026-01-11', kg:79.2},{date:'2026-01-14', kg:79.0},{date:'2026-01-17', kg:78.8},{date:'2026-01-20', kg:78.6}
+    ];
+    const r = calcAdaptiveTDEEv3({ weightHistory: wh, avgIntakeKcal: 2500, logDays: 2 });
+    expect(r?.adherence.sufficient).toBe(false);
+    expect(r?.confidence).not.toBe('high');
+  });
+  it('Adaptive v3: <7 точек -> null', async () => {
+    const { calcAdaptiveTDEEv3 } = await import('../metabolic-hub.engine');
+    expect(calcAdaptiveTDEEv3({ weightHistory: [{date:'2026-01-01',kg:80}], avgIntakeKcal: 2500 } as any)).toBeNull();
+  });
+  it('MET-60 каталог: 60 записей + профессия PAL + парсер км/2×/EN', async () => {
+    const { ACTIVITY_CATALOG_60, computePalFromActivity, parseWeeklyScheduleTextV2 } = await import('../../core/activity-catalog');
+    expect(Object.keys(ACTIVITY_CATALOG_60).length).toBeGreaterThanOrEqual(55);
+    expect(computePalFromActivity({ profession:'physical', metHoursPerWeek: 10 })).toBeGreaterThan(computePalFromActivity({ profession:'sedentary' }));
+    const p = parseWeeklyScheduleTextV2('mon: run 10km, tue: swim 45min, 2× strength 1h');
+    expect(p).not.toBeNull();
+    expect(p!.some(x=> x.key==='running_moderate')).toBe(true);
+  });
+  it('PALpro: профессия physical > sedentary при равных MET', async () => {
+    const { calcPALPro } = await import('../metabolic-hub.engine');
+    const a = calcPALPro({ ...base, activityLevel:'medium', profession:'sedentary' } as any);
+    const b = calcPALPro({ ...base, activityLevel:'medium', profession:'physical' } as any);
+    expect(b).toBeGreaterThan(a);
+  });
+  it('BMR-гарды: бариатрия −12%, гипо −12%, этнос −5%, Boer/adjusted', async () => {
+    const { computeBMR, boerLeanBodyMass, adjustedBodyWeight, pregnancyTDEEAdd } = await import('../../core/metabolic-constants');
+    const b = computeBMR({ weight:80, height:180, age:30, sex:'male', bodyFat:15 });
+    const bar = computeBMR({ weight:80, height:180, age:30, sex:'male', bodyFat:15, postBariatric:true } as any);
+    expect(bar.bmr).toBeLessThan(b.bmr);
+    expect(boerLeanBodyMass(80,180,'male')).toBeGreaterThan(50);
+    expect(adjustedBodyWeight(130,180,'male')).toBeLessThan(130);
+    expect(pregnancyTDEEAdd({ trimester:3 })).toBe(452);
+    expect(pregnancyTDEEAdd({ lactating:'exclusive' })).toBe(500);
+  });
+  it('Беременность: TDEE +340 Q2 в шагах/КБЖУ', async () => {
+    const { calcSteps, calcKBJU } = await import('../metabolic-hub.engine');
+    const a = calcSteps({ ...base, activityLevel:'medium' });
+    const p = calcSteps({ ...base, activityLevel:'medium', trimester:2 } as any);
+    expect(p.tdeeNat - a.tdeeNat).toBe(340);
+    const k = calcKBJU({ ...base, trimester:3 } as any);
+    expect(k.nat.tdee).toBeGreaterThan(calcKBJU({ ...base }).nat.tdee);
+  });
+  it('CAT2: red при 2 primary, orange при 1, green при 0', async () => {
+    const { calcRedsCAT2, calcLeamScore } = await import('../metabolic-hub.engine');
+    const red = calcRedsCAT2({ ea:20, sex:'female', leafScore:9, menstrualFlag:true } as any);
+    expect(red.light).toBe('red'); expect(red.primary).toBeGreaterThanOrEqual(2);
+    const orange = calcRedsCAT2({ ea:35, sex:'male', rmrRatio:0.85 } as any);
+    expect(['orange','red']).toContain(orange.light);
+    const green = calcRedsCAT2({ ea:46, sex:'male', leafScore:1 } as any);
+    expect(green.light).toBe('green');
+    expect(calcLeamScore([true,true,true,false,false,false]).risk).toBe('moderate');
+    expect(calcLeamScore([true,true,true,true,false,false]).risk).toBe('high');
+    expect(green.returnToPlay).toContain('допуск');
+  });
+  it('Sweat V2: измеренный + оценка популяции + акклиматизация Na −40%', async () => {
+    const { calcSweatTestV2, calcBeverageRankV2 } = await import('../metabolic-hub.engine');
+    const m = calcSweatTestV2({ preKg:80, postKg:79.2, fluidL:0.5, hours:1, sodiumMgPerL:900, weightKg:80 });
+    expect(m?.rateLPerH).toBeCloseTo(1.3, 0.05);
+    const e = calcSweatTestV2({ hours:1, weightKg:80, intensity:'moderate', environment:'hot' } as any);
+    expect(e?.measured).toBe(false); expect(e!.rateLPerH).toBeGreaterThan(1.0);
+    const acc = calcSweatTestV2({ preKg:80, postKg:79.2, fluidL:0.5, hours:1, sodiumMgPerL:1000, weightKg:80, acclimated:true });
+    expect(acc!.elect.sodiumMg).toBeLessThan(m!.elect.sodiumMg);
+    expect(calcBeverageRankV2(1500,1350,1)[0].bhi).toBeGreaterThanOrEqual(1.0);
+  });
+  it('MetS-добивка: TG/HDL, LAP, VAI, FMI', async () => {
+    const { calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap } = await import('../metabolic-hub.engine');
+    expect(calcTGHDLWrap(150,40)).toBeCloseTo(3.75, 0.05);
+    expect(calcTGHDLWrap(undefined as any, 40)).toBeNull();
+    expect(calcLAPWrap(102,180,'male')).toBeGreaterThan(20);
+    expect(calcVAIWrap({ waistCm:102, bmi:30, tgMgDl:180, hdlMgDl:35, sex:'male' })).toBeGreaterThan(1.5);
+    expect(calcFMIWrap(80,20,180)).toBeCloseTo(4.94, 0.2);
+  });
+  it('Алко-хроника: 14+ units high (WHO)', async () => {
+    const { calcAlcoholChronic } = await import('../metabolic-hub.engine');
+    expect(calcAlcoholChronic(40,3).unitsPerWeek).toBe(15);
+    expect(calcAlcoholChronic(40,3).risk).toBe('high');
+    expect(calcAlcoholChronic(20,2).risk).toBe('low');
+  });
+  it('DIAAS PRO: whey leuc > pea, 60+ ceiling 0.60, pre-sleep 40 при 90кг', async () => {
+    const { calcProteinTimingPro } = await import('../metabolic-hub.engine');
+    const w = calcProteinTimingPro(160,80,4,'whey',30);
+    const p = calcProteinTimingPro(160,80,4,'pea',30);
+    expect(w.leucinePerMeal).toBeGreaterThan(p.leucinePerMeal);
+    expect(w.diaas).toBeGreaterThan(p.diaas);
+    expect(calcProteinTimingPro(160,80,4,'mixed',65).ceiling).toBe(0.60);
+    expect(calcProteinTimingPro(180,95,4,'mixed',30).preSleepG).toBe(40);
+  });
+  it('NEATpro профессия + AT-range + reverse-auto', async () => {
+    const { calcNEATPro, calcATRange, calcReverseDietAuto } = await import('../metabolic-hub.engine');
+    const s = calcNEATPro({ weight:80, profession:'sedentary', steps:5000 });
+    const ph = calcNEATPro({ weight:80, profession:'physical', steps:5000 });
+    expect(ph.total).toBeGreaterThan(s.total);
+    const at = calcATRange({ tdee:2800, deficitKcal:500, weeksInDeficit:6 });
+    expect(at.low).toBe(Math.round(2800*0.05)); expect(at.high).toBe(Math.round(2800*0.15));
+    const rev = calcReverseDietAuto(2200,2600,-0.4);
+    expect(rev[0].kcal).toBe(2350); // шаг 150 при быстром снижении
+    expect(calcReverseDietAuto(2200,2600,0.3)[0].kcal).toBe(2260);
+  });
+  it('Goal V2: rate-caps + diet-break удлиняет', async () => {
+    const { calcGoalTimelineV2 } = await import('../metabolic-hub.engine');
+    const g = calcGoalTimelineV2({ weight:85, targetWeight:80, tdee:2800, withDietBreaks:true });
+    const b = calcGoalTimelineV2({ weight:85, targetWeight:80, tdee:2800 });
+    expect(g!.days).toBeGreaterThanOrEqual(b!.days);
+    expect(g!.rateNote.length).toBeGreaterThan(5);
+  });
+  it('One-answer PRO + diff сценариев', async () => {
+    const { buildOneAnswerPro, diffMetabolicSnapshots } = await import('../metabolic-hub.engine');
+    const o = buildOneAnswerPro({ formulaTDEE:2800, adaptiveV3:null, waterMl:3000, ea:38 });
+    expect(o.low).toBe(Math.round(2800*0.88)); expect(o.targets.cut).toBe(2300);
+    const d = diffMetabolicSnapshots({ weight:80, goal:'cut' }, { weight:82, goal:'bulk' });
+    expect(d.some(x=> x.key==='weight' && x.delta===2)).toBe(true);
+  });
+  it('Парсер PRO: бег 10км -> 1ч, swim EN, 2× strength', async () => {
+    const { parseWeeklyScheduleTextPro, buildMetHoursPro } = await import('../metabolic-hub.engine');
+    const p = parseWeeklyScheduleTextPro('mon: run 10km, tue: swim 45min, 2× strength 1h');
+    expect(p).not.toBeNull();
+    expect(p!.find(x=> x.key==='running_moderate')!.hours).toBeCloseTo(1.0, 0.05);
+    expect(buildMetHoursPro(p!)).toBeGreaterThan(15);
+  });
+});

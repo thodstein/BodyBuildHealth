@@ -1,14 +1,14 @@
-/** MetabolicHub.tsx — единый хаб Метаболики (14 в 1) Pro.
+/** MetabolicHub.tsx — единый хаб Метаболики PRO v4.
  *  Вода · Шаги · КБЖУ · Жир · StressLoad · Кровь · EA · Алко · Белок · Поиск · NEAT · AT · Thyroid · HOMA — один снапшот, натурал/ААС.
- *  Pro: Cunningham/Owen/TenHaaf + Harris/Henry/Livingston, EMA 14д R2, TEF Westerterp (инфо), MET PAL, Navy+JP/Durnin/BIA, FFMI 26.2 Helms 2023,
- *  Hall density p*9400, IOC EA Mountjoy 2018, Suter, Morton+Schoenfeld pre-sleep, Trexler AT, MATADOR reverse, Levine NEAT, Kim thyroid, Baker sweat.
- *  AAS — experimental (Bhasin/Heber) с дисклеймером, не peer-reviewed.
+ *  PRO v4: Adaptive v3 rolling-28д EMA + MET-60 + профессия + CAT2 traffic-light + LEAM-Q/EDE-Q + пот estimated/BHI + TG/HDL/LAP/VAI/FMI
+ *  + DIAAS + NEAT-профессия + AT-range + reverse-auto + goal-rate-caps + беременность IOM + бариатрия/этно-гарды.
  *  Evidence A/B/C/E бейджи + DLW band ±12% Westerterp.
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcAdaptiveTDEE, calcSweatTest, calcRedsScreening, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcBeverageRank, calcLeafScore, parseWeeklyScheduleText, buildMetHours, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
-import { MET_CATALOG } from '../../../core/metabolic-constants';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcAdaptiveTDEE, calcSweatTest, calcRedsScreening, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcBeverageRank, calcLeafScore, parseWeeklyScheduleText, buildMetHours, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { MET_CATALOG, calcTG_HDL, calcLAP, calcVAI, calcFMI, boerLeanBodyMass } from '../../../core/metabolic-constants';
+import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
 import { getProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
@@ -146,6 +146,23 @@ export const MetabolicHub: React.FC = () => {
   const [weightHistory, setWeightHistory] = useState<{date:string;kg:number}[]>([]);
   const [diaryAvgKcal, setDiaryAvgKcal] = useState<number|undefined>(undefined);
   const [diaryDays, setDiaryDays] = useState(0);
+  // PRO v4 — профессия/беременность/этника/бариатрия/акклиматизация/хроника/DIAAS/CAT2/пот-оценка
+  const [profession, setProfession] = useState<'sedentary'|'standing'|'physical'>('sedentary');
+  const [trimester, setTrimester] = useState<1|2|3|0>(0);
+  const [lactating, setLactating] = useState<'none'|'exclusive'|'mixed'>('none');
+  const [ethnicity, setEthnicity] = useState<'european'|'african'|'east_asian'>('european');
+  const [postBariatric, setPostBariatric] = useState(false);
+  const [acclimated, setAcclimated] = useState(false);
+  const [alcoholDays, setAlcoholDays] = useState(0);
+  const [proteinSource, setProteinSource] = useState('mixed');
+  const [leamAnswers, setLeamAnswers] = useState<boolean[]>(Array(6).fill(false));
+  const [edeScore, setEdeScore] = useState<number|undefined>(undefined);
+  const [lowT, setLowT] = useState(false);
+  const [lowBMD, setLowBMD] = useState(false);
+  const [sweatIntensity, setSweatIntensity] = useState<'easy'|'moderate'|'hard'>('moderate');
+  const [sweatEnv, setSweatEnv] = useState<'cool'|'temperate'|'hot'|'hot_humid'>('temperate');
+  const [useMeasuredSweat, setUseMeasuredSweat] = useState(true);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [toast, setToast] = useState<string|null>(null);
   const showToast = useCallback((m:string)=>{ setToast(m); setTimeout(()=> setToast(null), 2400); }, []);
 
@@ -370,6 +387,19 @@ export const MetabolicHub: React.FC = () => {
         if(typeof s.alt==='number') setAlt(s.alt);
         if(typeof s.plt==='number') setPlt(s.plt);
         if(typeof s.caffeineHoursSince==='number') setCaffeineHoursSince(s.caffeineHoursSince);
+        if(s.profession) setProfession(s.profession);
+        if(typeof s.trimester==='number') setTrimester(s.trimester as any);
+        if(s.lactating) setLactating(s.lactating);
+        if(s.ethnicity) setEthnicity(s.ethnicity);
+        if(typeof s.postBariatric==='boolean') setPostBariatric(s.postBariatric);
+        if(typeof s.acclimated==='boolean') setAcclimated(s.acclimated);
+        if(typeof s.alcoholDays==='number') setAlcoholDays(s.alcoholDays);
+        if(typeof s.proteinSource==='string') setProteinSource(s.proteinSource);
+        if(typeof s.edeScore==='number') setEdeScore(s.edeScore);
+        if(typeof s.lowT==='boolean') setLowT(s.lowT);
+        if(typeof s.lowBMD==='boolean') setLowBMD(s.lowBMD);
+        if(s.sweatIntensity) setSweatIntensity(s.sweatIntensity);
+        if(s.sweatEnv) setSweatEnv(s.sweatEnv);
         loaded=true;
       }
     }catch{}
@@ -424,10 +454,10 @@ export const MetabolicHub: React.FC = () => {
     }catch{}
   },[]);
   useEffect(()=>{
-    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince})); }catch{}
-  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince]);
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,acclimated,proteinSource,edeScore,lowT,lowBMD,sweatIntensity,sweatEnv})); }catch{}
+  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,acclimated,proteinSource,edeScore,lowT,lowBMD,sweatIntensity,sweatEnv]);
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate, sweatSodiumMgPerL: sweatSodium, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince]);
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate, sweatSodiumMgPerL: sweatSodium, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,acclimated,proteinSource]);
 
   const water = useMemo(()=> calcWater(input), [input]);
   const stepsCalc = useMemo(()=> calcSteps(input), [input]);
@@ -506,14 +536,45 @@ export const MetabolicHub: React.FC = () => {
   const carbLoad = useMemo(()=> calcCarbLoading(weight, carbLoadDays, carbGPerKg), [weight, carbLoadDays, carbGPerKg]);
   const sodiumLoad = useMemo(()=> calcSodiumLoading(weight, sodiumLoadDays, sodiumGPerDay), [weight, sodiumLoadDays, sodiumGPerDay]);
   const bodyCompProj = useMemo(()=> calcBodyCompProjection({ weight, height, bodyFat: bodyFat ?? 15, years: projectionYears, mode: projectionMode }), [weight,height,bodyFat,projectionYears,projectionMode]);
-  const parsedSchedule = useMemo(()=> parseWeeklyScheduleText(scheduleText), [scheduleText]);
-  const scheduleMetHours = useMemo(()=> parsedSchedule ? buildMetHours(parsedSchedule) : 0, [parsedSchedule]);
+  const parsedSchedule = useMemo(()=> parseWeeklyScheduleTextPro(scheduleText), [scheduleText]);
+  const scheduleMetHours = useMemo(()=> parsedSchedule ? buildMetHoursPro(parsedSchedule) : 0, [parsedSchedule]);
   const beverageRank = useMemo(()=> sweatTest ? calcBeverageRank(sweatTest.totalLossMl, sweatTest.elect.sodiumMg) : [], [sweatTest]);
+  // PRO v4 memos
+  const adaptiveV3 = useMemo(()=>{
+    if(!weightHistory || weightHistory.length<7 || !diaryAvgKcal) return null;
+    return calcAdaptiveTDEEv3({ weightHistory, avgIntakeKcal: diaryAvgKcal, bodyFatPct: bodyFat, goal, logDays: diaryDays });
+  }, [weightHistory, diaryAvgKcal, bodyFat, goal, diaryDays]);
+  const leamCalc = useMemo(()=> calcLeamScore(leamAnswers), [leamAnswers]);
+  const cat2 = useMemo(()=>{
+    const rmrRatio = measuredRMR && kbju.nat.bmr ? measuredRMR/kbju.nat.bmr : undefined;
+    const ls = leafCalc ? leafCalc.score : leafScore;
+    return calcRedsCAT2({ ea: ea?.ea ?? null, sex, leafScore: ls, leamScore: leamCalc.score, edeScore, rmrRatio, boneFlag, menstrualFlag, lowTestosterone: lowT, lowBMD: lowBMD, ferritinLow: (ferritin ?? 999) < 30, t3Low: false });
+  }, [ea, sex, leafScore, leafCalc, leamCalc, edeScore, measuredRMR, kbju, boneFlag, menstrualFlag, lowT, lowBMD, ferritin]);
+  const sweatV2 = useMemo(()=> calcSweatTestV2(useMeasuredSweat ? { preKg, postKg, fluidL, hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, acclimated } : { hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, intensity: sweatIntensity, environment: sweatEnv, acclimated }), [useMeasuredSweat, preKg, postKg, fluidL, sweatHours, sweatSodium, weight, acclimated, sweatIntensity, sweatEnv]);
+  const beverageV2 = useMemo(()=> sweatV2 ? calcBeverageRankV2(sweatV2.totalLossMl, sweatV2.elect.sodiumMg, sweatHours) : [], [sweatV2, sweatHours]);
+  const tgHdl = useMemo(()=> calcTGHDLWrap(tgMgDl2, hdlMgDl), [tgMgDl2, hdlMgDl]);
+  const bmiNow = useMemo(()=> weight / (((height||180)/100)**2), [weight, height]);
+  const lapV = useMemo(()=> calcLAPWrap(waist, tgMgDl2, sex), [waist, tgMgDl2, sex]);
+  const vaiV = useMemo(()=> calcVAIWrap({ waistCm: waist, bmi: bmiNow, tgMgDl: tgMgDl2, hdlMgDl, sex }), [waist, bmiNow, tgMgDl2, hdlMgDl, sex]);
+  const fmiV = useMemo(()=> calcFMIWrap(weight, bodyFat ?? 15, height), [weight, bodyFat, height]);
+  const boerLBM = useMemo(()=> boerLeanBodyMass(weight, height, sex), [weight, height, sex]);
+  const alcoholChronic = useMemo(()=> calcAlcoholChronic(alcoholG, alcoholDays), [alcoholG, alcoholDays]);
+  const proteinPro = useMemo(()=> calcProteinTimingPro(onAAS ? kbju.aas.p : kbju.nat.p, weight, 4, proteinSource, age), [kbju, weight, onAAS, proteinSource, age]);
+  const neatPro = useMemo(()=> calcNEATPro({ weight, profession, standingHours, fidgetLevel, steps, height }), [weight, profession, standingHours, fidgetLevel, steps, height]);
+  const atRange = useMemo(()=> calcATRange({ tdee: kbju.nat.tdee, deficitKcal, weeksInDeficit, weightLostKg }), [kbju, deficitKcal, weeksInDeficit, weightLostKg]);
+  const reverseAuto = useMemo(()=>{
+    const curKcal = diaryAvgKcal ?? kbju.nat.kcal;
+    const targetKcal = kbju.nat.tdee || curKcal + 400;
+    const trend = adaptiveV3?.trend ?? 0;
+    return calcReverseDietAuto(curKcal, targetKcal, trend);
+  }, [diaryAvgKcal, kbju, adaptiveV3]);
+  const goalV2 = useMemo(()=> targetWeight ? calcGoalTimelineV2({ weight, targetWeight, tdee: kbju.nat.tdee, bodyFat, withDietBreaks: true }) : null, [weight, targetWeight, kbju, bodyFat]);
+  const pregAdd = useMemo(()=> pregnancyAdd({ weight, height, age, sex, trimester: trimester || undefined, lactating: lactating === 'none' ? null : lactating } as any), [weight, height, age, sex, trimester, lactating]);
+  const palPro = useMemo(()=> calcPALPro({ weight, height, age, sex, activityLevel: activityLevel as any, profession, metHoursPerWeek, standingHours, fidgetLevel, steps } as any), [weight, height, age, sex, activityLevel, profession, metHoursPerWeek, standingHours, fidgetLevel, steps]);
   const oneAnswer = useMemo(()=>{
-    const tdee = adaptiveTDEE?.tdee ?? stepsCalc.tdeeNat;
-    const low = Math.round(tdee*0.88), high=Math.round(tdee*1.12);
-    return { tdee, low, high, water: onAAS? water.aas:water.nat, ea: ea?.ea, eaZone: ea?.zone, metsScore: mets.score };
-  }, [adaptiveTDEE, stepsCalc, water, onAAS, ea, mets]);
+    const pro = buildOneAnswerPro({ formulaTDEE: stepsCalc.tdeeNat, adaptiveV3, waterMl: onAAS ? water.aas : water.nat, ea: ea?.ea ?? null, pregnancyAddKcal: pregAdd });
+    return { ...pro, eaZone: ea?.zone, metsScore: mets.score };
+  }, [adaptiveV3, stepsCalc, water, onAAS, ea, mets, pregAdd]);
 
   // сценарии
   const [scenarios, setScenarios] = useState<Array<{id:string; name:string; snapshot:any}>>(()=>{
@@ -521,10 +582,10 @@ export const MetabolicHub: React.FC = () => {
   });
   const saveScenario = useCallback(()=>{
     const name = `Сценарий ${scenarios.length+1} · ${new Date().toLocaleDateString('ru-RU')} · ${weight}кг ${goal}`;
-    const snap = { weight,height,age,sex,bodyFat,activityLevel,trainingDays,cardioMin,goal,onAAS,aasDose };
+    const snap = { weight,height,age,sex,bodyFat,activityLevel,profession,trainingDays,cardioMin,goal,onAAS,aasDose,trimester,lactating,proteinSource };
     const next=[...scenarios, {id: Date.now().toString(), name, snapshot: snap}].slice(-6);
     setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}; showToast(`Сценарий "${name}" сохранён`);
-  }, [scenarios, weight,height,age,sex,bodyFat,activityLevel,trainingDays,cardioMin,goal,onAAS,aasDose, showToast]);
+  }, [scenarios, weight,height,age,sex,bodyFat,activityLevel,profession,trainingDays,cardioMin,goal,onAAS,aasDose,trimester,lactating,proteinSource, showToast]);
   const loadScenario = useCallback((id:string)=>{
     const sc=scenarios.find(s=>s.id===id); if(!sc) return;
     const s=sc.snapshot;
@@ -533,13 +594,22 @@ export const MetabolicHub: React.FC = () => {
     if(s.sex) setSex(s.sex);
     if(typeof s.bodyFat==='number') setBodyFat(s.bodyFat);
     if(s.activityLevel) setActivityLevel(s.activityLevel);
+    if(s.profession) setProfession(s.profession);
     if(typeof s.trainingDays==='number') setTrainingDays(s.trainingDays);
     if(typeof s.cardioMin==='number') setCardioMin(s.cardioMin);
     if(s.goal) setGoal(s.goal);
     if(typeof s.onAAS==='boolean') setOnAAS(s.onAAS);
     if(typeof s.aasDose==='number') setAasDose(s.aasDose);
+    if(typeof s.proteinSource==='string') setProteinSource(s.proteinSource);
     showToast(`Сценарий "${sc.name}" загружен`);
   }, [scenarios, showToast]);
+  const scenarioDiff = useMemo(()=>{
+    if(compareIds.length !== 2) return null;
+    const a = scenarios.find(s=> s.id===compareIds[0])?.snapshot;
+    const b = scenarios.find(s=> s.id===compareIds[1])?.snapshot;
+    if(!a || !b) return null;
+    return diffMetabolicSnapshots(a, b);
+  }, [compareIds, scenarios]);
   const deleteScenario = useCallback((id:string)=>{
     const next=scenarios.filter(s=>s.id!==id); setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}
   }, [scenarios]);
@@ -571,7 +641,7 @@ export const MetabolicHub: React.FC = () => {
   return (
     <div className="nut-metabolic" style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:780, margin:'0 auto' }}>
       {toast && <div style={{ position:'fixed', left:'50%', bottom:18, transform:'translateX(-50%)', zIndex:60, maxWidth:520, padding:'10px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 8px 24px rgba(0,0,0,0.35)', fontSize:11, fontWeight:600, color:'#fff', textAlign:'center' }}>{toast}</div>}
-      <ModernHero icon="⚖️" title="Метаболика Pro" subtitle="17 в 1 · TDEE Adaptive v2 · MET-часы · KBJU · Navy/JP/BIA · StressLoad · HCT · EA RED-S CAT2 · Пот-тест · MetS/TyG/FIB-4 · NEAT · AT MATADOR · Evidence A/B/C/E · DLW ±12%" />
+      <ModernHero icon="⚖️" title="Метаболика Pro" subtitle="PRO v4 · Adaptive v3 rolling-28д EMA · MET-60 · CAT2 traffic-light · Пот estimated/BHI · TG/HDL/LAP/VAI · DIAAS · NEAT-профессия · AT-range · DLW ±12%" />
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(96,165,250,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(96,165,250,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(96,165,250,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
@@ -603,13 +673,11 @@ export const MetabolicHub: React.FC = () => {
           </div>
         </div>
         {adaptiveTDEE && adaptiveTDEE.plateau && <div style={{ marginTop:8, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24' }}>⏸ Плато сушки: тренд {adaptiveTDEE.trend}кг/нед — проверь дефицит/шаги · AT {adaptiveTDEE.atKcal}ккал</div>}
-        {adaptiveTDEE && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>Adaptive TDEE v2: 7/14/21д окна → R² {adaptiveTDEE.r2} дни {adaptiveTDEE.days} плотность {adaptiveTDEE.density} · TDEE без AT {adaptiveTDEE.tdeeNoAT} · {adaptiveTDEE.note}</div>}
-        {adaptiveTDEE && <div style={{ marginTop:6, display:'flex', gap:3, alignItems:'end', height: 18 }}>{adaptiveTDEE.weeklySeries.map((w,i)=>(
-          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-            <div style={{ width:'100%', height: Math.max(6, Math.min(24, w.r2*24)), borderRadius:3, background: w.r2>0.6?'#22c55e': w.r2>0.35?'#f59e0b':'#ef4444', border:'1px solid rgba(255,255,255,0.06)' }} title={`${w.days}д R²${w.r2} тренд ${w.trend}`} />
-            <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)' }}>{w.days}д</span>
-          </div>
-        ))}</div>}
+        {adaptiveV3 && <div style={{ marginTop:6, fontSize:8, color: adaptiveV3.confidence==='high'?'#22c55e': adaptiveV3.confidence==='medium'?'#f59e0b':'#f87171', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>Adaptive v3 rolling-28д EMA: TDEE {adaptiveV3.tdee} [{adaptiveV3.low}–{adaptiveV3.high} DLW] · R²{adaptiveV3.r2} {adaptiveV3.confidence} · {adaptiveV3.adherence.note} · mildCut {adaptiveV3.targets.mildCut} / cut {adaptiveV3.targets.cut} / bulk {adaptiveV3.targets.bulk} · via {oneAnswer.tdeeSource}{pregAdd ? ` · 🤰 +${pregAdd} IOM` : ''} · PALpro {palPro.toFixed(2)}</div>}
+        {adaptiveV3 && adaptiveV3.plateau && <div style={{ marginTop:6, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24' }}>⏸ Плато v3: тренд {adaptiveV3.trend}кг/нед · AT {adaptiveV3.atKcal}ккал · EMA-точек {adaptiveV3.emaSeries.length}</div>}
+        {cat2.light !== 'green' && <div style={{ marginTop:6, padding:'7px 10px', borderRadius:8, background: `${cat2.color}14`, border: `1px solid ${cat2.color}33`, fontSize:9, color: cat2.color }}>CAT2 {cat2.light.toUpperCase()}: {cat2.note} · {cat2.returnToPlay}</div>}
+        {alcoholChronic.risk !== 'low' && <div style={{ marginTop:6, fontSize:8, color: alcoholChronic.risk==='high'?'#ef4444':'#f59e0b' }}>{alcoholChronic.note}</div>}
+        <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>PRO v4: TG/HDL {tgHdl ?? '—'}{tgHdl && tgHdl>=3.5?' ⚠ IR':''} · LAP {lapV ?? '—'} · VAI {vaiV ?? '—'} · FMI {fmiV ?? '—'} · Boer LBM {boerLBM}кг · NEATpro {neatPro.total} · AT {atRange.low}–{atRange.high} (mid {atRange.mid}) · DIAAS {proteinPro.diaas} · BHI-топ {beverageV2[0]?.name ?? '—'} · GoalV2 {goalV2 ? `${goalV2.days}д ${goalV2.rateNote}` : '—'}</div>
       </div>
       {/* Wizard 3 шага */}
       <div style={{ ...CARD, padding:10, display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.04)' }}>
@@ -660,7 +728,17 @@ export const MetabolicHub: React.FC = () => {
           {climate==='hot' && <PopupNumber label="Влажность, %" value={humidity} min={20} max={95} onChange={setHumidity} />}
           <PopupNumber label="Пот, мл/ч" value={sweatRate} min={300} max={1200} step={50} onChange={setSweatRate} />
           <PopupNumber label="Na в поте, мг/л" value={sweatSodium} min={400} max={1500} step={50} onChange={setSweatSodium} />
-          <div style={{ gridColumn:'1 / -1', fontSize:8, color:'rgba(56,165,250,0.75)', background:'rgba(56,165,250,0.06)', border:'1px solid rgba(56,165,250,0.12)', borderRadius:8, padding:'6px 8px' }}>Baker 2017: Na {water.sweatNaG}г · Cl {water.sweatClG}г · K {water.sweatKG}г · Mg {water.sweatMgMg}мг /тренировку · +1-1.5г Na/л пота. IOM {water.iomPerKg}мл/кг → база {water.baseIOM}мл (lean-модель {water.baseLeanModel}мл эксп.)</div>
+          <PopupSelect label="Профессия (PAL-база)" value={profession} options={[{id:'sedentary',label:'Офис 1.40'},{id:'standing',label:'На ногах 1.55'},{id:'physical',label:'Физ. труд 1.75'}]} onChange={v=> setProfession(v as any)} />
+          <div style={{ gridColumn:'1 / -1', fontSize:8, color:'rgba(56,165,250,0.75)', background:'rgba(56,165,250,0.06)', border:'1px solid rgba(56,165,250,0.12)', borderRadius:8, padding:'6px 8px' }}>Baker 2017: Na {water.sweatNaG}г · Cl {water.sweatClG}г · K {water.sweatKG}г · Mg {water.sweatMgMg}мг /тренировку · PALpro {palPro.toFixed(2)} (профессия {PROFESSION_PAL[profession]}) · Boer LBM {boerLBM}кг · Каталог MET-60: {Object.keys(ACTIVITY_CATALOG_60).length} активностей</div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.55)', gridColumn:'1 / -1' }}>PRO v4 — особые состояния (IOM/Endocrine/Knuth)</div>
+          <PopupSelect label="Триместр 🤰" value={String(trimester)} options={[{id:'0',label:'Нет'},{id:'1',label:'I (0 ккал)'},{id:'2',label:'II (+340) IOM'},{id:'3',label:'III (+452) IOM'}]} onChange={v=> setTrimester(Number(v) as any)} />
+          <PopupSelect label="Лактация" value={lactating} options={[{id:'none',label:'Нет'},{id:'exclusive',label:'Эксклюзив +500'},{id:'mixed',label:'Смешанная +400'}]} onChange={v=> setLactating(v as any)} />
+          <PopupSelect label="Этничность" value={ethnicity} options={[{id:'european',label:'Европеоид'},{id:'african',label:'Африкан. −5%'},{id:'east_asian',label:'Вост.-азиат. −5%'}]} onChange={v=> setEthnicity(v as any)} />
+          <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background: postBariatric?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={postBariatric} onChange={e=> setPostBariatric(e.target.checked)} /> Бариатрия −12% (Knuth)</label>
+          <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background: acclimated?'rgba(6,182,214,0.10)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', gridColumn:'1 / -1' }}><input type="checkbox" checked={acclimated} onChange={e=> setAcclimated(e.target.checked)} /> Акклиматизация 10–14д: пот +15%, Na −40% (Periard)</label>
+          {pregAdd > 0 && <div style={{ gridColumn:'1 / -1', fontSize:8, color:'#f9a8d4', background:'rgba(249,168,212,0.08)', border:'1px solid rgba(249,168,212,0.18)', borderRadius:8, padding:'6px 8px' }}>🤰 IOM 2025: +{pregAdd}ккал к TDEE (не к BMR) — мониторинг веса еженедельно</div>}
         </div>
       </div>
 
@@ -677,10 +755,11 @@ export const MetabolicHub: React.FC = () => {
         </div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
           <button onClick={saveScenario} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:9, fontWeight:700, cursor:'pointer' }}>💾 Сохранить сценарий</button>
-          {scenarios.length>0 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>{scenarios.length}/6</span>}
+          {scenarios.length>0 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>{scenarios.length}/6 · отметь 2 для ⇄ Сравнить</span>}
           <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
             {scenarios.map(sc=>(
-              <span key={sc.id} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'4px 6px 4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:8, color:'#fff' }}>
+              <span key={sc.id} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'4px 6px 4px 8px', borderRadius:20, background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.04)', border: compareIds.includes(sc.id) ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(255,255,255,0.06)', fontSize:8, color:'#fff' }}>
+                <input type="checkbox" checked={compareIds.includes(sc.id)} onChange={e=> { const next = e.target.checked ? [...compareIds, sc.id].slice(-2) : compareIds.filter(id=> id!==sc.id); setCompareIds(next); }} />
                 {sc.name}
                 <button onClick={()=> loadScenario(sc.id)} style={{ padding:'2px 6px', borderRadius:10, border:'none', background:'#60a5fa', color:'#000', fontSize:8, fontWeight:700, cursor:'pointer' }}>▶</button>
                 <button onClick={()=> deleteScenario(sc.id)} style={{ width:18, height:18, borderRadius:10, border:'none', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8, cursor:'pointer' }}>✕</button>
@@ -688,6 +767,7 @@ export const MetabolicHub: React.FC = () => {
             ))}
           </div>
         </div>
+        {scenarioDiff && <div style={{ fontSize:8, color:'#60a5fa', background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.14)', borderRadius:8, padding:'6px 8px' }}>⇄ Diff: {scenarioDiff.map(d=> `${d.key} ${d.a}→${d.b}${d.delta!=null?` (${d.delta>0?'+':''}${d.delta})`:''}`).join(' · ')}</div>}
       </div>
 
       {/* Ввод — группы — wizard step 1: Тело */}
@@ -699,13 +779,14 @@ export const MetabolicHub: React.FC = () => {
           <PopupNumber label="Возраст" value={age} min={14} max={80} onChange={setAge} />
           <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'♂ Мужчина'},{id:'female',label:'♀ Женщина'}]} onChange={v=> setSex(v as any)} />
           <PopupNumber label="Жир, % (если знаешь)" value={bodyFat} min={3} max={55} onChange={setBodyFat} />
+          <PopupSelect label="Белок DIAAS" value={proteinSource} options={[{id:'mixed',label:'Смешанный 0.95'},{id:'whey',label:'Whey 1.09'},{id:'milk',label:'Молоко 1.14'},{id:'egg',label:'Яйцо 1.13'},{id:'beef',label:'Говядина 1.10'},{id:'chicken',label:'Курица 1.08'},{id:'fish',label:'Рыба 1.05'},{id:'casein',label:'Казеин 1.12'},{id:'soy',label:'Соя 0.90'},{id:'pea',label:'Горох 0.58'},{id:'rice',label:'Рис 0.59'},{id:'blend_plant',label:'Бленд 0.75'}]} onChange={setProteinSource} />
           <PopupSelect label="Цель" value={goal} options={[{id:'cut',label:'Сушка −18% TDEE'},{id:'maintain',label:'Поддержание'},{id:'bulk',label:'Масса +10%'},{id:'health',label:'🩸 Здоровье (EA)'}]} onChange={v=> setGoal(v as any)} />
           <PopupNumber label="Цель вес, кг" value={targetWeight ?? weight} min={35} max={200} onChange={v=> setTargetWeight(v)} />
           <PopupNumber label="Креатин?" value={creatineUse?1:0} min={0} max={1} onChange={v=> setCreatineUse(v===1)} />
         </div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, lineHeight:1.35 }}>
-          BMR: {kbju.nat.method==='cunningham'?'Cunningham': kbju.nat.method==='ten_haaf'?'TenHaaf': kbju.nat.method==='owen'?'Owen': kbju.nat.method==='katch_mcardle'?'Katch-McArdle':'Mifflin'} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)} · TDEE {stepsCalc.tdeeNat} · TEF {kbju.tefNat}ккал
-          {goalTimeline && <span> · Цель: {goalTimeline.note} ({goalTimeline.days}д)</span>}
+          BMR: {kbju.nat.method==='cunningham'?'Cunningham': kbju.nat.method==='ten_haaf'?'TenHaaf': kbju.nat.method==='owen'?'Owen': kbju.nat.method==='katch_mcardle'?'Katch-McArdle':'Mifflin'} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)} (pro {palPro.toFixed(2)}) · TDEE {stepsCalc.tdeeNat} · TEF {kbju.tefNat}ккал · DIAAS {proteinPro.diaas} leuc {proteinPro.leucinePerMeal}г (60+ ceiling {proteinPro.ceiling})
+          {goalV2 && <span> · ЦельV2: {goalV2.note} ({goalV2.days}д)</span>}
         </div>
         {sex==='female' && (
           <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
@@ -733,11 +814,12 @@ export const MetabolicHub: React.FC = () => {
           {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} style={{ marginLeft:6, padding:'2px 6px', borderRadius:6, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:8, cursor:'pointer' }}>→ Применить</button></div>}
         </div>
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
-          {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth)` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Заполни MET-часы для честного PAL (лучше чем «средняя»). Каталог: strength 6, running 10, cycling 7.5, walking 3.8…'}
+          {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth) · PALpro ${palPro.toFixed(2)} (профессия ${profession} ${PROFESSION_PAL[profession]})` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Парсер v2 понимает км и 2×, EN+RU, 60 активностей.'}
         </div>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>TDEE {stepsCalc.tdeeNat} → цель {stepsCalc.targetNat}ккал · {stepsCalc.kcalPerStep}ккал/шаг · NEAT {stepsCalc.neat} · EAT {stepsCalc.eat} · ACWR {acwr.toFixed(2)}</div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>TDEE {stepsCalc.tdeeNat} → цель {stepsCalc.targetNat}ккал · {stepsCalc.kcalPerStep}ккал/шаг · NEAT {stepsCalc.neat} (pro {neatPro.total}) · EAT {stepsCalc.eat} · ACWR {acwr.toFixed(2)}{pregAdd ? ` · 🤰 +${pregAdd}` : ''}</div>
         {stepsCalc.adaptive && <div style={{ fontSize:8, color: stepsCalc.adaptive.r2>0.6?'#22c55e': stepsCalc.adaptive.r2>0.35?'#f59e0b':'#f87171' }}>Адаптивный: тренд {stepsCalc.adaptive.trend}кг/нед R2 {stepsCalc.adaptive.r2} · {stepsCalc.adaptive.suggest} → {stepsCalc.adaptive.tdee}ккал</div>}
         {adaptiveTDEE && <div style={{ fontSize:8, color: adaptiveTDEE.confidence==='high'?'#22c55e': adaptiveTDEE.confidence==='medium'?'#f59e0b':'#f87171', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>Adaptive v2 (7/14/21д): TDEE {adaptiveTDEE.tdee} (без AT {adaptiveTDEE.tdeeNoAT}) · R²{adaptiveTDEE.r2} дни {adaptiveTDEE.days} · {adaptiveTDEE.note}</div>}
+        {adaptiveV3 && <div style={{ fontSize:8, color: adaptiveV3.confidence==='high'?'#22c55e':'#f59e0b', background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.14)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>Adaptive v3 EMA-28д: {adaptiveV3.tdee} [{adaptiveV3.low}–{adaptiveV3.high}] R²{adaptiveV3.r2} {adaptiveV3.confidence} · {adaptiveV3.adherence.note} · reverse-auto шаг {reverseAuto[0]?.kcal ?? '—'}</div>}
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===1 ? 'block' : 'none' }}>
@@ -755,13 +837,26 @@ export const MetabolicHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===2 ? 'block' : 'none' }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>💦 Пот-тест — ② Активность</div>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>💦 Пот-тест PRO — ② Активность</div>
+        <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+          <button onClick={()=> setUseMeasuredSweat(true)} style={{ flex:1, minHeight:32, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: useMeasuredSweat?'#06b6d4':'#fff' }}>⚖️ Взвешивание (точно)</button>
+          <button onClick={()=> setUseMeasuredSweat(false)} style={{ flex:1, minHeight:32, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: !useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: !useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: !useMeasuredSweat?'#06b6d4':'#fff' }}>📊 Оценка (ACSM ±30%)</button>
+        </div>
+        {useMeasuredSweat ? (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="Вес до, кг" value={preKg} min={40} max={150} step={0.1} onChange={setPreKg} />
           <PopupNumber label="Вес после, кг" value={postKg} min={40} max={150} step={0.1} onChange={setPostKg} />
           <PopupNumber label="Выпито, л" value={fluidL} min={0} max={5} step={0.1} onChange={setFluidL} />
           <PopupNumber label="Длительность, ч" value={sweatHours} min={0.3} max={6} step={0.25} onChange={setSweatHours} />
         </div>
+        ) : (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          <PopupSelect label="Интенсивность" value={sweatIntensity} options={[{id:'easy',label:'Легко 0.7 л/ч'},{id:'moderate',label:'Средне 1.0'},{id:'hard',label:'Тяжело 1.4'}]} onChange={v=> setSweatIntensity(v as any)} />
+          <PopupSelect label="Среда" value={sweatEnv} options={[{id:'cool',label:'Прохладно ×0.75'},{id:'temperate',label:'Умеренно ×1'},{id:'hot',label:'Жара ×1.5'},{id:'hot_humid',label:'Жара+влажн ×1.9'}]} onChange={v=> setSweatEnv(v as any)} />
+          <PopupNumber label="Длительность, ч" value={sweatHours} min={0.3} max={6} step={0.25} onChange={setSweatHours} />
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', display:'flex', alignItems:'center', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px' }}>Оценка ±30% — для точности взвесься до/после</div>
+        </div>
+        )}
         {sweatTest ? (
           <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(6,182,214,0.08)', border:'1px solid rgba(6,182,214,0.18)', fontSize:9, color:'#fff', lineHeight:1.4 }}>
             <b style={{color:'#06b6d4'}}>Пот {sweatTest.rateLPerH.toFixed(2)}л/ч · потеря {sweatTest.totalLossMl}мл за {sweatHours}ч · Na {Math.round(sweatTest.elect.sodiumMg)}мг Cl {sweatTest.elect.chlorideMg} · {sweatTest.plan.note}</b>
@@ -780,9 +875,10 @@ export const MetabolicHub: React.FC = () => {
               ))}
             </div>
             <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>Beverage rank: {beverageRank.slice(0,3).map(b=>`${b.name} ×${b.score}`).join(' · ')}</div>
+            {sweatV2 && <div style={{ marginTop:6, fontSize:8, color:'#06b6d4', background:'rgba(6,182,214,0.06)', border:'1px solid rgba(6,182,214,0.12)', borderRadius:8, padding:'6px 8px' }}>PRO v2 {sweatV2.measured ? 'измеренный' : 'оценка ACSM'}: {sweatV2.rateLPerH.toFixed(2)} л/ч · {sweatV2.rangeNote} · BHI-топ: {beverageV2.slice(0,3).map(b=>`${b.name} BHI${b.bhi}`).join(' · ')}</div>}
           </div>
         ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки.</div>}
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Акклиматизация 10-14д: объём +10-20%, Na −40% (Periard). 3 профиля — cool (20°C) / warm (25°C) / hot (30°C+влажн.).</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Акклиматизация 10-14д: объём +10-20%, Na −40% (Periard) — чекбокс выше. 3 профиля — cool/warm/hot. Оценка ACSM ±30% по интенсивности/среде/весу.</div>
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===3 ? 'block' : 'none' }}>
@@ -799,7 +895,12 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ padding:8, borderRadius:8, background: mets.hasMetS ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.08)', border:`1px solid ${mets.hasMetS ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, fontSize:9, color: mets.hasMetS ? '#f87171':'#22c55e', textAlign:'center' }}>{mets.note} · {mets.criteria.join(', ') || 'критериев 0'}</div>
           <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', textAlign:'center' }}>WHtR {whtr? whtr.toFixed(3):'—'} {whtr && whtr>=0.5?'⚠ &gt;0.5':''} · ABSI {absi? absi.toFixed(3):'—'} · BAI {bai ?? '—'} · TyG {tyg ?? '—'} {tyg && tyg>=8.8?'⚠':''} · FIB-4 {fib4 ?? '—'} {fib4 && fib4>1.3?'⚠':''} · QUICKI {quicki ?? '—'}</div>
         </div>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>WHtR ≥0.5 риск, ABSI &gt;0.083 риск, TyG ≥8.8 IR, FIB-4 &lt;1.30 низкий &gt;2.67 высокий, QUICKI &lt;0.33 IR. ATP III ≥3/5 = MetS.</div>
+        <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+          <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>TG/HDL<br/><b style={{color: tgHdl && tgHdl>=3.5?'#ef4444':'#22c55e'}}>{tgHdl ?? '—'}</b>{tgHdl && tgHdl>=3.5?' ⚠ IR':''}</div>
+          <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>LAP<br/><b style={{color:'#fff'}}>{lapV ?? '—'}</b></div>
+          <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>VAI / FMI<br/><b style={{color: vaiV && vaiV>2?'#f59e0b':'#fff'}}>{vaiV ?? '—'}</b> / {fmiV ?? '—'}</div>
+        </div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>WHtR ≥0.5 риск, ABSI &gt;0.083 риск, TyG ≥8.8 IR, TG/HDL ≥3.5 IR (McLaughlin), LAP Kahn, VAI Amato &gt;2 риск, FMI Kelly, FIB-4 &lt;1.30 низкий &gt;2.67 высокий, QUICKI &lt;0.33 IR. ATP III ≥3/5 = MetS.</div>
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===1 ? 'block' : 'none' }}>
@@ -868,14 +969,16 @@ export const MetabolicHub: React.FC = () => {
           </div>
           <PopupNumber label="Кофеин, мг/сут" value={caffeineMg} min={0} max={800} onChange={setCaffeineMg} />
           <PopupNumber label="Алкоголь, г/сут" value={alcoholG} min={0} max={120} onChange={setAlcoholG} />
+          <PopupNumber label="Дней/нед с алко" value={alcoholDays} min={0} max={7} onChange={setAlcoholDays} />
           <PopupNumber label="TSH (опц.)" value={tsh ?? 1.5} min={0.1} max={10} step={0.1} onChange={v=> setTsh(v)} />
-          <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center' }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'}</div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center' }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholChronic.unitsPerWeek} units/нед {alcoholChronic.risk !== 'low' ? `· ${alcoholChronic.note}` : ''}</div>
           <PopupNumber label="Ч/после кофе, ч" value={caffeineHoursSince} min={0} max={24} step={0.5} onChange={setCaffeineHoursSince} />
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center' }}>{caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
         </div>
       </div>
       <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#06b6d4', marginBottom:8 }}>🔋 RED-S — ③ Лабы</div>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#06b6d4', marginBottom:8 }}>🔋 RED-S CAT2 PRO — ③ Лабы</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', marginBottom:6 }}>Step1 — LEAF-Q (Ж) + LEAM-Q (М) + EDE-Q · Step2 — severity primary×2/secondary · Step3 — return-to-play (IOC CAT2 2023, скрининг — не диагноз)</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <div style={{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
             {['Травмы (частые)','Болезни (частые)','ЖКТ вздутие','ЖКТ газы','Менстр. нарушения','Усталость','Настроение','Сон'].map((q,i)=>(
@@ -886,14 +989,30 @@ export const MetabolicHub: React.FC = () => {
             <div style={{ gridColumn:'1 / -1', fontSize:8, color: leafCalc.risk==='high'?'#ef4444': leafCalc.risk==='moderate'?'#f59e0b':'#22c55e', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px', textAlign:'center' }}>LEAF {leafCalc.score}/16 — {leafCalc.note} (чекбоксы ×2 балла)</div>
           </div>
           <PopupNumber label="RMR измер., ккал" value={measuredRMR ?? 0} min={800} max={3500} onChange={v=> setMeasuredRMR(v||undefined)} />
+          <PopupNumber label="EDE-Q 0–6 (РПП)" value={edeScore ?? 0} min={0} max={6} step={0.5} onChange={v=> setEdeScore(v||undefined)} />
+          <div style={{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+            <div style={{ fontSize:8, fontWeight:800, color:'rgba(255,255,255,0.55)', gridColumn:'1 / -1' }}>LEAM-Q lite (М, Lundy 2022):</div>
+            {['Либидо ↓','Утр. эрекция нет','Усталость','Переломы','Вес ↓','Настроение ↓'].map((q,i)=>(
+              <label key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:8, background: leamAnswers[i] ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)', border:`1px solid ${leamAnswers[i] ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.06)'}`, fontSize:8, color:'#fff' }}>
+                <input type="checkbox" checked={leamAnswers[i]} onChange={e=> { const next=[...leamAnswers]; next[i]=e.target.checked; setLeamAnswers(next); }} /> {q}
+              </label>
+            ))}
+            <div style={{ gridColumn:'1 / -1', fontSize:8, color: leamCalc.risk==='high'?'#ef4444': leamCalc.risk==='moderate'?'#f59e0b':'#22c55e', textAlign:'center' }}>LEAM {leamCalc.score}/12 — {leamCalc.note}</div>
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={boneFlag} onChange={e=> setBoneFlag(e.target.checked)} /> Стресс-перелом</label>
             <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={menstrualFlag} onChange={e=> setMenstrualFlag(e.target.checked)} /> Аменорея</label>
+            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={lowT} onChange={e=> setLowT(e.target.checked)} /> Тесто низкое (М)</label>
+            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={lowBMD} onChange={e=> setLowBMD(e.target.checked)} /> BMD T&lt;−1</label>
           </div>
         </div>
         <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: `${redsScreening.color}14`, border:`1px solid ${redsScreening.color}33`, fontSize:9, color: redsScreening.color, lineHeight:1.4 }}>
-          <b>{redsScreening.risk==='high'?'🔴 Высокий': redsScreening.risk==='moderate'?'🟠 Умеренный':'🟢 Низкий'} RED-S — score {redsScreening.score} · {redsScreening.flags.join(', ')||'флагов нет'}</b> · {redsScreening.note}
+          <b>{redsScreening.risk==='high'?'🔴 Высокий': redsScreening.risk==='moderate'?'🟠 Умеренный':'🟢 Низкий'} RED-S lite — score {redsScreening.score} · {redsScreening.flags.join(', ')||'флагов нет'}</b> · {redsScreening.note}
           <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:4 }}>EA {ea?.ea ?? '—'} · RMR ratio {measuredRMR && kbju.nat.bmr ? (measuredRMR/kbju.nat.bmr).toFixed(2):'—'} (&lt;0.90 = LEA флаг) · LEAF ≥8 = риск. IOC CAT2 — к врачу.</span>
+        </div>
+        <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background: `${cat2.color}14`, border:`1px solid ${cat2.color}33`, fontSize:9, color: cat2.color, lineHeight:1.4 }}>
+          <b>CAT2 {cat2.light.toUpperCase()} PRO — primary {cat2.primary} / secondary {cat2.secondary} · {cat2.flags.join(', ') || 'флагов нет'}</b> · {cat2.note}
+          <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:4 }}>{cat2.returnToPlay} · LEAM {leamCalc.score}/12 {leamCalc.note} · EDE-Q {edeScore ?? '—'} (≥4 primary, 2–4 secondary)</span>
         </div>
         {refeedNeed.needed && <div style={{ marginTop:6, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24' }}>Refeed нужен: +{refeedNeed.carbBoostPct}% углей 1×/нед — лептин/T3 (Trexler). {refeedNeed.note}</div>}
         {dietBreakPlan && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>MATADOR: {dietBreakPlan.slice(0,8).map(p=> p.phase==='deficit'?'−':'○').join('')} {dietBreakPlan.length}нед · break каждые 6нед ×2нед maintenance</div>}

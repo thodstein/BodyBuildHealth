@@ -72,6 +72,29 @@ export function bmrLivingston(weightKg: number, age: number, sex: 'male' | 'fema
   const base = 293 * Math.pow(weightKg, 0.4330) - 5.92 * age;
   return sex === 'male' ? base + 615 : base + 447;
 }
+// ── BMR PRO-гарды (Calorique DLW 2026, IOM 2025, Henry 2005) ──
+/** Boer 1984 LBM-оценка без BF: M (0.407W+0.267H−19.2), F (0.252W+0.473H−48.3) */
+export function boerLeanBodyMass(weightKg: number, heightCm: number, sex: 'male' | 'female'): number {
+  const lbm = sex === 'male'
+    ? 0.407 * weightKg + 0.267 * heightCm - 19.2
+    : 0.252 * weightKg + 0.473 * heightCm - 48.3;
+  return clamp(Math.round(lbm * 10) / 10, 25, 120);
+}
+/** Adjusted weight при BMI≥35: IBW + 0.4×(actual−IBW), IBW via Devine */
+export function adjustedBodyWeight(weightKg: number, heightCm: number, sex: 'male' | 'female'): number {
+  const hIn = heightCm / 2.54;
+  const ibw = sex === 'male' ? 50 + 2.3 * Math.max(0, hIn - 60) : 45.5 + 2.3 * Math.max(0, hIn - 60);
+  if (weightKg <= ibw) return weightKg;
+  return Math.round((ibw + 0.4 * (weightKg - ibw)) * 10) / 10;
+}
+/** IOM 2025 беременность/лактация: Q2 +340, Q3 +452, лактация +500/+400 */
+export function pregnancyTDEEAdd(opts: { trimester?: 1 | 2 | 3; lactating?: 'exclusive' | 'mixed' | null }): number {
+  if (opts.lactating === 'exclusive') return 500;
+  if (opts.lactating === 'mixed') return 400;
+  if (opts.trimester === 2) return 340;
+  if (opts.trimester === 3) return 452;
+  return 0;
+}
 export type BMRMethod = 'katch_mcardle' | 'cunningham' | 'owen' | 'ten_haaf' | 'mifflin' | 'harris_revised' | 'henry' | 'livingston';
 export interface BMRResult {
   bmr: number;
@@ -79,7 +102,7 @@ export interface BMRResult {
   method: BMRMethod;
   allMethods?: Record<BMRMethod, number>;
 }
-export function computeBMR(input: { weight: number; height: number; age: number; sex: 'male' | 'female'; bodyFat?: number }): BMRResult {
+export function computeBMR(input: { weight: number; height: number; age: number; sex: 'male' | 'female'; bodyFat?: number; postBariatric?: boolean; ethnicity?: 'european' | 'african' | 'east_asian'; untreatedHypothyroid?: boolean }): BMRResult {
   const bf = input.bodyFat;
   const hasBF = typeof bf === 'number' && bf > 3 && bf < 70;
   let lean: number;
@@ -147,6 +170,10 @@ export function computeBMR(input: { weight: number; height: number; age: number;
     const yearsOver = (input.age ?? 30) - 50;
     bmr = Math.round(bmr * (1 - yearsOver * 0.0015));
   }
+  // PRO-гарды Calorique DLW 2026 / Knuth 2021 / Endocrine 2024: бариатрия −12%, гипотиреоз −12%, этнос −5%
+  if ((input as any).postBariatric) bmr = Math.round(bmr * 0.88);
+  if ((input as any).untreatedHypothyroid) bmr = Math.round(bmr * 0.88);
+  else if ((input as any).ethnicity === 'african' || (input as any).ethnicity === 'east_asian') bmr = Math.round(bmr * 0.95);
   return { bmr, lean: Math.round(lean * 10) / 10, method, allMethods };
 }
 
@@ -274,6 +301,38 @@ export function calcQUICKI(glucoseMgDl?:number, insulinMuMl?:number): number | n
   const gMgDl=glucoseMgDl, i=insulinMuMl;
   const v=1/(Math.log10(gMgDl)+Math.log10(i));
   return Math.round(v*1000)/1000;
+}
+// ── MetS PRO-добивка: TG/HDL, LAP, VAI, FMI ──
+/** TG/HDL ratio: ≥3.5 IR-флаг (McLaughlin 2003) */
+export function calcTG_HDL(tgMgDl?: number, hdlMgDl?: number): number | null {
+  if (typeof tgMgDl !== 'number' || typeof hdlMgDl !== 'number' || tgMgDl <= 0 || hdlMgDl <= 0) return null;
+  return Math.round((tgMgDl / hdlMgDl) * 100) / 100;
+}
+/** LAP lipid accumulation product: M (waist−65)×TGmmol, F (waist−58)×TGmmol (Kahn 2005) */
+export function calcLAP(waistCm: number, tgMgDl?: number, sex: 'male' | 'female' = 'male'): number | null {
+  if (!isFinite(waistCm) || typeof tgMgDl !== 'number' || tgMgDl <= 0) return null;
+  const tgMmol = tgMgDl / 88.57;
+  const base = sex === 'male' ? waistCm - 65 : waistCm - 58;
+  if (base <= 0) return 0;
+  return Math.round(base * tgMmol * 10) / 10;
+}
+/** VAI visceral adiposity index (Amato 2010): M/F формулы через waist/BMI/TG/HDL */
+export function calcVAI(params: { waistCm: number; bmi: number; tgMgDl?: number; hdlMgDl?: number; sex: 'male' | 'female' }): number | null {
+  const { waistCm, bmi, tgMgDl, hdlMgDl, sex } = params;
+  if (!isFinite(waistCm) || !isFinite(bmi) || typeof tgMgDl !== 'number' || typeof hdlMgDl !== 'number') return null;
+  if (tgMgDl <= 0 || hdlMgDl <= 0 || bmi <= 0) return null;
+  const tgMmol = tgMgDl / 88.57; const hdlMmol = hdlMgDl / 38.67;
+  const v = sex === 'male'
+    ? (waistCm / (39.68 + 1.88 * bmi)) * (tgMmol / 1.03) * (1.31 / hdlMmol)
+    : (waistCm / (36.58 + 1.89 * bmi)) * (tgMmol / 0.81) * (1.52 / hdlMmol);
+  if (!isFinite(v) || v <= 0 || v > 30) return null;
+  return Math.round(v * 100) / 100;
+}
+/** FMI fat mass index = fatMass/h² (Kelly 2009): <6 норма M, <9 F */
+export function calcFMI(fatMassKg: number, heightCm: number): number | null {
+  if (!isFinite(fatMassKg) || !isFinite(heightCm) || heightCm < 100) return null;
+  const hM = heightCm / 100;
+  return Math.round((fatMassKg / (hM * hM)) * 10) / 10;
 }
 
 // Полная модель для планировщика (учитывает шаги/быт/NЕАТ/интенсивность)
