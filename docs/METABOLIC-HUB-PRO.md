@@ -83,4 +83,4 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 - **One-answer PRO + diff**: `buildOneAnswerPro` (adaptive-v3/formula + DLW-range + targets + беременность) + `diffMetabolicSnapshots` (⇄ Сравнить сценариев) + snapshot v5 расширен (профессия/триместр/DIAAS/CAT2/пот).
 
 ## Тесты
-`metabolic-hub.test.ts:1` 106 тестов (84→106 +22 v4: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность, CAT2/LEAM, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2, one-answer/diff, парсер PRO), `nutrition-v2-audit` 4, `tSC` свои 0.
+`metabolic-hub.test.ts:1` 114 тестов (84→114 +30 v4/v4-2: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность/лактация, CAT2/LEAM/return-to-play, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2/aggressive-cap, one-answer/diff-truncate, парсер PRO), `nutrition-v2-audit` 4, `rest-hooks-native` 60, `tSC` свои 0.
