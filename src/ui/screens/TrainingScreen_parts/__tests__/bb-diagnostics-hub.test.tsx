@@ -63,6 +63,24 @@ describe('BBDiagnosticsHub', () => {
     render(<BBDiagnosticsHub />);
     expect(screen.getAllByText(/SFR/)[0]).toBeInTheDocument();
   });
+  it('deviation chip fills setup note and raises synergistTakeover', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'tricep_pushdown_rope', name: 'Разгибание на блоке', muscle: 'triceps', sets: 3, rir: 2 }] }] }] }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
+    // выбираем упражнение из портфеля плана
+    const chips = Array.from(document.querySelectorAll('[title*="SFR"]'));
+    const target = chips.find((el) => /блок/i.test(el.getAttribute('title') || ''));
+    expect(target).toBeTruthy();
+    fireEvent.click(target!);
+    // чипы отклонений из записи стимула
+    const dev = screen.getAllByText(/локти вперёд/)[0];
+    fireEvent.click(dev);
+    expect(dev.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByText('synergistTakeover')[0]).toBeInTheDocument();
+    // повторный клик снимает тап и флаг
+    fireEvent.click(screen.getAllByText(/локти вперёд/)[0]);
+    expect(screen.queryByText('synergistTakeover')).toBeNull();
+  });
   it('weak zone card shows e1RM trend chip from diary', () => {
     localStorage.setItem('he_workout_log_v1', JSON.stringify([
       { date: '2026-07-20', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },

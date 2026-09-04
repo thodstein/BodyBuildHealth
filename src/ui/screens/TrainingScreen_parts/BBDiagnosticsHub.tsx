@@ -998,6 +998,31 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 10, color: state.stimShortRom ? '#f59e0b' : DIM, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={state.stimShortRom} onChange={e => setState(s => ({ ...s, stimShortRom: e.target.checked }))} /> амплитуда укорочена</label>
                 <input value={state.stimSetupNote} onChange={e => setState(s => ({ ...s, stimSetupNote: e.target.value }))} placeholder="отклонение: напр. локти вперёд" style={{ flex: 1, minWidth: 140, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 10 }} />
               </div>
+              {selectedDiagnosis?.stimulus?.record && selectedDiagnosis.stimulus.record.cheating.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: DIM }}>Проверь себя:</span>
+                  {selectedDiagnosis.stimulus.record.cheating.map((ch, i) => {
+                    const active = state.stimSetupNote.toLowerCase().includes(ch.deviation.toLowerCase().split(' ')[0]);
+                    return (
+                      <button
+                        key={i}
+                        title={`Если так делаешь — забирает: ${ch.steals}`}
+                        onClick={() => setState((s) => {
+                          const parts = s.stimSetupNote.split(',').map((p) => p.trim()).filter(Boolean);
+                          const key = ch.deviation.toLowerCase().split(' ')[0];
+                          const has = parts.some((p) => p.toLowerCase().includes(key));
+                          const next = has ? parts.filter((p) => !p.toLowerCase().includes(key)) : [...parts, ch.deviation];
+                          return { ...s, stimSetupNote: next.join(', ') };
+                        })}
+                        aria-pressed={active}
+                        style={{ padding: '3px 8px', borderRadius: 20, border: '1px solid', borderColor: active ? '#f59e0b' : '#1f3a5f', background: active ? 'rgba(245,158,11,0.14)' : '#0a1629', color: active ? '#f59e0b' : DIM, fontSize: 10, cursor: 'pointer' }}
+                      >
+                        {active ? '✓ ' : ''}{ch.deviation}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {!selectedDiagnosis ? (
                 <div style={{ fontSize: 10, color: DIM }}>Выбери упражнение — появится диагноз 12 флагов + PROF-чек + оценка 0-100.</div>
               ) : (
