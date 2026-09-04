@@ -30,7 +30,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../../../engines/bb/bb-weak-cause.engine';
-import { volumeHistory28d } from '../../../engines/bb/bb-weak-detection.engine';
+import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../../../engines/bb/bb-symmetry.engine';
@@ -288,10 +288,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     let topIds: string[] = [];
     let weakHeads: string[] = [];
     let specPayload: unknown = null;
-    // 28д-история + замеры — внутри хендлера (мемы ниже по коду недоступны из-за TDZ)
+    // 28д-история + замеры + e1RM — внутри хендлера (мемы ниже по коду недоступны из-за TDZ)
     let histLazy: Record<string, number[]> = {};
     let measLazy: Record<string, number> = {};
+    let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
     try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
+    try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
     try {
       measLazy = {};
       for (const [k, v] of Object.entries(state.circ)) {
@@ -308,10 +310,17 @@ export const BBDiagnosticsHub: React.FC = () => {
         try { hist = (histLazy as any)[z] || (histLazy as any)[canonicalMuscle(z)] || []; } catch { /* noop */ }
         if (!hist.length && fact != null) hist = [fact];
         const mavN = lm?.mav ?? null;
+        let e1rmDelta: number | null = null;
+        let e1rmSessions = 0;
+        try {
+          const t = (trendLazy as any)[z] || (trendLazy as any)[canonicalMuscle(z)];
+          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
+        } catch { /* noop */ }
         weakCausesPayload[z] = diagnoseWeakCause({
           zone: z,
           factHistory: hist,
           mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
+          e1rmDeltaPct: e1rmDelta, e1rmSessions,
           acwrZone: acwrZ,
           sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
           vbtLossPct: vbt?.lossPct ?? null,
@@ -422,9 +431,50 @@ export const BBDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
-    const csv = buildBBDiagnosticsCsv(report, bbPlan as any);
+    // лениво, как handleExport (мемы ниже недоступны из-за TDZ)
+    let causes: Record<string, any> = {};
+    let spec: any = null;
+    const heads: string[] = [];
+    try {
+      let histLazy: Record<string, number[]> = {};
+      let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
+      try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
+      try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
+      const measLazy: Record<string, number> = {};
+      try {
+        for (const [k, v] of Object.entries(state.circ)) {
+          const n = parseFloat(v as string);
+          if (Number.isFinite(n) && n > 0) measLazy[k] = n;
+        }
+      } catch { /* noop */ }
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const lm = getVolumeLandmarks(level, z);
+        let hist: number[] = [];
+        try { hist = (histLazy as any)[z] || (histLazy as any)[canonicalMuscle(z)] || []; } catch { /* noop */ }
+        let e1rmDelta: number | null = null;
+        let e1rmSessions = 0;
+        try {
+          const t = (trendLazy as any)[z] || (trendLazy as any)[canonicalMuscle(z)];
+          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
+        } catch { /* noop */ }
+        const wh = weakHeadForZone(z);
+        if (wh && !heads.includes(wh)) heads.push(wh);
+        const h = measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
+        const w = state.wristCm ? parseFloat(state.wristCm) : null;
+        causes[z] = diagnoseWeakCause({
+          zone: z, factHistory: hist,
+          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
+          e1rmDeltaPct: e1rmDelta, e1rmSessions,
+          idealDeltaPct: idealDeltaForZone(z, measLazy as any, h, w),
+          weeksAtMavClean: weeksAtMav(hist, lm?.mav ?? null),
+        });
+      }
+      const f: Record<string, number> = {};
+      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+    } catch { /* noop */ }
+    const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec });
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт (с упражнениями)');
+    setToast('✓ CSV экспорт (причины + спец-блок + упражнения)');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -453,6 +503,9 @@ export const BBDiagnosticsHub: React.FC = () => {
   const hist28 = useMemo(() => {
     try { return volumeHistory28d(diarySessions as any); } catch { return {}; }
   }, [diarySessions]);
+  const e1rmTrend = useMemo(() => {
+    try { return e1rmTrend28d(diarySessions as any); } catch { return {}; }
+  }, [diarySessions]);
   const weakCauses = useMemo(() => {
     const out: Record<string, ReturnType<typeof diagnoseWeakCause>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
@@ -467,6 +520,13 @@ export const BBDiagnosticsHub: React.FC = () => {
           hist = (hist28 as any)[z] || (hist28 as any)[canonicalMuscle(z)] || [];
         } catch { /* noop */ }
         if (!hist.length && fact != null) hist = [fact];
+        // e1RM-тренд 28д по канонической мышце — питает причину activation
+        let e1rmDelta: number | null = null;
+        let e1rmSessions = 0;
+        try {
+          const t = (e1rmTrend as any)[z] || (e1rmTrend as any)[canonicalMuscle(z)];
+          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
+        } catch { /* noop */ }
         const single = aud ? (aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6) : false;
         const missStrict = aud ? aud.strictCoverage.missing.length > 0 : false;
         const techClean = !single && !missStrict;
@@ -475,7 +535,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           zone: z,
           factHistory: hist,
           mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
-          e1rmDeltaPct: null, e1rmSessions: 0,
+          e1rmDeltaPct: e1rmDelta, e1rmSessions,
           acwrZone: acwrZ,
           sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
           vbtLossPct: vbt?.lossPct ?? null,
@@ -496,7 +556,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
     }
     return out;
-  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit, hist28, measNum, state.circ.heightCm, state.wristCm]);
+  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
   const specBlock = useMemo(() => {
     try {
       if (!report.weakZonesGranular.length) return null;

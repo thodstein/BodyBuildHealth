@@ -74,7 +74,11 @@ ${exerciseSection}
 </body></html>`;
 }
 
-export function buildBBDiagnosticsCsv(report: BBDiagnosticsReport, plan?: any): string {
+export function buildBBDiagnosticsCsv(
+  report: BBDiagnosticsReport,
+  plan?: any,
+  meta?: { weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; weakHeads?: string[]; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; note: string }> } | null },
+): string {
   const escCsv = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines: string[] = [];
   lines.push(['muscle', 'granular', 'source', 'deltaPct', 'reason'].map(escCsv).join(','));
@@ -86,6 +90,23 @@ export function buildBBDiagnosticsCsv(report: BBDiagnosticsReport, plan?: any): 
   lines.push(['verification', report.score.verification].map(escCsv).join(','));
   lines.push(['weakCanonical', report.weakMusclesCanonical.join('|')].map(escCsv).join(','));
   lines.push(['weakGranular', report.weakZonesGranular.join('|')].map(escCsv).join(','));
+  if (meta?.weakHeads?.length) lines.push(['weakHeads', meta.weakHeads.join('|')].map(escCsv).join(','));
+  if (meta?.weakCauses) {
+    lines.push('');
+    lines.push(['zone', 'cause', 'confidence', 'evidence', 'fix'].map(escCsv).join(','));
+    for (const [z, c] of Object.entries(meta.weakCauses)) {
+      lines.push([z, c.cause, Math.round(c.confidence * 100) + '%', c.evidence.join(' · '), c.fix].map(escCsv).join(','));
+    }
+  }
+  if (meta?.specBlock) {
+    const sb = meta.specBlock;
+    lines.push('');
+    lines.push(['spec_weeks', sb.lengthWeeks, 'donors', (sb.donors || []).join('|')].map(escCsv).join(','));
+    lines.push(['week', 'targets', 'note'].map(escCsv).join(','));
+    for (const w of sb.weeks || []) {
+      lines.push([w.week, Object.entries(w.targetSets).map(([k, v]) => `${k} ${v}`).join('; '), w.note].map(escCsv).join(','));
+    }
+  }
   for (const [k, v] of Object.entries(report.symmetry.ratios)) lines.push([k, v].map(escCsv).join(','));
   // упражнения → эффект (максимально)
   try {

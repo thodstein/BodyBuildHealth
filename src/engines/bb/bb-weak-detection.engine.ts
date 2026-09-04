@@ -89,21 +89,27 @@ export function detectBBWeakByVolume(
   return dedup.sort((a, b) => a.deltaPct - b.deltaPct);
 }
 
-/** 2) e1RM-тренд: окна 28д (old 4нед назад vs recent 7д) — как в weak-muscle-detection */
-export function detectBBWeakByE1rm(
-  sessions: Array<{ date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<{ weightKg: number; reps: number; rir?: number }> }> }>,
-): BBWeakCandidate[] {
-  if (!Array.isArray(sessions) || sessions.length < 4) return [];
+/** e1RM-тренд 28д per-muscle: old (28-35д назад, max) vs recent (7д, max) + число recent-замеров. */
+export interface E1rmTrend {
+  deltaPct: number;
+  sessions: number;
+  oldMax: number;
+  recMax: number;
+}
+
+type SessionLike = { date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<{ weightKg: number; reps: number; rir?: number }> }> };
+
+function bucketE1rm28d(sessions: SessionLike[]): { recent: Record<string, number[]>; old: Record<string, number[]>; countRecent: Record<string, number> } {
+  const recent: Record<string, number[]> = {};
+  const old: Record<string, number[]> = {};
+  const countRecent: Record<string, number> = {};
+  if (!Array.isArray(sessions) || sessions.length === 0) return { recent, old, countRecent };
   const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const now = sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : Date.now();
   const DAY = 24 * 60 * 60 * 1000;
   const recentFrom = now - 7 * DAY;
   const oldFrom = now - 35 * DAY;
   const oldTo = now - 28 * DAY;
-
-  const byMuscleRecent: Record<string, number[]> = {};
-  const byMuscleOld: Record<string, number[]> = {};
-  const countRecent: Record<string, number> = {};
 
   for (const s of sorted) {
     const t = s.date ? new Date(s.date).getTime() : 0;
@@ -125,15 +131,45 @@ export function detectBBWeakByE1rm(
       }
       if (best <= 0) continue;
       if (bucket === 'recent') {
-        if (!byMuscleRecent[muscle]) byMuscleRecent[muscle] = [];
-        byMuscleRecent[muscle].push(best);
+        if (!recent[muscle]) recent[muscle] = [];
+        recent[muscle].push(best);
         countRecent[muscle] = (countRecent[muscle] || 0) + 1;
       } else {
-        if (!byMuscleOld[muscle]) byMuscleOld[muscle] = [];
-        byMuscleOld[muscle].push(best);
+        if (!old[muscle]) old[muscle] = [];
+        old[muscle].push(best);
       }
     }
   }
+  return { recent, old, countRecent };
+}
+
+/** Полная карта трендов (все мышцы с old+recent данными) — питает причину activation. */
+export function e1rmTrend28d(sessions: SessionLike[]): Record<string, E1rmTrend> {
+  const { recent, old, countRecent } = bucketE1rm28d(sessions);
+  const out: Record<string, E1rmTrend> = {};
+  for (const m of Object.keys(recent)) {
+    const oldArr = old[m];
+    const recArr = recent[m];
+    if (!oldArr || oldArr.length === 0 || !recArr || recArr.length === 0) continue;
+    const oldMax = Math.max(...oldArr);
+    const recMax = Math.max(...recArr);
+    if (oldMax <= 0) continue;
+    out[m] = {
+      deltaPct: Math.round(((recMax - oldMax) / oldMax) * 1000) / 10,
+      sessions: countRecent[m] || 0,
+      oldMax: Math.round(oldMax * 10) / 10,
+      recMax: Math.round(recMax * 10) / 10,
+    };
+  }
+  return out;
+}
+
+/** 2) e1RM-тренд: окна 28д (old 4нед назад vs recent 7д) — как в weak-muscle-detection */
+export function detectBBWeakByE1rm(
+  sessions: Array<{ date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<{ weightKg: number; reps: number; rir?: number }> }> }>,
+): BBWeakCandidate[] {
+  if (!Array.isArray(sessions) || sessions.length < 4) return [];
+  const { recent: byMuscleRecent, old: byMuscleOld, countRecent } = bucketE1rm28d(sessions as SessionLike[]);
 
   const out: BBWeakCandidate[] = [];
   for (const m of Object.keys(byMuscleRecent)) {

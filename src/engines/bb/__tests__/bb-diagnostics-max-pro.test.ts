@@ -344,6 +344,84 @@ describe('ideal-delta + weeks-at-mav', () => {
   });
 });
 
+// ── e1rmTrend28d + activation через живые входы ──
+describe('e1rm-trend + activation', () => {
+  const mkSession = (date: string, muscle: string, weightKg: number, reps: number) => ({
+    date,
+    exercises: [{ muscleGroup: muscle, sets: [{ weightKg, reps }] }],
+  });
+  // old-окно 28-35д назад от последней даты (строго внутри), recent — последние 7д
+  const sessions = [
+    mkSession('2026-07-20', 'chest', 100, 8), // old: e1RM ~126.7
+    mkSession('2026-07-21', 'chest', 100, 8),
+    mkSession('2026-08-20', 'chest', 100, 8), // recent: тот же вес → плато ~0%
+    mkSession('2026-08-21', 'chest', 100, 8),
+    mkSession('2026-08-22', 'back', 80, 10),
+  ];
+  it('тренд считает дельту и сессии', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    const t = mod.e1rmTrend28d(sessions as any);
+    expect(t.chest).toBeDefined();
+    expect(t.chest.deltaPct).toBeCloseTo(0, 0);
+    expect(t.chest.sessions).toBe(2);
+    expect(t.back).toBeUndefined(); // нет old-окна
+  });
+  it('падение −6% ловится', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    const t = mod.e1rmTrend28d([
+      mkSession('2026-07-20', 'chest', 100, 8),
+      mkSession('2026-08-21', 'chest', 90, 8),
+    ] as any);
+    expect(t.chest.deltaPct).toBeLessThan(-5);
+  });
+  it('пусто → пустая карта', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    expect(mod.e1rmTrend28d([])).toEqual({});
+  });
+  it('activation через тренд+объём (без lengthened)', () => {
+    const r = diagnoseWeakCause({
+      zone: 'chest', factHistory: [16, 16, 16, 16], mev: 8, mav: 16,
+      e1rmDeltaPct: 0, e1rmSessions: 2, hasLengthened: false,
+    });
+    expect(r.cause).toBe('activation');
+  });
+  it('рефакторинг не сломал detectBBWeakByE1rm (падение+плато)', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    const out = mod.detectBBWeakByE1rm(sessions as any);
+    expect(out.some((c) => c.muscle === 'chest')).toBe(true);
+  });
+});
+
+// ── CSV meta-паритет ──
+describe('csv meta', () => {
+  const rep = () => ({
+    weakCandidates: [],
+    weakMusclesCanonical: ['chest'],
+    weakZonesGranular: ['chest_upper'],
+    symmetry: { ratios: {}, issues: [], score: 80 },
+    stimulus: { global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} }, issues: [] },
+    score: { score: 80, level: 'warn', floors: [], verification: 0.5, penalties: {}, raw: 5 },
+    findings: [], priorities: [],
+  });
+  it('CSV содержит причины/головки/спец-блок', async () => {
+    const mod = await import('../bb-diagnostics-export.engine');
+    const csv = mod.buildBBDiagnosticsCsv(rep() as any, null, {
+      weakCauses: { chest_upper: { cause: 'volume', confidence: 0.8, evidence: ['a'], fix: 'b' } },
+      weakHeads: ['chest_upper'],
+      specBlock: { lengthWeeks: 8, donors: ['back'], rationale: [], weeks: [{ week: 1, targetSets: { chest_upper: 16 }, note: 'n' }] },
+    } as any);
+    expect(csv).toContain('chest_upper');
+    expect(csv).toContain('volume');
+    expect(csv).toContain('spec_weeks');
+  });
+  it('CSV без meta — как раньше', async () => {
+    const mod = await import('../bb-diagnostics-export.engine');
+    const csv = mod.buildBBDiagnosticsCsv(rep() as any);
+    expect(csv).toContain('weakCanonical');
+    expect(csv).not.toContain('spec_weeks');
+  });
+});
+
 // ── prescribeCorrections weakHead ──
 describe('corrections weakHead', () => {
   it('замены целятся в слабую головку', async () => {
