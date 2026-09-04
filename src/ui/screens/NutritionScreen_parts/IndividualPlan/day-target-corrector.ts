@@ -12,7 +12,10 @@
 
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, isProteinPowderId } from './food-availability';
+// Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
+// Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
+const POWDER_PORTION_CAP_G = 60;
 // Маркер инсулин-окна (тип 'snack', закрыт для коррекций как peri). NB: проверять ТОЛЬКО
 // маркер, а не isPeriLikeMeal(): старые гейты по типам разные в каждой ветке
 // (swap скипает prew, cut — нет) и их расширение ломает peri-поведение.
@@ -105,6 +108,13 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCa
   let pool = ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !(excludedIds && excludedIds.has(f.id)) && foodAvailableForPlan(f));
   if (macro === 'c' && pool.length >= 2) {
     if (convenientCarbs) {
+      // HV: плотные comfort (пряники/джем) добирают угли без объёма тарелки.
+      for (const hid of ['pryaniki', 'jam']) {
+        if (!pool.some(p => p.id === hid) && !(excludedIds && excludedIds.has(hid))) {
+          const hf = FOOD_DB.find(f => f.id === hid);
+          if (hf && foodAvailableForPlan(hf)) pool.push(hf);
+        }
+      }
       const lowFiber = pool.filter(f => (f.fiber || 0) <= 3);
       if (lowFiber.length >= 2) pool = lowFiber;
     } else {
@@ -260,7 +270,10 @@ export function correctDayToTargets(
           });
           if (victimBad >= 0 && victimMi >= 0 && bestU) {
             const freedKcal = victimIt.kcal || 0;
-            const swapG = Math.max(20, Math.round(freedKcal / Math.max(1, bestU.kcal || 1) * 100 / 10) * 10);
+            let swapG = Math.max(20, Math.round(freedKcal / Math.max(1, bestU.kcal || 1) * 100 / 10) * 10);
+            // Порошок свопом — не больше скупа (иначе «курица 300 г → изолят 186 г»).
+            // Универсально: плотный порошок превращает любое освобождённое ккал в ведро.
+            if (isProteinPowderId(bestU.id)) swapG = Math.min(swapG, POWDER_PORTION_CAP_G);
             if (swapG >= 20) {
               const beforeTotals = sumTotals(meals);
               const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
@@ -414,7 +427,7 @@ export function correctDayToTargets(
         // источник (Финик Меджул → 150 г ×2 за день — жалоба «финики по 200 грам»).
         const COMFORT_TOTAL_CAP: Record<string, number> = {
           honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60, fruit_date_medjool: 60,
-          pryaniki: 50, jam: 35, zefir: 50, pastila: 45, sushki: 40, sugar_cookies: 40, marmalade: 35,
+          pryaniki: 80, jam: 55, zefir: 50, pastila: 50, sushki: 40, sugar_cookies: 40, marmalade: 35,
           bread_white: 110, bread_rye: 110, bread_borodinsky: 110, bread_fitness: 110, whole_grain_bread: 110,
         };
         if (COMFORT_TOTAL_CAP[cand.it.id] !== undefined) {
@@ -442,10 +455,13 @@ export function correctDayToTargets(
           if (addG < 10) continue;
         }
         const newAmount = cand.it.amount + addG;
-        // капы: белок ≤300, фрукт ≤150, клетчатка ≤10, общие ≤600
+        // Порошок растим только до скупа (60 г) — дальше новый приём/носитель.
+        if (isProteinPowderId(cand.it.id) && newAmount > POWDER_PORTION_CAP_G) continue;
+        // капы: белок ≤300, фрукт ≤150, клетчатка ≤10, общие ≤600, порошок ≤60
         let cap = 600;
         const isFiberSuppCap = candFood && candFood.category === 'supplement' && (candFood.fiber || 0) >= 30;
         if (isFiberSuppCap) cap = 10;
+        else if (isProteinPowderId(cand.it.id)) cap = POWDER_PORTION_CAP_G;
         else if (eff === 'p' && (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein')) cap = 300;
         else if (cand.it.role === 'fruit') cap = 150;
         if (newAmount > cap) continue;
@@ -468,7 +484,10 @@ export function correctDayToTargets(
       if (pool.length === 0) break;
       // выбираем самый плотный по нужному макро; для углеводов в convenient-режиме —
       // сначала удобство (низкая клетчатка): иначе «макрос/ккал» вечно выигрывает батат (20У при 86 ккал).
-      const best = [...pool].sort((a, b) => {
+      // Порошок, забитый до скупа ВО ВСЕХ годных приёмах, пропускаем к следующему
+      // носителю (иначе «изолят 60 + 126 = 186» в ветке роста ниже и дедлок топ-апа).
+      const _eligibleTypes = (m: CorrectorMeal) => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow;
+      const _sortedPool = [...pool].sort((a, b) => {
         if (conv && eff === 'c') {
           const ca = (a.carbs || 0) / (1 + (a.fiber || 0) * 2);
           const cb = (b.carbs || 0) / (1 + (b.fiber || 0) * 2);
@@ -477,13 +496,29 @@ export function correctDayToTargets(
         const av = eff === 'p' ? (a.protein || 0) / Math.max(1, a.kcal || 1) : eff === 'c' ? (a.carbs || 0) / Math.max(1, a.kcal || 1) : (a.fat || 0) / Math.max(1, a.kcal || 1);
         const bv = eff === 'p' ? (b.protein || 0) / Math.max(1, b.kcal || 1) : eff === 'c' ? (b.carbs || 0) / Math.max(1, b.kcal || 1) : (b.fat || 0) / Math.max(1, b.kcal || 1);
         return bv - av;
-      })[0];
+      });
+      let best: FoodItem | undefined;
+      for (const cand of _sortedPool) {
+        if (isProteinPowderId(cand.id)) {
+          const _roomAny = meals.some(m => {
+            if (!_eligibleTypes(m)) return false;
+            const ex = m.items.find(it => it.id === cand.id);
+            if (ex && (ex as any)._fixedGrams) return false;
+            return (ex ? ex.amount : 0) < POWDER_PORTION_CAP_G;
+          });
+          if (!_roomAny) continue;
+        }
+        best = cand;
+        break;
+      }
+      if (!best) break;
       const per100Best = eff === 'p' ? (best.protein || 0) : eff === 'c' ? (best.carbs || 0) : (best.fat || 0);
       if (per100Best <= 0) break;
       // «Комфортные» доборки (хлеб/мёд/сухофрукты) — дегустационные капы и ЗАПРЕТ дубля
       // в одном приёме (иначе «Финики 180г + Финики 70г» в обеде).
       const COMFORT_CAP: Record<string, number> = {
         honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60,
+        pryaniki: 80, jam: 55, zefir: 50, pastila: 50, sushki: 40, sugar_cookies: 40, marmalade: 35,
         bread_white: 100, bread_rye: 100, bread_borodinsky: 100, bread_fitness: 100, whole_grain_bread: 100,
       };
       let grams = Math.max(20, Math.min(200, Math.round(need / per100Best * 100 / 10) * 10));
@@ -503,6 +538,8 @@ export function correctDayToTargets(
       // псиллиум и т.д. ≤10г — только добивка
       const isFiberSuppBest = best.category === 'supplement' && (best.fiber || 0) >= 30;
       if (isFiberSuppBest) grams = Math.min(grams, 10);
+      // Порошок — не больше скупа новым пунктом (иначе «изолят 150 г» за раз).
+      if (isProteinPowderId(best.id)) grams = Math.min(grams, POWDER_PORTION_CAP_G);
       // не выходить за 1.03× цели по этому макро
       const curMacro = eff === 'p' ? sumTotals(meals).p : eff === 'c' ? sumTotals(meals).c : sumTotals(meals).f;
       const maxMacro = (eff === 'p' ? safeTargets.p : eff === 'c' ? safeTargets.c : safeTargets.f) * 1.03;
@@ -526,11 +563,18 @@ export function correctDayToTargets(
         });
       }
       if (!targetMeal) {
-        // все приёмы уже содержат best.id — растим самый недогруженный из них
+        // все приёмы уже содержат best.id — растим самый недогруженный из них.
+        // Кап итога обязателен: иначе «изолят 60 + 126 = 186» (500Б-проба).
         const withBest = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow && m.items.some(it => it.id === best.id));
         targetMeal = withBest.length > 0 ? withBest.reduce((a, b) => ((a.totals?.kcal || 0) <= (b.totals?.kcal || 0) ? a : b)) : meals[meals.length - 1];
         const ex = targetMeal.items.find(it => it.id === best.id);
         if (ex && !(ex as any)._fixedGrams) {
+          const _growCap = COMFORT_CAP[best.id] !== undefined ? COMFORT_CAP[best.id]
+            : isProteinPowderId(best.id) ? POWDER_PORTION_CAP_G
+            : (ex.role === 'protein' || ex.role === 'fast_protein' || ex.role === 'slow_protein') ? 300 : 600;
+          const _growRoom = Math.max(0, _growCap - ex.amount);
+          if (_growRoom < 10) break;
+          grams = Math.min(grams, _growRoom);
           const beforeTotals = sumTotals(meals);
           const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
           const prevAmount = ex.amount;
@@ -563,8 +607,10 @@ export function correctDayToTargets(
       const _dup = targetMeal.items.find(it => it.id === newItem.id && !(it as any)._fixedGrams);
       if (_dup) {
         const _prev = _dup.amount;
-        // Кап слияния: комфортные — дегустационный кап, остальные — 600 г.
-        const _mergeCap = COMFORT_CAP[newItem.id] !== undefined ? COMFORT_CAP[newItem.id] : 600;
+        // Кап слияния: комфортные — дегустационный кап, порошок — скуп (60 г),
+        // остальные — 600 г.
+        const _mergeCap = COMFORT_CAP[newItem.id] !== undefined ? COMFORT_CAP[newItem.id]
+          : isProteinPowderId(newItem.id) ? POWDER_PORTION_CAP_G : 600;
         if (_dup.amount + newItem.amount > _mergeCap) break;
         scaleItem(_dup, _dup.amount + newItem.amount);
         recalcMealTotals(meals);

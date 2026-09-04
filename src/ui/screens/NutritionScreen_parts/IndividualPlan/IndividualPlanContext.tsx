@@ -32,7 +32,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
-import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility, shrinkFirstForSecond } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -216,7 +216,7 @@ intolerances: Intolerances; setIntolerances: (v: any) => void;
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
-  addSecondRecipeToMeal: (recipe: Recipe, mealIdx: number, dayIdx: number) => void;
+  addSecondRecipeToMeal: (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean }) => void;
   addFoodToMeal: (dayIdx: number, mealIdx: number, food: any) => void;
 addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean; overrides?: { mealsCount?: number } }) => void;
@@ -2233,7 +2233,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    * G3: количественный гейт (нет принудительных +150 при закрытом приёме), вычитание
    * старого второго при замене, запрет в peri/presleep, закупки из пропатченных дней.
    */
-  const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number) => {
+  const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean }) => {
     const resolveMeals = (): { meals: any[]; plan: 'day' | 'three' | 'week'; day: number } | null => {
       if (dayIdx === 0) return { meals: dayPlan?.meals || [], plan: 'day', day: 0 };
       const r = _resolvePlanDay(dayIdx);
@@ -2277,12 +2277,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
     // G3: количественный гейт — второй как ДОЛЯ приёма, а не «плюс 150».
     // Первый уже закрыл приём → честное предупреждение + мини-порция (право пользователя).
+    // Опция B (план 8.2): shrinkFirst — ужать первый рецепт ×0.65, освободив место
+    // под полноценный второй (вместо мини-порции поверх закрытого приёма).
     const _mt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
     const _targetKcal = Math.round((_mt.p || 0) * 4 + (_mt.f || 0) * 9 + (_mt.c || 0) * 4) || m?.totals?.kcal || 300;
     const _firstKcal = sumMealTotals(_baseItems as any).kcal || 0;
     const _rawRoom = _targetKcal - _firstKcal;
     let _roomKcal = _rawRoom;
-    if (_rawRoom <= 0) {
+    let _shrinkNote: string | null = null;
+    if (opts?.shrinkFirst && !_isReplace && _rawRoom < 0.5 * _targetKcal) {
+      const _ids1: string[] | undefined = (m as any).recipeAppliedData?.ingredientIds;
+      const _core = _ids1 && _ids1.length > 0 ? new Set(_ids1) : null;
+      const _shrunk = shrinkFirstForSecond(_baseItems as any, _core, 0.65);
+      if (_shrunk.freedKcal >= 50) {
+        _baseItems = _shrunk.items as any[];
+        const _prevScale = Number((m as any).recipeAppliedData?.portionScale ?? (m as any).recipeAppliedData?.appliedScale ?? 1) || 1;
+        const _newScale = Math.max(0.5, Math.round(_prevScale * 0.65 * 2) / 2);
+        try {
+          (m as any).recipeAppliedData = { ...(m as any).recipeAppliedData, portionScale: _newScale, appliedScale: _newScale };
+        } catch {}
+        _roomKcal = _targetKcal - sumMealTotals(_baseItems as any).kcal;
+        _shrinkNote = `⚖️ Первый рецепт ужа́т до ×${_newScale} — место под второй освобождено`;
+        if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚖️ Первый ужа́т до ×${_newScale} — второй влезет полноценно`, 'info' as any);
+      }
+    }
+    if (_rawRoom <= 0 && !_shrinkNote) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём уже закрыт первым рецептом — «${recipe.name}» влезет только мини-порцией, день может перебрать`, 'warning');
       _roomKcal = 150;
     } else if (_rawRoom < 0.25 * _targetKcal) {
@@ -2296,7 +2315,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const flat2 = flattenRecipeOption(recipe);
     if (scaled2) flat2.appliedScale = scaled2.scale;
     const patched = resolved.meals.map((x: any, i: number) => i === mealIdx
-      ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2 }
+      ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2, rationale: _shrinkNote ? [...(x.rationale || []), _shrinkNote] : x.rationale }
       : x);
     const pre = sumDayTotals(patched as any);
     const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -2330,7 +2349,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // G3: закупки из ПРОПАТЧЕННЫХ дней (раньше three/week брались из старых days — список врал).
     setShoppingList(buildShoppingFromPlans(_visiblePlans));
     refreshRecipeCookingCardIfActive(resolved.plan === 'day' ? _resDay : dayPlan, resolved.plan === 'three' ? { days: _visiblePlans } : threeDayPlan, resolved.plan === 'week' ? { days: _visiblePlans } : weekPlan);
-    if (typeof (window as any).showToast === 'function') (window as any).showToast(_isReplace ? `🍳 Второй рецепт заменён на «${recipe.name}»` : `🍳 Второй рецепт «${recipe.name}» добавлен в приём`, 'success');
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(_isReplace ? `🍳 Второй рецепт заменён на «${recipe.name}»` : `🍳 Второй рецепт «${recipe.name}» добавлен в приём${_shrinkNote ? ' (первый ужа́т)' : ''}`, 'success');
     setRecipePickerMeal(null);
   };
 

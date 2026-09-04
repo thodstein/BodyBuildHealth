@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { getRecipes } from '../../../../../engines/nutrition-periodization.engine';
 import type { Recipe } from '../../../../../engines/nutrition-periodization.engine';
-import { scaleRecipeToTarget, recipeCompatibility, sumMealTotals } from '../planner-recipe-mode';
+import { scaleRecipeToTarget, recipeCompatibility, sumMealTotals, shrinkFirstForSecond } from '../planner-recipe-mode';
 
 const mkRecipe = (over: Partial<Recipe> & { ingredientIds?: string[]; portions?: Record<string, number> } = {}): Recipe => ({
   name: 'Тест-рецепт', meal: 'lunch', prepTimeMin: 15,
@@ -64,5 +64,39 @@ describe('recipeCompatibility (два рецепта в одном приёме)
     const b = mkRecipe({ name: 'Б', ingredientIds: ['chicken_breast', 'rice_white', 'carrot'] });
     const c = recipeCompatibility(a as any, b as any);
     expect(c.compatible).toBe(false);
+  });
+});
+
+describe('shrinkFirstForSecond (опция B: ужать первый под второй)', () => {
+  const items = [
+    { name: 'Курица', id: 'chicken_breast', amount: 200, kcal: 220, p: 62, f: 2, c: 0 },
+    { name: 'Рис', id: 'rice_white', amount: 200, kcal: 260, p: 5, f: 1, c: 56 },
+    { name: 'Сок', id: 'orange_juice', amount: 200, kcal: 90, p: 1, f: 0, c: 21 },
+  ];
+
+  it('ядро ужато ×0.65, сайды целы, комната освобождена', () => {
+    const before = sumMealTotals(items as any).kcal;
+    const res = shrinkFirstForSecond(items as any, new Set(['chicken_breast', 'rice_white']), 0.65);
+    expect(res.freedKcal).toBeGreaterThan(0);
+    expect(res.items.find(i => i.id === 'chicken_breast')!.amount).toBe(130);
+    expect(res.items.find(i => i.id === 'rice_white')!.amount).toBe(130);
+    // сайд (сок) не тронут
+    expect(res.items.find(i => i.id === 'orange_juice')!.amount).toBe(200);
+    expect(sumMealTotals(res.items).kcal).toBe(before - res.freedKcal);
+  });
+
+  it('без ids — жмётся весь приём; ratio клампится [0.3, 0.9]', () => {
+    const all = shrinkFirstForSecond(items as any, null, 0.65);
+    expect(all.items.every(i => (i.amount || 0) <= 200)).toBe(true);
+    const low = shrinkFirstForSecond(items as any, null, 0.05);
+    expect(low.items.find(i => i.id === 'chicken_breast')!.amount).toBe(60); // 200×0.3
+    const hi = shrinkFirstForSecond(items as any, null, 5);
+    expect(hi.items.find(i => i.id === 'chicken_breast')!.amount).toBe(180); // 200×0.9
+  });
+
+  it('порции не уходят в ноль (min 5 г)', () => {
+    const tiny = [{ name: 'Масло', id: 'olive_oil', amount: 8, kcal: 70, p: 0, f: 8, c: 0 }];
+    const res = shrinkFirstForSecond(tiny as any, null, 0.65);
+    expect(res.items[0].amount).toBeGreaterThanOrEqual(5);
   });
 });

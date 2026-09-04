@@ -372,6 +372,7 @@ export const MealComposer: React.FC = () => {
                               <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{isFavoriteRecipe(r.name) ? '⭐ ' : ''}{r.name}</div>
                               <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
                             </button>
+                            {_hasFirst && !_hasSecond ? <button type="button" title="Ужать первый рецепт ×0.65 и добавить этот полноценно (опция B)" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx, { shrinkFirst: true }); setRecipePickerMeal(null); }} style={{ width:34, borderRadius:12, cursor:'pointer', background:'rgba(139,92,246,0.12)', border:'1px dashed rgba(139,92,246,0.45)', color:'#c4b5fd', fontSize:13 }}>⚖️</button> : null}
                           </div>
                         ))}
                       </div>

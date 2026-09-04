@@ -164,6 +164,28 @@ export function pickRecipeOptions(
   return pickRecipesForMeal(pool, opts, count);
 }
 
+/**
+ * Опция B гейта второго рецепта (план 8.2): «ужать первый, чтобы влез второй».
+ * Масштабирует пункты ядра первого рецепта коэффициентом ratio (ядро = ingredientIds
+ * первого; без ids — весь приём целиком, сайды/добивки не трогаем когда ids есть).
+ * Возвращает ужатые items + освобождённые ккал. Чистая функция (тестируется).
+ */
+export function shrinkFirstForSecond(
+  items: PlanItemLike[],
+  coreIds: Set<string> | null,
+  ratio: number = 0.65,
+): { items: PlanItemLike[]; freedKcal: number } {
+  const r = Math.max(0.3, Math.min(0.9, ratio));
+  const before = sumMealTotals(items).kcal;
+  const next = items.map(it => {
+    const isCore = !coreIds || coreIds.has(it.id);
+    if (!isCore) return it;
+    return scaleItem(it, Math.max(5, Math.round((it.amount || 0) * r)));
+  });
+  const after = sumMealTotals(next).kcal;
+  return { items: next, freedKcal: Math.max(0, before - after) };
+}
+
 // ─── Сборка приёма из рецепта (авторские порции) ───────────────────────
 
 /**
@@ -485,9 +507,14 @@ export function rebalanceDayAfterRecipes(
       // Выбор роли доминирующего дефицита.
       // Legacy (не-HV): пул топ-апов бит-идентичен прежнему — рисовый крем
       // (новый id) исключён, иначе tie-break сортировки поползёт в 50 сценариях.
+      // HV: плюс плотные comfort-носители (пряники 74У/джем 69У — тарелка остаётся
+      // съедобной на 1500У: 80 г пряников = 60 г углей без 300 г каши сверху).
       let rolePool: FoodItem[];
       if (chosenRole === 'p') { rolePool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds); }
-      else if (chosenRole === 'c') { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds).filter(f => _hv || f.id !== 'cream_of_rice'); }
+      else if (chosenRole === 'c') {
+        const _hvExtra = _hv ? ['pryaniki', 'jam'] : [];
+        rolePool = topupFoods([..._sub(TOPUP_CARB_IDS), ..._hvExtra], opts?.excludedIds).filter(f => _hv || f.id !== 'cream_of_rice');
+      }
       else { rolePool = topupFoods(_sub(TOPUP_FAT_IDS), opts?.excludedIds); }
       if (rolePool.length === 0) break;
       const macroOf = (f: FoodItem) => chosenRole === 'p' ? (f.protein || 0) : chosenRole === 'c' ? (f.carbs || 0) : (f.fat || 0);
@@ -530,6 +557,11 @@ export function rebalanceDayAfterRecipes(
       }
       // Граммовка ровно под дефицит и комнату приёма (большой недобор идёт
       // по всем основным приёмам через итерации, а не в один).
+      // HV: плотные comfort — дегустационный кап (иначе «пряники 400 г»).
+      if (_hv) {
+        const _hvComfort: Record<string, number> = { pryaniki: 80, jam: 55, honey: 60, dates: 60, raisins: 60, marmalade: 35, zefir: 50, pastila: 50 };
+        if (_hvComfort[chosen.id] !== undefined) grams = Math.min(grams, _hvComfort[chosen.id]);
+      }
       grams = Math.floor(Math.min(grams, 400) / 10) * 10;
       if (grams < 30) {
         // этот дефицит не пролезает без перебора ккал — переходим к резке перебора

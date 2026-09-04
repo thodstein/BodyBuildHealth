@@ -5,8 +5,30 @@
  * + дефициты микронутриентов. XSS-экранирование всех пользовательских строк.
  */
 import type { DailyDietReport } from '../../../../engines/product-usefulness-v2.engine';
+import { displayAmount, type WeightMode } from './planner-weight-mode';
 
 const esc = (v: unknown): string => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * §6.2: бейдж режима веса в печати («сух/гот» — как в списке приёмов и закупках).
+ * cooked (дефолт): граммы как на тарелке; raw: крупы — сухим весом для взвешивания.
+ */
+export function weightModeBadge(mode?: WeightMode): string {
+  const raw = mode === 'raw';
+  return `<div style="display:inline-block;font-size:12px;margin:6px 0;padding:4px 10px;border-radius:999px;border:1px solid ${raw ? '#60a5fa55' : '#22c55e55'};background:${raw ? '#60a5fa11' : '#22c55e11'};color:${raw ? '#60a5fa' : '#22c55e'}">⚖️ Вес: ${raw ? 'сырой (сух.) — крупы взвешивать сухими' : 'как на тарелке (гот.)'}</div>`;
+}
+
+/** Печатная граммовка с суффиксом меры (по id продукта; без id — как есть). */
+export function printAmount(foodId: string | undefined, amountG: number, mode?: WeightMode): string {
+  const m = mode === 'raw' ? 'raw' : 'cooked';
+  if (!foodId) return `${Math.round(amountG)}г`;
+  try {
+    const d = displayAmount(foodId, amountG, m);
+    return d.suffix ? `${d.grams}г ${d.suffix}` : `${Math.round(amountG)}г`;
+  } catch {
+    return `${Math.round(amountG)}г`;
+  }
+}
 
 const chip = (label: string, ok: boolean, detail = ''): string => {
   const color = ok ? '#22c55e' : '#ef4444';
@@ -89,8 +111,10 @@ export function buildCoachExportHtml(args: {
   meals: any[];
   shopping: Array<{ name: string; amount: number; category?: string; dayCount?: number }>;
   notes?: string[];
+  /** §6.2: режим веса для бейджа и граммовок (по умолчанию — как на тарелке). */
+  weightMode?: WeightMode;
 }): string {
-  const { dateIso, totals, goals, isTrainingDay, meals, shopping, notes } = args;
+  const { dateIso, totals, goals, isTrainingDay, meals, shopping, notes, weightMode } = args;
   const t = totals || { kcal: 0, p: 0, f: 0, c: 0 };
   const g = goals;
 
@@ -104,7 +128,7 @@ export function buildCoachExportHtml(args: {
     return `<tr>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px;white-space:nowrap">${esc(m.time || '')}</td>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px"><b>${esc(m.label || '')}</b> ${recipeBadge}
-        <div style="color:#555">${items.map((it: any) => esc(`${it.name} ${it.amount}г`)).join(', ') || '—'}</div>
+        <div style="color:#555">${items.map((it: any) => esc(`${it.name} ${printAmount(it.id, it.amount, weightMode)}`)).join(', ') || '—'}</div>
       </td>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.kcal || 0)}</td>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.p || 0)}</td>
@@ -150,6 +174,7 @@ export function buildCoachExportHtml(args: {
 <style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:19px;border-bottom:2px solid #00c8a0;padding-bottom:8px}table{border-collapse:collapse;width:100%}@media print{body{margin:12mm}}</style></head>
 <body>
 <h1>🍽 План питания спортсмена — ${esc(dateIso)}</h1>
+${weightModeBadge(weightMode)}
 <div style="font-size:14px">Итог: <b>${Math.round(t.kcal || 0)}</b> ккал · Б <b>${Math.round(t.p || 0)}</b> · Ж <b>${Math.round(t.f || 0)}</b> · У <b>${Math.round(t.c || 0)}</b></div>
 ${goalRow}
 <h2 style="font-size:15px;margin-top:16px">Приёмы пищи</h2>
@@ -183,7 +208,7 @@ export function downloadCoachExport(html: string, filename: string): boolean {
  * day — план дня (формат IndividualPlanContext): приёмы с recipeApplied/recipeAppliedData
  * разворачиваются в ингредиенты и пошаговые инструкции. XSS-экранирование всех строк.
  */
-export function buildRecipePlanPrintHtml(day: any): string {
+export function buildRecipePlanPrintHtml(day: any, weightMode?: WeightMode): string {
   const meals = Array.isArray(day?.meals) ? day.meals : [];
   const applied = meals.flatMap((m: any) => {
     const list: any[] = [];
@@ -225,6 +250,7 @@ export function buildRecipePlanPrintHtml(day: any): string {
 <style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:19px;border-bottom:2px solid #f97316;padding-bottom:8px}@media print{body{margin:12mm}}</style></head>
 <body>
 <h1>🍳 Меню дня по рецептам</h1>
+${weightModeBadge(weightMode)}
 <div style="font-size:14px;margin:10px 0">Итог дня: <b>${Math.round(t.kcal || 0)}</b> ккал · Б <b>${Math.round(t.p || 0)}</b> · Ж <b>${Math.round(t.f || 0)}</b> · У <b>${Math.round(t.c || 0)}</b></div>
 ${recipeBlocks || '<p style="color:#999">Выбранных рецептов нет</p>'}
 ${otherMeals ? `<h2 style="font-size:15px;border-top:1px solid #eee;padding-top:12px">Остальные приёмы</h2>${otherMeals}` : ''}
@@ -285,10 +311,10 @@ export interface MealTimelinePrintItem {
   time: string;
   label: string;
   type: string;
-  items: { name: string; amount: number }[];
+  items: { name: string; amount: number; id?: string }[];
   totals: { kcal: number; p: number; f: number; c: number };
 }
-export function buildMealTimelinePrintHtml(meals: MealTimelinePrintItem[], meta: { title?: string; trainStart?: string; trainEnd?: string; kcal?: number } = {}): string {
+export function buildMealTimelinePrintHtml(meals: MealTimelinePrintItem[], meta: { title?: string; trainStart?: string; trainEnd?: string; kcal?: number; weightMode?: WeightMode } = {}): string {
   const toMin = (t: string) => { const [h, m] = (t || '').split(':').map(Number); return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m); };
   const sorted = [...meals].sort((a, b) => toMin(a.time) - toMin(b.time));
   const badgeFor = (type: string): string => {
@@ -300,7 +326,7 @@ export function buildMealTimelinePrintHtml(meals: MealTimelinePrintItem[], meta:
   const rows = sorted.map(m => `<tr>
     <td style="padding:6px;border:1px solid #ddd;font-size:12px;font-weight:700;white-space:nowrap">${esc(m.time)}</td>
     <td style="padding:6px;border:1px solid #ddd;font-size:12px">${esc(m.label)}${badgeFor(m.type)}</td>
-    <td style="padding:6px;border:1px solid #ddd;font-size:11px">${esc((m.items || []).map(it => `${it.name} ${Math.round(it.amount)}г`).join(', '))}</td>
+    <td style="padding:6px;border:1px solid #ddd;font-size:11px">${esc((m.items || []).map(it => `${it.name} ${printAmount((it as any).id, it.amount, meta.weightMode)}`).join(', '))}</td>
     <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.kcal || 0)}</td>
     <td style="padding:6px;border:1px solid #ddd;font-size:11px;text-align:center;white-space:nowrap">Б ${Math.round(m.totals?.p || 0)} · Ж ${Math.round(m.totals?.f || 0)} · У ${Math.round(m.totals?.c || 0)}</td>
   </tr>`).join('');
@@ -311,6 +337,7 @@ export function buildMealTimelinePrintHtml(meals: MealTimelinePrintItem[], meta:
 <style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:18px;border-bottom:2px solid #06b6d4;padding-bottom:8px}table{border-collapse:collapse;width:100%;margin-top:10px}th{font-size:11px;text-align:left}</style></head>
 <body>
 <h1>⏳ Таймлайн дня — ${esc(meta.title || '')}</h1>
+${weightModeBadge(meta.weightMode)}
 ${meta.kcal ? `<div style="font-size:13px;margin:8px 0">Калорийность дня: <b>${Math.round(meta.kcal)}</b> ккал</div>` : ''}
 ${trainRow}
 ${sorted.length === 0 ? '<p style="font-size:12px;color:#888">Нет приёмов.</p>' : `<table><tr><th>Время</th><th>Приём</th><th>Продукты</th><th>Ккал</th><th>БЖУ</th></tr>${rows}</table>`}

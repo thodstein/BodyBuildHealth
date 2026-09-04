@@ -80,6 +80,7 @@ export const IndividualPlanResults: React.FC = () => {
     removeFoodItem, replaceFoodItem, findSimilarFoods, updateItemAmount,
     setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
+    weightMode,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     plannerMode,
@@ -1117,6 +1118,7 @@ const doImportPlan = (raw: string): boolean => {
                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
                   </button>
                   <button onClick={() => setRecipeDetail(r)} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>ℹ️</button>
+                  {(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied && !_m?.recipeApplied2 ? <button type="button" title="Ужать первый рецепт ×0.65 и добавить этот полноценно (опция B)" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx, { shrinkFirst: true }); setRecipePickerMeal(null); }} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.12)', border:'1px dashed rgba(139,92,246,0.45)', color:'#c4b5fd', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>⚖️</button> : null; })()}
                 </div>
               ))}
             </div>
@@ -2079,7 +2081,7 @@ const doImportPlan = (raw: string): boolean => {
           {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
               <div style={{ display:'flex', gap:4 }}>
-                <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
                   🖨 Печать меню
                 </button>
                 <button onClick={() => {
@@ -2092,6 +2094,7 @@ const doImportPlan = (raw: string): boolean => {
                       meals: dayPlan.meals || [],
                       shopping: (shoppingList as any[])?.filter((s: any) => s.id !== 'unknown_x') || [],
                       notes: [...(dayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
+                      weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
                     });
                     const ok = downloadCoachExport(html, `plan-coach-${new Date().toISOString().slice(0, 10)}.html`);
                     if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера скачан' : 'Не удалось скачать файл', ok ? 'success' : 'warning');
@@ -2480,8 +2483,8 @@ const doImportPlan = (raw: string): boolean => {
                           coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage) ? (dayPlan as any).microSummary.coverage : []).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
                         }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
                         <button onClick={() => printMealTimeline(buildMealTimelinePrintHtml(
-                          (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount })), totals: m.totals || {} })),
-                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart }
+                          (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount, id: it.id })), totals: m.totals || {} })),
+                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any }
                         ))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
                       </span>
                     </div>

@@ -71,6 +71,12 @@ describe('E: peri-инварианты при любом бюджете (инт�
     const ps = plan.meals.find(m => m.type === 'presleep');
     if (ps) expect(ps.totals.c).toBeLessThanOrEqual(12);
   });
+
+  it('план §3.6: в rest-дне нет напитков лестницы (сок/декстроза) — только train', () => {
+    const rest = buildDayPlan(base({ isTrainingDay: false, allowIntraWorkout: false, trainStartMin: undefined }));
+    const restDrinks = rest.meals.flatMap(m => m.items || []).filter(i => i.id === 'orange_juice' || i.id === 'dextrose');
+    expect(restDrinks.map(i => `${i.id}:${i.amount}`).join(','), 'напитки в rest').toEqual('');
+  });
 });
 
 describe('C: инсулин-окна первого класса (интеграция)', () => {

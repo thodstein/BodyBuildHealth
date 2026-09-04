@@ -1029,6 +1029,9 @@ const _pickCtx: {
   // (второй comfort, лестница плотности) работают только здесь; обычные дни идут
   // бит-идентично старому движку (нулевой риск регрессии сходимости).
   highVolumeDay: boolean;
+  // План §3.6: день отдыха — лестнице плотности запрещены напитки (сок/декстроза);
+  // жидкие угли в rest — пустые калории без тренировочного окна.
+  isTrainingDayCtx: boolean;
   _locked: boolean;
 } = {
   tasteProfile: undefined,
@@ -1040,6 +1043,7 @@ const _pickCtx: {
   currentExcludedIds: undefined,
   currentCarbGPerKg: 0,
   highVolumeDay: false,
+  isTrainingDayCtx: true,
   _locked: false,
 };
 
@@ -1178,6 +1182,10 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
 
 export function snapPortionG(food: FoodItem, grams: number): number {
   if (grams <= 0) return grams;
+  // Кап добавок — ДО сетки: ветка «выше максимума сетки» возвращалась раньше,
+  // обходя кап внизу («изолят 186 г», «псиллиум 500 г»).
+  const _supCapEarly = SUPPLEMENT_MAX_G[food.id];
+  if (_supCapEarly != null) grams = Math.min(grams, _supCapEarly);
   const id = (food.id || '').toLowerCase();
   const cat = food.category;
   const isOil = id.includes('oil') || id.includes('масло') || (cat === 'fat' && (food.fat || 0) >= 90);
@@ -1767,11 +1775,15 @@ function buildWholeMeal(
         // Итерация B: лестница плотности — остаток >60 г после comfort закрываем ОДНИМ
         // шагом ladder (сок/мёд/пряники/финики/рисовый крем), а не вторым гарниром.
         // Только в high-volume день; та же защита от перелива тарелки (>550 г не доливаем).
+        // План §3.6: в день ОТДЫХА напитки лестницы (сок/декстроза) запрещены —
+        // жидкие угли без тренировочного окна; остаток закрывают мёд/выпечка/крупы.
         if (remC > 60 && _solidW() <= 550 && _pickCtx.highVolumeDay) {
           const usedIds3 = new Set(items.map(i => i.id));
+          const _isRest = !_pickCtx.isTrainingDayCtx;
           for (const step of liveLadderSteps()) {
             if (remC <= 60) break;
             if (usedIds3.has(step.id)) continue;
+            if (_isRest && step.kind === 'drink') continue;
             const f = FOOD_DB.find(x => x.id === step.id);
             if (!f || (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) || !foodAvailableForPlan(f)) continue;
             const g3 = Math.min(edibilityCapFor(f.id, step.maxG), Math.floor(Math.min(gramsForMacro(f, Math.min(remC, 90), 'carbs', carbPortionCap(f)), 400) / 5) * 5);
@@ -2691,6 +2703,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     || _bolusUnits > 0
     || (adjustedProteinG || input.goalProteinG) / Math.max(40, input.weightKg || 80) >= 2.8
     || (input.goalKcal || 0) >= 4200;
+  _pickCtx.isTrainingDayCtx = input.isTrainingDay !== false;
   const _capOf = (r: string): number => _keep.has(r)
     ? mealCarbCapacityG(r, { budget: input.budget, weightKg: input.weightKg, trainDurationMin: input.trainDurationMin })
     : 0;
@@ -4545,6 +4558,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // (share ≥0.95), углеводный недобор добивается и в перекусы (крупа в комнате ккал).
         // Иначе 1500У некуда лить: мейны в капах, а снекам У запрещены.
         const _highCarbDay = _isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80);
+        // Коктейльный режим (ultra-high protein): ≥350 г/день или ≥3.5 г/кг —
+        // белок добирается ЖИДКИМИ носителями (порошок ≤60 + яичный белок/молоко),
+        // а не «изолятом 186 г в перекусе». См. гейты ниже.
+        const _ultraPDay = (goals.p || 0) >= 350 || (goals.p || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
         const _mainsFull = _highCarbDay && effWorst === 'c' && ['breakfast', 'lunch', 'dinner']
           .every(t => { const mm = meals.find((x: any) => x.type === t); return !mm || _mealShareRatio(mm) >= 0.95; });
         const _candMeals = meals.filter((m:any)=> m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && m.type !== 'postworkout'
@@ -4574,9 +4591,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (!best) {
           // Эпик B: ротация кандидатов — если первый степл в приёме-цели уже у порционного
           // капа (мердж невозможен), берём следующий, иначе посадка буксует (недобор углей).
-          for (const cand of pool) {
+          // Коктейльный режим: в перекусе ultra-high-P дня жидкие носители
+          // (яичный белок/молоко/кефир + порошок с комнатой) идут раньше твёрдого мяса —
+          // 70 г белка должны выпиваться, а не жеваться третьим стейком.
+          const _candIter = (_ultraPDay && effWorst === 'p' && _isSnackSlot(targetMeal.type)) ? [...pool].sort((a: any, b: any) => {
+            const _rank = (f: any) => {
+              if (f.id === 'egg_white' || f.id === 'milk' || f.id === 'kefir') return 3;
+              if (isProteinPowderId(f.id)) {
+                const _ex = targetMeal.items.find((x: any) => x.id === f.id);
+                return ((_ex?.amount || 0) < (SUPPLEMENT_MAX_G[f.id] ?? 60)) ? 2 : -1;
+              }
+              return 1;
+            };
+            return _rank(b) - _rank(a);
+          }) : pool;
+          for (const cand of _candIter) {
             const _exC = targetMeal.items.find((x:any) => x.id === cand.id);
             const _capC = carbPortionCap(cand, mealCapScaleOf(targetMeal));
+            // Порошок сверх скупа — не доливаем в тот же приём (коктейль, не ведро).
+            if (isProteinPowderId(cand.id) && (_exC?.amount || 0) >= (SUPPLEMENT_MAX_G[cand.id] ?? 60)) continue;
             if (!_exC || (_exC.amount || 0) < _capC) { best = cand; break; }
           }
           if (!best) break;
@@ -4587,7 +4620,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // чтобы цикл не выходил раньше времени (перебор side-эффектов режет ветка need<0).
         // Дегустационный потолок: концентраты/хлеб/удовольствия — по карте (медджул ≤60 г,
         // хлеб ≤110 г), остальное ≤150 г. Иначе догон недобора наливал «Финик Меджул 150 г».
-        const _portionCeiling = COMFORT_PORTION_LIMITS[best.id] ?? 150;
+        // Порошок — скуп (60 г) и здесь, а не 150: иначе первый же push — «изолят 150 г».
+        const _portionCeiling = isProteinPowderId(best.id) ? (SUPPLEMENT_MAX_G[best.id] ?? 60) : (COMFORT_PORTION_LIMITS[best.id] ?? 150);
         let grams = Math.max(10, Math.min(_portionCeiling, Math.round(Math.max(0, _needG) / per100 * 100 / 10) * 10));
         const r = grams/100;
         const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
@@ -4602,7 +4636,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (effWorst === 'c' || (it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') return carbPortionCap(_fdC, mealCapScaleOf(targetMeal));
           // Эпик B: белок — жёсткий кап 300 г (тест d28: «порция белка ≤300 г»; ×1.25 давал 374 г
           // лосося = 48 г жира в ужине при утренней загрузке).
-          if (effWorst === 'p') return 300;
+          // Коктейльный режим: порошок — не больше скупа (SUPPLEMENT_MAX_G: изолят 60) —
+          // иначе «изолят 186 г в перекусе» вместо коктейля.
+          if (effWorst === 'p') {
+            const _supCap = isProteinPowderId(best.id) ? (SUPPLEMENT_MAX_G[best.id] ?? 60) : 300;
+            return Math.min(300, _supCap);
+          }
           return maxGramPerItem(_pickCtx.currentBudget, mealCapScaleOf(targetMeal));
         })();
         if (_exist) {
@@ -4627,7 +4666,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-    recalcDayTotals(meals, totals); // B4
+      recalcDayTotals(meals, totals); // B4
   }
   }
 
@@ -5009,6 +5048,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             let _merged = false;
             for (const _c2 of _pItems) {
               if ((_c2.it.amount || 0) >= 300) continue;
+              // Коктейльный режим: порошок мерджем НЕ растим (скуп 60 г — потолок,
+              // иначе «изолят 60 + 126 = 186»); добираем едой/жидким белком, а при
+              // исчерпании — fallback ниже льёт яичный белок.
+              if (isProteinPowderId(_c2.it.id)) continue;
               const _fd2 = FOOD_DB.find((f: any) => f.id === _c2.it.id);
               if (!_fd2 || !(_fd2.protein || 0)) continue;
               // Жирный белок (яйца 10Ж/100) не доливаем, когда жиры дня уже у цели, —
@@ -5033,13 +5076,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               // из цикла через |dev| ≤ 12 задолго до этого. Кап — 3 добавления на день.
               if (_pDev <= 40 || ((meals as any)._pAddsCount || 0) >= 3) break;
               // Lean-источники (без жирового хвоста — иначе чиним белок ценой перебора жиров).
-              const _npFood = FOOD_DB.find((f: any) => f.id === 'egg_white')
+              // Коктейльный режим: ротация носителей — не дублируем id в приёме
+              // («яичный белок 300 + 300»): яичный белок → обезжиренный творог → молоко.
+              const _npTarget = meals.filter((m: any) => _flexMeal(m) && (m.items || []).length < 8)
+                .sort((a: any, b: any) => (a.totals?.p || 0) - (b.totals?.p || 0))[0];
+              if (!_npTarget) break;
+              const _npHave = new Set((_npTarget.items || []).map((x: any) => x.id));
+              const _npFood = ['egg_white', 'cottage_cheese_0', 'cottage_cheese_5', 'milk', 'tuna_canned']
+                .map((pid: string) => FOOD_DB.find((f: any) => f.id === pid))
+                .find((f: any) => f && !_npHave.has(f.id))
+                || FOOD_DB.find((f: any) => f.id === 'egg_white')
                 || FOOD_DB.find((f: any) => f.id === 'cottage_cheese_0')
                 || FOOD_DB.find((f: any) => f.id === 'cottage_cheese_5')
                 || FOOD_DB.find((f: any) => f.category === 'protein' && (f.protein || 0) >= 15);
-              const _npTarget = meals.filter((m: any) => _flexMeal(m) && (m.items || []).length < 8)
-                .sort((a: any, b: any) => (a.totals?.p || 0) - (b.totals?.p || 0))[0];
-              if (!_npFood || !_npTarget) break;
+              if (!_npFood) break;
               const _npG = 100, _npR = 1;
               const _np = {
                 id: _npFood.id, name: _npFood.name, amount: _npG, role: 'protein',
@@ -5191,6 +5241,39 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── Коктейльный режим: тайминг жидкого белка (только чтение, макросы не трогаем) ──
+    // На ultra-high-P дне (≥350 г или ≥3.5 г/кг) приёмы с порошком ≥20 г и/или яичным
+    // белком ≥150 г получают пометку «🥤 Коктейль» со временем отнесения: большой белок
+    // должен выпиваться (взбить блендером), а не жеваться — иначе 500 г/день не съесть.
+    // Стоит ПОСЛЕ всех компенсаций — аннотирует финальное состояние дня.
+    {
+      const _ultraP = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      if (_ultraP) {
+        const _timingFor = (t: string): string =>
+          t === 'postworkout' ? 'выпить в первые 30 мин после тренировки'
+          : t === 'breakfast' ? 'выпить сразу после подъёма'
+          : (t || '').startsWith('snack') ? 'выпить между основными приёмами (за 60–90 мин до тренировки)'
+          : 'выпить в своё окно приёма';
+        const _sched: string[] = [];
+        for (const m of meals) {
+          const items = (m as any).items || [];
+          const pow = items.find((x: any) => isProteinPowderId(x.id) && (x.amount || 0) >= 20);
+          const egg = items.find((x: any) => x.id === 'egg_white' && (x.amount || 0) >= 150);
+          if (!pow && !egg) continue;
+          const _pShake = Math.round(((pow?.p || 0) + (egg?.p || 0)) * 10) / 10;
+          const _txt = pow && egg
+            ? `🥤 Коктейль: ${pow.name} ${pow.amount} г + яичный белок ${egg.amount} г — взбить блендером и ${_timingFor((m as any).type)} (≈${_pShake} г белка, жуётся ноль; курицу из приёма можно взбить туда же)`
+            : egg
+              ? `🥤 Яичный коктейль: белок ${egg.amount} г — взбить и ${_timingFor((m as any).type)} (≈${_pShake} г белка)`
+              : `🥤 Протеиновый коктейль: ${pow!.name} ${pow!.amount} г — ${_timingFor((m as any).type)} (≈${_pShake} г белка)`;
+          const rat = (m as any).rationale;
+          if (Array.isArray(rat)) rat.push(_txt);
+          _sched.push(`${(m as any).label} ${(m as any).time || ''} (≈${_pShake} г)`);
+        }
+        if (_sched.length > 0) notes.push(`🥤 Коктейли дня (взбить блендером): ${_sched.join(' · ')}`);
+      }
+    }
+
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -5210,10 +5293,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _pickCtx.qualityMode = 'full';
     _pickCtx.currentExcludedIds = undefined;
     // A6 (санитария): бюджет/вес/угли тоже сбрасываются — иначе протекали между вызовами
-    _pickCtx.currentBudget = 'medium';
-    _pickCtx.currentWeightKg = 80;
-    _pickCtx.currentCarbGPerKg = 0;
-    _pickCtx.highVolumeDay = false;
+  _pickCtx.currentBudget = 'medium';
+  _pickCtx.currentWeightKg = 80;
+  _pickCtx.currentCarbGPerKg = 0;
+  _pickCtx.highVolumeDay = false;
+  _pickCtx.isTrainingDayCtx = true;
   }
 }
 

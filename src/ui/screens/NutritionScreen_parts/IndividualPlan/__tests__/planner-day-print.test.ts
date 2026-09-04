@@ -5,7 +5,7 @@
  * - пользовательские строки XSS-экранируются.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { buildDayReportPrintHtml, buildWeekReportPrintHtml, printDayReport, printMealTimeline, buildMealTimelinePrintHtml } from '../planner-day-print';
+import { buildDayReportPrintHtml, buildWeekReportPrintHtml, printDayReport, printMealTimeline, buildMealTimelinePrintHtml, buildCoachExportHtml, buildRecipePlanPrintHtml } from '../planner-day-print';
 import { analyzeDailyDiet, getDefaultProfile } from '../../../../../engines/product-usefulness-v2.engine';
 
 describe('buildDayReportPrintHtml (P2-8)', () => {
@@ -79,5 +79,41 @@ describe('printDayReport / printMealTimeline (D-28 П8: окно печати)',
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWin as any);
     expect(() => printMealTimeline(buildMealTimelinePrintHtml([{ time: '08:00', label: 'Завтрак', items: [{ name: 'Яйцо', amount: 100, kcal: 150 }] }], { title: 'День' }))).not.toThrow();
     openSpy.mockRestore();
+  });
+});
+
+describe('§6.2: бейдж режима веса в печати (сух/гот)', () => {
+  const coachArgs = (weightMode?: any) => ({
+    dateIso: '2026-09-04',
+    totals: { kcal: 3000, p: 200, f: 80, c: 350 },
+    meals: [{ time: '08:00', label: 'Завтрак', items: [{ name: 'Рис белый (вареный)', id: 'rice_white', amount: 200 }], totals: { kcal: 260, p: 5, f: 1, c: 56 } }],
+    shopping: [],
+    ...(weightMode ? { weightMode } : {}),
+  });
+
+  it('coach-экспорт по умолчанию — «как на тарелке (гот.)»', () => {
+    const html = buildCoachExportHtml(coachArgs() as any);
+    expect(html).toContain('как на тарелке (гот.)');
+  });
+
+  it('raw-режим — бейдж «сырой (сух.)» + крупа сухим весом', () => {
+    const html = buildCoachExportHtml(coachArgs('raw') as any);
+    expect(html).toContain('сырой (сух.)');
+    // 200 г варёного риса → ~71 г сухого
+    expect(html).toContain('сух.');
+    expect(html).not.toContain('200г,');
+  });
+
+  it('меню с рецептами несёт бейдж в обоих режимах', () => {
+    const day = { meals: [], totals: { kcal: 0, p: 0, f: 0, c: 0 } };
+    expect(buildRecipePlanPrintHtml(day)).toContain('как на тарелке (гот.)');
+    expect(buildRecipePlanPrintHtml(day, 'raw')).toContain('сырой (сух.)');
+  });
+
+  it('таймлайн: бейдж + конвертация по id', () => {
+    const meals = [{ time: '08:00', label: 'Завтрак', type: 'breakfast', items: [{ name: 'Рис', id: 'rice_white', amount: 200 }], totals: { kcal: 260, p: 5, f: 1, c: 56 } }];
+    const html = buildMealTimelinePrintHtml(meals as any, { title: 'День', weightMode: 'raw' });
+    expect(html).toContain('сырой (сух.)');
+    expect(html).toContain('сух.');
   });
 });
