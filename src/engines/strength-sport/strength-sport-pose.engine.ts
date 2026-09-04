@@ -131,3 +131,85 @@ export function isPoseVerified(angles: JointAnglesPose | null): boolean {
   const st = livePoseStatus(angles);
   return st.ok;
 }
+
+// E8: углы суставов из CSV (экспорт трекера поз / ручной замер по кадрам).
+// Формат: t,hip,knee,ankle,shoulder[,elbow] (; или ,). Без заголовка — t,hip,knee,ankle,shoulder.
+export interface PoseAnglesSample { t: number; hip?: number; knee?: number; ankle?: number; shoulder?: number; elbow?: number; }
+
+export function parsePoseAnglesCsv(csv: string): PoseAnglesSample[] | null {
+  if (!csv || typeof csv !== 'string') return null;
+  const lines = csv.trim().split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+  const semi = (lines[0].match(/;/g) || []).length;
+  const comm = (lines[0].match(/,/g) || []).length;
+  const delim = semi > comm ? ';' : ',';
+  const cols = lines[0].toLowerCase().split(delim).map(s => s.trim());
+  const hasHeader = cols.some(c => ['t', 'time', 'frame', 'hip', 'knee', 'ankle', 'shoulder', 'elbow'].includes(c));
+  const idx = (names: string[], fallback: number) => {
+    if (!hasHeader) return fallback;
+    const i = cols.findIndex(c => names.includes(c));
+    return i >= 0 ? i : -1;
+  };
+  const iT = idx(['t', 'time', 'frame'], 0);
+  const iHip = idx(['hip', 'таз'], 1);
+  const iKnee = idx(['knee', 'колено'], 2);
+  const iAnkle = idx(['ankle', 'голеностоп'], 3);
+  const iSho = idx(['shoulder', 'плечо'], 4);
+  const iElb = idx(['elbow', 'локоть'], 5);
+  const num = (parts: string[], i: number): number | undefined => {
+    if (i < 0 || i >= parts.length) return undefined;
+    const v = parseFloat(parts[i]);
+    return Number.isFinite(v) && v >= 0 && v <= 250 ? v : undefined;
+  };
+  const out: PoseAnglesSample[] = [];
+  for (let li = hasHeader ? 1 : 0; li < lines.length; li++) {
+    const parts = lines[li].split(delim).map(s => s.trim());
+    if (parts.length < 4) continue;
+    const tRaw = iT >= 0 && iT < parts.length ? parseFloat(parts[iT]) : li * 0.033;
+    out.push({
+      t: Number.isFinite(tRaw) ? tRaw : li * 0.033,
+      hip: num(parts, iHip), knee: num(parts, iKnee), ankle: num(parts, iAnkle),
+      shoulder: num(parts, iSho), elbow: num(parts, iElb),
+    });
+  }
+  return out.length >= 2 ? out : null;
+}
+
+export interface PoseJointStat { min: number; max: number; avg: number; n: number; }
+export interface PoseAnglesSummary {
+  n: number;
+  hip: PoseJointStat | null;
+  knee: PoseJointStat | null;
+  ankle: PoseJointStat | null;
+  shoulder: PoseJointStat | null;
+}
+
+function stat(vals: Array<number | undefined>): PoseJointStat | null {
+  const clean = vals.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (!clean.length) return null;
+  const min = Math.min(...clean), max = Math.max(...clean);
+  const avg = Math.round((clean.reduce((a, b) => a + b, 0) / clean.length) * 10) / 10;
+  return { min, max, avg, n: clean.length };
+}
+
+export function summarizePoseAngles(samples: PoseAnglesSample[] | null | undefined): PoseAnglesSummary | null {
+  if (!samples || samples.length < 2) return null;
+  return {
+    n: samples.length,
+    hip: stat(samples.map(s => s.hip)),
+    knee: stat(samples.map(s => s.knee)),
+    ankle: stat(samples.map(s => s.ankle)),
+    shoulder: stat(samples.map(s => s.shoulder)),
+  };
+}
+
+/** Средние углы серии → вход autoValidateAnglesFromPose / autoOHSFromPose. */
+export function avgAnglesOfSummary(sum: PoseAnglesSummary | null): { hip?: number; knee?: number; ankle?: number; shoulder?: number } {
+  if (!sum) return {};
+  const out: Record<string, number> = {};
+  if (sum.hip) out.hip = sum.hip.avg;
+  if (sum.knee) out.knee = sum.knee.avg;
+  if (sum.ankle) out.ankle = sum.ankle.avg;
+  if (sum.shoulder) out.shoulder = sum.shoulder.avg;
+  return out;
+}

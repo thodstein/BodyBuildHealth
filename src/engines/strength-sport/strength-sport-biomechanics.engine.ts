@@ -287,17 +287,25 @@ export interface JointAnglesInput { hip?: number; knee?: number; ankle?: number;
 export function autoValidateAnglesFromPose(angles: JointAnglesInput, weakPoints?: WLWeakPoint[]): Array<{ weakPoint: WLWeakPoint; angle: number; valid: boolean; recommendation: string }> {
   const out: Array<{ weakPoint: WLWeakPoint; angle: number; valid: boolean; recommendation: string }> = [];
   const wps = weakPoints && weakPoints.length ? weakPoints : (Object.keys(TA_BIOMECH) as WLWeakPoint[]);
+  // Приоритет сустава: одиночный joint из TA_BIOMECH.joint (напр. сед → колено),
+  // при мульти-суставе — legacy-порядок (таз → колено → голеностоп → плечо → локоть).
+  const order: Array<[RegExp, 'hip' | 'knee' | 'ankle' | 'shoulder' | 'elbow']> = [
+    [/таз|hip/i, 'hip'], [/колен/i, 'knee'], [/голеностоп|ankle/i, 'ankle'], [/плеч|shoulder/i, 'shoulder'], [/локт|elbow/i, 'elbow'],
+  ];
   for (const wp of wps) {
     const bio = TA_BIOMECH[wp];
     if (!bio) continue;
-    // маппим keyJoint к углу: таз→hip, колено→knee, голеностоп→ankle, плечо→shoulder, локоть→elbow
-    const key = bio.keyJoint.toLowerCase();
+    const jointLow = bio.joint.toLowerCase();
+    const single = order.filter(([re]) => re.test(jointLow));
+    const pool = single.length === 1 ? single : order.filter(([re]) => re.test((bio.joint + ' ' + bio.keyJoint).toLowerCase()));
+    const pick = pool.length ? pool[0][1] : null;
+    // legacy-fallback: combined→knee??hip (как раньше)
     let angleVal: number | undefined;
-    if (key.includes('таз') || key.includes('hip') || key.includes('тазобед')) angleVal = angles.hip;
-    else if (key.includes('колен')) angleVal = angles.knee;
-    else if (key.includes('голеностоп') || key.includes('ankle')) angleVal = angles.ankle;
-    else if (key.includes('плеч') || key.includes('shoulder')) angleVal = angles.shoulder;
-    else if (key.includes('локт')) angleVal = angles.elbow;
+    if (pick === 'hip') angleVal = angles.hip;
+    else if (pick === 'knee') angleVal = angles.knee;
+    else if (pick === 'ankle') angleVal = angles.ankle;
+    else if (pick === 'shoulder') angleVal = angles.shoulder;
+    else if (pick === 'elbow') angleVal = angles.elbow;
     else angleVal = angles.knee ?? angles.hip;
     if (angleVal == null || !Number.isFinite(angleVal)) continue;
     const valid = isValidAngleForWeakPoint(wp, angleVal);

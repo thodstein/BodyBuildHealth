@@ -126,4 +126,14 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
     expect(container.textContent).toContain('bfPCA P1');
   });
+  it('E8 углы с видео → сводка + валидация фаз', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: фиксация в седе/)[0]);
+    fireEvent.click(screen.getAllByText(/Видео/)[0]);
+    const ta = container.querySelectorAll('textarea')[1];
+    fireEvent.change(ta, { target: { value: 't,hip,knee,ankle,shoulder\n0,100,80,40,160\n0.1,95,70,38,155\n0.2,90,65,36,150' } });
+    await waitFor(() => expect(container.textContent).toContain('Кадров: 3'), { timeout: 2000 });
+    expect(container.textContent).toContain('OHS-прогноз по углам');
+  });
 });

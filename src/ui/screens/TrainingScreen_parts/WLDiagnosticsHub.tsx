@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
-import { TA_BIOMECH, diagnoseTAWeakPoint } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
+import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
 import { loadBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
@@ -22,7 +22,7 @@ import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '.
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -86,6 +86,8 @@ type WLState = {
   jerkDipCm: string;
   jerkDipMs: string;
   bfPattern: string;
+  // E8: углы суставов с видео (CSV трекера поз)
+  poseCsv: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -103,6 +105,8 @@ const DEFAULT_STATE: WLState = {
   xLoopCm: '', yMaxCm: '', peakVelMs: '',
   preferredCorr: {},
   jerkDipCm: '', jerkDipMs: '', bfPattern: '',
+  // E8: углы суставов с видео (CSV трекера поз)
+  poseCsv: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -266,6 +270,26 @@ export const WLDiagnosticsHub: React.FC = () => {
       return { from: last[0], to: last[last.length - 1], ewma: vbtEwma(vels), n: vels.length };
     } catch { return null; }
   }, [csvText]);
+
+  // E8: углы с видео → сводка + автовалидация фаз + OHS-прогноз
+  const poseSummary = useMemo(() => {
+    try {
+      if (!state.poseCsv.trim()) return null;
+      return summarizePoseAngles(parsePoseAnglesCsv(state.poseCsv));
+    } catch { return null; }
+  }, [state.poseCsv]);
+  const poseValidation = useMemo(() => {
+    try {
+      if (!poseSummary) return [];
+      return autoValidateAnglesFromPose(avgAnglesOfSummary(poseSummary), weakPoints.length ? weakPoints : undefined);
+    } catch { return []; }
+  }, [poseSummary, weakPoints]);
+  const poseOhs = useMemo(() => {
+    try {
+      if (!poseSummary) return null;
+      return autoOHSFromPose(avgAnglesOfSummary(poseSummary));
+    } catch { return null; }
+  }, [poseSummary]);
 
   const scoring = useMemo(() => scoreTA({
     weakCount: weakPoints.length,
@@ -809,6 +833,19 @@ export const WLDiagnosticsHub: React.FC = () => {
             {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD: turnover {isRealChange(barMetrics.xLoop, 'turnover') ? 'реально >4см' : '≤4см норма'} · catch {isRealChange(barMetrics.xLoop, 'catch') ? 'реально >6см' : '≤6см норма'}</div></div>}
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
             <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
+            {/* E8: углы суставов с видео (CSV трекера поз) → автовалидация фаз + OHS-прогноз */}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📐 Углы с видео — вставь CSV трекера (t,hip,knee,ankle,shoulder)</div>
+              <textarea value={state.poseCsv} onChange={e => setState(s => ({ ...s, poseCsv: e.target.value }))} placeholder="t,hip,knee,ankle,shoulder&#10;0,100,80,40,160&#10;0.1,95,70,38,155" style={{ width: '100%', height: 56, marginTop: 6, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: 'monospace' }} />
+              {poseSummary && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 10, color: DIM }}>Кадров: {poseSummary.n} · колено {poseSummary.knee ? `${poseSummary.knee.min}–${poseSummary.knee.max}° (ср ${poseSummary.knee.avg}°)` : '—'} · таз {poseSummary.hip ? `ср ${poseSummary.hip.avg}°` : '—'} · голеностоп {poseSummary.ankle ? `ср ${poseSummary.ankle.avg}°` : '—'} · плечо {poseSummary.shoulder ? `ср ${poseSummary.shoulder.avg}°` : '—'}</div>
+                  {poseValidation.length > 0 && <div style={{ marginTop: 4 }}>{poseValidation.map(v => <div key={v.weakPoint} style={{ fontSize: 10, color: v.valid ? '#22c55e' : '#f59e0b', marginTop: 2 }}>{v.valid ? '✅' : '⚠️'} {v.recommendation}</div>)}</div>}
+                  {poseOhs && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>OHS-прогноз по углам: {poseOhs.score}/6 ({poseOhs.level}) — сверь чекбоксы в табе «Мобильность» вручную</div>}
+                </div>
+              )}
+              {state.poseCsv.trim() && !poseSummary && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>CSV не распознан — нужно ≥2 строк t,hip,knee,ankle,shoulder</div>}
+            </div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — следующий шаг</div>
               <div style={{ marginTop: 6, width: '100%', height: 60, background: 'rgba(255,255,255,0.03)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIM, fontSize: 11, border: '1px solid rgba(255,255,255,0.04)' }}>video preview — PRO: углы hip/knee/ankle/shoulder в реальном времени</div>
