@@ -151,4 +151,13 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
     await waitFor(() => expect(container.textContent).toContain('Женские бенчмарки пика'), { timeout: 2000 });
   });
+  it('E11 ножницы толчка → асимметрия + снимок', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Мобильность/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="95 нож"]')!, { target: { value: '85' } });
+    fireEvent.change(container.querySelector('input[placeholder="100 нож"]')!, { target: { value: '100' } });
+    await waitFor(() => expect(container.textContent).toContain('Ножницы 15%'), { timeout: 2000 });
+    fireEvent.click(screen.getByText(/Снимок ножниц/));
+    expect(JSON.parse(localStorage.getItem('he_ta_split_jerk_hist') || '[]').length).toBe(1);
+  });
 });

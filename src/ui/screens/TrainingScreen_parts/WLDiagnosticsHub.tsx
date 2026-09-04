@@ -31,6 +31,7 @@ import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-s
 import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
 import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport-ta-spec-block.engine';
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
+import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -93,6 +94,9 @@ type WLState = {
   anthroHeight: string;
   anthroArmSpan: string;
   anthroShoulder: string;
+  // E11: split-jerk ноги (левая/правая впереди)
+  jerkLeftFwd: string;
+  jerkRightFwd: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -114,6 +118,8 @@ const DEFAULT_STATE: WLState = {
   poseCsv: '',
   // E9: антропометрия ТА
   anthroHeight: '', anthroArmSpan: '', anthroShoulder: '',
+  // E11: split-jerk ноги
+  jerkLeftFwd: '', jerkRightFwd: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -325,6 +331,42 @@ export const WLDiagnosticsHub: React.FC = () => {
       });
     } catch { return null; }
   }, [state.anthroHeight, state.anthroArmSpan, state.anthroShoulder]);
+
+  // E11: split-jerk асимметрия + история
+  const [jerkHist, setJerkHist] = useState<SplitJerkSnapshot[]>(() => {
+    try {
+      const raw = localStorage.getItem('he_ta_split_jerk_hist');
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(s => s && typeof s.date === 'string') : [];
+    } catch { return []; }
+  });
+  const jerkAsym = useMemo(() => {
+    try {
+      return diagnoseSplitJerkAsymmetry({
+        leftForwardKg: state.jerkLeftFwd ? parseFloat(state.jerkLeftFwd) : null,
+        rightForwardKg: state.jerkRightFwd ? parseFloat(state.jerkRightFwd) : null,
+      });
+    } catch { return null; }
+  }, [state.jerkLeftFwd, state.jerkRightFwd]);
+  const jerkTrend = useMemo(() => { try { return splitJerkTrend(jerkHist); } catch { return null; } }, [jerkHist]);
+  const takeJerkSnapshot = () => {
+    if (!jerkAsym) {
+      setToast('Введи оба максимума ножниц — снимать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const entry: SplitJerkSnapshot = {
+      date: new Date().toISOString().slice(0, 10),
+      leftKg: parseFloat(state.jerkLeftFwd), rightKg: parseFloat(state.jerkRightFwd), diffPct: jerkAsym.diffPct,
+    };
+    setJerkHist(prev => {
+      const next = appendSplitJerkSnapshot(prev, entry);
+      try { localStorage.setItem('he_ta_split_jerk_hist', JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок ножниц ${entry.date} сохранён`);
+    setTimeout(() => setToast(''), 2000);
+  };
 
   const scoring = useMemo(() => scoreTA({
     weakCount: weakPoints.length,
@@ -957,6 +999,17 @@ export const WLDiagnosticsHub: React.FC = () => {
                 ? <div style={{ marginTop: 6 }}><div style={{ fontSize: 10, color: '#a78bfa' }}>Размах {anthro.diffCm > 0 ? '+' : ''}{anthro.diffCm}см → {anthro.gripAdvice}</div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{anthro.startAdvice}</div></div>
                 : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Введи рост + размах — посчитаем хват (Everett: широкий хват = риск промаха назад).</div>}
               <button onClick={applyAnthroToProfile} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Размах/плечи в профиль</button>
+            </div>
+            {/* E11: split-jerk ножницы L/R */}
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🦵 Ножницы толчка — левая/правая впереди</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: DIM }}>Левая впереди кг<br /><input value={state.jerkLeftFwd} onChange={e => setState(s => ({ ...s, jerkLeftFwd: e.target.value }))} placeholder="95 нож" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Правая впереди кг<br /><input value={state.jerkRightFwd} onChange={e => setState(s => ({ ...s, jerkRightFwd: e.target.value }))} placeholder="100 нож" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              </div>
+              {jerkAsym && <div style={{ fontSize: 10, color: jerkAsym.isCrit ? '#ef4444' : jerkAsym.isAsym ? '#f59e0b' : '#22c55e', marginTop: 6 }}>Ножницы {jerkAsym.diffPct}% {jerkAsym.isCrit ? 'CRITICAL ≥12%' : jerkAsym.isAsym ? 'WARN ≥7%' : '— норма'} — {jerkAsym.text}</div>}
+              {jerkTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд разницы ({jerkTrend.n} зам.): {jerkTrend.deltaPp > 0 ? '+' : ''}{jerkTrend.deltaPp} п.п. {jerkTrend.deltaPp <= 0 ? '— выравнивается ✓' : '— растёт ⚠️'}</div>}
+              <button onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
             </div>
             <button onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
             {/* Legacy compat fields hidden but synced */}
