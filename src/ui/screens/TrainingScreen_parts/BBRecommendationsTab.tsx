@@ -139,7 +139,7 @@ export const BBRecommendationsTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) =>
   const hasAlerts = summary.warns + summary.criticals > 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="train-bbrec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={() => hub.setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>← В запись</button>
         <span style={{ fontSize: 10, color: '#fff' }}>Вернуться к записи тренировки</span>

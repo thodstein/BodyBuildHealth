@@ -66,7 +66,7 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
   const cat = EXERCISE_CATALOG.find(c => c.name === exerciseName) || getExerciseById(exerciseName);
   if (!cat) {
     return (
-      <div style={overlay} onClick={onClose}>
+      <div className="train-subspopup" style={overlay} onClick={onClose}>
         <div onClick={e => e.stopPropagation()} style={sheet}>
           <div style={{ height: 3, background: `linear-gradient(90deg,${ACCENT},#00c853)` }} />
           <div style={sheetBody}>
@@ -130,7 +130,7 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
   }
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div className="train-subspopup-main" style={overlay} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={sheet}>
         <div style={{ height: 3, background: `linear-gradient(90deg,${ACCENT},#00c853)` }} />
         <div style={sheetBody}>

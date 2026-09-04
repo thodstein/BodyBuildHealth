@@ -7,7 +7,7 @@ export const SupportProtocolEmergency: React.FC<{ s: Record<string, any> }> = ({
   const [emergencyTab, setEmergencyTab] = useState('chest');
   return (
     <InfoErrorBoundary label="Экстренные состояния">
-      <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+      <div className="sup-proto-emergency" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>🚑 Экстренные состояния на курсе ААС</div>
           <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Дифференциальная диагностика критических симптомов. Если сомневаетесь — вызывайте скорую. Ложный вызов лучше несвоевременной помощи.</p>

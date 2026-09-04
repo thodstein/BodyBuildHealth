@@ -2676,3 +2676,51 @@ html.app-native .sup-proto-detox {
     animation: none;
   }
 }
+
+/* ─── 40. NATIVE DEEP-8 — библиотека, протоколы, модалки ─────── */
+html.app-native .train-bbrec,
+html.app-native .train-bblib,
+html.app-native .train-exlabpro,
+html.app-native .train-exlabsub,
+html.app-native .train-manlib,
+html.app-native .train-rirwave,
+html.app-native .train-subspopup,
+html.app-native .train-subspopup-main {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-bblib > button:first-child,
+html.app-native .train-subspopup {
+  border-radius: 16px !important;
+}
+
+/* Протоколы поддержки, третья волна */
+html.app-native .sup-proto-cost,
+html.app-native .sup-proto-emergency,
+html.app-native .sup-proto-gi,
+html.app-native .sup-proto-glp1,
+html.app-native .sup-proto-hair,
+html.app-native .sup-proto-inj,
+html.app-native .sup-proto-women {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-bbrec,
+  html.app-native .train-bblib,
+  html.app-native .train-exlabpro,
+  html.app-native .train-exlabsub,
+  html.app-native .train-manlib,
+  html.app-native .train-rirwave,
+  html.app-native .train-subspopup,
+  html.app-native .train-subspopup-main,
+  html.app-native .sup-proto-cost,
+  html.app-native .sup-proto-emergency,
+  html.app-native .sup-proto-gi,
+  html.app-native .sup-proto-glp1,
+  html.app-native .sup-proto-hair,
+  html.app-native .sup-proto-inj,
+  html.app-native .sup-proto-women {
+    animation: none;
+  }
+}

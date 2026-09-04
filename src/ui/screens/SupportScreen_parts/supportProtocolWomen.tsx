@@ -7,7 +7,7 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
   const [womenTab, setWomenTab] = useState('virilization');
   return (
     <InfoErrorBoundary label="Женщины и ААС">
-      <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+      <div className="sup-proto-women" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>♀️ Женский цикл и ААС</div>
           <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Абсолютные противопоказания, необратимые риски вирилизации, пороги андрогенов для женщин, беременность и контрацепция на ААС.</p>

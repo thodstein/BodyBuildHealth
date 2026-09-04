@@ -74,7 +74,7 @@ export const RirWaveChart: React.FC<RirWaveChartProps> = ({ program }) => {
   const isMass = program.meta.goal === 'hypertrophy' || program.meta.goal === 'recomposition';
   const stroke = '#00e68a';
   return (
-    <div style={{ ...CARD, padding: 10 }}>
+    <div className="train-rirwave" style={{ ...CARD, padding: 10 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>
         📉 RIR-волна по неделям
         <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>

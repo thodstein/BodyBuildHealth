@@ -7,7 +7,7 @@ export const SupportProtocolInjections: React.FC<{ s: Record<string, any> }> = (
   const [injectionTab, setInjectionTab] = useState('map');
   return (
           <InfoErrorBoundary label="Инъекции">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-inj" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#14b8a6', marginBottom:2 }}>💉 Карта инъекций · Техника · Ошибки и правила</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Карта ротации зон для локальных и общих инъекций. Техника безопасности. Частые ошибки и их предотвращение.</p>

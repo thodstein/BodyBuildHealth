@@ -159,7 +159,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
   const comparePL = compareIds.map(id => (plCycles as any[]).find((c: any) => c.meta.id === id)).filter(Boolean) as SRCycleTemplate[];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-manlib" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <ManualHeader
         title="📚 Библиотека шаблонов"
         subtitle={`${bbPrograms.length} программ · ${plCycles.length} ПЛ-циклов · фильтры + превью недели-1 + сравнение`}

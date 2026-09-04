@@ -119,7 +119,7 @@ export const BbProgramLibraryPicker: React.FC<{
   const sel = deduped.find(p => p.id === value);
   const disabled = useMemo(() => new Set(disabledIds || []), [disabledIds]);
 
-  return <>
+  return <div className="train-bblib">
     <button onClick={() => setOpen(true)} style={{ ...cardBtnStyle(!!value), width: '100%' }}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : '#fff' }}>
@@ -214,7 +214,7 @@ export const BbProgramLibraryPicker: React.FC<{
         </div>
       </PortalOverlay>
     )}
-  </>;
+  </div>;
 };
 
 export default BbProgramLibraryPicker;

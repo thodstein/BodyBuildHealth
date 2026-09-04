@@ -7,7 +7,7 @@ export const SupportProtocolGI: React.FC<{ s: Record<string, any> }> = ({ s }) =
   const [giTab, setGiTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="ЖКТ">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-gi" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#a3e635', marginBottom:2 }}>🫀 ЖКТ — защита слизистой и микробиома</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Профилактика гастропатии, дисбактериоза и синдрома дырявого кишечника на курсе ААС.</p>

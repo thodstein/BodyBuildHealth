@@ -7,7 +7,7 @@ export const SupportProtocolGLP1: React.FC<{ s: Record<string, any> }> = ({ s })
   const [glp1Tab, setGlp1Tab] = useState('protocol');
   return (
           <InfoErrorBoundary label="GLP-1">
-            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-glp1" style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#f59e0b', marginBottom:2 }}>🍪 GLP-1 и метаболическая поддержка</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Управление аппетитом, гликемией и весом через GLP-1 агонисты (семаглутид, лираглутид) и природные GLP-1 секретагоги. Контроль побочных эффектов.</p>

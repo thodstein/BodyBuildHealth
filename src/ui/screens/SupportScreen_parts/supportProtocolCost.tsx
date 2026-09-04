@@ -7,7 +7,7 @@ export const SupportProtocolCost: React.FC<{ s: Record<string, any> }> = ({ s })
   const [costTab, setCostTab] = useState('liver');
   return (
     <InfoErrorBoundary label="Оптимизация стоимости">
-      <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+      <div className="sup-proto-cost" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:2 }}>💰 Оптимизация стоимости поддержки — справочник (НЕ протокол назначения)</div>
           <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Ориентировочные цены и приоритеты. Реальные назначения и дозировки — ТОЛЬКО по назначению врача.</p>

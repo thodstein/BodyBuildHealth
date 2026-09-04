@@ -76,7 +76,7 @@ const ProAnalysisTab: React.FC = () => {
   }, [proGroup, groupExercises]);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+    <div className="train-exlabpro" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 12 }}>
         <PopupSelect label="Группа мышц" value={proGroup} options={GROUPS.filter(g => g !== 'all').map(g => ({ id: g, label: `${GROUP_ICON[g] || ''} ${GROUP_RU[g]}`, desc: '' }))} hint="Группа для анализа" onChange={v => setProGroup(v)} />
       </div>

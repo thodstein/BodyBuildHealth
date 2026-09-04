@@ -97,6 +97,19 @@ import { SupportProtocolThyroid } from '../screens/SupportScreen_parts/supportPr
 import { SupportProtocolMetabolic } from '../screens/SupportScreen_parts/supportProtocolMetabolic';
 import { SupportProtocolHemato } from '../screens/SupportScreen_parts/supportProtocolHemato';
 import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProtocolDetox';
+import { BbProgramLibraryPicker } from '../screens/TrainingScreen_parts/BbProgramLibraryPicker';
+import { default as ExerciseLabPro } from '../screens/TrainingScreen_parts/ExerciseLabPro';
+import { default as ExerciseLabProSubstitute } from '../screens/TrainingScreen_parts/ExerciseLabProSubstitute';
+import { ManualLibraryGallery } from '../screens/TrainingScreen_parts/ManualLibraryGallery';
+import { RirWaveChart } from '../screens/TrainingScreen_parts/ProgramEditorPanels2';
+import { SubstitutionPopup } from '../screens/TrainingScreen_parts/SubstitutionPopup';
+import { SupportProtocolCost } from '../screens/SupportScreen_parts/supportProtocolCost';
+import { SupportProtocolEmergency } from '../screens/SupportScreen_parts/supportProtocolEmergency';
+import { SupportProtocolGI } from '../screens/SupportScreen_parts/supportProtocolGI';
+import { SupportProtocolGLP1 } from '../screens/SupportScreen_parts/supportProtocolGLP1';
+import { SupportProtocolHair } from '../screens/SupportScreen_parts/supportProtocolHair';
+import { SupportProtocolInjections } from '../screens/SupportScreen_parts/supportProtocolInjections';
+import { SupportProtocolWomen } from '../screens/SupportScreen_parts/supportProtocolWomen';
 import { ArmAutoConstructor } from '../screens/TrainingScreen_parts/ArmAutoConstructor';
 import { FatigueIndexTab } from '../screens/TrainingScreen_parts/FatigueIndexTab';
 import { MRVEstimatorTab } from '../screens/TrainingScreen_parts/MRVEstimatorTab';
@@ -581,5 +594,56 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c8 } = render(<SupportProtocolDetox s={{}} />);
     expect(c8.querySelector('.sup-proto-detox'), 'detox').not.toBeNull();
+  });
+
+  it('29. Batch-8 корни: библиотека, лаборатория, модалки', () => {
+    const { container: c1 } = render(
+      <BbProgramLibraryPicker value={null} label="Программа" programs={[]} onSelect={() => {}} />,
+    );
+    expect(c1.querySelector('.train-bblib'), 'bblib').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<ExerciseLabPro />);
+    expect(c2.querySelector('.train-exlabpro'), 'exlabpro').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<ExerciseLabProSubstitute />);
+    expect(c3.querySelector('.train-exlabsub'), 'exlabsub').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <ManualLibraryGallery bbPrograms={[]} plCycles={[]} onSelectBB={() => {}} onSelectPL={() => {}} />,
+    );
+    expect(c4.querySelector('.train-manlib'), 'manlib').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <SubstitutionPopup exerciseName="Жим" group="chest" onSelect={() => {}} onClose={() => {}} />,
+    );
+    expect(
+      c5.querySelector('.train-subspopup') ?? c5.querySelector('.train-subspopup-main'),
+      'subspopup',
+    ).not.toBeNull();
+  });
+
+  it('30. Batch-8 корни: протоколы, третья волна', () => {
+    const { container: c1 } = render(<SupportProtocolCost s={{}} />);
+    expect(c1.querySelector('.sup-proto-cost'), 'cost').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupportProtocolEmergency s={{}} />);
+    expect(c2.querySelector('.sup-proto-emergency'), 'emergency').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportProtocolGI s={{}} />);
+    expect(c3.querySelector('.sup-proto-gi'), 'gi').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportProtocolGLP1 s={{}} />);
+    expect(c4.querySelector('.sup-proto-glp1'), 'glp1').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<SupportProtocolHair s={{}} />);
+    expect(c5.querySelector('.sup-proto-hair'), 'hair').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<SupportProtocolInjections s={{}} />);
+    expect(c6.querySelector('.sup-proto-inj'), 'inj').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(<SupportProtocolWomen s={{}} />);
+    expect(c7.querySelector('.sup-proto-women'), 'women').not.toBeNull();
+    // BBRecommendationsTab/RirWaveChart требуют hub/program —
+    // хуки живут в прод-ветках, здесь не проверяются.
   });
 });
