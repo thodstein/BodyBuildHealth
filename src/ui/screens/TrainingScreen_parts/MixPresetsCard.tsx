@@ -95,7 +95,7 @@ export const MixPresetsCard: React.FC = () => {
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-mixpresets" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🧪 Пресеты здоровья</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         Готовые составы pre/intra/post: жиросжигание, суставы, ЖКТ, сон, гидратация, противовоспалительный, иммунитет. Выберите цель, подгоните вес и множитель дозы.

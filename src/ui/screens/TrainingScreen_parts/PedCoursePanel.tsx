@@ -48,7 +48,7 @@ export const PedInputPanel: React.FC<{
 }> = ({ peds, onToggle, pedDoses, onDose, courseIntensity, onIntensity, headerExtra }) => {
   const active = peds.length > 0;
   return (
-    <div style={{ ...CARD, marginBottom: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.14)', padding: 12 }}>
+    <div className="train-pedinput" style={{ ...CARD, marginBottom: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.14)', padding: 12 }}>
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>

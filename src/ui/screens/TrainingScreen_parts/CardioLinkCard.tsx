@@ -121,7 +121,7 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
   }, [pendingDiff]);
 
   return (
-    <div style={{ ...CARD, gap: 10 }}>
+    <div className="train-cardiolink" style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
         <span style={LABEL}>❤️ Кардио</span>
         {link ? (

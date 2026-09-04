@@ -151,7 +151,7 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
   };
 
   return (
-    <div style={{ ...CARD, padding: 10 }}>
+    <div className="train-bulk" style={{ ...CARD, padding: 10 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
         🔧 Массовые операции PRO
         <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>

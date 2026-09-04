@@ -117,7 +117,7 @@ export const MRVEstimatorTab: React.FC = () => {
   const recMax = Math.max(80, ...(recs.length ? recs : [80]));
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-mrvest" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🎯 Work capacity / MRV-оценщик</div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Индивидуальный MRV (Maximum Recoverable Volume) оценивается по истории тренировок (sRPE) и готовности:

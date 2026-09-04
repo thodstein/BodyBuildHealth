@@ -92,7 +92,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
   const isWide = false; // always 2-col on mobile, 1-col at <=360px handled by CSS
 
   return (
-    <div style={{ padding: '2px 0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-inteldash" style={{ padding: '2px 0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Header */}
       <div style={{ padding: '0 4px', marginBottom: 2 }}>
         <h3 style={{ margin: '0 0 2px', fontSize: 15, fontWeight: 800, color: '#fff' }}>

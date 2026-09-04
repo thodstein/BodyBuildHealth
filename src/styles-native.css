@@ -2502,3 +2502,65 @@ html.app-native .sup-risktimeline {
     animation: none;
   }
 }
+
+/* ─── 37. NATIVE DEEP-5 — конструкторы, импорт, модалки ─────── */
+html.app-native .train-arm,
+html.app-native .train-bulk,
+html.app-native .train-cardiolink,
+html.app-native .train-cardiovol,
+html.app-native .train-cycletemplates,
+html.app-native .train-diarytools,
+html.app-native .train-csvimport,
+html.app-native .train-fatigue,
+html.app-native .train-hybrid,
+html.app-native .train-mrvest,
+html.app-native .train-tonnage,
+html.app-native .train-profilecard,
+html.app-native .train-plannertools,
+html.app-native .train-conjugate,
+html.app-native .train-inteldash,
+html.app-native .train-mesoprog,
+html.app-native .train-pedinput,
+html.app-native .train-sessionmodal,
+html.app-native .train-mixpresets {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-bulk,
+html.app-native .train-cardiolink,
+html.app-native .train-cardiovol,
+html.app-native .train-cycletemplates,
+html.app-native .train-mesoprog,
+html.app-native .train-pedinput,
+html.app-native .train-profilecard {
+  border-radius: 20px !important;
+}
+
+html.app-native .train-sessionmodal > div {
+  border-radius: 22px !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-arm,
+  html.app-native .train-bulk,
+  html.app-native .train-cardiolink,
+  html.app-native .train-cardiovol,
+  html.app-native .train-cycletemplates,
+  html.app-native .train-diarytools,
+  html.app-native .train-csvimport,
+  html.app-native .train-fatigue,
+  html.app-native .train-hybrid,
+  html.app-native .train-mrvest,
+  html.app-native .train-tonnage,
+  html.app-native .train-profilecard,
+  html.app-native .train-plannertools,
+  html.app-native .train-conjugate,
+  html.app-native .train-inteldash,
+  html.app-native .train-mesoprog,
+  html.app-native .train-pedinput,
+  html.app-native .train-sessionmodal,
+  html.app-native .train-mixpresets {
+    animation: none;
+  }
+}

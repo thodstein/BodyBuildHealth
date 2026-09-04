@@ -72,7 +72,7 @@ export const TonnageCalcTab: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-tonnage" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>📦 Тоннаж калькулятор</div>
       <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>Ввод упражнений → тоннаж, КПШ, средний вес, УОИ, разбивка по мышцам и зонам интенсивности.</div>
 

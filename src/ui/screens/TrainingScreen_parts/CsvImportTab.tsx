@@ -145,7 +145,7 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
   const loadSample = () => { setText(SAMPLES[format]); setResult(null); };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-csvimport" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>📥 Импорт тренировок</div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>

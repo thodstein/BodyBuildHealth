@@ -98,7 +98,7 @@ export const HybridPlanPanel: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-hybrid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (сила + масса)</div>
       <div style={{ fontSize: 11, color: DIM }}>Проф. ПЛ-цикл (тяжёлые присед/жим/тяга, immutable) + ББ-аксессуары на мышцы-антагонисты после каждого тяжёлого дня.</div>
 

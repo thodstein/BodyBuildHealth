@@ -287,7 +287,7 @@ export function ArmAutoConstructor() {
   const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: 12 }}>
+    <div className="train-arm" style={{ maxWidth: 980, margin: '0 auto', padding: 12 }}>
       <h2 style={H}>🤝 Арм-конструктор PRO</h2>
       <p style={SMALL}>Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard.</p>
 

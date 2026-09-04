@@ -112,7 +112,7 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => 
   const [openId, setOpenId] = useState<string | null>(null);
   const tools = TOOLS[mode] || [];
   return (
-    <div style={{ marginTop: 6, minWidth: 0, maxWidth: '100%' }}>
+    <div className="train-plannertools" style={{ marginTop: 6, minWidth: 0, maxWidth: '100%' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', margin: '8px 0 4px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         🔧 Инструменты ({tools.length})
       </div>

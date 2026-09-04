@@ -117,7 +117,7 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
   const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
 
   return (
-    <div style={CARD}>
+    <div className="train-cardiovol" style={CARD}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>📈 Объём по неделям</span>
         <button style={metric === 'minutes' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('minutes')}>мин</button>

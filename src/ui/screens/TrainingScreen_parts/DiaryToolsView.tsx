@@ -39,7 +39,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     return [...templateMap.entries()].slice(0, 4) as [string, { exercises: string[]; sets: number; date: string }][];
   }, [historyWorkouts]);
   return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="train-diarytools" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CsvImportTab onDone={onRefresh} />
           {/* CSV Export */}
           <div style={style.card}>

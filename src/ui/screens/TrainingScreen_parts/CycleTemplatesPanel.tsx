@@ -144,7 +144,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
   const phaseColors: Record<string, string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="train-cycletemplates" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>📚 Шаблоны циклов</span>
         <span style={{ fontSize: 10, color: DIM }}>{weeks} нед × {days}д/нед · {level} · {dir.toUpperCase()}</span>

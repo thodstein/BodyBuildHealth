@@ -79,7 +79,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
   const phases = Object.keys(PHASE_COLORS) as MesocyclePhase[];
 
   return (
-    <div style={CARD}>
+    <div className="train-mesoprog" style={CARD}>
       <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
         {isSourceCalendar ? '📅' : '📈'} {title || 'Прогрессия мезоцикла'}
         <div style={{ marginLeft: 8, fontSize: 10, color: '#fff', fontWeight: 400, marginTop: 2 }}>

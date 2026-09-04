@@ -94,7 +94,7 @@ export const FatigueIndexTab: React.FC = () => {
 
   if (sessions.length === 0) {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <div className="train-fatigue" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
         <div style={H}>📉 Индекс усталости (Fatigue Index)</div>
         <div style={CARD}>
           <div style={SMALL}>Нет записанных sRPE сессий. Добавьте тренировки в калькулятор «Нагрузка/тоннаж» (вкладка «⚖️») для расчёта усталости.</div>
@@ -107,7 +107,7 @@ export const FatigueIndexTab: React.FC = () => {
   const acwrPct = Math.min(100, Math.max(0, (acwr.ratio / 2) * 100));
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-fatigue" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📉 Индекс усталости (Fatigue Index из sRPE)</div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Источник: sRPE-дневник. Метрики: недельная нагрузка (sRPE × минуты), монотонность (mean/stdev), strain (mono × total),

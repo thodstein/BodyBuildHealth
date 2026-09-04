@@ -68,6 +68,17 @@ import { SupportPeptideCalc } from '../screens/SupportScreen_parts/SupportPeptid
 import { SupportAnalogCalculator } from '../screens/SupportScreen_parts/SupportAnalogCalculator';
 import { SupportEffectiveDose } from '../screens/SupportScreen_parts/SupportEffectiveDose';
 import { RiskTimelineChart } from '../screens/SupportScreen_parts/RiskTimelineChart';
+import { ArmAutoConstructor } from '../screens/TrainingScreen_parts/ArmAutoConstructor';
+import { FatigueIndexTab } from '../screens/TrainingScreen_parts/FatigueIndexTab';
+import { MRVEstimatorTab } from '../screens/TrainingScreen_parts/MRVEstimatorTab';
+import { TonnageCalcTab } from '../screens/TrainingScreen_parts/TonnageCalcTab';
+import { CsvImportTab } from '../screens/TrainingScreen_parts/CsvImportTab';
+import { CardioLinkCard } from '../screens/TrainingScreen_parts/CardioLinkCard';
+import { MixPresetsCard } from '../screens/TrainingScreen_parts/MixPresetsCard';
+import { PlannerToolsPanel } from '../screens/TrainingScreen_parts/PlannerToolsPanel';
+import ConjugateDesigner from '../screens/TrainingScreen_parts/ConjugateDesigner';
+import { MesocycleProgressionCard } from '../screens/TrainingScreen_parts/MesocycleProgressionCard';
+import { PedInputPanel } from '../screens/TrainingScreen_parts/PedCoursePanel';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -391,5 +402,55 @@ describe('market + pharma + labs roots', () => {
       />,
     );
     expect(c4.querySelector('.sup-risktimeline'), 'risktimeline').not.toBeNull();
+  });
+
+  it('21. Batch-5 корни: arm, fatigue, mrv, tonnage', () => {
+    const { container: c1 } = render(<ArmAutoConstructor />);
+    expect(c1.querySelector('.train-arm'), 'arm').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<FatigueIndexTab />);
+    expect(c2.querySelector('.train-fatigue'), 'fatigue').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<MRVEstimatorTab />);
+    expect(c3.querySelector('.train-mrvest'), 'mrvest').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TonnageCalcTab />);
+    expect(c4.querySelector('.train-tonnage'), 'tonnage').not.toBeNull();
+  });
+
+  it('22. Batch-5 корни: csv, cardiolink, mixpresets', () => {
+    const { container: c1 } = render(<CsvImportTab />);
+    expect(c1.querySelector('.train-csvimport'), 'csvimport').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<CardioLinkCard />);
+    expect(c2.querySelector('.train-cardiolink'), 'cardiolink').not.toBeNull();
+    cleanup();
+    // CardioVolumeChart возвращает null без цикла (строка 46) —
+    // хук .train-cardiovol живёт в прод-ветке, здесь не проверяется.
+    const { container: c4 } = render(<MixPresetsCard />);
+    expect(c4.querySelector('.train-mixpresets'), 'mixpresets').not.toBeNull();
+  });
+
+  it('23. Batch-5 корни: plannertools, conjugate, mesoprog, pedinput', () => {
+    const { container: c1 } = render(<PlannerToolsPanel mode="pl" />);
+    expect(c1.querySelector('.train-plannertools'), 'plannertools').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<ConjugateDesigner />);
+    expect(c2.querySelector('.train-conjugate'), 'conjugate').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<MesocycleProgressionCard />);
+    expect(c3.querySelector('.train-mesoprog'), 'mesoprog').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <PedInputPanel
+        peds={[]}
+        onToggle={() => {}}
+        pedDoses={{}}
+        onDose={() => {}}
+        courseIntensity={'moderate' as never}
+        onIntensity={() => {}}
+      />,
+    );
+    expect(c4.querySelector('.train-pedinput'), 'pedinput').not.toBeNull();
   });
 });

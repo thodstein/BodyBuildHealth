@@ -30,7 +30,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
   const [injVolPct, setInjVolPct] = useState(80);
   const [injRepsCap, setInjRepsCap] = useState(12);
   return (
-    <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 12, margin: '0 0 10px' }}>
+    <div className="train-profilecard" style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 12, margin: '0 0 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>🧬 Профиль тренированности</div>
         <span style={{ fontSize: 10, color: '#fff' }}>единый источник данных</span>

@@ -79,7 +79,7 @@ const ConjugateDesigner: React.FC = () => {
   };
 
   return (
-    <div style={{ marginTop: 6 }}>
+    <div className="train-conjugate" style={{ marginTop: 6 }}>
       {/* Режим */}
       <div style={GLASS}>
         <div style={H}>🔁 Режим конъюгата</div>
