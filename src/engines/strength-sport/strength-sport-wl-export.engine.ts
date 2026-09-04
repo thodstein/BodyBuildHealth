@@ -77,16 +77,6 @@ ${injRows ? `<h2>Инъекция в план</h2><ul>${injRows}</ul>` : ''}
 </body></html>`;
 }
 
-export function buildWLPlanHtml(plan: any, snap?: WLDiagnosticSnapshot): string {
-  const weeks = (plan?.weeksData || []).map((w: any) => `<tr><td>${w.week}</td><td>${esc(w.phase)}</td><td>${w.totalSets}</td><td>${Math.round((w.totalTonnage||0)/1000)}т</td></tr>`).join('');
-  const diag = snap ? buildWLDiagnosticsHtml(snap).replace('<!DOCTYPE html>', '').replace(/<html>.*<\/html>/s, '') : '';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ТА-план ${esc(plan?.id || '')}</title><style>body{font-family:system-ui;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px}</style></head><body>
-<h1>ТА-план ${esc(plan?.mode || '')} ${plan?.weeks}нед</h1>
-<table><tr><th>Нед</th><th>Фаза</th><th>Сеты</th><th>Тоннаж</th></tr>${weeks}</table>
-${diag}
-</body></html>`;
-}
-
 export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
   const escCsv = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
   const rows = [

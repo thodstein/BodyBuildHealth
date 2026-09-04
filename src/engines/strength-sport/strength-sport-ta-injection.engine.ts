@@ -47,22 +47,66 @@ export interface TAInjectionOpts {
 export const TA_PLAN_KEY = 'he_strength_sport_plan_v1';
 export const TA_PLAN_PREV_KEY = 'he_strength_sport_plan_prev_v1';
 
+function planIdOf(raw: string | null): string | null {
+  try {
+    if (!raw) return null;
+    const j = JSON.parse(raw);
+    const id = j?.id ?? j?.plan?.id;
+    return typeof id === 'string' && id ? id : null;
+  } catch { return null; }
+}
+
+interface TASnapshot {
+  raw: string;
+  planId: string | null;
+  savedAt: string;
+}
+
+function readSnapshot(): TASnapshot | string | null {
+  try {
+    const prev = localStorage.getItem(TA_PLAN_PREV_KEY);
+    if (!prev) return null;
+    try {
+      const j = JSON.parse(prev);
+      // V6-B2 формат {raw, planId, savedAt}; legacy — сырой план строкой
+      if (j && typeof j === 'object' && typeof (j as any).raw === 'string') return j as TASnapshot;
+    } catch { /* legacy raw — ниже */ }
+    return prev;
+  } catch { return null; }
+}
+
 /** Снапшот текущего плана перед инъекцией (для отката). */
 export function snapshotTAPlanForInject(): boolean {
   try {
     const raw = localStorage.getItem(TA_PLAN_KEY);
     if (!raw) return false;
-    localStorage.setItem(TA_PLAN_PREV_KEY, raw);
+    const snap: TASnapshot = { raw, planId: planIdOf(raw), savedAt: new Date().toISOString() };
+    localStorage.setItem(TA_PLAN_PREV_KEY, JSON.stringify(snap));
     return true;
   } catch { return false; }
 }
 
-/** Откат инъекции: восстановить снапшот. */
+/**
+ * Откат инъекции: восстановить снапшот.
+ * V6-B2: если план пересобран после снапшота (другой id) — откат запрещён,
+ * stale-снапшот удаляется, возвращается false (план не тронут).
+ */
 export function rollbackTAPlanInject(): boolean {
   try {
-    const prev = localStorage.getItem(TA_PLAN_PREV_KEY);
-    if (!prev) return false;
-    localStorage.setItem(TA_PLAN_KEY, prev);
+    const snap = readSnapshot();
+    if (!snap) return false;
+    if (typeof snap === 'string') {
+      // legacy-снапшот (сырой план) — старое поведение
+      localStorage.setItem(TA_PLAN_KEY, snap);
+      localStorage.removeItem(TA_PLAN_PREV_KEY);
+      return true;
+    }
+    const curId = planIdOf(localStorage.getItem(TA_PLAN_KEY));
+    if (snap.planId != null && curId != null && snap.planId !== curId) {
+      localStorage.removeItem(TA_PLAN_PREV_KEY);
+      return false;
+    }
+    localStorage.setItem(TA_PLAN_KEY, snap.raw);
     localStorage.removeItem(TA_PLAN_PREV_KEY);
     return true;
   } catch { return false; }

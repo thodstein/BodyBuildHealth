@@ -126,4 +126,41 @@ describe('TA injection v2 E6 — все недели + preferred + spec + отк
       (global as any).localStorage = orig;
     }
   });
+  it('V6-B2 stale: план пересобран (другой id) — откат запрещён, план цел', () => {
+    let store: any = {};
+    const orig = (global as any).localStorage;
+    (global as any).localStorage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; },
+    } as any;
+    try {
+      store[TA_PLAN_KEY] = JSON.stringify({ id: 'plan-A', v: 1 });
+      expect(snapshotTAPlanForInject()).toBe(true);
+      store[TA_PLAN_KEY] = JSON.stringify({ id: 'plan-B', v: 2 }); // пересборка в конструкторе
+      expect(rollbackTAPlanInject()).toBe(false);
+      expect(JSON.parse(store[TA_PLAN_KEY]).id).toBe('plan-B'); // новый план не тронут
+      expect(store[TA_PLAN_PREV_KEY]).toBeUndefined(); // stale очищен
+      expect(hasTAPlanPrev()).toBe(false);
+    } finally {
+      (global as any).localStorage = orig;
+    }
+  });
+  it('V6-B2 legacy-снапшот (сырой план) — старое поведение', () => {
+    let store: any = {};
+    const orig = (global as any).localStorage;
+    (global as any).localStorage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; },
+    } as any;
+    try {
+      store[TA_PLAN_KEY] = JSON.stringify({ id: 'plan-A', v: 2 });
+      store[TA_PLAN_PREV_KEY] = JSON.stringify({ id: 'plan-A', v: 1 }); // формат до V6
+      expect(rollbackTAPlanInject()).toBe(true);
+      expect(JSON.parse(store[TA_PLAN_KEY]).v).toBe(1);
+    } finally {
+      (global as any).localStorage = orig;
+    }
+  });
 });

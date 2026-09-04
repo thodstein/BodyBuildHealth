@@ -311,4 +311,32 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText(/Проверить MediaPipe/));
     await waitFor(() => expect(container.textContent).toMatch(/проверяем|модель доступна|нет сети/), { timeout: 5000 });
   });
+  it('V6-B3 IMTP ручной вес без профиля', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Взятие/)[0]);
+    fireEvent.change(container.querySelector('input[placeholder="250"]')!, { target: { value: '200' } });
+    fireEvent.change(container.querySelector('input[placeholder="90"]')!, { target: { value: '80' } });
+    await waitFor(() => expect(container.textContent).toContain('×BW'), { timeout: 2000 });
+  });
+  it('V6-B1 ноты инъекции персистятся и переживают remount', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 1, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+      ],
+      workMax: { snatch: 80 }, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const first = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: середина тяги/)[0]);
+    fireEvent.click(await screen.findByText(/Вставить коррекции/));
+    await waitFor(() => expect(first.container.textContent).toContain('Вставлено коррекций'), { timeout: 2000 });
+    const stored = JSON.parse(localStorage.getItem('he_wl_diagnostics_hub_v1') || '{}');
+    expect(Array.isArray(stored.lastInjectNotes) && stored.lastInjectNotes.length).toBeGreaterThan(0);
+    first.unmount();
+    const second = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
+    await waitFor(() => expect(second.container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+  });
 });

@@ -1,12 +1,12 @@
 /**
  * strength-sport-diary-integration.engine.ts — СВЯЗКА ДНЕВНИКА → ТА-диагностика
  *
- * Использует weak-muscle-detection (e1RM тренд 28д), phaseForReps, diary trend для выявления
+ * Использует weak-muscle-detection (e1RM тренд 28д) и rep-частотную эвристику
+ * (reps≤2 → max moment, 3-5 → mid — parity с phaseForReps) для выявления
  * слабых фаз ТА. Чистый, parity с PlDeadpointsBarPathCard.
  */
 
-import { detectWeakMusclesByE1rm, type WeakMuscleSession, groupOfExerciseName } from '../pro/weak-muscle-detection.engine';
-import { phaseForReps } from '../pro/lift-diagnostics.engine';
+import { detectWeakMusclesByE1rm, type WeakMuscleSession } from '../pro/weak-muscle-detection.engine';
 import type { WLWeakPoint } from './strength-sport-weakpoint';
 import { WL_WEAKPOINT_BY_LIFT } from './strength-sport-weakpoint';
 
@@ -52,13 +52,9 @@ export function candidateTAWeakPointsFromDiary(
       for (const set of (ex.sets || [])) {
         const rpe = set.rpe ?? 0;
         const reps = set.reps ?? 0;
-        const w = set.weightKg ?? 0;
-        if (rpe >= 8 && reps > 0 && reps < 6) {
-          // e1RM-тренд уже в detectTAWeakFromDiary, здесь только phaseForReps parity
-          const ph = phaseForReps(reps, liftKey as any);
-          if (ph) repBuckets.push(reps);
-          else repBuckets.push(reps);
-        } else if (rpe >= 8 && reps > 0) repBuckets.push(reps);
+        // Тяжёлые сеты (RPE≥8): фаза определяется ниже через phaseForReps-частоты;
+        // e1RM-тренд уже учтён в detectTAWeakFromDiary.
+        if (rpe >= 8 && reps > 0) repBuckets.push(reps);
       }
     }
   }

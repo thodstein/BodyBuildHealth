@@ -218,30 +218,6 @@ export function diagnoseBarPathFromMetrics(metrics: BarPathMetrics | null, lift:
 }
 
 /**
- * Расширенная диагностика bar path для WLDiagnosticsHub: связывает deviation → weakPoint
- * (совместимо со старым diagnoseBarPath, но с метриками)
- */
-export function diagnoseBarPathPro(lift: string, deviation: BarPathDeviationPro, metrics?: BarPathMetrics | null): { weak: string | null; corrections: string[]; metrics?: BarPathMetrics | null; trajectory?: TrajectoryClassification | null } {
-  const map: Record<string, Record<BarPathDeviationPro, string>> = {
-    snatch: { forward: 'snatch_mid', backward: 'snatch_off_floor', loop: 'snatch_pull_under', early_pull: 'snatch_mid', soft_lockout: 'snatch_catch' },
-    clean: { forward: 'clean_mid', backward: 'clean_off_floor', loop: 'clean_catch', early_pull: 'clean_mid', soft_lockout: 'clean_catch' },
-    jerk: { forward: 'jerk_drive', backward: 'jerk_dip', loop: 'jerk_lockout', early_pull: 'jerk_dip', soft_lockout: 'jerk_lockout' },
-    squat: { forward: 'squat_mid', backward: 'squat_bottom', loop: 'squat_mid', early_pull: 'squat_bottom', soft_lockout: 'squat_mid' },
-  };
-  const key = lift.toLowerCase().includes('snatch') ? 'snatch' : lift.toLowerCase().includes('clean') ? 'clean' : lift.toLowerCase().includes('jerk') ? 'jerk' : lift.toLowerCase().includes('squat') ? 'squat' : 'snatch';
-  const table = map[key];
-  const weak = table ? table[deviation] : null;
-  const corrMap: Record<BarPathDeviationPro, string[]> = {
-    forward: ['pause_snatch', 'snatch_balance', 'overhead_squat_v2'],
-    backward: ['deficit_snatch', 'snatch_pull', 'high_hang_snatch'],
-    loop: ['muscle_snatch', 'hang_snatch', 'tempo_squat'],
-    early_pull: ['pause_pull', 'deficit_pull', 'clean_pull'],
-    soft_lockout: ['push_jerk', 'split_jerk', 'jerk_recovery'],
-  };
-  return { weak, corrections: corrMap[deviation] || [], metrics: metrics ?? null, trajectory: metrics?.trajectoryType ? classifyTrajectoryType([]) : null };
-}
-
-/**
  * Field-based reliability: SEM/SRD reference из Frontiers 2023
  * Возвращает, является ли изменение реальным ( > SRD )
  */

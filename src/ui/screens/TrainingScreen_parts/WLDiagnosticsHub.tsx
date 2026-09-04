@@ -16,8 +16,8 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
 import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
-import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
+import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
+import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
@@ -108,6 +108,10 @@ type WLState = {
   imtpRfd: string;
   imtpDur: string;
   imtpCountermove: boolean;
+  // V6-B3: ручной вес для IMTP (при пустом профиле)
+  imtpBw: string;
+  // V4-B/V6-B1: ноты последней инъекции (идут в экспорт, персистятся с состоянием хаба)
+  lastInjectNotes: string[];
   // V3: MediaPipe live-статус + прогресс двоеборья
   poseLive: '' | 'loading' | 'ok' | 'fail';
   progBw: string;
@@ -141,9 +145,13 @@ const DEFAULT_STATE: WLState = {
   taSnatchMax: '', taCjMax: '', taVelStd: '', taVelToday: '', taStrategy: 'balanced',
   // E13: IMTP/RFD
   imtpRfd: '', imtpDur: '', imtpCountermove: false,
+  // V6-B3: ручной вес IMTP
+  imtpBw: '',
   // V3: live-статус + прогресс
   poseLive: '' as '' | 'loading' | 'ok' | 'fail',
   progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
+  // V6-B1: старые сохранения без поля → []
+  lastInjectNotes: [],
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -183,8 +191,6 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
   });
-  // V4-B: ноты последней инъекции (идут в экспорт)
-  const [lastInjectNotes, setLastInjectNotes] = useState<string[]>([]);
   // V5-B: стартовая неделя годового синка
   const [annualStartWeek, setAnnualStartWeek] = useState('1');
 
@@ -575,21 +581,22 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
-  // E13: IMTP/RFD-профиль (вес тела из профиля)
+  // E13: IMTP/RFD-профиль (вес: ручной ввод → профиль)
   const imtpResult = useMemo(() => {
     try {
-      // IMTP-ввод живёт в clean-табе (кг силы), RFD/длительность — здесь же
-      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove;
+      // IMTP-ввод живёт в clean-табе (кг силы), RFD/длительность/вес — здесь же
+      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove || state.imtpBw;
       if (!hasAny) return null;
+      const manualBw = state.imtpBw ? parseFloat(state.imtpBw) : NaN;
       return diagnoseTAImtp({
         peakForceN: state.imtpKg ? parseFloat(state.imtpKg) * 9.81 : null,
-        bodyweightKg: profileWeightKg ?? null,
+        bodyweightKg: (Number.isFinite(manualBw) && manualBw > 0 ? manualBw : null) ?? profileWeightKg ?? null,
         rfdNs: state.imtpRfd ? parseFloat(state.imtpRfd) : null,
         durationS: state.imtpDur ? parseFloat(state.imtpDur) : null,
         countermovement: state.imtpCountermove || null,
       });
     } catch { return null; }
-  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, profileWeightKg]);
+  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, profileWeightKg]);
 
   // E2: причина слабой фазы (объём/техника/мобильность/усталость/сила)
   const causeFor = (wp: WLWeakPoint) => {
@@ -717,7 +724,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setToast(`⊘ Не вставлено (бюджет-скип: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
       setTimeout(() => setToast(''), 3000);
       setHasInjectPrev(true);
-      setLastInjectNotes(r.notes || []);
+      setState(s => ({ ...s, lastInjectNotes: r.notes || [] }));
       return;
     }
     try {
@@ -733,7 +740,7 @@ export const WLDiagnosticsHub: React.FC = () => {
     }
     setHasInjectPrev(true);
     setPlanNonce(n => n + 1);
-    setLastInjectNotes(r.notes || []);
+    setState(s => ({ ...s, lastInjectNotes: r.notes || [] }));
     setToast(`✓ Вставлено коррекций: ${r.injected} (нед: ${r.plan.weeksData.length}, скип-бюджет: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
     setTimeout(() => setToast(''), 3000);
     try {
@@ -744,10 +751,14 @@ export const WLDiagnosticsHub: React.FC = () => {
   };
 
   const handleRollbackInject = () => {
+    // V6-B2: был ли снапшот до попытки (stale = план пересобран после инъекции)
+    let hadPrev = false;
+    try { hadPrev = hasTAPlanPrev(); } catch { /* noop */ }
     try {
       if (!rollbackTAPlanInject()) {
-        setToast('Снапшота нет — откатывать нечего');
-        setTimeout(() => setToast(''), 2000);
+        setHasInjectPrev(false);
+        setToast(hadPrev ? 'План пересобран после инъекции — откат недоступен' : 'Снапшота нет — откатывать нечего');
+        setTimeout(() => setToast(''), 2500);
         return;
       }
     } catch { /* noop */ }
@@ -913,8 +924,9 @@ export const WLDiagnosticsHub: React.FC = () => {
       }).filter(Boolean);
       base.corrections = weakPoints.flatMap(wp => { try { return top3For(wp).map(c => ({ weakPoint: wp, corrId: c.id, name: c.name, protocol: `${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%` })); } catch { return []; } });
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
-      // V4-B: ноты последней инъекции + Sinclair прогресса
-      if (lastInjectNotes.length) base.injectionNotes = [...lastInjectNotes];
+      // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
+      const injectNotes = Array.isArray(state.lastInjectNotes) ? state.lastInjectNotes : [];
+      if (injectNotes.length) base.injectionNotes = [...injectNotes];
       if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair };
     } catch { /* noop — базовый снап */ }
     return base;
@@ -1088,9 +1100,10 @@ export const WLDiagnosticsHub: React.FC = () => {
             {/* E13: IMTP/RFD-профиль */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>IMTP/RFD — профиль силы vs взрыва{profileWeightKg ? ` · вес ${profileWeightKg}кг` : ' · вес задай в профиле'}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 6 }}>
                 <label style={{ fontSize: 11, color: DIM }}>RFD Н/с (0–200мс)<br /><input value={state.imtpRfd} onChange={e => setState(s => ({ ...s, imtpRfd: e.target.value }))} placeholder="7000" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
                 <label style={{ fontSize: 11, color: DIM }}>Длительность с<br /><input value={state.imtpDur} onChange={e => setState(s => ({ ...s, imtpDur: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: DIM }}>Вес кг<br /><input value={state.imtpBw} onChange={e => setState(s => ({ ...s, imtpBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '90'} style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
               </div>
               <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}><input type="checkbox" checked={state.imtpCountermove} onChange={e => setState(s => ({ ...s, imtpCountermove: e.target.checked }))} /> Был dip/пружина перед тягой (инвалидирует тест)</label>
               {imtpResult && <div style={{ fontSize: 10, color: imtpResult.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>{imtpResult.relForce != null ? `${imtpResult.relForce}×BW · ` : ''}{imtpResult.verdict}</div>}
@@ -1368,7 +1381,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             ))}
             <button onClick={takeProgSnapshot} style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
           </div>
-          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair}</div>}
+          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair}</div>}
           {progTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
