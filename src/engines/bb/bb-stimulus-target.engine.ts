@@ -1,5 +1,5 @@
 /**
- * bb-stimulus-target.engine.ts — «стимул в цель», а не «вес поднят» (MAX PRO пилот: руки + дельты).
+ * bb-stimulus-target.engine.ts — «стимул в цель», а не «вес поднят» (MAX PRO: руки + дельты + грудь/спина/ноги).
  *
  * Отвечает на вопрос: насколько нагрузка упражнения доходит до целевой мышцы/головки.
  * Канон функции мышцы — TARGET_MUSCLE_DB (анатомия/mmc), канон упражнения — EXERCISE_CATALOG.
@@ -25,7 +25,7 @@ export interface HeadFunction {
   loadedBy: string[]; // имена-ориентиры упражнений
 }
 
-/** Функции головок пилота (сверено с TARGET_MUSCLE_DB + bb-labels). */
+/** Функции головок (сверено с TARGET_MUSCLE_DB + bb-labels + EXERCISE_CATALOG.targetMuscle). */
 export const HEAD_FUNCTIONS: Record<string, HeadFunction> = {
   triceps_long: {
     head: 'triceps_long', muscle: 'triceps', label: 'Длинная головка трицепса (масса)',
@@ -67,6 +67,51 @@ export const HEAD_FUNCTIONS: Record<string, HeadFunction> = {
     stretchCondition: 'Жим вверх перед собой, локти под грифом',
     loadedBy: ['Армейский жим', 'Жим гантелей сидя'],
   },
+  chest_upper: {
+    head: 'chest_upper', muscle: 'chest', label: 'Верх груди (ключичная)',
+    stretchCondition: 'Скамья 30° (не 45°), гриф к подбородку/верху груди',
+    loadedBy: ['Жим на наклонной 30°', 'Жим гантелей на наклонной'],
+  },
+  chest_mid: {
+    head: 'chest_mid', muscle: 'chest', label: 'Середина груди',
+    stretchCondition: 'Горизонтальный жим, локти 75°, гриф к соскам',
+    loadedBy: ['Жим штанги лёжа', 'Жим гантелей лёжа', 'Сведение в тренажёре'],
+  },
+  chest_lower: {
+    head: 'chest_lower', muscle: 'chest', label: 'Низ груди',
+    stretchCondition: 'Наклон вперёд 30-40° (брусья) или скамья −15°',
+    loadedBy: ['Брусья грудным стилем', 'Жим на decline'],
+  },
+  back_width: {
+    head: 'back_width', muscle: 'back', label: 'Ширина спины (широчайшие)',
+    stretchCondition: 'Вис/растяжение внизу, тяга локтями к карманам',
+    loadedBy: ['Подтягивания', 'Тяга верхнего блока'],
+  },
+  back_thickness: {
+    head: 'back_thickness', muscle: 'back', label: 'Толщина спины (центр/ромбы)',
+    stretchCondition: 'Наклон с упором, локти в стороны 60-90°, сведение лопаток',
+    loadedBy: ['Тяга Т-грифа', 'Тяга с упором грудью', 'Тяга горизонтального блока'],
+  },
+  quads: {
+    head: 'quads', muscle: 'quads', label: 'Квадрицепс',
+    stretchCondition: 'Глубокий присед (бёдра ниже параллели), пятки прижаты',
+    loadedBy: ['Приседания', 'Гакк-присед', 'Жим ногами', 'Разгибания ног (прямая мышца)'],
+  },
+  hamstrings: {
+    head: 'hamstrings', muscle: 'hamstrings', label: 'Бицепс бедра',
+    stretchCondition: 'Шарнир: таз назад (RDL) или полное сгибание колена (curl)',
+    loadedBy: ['Румынская тяга', 'Сгибания ног'],
+  },
+  glutes: {
+    head: 'glutes', muscle: 'glutes', label: 'Ягодицы',
+    stretchCondition: 'Таз до прямой с паузой 2с (хип-траст), толчок пяткой',
+    loadedBy: ['Ягодичный мост/хип-траст'],
+  },
+  calves: {
+    head: 'calves', muscle: 'calves', label: 'Икры',
+    stretchCondition: 'Полная амплитуда ниже уровня платформы, пауза 2с вверху',
+    loadedBy: ['Подъёмы на носки стоя'],
+  },
 };
 
 export function headsForMuscle(muscle: string): string[] {
@@ -98,7 +143,7 @@ export interface ExerciseStimulus {
   rom: string; // норма полной амплитуды
 }
 
-/** Пилот: руки + дельты. Остальные мышцы — neutral (записей нет = диагноз молчит). */
+/** Руки + дельты + грудь/спина/ноги. Мышц без записей нет = диагноз молчит (neutral). */
 export const EXERCISE_STIMULUS_DB: ExerciseStimulus[] = [
   {
     key: 'pushdown',
@@ -283,6 +328,234 @@ export const EXERCISE_STIMULUS_DB: ExerciseStimulus[] = [
     rirTarget: [2, 3],
     rom: 'Гриф к ключице ↔ выпрямление рук',
   },
+  {
+    key: 'incline_press',
+    ids: ['incline_bar', 'incline_db', 'smith_incline'],
+    nameRe: [/наклон.*жим/i, /жим.*наклон/i, /incline.*press/i],
+    headsHit: ['chest_upper'],
+    alternativesForMissed: { chest_mid: ['Жим штанги лёжа', 'Сведение в тренажёре'], chest_lower: ['Брусья грудным стилем'] },
+    setup: ['Скамья 30° (не 45°)', 'Лопатки сведены+опущены, грудь колесом', 'Локти 75° к корпусу, гриф к подбородку/верху груди'],
+    resistanceLine: 'Пик в растянутой внизу. Угол 45° переносит нагрузку на переднюю дельту — главный вор верха груди',
+    peakPoint: 'lengthened',
+    needsPause: true,
+    stability: 'med',
+    cheating: [
+      { deviation: 'угол 45°', steals: 'передняя дельта' },
+      { deviation: 'локти 90° в стороны', steals: 'плечевой сустав (стресс вместо стимула)' },
+      { deviation: 'отбив от груди', steals: 'моментум вместо растянутой позиции' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Гриф к верху груди ↔ выпрямление (гантели — со сведением)',
+  },
+  {
+    key: 'flat_press',
+    ids: ['bench_bar', 'bench_db', 'machine_chest_press'],
+    nameRe: [/жим штанги лёжа/i, /жим гантелей лёжа/i, /bench(?!.*incline)/i, /жим в смите/i, /жим в тренажёре/i],
+    headsHit: ['chest_mid'],
+    alternativesForMissed: { chest_upper: ['Жим на наклонной 30°'], chest_lower: ['Брусья грудным стилем'] },
+    setup: ['Лопатки сведены вниз, грудь колесом', 'Локти 75° к корпусу', 'Гриф к соскам, без отбива'],
+    resistanceLine: 'База середины груди. Сведение гантелей вверху добавляет пиковое сокращение',
+    peakPoint: 'mid',
+    needsPause: false,
+    stability: 'med',
+    cheating: [
+      { deviation: 'локти 90° в стороны', steals: 'плечевой сустав (стресс вместо груди)' },
+      { deviation: 'отбив от груди', steals: 'моментум вместо стимула' },
+      { deviation: 'чрезмерный мост', steals: 'низ груди и трицепс вместо середины' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Гриф к соскам ↔ выпрямление',
+  },
+  {
+    key: 'dips_decline',
+    ids: ['dips_chest', 'decline_bar', 'decline_db'],
+    nameRe: [/брусья/i, /dips/i, /отрицательн/i, /decline/i],
+    headsHit: ['chest_lower'],
+    alternativesForMissed: { chest_upper: ['Жим на наклонной 30°'], chest_mid: ['Жим гантелей лёжа'] },
+    setup: ['Брусья: наклон корпуса 30-40° вперёд, локти в стороны', 'Decline: гриф к низу груди', 'Глубокое опускание с растяжением'],
+    resistanceLine: 'Низ груди работает в растянутой внизу. Вертикальные брусья — уже трицепс, не грудь',
+    peakPoint: 'lengthened',
+    needsPause: false,
+    stability: 'high',
+    cheating: [
+      { deviation: 'вертикальный корпус на брусьях', steals: 'трицепс вместо низа груди' },
+      { deviation: 'короткая амплитуда сверху', steals: 'теряется растяжение низа груди' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Глубокое опускание ↔ мощное сведение вверх',
+  },
+  {
+    key: 'fly_stretch',
+    ids: ['fly_db', 'fly_cable', 'dumbbell_pullover'],
+    nameRe: [/разводк/i, /fly_db/i, /пуловер/i, /pullover/i],
+    headsHit: ['chest_mid'],
+    alternativesForMissed: { chest_upper: ['Жим на наклонной 30°'] },
+    setup: ['Локти слегка согнуты и зафиксированы', 'Широкий полукруг — как обнимаешь дерево', 'Вес вторичен, форма первична'],
+    resistanceLine: 'Изоляция в растянутой — главный стимул здесь, не вес. Пауза 1-2с внизу',
+    peakPoint: 'lengthened',
+    needsPause: true,
+    stability: 'med',
+    cheating: [
+      { deviation: 'сгибание локтей в жим', steals: 'трицепс вместо растяжения груди' },
+      { deviation: 'слишком тяжёлый вес', steals: 'передняя дельта' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Широкое растяжение внизу ↔ сведение вверху',
+  },
+  {
+    key: 'crossover_peak',
+    ids: ['crossover_cable', 'pec_deck', 'butterfly'],
+    nameRe: [/кроссовер/i, /crossover/i, /пек/i, /pec.?deck/i, /бабочк/i, /butterfly/i, /сведение.*тренаж/i],
+    headsHit: ['chest_mid'],
+    alternativesForMissed: { chest_upper: ['Жим на наклонной 30°'] },
+    setup: ['Корпус слегка вперёд, плечи опущены', 'Сведение до касания/креста с паузой 1-2с', 'Не отпускай вес резко'],
+    resistanceLine: 'Пик в сокращённой — здесь держится то, чего нет в жимах. Пауза в сведении обязательна',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [{ deviation: 'короткое сведение без паузы', steals: 'теряется пиковое сокращение — главный смысл упражнения' }],
+    rirTarget: [1, 2],
+    rom: 'Растяжение ↔ полное сведение с паузой',
+  },
+  {
+    key: 'vertical_pull',
+    ids: ['pullup', 'pullup_wide', 'pulldown', 'pulldown_wide', 'pulldown_vbar', 'pulldown_single', 'lat_pulldown', 'chinup', 'pullup_neutral'],
+    nameRe: [/подтягиван/i, /pull.?up/i, /тяга верхн/i, /pulldown/i, /пуллдаун/i, /верхн.*блок/i],
+    headsHit: ['back_width'],
+    alternativesForMissed: { back_thickness: ['Тяга Т-грифа', 'Тяга горизонтального блока'] },
+    setup: ['Тяга локтями вниз к карманам, не кистями', 'Лопатки вниз-назад, грудь вперёд', 'Тяга к верхней части груди, не за голову'],
+    resistanceLine: 'Широчайшие растянуты в висе и сокращаются по всей дуге. Сведение лопаток вверху + медленный возврат 2-3с',
+    peakPoint: 'lengthened',
+    needsPause: true,
+    stability: 'med',
+    cheating: [
+      { deviation: 'тяга за голову', steals: 'шея и плечевой сустав (стресс вместо ширины)' },
+      { deviation: 'раскачка корпусом', steals: 'моментум вместо широчайших' },
+      { deviation: 'тяга кистями без сведения лопаток', steals: 'бицепс вместо спины' },
+    ],
+    rirTarget: [1, 3],
+    rom: 'Полный вис с растяжением ↔ подбородок/гриф к груди',
+  },
+  {
+    key: 'horizontal_row',
+    ids: ['row_bar', 'row_tbar', 'row_db', 'seated_row', 'row_seal', 'row_pendlay', 'yates_row', 'row_cable_single'],
+    nameRe: [/тяга штанги в наклоне/i, /тяга гантели/i, /т-гриф/i, /t.?bar/i, /seal row/i, /тяга горизонтального/i],
+    headsHit: ['back_thickness'],
+    headsPartial: ['back_width'],
+    alternativesForMissed: { back_width: ['Подтягивания', 'Тяга верхнего блока'] },
+    setup: ['Локти в стороны 60-90° (центр) — вдоль тела только для широчайших', 'Тяга к низу живота/груди', 'Сведение лопаток на 1с, корпус фиксирован'],
+    resistanceLine: 'Толщина строится сведением лопаток в пике. Без паузы — гребля бицепсом',
+    peakPoint: 'mid',
+    needsPause: true,
+    stability: 'med',
+    cheating: [
+      { deviation: 'раскачка корпусом', steals: 'поясница вместо центра спины' },
+      { deviation: 'тяга кистями без сведения', steals: 'бицепс вместо ромбовидных' },
+      { deviation: 'кругление спины', steals: 'нагрузка уходит с мышц, риск поясницы' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Растяжение с грудью вперёд ↔ сведение лопаток 1с',
+  },
+  {
+    key: 'squat_press',
+    ids: ['squat', 'hack_squat', 'squat_smith', 'leg_press', 'bulgarian_split_squat', 'bulgarian_split', 'bulgarian_split_db', 'bulgarian_bw'],
+    nameRe: [/присед/i, /squat/i, /гакк/i, /hack/i, /жим ногами/i, /leg.?press/i, /болгар/i, /bulgarian/i],
+    headsHit: ['quads'],
+    headsPartial: ['glutes'],
+    setup: ['Стопы ширина плеч, носки чуть наружу', 'Колени по линии носков, не внутрь', 'Глубина: бёдра ниже параллели, пятки прижаты'],
+    resistanceLine: 'Квадрицепс в растянутой внизу — глубина решает. Полуприсед = потерянный стимул',
+    peakPoint: 'lengthened',
+    needsPause: false,
+    stability: 'high',
+    cheating: [
+      { deviation: 'колени внутрь (вальгус)', steals: 'связки колена (травма вместо стимула)' },
+      { deviation: 'полуприсед', steals: 'теряется растянутая позиция — главный драйвер' },
+      { deviation: 'таз вверх первым (гудморнинг)', steals: 'поясница и ягодицы вместо квадрицепса' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Бёдра ниже параллели ↔ выпрямление без блокировки',
+  },
+  {
+    key: 'leg_extension',
+    ids: ['leg_ext', 'leg_ext_v2', 'leg_ext_single', 'single_leg_extension'],
+    nameRe: [/разгибание ног/i, /leg.?ext/i],
+    headsHit: ['quads'],
+    setup: ['Спинка вертикально, валик на голеностопе', 'Пауза 1-2с вверху, возврат 3с'],
+    resistanceLine: 'Пик в сокращённой — изоляция прямой мышцы бедра. Добивка после базы, не замена',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [{ deviation: 'рывок и отрыв таза', steals: 'моментум вместо пикового сокращения' }],
+    rirTarget: [1, 2],
+    rom: 'Полное сгибание ↔ разгибание с паузой',
+  },
+  {
+    key: 'rdl_hinge',
+    ids: ['rdl', 'deadlift_romanian', 'good_morning', 'single_leg_rdl', 'single_leg_rdl_v2', 'kb_single_leg_rdl'],
+    nameRe: [/румын/i, /rdl/i, /гудморнинг/i, /good.?morning/i],
+    headsHit: ['hamstrings'],
+    headsPartial: ['glutes'],
+    setup: ['Таз назад (шарнир), штанга скользит по ногам', 'Колени мягкие 15-20°, спина нейтраль', 'Растяжение сзади внизу 1с'],
+    resistanceLine: 'Бицепс бедра в растянутой под нагрузкой — эталон stretch-mediated. Кругление убивает всё',
+    peakPoint: 'lengthened',
+    needsPause: true,
+    stability: 'med',
+    cheating: [
+      { deviation: 'кругление поясницы', steals: 'межпозвоночные диски (травма вместо бицепса бедра)' },
+      { deviation: 'штанга далеко от ног', steals: 'поясница вместо задней цепи' },
+      { deviation: 'присед вместо шарнира', steals: 'квадрицепс вместо бицепса бедра' },
+    ],
+    rirTarget: [2, 3],
+    rom: 'Растяжение сзади ↔ сокращение ягодицами вперёд',
+  },
+  {
+    key: 'leg_curl_iso',
+    ids: ['leg_curl', 'leg_curl_lying', 'leg_curl_seated', 'leg_curl_single', 'single_leg_curl'],
+    nameRe: [/сгибание ног/i, /leg.?curl/i, /норд/i, /nordic/i],
+    headsHit: ['hamstrings'],
+    setup: ['Таз прижат к скамье', 'Пауза 1с в пике, медленный возврат'],
+    resistanceLine: 'Пик в сокращённой. Пара к RDL: шарнир + сгибание = полный бицепс бедра',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [{ deviation: 'отрыв таза', steals: 'поясница и моментум вместо пика бицепса' }],
+    rirTarget: [1, 2],
+    rom: 'Полное разгибание ↔ полное сгибание с паузой',
+  },
+  {
+    key: 'hip_thrust_glute',
+    ids: ['hip_thrust', 'hip_thrust_single', 'single_leg_glute_bridge'],
+    nameRe: [/хип/i, /hip.?thrust/i, /ягодичный мост/i, /glute.?bridge/i],
+    headsHit: ['glutes'],
+    setup: ['Подбородок прижат, взгляд вперёд', 'Таз до прямой линии (не выше — без переразгибания)', 'Пауза 2с вверху'],
+    resistanceLine: 'Пик в сокращённой вверху. Лучшее упражнение для ягодиц по EMG именно с паузой',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [
+      { deviation: 'переразгибание поясницы', steals: 'поясница вместо ягодиц' },
+      { deviation: 'толчок носками', steals: 'квадрицепс вместо ягодиц' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Растяжение внизу ↔ таз в линию с паузой 2с',
+  },
+  {
+    key: 'calf_raise_iso',
+    ids: ['calf_raise', 'calf_raise_single', 'standing_calf'],
+    nameRe: [/носк/i, /calf/i, /подъём на носки/i, /икроножн/i, /икр/i],
+    headsHit: ['calves'],
+    setup: ['Ниже уровня платформы (ступенька)', 'Колено прямо стоя / 90° сидя (камбаловидная)', 'Пауза 2с вверху, растяжение 2с внизу'],
+    resistanceLine: 'Икры растут от полной амплитуды + пауз. Пружинистые пол-амплитуды = впустую',
+    peakPoint: 'lengthened',
+    needsPause: true,
+    stability: 'low',
+    cheating: [
+      { deviation: 'короткая амплитуда/пружинишь', steals: 'ахилл вместо икроножной' },
+      { deviation: 'согнутые колени стоя', steals: 'камбаловидная вместо икроножной (не ошибка, если цель — она)' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Ниже платформы ↔ верх на носках с паузой 2с',
+  },
 ];
 
 function norm(s: string): string {
@@ -382,7 +655,7 @@ export interface StimulusDiagnosis {
   headsMissed: string[]; // головки мышцы, не получающие стимул
   flags: StimulusFlag[];
   issues: string[];
-  score: number | null; // 0-100 «доля в цель», null = нет данных (не пилот)
+  score: number | null; // 0-100 «доля в цель», null = нет записи (neutral)
   breakdown: StimulusBreakdown | null;
 }
 
@@ -390,10 +663,41 @@ const HEADS_BY_MUSCLE: Record<string, string[]> = {
   triceps: ['triceps_long', 'triceps_lateral'],
   biceps: ['biceps_long', 'biceps_short', 'brachialis'],
   shoulders: ['delt_mid', 'delt_rear', 'delt_front'],
+  chest: ['chest_upper', 'chest_mid', 'chest_lower'],
+  back: ['back_width', 'back_thickness'],
+  quads: ['quads'],
+  hamstrings: ['hamstrings'],
+  glutes: ['glutes'],
+  calves: ['calves'],
 };
 
 function muscleOfHead(head: string): string {
   return HEAD_FUNCTIONS[head]?.muscle || '';
+}
+
+/**
+ * Слабая зона хаба (delt_mid, chest_upper, quads, chest, back…) → головка стимула.
+ * Канонические fallback: chest→chest_mid, back→back_width, shoulders→delt_mid,
+ * biceps→biceps_long, triceps→triceps_long. traps/forearms/abs → null (нет записей).
+ */
+export function weakHeadForZone(zone: string): string | null {
+  const z = String(zone || '').toLowerCase().trim();
+  if (!z) return null;
+  if (HEAD_FUNCTIONS[z]) return z;
+  const fallback: Record<string, string> = {
+    chest: 'chest_mid',
+    back: 'back_width',
+    shoulders: 'delt_mid',
+    biceps: 'biceps_long',
+    triceps: 'triceps_long',
+    quads: 'quads',
+    hamstrings: 'hamstrings',
+    glutes: 'glutes',
+    calves: 'calves',
+    legs: 'quads',
+    arms: 'biceps_long',
+  };
+  return fallback[z] || null;
 }
 
 export function diagnoseStimulusTarget(

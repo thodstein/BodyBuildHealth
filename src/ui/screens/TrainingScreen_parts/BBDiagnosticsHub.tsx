@@ -33,6 +33,7 @@ import { diagnoseWeakCause } from '../../../engines/bb/bb-weak-cause.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../../../engines/bb/bb-symmetry.engine';
+import { weakHeadForZone, HEAD_FUNCTIONS } from '../../../engines/bb/bb-stimulus-target.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
@@ -452,6 +453,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         } catch { /* noop */ }
         out[z] = rankCorrectionsForWeak(z, null, {
           cause: weakCauses[z]?.cause,
+          weakHead: weakHeadForZone(z),
           asymPct: asym,
           level,
           missingAngles: aud?.angleCoverage.missing || [],
@@ -489,10 +491,24 @@ export const BBDiagnosticsHub: React.FC = () => {
       const singleAngleMuscle = planAudit ? Object.entries(planAudit.byMuscle).find(([, bm]) => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6)?.[0] || null : null;
       const uncovered = planAudit?.byMuscle[selectedExRaw.muscle || '']?.regionalCoverage.missing || [];
       const strictMissing = planAudit?.byMuscle[selectedExRaw.muscle || '']?.strictCoverage.missing || [];
+      // слабая головка под выбранную мышцу (для wrongHead): первая зона, чья головка из той же семьи
+      const weakHead = (() => {
+        try {
+          const m = String(selectedExRaw.muscle || '').toLowerCase();
+          const LEGS = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'legs']);
+          for (const z of report.weakZonesGranular) {
+            const h = weakHeadForZone(z);
+            if (!h) continue;
+            const hm = HEAD_FUNCTIONS[h]?.muscle || '';
+            if (hm === m || (LEGS.has(hm) && LEGS.has(m))) return h;
+          }
+          return null;
+        } catch { return null; }
+      })();
       return diagnoseExercise(selectedExRaw as any, {
         goal: 'hypertrophy', level, weakZones: report.weakZonesGranular, weakMusclesCanonical: report.weakMusclesCanonical,
         muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null, planReps: 10,
-        singleAngleMuscle, uncoveredSubregions: uncovered, strictMissing,
+        singleAngleMuscle, uncoveredSubregions: uncovered, strictMissing, weakHead,
       } as any);
     } catch { return null; }
   }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit]);
