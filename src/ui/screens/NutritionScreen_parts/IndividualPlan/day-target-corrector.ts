@@ -88,17 +88,30 @@ function isCoreRecipeItem(meal: CorrectorMeal, itemId: string): boolean {
 }
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
+// NB: порядок/состав влияет на products-путь (legacy low-GI фильтр ниже) —
+// новые носители только в ХВОСТ, чтобы legacy-пул был бит-идентичен.
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein', 'egg_whole', 'tuna_canned'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'bread_white', 'whole_grain_bread'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'bread_white', 'whole_grain_bread', 'cream_of_rice', 'rice_basmati'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter'];
 
-function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>): FoodItem[] {
+/**
+ * Пул носителей макроса. convenientCarbs=true (только рецептурный путь):
+ * для углеводов — низкая клетчатка вместо низкого GI, иначе low-GI фильтр
+ * систематически выбирает булгур/батат и отбрасывает рис/рисовый крем.
+ * Legacy (products): поведение бит-идентично прежнему.
+ */
+function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean): FoodItem[] {
   const ids = macro === 'p' ? TOPUP_PROTEIN_IDS : macro === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
   let pool = ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !(excludedIds && excludedIds.has(f.id)) && foodAvailableForPlan(f));
-  // для углеводов — предпочитаем низкий GI (≤55) чтобы не раздувать GL, если есть выбор
   if (macro === 'c' && pool.length >= 2) {
-    const lowGi = pool.filter(f => (f.gi || 100) <= 55);
-    if (lowGi.length >= 2) pool = lowGi;
+    if (convenientCarbs) {
+      const lowFiber = pool.filter(f => (f.fiber || 0) <= 3);
+      if (lowFiber.length >= 2) pool = lowFiber;
+    } else {
+      // для углеводов — предпочитаем низкий GI (≤55) чтобы не раздувать GL, если есть выбор
+      const lowGi = pool.filter(f => (f.gi || 100) <= 55);
+      if (lowGi.length >= 2) pool = lowGi;
+    }
   }
   return pool;
 }
@@ -113,14 +126,17 @@ function currentFiber(meals: CorrectorMeal[]): number {
 /**
  * Единый корректор: доводит день до targets в пределах ±3% по каждому макросу.
  * После порционных капов/квот/финальной санитарии — последний шанс закрыть разбег.
+ * convenientCarbs=true — только рецептурный путь (удобные носители, дедуп, защита
+ * снеков); products-путь вызывает без флага и идёт бит-идентично прежнему.
  */
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
   const maxIter = opts?.maxIter ?? 80;
   const weightKg = opts?.weightKg ?? 80;
+  const conv = opts?.convenientCarbs === true;
   const weightScaleCorr = Math.max(1, Math.min(1.6, weightKg / 80));
   const meals = cloneMeals(mealsIn);
   // кумулятивная шкала ядра рецепта (не более ±25% для тяжей, иначе 7-12% разбег)
@@ -198,9 +214,17 @@ export function correctDayToTargets(
         const over = overs[0];
         const needFor = (f: FoodItem) => under === 'p' ? (f.protein || 0) : under === 'c' ? (f.carbs || 0) : (f.fat || 0);
         const overFor = (f: FoodItem) => over === 'p' ? (f.protein || 0) : over === 'c' ? (f.carbs || 0) : (f.fat || 0);
-        const underPool = poolFor(under, opts?.excludedIds).filter(f => needFor(f) > 0);
+        const underPool = poolFor(under, opts?.excludedIds, conv).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
-          const bestU = [...underPool].sort((a, b) => needFor(b) / Math.max(1, b.kcal || 1) - needFor(a) / Math.max(1, a.kcal || 1))[0];
+          // Углеводы в convenient-режиме: удобство первым (низкая клетчатка) — иначе swap тащит батат.
+          const bestU = [...underPool].sort((a, b) => {
+            if (conv && under === 'c') {
+              const ca = (a.carbs || 0) / (1 + (a.fiber || 0) * 2);
+              const cb = (b.carbs || 0) / (1 + (b.fiber || 0) * 2);
+              if (Math.abs(ca - cb) > 0.5) return cb - ca;
+            }
+            return needFor(b) / Math.max(1, b.kcal || 1) - needFor(a) / Math.max(1, a.kcal || 1);
+          })[0];
           const bestUFood = FOOD_DB.find(f => f.id === bestU.id);
           const bestUMacros = bestUFood ? { p: bestUFood.protein || 0, f: bestUFood.fat || 0, c: bestUFood.carbs || 0 } : { p: 0, f: 0, c: 0 };
           let victimMi = -1, victimIi = -1, victimBad = -1;
@@ -277,11 +301,15 @@ export function correctDayToTargets(
 
     if (need < 0) {
       // перебор — урезаем
-      // кандидаты: не-fixed, не-presleep/intra, сначала гибкие (не ядро), затем ядро
+      // кандидаты: не-fixed, не-presleep/intra, сначала гибкие (не ядро), затем ядро.
+      // convenient: при недоборе ккал дня маленькие приёмы (<250 ккал) не трогаем —
+      // им добивка нужна, не резка («Перекус 488→107» на 1500У).
       type Cand = { mi: number; ii: number; it: CorrectorItem; per100: number; totalMacro: number };
       const cands: Cand[] = [];
+      const _dayUnderKcal = conv && totals.kcal < safeTargets.kcal * 0.97;
       meals.forEach((m, mi) => {
         if (m.type === 'presleep' || m.type === 'intra' || (m as any)._insulinWindow) return;
+        if (_dayUnderKcal && (m.totals?.kcal || 0) < 250) return;
         (m.items || []).forEach((it, ii) => {
           if ((it as any)._fixedGrams) return;
           if ((it.amount || 0) < 15) return;
@@ -436,10 +464,16 @@ export function correctDayToTargets(
       }
       if (done) continue;
       // 2) не нашли куда нарастить — добавляем новый item из пула
-      const pool = poolFor(eff, opts?.excludedIds);
+      const pool = poolFor(eff, opts?.excludedIds, conv);
       if (pool.length === 0) break;
-      // выбираем самый плотный по нужному макро
+      // выбираем самый плотный по нужному макро; для углеводов в convenient-режиме —
+      // сначала удобство (низкая клетчатка): иначе «макрос/ккал» вечно выигрывает батат (20У при 86 ккал).
       const best = [...pool].sort((a, b) => {
+        if (conv && eff === 'c') {
+          const ca = (a.carbs || 0) / (1 + (a.fiber || 0) * 2);
+          const cb = (b.carbs || 0) / (1 + (b.fiber || 0) * 2);
+          if (Math.abs(ca - cb) > 0.5) return cb - ca;
+        }
         const av = eff === 'p' ? (a.protein || 0) / Math.max(1, a.kcal || 1) : eff === 'c' ? (a.carbs || 0) / Math.max(1, a.kcal || 1) : (a.fat || 0) / Math.max(1, a.kcal || 1);
         const bv = eff === 'p' ? (b.protein || 0) / Math.max(1, b.kcal || 1) : eff === 'c' ? (b.carbs || 0) / Math.max(1, b.kcal || 1) : (b.fat || 0) / Math.max(1, b.kcal || 1);
         return bv - av;
@@ -474,18 +508,42 @@ export function correctDayToTargets(
       const maxMacro = (eff === 'p' ? safeTargets.p : eff === 'c' ? safeTargets.c : safeTargets.f) * 1.03;
       const over = curMacro + per100Best * grams / 100 - maxMacro;
       if (over > 0) grams = Math.max(0, grams - Math.ceil(over / per100Best * 100 / 10) * 10);
-      if (grams < 10) break;
-      // выбираем приём с минимальной долей ккал (недогруженный);
-      // для комфортных источников — приём, где этого id ещё НЕТ (не дублируем)
-      const _comfortDup = COMFORT_CAP[best.id] !== undefined;
-      let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow)
-        .filter(m => !_comfortDup || !m.items.some(it => it.id === best.id))
-        .reduce((a, b) => {
+      // стабы не кладём («рис 15 г» — шум в тарелке, а не добор);
+      // legacy-порог 10 (products-точностям нужны мелкие топ-апы для 1.2%).
+      if (grams < (conv ? 20 : 10)) break;
+      // выбираем приём с минимальной долей ккал (недогруженный).
+      // convenient: дубли запрещены для ВСЕХ id (legacy — только комфортные),
+      // иначе корректор кладёт «батат 75 + 75 + 75» — растим существующий пункт.
+      const _dupFilter = (m: CorrectorMeal) => conv ? !m.items.some(it => it.id === best.id) : (COMFORT_CAP[best.id] === undefined || !m.items.some(it => it.id === best.id));
+      const _freeMeals = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow)
+        .filter(_dupFilter);
+      let targetMeal: CorrectorMeal | undefined;
+      if (_freeMeals.length > 0) {
+        targetMeal = _freeMeals.reduce((a, b) => {
           const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
           const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
           return aShare <= bShare ? a : b;
-        }, meals[0] || meals[meals.length - 1]);
-      if (!targetMeal) targetMeal = meals[meals.length - 1];
+        });
+      }
+      if (!targetMeal) {
+        // все приёмы уже содержат best.id — растим самый недогруженный из них
+        const withBest = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !(m as any)._insulinWindow && m.items.some(it => it.id === best.id));
+        targetMeal = withBest.length > 0 ? withBest.reduce((a, b) => ((a.totals?.kcal || 0) <= (b.totals?.kcal || 0) ? a : b)) : meals[meals.length - 1];
+        const ex = targetMeal.items.find(it => it.id === best.id);
+        if (ex && !(ex as any)._fixedGrams) {
+          const beforeTotals = sumTotals(meals);
+          const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
+          const prevAmount = ex.amount;
+          scaleItem(ex, ex.amount + grams);
+          recalcMealTotals(meals);
+          const afterTotals = sumTotals(meals);
+          const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
+          if (afterDev < beforeDev - 0.05) continue;
+          scaleItem(ex, prevAmount);
+          recalcMealTotals(meals);
+        }
+        break;
+      }
       const role: string = eff === 'p' ? 'protein' : eff === 'c' ? 'carb_slow' : 'fat';
       const newItem: CorrectorItem = {
         id: best.id, name: best.name, amount: grams,
@@ -500,6 +558,23 @@ export function correctDayToTargets(
       newItem.kcal = Math.round(4 * newItem.p + 9 * newItem.f + 4 * newItem.c);
       const beforeTotals = sumTotals(meals);
       const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
+      // Слияние-паранойя: если пункт уже есть (межфазный дубль — сайд tryBuild +
+      // топ-ап ребаланса + добор корректора), растим его, а не кладём второй.
+      const _dup = targetMeal.items.find(it => it.id === newItem.id && !(it as any)._fixedGrams);
+      if (_dup) {
+        const _prev = _dup.amount;
+        // Кап слияния: комфортные — дегустационный кап, остальные — 600 г.
+        const _mergeCap = COMFORT_CAP[newItem.id] !== undefined ? COMFORT_CAP[newItem.id] : 600;
+        if (_dup.amount + newItem.amount > _mergeCap) break;
+        scaleItem(_dup, _dup.amount + newItem.amount);
+        recalcMealTotals(meals);
+        const afterTotals = sumTotals(meals);
+        const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
+        if (afterDev < beforeDev - 0.05) continue;
+        scaleItem(_dup, _prev);
+        recalcMealTotals(meals);
+        break;
+      }
       targetMeal.items.push(newItem);
       recalcMealTotals(meals);
       const afterTotals = sumTotals(meals);

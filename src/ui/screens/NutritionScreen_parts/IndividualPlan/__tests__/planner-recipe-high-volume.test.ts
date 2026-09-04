@@ -168,3 +168,77 @@ describe('R-HV: train/rest и snack carb-mode', () => {
     expect(snackCarbs, `угли перекусов: ${snackCarbs}`).toBeGreaterThanOrEqual(50);
   });
 });
+
+describe('R-1500: assembleRecipeDay на 1500У (реальный поток: products-цели → рецепты)', () => {
+  // Единственный непроверенный путь (п.4): 1500У идут через 13 приёмов
+  // (7 базовых + 3 инсулин-окна + peri), из них рецептурных 4-5 — остальное продукты.
+  // Структурный best-effort: 4 рецепта физически не закрывают 1500У в ±8%
+  // (пул lunch топ 132У против цели 307У), поэтому пин — честный флаг + гарды,
+  // как 800У (14.8%) и 500Б (−17%).
+  const plan1500 = buildDayPlan(base({
+    weightKg: 120, lbmKg: 100, goalKcal: 8600, goalProteinG: 280, goalFatG: 120, goalCarbsG: 1500,
+    injections: [
+      { type: 'инсулин', name: 'А', time: '08:00', dose: 40, esterType: 'short' },
+      { type: 'инсулин', name: 'Б', time: '13:00', dose: 40, esterType: 'short' },
+      { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
+    ] as any,
+  }));
+  const res1500 = assembleRecipeDay({
+    meals: plan1500.meals.map((m: any) => ({
+      ...m, items: (m.items || []).map((i: any) => ({ ...i })),
+      totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) },
+    })) as any,
+    pool: RECIPE_DB as any, targets: { kcal: 8600, p: 280, f: 120, c: 1500 },
+    excludedIds: new Set<string>(), trainDay: true, athleteWeightKg: 120, seed: 3, goal: 'mass',
+  });
+
+  it('best-effort dev ≤26% + честный флаг при >3%', () => {
+    expect(res1500.deviationPct).toBeLessThanOrEqual(26);
+    if (!res1500.withinTolerance) {
+      expect(res1500.notes.some(n => (n || '').includes('отклонение')), 'нет честного флага').toBe(true);
+    }
+  });
+
+  it('нет глупого добора: булгур 0 г, дублей id в приёме нет', () => {
+    const bulg = res1500.meals.flatMap(m => m.items || []).filter(i => i.id === 'bulgur').reduce((s, i) => s + (i.amount || 0), 0);
+    expect(bulg, `булгур ${bulg} г`).toBe(0);
+    for (const m of res1500.meals) {
+      const ids = (m.items || []).map(i => i.id);
+      expect(new Set(ids).size, `${m.label}: дубли ${ids.join(',')}`).toBe(ids.length);
+    }
+  });
+
+  it('peri-капы целы: предтрен ≤63 / пост-трен ≤79 / intra ≤95 / presleep ≤20', () => {
+    // Pre-sleep в рецептурном пути: пул presleep-рецептов несёт мёд+лактозу
+    // (пол ~16У: мёд 10 г + йогурт), строгие 12 — только продукты-путь (800У-тест).
+    const capOf = (m: any): number | null => {
+      const t = String((m as any).type || '');
+      if (t === 'preworkout') return 63;
+      if (t === 'postworkout') return 79;
+      if (t === 'intra') return 95;
+      if (t === 'presleep') return 20;
+      return null;
+    };
+    for (const m of res1500.meals) {
+      const cap = capOf(m);
+      if (cap != null && (m.items || []).length > 0) {
+        expect(m.totals.c, `${m.label} ${m.totals.c} г`).toBeLessThanOrEqual(cap);
+      }
+    }
+  });
+
+  it('перекусы живы (не выедены резкой): каждый ≥100 ккал с белковым пунктом', () => {
+    const snacks = res1500.meals.filter(m => String((m as any).type || '').startsWith('snack') && !(m as any)._insulinWindow);
+    expect(snacks.length).toBeGreaterThan(0);
+    for (const s of snacks) {
+      expect(s.totals.kcal, `${s.label} ${s.totals.kcal} ккал`).toBeGreaterThanOrEqual(100);
+      const hasProt = (s.items || []).some(i => (i.p || 0) >= 5);
+      expect(hasProt, `${s.label}: нет белка`).toBe(true);
+    }
+  });
+
+  it('клетчатка не раздута добором: ≤150 г (продукты дают ~174 г)', () => {
+    const fib = res1500.meals.flatMap(m => m.items || []).reduce((s, i) => s + (i.fiber || 0), 0);
+    expect(fib, `клетчатка ${fib} г`).toBeLessThanOrEqual(150);
+  });
+});

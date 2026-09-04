@@ -250,6 +250,39 @@ export function sumDayTotals(meals: PlanMealLike[]): PlanTotalsLike {
 
 // ─── Ребаланс дня (недобор/перебор → ±3%) ──────────────────────────────
 
+/**
+ * Финальное слияние дублей id внутри приёма: один продукт — один пункт
+ * («рисовый крем 63 + 70» → «рисовый крем 133»). Суммы сохраняются, kcal — из
+ * формулы. Мутирует meals in-place (вызывается перед отдачей дня).
+ */
+export function mergeSameIdItems(meals: PlanMealLike[]): void {
+  for (const m of meals) {
+    const items = m.items || [];
+    if (items.length < 2) continue;
+    const seen = new Map<string, PlanItemLike>();
+    const order: string[] = [];
+    for (const it of items) {
+      const ex = seen.get(it.id);
+      if (ex) {
+        ex.amount = (ex.amount || 0) + (it.amount || 0);
+        ex.p = Math.round(((ex.p || 0) + (it.p || 0)) * 10) / 10;
+        ex.f = Math.round(((ex.f || 0) + (it.f || 0)) * 10) / 10;
+        ex.c = Math.round(((ex.c || 0) + (it.c || 0)) * 10) / 10;
+        ex.fiber = ex.fiber != null || it.fiber != null ? Math.round(((ex.fiber || 0) + (it.fiber || 0)) * 10) / 10 : undefined;
+        ex.leucine_mg = ex.leucine_mg != null || (it as any).leucine_mg != null ? Math.round((ex.leucine_mg || 0) + ((it as any).leucine_mg || 0)) : undefined;
+        ex.kcal = Math.round(4 * (ex.p || 0) + 9 * (ex.f || 0) + 4 * (ex.c || 0));
+      } else {
+        seen.set(it.id, { ...it });
+        order.push(it.id);
+      }
+    }
+    if (seen.size !== items.length) {
+      m.items = order.map(id => seen.get(id)!);
+      m.totals = sumMealTotals(m.items);
+    }
+  }
+}
+
 export interface DayMacroTargets { kcal: number; p: number; f: number; c: number }
 
 export interface RebalanceResult {
@@ -281,9 +314,22 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
 }
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
+// Порядок = удобство добора (низкая клетчатка первым): рисовый крем/рис/паста —
+// в голове, булгур/батат — в хвосте («глупый добор» 1500У: батат ×5 + булгур-осцилляция).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur', 'bread_white', 'whole_grain_bread'];
+export const TOPUP_CARB_IDS = ['cream_of_rice', 'rice_white', 'rice_basmati', 'pasta_durum', 'bread_white', 'whole_grain_bread', 'buckwheat', 'oats', 'potato_boiled', 'sweet_potato', 'bulgur'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
+
+/**
+ * Удобство углеводного добора: угли на единицу клетчатки. Рис/рисовый крем
+ * (fiber ≤1) >> хлеб/паста >> картофель/гречка >> батат/овёс >> булгур (fiber 4.5
+ * при 18.6У — самый «дорогой» по ЖКТ и объёму тарелки).
+ */
+export function carbConvenience(f: FoodItem): number {
+  const c = f.carbs || 0;
+  const fib = f.fiber || 0;
+  return c / (1 + fib * 2);
+}
 
 // C5 (Эпик C): субротация фиксированных пулов по seed дня — иначе каждый недобор
 // закрывается ПЕРВОЙ позицией списка («рис/гречка/оливковое масло» в каждом дне).
@@ -372,11 +418,14 @@ function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
 export function rebalanceDayAfterRecipes(
   meals: PlanMealLike[],
   targets: DayMacroTargets,
-  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number },
+  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number; highCarb?: boolean },
 ): RebalanceResult {
   const notes: string[] = [];
   const maxIter = opts?.maxIter ?? 24;
   const _sub = (ids: string[]) => subrot(ids, opts?.seed);
+  // HV-gate: удобные носители/дедуп/защита снеков/ккал-гейт — только high-carb дни
+  // (800У+); обычные дни идут бит-идентично прежнему (сторожит property-тест).
+  const _hv = opts?.highCarb === true;
   const work: PlanMealLike[] = meals.map(m => ({ ...m, items: [...(m.items || [])], totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) } }));
 
   const validTargets: DayMacroTargets = {
@@ -411,7 +460,10 @@ export function rebalanceDayAfterRecipes(
     // Недобор «осмысленный», только если он ≥ ~120 ккал в эквиваленте любого макроса —
     // иначе микро-хвосты (например +7 г углеводов при переборе жиров на 80 г) не должны
     // блокировать резку перебора.
-    if (dKcalEquiv >= 120) {
+    // HV-гейт ккал-комнаты: при переборе ккал дня НЕ доливаем (иначе осцилляция
+    // «добавил 250 г басмати → срезал» сжигает итерации: 1500У-проба давала 20+ пар
+    // add/cut с финишем ребаланса 48%). Сначала резка/swap перебора ниже.
+    if (dKcalEquiv >= 120 && (!_hv || dKcal > 0)) {
       // ── Недобор: добавляем топ-ап. Роль дефицита определяет цель:
       // углеводы → ОБЕД/УЖИН/ЗАВТРАК (carbMealIndex, распределяет по основным приёмам,
       // а не сваливает в один перекус — жалоба «все углеводы в один приём»);
@@ -430,10 +482,12 @@ export function rebalanceDayAfterRecipes(
         fi = work.length - 1;
         notes.push('➕ Добавлен приём «Добор» — основные приёмы собраны из рецептов');
       }
-      // Выбор роли доминирующего дефицита
+      // Выбор роли доминирующего дефицита.
+      // Legacy (не-HV): пул топ-апов бит-идентичен прежнему — рисовый крем
+      // (новый id) исключён, иначе tie-break сортировки поползёт в 50 сценариях.
       let rolePool: FoodItem[];
       if (chosenRole === 'p') { rolePool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds); }
-      else if (chosenRole === 'c') { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds); }
+      else if (chosenRole === 'c') { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds).filter(f => _hv || f.id !== 'cream_of_rice'); }
       else { rolePool = topupFoods(_sub(TOPUP_FAT_IDS), opts?.excludedIds); }
       if (rolePool.length === 0) break;
       const macroOf = (f: FoodItem) => chosenRole === 'p' ? (f.protein || 0) : chosenRole === 'c' ? (f.carbs || 0) : (f.fat || 0);
@@ -443,7 +497,18 @@ export function rebalanceDayAfterRecipes(
       const kcalRoomOk = dKcal > Math.max(80, dMacro * 2);
       const usable = rolePool.filter(f => macroOf(f) > 0);
       if (usable.length === 0) break;
-      const chosen = [...usable].sort((a, b) => {
+      // Дедуп HV: один и тот же носитель не кладём дважды в один приём
+      // («батат 270 + 190 + 250» в Завтраке на 1500У). Сначала неиспользованные id.
+      const inMealIds = new Set((work[fi]?.items || []).map(i => i.id));
+      const fresh = usable.filter(f => !inMealIds.has(f.id));
+      const candPool = _hv ? (fresh.length > 0 ? fresh : usable) : usable;
+      const chosen = [...candPool].sort((a, b) => {
+        // Углеводы HV: удобство первым (низкая клетчатка) — иначе «макрос/ккал»
+        // систематически выигрывает булгур (18.6У при 83 ккал), забивая ЖКТ и тарелку.
+        if (_hv && chosenRole === 'c') {
+          const ca = carbConvenience(a), cb = carbConvenience(b);
+          if (Math.abs(ca - cb) > 0.5) return cb - ca;
+        }
         if (kcalRoomOk) {
           const ra = macroOf(a) / Math.max(1, a.kcal || 1);
           const rb = macroOf(b) / Math.max(1, b.kcal || 1);
@@ -463,6 +528,8 @@ export function rebalanceDayAfterRecipes(
         const roomC = (work[fi].target?.c ?? 0) - (work[fi].totals?.c || 0);
         if (roomC > 0) grams = Math.min(grams, roomC / per100 * 100);
       }
+      // Граммовка ровно под дефицит и комнату приёма (большой недобор идёт
+      // по всем основным приёмам через итерации, а не в один).
       grams = Math.floor(Math.min(grams, 400) / 10) * 10;
       if (grams < 30) {
         // этот дефицит не пролезает без перебора ккал — переходим к резке перебора
@@ -471,6 +538,9 @@ export function rebalanceDayAfterRecipes(
           name: chosen.name, id: chosen.id, amount: 100,
           kcal: Math.round(chosen.kcal || 0), p: chosen.protein || 0, f: chosen.fat || 0, c: chosen.carbs || 0,
           fiber: chosen.fiber || 0,
+          // Роль HV: без неё корректор видит «misc» (пол резки 15 г,
+          // белковые топ-апы — беззащитны перед swap), плодя стабы «рис 15 г».
+          ...(_hv ? { role: chosenRole === 'p' ? 'protein' : chosenRole === 'c' ? 'carb_slow' : 'fat' } : {}),
         }, grams);
         work[fi] = { ...work[fi], items: [...work[fi].items, item], totals: sumMealTotals([...work[fi].items, item]) };
         notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
@@ -572,6 +642,10 @@ export function rebalanceDayAfterRecipes(
     type Cut = { mi: number; ii: number; newAmount: number; label: string; score: number };
     let bestCut: Cut | null = null;
     let bestDev = maxDeviationPct(totals, validTargets);
+    // День в недоборе ккал резать в целом не надо — но перебор отдельной оси
+    // (белок/жир) HV правим из БОЛЬШИХ приёмов, а не выедаем маленькие перекусы
+    // («Перекус 488→107» на 1500У: резка съедала снеки, а угли дня так и висели в недоборе).
+    const _dayUnderKcal = _hv && totals.kcal < validTargets.kcal * 0.98;
     work.forEach((m, mi) => {
       // Aug 28: в рецептурных приёмах авторское ЯДРО не трогается, но САЙД-добивка
       // (продукт не из ingredientIds рецепта) — сжимаема, иначе перебор неустраним.
@@ -618,7 +692,11 @@ export function rebalanceDayAfterRecipes(
           const dv = maxDeviationPct(nt as any, validTargets);
           if (dv >= bestDev - 0.0005) continue; // строгое улучшение — иначе осцилляции
           const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном|Pre-sleep/i.test(m.label || '') || ['snack', 'snack2', 'snack3', 'snack4', 'presleep'].includes(String((m as any).type));
-          const score = (isSnackish ? 0 : 1e6) + (1000 - Math.min(999, a - v));
+          // HV при недоборе дня: маленькие приёмы не трогаем вообще (им добивка
+          // нужна, не резка); приоритет резки инвертируется: сначала большие
+          // основные, снеки — в последнюю очередь.
+          if (_dayUnderKcal && (m.totals?.kcal || 0) < 250) continue;
+          const score = (isSnackish ? (_dayUnderKcal ? 1e6 : 0) : (_dayUnderKcal ? 0 : 1e6)) + (1000 - Math.min(999, a - v));
           if (!bestCut || score < bestCut.score || (score === bestCut.score && v < bestCut.newAmount)) {
             bestDev = dv;
             bestCut = { mi, ii, newAmount: v, label: m.label || '', score };
@@ -681,7 +759,10 @@ export function rebalanceDayAfterRecipes(
           || FOOD_DB.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 10 && _topupOk(f))
             .sort((a, b) => (b.carbs || 0) - (a.carbs || 0))[0];
         if (fruit) {
-          const gF = Math.min(150, Math.round(roomK2 / Math.max(1, fruit.kcal || 1) * 100 / 10) * 10);
+          // HV: концентрат (изюм/финики, У≥55) — не больше 60 г за раз, свежий — до 100 г
+          // («Изюм 110 г» в перекусе на 1500У — сахарная бомба).
+          const _fruitCap = _hv ? ((fruit.carbs || 0) >= 55 ? 60 : 100) : 150;
+          const gF = Math.min(_fruitCap, Math.round(roomK2 / Math.max(1, fruit.kcal || 1) * 100 / 10) * 10);
           if (gF >= 60) {
             m.items = [...(m.items || []), scaleItem({ name: fruit.name, id: fruit.id, amount: 100, kcal: Math.round(fruit.kcal || 0), p: fruit.protein || 0, f: fruit.fat || 0, c: fruit.carbs || 0, fiber: fruit.fiber || 0 } as any, gF)];
             added.push(`${fruit.name} ${gF} г`);
@@ -693,9 +774,10 @@ export function rebalanceDayAfterRecipes(
       const ak3 = sumMealTotals(m.items || []).kcal;
       const roomK3 = tk - ak3;
       if (roomK3 > 180) {
+        const _inMeal = new Set((m.items || []).map(i => i.id));
         const carb = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds)
-          .filter(f => _topupOk(f) && f.category !== 'veg_fruit' && (f.carbs || 0) >= 15)
-          .sort((a, b) => (b.carbs || 0) / Math.max(1, b.kcal || 1) - (a.carbs || 0) / Math.max(1, a.kcal || 1))[0];
+          .filter(f => _topupOk(f) && f.category !== 'veg_fruit' && (f.carbs || 0) >= 15 && (!_hv || !_inMeal.has(f.id)) && (_hv || f.id !== 'cream_of_rice'))
+          .sort((a, b) => ((_hv ? carbConvenience(b) - carbConvenience(a) : 0)) || ((b.carbs || 0) / Math.max(1, b.kcal || 1) - (a.carbs || 0) / Math.max(1, a.kcal || 1)))[0];
         if (carb) {
           const gC = Math.min(200, Math.round(roomK3 / Math.max(1, carb.kcal || 1) * 100 / 10) * 10);
           if (gC >= 40) {
@@ -1306,7 +1388,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           const sidePoolFor = (ids: string[]) => ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !used.has(f.id) && !excludedIds.has(f.id));
           let pool: FoodItem[]; let macroOf: (f: FoodItem) => number; let dMacro: number; let role: string;
           if (rel(dC, tgt.c || 40) >= rel(dP, tgt.p || 30) && rel(dC, tgt.c || 40) >= rel(dF, tgt.f || 15)) {
-            pool = sidePoolFor(['rice_white', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_basmati', 'bulgur']);
+            // HV: удобные первыми — рисовый крем (сухая мера 82У, fiber 1) → рис →
+            // паста, булгур/батат — в хвосте (объём тарелки и ЖКТ на 1500У).
+            pool = sidePoolFor(_dayHighCarb
+              ? ['cream_of_rice', 'rice_white', 'rice_basmati', 'pasta_durum', 'buckwheat', 'potato_boiled', 'sweet_potato', 'bulgur']
+              : ['rice_white', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_basmati', 'bulgur']);
             macroOf = f => f.carbs || 0; dMacro = dC; role = 'углеводы';
           } else if (rel(dP, tgt.p || 30) >= rel(dF, tgt.f || 15)) {
             pool = sidePoolFor(['chicken_breast', 'cottage_cheese_5', 'turkey_breast', 'egg_whole', 'tuna_fresh']);
@@ -1315,11 +1401,18 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             pool = sidePoolFor(['olive_oil', 'peanut_butter', 'avocado', 'walnuts']);
             macroOf = f => f.fat || 0; dMacro = dF; role = 'жиры';
           }
-          const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
+          const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) =>
+            (role === 'углеводы' && _dayHighCarb)
+              ? (carbConvenience(b) - carbConvenience(a)) || (macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1))
+              : (macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1)));
           const side = ok[0];
           if (!side || dMacro <= 8) break;
-          // Comfort-кап: крупяной сайд ≤200 г (не «булгур 400 г»); дедуп по id (не двоить).
-          const _SIDE_CAP: Record<string, number> = { bulgur: 200, rice_white: 250, rice_basmati: 250, buckwheat: 200, potato_boiled: 300, pasta_durum: 200, sweet_potato: 300 };
+          // HV-капы сайдов: сухая мера рисового крема 150 г (=123У) — один сайд
+          // закрывает больше без раздувания тарелки; булгур ужа́т до 150 г.
+          // Обычные дни — legacy-капы.
+          const _SIDE_CAP: Record<string, number> = _dayHighCarb
+            ? { bulgur: 150, rice_white: 300, rice_basmati: 300, buckwheat: 250, potato_boiled: 350, pasta_durum: 300, sweet_potato: 250, cream_of_rice: 150 }
+            : { bulgur: 200, rice_white: 250, rice_basmati: 250, buckwheat: 200, potato_boiled: 300, pasta_durum: 200, sweet_potato: 300 };
           const _sideCap = _SIDE_CAP[side.id] ?? 200;
           let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, _sideCap) / 10) * 10;
           if (g < 30) break;
@@ -1357,8 +1450,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Чистка-2026: с ПОРЦИОННЫМ рядом (шаги ×0.5) гейт ослаблен до ±22% — остаток порции
     // добирают сайды (maxSides=2) и посадка дня; гейты Б/Ж/У ослаблены пропорционально.
     const kcalTol = 0.22;
+    // Peri-капы приёмки HV (стража физиологических окон в рецептурном пути):
+    // предтрен ≤63 / пост-трен ≤79. Только high-carb дни: обычные дни идут legacy
+    // (иначе гейт меняет выбор рецептов в 50 property-сценариях).
+    // Pre-sleep НЕ клампим: пул presleep-рецептов по дизайну несёт мёд+лактозу
+    // (~19У), кламп резал бы авторское ядро («йогурт с черникой» 118→31).
+    const _periCarbCap = !_dayHighCarb ? null : periType === 'preworkout' ? 63 : periType === 'postworkout' ? 79 : null;
     const _passesGate = (built: { totals: PlanTotalsLike }): boolean => {
       const tk = built.totals.kcal || 1;
+      if (_periCarbCap != null && built.totals.c > _periCarbCap + 1) return false;
       return Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
         && built.totals.p >= 0.72 * (tgt.p || 30) - 0.5
         && built.totals.p <= 1.30 * (tgt.p || 30) + 0.5
@@ -1396,6 +1496,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     }
     if (!chosen && !fallback) return;
     const use = chosen || fallback!;
+    // Fallback тоже уважает peri-кап: ужимаем углеводные пункты приёма до капа
+    // (белок не трогаем) — иначе fallback «не точно в цель» сносит окно 60→132.
+    if (_periCarbCap != null && use.totals.c > _periCarbCap + 1) {
+      const over = use.totals.c - _periCarbCap;
+      const carbIdx = use.items
+        .map((it, ii) => ({ it, ii }))
+        .filter(({ it }) => (it.c || 0) > 0 && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein');
+      const carbSum = carbIdx.reduce((s, { it }) => s + (it.c || 0), 0);
+      if (carbSum > 0 && over < carbSum) {
+        const k = (carbSum - over) / carbSum;
+        use.items = use.items.map((it, ii) => {
+          if (!carbIdx.some(x => x.ii === ii)) return it;
+          const ng = Math.max(10, Math.round((it.amount || 0) * k));
+          return scaleItem(it, ng);
+        });
+        use.totals = sumMealTotals(use.items);
+      }
+    }
     const chosenFlat = use.flat;
     const finalItems = use.items;
     mealAny.items = finalItems;
@@ -1417,15 +1535,18 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
-  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed });
+  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb });
   const notes = [...rb.notes];
 
   // D4: единый корректор — после всех капов/ребелов доводим день до ≤3% по 4 осям.
   // Ядро рецепта трогается только в крайнем случае (±15% кумулятивно), гибкие слоты — свободно.
   const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
   if (needCorr) {
-    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80 });
+    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80, convenientCarbs: _dayHighCarb });
     const corrDev = corr.deviationPct;
+    // Финальное слияние дублей: сайд tryBuild + топ-ап ребаланса + добор корректора
+    // могут положить один id дважды («рисовый крем 63 + 70») — суммируем в один пункт.
+    mergeSameIdItems(corr.meals as any);
     // C1: финальный грамм-трим квот после корректора (его доборы идут мимо квот).
     const _trimNotes1 = trimQuotaOverflow(corr.meals as any);
     if (corrDev + 1e-9 < rb.deviationPct) {
