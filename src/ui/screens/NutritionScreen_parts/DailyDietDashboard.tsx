@@ -102,7 +102,7 @@ export const DailyDietDashboard: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '8px 0', marginBottom: 8 }}>
+    <div className="nut-dailydiet" style={{ padding: '8px 0', marginBottom: 8 }}>
       <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>📊 Анализ рациона (v2)</div>
       <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>Ккал: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | Омега-6/3: {report.omegaRatio.toFixed(1)} | Гистамин: {report.histamineSensitive ? '⚠️ Чувствителен' : '✅ Норма'}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>

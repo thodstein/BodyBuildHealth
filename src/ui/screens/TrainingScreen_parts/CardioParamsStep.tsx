@@ -228,7 +228,7 @@ export const CardioParamsStep: React.FC<{
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="train-cardioparams" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <SectionNav items={NAV} />
       {!preview.cycle && comps.length === 0 && (
         <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр → «Далее» и соберите цикл.</InfoBanner>

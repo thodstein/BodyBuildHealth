@@ -38,7 +38,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   } = hub;
   if (!analytics) {
     return (
-      <div style={style.card}>
+      <div className="train-diaryanalytics" style={style.card}>
         <div style={style.label}>📊 Аналитика</div>
         <div style={{ fontSize: 11, color: '#fff', textAlign: 'center', padding: 20, lineHeight:1.5 }}>
           Нет данных для аналитики. Запишите хотя бы 2 тренировки — здесь появится объём, интенсивность, баланс мышц и прогресс.

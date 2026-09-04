@@ -146,7 +146,7 @@ export const ProMetricsPanel: React.FC = () => {
   const prog = useMemo(() => generateProgression(schemeId as any, e1rm), [schemeId, e1rm]);
 
   return (
-    <div>
+    <div className="pl-prometrics">
       <div style={{ ...H, fontSize: 16, margin: "0 0 8px" }}>🧮 Pro-метрики <span style={{ fontSize: 10, color: "#fff", fontWeight: 400 }}>проф-движки: e1RM · нагрузка · VBT · авторегуляция · относ. сила · прогрессии</span></div>
 
       {/* Относительная сила */}

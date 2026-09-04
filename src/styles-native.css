@@ -2239,3 +2239,94 @@ html.app-native .nut-ref {
     animation: none;
   }
 }
+
+/* ─── 34. NATIVE DEEP-2 — второй уровень всех блоков ─────────── */
+/* Кардио-шаги, дневники, аналитика тренинга */
+html.app-native .train-cardiodiary,
+html.app-native .train-cardioparams,
+html.app-native .train-cardiopreview,
+html.app-native .train-cardiomanage,
+html.app-native .train-diaryanalytics,
+html.app-native .train-diaryhistory,
+html.app-native .train-strength,
+html.app-native .train-taper,
+html.app-native .train-plnorms,
+html.app-native .train-tempo,
+html.app-native .train-excalc {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-cardiodiary,
+html.app-native .train-cardiopreview {
+  border-radius: 20px !important;
+}
+
+/* SRCBB-панели: метрики, соревнования, авторегуляция */
+html.app-native .pl-prometrics,
+html.app-native .pl-comp,
+html.app-native .pl-autoreg {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-comp {
+  border-radius: 16px !important;
+}
+
+/* Поддержка: комплаенс, взаимодействия, синергия */
+html.app-native .sup-compliance,
+html.app-native .sup-interact,
+html.app-native .sup-synergy {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Анализы: расширенная панель и ТЗ-риски */
+html.app-native .labs-extended,
+html.app-native .labs-tzrisk {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Риски: детали и верификация */
+html.app-native .risk-details,
+html.app-native .risk-verify {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* Питание: дневной разбор и графики дневника */
+html.app-native .nut-dailydiet,
+html.app-native .nut-diarycharts {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-cardiodiary,
+  html.app-native .train-cardioparams,
+  html.app-native .train-cardiopreview,
+  html.app-native .train-cardiomanage,
+  html.app-native .train-diaryanalytics,
+  html.app-native .train-diaryhistory,
+  html.app-native .train-strength,
+  html.app-native .train-taper,
+  html.app-native .train-plnorms,
+  html.app-native .train-tempo,
+  html.app-native .train-excalc,
+  html.app-native .pl-prometrics,
+  html.app-native .pl-comp,
+  html.app-native .pl-autoreg,
+  html.app-native .sup-compliance,
+  html.app-native .sup-interact,
+  html.app-native .sup-synergy,
+  html.app-native .labs-extended,
+  html.app-native .labs-tzrisk,
+  html.app-native .risk-details,
+  html.app-native .risk-verify,
+  html.app-native .nut-dailydiet,
+  html.app-native .nut-diarycharts {
+    animation: none;
+  }
+}

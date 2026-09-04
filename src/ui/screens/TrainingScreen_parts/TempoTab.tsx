@@ -104,7 +104,7 @@ export const TempoTab: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-tempo" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>⏱️ Темп повторений</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>
         Управление скоростью повторений. Формат <b>Эксцентрика–Пауза внизу–Концентрика–Пауза вверху</b> (сек).

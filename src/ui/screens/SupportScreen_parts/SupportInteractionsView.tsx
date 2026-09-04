@@ -138,7 +138,7 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
   const PAIR_LEVEL_RU: Record<string, string> = { STRONG_SYNERGY: 'Сильная синергия', GOOD_SYNERGY: 'Хорошая синергия', NEUTRAL: 'Нейтрально', WEAK_CONFLICT: 'Слабый конфликт', DANGEROUS_CONFLICT: 'Опасный конфликт' };
 
   return (
-    <div>
+    <div className="sup-interact">
       {/* Sub-tab pills */}
       <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
         {[['all','📋 Все'],['calculator','⚡ Калькулятор'],['pair','🧬 Парная синергия']].map(([id,label]) => (

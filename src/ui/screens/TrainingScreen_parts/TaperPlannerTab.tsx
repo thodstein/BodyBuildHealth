@@ -281,7 +281,7 @@ export const TaperPlannerTab: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-taper" style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🔻 Тапер-планер (ПОЛНЫЙ)</div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Единый калькулятор: тейпер/пик для пауэрлифтинга (снижение объёма 40-60%, прикиды, стратегия,

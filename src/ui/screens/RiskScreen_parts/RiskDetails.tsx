@@ -78,7 +78,7 @@ export const RiskDetails: React.FC<{
   }, [riskResult.systemBreakdown]);
 
   return (
-    <div>
+    <div className="risk-details">
       {/* Per-system detail cards */}
       {CORE_SYSTEMS.map(coreSys => {
         const info = SYSTEM_INFO[coreSys];

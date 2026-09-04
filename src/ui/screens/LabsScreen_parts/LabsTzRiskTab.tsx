@@ -106,7 +106,7 @@ export const LabsTzRiskTab: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '0 0 80px' }}>
+    <div className="labs-tzrisk" style={{ padding: '0 0 80px' }}>
       <div style={CARD}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧮 Риски по механизм-ориентированной модели (ТЗ)</div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 8 }}>

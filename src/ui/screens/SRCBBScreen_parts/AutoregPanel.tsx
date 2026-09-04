@@ -88,7 +88,7 @@ export const AutoregPanel: React.FC = () => {
   }, [readiness, fatigue, recovery, goal, intensity, sets, reps, freq]);
 
   return (
-    <div>
+    <div className="pl-autoreg">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         <div><div style={LABEL}>Готовность (PRI), %</div><input style={IN} type="number" min={0} max={100} value={readiness} onChange={e => setReadiness(+e.target.value)} /></div>
         <div><div style={LABEL}>Усталость, %</div><input style={IN} type="number" min={0} max={100} value={fatigue} onChange={e => setFatigue(+e.target.value)} /></div>

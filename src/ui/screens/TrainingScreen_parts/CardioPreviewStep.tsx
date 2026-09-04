@@ -186,8 +186,8 @@ export const CardioPreviewStep: React.FC<{
   ] as const;
 
   if (!cycle || !summary) {
-    return (
-      <div style={CARD}>
+  return (
+    <div className="train-cardiopreview" style={CARD}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>
           Соберите кардио-цикл из параметров и стартов — появится предпросмотр по неделям.
         </div>

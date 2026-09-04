@@ -253,7 +253,7 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
   if (!hasData) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="nut-diarycharts" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Macro distribution donut + gauge cards */}
       <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap', padding:16 }}>
         <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={92} />

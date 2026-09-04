@@ -147,7 +147,7 @@ export default function ExtendedLabsTab({
   }, [values]);
 
   return (
-    <div>
+    <div className="labs-extended">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <span style={{ fontSize: 18 }}>🔬</span>
         <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>Расширенная панель анализов</span>

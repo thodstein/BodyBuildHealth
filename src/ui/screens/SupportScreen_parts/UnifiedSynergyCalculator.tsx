@@ -660,7 +660,7 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
 
   /* ──────────────── RENDER ──────────────── */
   return (
-    <div style={{ padding:'4px 0 100px', display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="sup-synergy" style={{ padding:'4px 0 100px', display:'flex', flexDirection:'column', gap:10 }}>
       {/* Header */}
       <div style={{ marginBottom:2 }}>
         <div style={{ fontSize:14, fontWeight:800, color:'#00e68a', letterSpacing:'-0.3px' }}>Калькулятор синергии и взаимодействий</div>

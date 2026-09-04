@@ -94,7 +94,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
   const overallPct = Math.round((engineOverall ?? report.overall) * 100);
 
   return (
-    <div style={{ padding: '4px 0 80px' }}>
+    <div className="risk-verify" style={{ padding: '4px 0 80px' }}>
       {/* HERO */}
       <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.05) 0%, rgba(24,24,27,0.15) 100%)', border: '1px solid rgba(0,230,138,0.12)' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Верификация рисков анализами</div>

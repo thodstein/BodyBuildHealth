@@ -11,6 +11,15 @@ import { MapperTab } from '../screens/PharmaScreen_parts/MapperTab';
 import { LabsSchedule } from '../screens/LabsScreen_parts/LabsSchedule';
 import { LabsResults } from '../screens/LabsScreen_parts/LabsResults';
 import { TimersTab } from '../screens/TrainingScreen_parts/TimersTab';
+import { StrengthAnalysisHub } from '../screens/TrainingScreen_parts/StrengthAnalysisHub';
+import { TaperPlannerTab } from '../screens/TrainingScreen_parts/TaperPlannerTab';
+import { TempoTab } from '../screens/TrainingScreen_parts/TempoTab';
+import { ProMetricsPanel } from '../screens/SRCBBScreen_parts/ProMetricsPanel';
+import { AutoregPanel } from '../screens/SRCBBScreen_parts/AutoregPanel';
+import { SupplementComplianceCard } from '../screens/SupportScreen_parts/SupplementComplianceCard';
+import { default as ExtendedLabsTab } from '../screens/LabsScreen_parts/ExtendedLabsTab';
+import { LabsTzRiskTab } from '../screens/LabsScreen_parts/LabsTzRiskTab';
+import { TimersTab } from '../screens/TrainingScreen_parts/TimersTab';
 import { PlateCalcTab } from '../screens/TrainingScreen_parts/PlateCalcTab';
 import { OneRmCalcTab } from '../screens/TrainingScreen_parts/OneRmCalcTab';
 import { VBTCalcTab } from '../screens/TrainingScreen_parts/VBTCalcTab';
@@ -133,5 +142,42 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c2 } = render(<NutritionReference />);
     expect(c2.querySelector('.nut-ref'), 'ref').not.toBeNull();
+  });
+
+  it('9. Training deep-2 несут корни', () => {
+    const { container: c1 } = render(<TimersTab />);
+    expect(c1.querySelector('.train-timers'), 'timers2').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<StrengthAnalysisHub />);
+    expect(c2.querySelector('.train-strength'), 'strength').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<TaperPlannerTab />);
+    expect(c3.querySelector('.train-taper'), 'taper').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TempoTab />);
+    expect(c4.querySelector('.train-tempo'), 'tempo').not.toBeNull();
+  });
+
+  it('10. SRCBB панели и комплаенс несут корни', () => {
+    const { container: c1 } = render(<ProMetricsPanel />);
+    expect(c1.querySelector('.pl-prometrics'), 'prometrics').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<AutoregPanel />);
+    expect(c2.querySelector('.pl-autoreg'), 'autoreg').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupplementComplianceCard />);
+    expect(c3.querySelector('.sup-compliance'), 'compliance').not.toBeNull();
+  });
+
+  it('11. Labs deep несут корни', () => {
+    const { container: c1 } = render(
+      <ExtendedLabsTab labs={[]} selectedPhase="baseline" onPhaseChange={() => {}} tick={0} />,
+    );
+    expect(c1.querySelector('.labs-extended'), 'extended').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<LabsTzRiskTab />);
+    expect(c2.querySelector('.labs-tzrisk'), 'tzrisk').not.toBeNull();
+    // DailyDietDashboard рендерится только при наличии плана (null без него) —
+    // хук .nut-dailydiet живёт в прод-ветке, здесь не проверяется.
   });
 });

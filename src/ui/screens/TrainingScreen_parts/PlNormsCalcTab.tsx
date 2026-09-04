@@ -221,7 +221,7 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
   };
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="train-plnorms" style={{ maxWidth: 760, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, margin: '2px 0 6px' }}>🏆 Калькулятор разрядных нормативов — единый центр</div>
       <div style={{ ...SMALL, marginBottom: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)', borderRadius: 8, padding: 8 }}>
         <b style={{ color: '#fff' }}>Что это:</b> единый калькулятор всех разрядных инструментов из приложения — нормативы по федерации/дисциплине/полу/весовой категории + DOTS/Wilks/IPF GL + прогресс до следующего разряда. Выберите пол, федерацию, движение, свой вес и результат — я покажу разряд, сколько до следующего, очки относительной силы и как читать каждый график (разъяснения под каждым блоком).

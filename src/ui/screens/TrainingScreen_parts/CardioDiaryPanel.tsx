@@ -216,7 +216,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   };
 
   return (
-    <div style={CARD}>
+    <div className="train-cardiodiary" style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📓 Дневник выполнения кардио</span>
         <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : '#fff'}>🔥 стрик {streak.current}д</Badge>

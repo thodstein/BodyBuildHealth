@@ -46,7 +46,7 @@ export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ pl
 
   if (data.activeSubstances.length === 0) {
     return (
-      <div style={{ padding: 16, borderRadius: 14, background: BG, border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+      <div className="sup-compliance" style={{ padding: 16, borderRadius: 14, background: BG, border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>📋 Комплаенс приёма</div>
         <div style={{ fontSize: 10, color: DIM }}>Нет активных назначений. Добавьте препараты в разделе «Симптомы» → «Решить симптом».</div>
       </div>
@@ -66,7 +66,7 @@ export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ pl
   const monthAdh = data.overall30d;
 
   return (
-    <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="sup-compliance" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* ── Hero Summary ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
         <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>

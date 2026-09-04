@@ -65,7 +65,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     return sorted.slice(-12).map((w: any) => Math.max(0, ...(Array.isArray(w.exercises) ? w.exercises : []).map((e: any) => e.estimated1RM || 0)));
   }, [historyWorkouts]);
   return (
-        <div>
+        <div className="train-diaryhistory">
           {/* Кнопка возврата к записи (История — подвкладка дневника) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
             <button onClick={() => setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>← В запись</button>
