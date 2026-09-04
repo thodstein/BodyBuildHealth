@@ -172,4 +172,13 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getByRole('button', { name: /Худшее в плане/ }));
     expect(screen.getAllByText(/Нет плана ББ/)[0]).toBeInTheDocument();
   });
+  it('weak zone without old diary shows low-data badge instead of silence', () => {
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-08-21', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },
+      { date: '2026-08-22', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },
+    ]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    expect(screen.getAllByText(/мало данных/)[0]).toBeInTheDocument();
+  });
 });

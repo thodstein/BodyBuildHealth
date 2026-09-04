@@ -4,6 +4,7 @@
  * Чистые функции, без мутаций плана. Источники: Schoenfeld 2017/2016, Israetel MEV/MAV/MRV,
  * Pareja-Blanco 2017 (VBT loss), Wolf 2023/2025 (lengthened), McCallum/Reeves пропорции.
  */
+import { getVolumeLandmarks } from '../volume-landmarks.engine';
 
 export type WeakCause = 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics';
 
@@ -164,6 +165,86 @@ export function diagnoseWeakCauses(
     out[z] = diagnoseWeakCause({ zone: z, ...(byZone[z] || {}) });
   }
   return out;
+}
+
+export interface WeakCauseAuditFlags {
+  lengthened: boolean;
+  singleAngle: boolean;
+  missingStrict: boolean;
+  avgSfr: number | null;
+}
+
+export interface WeakCauseAssembleDeps {
+  level: string;
+  factVolume?: Record<string, { effectiveSets?: number; directSets?: number } | number> | null;
+  perMuscleAcwr?: Record<string, { zone: string }> | null;
+  sleepHours?: number | null;
+  vbtLossPct?: number | null;
+  hist28?: Record<string, number[]>;
+  e1rmTrend?: Record<string, { deltaPct: number; sessions: number }>;
+  meas?: Record<string, unknown>;
+  heightCm?: number | null;
+  wristCm?: number | null;
+  auditFor?: (zone: string) => WeakCauseAuditFlags | null;
+  canonicalOf?: (zone: string) => string;
+}
+
+function factSetsOf(factVolume: WeakCauseAssembleDeps['factVolume'], zone: string): number | null {
+  if (!factVolume) return null;
+  const v: any = (factVolume as any)[zone];
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const n = v.effectiveSets ?? v.directSets ?? null;
+  return n == null || !Number.isFinite(n) ? null : n;
+}
+
+/** Единая сборка входов причины на зону (хаб, мост и экспорт используют одно и то же). */
+export function assembleWeakCauseInput(zone: string, deps: WeakCauseAssembleDeps): Omit<WeakCauseInput, 'zone'> {
+  const z = zone;
+  const canon = (() => { try { return deps.canonicalOf ? deps.canonicalOf(z) : z; } catch { return z; } })();
+  const lm = (() => { try { return getVolumeLandmarks(deps.level || 'intermediate', z); } catch { return null; } })();
+  const fact = factSetsOf(deps.factVolume, z);
+  const acwrZ = (() => { try { return (deps.perMuscleAcwr as any)?.[z]?.zone ?? null; } catch { return null; } })();
+  let hist: number[] = [];
+  try { hist = (deps.hist28 as any)?.[z] || (deps.hist28 as any)?.[canon] || []; } catch { /* noop */ }
+  if (!hist.length && fact != null) hist = [fact];
+  let e1rmDelta: number | null = null;
+  let e1rmSessions = 0;
+  try {
+    const t = (deps.e1rmTrend as any)?.[z] || (deps.e1rmTrend as any)?.[canon];
+    if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
+  } catch { /* noop */ }
+  const aud = (() => { try { return deps.auditFor ? deps.auditFor(z) : null; } catch { return null; } })();
+  const mavN = lm?.mav ?? null;
+  const techClean = aud ? !aud.singleAngle && !aud.missingStrict : true;
+  return {
+    factHistory: hist,
+    mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
+    e1rmDeltaPct: e1rmDelta, e1rmSessions,
+    acwrZone: acwrZ,
+    sleepHours: deps.sleepHours != null && Number.isFinite(deps.sleepHours) ? deps.sleepHours : null,
+    vbtLossPct: deps.vbtLossPct ?? null,
+    hasLengthened: aud ? aud.lengthened : undefined,
+    singleAngle: aud ? aud.singleAngle : false,
+    missingStrict: aud ? aud.missingStrict : false,
+    tempoMismatch: false,
+    avgSfr: aud?.avgSfr ?? null,
+    idealDeltaPct: idealDeltaForZone(z, (deps.meas || {}) as any, deps.heightCm ?? null, deps.wristCm ?? null),
+    weeksAtMavClean: techClean ? weeksAtMav(hist, mavN) : 0,
+  };
+}
+
+/** Пакетная диагностика из живых входов (единая точка для хаба/моста/экспорта). */
+export function diagnoseWeakCausesBatch(
+  zones: string[],
+  deps: WeakCauseAssembleDeps,
+): Record<string, WeakCauseResult> {
+  const list = zones.slice(0, 2);
+  const byZone: Record<string, Omit<WeakCauseInput, 'zone'>> = {};
+  for (const z of list) {
+    try { byZone[z] = assembleWeakCauseInput(z, deps); } catch { /* noop */ }
+  }
+  return diagnoseWeakCauses(list, byZone);
 }
 
 function num(v: unknown): number | null {

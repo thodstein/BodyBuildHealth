@@ -362,7 +362,7 @@ describe('e1rm-trend + activation', () => {
     date,
     exercises: [{ muscleGroup: muscle, sets: [{ weightKg, reps }] }],
   });
-  // old-окно 28-35д назад от последней даты (строго внутри), recent — последние 7д
+  // old-окно 21–42д назад от последней даты, recent — последние 7д
   const sessions = [
     mkSession('2026-07-20', 'chest', 100, 8), // old: e1RM ~126.7
     mkSession('2026-07-21', 'chest', 100, 8),
@@ -401,6 +401,46 @@ describe('e1rm-trend + activation', () => {
     const mod = await import('../bb-weak-detection.engine');
     const out = mod.detectBBWeakByE1rm(sessions as any);
     expect(out.some((c) => c.muscle === 'chest')).toBe(true);
+  });
+});
+
+// ── Широкое old-окно + батч-сборка ──
+describe('e1rm wide window + batch', () => {
+  const mk = (date: string, muscle: string, weightKg: number, reps: number) => ({
+    date,
+    exercises: [{ muscleGroup: muscle, sets: [{ weightKg, reps }] }],
+  });
+  it('замер 30д назад ловится (раньше окно 28–35д его резало на границе)', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    const t = mod.e1rmTrend28d([
+      mk('2026-07-23', 'chest', 100, 8), // 30д до 08-22
+      mk('2026-08-22', 'chest', 100, 8),
+    ] as any);
+    expect(t.chest).toBeDefined();
+    expect(t.chest.sessions).toBe(1);
+  });
+  it('замер 45д назад — всё ещё мимо', async () => {
+    const mod = await import('../bb-weak-detection.engine');
+    const t = mod.e1rmTrend28d([
+      mk('2026-07-08', 'chest', 100, 8),
+      mk('2026-08-22', 'chest', 100, 8),
+    ] as any);
+    expect(t.chest).toBeUndefined();
+  });
+  it('diagnoseWeakCausesBatch собирает 2 зоны из живых входов', async () => {
+    const mod = await import('../bb-weak-cause.engine');
+    const out = mod.diagnoseWeakCausesBatch(['chest', 'back'], {
+      level: 'intermediate',
+      factVolume: { chest: { effectiveSets: 4 }, back: { effectiveSets: 18 } },
+      canonicalOf: (z: string) => z,
+    });
+    expect(out.chest.cause).toBe('volume');
+    expect(out.back).toBeDefined();
+  });
+  it('batch без данных — volume-фолбэк, не падение', async () => {
+    const mod = await import('../bb-weak-cause.engine');
+    const out = mod.diagnoseWeakCausesBatch(['chest'], { level: 'intermediate' });
+    expect(out.chest.cause).toBe('volume');
   });
 });
 

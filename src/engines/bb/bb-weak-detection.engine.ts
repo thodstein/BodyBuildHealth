@@ -89,7 +89,7 @@ export function detectBBWeakByVolume(
   return dedup.sort((a, b) => a.deltaPct - b.deltaPct);
 }
 
-/** e1RM-тренд 28д per-muscle: old (28-35д назад, max) vs recent (7д, max) + число recent-замеров. */
+/** e1RM-тренд per-muscle: old (21–42д назад, max) vs recent (7д, max) + число recent-замеров. */
 export interface E1rmTrend {
   deltaPct: number;
   sessions: number;
@@ -108,8 +108,9 @@ function bucketE1rm28d(sessions: SessionLike[]): { recent: Record<string, number
   const now = sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : Date.now();
   const DAY = 24 * 60 * 60 * 1000;
   const recentFrom = now - 7 * DAY;
-  const oldFrom = now - 35 * DAY;
-  const oldTo = now - 28 * DAY;
+  // Старое окно широкое (21–42д), чтобы редкий дневник тоже давал тренд; свежее — 7д
+  const oldFrom = now - 42 * DAY;
+  const oldTo = now - 21 * DAY;
 
   for (const s of sorted) {
     const t = s.date ? new Date(s.date).getTime() : 0;
@@ -164,7 +165,7 @@ export function e1rmTrend28d(sessions: SessionLike[]): Record<string, E1rmTrend>
   return out;
 }
 
-/** 2) e1RM-тренд: окна 28д (old 4нед назад vs recent 7д) — как в weak-muscle-detection */
+/** 2) e1RM-тренд: old (21–42д назад) vs recent (7д) — широкое old-окно под редкий дневник */
 export function detectBBWeakByE1rm(
   sessions: Array<{ date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<{ weightKg: number; reps: number; rir?: number }> }> }>,
 ): BBWeakCandidate[] {

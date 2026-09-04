@@ -29,7 +29,7 @@ import { getProfExecutionProfile } from '../../../engines/bb/bb-execution-prof.e
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { sfrOf } from '../../../engines/bb/bb-sfr-db';
-import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../../../engines/bb/bb-weak-cause.engine';
+import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
@@ -328,38 +328,19 @@ export const BBDiagnosticsHub: React.FC = () => {
       }
     } catch { /* noop */ }
     try {
-      for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const lm = getVolumeLandmarks(level, z);
-        const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
-        const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
-        let hist: number[] = [];
-        try { hist = (histLazy as any)[z] || (histLazy as any)[canonicalMuscle(z)] || []; } catch { /* noop */ }
-        if (!hist.length && fact != null) hist = [fact];
-        const mavN = lm?.mav ?? null;
-        let e1rmDelta: number | null = null;
-        let e1rmSessions = 0;
-        try {
-          const t = (trendLazy as any)[z] || (trendLazy as any)[canonicalMuscle(z)];
-          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
-        } catch { /* noop */ }
-        weakCausesPayload[z] = diagnoseWeakCause({
-          zone: z,
-          factHistory: hist,
-          mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
-          e1rmDeltaPct: e1rmDelta, e1rmSessions,
-          acwrZone: acwrZ,
-          sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-          vbtLossPct: vbt?.lossPct ?? null,
-          idealDeltaPct: (() => {
-            try {
-              const h = measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
-              const w = state.wristCm ? parseFloat(state.wristCm) : null;
-              return idealDeltaForZone(z, measLazy as any, h, w);
-            } catch { return null; }
-          })(),
-          weeksAtMavClean: weeksAtMav(hist, mavN),
-        });
-      }
+      weakCausesPayload = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
+        level,
+        factVolume: factVolume as any,
+        perMuscleAcwr: perMuscleAcwr as any,
+        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        hist28: histLazy as any,
+        e1rmTrend: trendLazy as any,
+        meas: measLazy as any,
+        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
+        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
+        canonicalOf: canonicalMuscle,
+      });
     } catch { /* noop */ }
     try {
       const f: Record<string, number> = {};
@@ -445,9 +426,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     let spec: unknown = null;
     const heads: string[] = [];
     try {
+      causes = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
+        level,
+        factVolume: factVolume as any,
+        canonicalOf: canonicalMuscle,
+      });
       for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const lm = getVolumeLandmarks(level, z);
-        causes[z] = diagnoseWeakCause({ zone: z, mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null });
         const wh = weakHeadForZone(z);
         if (wh && !heads.includes(wh)) heads.push(wh);
       }
@@ -477,27 +461,22 @@ export const BBDiagnosticsHub: React.FC = () => {
         }
       } catch { /* noop */ }
       for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const lm = getVolumeLandmarks(level, z);
-        let hist: number[] = [];
-        try { hist = (histLazy as any)[z] || (histLazy as any)[canonicalMuscle(z)] || []; } catch { /* noop */ }
-        let e1rmDelta: number | null = null;
-        let e1rmSessions = 0;
-        try {
-          const t = (trendLazy as any)[z] || (trendLazy as any)[canonicalMuscle(z)];
-          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
-        } catch { /* noop */ }
         const wh = weakHeadForZone(z);
         if (wh && !heads.includes(wh)) heads.push(wh);
-        const h = measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
-        const w = state.wristCm ? parseFloat(state.wristCm) : null;
-        causes[z] = diagnoseWeakCause({
-          zone: z, factHistory: hist,
-          mev: lm?.mev ?? null, mav: lm?.mav ?? null, mrv: lm?.mrv ?? null,
-          e1rmDeltaPct: e1rmDelta, e1rmSessions,
-          idealDeltaPct: idealDeltaForZone(z, measLazy as any, h, w),
-          weeksAtMavClean: weeksAtMav(hist, lm?.mav ?? null),
-        });
       }
+      causes = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
+        level,
+        factVolume: factVolume as any,
+        perMuscleAcwr: perMuscleAcwr as any,
+        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        hist28: histLazy as any,
+        e1rmTrend: trendLazy as any,
+        meas: measLazy as any,
+        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
+        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
+        canonicalOf: canonicalMuscle,
+      });
       const f: Record<string, number> = {};
       spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
     } catch { /* noop */ }
@@ -536,55 +515,31 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { return e1rmTrend28d(diarySessions as any); } catch { return {}; }
   }, [diarySessions]);
   const weakCauses = useMemo(() => {
-    const out: Record<string, ReturnType<typeof diagnoseWeakCause>> = {};
-    for (const z of report.weakZonesGranular.slice(0, 2)) {
-      try {
-        const lm = getVolumeLandmarks(level, z);
-        const fact = (factVolume as any)?.[z]?.effectiveSets ?? (factVolume as any)?.[z]?.directSets ?? null;
-        const acwrZ = (perMuscleAcwr as any)?.[z]?.zone ?? null;
-        const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
-        // 28д-история по канонической мышце (фолбэк — факт 7д)
-        let hist: number[] = [];
-        try {
-          hist = (hist28 as any)[z] || (hist28 as any)[canonicalMuscle(z)] || [];
-        } catch { /* noop */ }
-        if (!hist.length && fact != null) hist = [fact];
-        // e1RM-тренд 28д по канонической мышце — питает причину activation
-        let e1rmDelta: number | null = null;
-        let e1rmSessions = 0;
-        try {
-          const t = (e1rmTrend as any)[z] || (e1rmTrend as any)[canonicalMuscle(z)];
-          if (t && Number.isFinite(t.deltaPct)) { e1rmDelta = t.deltaPct; e1rmSessions = t.sessions || 0; }
-        } catch { /* noop */ }
-        const single = aud ? (aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6) : false;
-        const missStrict = aud ? aud.strictCoverage.missing.length > 0 : false;
-        const techClean = !single && !missStrict;
-        const mavN = lm?.mav ?? null;
-        out[z] = diagnoseWeakCause({
-          zone: z,
-          factHistory: hist,
-          mev: lm?.mev ?? null, mav: mavN, mrv: lm?.mrv ?? null,
-          e1rmDeltaPct: e1rmDelta, e1rmSessions,
-          acwrZone: acwrZ,
-          sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-          vbtLossPct: vbt?.lossPct ?? null,
-          hasLengthened: aud ? aud.lengthened > 0 : undefined,
-          singleAngle: aud ? (aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6) : false,
-          missingStrict: aud ? aud.strictCoverage.missing.length > 0 : false,
-          tempoMismatch: false,
-          avgSfr: aud?.avgSfr ?? null,
-          idealDeltaPct: (() => {
-            try {
-              const h = measNum.heightCm ?? (parseFloat(state.circ.heightCm || '') || null);
-              const w = state.wristCm ? parseFloat(state.wristCm) : null;
-              return idealDeltaForZone(z, measNum as any, h, w);
-            } catch { return null; }
-          })(),
-          weeksAtMavClean: techClean ? weeksAtMav(hist, mavN) : 0,
-        });
-      } catch { /* noop */ }
-    }
-    return out;
+    try {
+      return diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
+        level,
+        factVolume: factVolume as any,
+        perMuscleAcwr: perMuscleAcwr as any,
+        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        hist28: hist28 as any,
+        e1rmTrend: e1rmTrend as any,
+        meas: measNum as any,
+        heightCm: measNum.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
+        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
+        canonicalOf: canonicalMuscle,
+        auditFor: (z) => {
+          const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+          if (!aud) return null;
+          return {
+            lengthened: aud.lengthened > 0,
+            singleAngle: aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6,
+            missingStrict: aud.strictCoverage.missing.length > 0,
+            avgSfr: aud.avgSfr ?? null,
+          };
+        },
+      });
+    } catch { return {}; }
   }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
   const specBlock = useMemo(() => {
     try {
@@ -1025,7 +980,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                       {(() => {
                         let t: { deltaPct: number; sessions: number } | null = null;
                         try { t = (e1rmTrend as any)[z] || (e1rmTrend as any)[canonicalMuscle(z)] || null; } catch { /* noop */ }
-                        if (!t || !Number.isFinite(t.deltaPct)) return null;
+                        if (!t || !Number.isFinite(t.deltaPct)) {
+                          if (diarySessions.length > 0) {
+                            return <div style={{ color: DIM }}>Дневник e1RM: мало данных — нужны замеры 3+ нед назад для тренда</div>;
+                          }
+                          return null;
+                        }
                         const arrow = t.deltaPct <= -5 ? '▼' : t.deltaPct <= 1 ? '►' : '▲';
                         const tcol = t.deltaPct <= -5 ? '#ef4444' : t.deltaPct <= 1 ? '#f59e0b' : '#22c55e';
                         return <div style={{ color: tcol }}>Дневник e1RM (28д): {arrow} {t.deltaPct}% · {t.sessions} зам.</div>;
