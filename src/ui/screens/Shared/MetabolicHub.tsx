@@ -6,7 +6,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { boerLeanBodyMass } from '../../../core/metabolic-constants';
 import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
 import { getProfile } from '../../../core/profile-manager';
@@ -470,7 +470,7 @@ export const MetabolicHub: React.FC = () => {
   const kbju = useMemo(()=> calcKBJU(input), [input]);
   const fat = useMemo(()=> calcBodyFat(input), [input]);
   const cortisol = useMemo(()=> calcStressLoad(input), [input]);
-  const neat = useMemo(()=> calcNEAT({ weight, standingHours, fidgetLevel, steps, height }), [weight, standingHours, fidgetLevel, steps, height]);
+  // NEAT — единая точка PRO: neatPro (профессия), v1 calcNEAT удалён из UI
   const at = useMemo(()=> calcAdaptiveThermogenesis({ weight, height, age, sex, bodyFat, deficitKcal, weeksInDeficit, weightLostKg }), [weight,height,age,sex,bodyFat,deficitKcal,weeksInDeficit,weightLostKg]);
   // reverse — единая точка PRO: reverseAuto (шаг по trend), v1 calcReverseDiet удалён из UI (движок оставлен для совместимости)
   const thyroid = useMemo(()=> calcThyroidImpact(ft4, tsh), [ft4,tsh]);
@@ -1508,17 +1508,17 @@ export const MetabolicHub: React.FC = () => {
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.18)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'#14b8a6' }}>NEAT сегодня · Levine 2002</div>
-                  <div style={{ fontSize:22, fontWeight:900, color:'#14b8a6' }}>{neat.total}<span style={{ fontSize:10 }}>ккал</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>+{neat.standing} стоя +{neat.fidget>=0?'+':''}{neat.fidget} fidget +{neat.walking} ходьба</div>
+                  <div style={{ fontSize:10, color:'#14b8a6' }}>NEATpro сегодня · Levine 2002 + профессия {profession} {PROFESSION_PAL[profession]}</div>
+                  <div style={{ fontSize:22, fontWeight:900, color:'#14b8a6' }}>{neatPro.total}<span style={{ fontSize:10 }}>ккал</span></div>
+                  <div style={{ fontSize:9, color:'#fff' }}>база {neatPro.profession} +{neatPro.standing} стоя +{neatPro.fidget>=0?'+':''}{neatPro.fidget} fidget +{neatPro.walking} ходьба</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                  {neat.note}<br/>
+                  {neatPro.note}<br/>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>NEAT объясняет плато сушки: +2ч стоя = +80ккал, +2000 шагов +80ккал. PAL 1.40-1.95 включает.</span>
                   <div style={{ marginTop:8, display:'flex', gap:6 }}>
-                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>стоя<br/><b style={{ color:'#14b8a6' }}>{neat.standing}</b></div>
-                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>fidget<br/><b style={{ color:'#14b8a6' }}>{neat.fidget}</b></div>
-                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>ходьба<br/><b style={{ color:'#14b8a6' }}>{neat.walking}</b></div>
+                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>стоя<br/><b style={{ color:'#14b8a6' }}>{neatPro.standing}</b></div>
+                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>fidget<br/><b style={{ color:'#14b8a6' }}>{neatPro.fidget}</b></div>
+                    <div style={{ flex:1, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>ходьба<br/><b style={{ color:'#14b8a6' }}>{neatPro.walking}</b></div>
                   </div>
                 </div>
               </div>

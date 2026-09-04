@@ -83,7 +83,7 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 - **One-answer PRO + diff**: `buildOneAnswerPro` (adaptive-v3/formula + DLW-range + targets + беременность) + `diffMetabolicSnapshots` (⇄ Сравнить сценариев) + snapshot v5 расширен (профессия/триместр/DIAAS/CAT2/пот).
 
 ## PRO v4.3 — дедуп поколений (Sep 2026)
-- **Единые точки UI**: adaptive v3 / CAT2 / sweatV2+BHI / proteinPro / reverseAuto / goalV2 — v1-панели удалены из хаба (движок v1 оставлен для совместимости тестов и планировщика).
+- **Единые точки UI**: adaptive v3 / CAT2 / sweatV2+BHI / proteinPro / reverseAuto / goalV2 / neatPro — v1-панели удалены из хаба (движок v1 оставлен для совместимости тестов и планировщика).
 - **PAL-паритет**: `calcPALPro` учитывает тоннаж/кардио той же шкалой, что `getEffectivePal` (±0.01 в тесте).
 - **DIAAS в целях**: `0.95/diaas` кап ×1.3, животный не урезается (mixed ×1.0 — дефолт неизменен), пометка в note.
 - **Вода IOM**: триместр +300мл, лактация +700/+400мл (бар в табe воды + breakdown.pregnancy).
