@@ -2677,6 +2677,50 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 45. NATIVE DEEP-13 — калькулятор, дневник, лабы, combat ─ */
+html.app-native .calc-system,
+html.app-native .calc-tzrisk,
+html.app-native .calc-ped,
+html.app-native .calc-labscard,
+html.app-native .calc-profile,
+html.app-native .nut-mealcard,
+html.app-native .nut-macrosum,
+html.app-native .nut-weekday,
+html.app-native .nut-storageerr,
+html.app-native .labs-invest,
+html.app-native .labs-problems,
+html.app-native .combat-constructor {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .calc-tzrisk,
+html.app-native .calc-ped,
+html.app-native .nut-mealcard,
+html.app-native .nut-weekday {
+  border-radius: 20px !important;
+}
+
+html.app-native .nut-macrosum {
+  gap: 8px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .calc-system,
+  html.app-native .calc-tzrisk,
+  html.app-native .calc-ped,
+  html.app-native .calc-labscard,
+  html.app-native .calc-profile,
+  html.app-native .nut-mealcard,
+  html.app-native .nut-macrosum,
+  html.app-native .nut-weekday,
+  html.app-native .nut-storageerr,
+  html.app-native .labs-invest,
+  html.app-native .labs-problems,
+  html.app-native .combat-constructor {
+    animation: none;
+  }
+}
+
 /* ─── 44. NATIVE DEEP-12 — атомы, строки, пикеры, киты ───── */
 html.app-native .train-diarysetrow,
 html.app-native .train-exlabpicker,

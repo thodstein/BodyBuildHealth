@@ -39,7 +39,7 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
   const organs = Array.isArray(tz?.organs) ? tz.organs : [];
 
   return (
-    <div style={{ ...GLASS, padding: '10px 12px', marginTop: 6, marginBottom: 6 }}>
+    <div className="calc-tzrisk" style={{ ...GLASS, padding: '10px 12px', marginTop: 6, marginBottom: 6 }}>
       {/* ── Заголовок ── */}
       <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 3, height: 14, borderRadius: 2, background: ACCENT, display: 'inline-block' }} />

@@ -116,7 +116,7 @@ export const CalcProfileCard: React.FC<Props> = ({ state, onStateChange }) => {
   };
 
   return (
-    <div style={{ ...GLASS, padding: 10, marginBottom: 8 }}>
+    <div className="calc-profile" style={{ ...GLASS, padding: 10, marginBottom: 8 }}>
       <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>👤 Профиль</span>
         <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>

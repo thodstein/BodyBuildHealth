@@ -163,6 +163,18 @@ import { WarmupCheckinInline } from '../screens/SRCBBScreen_parts/WarmupSessionP
 import { CooldownCheckinInline } from '../screens/SRCBBScreen_parts/CooldownSessionPanel';
 import { PhaseLabel, ItemRow } from '../screens/SupportScreen_parts/supportProtocolsShared';
 import { MetabolicHub } from '../screens/Shared/MetabolicHub';
+import { CalcSystemPanel } from '../screens/Calculator/CalcSystemPanel';
+import { TzRiskCard } from '../screens/Calculator/TzRiskCard';
+import { CalcPEDCard } from '../screens/Calculator/CalcPEDCard';
+import { CalcLabsCard } from '../screens/Calculator/CalcLabsCard';
+import { CalcProfileCard } from '../screens/Calculator/CalcProfileCard';
+import { MealCard } from '../screens/NutritionScreen_parts/diary/MealCard';
+import { MacroSummary } from '../screens/NutritionScreen_parts/diary/MacroSummary';
+import { WeekDaySelector } from '../screens/NutritionScreen_parts/diary/WeekDaySelector';
+import { StorageErrorBanner } from '../screens/NutritionScreen_parts/diary/StorageErrorBanner';
+import { LabsInvestigations } from '../screens/LabsScreen_parts/LabsInvestigations';
+import LabsProblemPanelsTab from '../screens/LabsScreen_parts/LabsProblemPanelsTab';
+import { CombatConstructor } from '../screens/combat/CombatConstructor';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -943,5 +955,79 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c5 } = render(<MetabolicHub />);
     expect(c5.querySelector('.nut-metabolic'), 'metabolic').not.toBeNull();
+  });
+
+  it('41. Batch-13 корни: калькулятор поддержки', () => {
+    const { container: c1 } = render(<CalcSystemPanel />);
+    expect(c1.querySelector('.calc-system'), 'system').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <TzRiskCard
+        tz={{ organs: [], d_cov: 1, u_i: 1, supportCount: 0 } as never}
+        before={30}
+        after={20}
+      />,
+    );
+    expect(c2.querySelector('.calc-tzrisk'), 'tzrisk').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <CalcPEDCard state={{ pharma: {} }} onStateChange={() => {}} />,
+    );
+    expect(c3.querySelector('.calc-ped'), 'ped').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <CalcLabsCard state={{}} onStateChange={() => {}} />,
+    );
+    expect(c4.querySelector('.calc-labscard'), 'labscard').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <CalcProfileCard state={{}} onStateChange={() => {}} />,
+    );
+    expect(c5.querySelector('.calc-profile'), 'profile').not.toBeNull();
+  });
+
+  it('42. Batch-13 корни: дневник питания', () => {
+    const { container: c1 } = render(
+      <MealCard
+        mealName="Завтрак"
+        items={[]}
+        onEditItem={() => {}}
+        onDeleteItem={() => {}}
+        onCopyMeal={() => {}}
+        onSavePreset={() => {}}
+      />,
+    );
+    expect(c1.querySelector('.nut-mealcard'), 'mealcard').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MacroSummary dayTotals={{ kcal: 2000, p: 150, f: 70, c: 220 }} />,
+    );
+    expect(c2.querySelector('.nut-macrosum'), 'macrosum').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <WeekDaySelector
+        weekDays={['2026-01-01', '2026-01-02']}
+        selectedDate="2026-01-01"
+        onSelectDate={() => {}}
+        diaryData={{}}
+      />,
+    );
+    expect(c3.querySelector('.nut-weekday'), 'weekday').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <StorageErrorBanner error="Тестовая ошибка" onDismiss={() => {}} />,
+    );
+    expect(c4.querySelector('.nut-storageerr'), 'storageerr').not.toBeNull();
+  });
+
+  it('43. Batch-13 корни: лабы и combat', () => {
+    const { container: c1 } = render(<LabsInvestigations />);
+    expect(c1.querySelector('.labs-invest'), 'invest').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<LabsProblemPanelsTab />);
+    expect(c2.querySelector('.labs-problems'), 'problems').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<CombatConstructor />);
+    expect(c3.querySelector('.combat-constructor'), 'combat').not.toBeNull();
   });
 });

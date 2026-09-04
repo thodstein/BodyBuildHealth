@@ -26,7 +26,7 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
   })();
 
   return (
-    <div style={{ 
+    <div className="nut-mealcard" style={{ 
       marginBottom: 10, borderRadius: 16, background: '#18181b', 
       border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden',
       boxShadow: '0 2px 12px rgba(0,0,0,0.15)',

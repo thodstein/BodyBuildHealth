@@ -64,7 +64,7 @@ export const CalcSystemPanel: React.FC<{
   const showSub = groups && groups.length > 0 && !!risk;
   const contraList = (contra || []).filter(c => c?.label || c?.message);
   return (
-    <div style={{ marginBottom: 8 }}>
+    <div className="calc-system" style={{ marginBottom: 8 }}>
       {risk && (
         <div style={{ padding: '6px 8px', borderRadius: 7, marginBottom: 6, background: 'rgba(20,184,166,0.06)', border: '1px solid rgba(20,184,166,0.18)' }}>
           <div style={{ fontSize: 7, fontWeight: 700, color: '#5eead4', marginBottom: 2 }}>

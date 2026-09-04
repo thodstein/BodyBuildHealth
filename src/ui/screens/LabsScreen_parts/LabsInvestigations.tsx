@@ -173,7 +173,7 @@ export const LabsInvestigations: React.FC = () => {
   const totalCount = INVESTIGATIONS.length;
 
   return (
-    <div style={{ height: 'calc(100vh - 100px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="labs-invest" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontSize: 13, fontWeight: 700, padding: '8px 0 4px', flexShrink: 0 }}>Обследования и панели</div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8, flexShrink: 0 }}>
         {totalCount} исследований и лабораторных панелей для мониторинга на курсе

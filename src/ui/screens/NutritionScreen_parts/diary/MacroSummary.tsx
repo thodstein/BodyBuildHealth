@@ -21,7 +21,7 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
   const r=14; const circ=2*Math.PI*r; const dash = circ * kcalPct/100;
   return (
     <>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+    <div className="nut-macrosum" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
       {items.map(m => {
         const pct = m.t > 0 ? Math.min(100, Math.round(m.v / m.t * 100)) : 0;
         const isOver = pct > 100;

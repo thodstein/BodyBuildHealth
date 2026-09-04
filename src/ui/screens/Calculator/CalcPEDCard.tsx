@@ -113,7 +113,7 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
   };
 
   return (
-    <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.25)' }}>
+    <div className="calc-ped" style={{ ...GLASS, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.25)' }}>
       <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '4px 6px', borderRadius: 8, background: open ? 'rgba(0,230,138,0.05)' : 'transparent', transition: 'background 0.15s' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
           💊 Курс (PED)

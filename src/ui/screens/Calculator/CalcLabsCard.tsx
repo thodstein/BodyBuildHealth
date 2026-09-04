@@ -73,7 +73,7 @@ export const CalcLabsCard: React.FC<Props> = ({ state, onStateChange, onOpenLabs
   const filledCount = REQUIRED_MARKERS.filter(m => getMarkerValue(m.key)).length;
 
   return (
-    <div style={{ ...GLASS, padding: 10, marginBottom: 8 }}>
+    <div className="calc-labscard" style={{ ...GLASS, padding: 10, marginBottom: 8 }}>
       <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>🧪 Анализы</span>
         <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>

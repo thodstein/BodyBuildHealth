@@ -51,7 +51,7 @@ export const StorageErrorBanner: React.FC<StorageErrorBannerProps> = ({
   };
   
   return (
-    <div className={`border rounded-lg p-4 mb-4 ${isQuotaError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+    <div className={`nut-storageerr border rounded-lg p-4 mb-4 ${isQuotaError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
       <div className="flex justify-between items-start">
         <div className={`flex-1 ${isQuotaError ? 'bg-red-50' : 'bg-yellow-50'}`}>
           <div className="flex items-center gap-2 mb-2">

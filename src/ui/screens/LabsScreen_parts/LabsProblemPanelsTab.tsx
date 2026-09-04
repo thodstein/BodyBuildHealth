@@ -129,7 +129,7 @@ const LabsProblemPanelsTab: React.FC = () => {
   // Detail view for a specific panel
   if (selectedPanel) {
     return (
-      <div style={{ padding: '8px 0 60px' }}>
+      <div className="labs-problems" style={{ padding: '8px 0 60px' }}>
         <button onClick={() => setSelectedPanelId(null)} style={{
           padding: '6px 12px', borderRadius: 12, cursor: 'pointer', fontWeight: 600, fontSize: 11,
           background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
@@ -237,7 +237,7 @@ const LabsProblemPanelsTab: React.FC = () => {
 
   // List view
   return (
-    <div style={{ padding: '8px 0 60px' }}>
+    <div className="labs-problems" style={{ padding: '8px 0 60px' }}>
       {/* Header + symptom link */}
       <div style={{ marginBottom: 12 }}>
         <p style={{ margin: '0 0 8px', fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
