@@ -185,4 +185,11 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
     await waitFor(() => expect(container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
   });
+  it('E15 ICS календарь спец-блока', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.click(await screen.findByText(/📅 ICS/));
+    await waitFor(() => expect(container.textContent).toContain('ICS календарь'), { timeout: 2000 });
+  });
 });

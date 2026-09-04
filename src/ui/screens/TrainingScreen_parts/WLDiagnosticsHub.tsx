@@ -34,6 +34,7 @@ import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
 import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
 import { diagnoseTAImtp } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
+import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -647,6 +648,24 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
+  // E15: календарь спец-блока (.ics)
+  const handleExportIcs = () => {
+    if (!specPreview || !specPreview.weeks.length) {
+      setToast('Выбери слабые фазы — календарь строить не из чего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const ics = buildTAIcs(specPreview);
+    if (!ics) {
+      setToast('Календарь не построен');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    downloadTAIcs(ics, `ta-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+    setToast(`✓ ICS календарь (${specPreview.totalWeeks} нед)`);
+    setTimeout(() => setToast(''), 2000);
+  };
+
   const applyToConstructor = () => {
     if (weakPoints.length === 0) {
       setToast('Слабые фазы не выбраны — нечего применять');
@@ -1148,6 +1167,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{specPreview.rationale[0]}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
+              <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
               {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>
           </div>
