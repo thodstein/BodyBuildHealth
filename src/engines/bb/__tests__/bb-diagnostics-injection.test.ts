@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { injectBBWeakPoints, computeBudgetBBFallback } from '../bb-diagnostics-injection.engine';
+import { finalizeBBPlan } from '../bb-finalize.engine';
 import type { BBPlan } from '../bb-builder.engine';
 
 function mockPlan(setsPerWeek = 80, level = 'intermediate'): BBPlan {
@@ -65,5 +66,40 @@ describe('bb-diagnostics-injection', () => {
     const res = injectBBWeakPoints(plan, ['delt_mid'], { weekIdxs: [0] });
     expect(res.injected).toBe(0);
     expect(res.notes.join(' ')).toMatch(/делод/);
+  });
+  // e2e пути приёма внешнего плана: инъекция → revalidate (те же опции, что в BbAutoConstructor) → упражнение живо
+  it('injected exercise survives finalizeBBPlan revalidate path', () => {
+    const plan = mockPlan() as any;
+    const res = injectBBWeakPoints(plan, ['delt_mid'], { budget: 500 });
+    expect(res.injected).toBe(1);
+    const re = finalizeBBPlan(res.plan as any, {
+      reorder: false,
+      phaseSafety: true,
+      level: 'intermediate',
+      ensureMinimumVolume: true,
+      controlledRotation: false,
+    } as any);
+    const found = (re.weeks[0].sessions as any[]).flatMap((s: any) => s.exercises || [])
+      .filter((e: any) => String(e.exerciseName || '').toLowerCase() === 'lateral_raise');
+    expect(found.length).toBe(1);
+    expect(found[0].sets).toBeGreaterThanOrEqual(2);
+  });
+  it('injected exercise survives revalidate across all weeks', () => {
+    const plan = mockPlan() as any;
+    plan.weeks.push(JSON.parse(JSON.stringify(plan.weeks[0])));
+    const res = injectBBWeakPoints(plan, ['chest_upper'], { budget: 500, allWeeks: true });
+    expect(res.injected).toBe(2);
+    const re = finalizeBBPlan(res.plan as any, {
+      reorder: false,
+      phaseSafety: true,
+      level: 'intermediate',
+      ensureMinimumVolume: true,
+      controlledRotation: false,
+    } as any);
+    for (const w of re.weeks as any[]) {
+      const has = (w.sessions as any[]).flatMap((s: any) => s.exercises || [])
+        .some((e: any) => String(e.comment || '').includes('ББ-диагностика'));
+      expect(has).toBe(true);
+    }
   });
 });
