@@ -102,3 +102,29 @@ export const OHS_NORMS = {
   thoracicExtension: '40-45°',
   shoulderFlexion: 180,
 };
+
+// V4-C: история OHS-скринингов (свой ключ хаба, кап 30)
+export const TA_OHS_HIST_KEY = 'he_ta_ohs_hist_v1';
+
+export interface OHSSnapshot {
+  date: string; // yyyy-mm-dd
+  score: number; // 0-6
+  failed: number;
+  level: string;
+}
+
+/** Добавить/заменить снимок дня (кап 30, по дате). */
+export function appendOHSSnapshot(hist: OHSSnapshot[], entry: OHSSnapshot): OHSSnapshot[] {
+  const clean = (Array.isArray(hist) ? hist : []).filter(s => s && typeof s.date === 'string');
+  return [...clean.filter(s => s.date !== entry.date), entry]
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .slice(-30);
+}
+
+/** Тренд скора: последний − первый (плюс = улучшение). */
+export function ohsScoreTrend(hist: OHSSnapshot[]): { delta: number; n: number } | null {
+  const clean = (Array.isArray(hist) ? hist : []).filter(s => s && Number.isFinite(s.score));
+  if (clean.length < 2) return null;
+  const sorted = [...clean].sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { delta: sorted[sorted.length - 1].score - sorted[0].score, n: sorted.length };
+}

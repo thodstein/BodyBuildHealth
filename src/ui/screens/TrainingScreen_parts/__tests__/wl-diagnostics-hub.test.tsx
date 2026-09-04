@@ -119,12 +119,77 @@ describe('WLDiagnosticsHub PRO', () => {
   });
   it('E7 Kinovea CSV → метрики + bfPCA', async () => {
     const { container } = render(<WLDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Видео/)[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
     const ta = container.querySelector('textarea')!;
     fireEvent.change(ta, { target: { value: 't,x,y\n0,0,0\n0.033,0.5,10\n0.066,1,25\n0.1,0.5,45\n0.133,0,60' } });
     fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
     await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
     expect(container.textContent).toContain('bfPCA P1');
+  });
+  it('V4-A повторный парс растит историю + EWMA-тренд', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
+    const ta = container.querySelector('textarea')!;
+    const csv = 't,x,y\n0,0,0\n0.033,0.5,10\n0.066,1,25\n0.1,0.5,45\n0.133,0,60';
+    fireEvent.change(ta, { target: { value: csv } });
+    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
+    await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
+    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
+    await waitFor(() => expect(container.textContent).toContain('История трекинга (2)'), { timeout: 2000 });
+    expect(JSON.parse(localStorage.getItem('he_ta_bar_tracking_v1') || '[]').length).toBe(2);
+  });
+  it('V4-B инъекция + Sinclair уходят в экспорт без ошибок', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 2, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+        { week: 2, phase: 'accumulation', sessions: [] },
+      ],
+      workMax: { snatch: 80 }, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.change(container.querySelector('input[placeholder="80"]')!, { target: { value: '81' } });
+    const snI = Array.from(container.querySelectorAll('input[placeholder="100"]'));
+    fireEvent.change(snI[snI.length - 1], { target: { value: '100' } });
+    const cjI = Array.from(container.querySelectorAll('input[placeholder="125"]'));
+    fireEvent.change(cjI[cjI.length - 1], { target: { value: '125' } });
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: середина тяги/)[0]);
+    fireEvent.click(await screen.findByText(/Вставить коррекции/));
+    await waitFor(() => expect(container.textContent).toContain('Вставлено коррекций'), { timeout: 2000 });
+    fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
+    await waitFor(() => expect(container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+  });
+  it('V4-C coverage-strip при наличии плана', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 1, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+      ],
+      workMax: {}, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    await waitFor(() => expect(container.textContent).toContain('рыв.отрыв 3'), { timeout: 2000 });
+    expect(container.textContent).toContain('рыв.серед 0');
+  });
+  it('V4-C LVP-sparkline рисуется из ramp-ввода', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    await waitFor(() => expect(container.querySelector('svg polyline')).toBeTruthy(), { timeout: 2000 });
+  });
+  it('V4-C OHS снимок сохраняется', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Мобильность/)[0]);
+    fireEvent.click(screen.getByText(/Снимок OHS/));
+    await waitFor(() => expect(container.textContent).toContain('Снимок OHS'), { timeout: 2000 });
+    expect(JSON.parse(localStorage.getItem('he_ta_ohs_hist_v1') || '[]').length).toBe(1);
+  });
+  it('V4-C печать без popup → честный фолбэк', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByText(/🖨 Печать/));
+    await waitFor(() => expect(container.textContent).toMatch(/Всплывающие окна|Печать недоступна/), { timeout: 2000 });
   });
   it('E8 углы с видео → сводка + валидация фаз', async () => {
     const { container } = render(<WLDiagnosticsHub />);

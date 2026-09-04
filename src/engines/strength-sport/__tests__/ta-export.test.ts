@@ -38,4 +38,11 @@ describe('TA export v2 E14', () => {
     const html = buildWLDiagnosticsHtml({ ...BASE, injectionNotes: ['✓ snatch_mid → pause_snatch'] });
     expect(html).toContain('Инъекция в план');
   });
+  it('V4-B Sinclair секция + CSV', () => {
+    const snap: any = { ...BASE, sinclair: { total: 225, coeff: 1.2691, value: 285.55 } };
+    const html = buildWLDiagnosticsHtml(snap);
+    expect(html).toContain('Sinclair');
+    expect(html).toContain('285.55');
+    expect(buildWLCsv(snap)).toContain('225/1.2691/285.55');
+  });
 });

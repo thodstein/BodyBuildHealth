@@ -8,7 +8,7 @@ import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '
 import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
-import { loadBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { loadBarTracking, saveBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { optimalFvSlopeForPmax, vbtEwma } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -16,7 +16,7 @@ import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
-import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
@@ -26,7 +26,7 @@ import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, pars
 import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
-import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
+import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
@@ -179,12 +179,16 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [tab, setTab] = useState<WLTab>('snatch');
   const [toast, setToast] = useState<string>('');
   const [csvText, setCsvText] = useState<string>('');
+  // V4-A: nonce парсов трекинга (одинаковый CSV даёт те же метрики — memo иначе не обновится)
+  const [trackNonce, setTrackNonce] = useState(0);
   // Нонс перечитывания плана ТА из хранилища (инъекция/откат меняют его мимо мемов)
   const [planNonce, setPlanNonce] = useState(0);
   // E6: флаг снапшота до инъекции (откат)
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
   });
+  // V4-B: ноты последней инъекции (идут в экспорт)
+  const [lastInjectNotes, setLastInjectNotes] = useState<string[]>([]);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -400,7 +404,8 @@ export const WLDiagnosticsHub: React.FC = () => {
       const last = vels.slice(-5);
       return { from: last[0], to: last[last.length - 1], ewma: vbtEwma(vels), n: vels.length };
     } catch { return null; }
-  }, [csvText]);
+    // V4-A: trackNonce — тренд свежий после каждого saveBarTracking
+  }, [trackNonce]);
 
   // E8: углы с видео → сводка + автовалидация фаз + OHS-прогноз
   const poseSummary = useMemo(() => {
@@ -421,6 +426,26 @@ export const WLDiagnosticsHub: React.FC = () => {
       return autoOHSFromPose(avgAnglesOfSummary(poseSummary));
     } catch { return null; }
   }, [poseSummary]);
+
+  // V4-C: LVP-sparkline (точки 50/65/80/90 из ramp-ввода)
+  const lvpSpark = useMemo(() => {
+    try {
+      const pts = [
+        { pct: 50, v: parseFloat(state.lvp50) }, { pct: 65, v: parseFloat(state.lvp65) },
+        { pct: 80, v: parseFloat(state.lvp75) }, { pct: 90, v: parseFloat(state.lvp90) },
+      ].filter(p => Number.isFinite(p.v) && p.v > 0);
+      if (pts.length < 2) return null;
+      const vs = pts.map(p => p.v);
+      const lo = Math.min(...vs), hi = Math.max(...vs);
+      const W = 120, H = 36;
+      const xy = pts.map((p, i) => {
+        const x = pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * (W - 8) + 4;
+        const y = hi === lo ? H / 2 : H - 4 - ((p.v - lo) / (hi - lo)) * (H - 8);
+        return `${Math.round(x)},${Math.round(y * 10) / 10}`;
+      });
+      return { pts: xy.join(' '), n: pts.length };
+    } catch { return null; }
+  }, [state.lvp50, state.lvp65, state.lvp75, state.lvp90]);
 
   // E9: антропометрия → хват/старт
   const anthro = useMemo(() => {
@@ -466,6 +491,29 @@ export const WLDiagnosticsHub: React.FC = () => {
       return next;
     });
     setToast(`✓ Снимок ножниц ${entry.date} сохранён`);
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  // V4-C: история OHS-скринингов
+  const [ohsHist, setOhsHist] = useState<OHSSnapshot[]>(() => {
+    try {
+      const raw = localStorage.getItem(TA_OHS_HIST_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(s => s && typeof s.date === 'string') : [];
+    } catch { return []; }
+  });
+  const ohsTrend = useMemo(() => { try { return ohsScoreTrend(ohsHist); } catch { return null; } }, [ohsHist]);
+  const takeOhsSnapshot = () => {
+    const entry: OHSSnapshot = {
+      date: new Date().toISOString().slice(0, 10),
+      score: ohs.totalScore, failed: ohs.failed, level: ohs.level,
+    };
+    setOhsHist(prev => {
+      const next = appendOHSSnapshot(prev, entry);
+      try { localStorage.setItem(TA_OHS_HIST_KEY, JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок OHS ${entry.date}: ${entry.score}/6 сохранён`);
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -671,6 +719,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setToast(`⊘ Не вставлено (бюджет-скип: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
       setTimeout(() => setToast(''), 3000);
       setHasInjectPrev(true);
+      setLastInjectNotes(r.notes || []);
       return;
     }
     try {
@@ -686,6 +735,7 @@ export const WLDiagnosticsHub: React.FC = () => {
     }
     setHasInjectPrev(true);
     setPlanNonce(n => n + 1);
+    setLastInjectNotes(r.notes || []);
     setToast(`✓ Вставлено коррекций: ${r.injected} (нед: ${r.plan.weeksData.length}, скип-бюджет: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
     setTimeout(() => setToast(''), 3000);
     try {
@@ -794,6 +844,9 @@ export const WLDiagnosticsHub: React.FC = () => {
       if (p1 && p3) bf = `bfPCA P1 ${p1.score} (r ${p1.correlationWithPerformance}) · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'}`;
     } catch { /* noop */ }
     setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf }));
+    // V4-A: замер в историю (питает EWMA-тренд)
+    try { saveBarTracking(res); } catch { /* noop */ }
+    setTrackNonce(n => n + 1);
     setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
   };
@@ -857,6 +910,9 @@ export const WLDiagnosticsHub: React.FC = () => {
       }).filter(Boolean);
       base.corrections = weakPoints.flatMap(wp => { try { return top3For(wp).map(c => ({ weakPoint: wp, corrId: c.id, name: c.name, protocol: `${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%` })); } catch { return []; } });
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
+      // V4-B: ноты последней инъекции + Sinclair прогресса
+      if (lastInjectNotes.length) base.injectionNotes = [...lastInjectNotes];
+      if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair };
     } catch { /* noop — базовый снап */ }
     return base;
   };
@@ -873,6 +929,26 @@ export const WLDiagnosticsHub: React.FC = () => {
     downloadWLCsv(snap, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
     setToast('✓ CSV экспорт (причины + коррекции + попытки)');
     setTimeout(() => setToast(''), 2000);
+  };
+
+  // V4-C: печать сводки (то же HTML, что в экспорте)
+  const handlePrint = () => {
+    try {
+      const html = buildWLDiagnosticsHtml(exportSnap());
+      const w = window.open('', '_blank');
+      if (!w) {
+        setToast('Всплывающие окна заблокированы — скачай HTML');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch {
+      setToast('Печать недоступна — скачай HTML');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   const mockPose = useMemo(() => {
@@ -1110,6 +1186,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>{state.lvpResult}</span>
               </div>
               <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
+              {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>
            </div>
          )}
@@ -1174,6 +1251,11 @@ export const WLDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>{ohs.recommendation} {ohs.needsPhysio ? '· нужен физио' : ''}</div>
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Нормы OHS_NORMS knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}, hip {OHS_NORMS.hipFlexion}°/IR {OHS_NORMS.hipIR}°, shoulder {OHS_NORMS.shoulderFlexion}°</div>
             </div>
+            {/* V4-C: история OHS */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+              <button onClick={takeOhsSnapshot} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок OHS ({ohs.totalScore}/6)</button>
+              {ohsTrend && <span style={{ fontSize: 10, color: DIM }}>Тренд ({ohsTrend.n}): {ohsTrend.delta > 0 ? '+' : ''}{ohsTrend.delta} {ohsTrend.delta >= 0 ? '✓' : '⚠️'}</span>}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
               <label style={{ fontSize: 11, color: DIM }}>Knee-to-wall см<br /><input value={state.kneeToWallCm} onChange={e => setState(s => ({ ...s, kneeToWallCm: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
               <label style={{ fontSize: 11, color: DIM }}>Голеностоп °<br /><input value={state.ankleDeg} onChange={e => setState(s => ({ ...s, ankleDeg: e.target.value }))} placeholder="35" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
@@ -1236,6 +1318,18 @@ export const WLDiagnosticsHub: React.FC = () => {
           </div>
           {planAudit.hasPlan && planAudit.missing.length > 0 && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>Нет в плане: {planAudit.missing.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ')}</div>}
           {planAudit.hasPlan && planAudit.missing.length === 0 && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Все 11 фаз двоеборья покрыты ✓</div>}
+          {planAudit.hasPlan && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+              {TA_CORE_PHASES.map(wp => {
+                const c = planAudit.byPhase[wp];
+                const isWorst = planAudit.worstPhase === wp;
+                const short = ({ snatch_off_floor: 'рыв.отрыв', snatch_mid: 'рыв.серед', snatch_pull_under: 'рыв.уход', snatch_catch: 'рыв.сед', snatch_overhead: 'рыв.верх', clean_off_floor: 'вз.отрыв', clean_mid: 'вз.серед', clean_catch: 'вз.сед', jerk_dip: 'dip', jerk_drive: 'drive', jerk_lockout: 'замок' } as Record<string, string>)[wp] || wp;
+                return (
+                  <span key={wp} title={`${c.label}: ${c.sets} сетов`} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 12, background: isWorst ? 'rgba(239,68,68,0.12)' : c.covered ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWorst ? 'rgba(239,68,68,0.35)' : c.covered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: isWorst ? '#ef4444' : c.covered ? '#22c55e' : DIM }}>{short} {c.sets}</span>
+                );
+              })}
+            </div>
+          )}
           {planAudit.hasPlan && planAudit.worstPhase && (
             <button onClick={selectWorstPhase} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({planAudit.byPhase[planAudit.worstPhase].sets} сетов) → разобрать
@@ -1276,6 +1370,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
           <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
+          <button onClick={handlePrint} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Печать</button>
           <button onClick={handleExportCsv} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
         </div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
