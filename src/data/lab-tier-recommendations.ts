@@ -114,7 +114,7 @@ const TIER_RULES: TierRule[] = [
   { marker: 'PLT', tier1: { nutrition: [['Omega-3', '↑3 г']] }, tier2: { add: [['garlic', 'Чеснок 1200 мг — ↓ aggregation'], ['omega3', 'Омега-3 4 г'], ['nattokinase', 'Nattokinase 200 мг']], nutrition: [['STOP smoking', 'ZERO']] }, tier3: { alerts: ['Тромбоциты = {value}×10⁹/L — тромбоцитоз. Кардиолог/гематолог.'] } },
 
   // ─── ГОРМОНАЛЬНЫЕ ───
-  { marker: 'E2', tier1: { titrate: [['anastrozole', 1.5, 'Anastrozole ↑3р/нед (было 2р)']], nutrition: [['Контроль E2', 'Повторить через 7 дней']] }, tier2: { titrate: [['anastrozole', 2.0, 'Anastrozole ↑1 мг/день (было 0.5 2р/нед)']], nutrition: [['Срочно сдать E2', 'Повтор через 7 дней']] }, tier3: { alerts: ['⛔ Эстрадиол = {value} pg/mL — риск гинекомастии. ↑AI до 1 мг/день + рассмотреть SERM (tamoxifen 20 мг). Срочно.'] } },
+  { marker: 'E2', tier1: { titrate: [['anastrozole', 1.5, 'Anastrozole 0.25-0.5 мг 1р/нед, контроль через 14 дней (цель 20-40 пг/мл)']], nutrition: [['Контроль E2', 'Повторить через 14 дней']] }, tier2: { titrate: [['anastrozole', 2.0, 'Anastrozole 0.25-0.5 мг 2р/нед макс. (шаг +0.25 мг; 1 мг/день НЕ применять)']], nutrition: [['Срочно сдать E2', 'Повтор через 14 дней']] }, tier3: { alerts: ['⛔ Эстрадиол = {value} pg/mL — риск гинекомастии. AI титрацией (макс. 0.5 мг 2р/нед) + короткая связка с SERM (tamoxifen 20 мг) 2-4 нед при острой гинекомастии. Срочно к врачу.'] } },
 
   { marker: 'PRL', tier1: { add: [['vitamin_b6', 'B6 P5P ↑50 мг — модуляция пролактина (D2)']] }, tier2: { add: [['cabergoline', 'Cabergoline 0.5 мг 2р/нед — D2-агонист']], nutrition: [['Dopamine', '↑ tyrosine, B6']] }, tier3: { alerts: ['⛔ Пролактин = {value} ng/mL — пролактининома? МРТ селлярной области. Эндокринолог срочно.'] } },
 

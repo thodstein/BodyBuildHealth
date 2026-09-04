@@ -6,7 +6,7 @@ import React from 'react';
 import { FertilityPCTScreen } from '../FertilityPCTScreen';
 import { InfoErrorBoundary } from './SupportScreenData';
 import { SymptomSolverTab } from './SymptomSolverTab';
-import { cardBg, pillActive, pillInactive, PROTOCOL_CARDS } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PROTOCOL_CARDS, PreCycleChecklist, EVIDENCE_LEGEND } from './supportProtocolsShared';
 import { SupportProtocolNeuro } from './supportProtocolNeuro';
 import { SupportProtocolCardio } from './supportProtocolCardio';
 import { SupportProtocolHepatic } from './supportProtocolHepatic';
@@ -62,8 +62,10 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             <span style={{ fontSize:18, flexShrink:0, marginTop:1 }}>⚠️</span>
             <div style={{ fontSize:11, fontWeight:700, color:'#fca5a5', lineHeight:1.5 }}>
               Все протоколы — <b style={{color:'#ef4444'}}>ознакомительные</b>. Назначение препаратов и схемы — <b style={{color:'#ef4444'}}>только врачом</b>. Самолечение опасно для жизни.
+              <div style={{ fontWeight:400, color:'rgba(255,255,255,0.55)', marginTop:4 }}>{EVIDENCE_LEGEND}</div>
             </div>
           </div>
+          <PreCycleChecklist />
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             {PROTOCOL_CARDS.map(p => (
               <button key={p.id} onClick={() => { setProtocolTab(p.id); setProtocolView('detail'); }}

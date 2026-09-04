@@ -16,7 +16,7 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   // ─── BLOCK (нельзя комбинировать) ───
   { a: 'tadalafil', b: 'nitrates', severity: 'block', reason: 'Фатальная гипотония (NO-каптаки)', action: '⛔ Не комбинировать. Нитраты → STOP tadalafil за 48 ч' },
   { a: 'tadalafil', b: '@alpha_blocker', severity: 'block', reason: 'Ортостатическая гипотензия', action: '⛔ Не комбинировать или разнести по времени на 4+ ч' },
-  { a: 'anastrozole', b: 'tamoxifen', severity: 'block', reason: 'AI аннулирует SERM effectiveness (аддитивно ↓ E2 → ↓ SERM)', action: '⛔ Не комбинировать. Выбрать один' },
+  { a: 'anastrozole', b: 'tamoxifen', severity: 'block', reason: 'AI ↓ E2 (мишень SERM → ↓ эффективности SERM при длительном комбо)', action: '⛔ Базисно — один механизм. Исключение: острая болезненная гинекомастия — короткая связка AI+SERM 2-4 нед только по врачу' },
   { a: 'spironolactone', b: '@raas', severity: 'block', reason: 'Двойная K⁺-сберегающая → гиперкалиемия', action: '⛔ Не комбинировать со спиро. Уже есть telmisartan (ARB = K⁺-сберегающий)' },
   { a: 'insulin', b: '@alcohol', severity: 'block', reason: 'Тяжёлая гипогликемия (торможение глюконеогенеза)', action: '⛔ ZERO алкоголя при инсулине' },
   { a: 'cabergoline', b: '@d2_antagonist', severity: 'block', reason: 'Антагонизм D2-рецепторов (метоклопрамид, фенотиазины)', action: '⛔ Не комбинировать с прокинетиками/противорвотными D2-блокерами' },
@@ -51,7 +51,7 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   { a: 'spironolactone', b: 'potassium', severity: 'block', reason: 'Гиперкалиемия', action: '⛔ Не добавлять K⁺-добавки на спиро' },
 
   // ─── Анастрозол/летрозол: ароматизация и AAS/RAAS ───
-  { a: 'anastrozole', b: 'tamoxifen', severity: 'block', reason: 'AI + SERM: AI ↓ E2 (мишень SERM → неэффективен)', action: '⛔ Не комбинировать. Выбрать один механизм контроля E2' },
+  { a: 'anastrozole', b: 'tamoxifen', severity: 'block', reason: 'AI + SERM: длительно AI ↓ E2 (мишень SERM → неэффективен)', action: '⛔ Базисно — один механизм. Исключение: острая гинекомастия 2-4 нед по врачу' },
   { a: 'anastrozole', b: '@statin', severity: 'warn', reason: 'Оба метаболизируются CYP3A4 → ↑ концентрация обоих', action: '⚠ Мониторинг липидограммы и E2 каждые 4 нед' },
   { a: 'anastrozole', b: '@raas', severity: 'warn', reason: 'AI ↓ E2 → возможна ортостатическая гипотензия, RAAS ↓ АД — аддитивно', action: '⚠ Контроль АД, титровать дозу AI медленно' },
   { a: 'anastrozole', b: 'cabergoline', severity: 'warn', reason: 'Оба ↓ пролактина → риск гипопролактинемии', action: '⚠ Контроль PRL каждые 4 нед' },

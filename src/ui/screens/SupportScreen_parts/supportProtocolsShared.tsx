@@ -227,3 +227,50 @@ export const PROTOCOL_CARDS = [
   { id:'fertility', icon:'👶', label:'Фертильность', desc:'Репродуктивное здоровье: спермограмма, гормоны, DFI', color:'#ec4899', system:'Репродуктивная', tags:['Сперма','Гормоны','DFI','ЭКО'] },
   { id:'hrt', icon:'🔄', label:'ГЗТ (HRT)', desc:'Заместительная гормональная терапия: протоколы, мониторинг', color:'#f59e0b', system:'Гормоны', tags:['ГЗТ','TRT','Замещение'] },
 ];
+
+// ── PRE-CYCLE CHECKLIST + STOP-TABLE (аудит 2026-09: единая точка входа перед курсом) ──
+export const PRE_CYCLE_LABS: Array<{ marker: string; target: string }> = [
+  { marker:'АД (среднее 7 дней, утро+вечер)', target:'<130/85' },
+  { marker:'Липиды: ЛПВП / ЛПНП / ТГ', target:'ЛПВП >40 · ЛПНП <130 · ТГ <150 мг/дл' },
+  { marker:'Печень: АЛТ / АСТ / ГГТ / ЩФ / билирубин', target:'АЛТ/АСТ <40 · ГГТ <55 · бил <21 мкмоль/л' },
+  { marker:'Кровь: Hct / Hb / PLT / фибриноген', target:'Hct 42-50% · Hb 13.5-17.5 · PLT 150-350' },
+  { marker:'Гормоны: T общ / E2 / PRL / ЛГ / ФСГ', target:'E2 20-60 пг/мл · PRL <600 мМЕ/л' },
+  { marker:'Почки: креатинин / СКФ + цистатин C при массе >100 кг', target:'СКФ >90 · UACR <30' },
+  { marker:'Глюкоза натощак / HbA1c', target:'<5.6 ммоль/л · <6.0%' },
+  { marker:'K⁺ / Na⁺ / Mg²⁺', target:'K 3.5-5.0 · Na 135-145 · Mg >0.75' },
+  { marker:'ЭКГ (+ ЭХО при стаже ААС / GH / дозах >1 г/нед)', target:'QTc <450м/<460ж · ФВ >55%' },
+  { marker:'ПСА (мужчины >40)', target:'<2.5 нг/мл' },
+  { marker:'Спермограмма (при планах фертильности)', target:'До курса (база для ПКТ)' },
+  { marker:'УЗИ ЖКБ (перед берберином/УДХК/TUDCA)', target:'Нет камней/сладжа (иначе — колика)' },
+];
+
+export const STOP_COURSE_TABLE: Array<{ cond: string; action: string }> = [
+  { cond:'АД >160/100', action:'Стоп курса' },
+  { cond:'ЛПВП <20 мг/дл', action:'Немедленный стоп' },
+  { cond:'Hct >54% (симптомы гипервязкости — раньше)', action:'Стоп + флеботомия' },
+  { cond:'АЛТ/АСТ >5×ВГН или билирубин >34 мкмоль/л', action:'Стоп оральных + гепатолог' },
+  { cond:'E2 >120 + симптомы / E2 <20 (перелечили)', action:'AI-титрация / отмена AI' },
+  { cond:'PRL >2000 + головные боли/поля зрения', action:'МРТ + эндокринолог' },
+  { cond:'K⁺ >5.5 / <3.0 · Na⁺ <125', action:'Экстренная коррекция (см. Электролиты Ф4)' },
+  { cond:'Глюкоза >11.1 / HbA1c >6.5%', action:'Эндокринолог (СД)' },
+  { cond:'Боль в груди / одышка / ТГВ-признаки / мелена / анафилаксия', action:'103/112 немедленно (см. Экстренные)' },
+];
+
+export const PreCycleChecklist: React.FC = () => (
+  <div style={{ borderRadius:14, padding:'12px 14px', background:'rgba(34,197,94,0.07)', border:'1px solid rgba(34,197,94,0.22)' }}>
+    <div style={{ fontSize:12, fontWeight:850, color:'#22c55e', marginBottom:8 }}>✅ Pre-cycle чеклист — сдать ДО курса (иначе фазы не от чего титровать)</div>
+    {PRE_CYCLE_LABS.map((x, i) => (
+      <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.75)', lineHeight:1.5, paddingLeft:8, borderLeft:'2px solid rgba(34,197,94,0.25)', marginBottom:3 }}>
+        • {x.marker} — <b style={{color:'#22c55e'}}>{x.target}</b>
+      </div>
+    ))}
+    <div style={{ fontSize:12, fontWeight:850, color:'#ef4444', margin:'10px 0 8px' }}>🛑 Стоп-таблица — отмена курса + врач</div>
+    {STOP_COURSE_TABLE.map((x, i) => (
+      <div key={i} style={{ fontSize:11, color:'#fca5a5', lineHeight:1.5, paddingLeft:8, borderLeft:'2px solid rgba(239,68,68,0.25)', marginBottom:3 }}>
+        • {x.cond} — <b>{x.action}</b>
+      </div>
+    ))}
+  </div>
+);
+
+export const EVIDENCE_LEGEND = 'Уровни доказательности в протоколах: A — РКИ/гайды (телмисартан, УДХК 13-15 мг/кг, эзетимиб, каберголин); B — когорты/мета-анализы (силимарин, берберин, омега-3); C — механизм/консенсус без РКИ у мужчин на ААС (DIM, кальций-D-глюкарат, NMN/NR, PQQ, D-рибоза, ГАМК — не замена препаратам).';
