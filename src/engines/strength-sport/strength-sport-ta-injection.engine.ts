@@ -33,6 +33,43 @@ export interface TAInjectionOpts {
   dayMap?: Record<string, number[]>; // weakPoint → days 1-based
   budget?: number; // weeklySets cap, если не задан — вычисляем по уровню
   workMax?: any;
+  /** E6 v2: индексы недель для инъекции (0-индекс). Дефолт [0] — legacy (только нед.1, как PL). */
+  weekIdxs?: number[];
+  /** E6 v2: предпочитаемая коррекция фазы (из ⭐ хаба) — идёт первой, остальные corr — fallback. */
+  preferredCorr?: Record<string, string>;
+  /** E6 v2: протокол фазы {sets, reps, pct} (из ранжира топ-3). */
+  protocols?: Record<string, { sets?: number; reps?: number; pct?: number }>;
+  /** E6 v2: сеты по неделям из спец-блока (индекс недели → {weakPoint: sets}). */
+  targetSetsByWeek?: Array<Record<string, number>>;
+}
+
+/** Ключи стораджа плана ТА и снапшота до инъекции (откат). */
+export const TA_PLAN_KEY = 'he_strength_sport_plan_v1';
+export const TA_PLAN_PREV_KEY = 'he_strength_sport_plan_prev_v1';
+
+/** Снапшот текущего плана перед инъекцией (для отката). */
+export function snapshotTAPlanForInject(): boolean {
+  try {
+    const raw = localStorage.getItem(TA_PLAN_KEY);
+    if (!raw) return false;
+    localStorage.setItem(TA_PLAN_PREV_KEY, raw);
+    return true;
+  } catch { return false; }
+}
+
+/** Откат инъекции: восстановить снапшот. */
+export function rollbackTAPlanInject(): boolean {
+  try {
+    const prev = localStorage.getItem(TA_PLAN_PREV_KEY);
+    if (!prev) return false;
+    localStorage.setItem(TA_PLAN_KEY, prev);
+    localStorage.removeItem(TA_PLAN_PREV_KEY);
+    return true;
+  } catch { return false; }
+}
+
+export function hasTAPlanPrev(): boolean {
+  try { return localStorage.getItem(TA_PLAN_PREV_KEY) != null; } catch { return false; }
 }
 
 export interface TAInjectionResult {
@@ -58,65 +95,85 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
 
   // dedup weakPoints
   const uniq = [...new Set(weakPoints)].slice(0, 3) as WLWeakPoint[];
+  // E6 v2: недели инъекции (дефолт [0] — legacy week1-only)
+  const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
+    ? opts.weekIdxs.filter(wi => Number.isInteger(wi) && wi >= 0)
+    : [0];
 
-  for (const wp of uniq) {
-    const corrList = (WL_WEAKPOINT_CORRECTION as any)[wp] as string[] | undefined;
-    const bio = (TA_BIOMECH as any)[wp];
-    const corrId = corrList && corrList[0] ? corrList[0] : null;
-    if (!corrId) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
-    const intensityPct: number = bio?.intensityPct ?? 0.70;
-    // target week 1 only (как PL)
-    const week = copy.weeksData[0];
-    if (!week || week.deload) { notes.push(`⚠ ${wp} — делод, пропуск`); continue; }
-    // dayMap поддержка
-    const configuredDays = opts.dayMap?.[wp];
-    let targetSession: StrengthSportSession | null = null;
-    if (configuredDays && configuredDays.length) {
-      const dayIdx = configuredDays[0] - 1;
-      targetSession = week.sessions[dayIdx] ?? null;
+  for (const wi of weekIdxs) {
+    const week = copy.weeksData[wi];
+    if (!week) continue;
+    if (week.deload) { notes.push(`⚠ нед ${week.week} — делод, пропуск`); continue; }
+    for (const wp of uniq) {
+      const corrList = (WL_WEAKPOINT_CORRECTION as any)[wp] as string[] | undefined;
+      const bio = (TA_BIOMECH as any)[wp];
+      if (!corrList || !corrList[0]) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
+      // E6 v2: предпочитаемая первой, остальные — fallback (без preferred — legacy: только corr[0])
+      const pref = opts.preferredCorr?.[wp];
+      const candidates = pref && corrList.includes(pref)
+        ? [pref, ...corrList.filter(c => c !== pref)]
+        : [corrList[0]];
+      // E6 v2: сеты/повторы/% из спец-блока и ранжира
+      const specSets = opts.targetSetsByWeek?.[wi]?.[wp];
+      const proto = opts.protocols?.[wp] || {};
+      const addSets = (specSets != null && specSets > 0) ? Math.round(specSets) : (proto.sets && proto.sets > 0 ? Math.round(proto.sets) : 3);
+      const repsAvg = proto.reps && proto.reps > 0 ? Math.round(proto.reps) : 5;
+      const pctUsed = proto.pct && proto.pct > 0 ? proto.pct : Math.round((bio?.intensityPct ?? 0.70) * 100);
+      // dayMap поддержка
+      const configuredDays = opts.dayMap?.[wp];
+      let targetSession: StrengthSportSession | null = null;
+      if (configuredDays && configuredDays.length) {
+        const dayIdx = configuredDays[0] - 1;
+        targetSession = week.sessions[dayIdx] ?? null;
+      }
+      if (!targetSession) targetSession = sessionForInjection(week, wp);
+      if (!targetSession) { notes.push(`⚠ ${wp} — нет сессии (нед ${week.week})`); continue; }
+      // budget check weeklySets ЭТОЙ недели (кумулятивно с уже вставленным)
+      const weeklySets = week.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
+      if (weeklySets + addSets > budget) {
+        skippedBudget++; notes.push(`⊘ ${wp} → превысит Budget ${budget} (нед ${week.week}: ${weeklySets}+${addSets})`);
+        continue;
+      }
+      // перебор кандидатов: первый отсутствующий в сессии
+      let placed = false;
+      for (const corrId of candidates) {
+        // dedup по id в ЭТОЙ сессии
+        if (targetSession.exercises.some(e => e.id === corrId || e.id.toLowerCase() === corrId.toLowerCase())) {
+          skippedDup++;
+          continue;
+        }
+        // build exercise
+        const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
+        const basePm = basePmForTA(corrId, wm);
+        const weight = Math.round(basePm * (pctUsed / 100) / 2.5) * 2.5;
+        const rir = 2;
+        const tempo = 'X-0-X-0';
+        const rest = 120;
+        const ex: StrengthSportExercise = {
+          id: corrId,
+          name: bio?.corrections?.[0] || corrId,
+          group: 'legs',
+          pattern: 'hinge',
+          sets: addSets,
+          reps: `${repsAvg}-${repsAvg + 1}`,
+          rir,
+          tempo,
+          restSeconds: rest,
+          weight,
+          workSets: Array.from({ length: addSets }, () => ({ reps: repsAvg, rir, weight, pct: pctUsed, tempo, restSeconds: rest } as any)),
+          warmupSets: [],
+        } as any;
+        // вставляем в конец сессии (аксессуар)
+        targetSession.exercises.push(ex);
+        // обновим week totals если есть
+        if (typeof week.totalSets === 'number') week.totalSets += addSets;
+        injected++;
+        notes.push(`✓ ${wp} → ${corrId} в ${targetSession.sessionTag} ${addSets}×${repsAvg} @${pctUsed}% (нед ${week.week})`);
+        placed = true;
+        break;
+      }
+      if (!placed) notes.push(`⊘ ${wp} — все кандидаты уже есть (нед ${week.week})`);
     }
-    if (!targetSession) targetSession = sessionForInjection(week, wp);
-    if (!targetSession) { notes.push(`⚠ ${wp} — нет сессии`); continue; }
-    // dedup по id
-    if (targetSession.exercises.some(e => e.id === corrId || e.id.toLowerCase() === corrId.toLowerCase())) {
-      skippedDup++; notes.push(`⊘ ${wp} → ${corrId} уже есть в ${targetSession.sessionTag}`);
-      continue;
-    }
-    // budget check weeklySets
-    const weeklySets = copy.weeksData[0].sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-    const addSets = 3;
-    if (weeklySets + addSets > budget) {
-      skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${addSets})`);
-      continue;
-    }
-    // build exercise
-    const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
-    const basePm = basePmForTA(corrId, wm);
-    const weight = Math.round(basePm * intensityPct / 2.5) * 2.5;
-    const repsAvg = 5; // средний для ТА техники
-    const rir = 2;
-    const tempo = 'X-0-X-0';
-    const rest = 120;
-    const ex: StrengthSportExercise = {
-      id: corrId,
-      name: bio?.corrections?.[0] || corrId,
-      group: 'legs',
-      pattern: 'hinge',
-      sets: addSets,
-      reps: `${repsAvg}-${repsAvg + 1}`,
-      rir,
-      tempo,
-      restSeconds: rest,
-      weight,
-      workSets: Array.from({ length: addSets }, () => ({ reps: repsAvg, rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest } as any)),
-      warmupSets: [],
-    } as any;
-    // вставляем в конец сессии (аксессуар)
-    targetSession.exercises.push(ex);
-    // обновим week totals если есть
-    if (typeof week.totalSets === 'number') week.totalSets += addSets;
-    injected++;
-    notes.push(`✓ ${wp} → ${corrId} в ${targetSession.sessionTag} 3×5 @${Math.round(intensityPct * 100)}%`);
   }
 
   if (injected > 0) {

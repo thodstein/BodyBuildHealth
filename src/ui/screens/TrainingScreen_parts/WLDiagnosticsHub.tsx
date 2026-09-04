@@ -26,6 +26,8 @@ import { auditTAPlan, hubTabForPhase } from '../../../engines/strength-sport/str
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 import { simulateTACorrection } from '../../../engines/strength-sport/strength-sport-ta-simulator.engine';
+import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport-ta-spec-block.engine';
+import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -117,6 +119,10 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [csvText, setCsvText] = useState<string>('');
   // Нонс перечитывания плана ТА из хранилища (инъекция/откат меняют его мимо мемов)
   const [planNonce, setPlanNonce] = useState(0);
+  // E6: флаг снапшота до инъекции (откат)
+  const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
+    try { return hasTAPlanPrev(); } catch { return false; }
+  });
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -351,6 +357,100 @@ export const WLDiagnosticsHub: React.FC = () => {
     );
   };
 
+  // E6: уровень и спец-блок превью (волна по рабочим неделям плана)
+  const taLevel = useMemo(() => {
+    try {
+      const p: any = planData;
+      return p?.inputSnapshot?.level ?? p?.level ?? 'intermediate';
+    } catch { return 'intermediate'; }
+  }, [planData]);
+  const specPreview = useMemo(() => {
+    try {
+      const wks = Math.max(4, Math.min(8, planAudit.workWeeks || 6));
+      return buildTASpecBlock({ weakPoints, level: taLevel, weeks: wks });
+    } catch { return null; }
+  }, [weakPoints, taLevel, planAudit.workWeeks]);
+
+  // E6: инъекция коррекций в сохранённый план (все рабочие недели + спец-блок + откат)
+  const handleInjectToPlan = () => {
+    const zones = weakPoints.slice(0, 3);
+    if (!zones.length) {
+      setToast('Выбери 1-3 слабые фазы — нечего вставлять');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    if (!planData) {
+      setToast('Нет плана ТА — собери в ТА-конструкторе, потом вставляй коррекции');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    try { snapshotTAPlanForInject(); } catch { /* noop */ }
+    const protocols: Record<string, { sets?: number; reps?: number; pct?: number }> = {};
+    for (const wp of zones) {
+      try {
+        const t = top3For(wp);
+        const prefId = (state.preferredCorr || {})[wp];
+        const pick = (prefId && t.find(c => c.id === prefId)) || t[0];
+        if (pick) protocols[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
+      } catch { /* noop */ }
+    }
+    const weekIdxs = (planData.weeksData || []).map((_: any, i: number) => i);
+    let r;
+    try {
+      r = injectTAWeakPoints(planData, zones, {
+        weekIdxs,
+        preferredCorr: state.preferredCorr || {},
+        protocols,
+        targetSetsByWeek: specPreview ? specPreview.weeks.map(w => w.targetSets) : undefined,
+        dayMap: specPreview ? specPreview.dayMap : undefined,
+      });
+    } catch {
+      setToast('Ошибка инъекции — план не тронут');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    if (!r.injected) {
+      setToast(`⊘ Не вставлено (бюджет-скип: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
+      setTimeout(() => setToast(''), 3000);
+      setHasInjectPrev(true);
+      return;
+    }
+    try {
+      r.plan.rationale = [...(r.plan.rationale || []), ...(specPreview ? specPreview.rationale : [])];
+      const raw = localStorage.getItem('he_strength_sport_plan_v1');
+      const j = raw ? JSON.parse(raw) : null;
+      const out = j && j.weeksData ? r.plan : { ...(j || {}), plan: r.plan };
+      localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(out));
+    } catch {
+      setToast('Не влезло в хранилище — очисти старые планы');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setHasInjectPrev(true);
+    setPlanNonce(n => n + 1);
+    setToast(`✓ Вставлено коррекций: ${r.injected} (нед: ${r.plan.weeksData.length}, скип-бюджет: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
+    setTimeout(() => setToast(''), 3000);
+    try {
+      window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'strength' } as any));
+      localStorage.setItem('he_training_planning_track', 'strength');
+      localStorage.setItem('he_strength_sport_mode', 'weightlifting');
+    } catch { /* noop */ }
+  };
+
+  const handleRollbackInject = () => {
+    try {
+      if (!rollbackTAPlanInject()) {
+        setToast('Снапшота нет — откатывать нечего');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
+    } catch { /* noop */ }
+    setHasInjectPrev(false);
+    setPlanNonce(n => n + 1);
+    setToast('↩ План восстановлен до инъекции');
+    setTimeout(() => setToast(''), 2500);
+  };
+
   const applyToConstructor = () => {
     if (weakPoints.length === 0) {
       setToast('Слабые фазы не выбраны — нечего применять');
@@ -373,6 +473,10 @@ export const WLDiagnosticsHub: React.FC = () => {
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         asymmetry: asymmetry?.diff ?? null,
         fvr: fvr ? { snatchTh: fvr.snatchTh, Pmax: fvr.Pmax } : null,
+        // E5/E6: спец-блок + предпочитаемые + причины (конструктор игнорирует неизвестные — safe)
+        taSpecBlock: specPreview,
+        taPreferredCorr: state.preferredCorr || {},
+        taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
       } as any,
       source: 'intellectual',
     });
@@ -717,6 +821,17 @@ export const WLDiagnosticsHub: React.FC = () => {
           )}
         </div>
         {level === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>⚠️ CRITICAL — план будет урезан (MRV gate) и требует коррекции до пика. Рекомендуется OHS + VBT retest.</div>}
+        {/* E5/E6: спец-блок + инъекция в план + откат */}
+        {specPreview && specPreview.weakPoints.length > 0 && (
+          <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.16)', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>📅 Спец-блок {specPreview.totalWeeks} нед: {specPreview.weeks.map(w => `Н${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}</div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{specPreview.rationale[0]}</div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
+              {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
           <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>

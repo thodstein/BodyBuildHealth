@@ -89,4 +89,24 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/Рывок: середина тяги/)[0]);
     await waitFor(() => expect(container.textContent).toContain('покрытие 1/11 → 2/11'), { timeout: 2000 });
   });
+  it('E6 инъекция в план + откат', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 2, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+        { week: 2, phase: 'accumulation', sessions: [{ day: 1, week: 2, sessionTag: 'snatch_day', character: 'тяж', exercises: [{ id: 'deficit_snatch', name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] }] }] },
+      ],
+      workMax: { snatch: 80 }, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок: середина тяги/)[0]);
+    fireEvent.click(await screen.findByText(/Вставить коррекции/));
+    await waitFor(() => expect(container.textContent).toContain('Вставлено коррекций'), { timeout: 2000 });
+    expect(localStorage.getItem('he_strength_sport_plan_v1')).toContain('pause_snatch');
+    expect(localStorage.getItem('he_strength_sport_plan_prev_v1')).not.toContain('pause_snatch');
+    fireEvent.click(await screen.findByText(/↩ Откат/));
+    await waitFor(() => expect(container.textContent).toContain('восстановлен до инъекции'), { timeout: 2000 });
+    expect(localStorage.getItem('he_strength_sport_plan_v1')).not.toContain('pause_snatch');
+  });
 });
