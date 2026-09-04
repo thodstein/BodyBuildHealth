@@ -79,6 +79,18 @@ export const TA_VTHRES_NORMS: Record<string, { min: number; max: number; optimal
   jerk: { min: 1.20, max: 1.50, optimal: 1.35 },
 };
 
+// E10: женские нормы пика (PoinT GO 2026: рывок 1.5–1.8, взятие 1.3–1.6; толчок — оценка по пропорции)
+export const TA_VTHRES_NORMS_F: Record<string, { min: number; max: number; optimal: number }> = {
+  snatch: { min: 1.50, max: 1.80, optimal: 1.65 },
+  clean: { min: 1.30, max: 1.60, optimal: 1.45 },
+  jerk: { min: 1.10, max: 1.40, optimal: 1.25 },
+};
+
+/** Нормы vThres по полу (дефолт M). */
+export function taVthresNorms(sex?: string | null): Record<string, { min: number; max: number; optimal: number }> {
+  return sex === 'female' ? TA_VTHRES_NORMS_F : TA_VTHRES_NORMS;
+}
+
 export function taZoneForVelocity(velocity: number, exercise: string): string {
   const zones = TA_PEAK_VELOCITY_ZONES[exercise] || TA_PEAK_VELOCITY_ZONES.snatch;
   for (const z of zones) if (velocity >= z.velocity[0] && velocity <= z.velocity[1]) return z.label;

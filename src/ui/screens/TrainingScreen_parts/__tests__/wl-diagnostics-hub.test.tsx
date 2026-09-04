@@ -145,4 +145,10 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText(/Размах\/плечи в профиль/));
     expect(JSON.parse(localStorage.getItem('he_profile_v2') || '{}').personal?.armSpanCm).toBe(190);
   });
+  it('E10 женские бенчмарки при sex=female', async () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ personal: { sex: 'female' } }));
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    await waitFor(() => expect(container.textContent).toContain('Женские бенчмарки пика'), { timeout: 2000 });
+  });
 });

@@ -17,7 +17,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { LIMITER_CATEGORIES, LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
@@ -265,6 +265,14 @@ export const WLDiagnosticsHub: React.FC = () => {
       return Number.isFinite(w) && w > 0 ? w : undefined;
     } catch { return undefined; }
   }, []);
+  // E10: пол из профиля — женские нормы (Type3, VBT-бенчмарки)
+  const profileSex = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const s = p?.settings?.personal?.sex ?? p?.personal?.sex;
+      return s === 'female' || s === 'male' ? s : null;
+    } catch { return null; }
+  }, []);
   const jerkDip = useMemo(() => {
     const cm = parseFloat(state.jerkDipCm), ms = parseFloat(state.jerkDipMs);
     if (!Number.isFinite(cm) || !Number.isFinite(ms)) return null;
@@ -325,10 +333,11 @@ export const WLDiagnosticsHub: React.FC = () => {
     vbtLossPct: vbtLoss?.lossPct ?? (state.vbtVel ? (parseFloat(state.vbtVel) < 1.3 ? 12 : null) : null),
     mobilityFails: ohs.failed,
     imtpRatio: isppRatio,
+    sex: profileSex,
     hasVideo: !!barMetrics || !!csvText,
     hasVbt: !!vbtLoss || !!state.vbtVel,
     hasMobility: ohs.failed !== 6,
-  }), [weakPoints.length, asymmetry, state.barPath, vbtLoss, state.vbtVel, ohs.failed, isppRatio, barMetrics, csvText]);
+  }), [weakPoints.length, asymmetry, state.barPath, vbtLoss, state.vbtVel, ohs.failed, isppRatio, profileSex, barMetrics, csvText]);
 
   const score = scoring.score;
   const level = scoring.level;
@@ -818,6 +827,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               <label style={{ fontSize: 11, color: DIM }}>Пиковая скорость м/с<br /><input value={state.vbtVel} onChange={e => setState(s => ({ ...s, vbtVel: e.target.value }))} placeholder="1.75" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
             </div>
             {vbtZone && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Зона {vbtZone} (все &gt;80% &gt;1.3 м/с — PLOS 2026). Для рывка absolute 1.3-1.75 м/с.</div>}
+            {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Женские бенчмарки пика: рывок 1.5–1.8 · взятие 1.3–1.6 м/с (PoinT GO); Type3-траектория — вариант нормы (Hiskia 53% ЧМ).</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
               <label style={{ fontSize: 11, color: DIM }}>Best м/с<br /><input value={state.vbtBest} onChange={e => setState(s => ({ ...s, vbtBest: e.target.value }))} placeholder="1.90" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
               <label style={{ fontSize: 11, color: DIM }}>Last м/с<br /><input value={state.vbtLast} onChange={e => setState(s => ({ ...s, vbtLast: e.target.value }))} placeholder="1.55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
@@ -833,7 +843,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 10, color: DIM }}>Vmax110 м/с<br /><input value={state.fvrVmax110} onChange={e => setState(s => ({ ...s, fvrVmax110: e.target.value }))} placeholder="1.45" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
                 <label style={{ fontSize: 10, color: DIM }}>Vthres м/с<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               </div>
-              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres snatch {TA_VTHRES_NORMS.snatch.min}-{TA_VTHRES_NORMS.snatch.max} (opt {TA_VTHRES_NORMS.snatch.optimal}), clean {TA_VTHRES_NORMS.clean.min}-{TA_VTHRES_NORMS.clean.max}</div>}
+              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>SnatchTh {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} snatch {taVthresNorms(profileSex).snatch.min}-{taVthresNorms(profileSex).snatch.max} (opt {taVthresNorms(profileSex).snatch.optimal}), clean {taVthresNorms(profileSex).clean.min}-{taVthresNorms(profileSex).clean.max}</div>}
               {fvr && fvrOptimal && <div style={{ fontSize: 10, color: fvrOptimal.forceDom ? '#f59e0b' : '#22c55e', marginTop: 4 }}>FvR-профиль: slope {fvr.slope} vs оптимум {fvrOptimal.opt} (Δ {fvrOptimal.diff > 0 ? '+' : ''}{fvrOptimal.diff}) — {fvrOptimal.forceDom ? 'force-доминантен → приоритет скорость (вис/прыжки)' : 'сбалансирован ✓'}</div>}
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>

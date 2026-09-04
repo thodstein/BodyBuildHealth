@@ -14,6 +14,8 @@ export interface ScoringInput {
   vbtLossPct?: number | null;
   mobilityFails?: number; // 0-6
   imtpRatio?: number | null; // ISPP/IMTP
+  /** E10: пол — у женщин Type3 (loop) вариант нормы (Hiskia 53% ЧМ), не критично. */
+  sex?: string | null;
 }
 
 export interface ScoringResult {
@@ -65,12 +67,17 @@ export function scoreTA(input: ScoringInput & { hasVideo?: boolean; hasVbt?: boo
     }
   }
 
-  // bar path
+  // bar path (E10: у женщин loop/Type3 — часто вариант нормы, warn вместо crit без floor)
   if (input.barPathDeviation) {
     // петля — критично, остальное warn
-    const isCrit = input.barPathDeviation === 'loop';
+    const isLoop = input.barPathDeviation === 'loop';
+    const femaleLoop = isLoop && input.sex === 'female';
+    const isCrit = isLoop && !femaleLoop;
     penalties.push(isCrit ? PENALTY.barCrit : PENALTY.barWarn);
-    findings.push({ level: isCrit ? 'critical' : 'warn', text: `Bar path: ${input.barPathDeviation}` });
+    findings.push({
+      level: isCrit ? 'critical' : 'warn',
+      text: femaleLoop ? `Bar path: ${input.barPathDeviation} (Type3 — вариант нормы у женщин, Hiskia)` : `Bar path: ${input.barPathDeviation}`,
+    });
   } else {
     findings.push({ level: 'ok', text: 'Траектория в допуске' });
   }
