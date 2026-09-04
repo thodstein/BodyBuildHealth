@@ -54,6 +54,9 @@ type BBState = {
   sleepHours: string;
   specWeeks: string;
   showSpecBlock: boolean;
+  stimCheating: boolean;
+  stimShortRom: boolean;
+  stimSetupNote: string;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -72,6 +75,9 @@ const DEFAULT_STATE: BBState = {
   sleepHours: '',
   specWeeks: '8',
   showSpecBlock: false,
+  stimCheating: false,
+  stimShortRom: false,
+  stimSetupNote: '',
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -279,6 +285,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     // MAX PRO payload: причины + топ-3 + спец-блок (лениво, без TDZ — считается внутри хендлера)
     let weakCausesPayload: Record<string, unknown> = {};
     let topIds: string[] = [];
+    let weakHeads: string[] = [];
     let specPayload: unknown = null;
     try {
       for (const z of report.weakZonesGranular.slice(0, 2)) {
@@ -299,8 +306,21 @@ export const BBDiagnosticsHub: React.FC = () => {
       const f: Record<string, number> = {};
       for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
       specPayload = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
-      const first = report.weakZonesGranular[0];
-      if (first) topIds = rankCorrectionsForWeak(first, null, { level, sex: state.sex || undefined }).slice(0, 1).map((r) => r.id);
+      // топ-3 на каждую слабую зону с бонусом слабой головки (макс 6) + сами головки
+      const seen = new Set<string>();
+      const heads: string[] = [];
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const wh = weakHeadForZone(z);
+        if (wh && !heads.includes(wh)) heads.push(wh);
+        try {
+          for (const r of rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: wh }).slice(0, 3)) {
+            const id = String(r.id).toLowerCase();
+            if (!seen.has(id)) { seen.add(id); topIds.push(r.id); }
+          }
+        } catch { /* noop */ }
+      }
+      topIds = topIds.slice(0, 6);
+      weakHeads = heads;
     } catch { /* noop */ }
     applyToPlanner({
       kind: 'weakpoints',
@@ -316,6 +336,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         vbt: vbt ? { lossPct: vbt.lossPct, zone: vbt.zone } : null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
+        weakHeads,
         specBlock: specPayload,
         sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
       } as any,
@@ -509,9 +530,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         goal: 'hypertrophy', level, weakZones: report.weakZonesGranular, weakMusclesCanonical: report.weakMusclesCanonical,
         muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null, planReps: 10,
         singleAngleMuscle, uncoveredSubregions: uncovered, strictMissing, weakHead,
+        cheating: state.stimCheating || null,
+        rangeFull: state.stimShortRom ? false : null,
+        setupIssues: state.stimSetupNote.trim() ? [state.stimSetupNote.trim()] : undefined,
       } as any);
     } catch { return null; }
-  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit]);
+  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit, state.stimCheating, state.stimShortRom, state.stimSetupNote]);
 
   const selectedCorrections = useMemo(() => {
     if (!selectedDiagnosis || !selectedExRaw) return [];
@@ -748,6 +772,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                   {EXERCISE_CATALOG.slice(0, 80).map(c => <option key={c.id} value={c.id}>{c.name} · {c.group} · SFR{sfrOf(c as any) ?? '—'}</option>)}
                 </select>
                 <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.04)', color: DIM, fontSize: 11, cursor: 'pointer' }}>Сброс</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: DIM }}>Как выполняешь:</span>
+                <label style={{ fontSize: 10, color: state.stimCheating ? '#f59e0b' : DIM, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={state.stimCheating} onChange={e => setState(s => ({ ...s, stimCheating: e.target.checked }))} /> читинг/раскачка</label>
+                <label style={{ fontSize: 10, color: state.stimShortRom ? '#f59e0b' : DIM, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={state.stimShortRom} onChange={e => setState(s => ({ ...s, stimShortRom: e.target.checked }))} /> амплитуда укорочена</label>
+                <input value={state.stimSetupNote} onChange={e => setState(s => ({ ...s, stimSetupNote: e.target.value }))} placeholder="отклонение: напр. локти вперёд" style={{ flex: 1, minWidth: 140, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 10 }} />
               </div>
               {!selectedDiagnosis ? (
                 <div style={{ fontSize: 10, color: DIM }}>Выбери упражнение — появится диагноз 12 флагов + PROF-чек + оценка 0-100.</div>

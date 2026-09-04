@@ -112,6 +112,21 @@ export const HEAD_FUNCTIONS: Record<string, HeadFunction> = {
     stretchCondition: 'Полная амплитуда ниже уровня платформы, пауза 2с вверху',
     loadedBy: ['Подъёмы на носки стоя'],
   },
+  traps: {
+    head: 'traps', muscle: 'traps', label: 'Трапеции (верх)',
+    stretchCondition: 'Опущенные плечи внизу, подъём строго вверх с паузой 1-2с',
+    loadedBy: ['Шраги со штангой/гантелями', 'Шраги Келсо (середина)'],
+  },
+  forearms: {
+    head: 'forearms', muscle: 'forearms', label: 'Предплечья (хват)',
+    stretchCondition: 'Предплечья зафиксированы, движение только кистями, 15-20 повторов',
+    loadedBy: ['Сгибания запястий', 'Валик/роллер'],
+  },
+  abs: {
+    head: 'abs', muscle: 'abs', label: 'Пресс (прямая мышца)',
+    stretchCondition: 'Скручивание грудью к тазу / подкручивание таза, пауза в пике',
+    loadedBy: ['Скручивания', 'Подъём ног в висе'],
+  },
 };
 
 export function headsForMuscle(muscle: string): string[] {
@@ -556,6 +571,76 @@ export const EXERCISE_STIMULUS_DB: ExerciseStimulus[] = [
     rirTarget: [1, 2],
     rom: 'Ниже платформы ↔ верх на носках с паузой 2с',
   },
+  {
+    key: 'shrug_trap',
+    ids: ['shrug_bar', 'shrug_db', 'shrug_behind', 'shrug_cable', 'kelso_shrug'],
+    nameRe: [/шраг/i, /shrug/i, /келсо/i, /kelso/i, /трапеци/i],
+    headsHit: ['traps'],
+    setup: ['Руки прямые вдоль тела', 'Движение строго вверх-вниз', 'Пауза 1-2с вверху'],
+    resistanceLine: 'Верх трапеции работает в сокращённой. Пауза вверху — весь смысл; без неё — пустые пожимания',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [
+      { deviation: 'вращение плечами', steals: 'суставная сумка (стресс вместо стимула)' },
+      { deviation: 'рывок ногами/подсед', steals: 'моментум вместо верха трапеций' },
+      { deviation: 'тяга руками (сгибание локтей)', steals: 'бицепс вместо трапеций' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Опущенные плечи ↔ верх с паузой 1-2с',
+  },
+  {
+    key: 'wrist_forearm',
+    ids: ['wrist_curl', 'wrist_curl_db', 'wrist_curl_v2', 'wrist_curl_db_v2', 'wrist_curl_reverse', 'curl_wrist', 'curl_wrist_reverse', 'curl_wrist_db', 'wrist_extension_db', 'wrist_roller'],
+    nameRe: [/запяст/i, /кист/i, /wrist/i, /валик/i, /roller/i, /предплеч/i, /forearm/i],
+    headsHit: ['forearms'],
+    setup: ['Предплечья лежат на бёдрах/скамье и неподвижны', 'Движение только кистями', 'Полная амплитуда, 15-20 повторов'],
+    resistanceLine: 'Мелкая мышца — стимул от полной амплитуды и жжения, не от веса. Тяжёлый вес зовёт бицепс',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [
+      { deviation: 'помогают локти и плечи', steals: 'бицепс вместо предплечий' },
+      { deviation: 'укороченная амплитуда', steals: 'теряется единственное преимущество изоляции' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Полное разгибание кисти ↔ полное сгибание',
+  },
+  {
+    key: 'crunch_abs',
+    ids: ['crunch', 'crunch_reverse', 'cable_crunch', 'cable_crunch_v2', 'crunch_cable_kneeling', 'crunch_machine', 'decline_crunch', 'swiss_ball_crunch', 'crunch_bicycle'],
+    nameRe: [/скручиван/i, /crunch/i, /велосипед/i],
+    headsHit: ['abs'],
+    setup: ['Поясница прижата', 'Скручивание грудью к тазу (не подъём корпуса)', 'Пауза 1с в пике'],
+    resistanceLine: 'Пресс сокращается скручиванием, а не подъёмом. Подъём корпуса — уже сгибатели бедра',
+    peakPoint: 'short',
+    needsPause: true,
+    stability: 'low',
+    cheating: [
+      { deviation: 'подъём корпуса вместо скручивания', steals: 'сгибатели бедра вместо пресса' },
+      { deviation: 'тяга руками за голову', steals: 'шея вместо пресса' },
+      { deviation: 'раскачка/инерция', steals: 'моментум вместо пикового сокращения' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Растяжение ↔ полное скручивание с паузой',
+  },
+  {
+    key: 'hanging_leg_abs',
+    ids: ['hanging_leg', 'knee_raise'],
+    nameRe: [/подъём ног/i, /подъём колен/i, /hanging/i, /ног.*висе/i],
+    headsHit: ['abs'],
+    setup: ['Вис без раскачки', 'Подкручивание таза вверху (не просто ноги)', 'Медленное опускание 3с'],
+    resistanceLine: 'Низ пресса включается подкручиванием таза. Просто махи ногами — сгибатели бедра',
+    peakPoint: 'short',
+    needsPause: false,
+    stability: 'med',
+    cheating: [
+      { deviation: 'раскачка', steals: 'моментум вместо пресса' },
+      { deviation: 'ноги без подкручивания таза', steals: 'сгибатели бедра вместо низа пресса' },
+    ],
+    rirTarget: [1, 2],
+    rom: 'Вис ↔ колени/носки к груди с подкручиванием таза',
+  },
 ];
 
 function norm(s: string): string {
@@ -669,6 +754,9 @@ const HEADS_BY_MUSCLE: Record<string, string[]> = {
   hamstrings: ['hamstrings'],
   glutes: ['glutes'],
   calves: ['calves'],
+  traps: ['traps'],
+  forearms: ['forearms'],
+  abs: ['abs'],
 };
 
 function muscleOfHead(head: string): string {
@@ -694,8 +782,12 @@ export function weakHeadForZone(zone: string): string | null {
     hamstrings: 'hamstrings',
     glutes: 'glutes',
     calves: 'calves',
+    traps: 'traps',
+    forearms: 'forearms',
+    abs: 'abs',
     legs: 'quads',
     arms: 'biceps_long',
+    core: 'abs',
   };
   return fallback[z] || null;
 }

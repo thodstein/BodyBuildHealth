@@ -1388,6 +1388,14 @@ export const BbAutoConstructor: React.FC = () => {
         if (causes && typeof causes === 'object') {
           try { localStorage.setItem('he_bb_last_weak_causes', JSON.stringify(causes)); } catch {}
         }
+        // Слабые головки стимула — persist для будущих сборок и смены углов
+        const heads = (payload.data as any).weakHeads;
+        if (Array.isArray(heads) && heads.length) {
+          const clean = heads.map((h) => String(h).toLowerCase().trim()).filter(Boolean).slice(0, 2);
+          try { localStorage.setItem('he_bb_last_weak_heads', JSON.stringify(clean)); } catch {}
+          setBridgeMsg((prev: string) => prev ? `${prev} · головки ${clean.join(', ')}` : `🔗 Головки → ББ-авто: ${clean.join(', ')}`);
+          setTimeout(() => setBridgeMsg(''), 5000);
+        }
       } else if (payload.kind === 'pm' && payload.data) {
         const d: any = payload.data;
         const patch: Record<string, number> = {};

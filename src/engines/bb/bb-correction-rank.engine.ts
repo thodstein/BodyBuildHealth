@@ -57,14 +57,19 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     const g = norm(c.group);
     const LEGS = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'legs']);
     const same = g === muscle || (LEGS.has(muscle) && g === 'legs') || (muscle === 'legs' && LEGS.has(g));
-    // каталог держит руки в группе arms — маппим triceps/biceps на arms с keyword-фильтром
-    const ARMS: Record<string, RegExp> = {
-      triceps: /трицепс|tricep|француз|french|skull|кикбэк|kickback|pushdown/i,
-      biceps: /бицепс|bicep|curl|сгибание|молот|hammer|скотт|preacher|пауч|spider|концентр|байес|bayesian|драг|drag/i,
+    // каталог держит руки в группе arms, трапеции в back, пресс в core — маппим с keyword-фильтром
+    const ALIAS: Record<string, { group: string; re: RegExp }> = {
+      triceps: { group: 'arms', re: /трицепс|tricep|француз|french|skull|кикбэк|kickback|pushdown/i },
+      biceps: { group: 'arms', re: /бицепс|bicep|curl|сгибание|молот|hammer|скотт|preacher|пауч|spider|концентр|байес|bayesian|драг|drag/i },
+      forearms: { group: 'arms', re: /запяст|кист|wrist|предплеч|forearm|валик|roller/i },
+      traps: { group: 'back', re: /шраг|shrug|трапеци|trap|келсо|kelso/i },
+      abs: { group: 'core', re: /пресс|скручиван|crunch|подъём ног|подъём колен|hanging|knee.?raise|велосипед|брюшн|abs/i },
     };
-    const armsRe = (ARMS as Record<string, RegExp>)[muscle];
-    const armsOk = armsRe && g === 'arms' && armsRe.test(`${c.id} ${c.name}`);
-    if (muscle && !same && !armsOk) return false;
+    const alias = (ALIAS as Record<string, { group: string; re: RegExp }>)[muscle];
+    // бицепс: отсекаем запястья (у них своя зона forearms)
+    const notForearm = muscle !== 'biceps' || !/запяст|кист|wrist|предплеч|forearm|валик|roller/i.test(`${c.id} ${c.name}`);
+    const aliasOk = alias && g === alias.group && alias.re.test(`${c.id} ${c.name}`) && notForearm;
+    if (muscle && !same && !aliasOk) return false;
     if (inPlan.has(norm(c.id)) || inPlan.has(norm(c.name))) return false;
     if (!levelAllows(ctx.level, String(c.name))) return false;
     if (ctx.equipment && ctx.equipment.length > 0) {

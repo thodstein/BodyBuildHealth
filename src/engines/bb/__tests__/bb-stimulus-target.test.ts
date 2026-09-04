@@ -245,11 +245,11 @@ describe('грудь: головки и wrongHead', () => {
     const d = diagnoseStimulusTarget({ id: 'pec_deck' }, { tempoHasPause: false });
     expect(d.flags).toContain('resistanceLineGap');
   });
-  it('weakHeadForZone: chest_upper прямо, chest→mid, traps→null', async () => {
+  it('weakHeadForZone: chest_upper прямо, chest→mid, traps→traps', async () => {
     const mod = await import('../bb-stimulus-target.engine');
     expect(mod.weakHeadForZone('chest_upper')).toBe('chest_upper');
     expect(mod.weakHeadForZone('chest')).toBe('chest_mid');
-    expect(mod.weakHeadForZone('traps')).toBe(null);
+    expect(mod.weakHeadForZone('traps')).toBe('traps');
     expect(mod.weakHeadForZone('quads')).toBe('quads');
   });
 });
@@ -336,5 +336,73 @@ describe('ранжир по головкам грудь/спина', () => {
     const r = rankCorrectionsForWeak('back', null, { weakHead: 'back_width' } as any);
     expect(r.length).toBeGreaterThan(0);
     expect(r[0].headsHit).toContain('back_width');
+  });
+});
+
+describe('трапеции / предплечья / пресс', () => {
+  it('шраги бьют в traps', () => {
+    expect(headsHitOf({ id: 'shrug_db' })).toContain('traps');
+  });
+  it('запястья бьют в forearms', () => {
+    expect(headsHitOf({ id: 'wrist_curl' })).toContain('forearms');
+  });
+  it('скручивания бьют в abs', () => {
+    expect(headsHitOf({ id: 'crunch' })).toContain('abs');
+  });
+  it('подъём ног бьёт в abs', () => {
+    expect(headsHitOf({ id: 'hanging_leg' })).toContain('abs');
+  });
+  it('вращение плечами в шрагах → synergistTakeover', () => {
+    const d = diagnoseStimulusTarget({ id: 'shrug_bar' }, { setupIssues: ['вращаю плечами по кругу'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toContain('сустав');
+  });
+  it('шраги без паузы → resistanceLineGap', () => {
+    const d = diagnoseStimulusTarget({ id: 'shrug_db' }, { tempoHasPause: false });
+    expect(d.flags).toContain('resistanceLineGap');
+  });
+  it('подъём корпуса вместо скручивания → сгибатели бедра', () => {
+    const d = diagnoseStimulusTarget({ id: 'crunch' }, { setupIssues: ['поднимаю корпус вместо скручивания'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.join(' ')).toMatch(/сгибатели бедра/);
+  });
+  it('вис без подкручивания таза → сгибатели бедра', () => {
+    const d = diagnoseStimulusTarget({ id: 'hanging_leg' }, { setupIssues: ['ноги без подкручивания таза'] });
+    expect(d.flags).toContain('synergistTakeover');
+  });
+  it('предплечья RIR 5 → rirMismatch (недожим)', () => {
+    const d = diagnoseStimulusTarget({ id: 'wrist_curl' }, { rirActual: 5 });
+    expect(d.flags).toContain('rirMismatch');
+  });
+  it('weakHeadForZone: traps/forearms/abs/core', async () => {
+    const mod = await import('../bb-stimulus-target.engine');
+    expect(mod.weakHeadForZone('traps')).toBe('traps');
+    expect(mod.weakHeadForZone('forearms')).toBe('forearms');
+    expect(mod.weakHeadForZone('abs')).toBe('abs');
+    expect(mod.weakHeadForZone('core')).toBe('abs');
+  });
+  it('ранжир traps топит шраги', () => {
+    const r = rankCorrectionsForWeak('traps', null, { weakHead: 'traps' } as any);
+    expect(r.length).toBeGreaterThan(0);
+    expect(r[0].headsHit).toContain('traps');
+  });
+  it('ранжир abs топит скручивания/вис', () => {
+    const r = rankCorrectionsForWeak('abs', null, { weakHead: 'abs' } as any);
+    expect(r.length).toBeGreaterThan(0);
+    expect(r[0].headsHit).toContain('abs');
+  });
+  it('тапы хаба доходят через diagnoseExercise (читинг+укороченная)', () => {
+    const d = diagnoseExercise(
+      { id: 'shrug_bar', name: 'Шраги со штангой', muscle: 'traps', rir: 2 } as any,
+      { muscle: 'traps', weakHead: 'traps', cheating: true, rangeFull: false } as any,
+    );
+    expect(d.flags).toContain('stabilityGap');
+    expect(d.flags).toContain('romShort');
+    expect(d.stimulus?.score).toBeLessThan(100);
+  });
+  it('PROF traps/forearms/abs: сетап и утечки', () => {
+    expect(getProfExecutionProfile('traps')?.leakTo).toMatch(/моментум|сустав/i);
+    expect(getProfExecutionProfile('forearms')?.leakTo).toMatch(/бицепс/);
+    expect(getProfExecutionProfile('abs')?.leakTo).toMatch(/сгибатели бедра|шея/i);
   });
 });
