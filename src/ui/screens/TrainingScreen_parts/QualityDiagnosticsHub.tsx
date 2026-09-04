@@ -36,7 +36,7 @@ export const QualityDiagnosticsHub: React.FC<QualityDiagnosticsHubProps> = (prop
   const [mode, setMode] = useState<HubMode>('quality');
 
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
+    <div className="train-qualityhub" style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🎯 Качество и диагностика — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
         Без дублей: слева — <b style={{ color: '#fff' }}>оценка плана</b> (0-100, объём по группам), справа — <b style={{ color: '#fff' }}>диагностика</b> (мастер движения 9 лифтов, срывы дневник, RIR, мезо). Полные инструменты сохранены, переключение без потери контекста.

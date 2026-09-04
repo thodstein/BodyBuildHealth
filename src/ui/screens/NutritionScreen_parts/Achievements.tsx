@@ -38,7 +38,7 @@ export const Achievements: React.FC = () => {
   const unlockedCount = Object.values(state).filter(s => s.unlocked).length;
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="nut-achieve" style={{ paddingBottom: 80 }}>
       <ModernHero icon="🏆" title="Достижения" subtitle="Награды за регулярность, цели и рекорды." />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🏆 Достижения</div>

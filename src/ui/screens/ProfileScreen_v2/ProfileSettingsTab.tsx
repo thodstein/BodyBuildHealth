@@ -126,7 +126,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="profile-settings" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <AccordionSection
         title="4.1 Системные"
         subtitle="Единицы, уведомления, приватность"

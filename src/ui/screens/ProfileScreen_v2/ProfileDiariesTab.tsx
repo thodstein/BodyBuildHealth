@@ -926,7 +926,7 @@ const exportAllDiariesPdf = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="profile-diaries" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {activeDiary === 'sleep' ? (
         <SleepDiary open onClose={() => setActiveDiary(null)} diaryKey="sleep" goals={goals} onDataChange={refresh} />
       ) : activeDiary === 'bp' ? (

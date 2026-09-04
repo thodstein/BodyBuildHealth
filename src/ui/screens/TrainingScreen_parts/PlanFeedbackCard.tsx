@@ -38,7 +38,7 @@ export const PlanFeedbackCard: React.FC<{
   };
 
   return (
-    <div style={{ ...CARD, padding: 10, marginBottom: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
+    <div className="train-planfeedback" style={{ ...CARD, padding: 10, marginBottom: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>↻ Дневник → план (прогрессия по факту)</span>
         <span style={{ fontSize: 10, color: '#fff' }}>{withFact.length} из {feedback.length} с данными{noData > 0 ? ` · ${noData} без лога` : ''}</span>

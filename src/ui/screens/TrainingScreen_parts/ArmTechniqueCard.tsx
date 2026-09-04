@@ -40,7 +40,7 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
   };
 
   return (
-    <div style={{ border: '1px solid #1f3a5f', borderRadius: 12, padding: 12, background: '#0f1e35' }}>
+    <div className="train-armtech" style={{ border: '1px solid #1f3a5f', borderRadius: 12, padding: 12, background: '#0f1e35' }}>
       <h3 style={{ margin: '0 0 8px', color: '#fff' }}>🎯 Диагностика слабых звеньев</h3>
       <p style={{ color: '#9ab', fontSize: 13, margin: '0 0 8px' }}>Где проваливаешься за столом? Отметь — получишь слабые мышцы и упражнения.</p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>

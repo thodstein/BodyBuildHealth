@@ -33,7 +33,7 @@ const MicrocyclePlannerCardBase: React.FC = () => {
   plan.phases.forEach(ph => { for (let i = 0; i < ph.weeks; i++) { weekCursor++; rows.push({ week: weekCursor, phase: ph.phase, params: ph.params }); } });
 
   return (
-    <div style={{ padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 10 }}>
+    <div className="train-microcyc" style={{ padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🗓️ Планер микроциклов</div>
       <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>Задайте длительность и цель — получите готовую последовательность фаз/микроциклов с варьирующейся интенсивностью.</div>
 

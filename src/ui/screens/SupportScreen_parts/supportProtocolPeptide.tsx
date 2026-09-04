@@ -7,7 +7,7 @@ export const SupportProtocolPeptide: React.FC<{ s: Record<string, any> }> = ({ s
   const [peptideTab, setPeptideTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="Пептиды">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-peptide" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#2dd4bf', marginBottom:2 }}>🧬 Пептиды — справочник (НЕ протокол назначения)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Информационный справочник о классах пептидов. Дозировки и схемы приёма — ТОЛЬКО по назначению врача. Самостоятельное применение рискованно.</p>

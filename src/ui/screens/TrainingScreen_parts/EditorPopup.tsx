@@ -14,7 +14,7 @@ import { ACCENT, IN } from './training-ui';
 export const EditorOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
   if (typeof document === 'undefined') return null;
   return ReactDOM.createPortal(
-    <div data-testid="editor-popup-overlay" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }}>
+    <div data-testid="editor-popup-overlay" className="train-editoroverlay" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }}>
       {children}
     </div>,
     document.body,

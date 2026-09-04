@@ -47,7 +47,7 @@ export const DailyQuests: React.FC = () => {
   const questOfDay = QUESTS[todayQuestIdx];
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="nut-quests" style={{ paddingBottom: 80 }}>
       <ModernHero icon="🎯" title="Квесты" subtitle="Ежедневные задания для дисциплины питания." />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>🎯 Ежедневные квесты</div>

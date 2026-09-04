@@ -97,6 +97,18 @@ import { SupportProtocolThyroid } from '../screens/SupportScreen_parts/supportPr
 import { SupportProtocolMetabolic } from '../screens/SupportScreen_parts/supportProtocolMetabolic';
 import { SupportProtocolHemato } from '../screens/SupportScreen_parts/supportProtocolHemato';
 import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProtocolDetox';
+import { ArmTechniqueCard } from '../screens/TrainingScreen_parts/ArmTechniqueCard';
+import { MicrocyclePlannerCard } from '../screens/TrainingScreen_parts/MicrocyclePlannerCard';
+import { PlanFeedbackCard } from '../screens/TrainingScreen_parts/PlanFeedbackCard';
+import { QualityDiagnosticsHub } from '../screens/TrainingScreen_parts/QualityDiagnosticsHub';
+import { TrainingSafetyHub } from '../screens/TrainingScreen_parts/TrainingSafetyHub';
+import { EditorOverlay } from '../screens/TrainingScreen_parts/EditorPopup';
+import { ProfileDiariesTab } from '../screens/ProfileScreen_v2/ProfileDiariesTab';
+import { ProfileSettingsTab } from '../screens/ProfileScreen_v2/ProfileSettingsTab';
+import { SupportProtocolPeptide } from '../screens/SupportScreen_parts/supportProtocolPeptide';
+import { SupportProtocolRAAS } from '../screens/SupportScreen_parts/supportProtocolRAAS';
+import { Achievements } from '../screens/NutritionScreen_parts/Achievements';
+import { DailyQuests } from '../screens/NutritionScreen_parts/DailyQuests';
 import { default as MMCTrackingCard } from '../screens/TrainingScreen_parts/MMCTrackingCard';
 import { HysteresisChart } from '../screens/RiskScreen_parts/HysteresisChart';
 import { PredictiveAnalytics } from '../screens/RiskScreen_parts/PredictiveAnalytics';
@@ -788,5 +800,51 @@ describe('market + pharma + labs roots', () => {
     expect(c7.querySelector('.sup-proto-women'), 'women').not.toBeNull();
     // BBRecommendationsTab/RirWaveChart требуют hub/program —
     // хуки живут в прод-ветках, здесь не проверяются.
+  });
+
+  it('36. Batch-11 корни: планировщики и оверлей', () => {
+    const { container: c1 } = render(<ArmTechniqueCard />);
+    expect(c1.querySelector('.train-armtech'), 'armtech').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <MicrocyclePlannerCard plan={{ phases: [] } as never} />,
+    );
+    expect(c2.querySelector('.train-microcyc'), 'microcyc').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<QualityDiagnosticsHub program={null as never} />);
+    expect(c3.querySelector('.train-qualityhub'), 'qualityhub').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TrainingSafetyHub />);
+    expect(c4.querySelector('.train-safetyhub'), 'safetyhub').not.toBeNull();
+    cleanup();
+    const { unmount: unmountOverlay } = render(
+      <EditorOverlay onClose={() => {}}>
+        <div>тело</div>
+      </EditorOverlay>,
+    );
+    // Portal уходит в document.body, а не в container
+    expect(document.body.querySelector('.train-editoroverlay'), 'editoroverlay').not.toBeNull();
+    unmountOverlay();
+  });
+
+  it('37. Batch-11 корни: вкладки профиля и протоколы', () => {
+    const { container: c1 } = render(<ProfileDiariesTab />);
+    expect(c1.querySelector('.profile-diaries'), 'diaries').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<ProfileSettingsTab />);
+    expect(c2.querySelector('.profile-settings'), 'settings').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SupportProtocolPeptide s={{}} />);
+    expect(c3.querySelector('.sup-proto-peptide'), 'peptide').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SupportProtocolRAAS s={{}} />);
+    expect(c4.querySelector('.sup-proto-raas'), 'raas').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<Achievements />);
+    expect(c5.querySelector('.nut-achieve'), 'achieve').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<DailyQuests />);
+    expect(c6.querySelector('.nut-quests'), 'quests').not.toBeNull();
+    // PlanFeedbackCard требует plan/feedback — хук живёт в прод-ветке.
   });
 });

@@ -30,7 +30,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
   const [section, setSection] = useState<SectionId>(initialSection);
 
   return (
-    <div style={{ color: '#fff', padding: 4 }}>
+    <div className="train-safetyhub" style={{ color: '#fff', padding: 4 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>🛡 Безопасность и нагрузка</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.4 }}>
         Единый контейнер без дублей формул: ортопедия (быстрый чек) + нагрузка + авторегуляция + восстановление. Полный разбор сустава и техники упражнения → <b style={{ color: '#fff' }}>«Суставы и ортопедия»</b> (вкладка рядом, единый инструмент). Кардио-цикл → <b style={{ color: '#fff' }}>Кардио-конструктор</b> (Планировщик), объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV). Источники: Foster/Banister/Helms/McGill.

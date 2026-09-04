@@ -2677,6 +2677,50 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 43. NATIVE DEEP-11 — планировщики, оверлеи, вкладки ───── */
+html.app-native .train-armtech,
+html.app-native .train-microcyc,
+html.app-native .train-planfeedback,
+html.app-native .train-qualityhub,
+html.app-native .train-safetyhub,
+html.app-native .train-editoroverlay,
+html.app-native .profile-diaries,
+html.app-native .profile-settings,
+html.app-native .sup-proto-peptide,
+html.app-native .sup-proto-raas,
+html.app-native .nut-achieve,
+html.app-native .nut-quests {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-armtech,
+html.app-native .train-microcyc,
+html.app-native .train-planfeedback {
+  border-radius: 20px !important;
+}
+
+html.app-native .profile-diaries,
+html.app-native .profile-settings {
+  gap: 12px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armtech,
+  html.app-native .train-microcyc,
+  html.app-native .train-planfeedback,
+  html.app-native .train-qualityhub,
+  html.app-native .train-safetyhub,
+  html.app-native .train-editoroverlay,
+  html.app-native .profile-diaries,
+  html.app-native .profile-settings,
+  html.app-native .sup-proto-peptide,
+  html.app-native .sup-proto-raas,
+  html.app-native .nut-achieve,
+  html.app-native .nut-quests {
+    animation: none;
+  }
+}
+
 /* ─── 42. NATIVE DEEP-10 — шаги, строки, графики ─────────────── */
 html.app-native .train-armheatmap,
 html.app-native .train-insights,

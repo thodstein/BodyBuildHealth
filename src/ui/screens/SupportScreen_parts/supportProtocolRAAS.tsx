@@ -7,7 +7,7 @@ export const SupportProtocolRAAS: React.FC<{ s: Record<string, any> }> = ({ s })
   const [raasTab, setRaasTab] = useState('protocol');
   return (
           <InfoErrorBoundary label="RAAS">
-            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="sup-proto-raas" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>🫀 RAAS (АД/почки/фиброз)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Ренин-ангиотензин-альдостероновая система — ключевая мишень для контроля АД, протеинурии и фиброза на курсе ААС.</p>
