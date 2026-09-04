@@ -1203,7 +1203,7 @@ export function calcSweatTestV2(input: { preKg?: number; postKg?: number; fluidL
   if (typeof input.preKg === 'number' && typeof input.postKg === 'number' && typeof input.fluidL === 'number') {
     const r = calcSweatTest({ preKg: input.preKg, postKg: input.postKg, fluidL: input.fluidL, hours: input.hours, sodiumMgPerL: sodiumAdj, weightKg: input.weightKg ?? 80 });
     if (!r) return null;
-    return { ...r, elect: { ...r.elect }, rangeNote: `Измеренный (Baker): ${r.rateLPerH} л/ч · Na ${sodiumAdj}мг/л${input.acclimated ? ' (акклиматизация −40% Na)' : ''}` };
+    return { ...r, measured: true as const, elect: { ...r.elect }, rangeNote: `Измеренный (Baker): ${r.rateLPerH} л/ч · Na ${sodiumAdj}мг/л${input.acclimated ? ' (акклиматизация −40% Na)' : ''}` };
   }
   const est = estimateSweatRatePopulation({ intensity: input.intensity ?? 'moderate', environment: input.environment ?? 'temperate', weightKg: input.weightKg ?? 80, acclimated: input.acclimated });
   const elect = calcSweatElectrolytes(est.rateLPerH * 1000 * input.hours, sodiumAdj);
