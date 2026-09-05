@@ -39,10 +39,13 @@ describe('DashboardNative first-run', () => {
     setCapacitorNative();
     resetAppPlatformCache();
     const calls: string[] = [];
-    render(<DashboardNative onNavigate={(s) => calls.push(s)} />);
+    const { container } = render(<DashboardNative onNavigate={(s) => calls.push(s)} />);
     expect(screen.getByText('Первая тренировка ждёт')).not.toBeNull();
     fireEvent.click(screen.getByText(/К тренингу/));
     expect(calls).toEqual(['training']);
+    // Guard от молчаливого отката: hero идёт через HeroImg (WebP + фолбэк).
+    const source = container.querySelector('.native-home-bg source[type="image/webp"]');
+    expect(source?.getAttribute('srcset')).toContain('hero-main.webp');
   });
 
   it('после первой сессии карточки нет', () => {

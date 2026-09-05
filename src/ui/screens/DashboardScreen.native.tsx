@@ -21,6 +21,7 @@ import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { consumeWidgetLaunchTarget } from '../../core/widget-bridge';
 import { syncAllWidgets } from '../native/widget-sync';
 import { NativeEmpty } from '../native/NativeEmpty';
+import { usePullToRefresh } from '../native/usePullToRefresh';
 
 export type DashboardNativeNavId =
   | 'training' | 'nutrition' | 'labs' | 'risks' | 'pharma' | 'support'
@@ -95,6 +96,20 @@ const ACTIONS: { id: DashboardNativeNavId; icon: string; label: string; hint: st
 
 export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
   const [widgetMsg, setWidgetMsg] = useState<string | null>(null);
+  // Pull-to-refresh Главной: повторный синк виджетов жестом вниз.
+  const ptr = usePullToRefresh({
+    onRefresh: async () => {
+      try {
+        const r = await syncAllWidgets();
+        const parts: string[] = [];
+        if (r.drainedWaterMl > 0) parts.push(`💧 +${r.drainedWaterMl} мл из виджета`);
+        if (r.drainedFoods > 0) parts.push(`🍽️ блюд из виджета: ${r.drainedFoods}`);
+        setWidgetMsg(parts.length > 0 ? parts.join(' · ') : '✓ Данные обновлены');
+      } catch {
+        /* тихий no-op — индикатор прячется в любом случае */
+      }
+    },
+  });
 
   // Виджеты: при входе на Главную — отдать очередь в дневники, запушить
   // свежие снапшоты и отработать тап по виджету (one-shot deep link).
@@ -186,13 +201,23 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div className="native-home">
+    <div className="native-home" ref={ptr.containerRef as React.RefObject<HTMLDivElement>}>
       <div className="native-home-bg" aria-hidden="true">
         <HeroImg webp="/hero-main.webp?v=20250827k" src="/hero-main.png?v=20250827k" alt="" draggable={false} />
         <div className="native-home-shade" />
       </div>
 
       <div className="native-home-content">
+        <div
+          ref={ptr.indicatorRef as React.RefObject<HTMLDivElement>}
+          className="native-ptr"
+          aria-hidden="true"
+          style={{ height: 0 }}
+        >
+          <span className={ptr.refreshing ? 'native-ptr-spin' : ''}>
+            {ptr.refreshing ? '◌' : '↓'}
+          </span>
+        </div>
         <div className="native-home-kicker">Health Engine · Pro</div>
         <h1 className="native-home-title">
           {greeting()}

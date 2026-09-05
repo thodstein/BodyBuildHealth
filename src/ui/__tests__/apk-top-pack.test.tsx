@@ -18,7 +18,7 @@ import { NativeFab } from '../native/NativeFab';
 import { NativeOfflinePill } from '../native/NativeOfflinePill';
 import { isOnline, watchOnline } from '../../core/native-bridge';
 import { HeroImg } from '../HeroImg';
-import { getNavBadges } from '../native/nav-badges';
+import { getNavBadges, profileCompleteness } from '../native/nav-badges';
 // ВНИМАНИЕ: CSS читаем через process.cwd(), а НЕ через new URL(*.css,
 // import.meta.url) — Vite считает такую конструкцию ассетом и падает
 // на CSS-модулях (?url is not supported with CSS modules).
@@ -328,18 +328,65 @@ describe('APK TOP pack', () => {
   });
 
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {
-    expect(getNavBadges()).toEqual({ support: '' });
+    // Дефолтный профиль уже даёт ≥ 50% — дот не горит без повода.
+    expect(getNavBadges()).toEqual({ support: '', profile: '' });
     try {
       localStorage.setItem('he_drug_warnings', JSON.stringify({ count: 2, highCount: 3, warnings: [] }));
     } catch {}
-    expect(getNavBadges()).toEqual({ support: '3' });
+    expect(getNavBadges()).toEqual({ support: '3', profile: '' });
     try {
       localStorage.setItem('he_drug_warnings', JSON.stringify({ count: 1, highCount: 150, warnings: [] }));
     } catch {}
-    expect(getNavBadges()).toEqual({ support: '99+' });
+    expect(getNavBadges()).toEqual({ support: '99+', profile: '' });
     try {
       localStorage.setItem('he_drug_warnings', 'not-json{{{');
     } catch {}
-    expect(getNavBadges()).toEqual({ support: '' });
+    expect(getNavBadges()).toEqual({ support: '', profile: '' });
+  });
+
+  it('nav-badges: дот профиля гаснет на заполненности ≥ 50%', () => {
+    expect(profileCompleteness(null)).toBe(0);
+    expect(profileCompleteness({})).toBe(0);
+    const full = {
+      personal: { age: 30, sex: 'male', height: 180, weight: 80 },
+      training: { primaryGoal: 'bulk', level: 'intermediate', daysPerWeek: 4 },
+      lifestyle: { sleepHours: 8, stressLevel: 3 },
+      health: { bpStage: 'normal' },
+      nutrition: { dietType: 'omni', proteinPerKg: 2 },
+      goals: { primaryGoal: 'bulk' },
+    };
+    expect(profileCompleteness(full)).toBe(100);
+    // 7/13 = 54%: граница гаснущего дота.
+    const half = {
+      personal: { age: 30, sex: 'male', height: 180, weight: 80 },
+      training: { primaryGoal: 'bulk', level: 'intermediate', daysPerWeek: 4 },
+    };
+    expect(profileCompleteness(half)).toBeGreaterThanOrEqual(50);
+  });
+
+  it('nav-badges: разреженный профиль зажигает дот, полный — гасит', () => {
+    try {
+      localStorage.setItem(
+        'he_profile_v2',
+        JSON.stringify({ settings: { personal: { age: 30 } } }),
+      );
+    } catch {}
+    expect(getNavBadges().profile).toBe('!');
+    try {
+      localStorage.setItem(
+        'he_profile_v2',
+        JSON.stringify({
+          settings: {
+            personal: { age: 30, sex: 'male', height: 180, weight: 80 },
+            training: { primaryGoal: 'bulk', level: 'intermediate', daysPerWeek: 4 },
+            lifestyle: { sleepHours: 8, stressLevel: 3 },
+            health: { bpStage: 'normal' },
+            nutrition: { dietType: 'omni', proteinPerKg: 2 },
+            goals: { primaryGoal: 'bulk' },
+          },
+        }),
+      );
+    } catch {}
+    expect(getNavBadges().profile).toBe('');
   });
 });
