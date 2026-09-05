@@ -465,5 +465,15 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
 - Полная регрессия UI-папки зелёная (шум canvas/keys/act/DB — базовый,
   был и до волн).
 
+Волна 15 — починка CI (`verify:apk-ci` OK, `verify:apk-design` OK):
+
+- **`secrets` нельзя в `if`** (Invalid workflow file): секреты релиза
+  переехали в `env` job'а (там можно), 4 гейта — по `env` (там можно);
+  без секретов шаги корректно скипаются, debug не страдает.
+- По ходу найден и удалён **дубль блока Upload release APK** в конце файла
+  (он же объяснял уцелевший `secrets` после первой правки).
+- Новый guard `npm run verify:apk-ci` (`scripts/check-apk-workflow.mjs`):
+  нет `secrets` в `if`, 4 гейта по env, одно объявление, без табов.
+
 Осознанные остатки (не баги): бейдж-драйверы кроме interactions/profile;
 Gradle-сборка Java-слоя — только CI.
