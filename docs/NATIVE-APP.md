@@ -302,7 +302,32 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
 - **Perf**: preload `hero-main.png`; скелетон-shimmer, тосты над пилюлей,
   планшетный центр ≤600px (hero остаётся fullscreen).
 
-Осознанные остатки (не баги): hero без WebP (нужен ассет-пайплайн),
-переключатель темы в UI Профиля, живые бейджи навбара (CSS готов),
-dynamic-color runtime (Android 12+), CSS-сплит native-бандла из TG
-(сейчас мёртвый груз ~60КБ — дёшево, но честно).
+Волна 2 — остатки закрыты (тест `apk-top-pack` 9/9, `tsc` 0, `vite build` OK,
+native-CSS — отдельными чанками `styles-native-*.css`, в TG-старт не грузятся):
+
+- **Hero WebP**: `scripts/sync-hero-webp.mjs` (`npm run sync-hero-webp`, без новых
+  зависимостей — `@napi-rs/canvas`): PNG 1.2–2МБ → WebP 6–15% (hero-main 14%,
+  bg-profile 10%); компонент `ui/HeroImg.tsx` (`picture` + `display:contents` —
+  селекторы `… img`, классы и тесты экранов не меняются) вшит в 10 точек
+  (Dashboard TG+APK, тренинг, фарма, риски, статьи, профиль, питание, анализы,
+  фон App); preload в `index.html` — на WebP. `support-hero.jpg` сознательно
+  оставлен JPG: замеры показали WebP больше (197КБ → 246КБ), скрипт такие
+  случаи пропускает сам.
+- **Переключатель темы**: `ui/native/AppearanceSetupCard.tsx` в Профиле
+  §4.4 (тёмная/AMOLED/светлая + 5 акцентов, применяется мгновенно).
+- **Dynamic color**: слой var-изирован (`--accent/--accent-2/--accent-rgb…`,
+  hex остался только в 3 определениях — тест следит); палитры
+  lime/mint/sky/violet/amber (§59). Системная палитра Material You без
+  нативного плагина из WebView недоступна — пользовательский акцент её
+  закрывает; инлайн-TSX мелочи (NativeEmpty SVG, экран AppLock) акцент
+  не подхватывают (честный остаток, ~5 строк).
+- **Живые бейджи**: `ui/native/nav-badges.ts` + `data-badge` в `App.tsx`
+  (рекомпут при смене таба/фокусе): красный дот на БАДах при критических
+  взаимодействиях (`he_drug_warnings.highCount`, кап 99+). Точка расширения
+  задокументирована в файле.
+- **CSS-сплит**: `main.tsx` грузит `styles-native*.css` динамическим import
+  до первого рендера только при `platform === 'native'` (FOUC нет —
+  `createRoot` позже); TG/web — только `styles.css`.
+
+Осознанные остатки (не баги): инлайн-TSX акценты (см. выше), бейдж-драйверы
+кроме interactions, Material You из системы (нужен Capacitor-плагин).

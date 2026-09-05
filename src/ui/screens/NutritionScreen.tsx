@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { HeroImg } from '../HeroImg';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes, calculateUserRecipeUsefulness } from '../../engines/nutrition-periodization.engine';
@@ -1469,7 +1470,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     const todayProtein = todayEntries.reduce((s, e) => s + (e.p || 0), 0);
     return (
       <div className="nutrition-hero" style={{ position:'fixed', inset:0, display:'flex', flexDirection:'column' }}>
-        <img src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+        <HeroImg webp="/nutrition-hero.webp" src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 45%, rgba(0,0,0,0.85))' }} />
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
           <h1 className="nutrition-hero-title" style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Питание</h1>

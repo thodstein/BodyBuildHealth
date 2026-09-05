@@ -20,8 +20,8 @@ import { initErrorHandler } from './core/error-handler';
 import { optimizeDBSpace } from './core/performance-optimizer';
 import { ensureAdmin } from './core/auth-manager';
 import './styles.css';
-import './styles-native.css';
-import './styles-native-pro.css';
+// styles-native*.css — ТОЛЬКО APK: грузятся динамическим import ниже отдельным
+// чанком и в TG/web-бандл не попадают вообще (было ~60КБ мёртвого груза).
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -110,6 +110,13 @@ async function bootstrap() {
   // Telegram-ветка ниже не меняется: в Mini App всё как раньше.
   let platform: 'telegram' | 'native' | 'web' = 'web';
   try { platform = applyPlatformAttributes(); } catch (e) { console.warn('applyPlatformAttributes failed:', e); }
+  // Native-CSS — до первого рендера (FOUC нет: createRoot вызывается позже).
+  // В TG/web ветка не выполняется — Mini App грузит только styles.css.
+  if (platform === 'native') {
+    try {
+      await Promise.all([import('./styles-native.css'), import('./styles-native-pro.css')]);
+    } catch (e) { console.warn('native CSS load failed:', e); }
+  }
   // Тема APK (dark/amoled/light): внутри — гейт на native, в TG/web no-op.
   try { initApkAppearance(); } catch (e) { console.warn('initApkAppearance failed:', e); }
   if (platform === 'native') {

@@ -29,12 +29,14 @@ html.app-native {
   --text-light: rgba(226, 236, 255, 0.92);
   --text-faint: rgba(226, 236, 255, 0.45);
   --accent: #c9f73a;
+  --accent-rgb: 201, 247, 58;
   --accent-2: #00e68a;
-  --accent-dim: rgba(201, 247, 58, 0.12);
-  --accent-glow: rgba(201, 247, 58, 0.35);
-  --accent-gradient: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  --accent-2-rgb: 0, 230, 138;
+  --accent-dim: rgba(var(--accent-rgb), 0.12);
+  --accent-glow: rgba(var(--accent-rgb), 0.35);
+  --accent-gradient: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   --accent-contrast: #0a1a08;
-  --accent-line: rgba(201, 247, 58, 0.45);
+  --accent-line: rgba(var(--accent-rgb), 0.45);
   --nav-height: 76px;
   --radius: 18px;
   --radius-sm: 12px;
@@ -49,8 +51,8 @@ html.app-native {
 /* База: глубокий фон + спортивная типографика. Только native. */
 html.app-native body {
   background:
-    radial-gradient(120% 60% at 50% -10%, rgba(201, 247, 58, 0.07) 0%, transparent 60%),
-    radial-gradient(100% 50% at 50% 110%, rgba(0, 230, 138, 0.06) 0%, transparent 60%),
+    radial-gradient(120% 60% at 50% -10%, rgba(var(--accent-rgb), 0.07) 0%, transparent 60%),
+    radial-gradient(100% 50% at 50% 110%, rgba(var(--accent-2-rgb), 0.06) 0%, transparent 60%),
     #050b16;
   font-family: var(--font-main);
   letter-spacing: 0.1px;
@@ -108,8 +110,8 @@ html.app-native .nav-btn svg {
 
 html.app-native .nav-btn.active {
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
-  box-shadow: 0 6px 20px rgba(201, 247, 58, 0.35);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.35);
   text-shadow: none;
 }
 
@@ -191,8 +193,8 @@ html.app-native .screen h2::after {
   height: 4px;
   border-radius: 99px;
   margin-top: 8px;
-  background: linear-gradient(90deg, #c9f73a, #00e68a);
-  box-shadow: 0 0 12px rgba(201, 247, 58, 0.5);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.5);
 }
 
 /* ─── 5. КАРТОЧКИ ──────────────────────────────────────────────── */
@@ -221,10 +223,10 @@ html.app-native .btn:active {
 
 html.app-native .btn-primary,
 html.app-native button[data-variant='primary'] {
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   color: #0a1a08;
   border: none;
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
 }
 
 html.app-native .tab-btn {
@@ -233,10 +235,10 @@ html.app-native .tab-btn {
 }
 
 html.app-native .tab-btn.active {
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   color: #0a1a08;
   border-color: transparent;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3);
 }
 
 /* ─── 7. ЧИПЫ / СЕГМЕНТЫ / ИНПУТЫ ──────────────────────────────── */
@@ -250,8 +252,8 @@ html.app-native textarea {
 html.app-native input:focus,
 html.app-native select:focus,
 html.app-native textarea:focus {
-  border-color: rgba(201, 247, 58, 0.6);
-  box-shadow: 0 0 0 3px rgba(201, 247, 58, 0.15);
+  border-color: rgba(var(--accent-rgb), 0.6);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
   outline: none;
 }
 
@@ -278,7 +280,7 @@ html.app-native button {
 }
 
 html.app-native ::selection {
-  background: rgba(201, 247, 58, 0.35);
+  background: rgba(var(--accent-rgb), 0.35);
 }
 
 /* Числа — табличные, спортивная статистика не «прыгает» */
@@ -320,8 +322,8 @@ html.app-native div[style*='position:fixed'] h1::after {
   height: 5px;
   border-radius: 99px;
   margin-top: 10px;
-  background: linear-gradient(90deg, #c9f73a, #00e68a);
-  box-shadow: 0 0 14px rgba(201, 247, 58, 0.55);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.55);
 }
 
 /* Плитки hero — спортивное стекло (база для всех кнопок hero) */
@@ -341,14 +343,14 @@ html.app-native div[style*='position:fixed'] button:active {
 
 /* Строки-меню (тренировки, профиль, анализы) — лаймовая кромка слева */
 html.app-native div[style*='position:fixed'] button:has(> div) {
-  border-left: 3px solid #c9f73a !important;
+  border-left: 3px solid var(--accent) !important;
   text-align: left !important;
 }
 
 /* Квадратные плитки (Главная: Профиль/Магазин/Статьи) — чистые, центрированные */
 html.app-native div[style*='position:fixed'] button[style*='aspect-ratio'] {
   border-radius: 22px !important;
-  border-top: 2px solid rgba(201, 247, 58, 0.5) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5) !important;
 }
 
 /* Текстовые пилюли («← На главную», «← Обзор») — компактные */
@@ -409,8 +411,8 @@ html.app-native .native-home-kicker {
   font-weight: 800;
   letter-spacing: 3px;
   text-transform: uppercase;
-  color: #c9f73a;
-  text-shadow: 0 0 16px rgba(201, 247, 58, 0.5);
+  color: var(--accent);
+  text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.5);
   margin-bottom: 6px;
   /* Верхние системные кнопки (синк + язык) — не налезают на строку */
   padding-right: 112px;
@@ -434,8 +436,8 @@ html.app-native .native-home-title::after {
   height: 5px;
   border-radius: 99px;
   margin-top: 10px;
-  background: linear-gradient(90deg, #c9f73a, #00e68a);
-  box-shadow: 0 0 14px rgba(201, 247, 58, 0.55);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.55);
 }
 
 html.app-native .native-home-date {
@@ -453,10 +455,10 @@ html.app-native .native-home-streak {
   font-size: 12px;
   font-weight: 800;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-radius: 999px;
   padding: 3px 10px;
-  box-shadow: 0 4px 14px rgba(201, 247, 58, 0.4);
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.4);
 }
 
 /* Статистика — компактная сетка 2×2, всё помещается без скролла */
@@ -477,7 +479,7 @@ html.app-native .native-home-stat {
   padding: 12px;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.78), rgba(12, 23, 40, 0.78));
   border: 1px solid rgba(140, 190, 255, 0.14);
-  border-top: 2px solid rgba(201, 247, 58, 0.45);
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -508,7 +510,7 @@ html.app-native .native-home-stat-l {
 html.app-native .native-home-stat-s {
   font-size: 10px;
   font-weight: 600;
-  color: #c9f73a;
+  color: var(--accent);
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -526,8 +528,8 @@ html.app-native .native-home-last {
   cursor: pointer;
   border-radius: 22px;
   color: #fff;
-  background: linear-gradient(135deg, rgba(201, 247, 58, 0.16), rgba(0, 230, 138, 0.10)), linear-gradient(180deg, rgba(21, 38, 66, 0.85), rgba(12, 23, 40, 0.85));
-  border: 1px solid rgba(201, 247, 58, 0.3);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-2-rgb), 0.10)), linear-gradient(180deg, rgba(21, 38, 66, 0.85), rgba(12, 23, 40, 0.85));
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -543,7 +545,7 @@ html.app-native .native-home-last-top {
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #c9f73a;
+  color: var(--accent);
 }
 
 html.app-native .native-home-last-title {
@@ -632,7 +634,7 @@ html.app-native .native-home-warn {
 html.app-native .native-home-warn--ok {
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72));
   border: 1px solid rgba(140, 190, 255, 0.14);
-  border-left: 3px solid #c9f73a;
+  border-left: 3px solid var(--accent);
 }
 
 html.app-native .native-home-warn-t {
@@ -678,7 +680,7 @@ html.app-native .training-hero-stat {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72));
   border: 1px solid rgba(140, 190, 255, 0.16);
-  border-top: 2px solid rgba(201, 247, 58, 0.5);
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -731,8 +733,8 @@ html.app-native .training-hero-zone:active {
 /* Окно выбора конструктора — фирменный navy вместо серого */
 html.app-native .training-planning {
   background:
-    radial-gradient(1100px 520px at 15% -10%, rgba(201, 247, 58, 0.1), transparent 60%),
-    radial-gradient(900px 460px at 92% 4%, rgba(0, 230, 138, 0.1), transparent 60%),
+    radial-gradient(1100px 520px at 15% -10%, rgba(var(--accent-rgb), 0.1), transparent 60%),
+    radial-gradient(900px 460px at 92% 4%, rgba(var(--accent-2-rgb), 0.1), transparent 60%),
     #050b16 !important;
 }
 
@@ -803,7 +805,7 @@ html.app-native .nutrition-hero-stat {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72));
   border: 1px solid rgba(140, 190, 255, 0.16);
-  border-top: 2px solid rgba(201, 247, 58, 0.5);
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -840,8 +842,8 @@ html.app-native .nutrition-hero-bar-fill {
   display: block;
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #c9f73a, #00e68a);
-  box-shadow: 0 0 8px rgba(201, 247, 58, 0.5);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
 }
 
 /* Вкладки: стеклянная шапка, крупные чипы */
@@ -863,10 +865,10 @@ html.app-native .nutrition-chip {
 }
 
 html.app-native .nutrition-chip[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 /* ─── 14. NATIVE LABS — PRO-подача ────────────────────────────── */
@@ -896,7 +898,7 @@ html.app-native .labs-hero-stat {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72));
   border: 1px solid rgba(140, 190, 255, 0.16);
-  border-top: 2px solid rgba(201, 247, 58, 0.5);
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -994,7 +996,7 @@ html.app-native .risk-hero-card {
   border-radius: 20px !important;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
   border: 1px solid rgba(140, 190, 255, 0.16) !important;
-  border-left: 3px solid #c9f73a !important;
+  border-left: 3px solid var(--accent) !important;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
@@ -1067,7 +1069,7 @@ html.app-native .support-hero-card {
   border-radius: 20px !important;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
   border: 1px solid rgba(140, 190, 255, 0.16) !important;
-  border-left: 3px solid #c9f73a !important;
+  border-left: 3px solid var(--accent) !important;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
@@ -1096,7 +1098,7 @@ html.app-native .profile-hero-card {
   border-radius: 20px !important;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
   border: 1px solid rgba(140, 190, 255, 0.16) !important;
-  border-left: 3px solid #c9f73a !important;
+  border-left: 3px solid var(--accent) !important;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
@@ -1122,7 +1124,7 @@ html.app-native .articles-hero-card {
   border-radius: 20px !important;
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
   border: 1px solid rgba(140, 190, 255, 0.16) !important;
-  border-left: 3px solid #c9f73a !important;
+  border-left: 3px solid var(--accent) !important;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
@@ -1153,7 +1155,7 @@ html.app-native .ck-card {
 html.app-native .kit-hero,
 html.app-native .modern-hero {
   border-radius: 22px !important;
-  border-top: 2px solid rgba(201, 247, 58, 0.5) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5) !important;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   backdrop-filter: blur(20px) !important;
@@ -1164,7 +1166,7 @@ html.app-native .modern-hero {
 html.app-native .kit-stat,
 html.app-native .ck-tile {
   border-radius: 16px !important;
-  border-top: 2px solid rgba(201, 247, 58, 0.45) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   backdrop-filter: blur(16px) !important;
 }
@@ -1177,10 +1179,10 @@ html.app-native .kit-chiptoggle[data-active='true'],
 html.app-native .kit-sectionnav-opt[data-active='true'],
 html.app-native .modern-pill[data-active='true'],
 html.app-native .profile-boolchip[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 html.app-native .kit-tabs,
@@ -1206,11 +1208,11 @@ html.app-native .modern-search input {
 }
 
 html.app-native .kit-glassbtn[data-variant='primary'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border: none !important;
   color: #0a1a08 !important;
   font-weight: 800 !important;
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 /* Прогресс-бары китов — светящийся трек */
@@ -1283,10 +1285,10 @@ html.app-native .plan-tab {
 }
 
 html.app-native .plan-tab[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 html.app-native .plan-pill {
@@ -1295,7 +1297,7 @@ html.app-native .plan-pill {
 }
 
 html.app-native .plan-pill[data-active='true'] {
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 html.app-native .food-diary,
@@ -1326,11 +1328,11 @@ html.app-native .risk-subtab {
 
 html.app-native .labs-subtab[data-active='true'],
 html.app-native .risk-subtab[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
   font-weight: 800 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 /* Фарма: внутренняя шапка и курс */
@@ -1430,8 +1432,8 @@ html.app-native .nav-btn {
 
 /* Лоадер — лаймовый на navy */
 html.app-native .screen-loading .loading-spinner {
-  border-color: rgba(201, 247, 58, 0.18);
-  border-top-color: #c9f73a;
+  border-color: rgba(var(--accent-rgb), 0.18);
+  border-top-color: var(--accent);
 }
 
 /* Тосты — стеклянные пилюли над навбаром */
@@ -1455,7 +1457,7 @@ html.app-native .toast-item {
 html.app-native .tab-btn:focus-visible,
 html.app-native .btn:focus-visible,
 html.app-native .nav-btn:focus-visible {
-  outline: 2px solid rgba(201, 247, 58, 0.7);
+  outline: 2px solid rgba(var(--accent-rgb), 0.7);
   outline-offset: 2px;
 }
 
@@ -1693,8 +1695,8 @@ html.app-native .native-feature-icon {
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3);
   flex-shrink: 0;
 }
 
@@ -1722,8 +1724,8 @@ html.app-native .native-dot {
 }
 
 html.app-native .native-dot--ok {
-  background: #c9f73a;
-  box-shadow: 0 0 10px rgba(201, 247, 58, 0.6);
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
 }
 
 html.app-native .native-dot--bad {
@@ -1779,9 +1781,9 @@ html.app-native .native-feature-btn {
   font-weight: 800;
   cursor: pointer;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border: none;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3);
   min-height: 40px;
 }
 
@@ -1805,9 +1807,9 @@ html.app-native .native-feature-wide {
   font-weight: 800;
   cursor: pointer;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border: none;
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
   min-height: 48px;
 }
 
@@ -1830,8 +1832,8 @@ html.app-native .native-feature-msg {
   font-weight: 700;
   line-height: 1.45;
   color: #fff;
-  background: rgba(201, 247, 58, 0.08);
-  border: 1px solid rgba(201, 247, 58, 0.2);
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
 }
 
 html.app-native .native-feature-details {
@@ -1841,7 +1843,7 @@ html.app-native .native-feature-details {
 html.app-native .native-feature-details summary {
   font-size: 12px;
   font-weight: 800;
-  color: #c9f73a;
+  color: var(--accent);
   cursor: pointer;
   padding: 6px 2px;
 }
@@ -1915,10 +1917,10 @@ html.app-native .profile-reports-tab {
 }
 
 html.app-native .profile-reports-tab[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 html.app-native .profile-reports-item {
@@ -1968,8 +1970,8 @@ html.app-native .profile-pve-btn {
 }
 
 html.app-native .profile-pve-btn[data-filled='true'] {
-  border-color: rgba(201, 247, 58, 0.45) !important;
-  box-shadow: 0 4px 16px rgba(201, 247, 58, 0.12) !important;
+  border-color: rgba(var(--accent-rgb), 0.45) !important;
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.12) !important;
 }
 
 /* ─── 31. NATIVE EMPTY — пустые состояния с CTA ──────────────── */
@@ -1983,7 +1985,7 @@ html.app-native .native-empty {
 }
 
 html.app-native .native-empty-art {
-  filter: drop-shadow(0 6px 18px rgba(201, 247, 58, 0.15));
+  filter: drop-shadow(0 6px 18px rgba(var(--accent-rgb), 0.15));
   animation: nativeScreenIn 0.42s cubic-bezier(0.22, 0.68, 0, 1);
 }
 
@@ -2011,8 +2013,8 @@ html.app-native .native-empty-cta {
   font-size: 13px;
   font-weight: 800;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
   min-height: 48px;
 }
 
@@ -2031,8 +2033,8 @@ html.app-native .programs-empty-cta {
   font-size: 13px;
   font-weight: 800;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a, #00e68a);
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
   min-height: 48px;
   display: block;
 }
@@ -2089,7 +2091,7 @@ html.app-native .market-tab {
 }
 
 html.app-native .market-tab[data-active='true'] {
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.25) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.25) !important;
 }
 
 html.app-native .market-filter {
@@ -2098,7 +2100,7 @@ html.app-native .market-filter {
 }
 
 html.app-native .market-filter[data-active='true'] {
-  box-shadow: 0 4px 14px rgba(201, 247, 58, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.25) !important;
 }
 
 html.app-native .market-card {
@@ -2108,8 +2110,8 @@ html.app-native .market-card {
 }
 
 html.app-native .market-card[data-expanded='true'] {
-  border-color: rgba(201, 247, 58, 0.4) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(201, 247, 58, 0.15) !important;
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(var(--accent-rgb), 0.15) !important;
 }
 
 html.app-native .market-body {
@@ -2129,10 +2131,10 @@ html.app-native .support-pill {
 }
 
 html.app-native .support-pill[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a, #00e68a) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   border-color: transparent !important;
   color: #0a1a08 !important;
-  box-shadow: 0 6px 18px rgba(201, 247, 58, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3446,7 +3448,7 @@ html.app-native {
   --motion-fast: 0.15s ease;
   --fab-size: 56px;
   --badge-dot: 9px;
-  --focus-ring: 0 0 0 3px rgba(201, 247, 58, 0.35);
+  --focus-ring: 0 0 0 3px rgba(var(--accent-rgb), 0.35);
 }
 
 /* 58.1 Фон-подложка App: чиним растягивание (fill → cover) только в APK.
@@ -3506,7 +3508,7 @@ html.app-native .nav-btn[data-badge]:not([data-badge='']):not([data-badge='0']):
 }
 
 html.app-native .nav-btn.active[data-badge]:not([data-badge='']):not([data-badge='0'])::before {
-  border-color: rgba(201, 247, 58, 0.9);
+  border-color: rgba(var(--accent-rgb), 0.9);
 }
 
 /* Узкие экраны: иконки и кегль ужимаются, строка не ломается. */
@@ -3557,9 +3559,9 @@ html.app-native .native-btn-danger {
 }
 
 html.app-native .native-btn-primary {
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   color: #0a1a08;
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
 }
 
 html.app-native .native-btn-ghost {
@@ -3596,7 +3598,7 @@ html.app-native .native-chip {
 }
 
 html.app-native .native-chip[data-active='true'] {
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   border-color: transparent;
   color: #0a1a08;
 }
@@ -3736,8 +3738,8 @@ html.app-native .native-fab {
   align-items: center;
   justify-content: center;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
-  box-shadow: 0 10px 28px rgba(201, 247, 58, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transition: transform var(--motion-fast), box-shadow 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -3799,8 +3801,8 @@ html.app-native .native-empty-cta {
   font-size: var(--type-body);
   cursor: pointer;
   color: #0a1a08;
-  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
-  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
 }
 
 /* Тосты и баннеры — строго над пилюлей навигации. */
@@ -3867,6 +3869,50 @@ html.app-native .sup-proto-hair,
 html.app-native .sup-proto-inj,
 html.app-native .sup-proto-women {
   animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* ─── 59. APK DYNAMIC COLOR — акцент поверх var-изированных токенов ──
+ * Дефолт (без атрибута) — лайм. Весь слой уже сидит на var(--accent) /
+ * var(--accent-2) / --accent-rgb, поэтому переключение мгновенное и полное.
+ * Выбор — ui/native/AppearanceSetupCard (Профиль → Телефон · APK). */
+html.app-native[data-apk-accent='mint'] {
+  --accent: #00e68a;
+  --accent-rgb: 0, 230, 138;
+  --accent-2: #5eead4;
+  --accent-2-rgb: 94, 234, 212;
+  --accent-contrast: #05281b;
+}
+
+html.app-native[data-apk-accent='sky'] {
+  --accent: #38bdf8;
+  --accent-rgb: 56, 189, 248;
+  --accent-2: #818cf8;
+  --accent-2-rgb: 129, 140, 248;
+  --accent-contrast: #06121f;
+}
+
+html.app-native[data-apk-accent='violet'] {
+  --accent: #a78bfa;
+  --accent-rgb: 167, 139, 250;
+  --accent-2: #e879f9;
+  --accent-2-rgb: 232, 121, 249;
+  --accent-contrast: #150a24;
+}
+
+html.app-native[data-apk-accent='amber'] {
+  --accent: #fbbf24;
+  --accent-rgb: 251, 191, 36;
+  --accent-2: #f97316;
+  --accent-2-rgb: 249, 115, 22;
+  --accent-contrast: #1f1006;
+}
+
+/* Системная тёмная/светлая подсказка ОС: без явного выбора следуем тем,
+ * что уже делает data-apk-theme (дефолт — тёмная спортивная). */
+@media (prefers-color-scheme: light) {
+  html.app-native:not([data-apk-theme]):not([data-apk-accent]) {
+    color-scheme: dark;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { HeroImg } from '../HeroImg';
 import { getProfile } from '../../core/profile-manager';
 import { getWeightLog } from '../../engines/profile-store';
 import {
@@ -186,7 +187,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="native-home">
       <div className="native-home-bg" aria-hidden="true">
-        <img src="/hero-main.png?v=20250827k" alt="" draggable={false} />
+        <HeroImg webp="/hero-main.webp?v=20250827k" src="/hero-main.png?v=20250827k" alt="" draggable={false} />
         <div className="native-home-shade" />
       </div>
 

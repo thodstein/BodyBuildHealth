@@ -4,6 +4,7 @@
  * Вкладки внизу как в БАД-поддержке — с небольшой тенью 0 3px 12px.
  */
 import React, { useEffect, useState } from 'react';
+import { HeroImg } from '../../HeroImg';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
@@ -77,7 +78,8 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
 
   return (
     <div className="profile-hero" style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img
+      <HeroImg
+        webp="/profile-hero.webp"
         src="/profile-hero.png"
         alt="Profile"
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}

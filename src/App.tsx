@@ -20,6 +20,8 @@ import { isNativeApp } from './core/app-platform';
 import { setupNativeBackButton, haptics, isBiometricAvailable, authenticateWithBiometrics } from './core/native-bridge';
 import { useSwipeTabs } from './ui/native/useSwipeTabs';
 import { NativeFab } from './ui/native/NativeFab';
+import { getNavBadges } from './ui/native/nav-badges';
+import { HeroImg } from './ui/HeroImg';
 
 /** Экран блокировки входа. Рендерится ТОЛЬКО в APK при включённом блоке. */
 function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
@@ -93,6 +95,25 @@ export default function App() {
   const [screenKey, setScreenKey] = useState(0);
   // Блок входа по биометрии — ТОЛЬКО APK (флаги he_biometry_* из BiometrySetupCard).
   const [appLocked, setAppLocked] = useState(false);
+  // Живые бейджи навбара — только APK: в TG data-badge не выставляется вообще.
+  const [navBadges, setNavBadges] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    const refresh = () => {
+      try {
+        setNavBadges(getNavBadges());
+      } catch {
+        /* ignore */
+      }
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [tab, screenKey]);
   // touchRef removed
   const mainRef = useRef<HTMLElement>(null);
 
@@ -366,7 +387,7 @@ export default function App() {
     <div className="app" >
       <DarkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0, pointerEvents:'none', opacity:0.3 }} />
+        <HeroImg webp="/bg-profile.webp" src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0, pointerEvents:'none', opacity:0.3 }} />
 <div className={slideDir ? `tab-slide-${slideDir}` : undefined} style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Sync + locale toggles (top-right) */}
           <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 1000, display: 'flex', gap: 6 }}>
@@ -405,6 +426,7 @@ export default function App() {
           <button
             key={item.id}
             data-tab={item.id}
+            data-badge={navBadges[item.id] ?? ''}
             aria-label={item.label}
             aria-current={tab === item.id ? 'page' : undefined}
             className={'nav-btn' + (tab === item.id ? ' active' : '')}

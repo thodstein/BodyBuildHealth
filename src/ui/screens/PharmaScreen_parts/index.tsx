@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { HeroImg } from '../../HeroImg';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { PharmaScoreCard } from '../../components/PharmaScoreCard';
 import { PharmaCourseScreen } from '../PharmaCourseScreen';
@@ -57,7 +58,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     const risk = linked.risk?.overallNet;
     return (
       <div className="pharma-hero" style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
-        <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
+        <HeroImg webp="/pharma-hero.webp" src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
 
         {/* header — без стекла, hero открыт */}

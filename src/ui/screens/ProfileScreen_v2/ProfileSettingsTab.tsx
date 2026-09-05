@@ -8,6 +8,7 @@ import type { UnifiedSettings } from '../../../core/types';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from './ui';
 import { isNativeApp } from '../../../core/app-platform';
 import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
+import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
 import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
 
@@ -234,6 +235,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           id="phone-apk"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <AppearanceSetupCard />
             <WidgetsSetupCard />
             <BiometrySetupCard />
             <NativeFeaturesCard />
