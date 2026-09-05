@@ -41,6 +41,14 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    LiveUpdate: {
+      // Self-hosted OTA без облаков: бандлы тянем из GitHub Releases
+      // (см. docs/NATIVE-APP.md §12). appId для self-hosted не нужен.
+      // readyTimeout + ready() в main.tsx = авто-откат на встроенный dist,
+      // если новый бандл не загрузился за 10с.
+      readyTimeout: 10000,
+      autoDeleteBundles: true,
+    },
   },
 };
 

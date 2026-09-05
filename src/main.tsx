@@ -16,7 +16,7 @@ import { processQueue } from './core/sync-queue';
 import { initEncryption } from './core/db-encryption';
 import { registerSW } from './core/service-worker';
 import { initRealtime } from './core/realtime-sync';
-import { initErrorHandler } from './core/error-handler';
+import { initErrorHandler, markBooted } from './core/error-handler';
 import { optimizeDBSpace } from './core/performance-optimizer';
 import { ensureAdmin } from './core/auth-manager';
 import './styles.css';
@@ -184,6 +184,20 @@ async function bootstrap() {
           <AppUpdateBanner />
         </>,
       );
+      // OTA live-update: WebView стартовал — гасим readyTimeout,
+      // иначе плагин откатит только что поставленный бандл.
+      try {
+        void import('./core/live-update').then((m) => m.markAppReady());
+      } catch (e) {
+        console.warn('markAppReady failed:', e);
+      }
+      // Первый рендер ушёл: дальше краши не роняют экран (только лог),
+      // иначе фоновый шум даёт вечный цикл «ошибка → перезагрузка».
+      try {
+        markBooted();
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       console.error('[bootstrap] React render failed:', e);
       showBootstrapError('Ошибка рендеринга приложения: ' + ((e as Error)?.message || e));

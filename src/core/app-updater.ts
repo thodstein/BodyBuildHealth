@@ -21,8 +21,10 @@ export interface UpdateAsset {
 export interface UpdateRelease {
   /** Версия без префикса v: "3.0.1". */
   version: string;
-  /** Прямая ссылка на .apk. */
+  /** Прямая ссылка на .apk (полное обновление). */
   apkUrl: string;
+  /** Прямая ссылка на web-bundle .zip (быстрое OTA) или null. */
+  bundleUrl: string | null;
   notes: string;
 }
 
@@ -92,6 +94,23 @@ export function pickApkAssetUrl(assets: unknown): string | null {
   return (signed ?? apks[0]).browser_download_url as string;
 }
 
+/**
+ * Выбор web-бандла (.zip с dist) из ассетов релиза для OTA.
+ * Имя канона: web-bundle-<tag>.zip (кладёт CI, см. android-apk.yml).
+ */
+export function pickBundleAssetUrl(assets: unknown): string | null {
+  if (!Array.isArray(assets)) return null;
+  const found = (assets as UpdateAsset[]).find(
+    (a) =>
+      a &&
+      typeof a.browser_download_url === 'string' &&
+      a.browser_download_url.length > 0 &&
+      /\.zip($|\?)/i.test(a.name || '') &&
+      /bundle/i.test(a.name || ''),
+  );
+  return found?.browser_download_url ?? null;
+}
+
 type FetchFn = (
   input: string,
   init?: Record<string, unknown>,
@@ -132,7 +151,7 @@ export async function fetchLatestRelease(
           : pickApkAssetUrl(json?.assets);
       if (!version || !apkUrl) return null;
       const notes = String(json?.body ?? json?.notes ?? '').slice(0, 2000);
-      return { version, apkUrl, notes };
+      return { version, apkUrl, bundleUrl: pickBundleAssetUrl(json?.assets), notes };
     } finally {
       clearTimeout(timer);
     }

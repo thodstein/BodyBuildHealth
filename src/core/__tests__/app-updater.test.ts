@@ -10,6 +10,7 @@ import {
   isNewerVersion,
   parseVersionTag,
   pickApkAssetUrl,
+  pickBundleAssetUrl,
   readUpdateState,
   shouldCheckNow,
   writeUpdateState,
@@ -72,8 +73,7 @@ describe('pickApkAssetUrl', () => {
   });
 });
 
-describe('fetchLatestRelease', () => {
-  it('5. GitHub-формат: tag + assets + body', async () => {
+describe('fetchLatestRelease', () => {  it('5. GitHub-формат: tag + assets + body', async () => {
     const stub = async () => ({
       ok: true,
       json: async () => ({
@@ -87,6 +87,7 @@ describe('fetchLatestRelease', () => {
     expect(await fetchLatestRelease(stub)).toEqual({
       version: '3.1.0',
       apkUrl: 'https://x/r.apk',
+      bundleUrl: null,
       notes: 'Фиксы',
     });
   });

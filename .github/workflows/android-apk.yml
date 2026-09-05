@@ -31,6 +31,22 @@ jobs:
       - name: Web build + Capacitor sync
         run: npm run build:native
 
+      # OTA-бандл: zip свежего dist/ (корень = index.html) для подтягивания
+      # файлов внутрь установленного APK без переустановки (LiveUpdate).
+      - name: Pack web bundle for OTA
+        run: |
+          cd dist
+          zip -qr ../web-bundle.zip . -x 'assets/*.map'
+          cd ..
+          ls -la web-bundle.zip
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: he-web-bundle
+          path: web-bundle.zip
+          if-no-files-found: error
+
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
@@ -155,6 +171,13 @@ jobs:
           name: he-release-apk
           path: ./artifacts-signed
 
+      - name: Download web bundle (OTA)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: he-web-bundle
+          path: ./artifacts-bundle
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -167,6 +190,10 @@ jobs:
           if [ -f ./artifacts-signed/app-release.apk ]; then
             FILES="$FILES ./artifacts-signed/app-release.apk"
           fi
+          if [ -f ./artifacts-bundle/web-bundle.zip ]; then
+            cp ./artifacts-bundle/web-bundle.zip "./web-bundle-$TAG.zip"
+            FILES="$FILES ./web-bundle-$TAG.zip"
+          fi
           if [ -z "$FILES" ]; then
             echo "::error::Красная сборка: ни одного APK нет — публиковать нечего, релиз не трогаем"
             exit 1
@@ -178,5 +205,5 @@ jobs:
             # shellcheck disable=SC2086
             gh release create "$TAG" $FILES \
               --title "Health Engine $TAG" \
-              --notes "APK для установки и самообновления без сторов. Ставится поверх прошлой версии (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
+              --notes "APK + web-bundle для самообновления без сторов. Приложение само предложит: быстрое обновление (файлы внутрь, без переустановки) или полный APK поверх (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
           fi

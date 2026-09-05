@@ -24,8 +24,14 @@ import {
   pollApkDownload,
   startApkDownload,
 } from '../../core/native-bridge';
+import {
+  getLiveBundleId,
+  isBundleCompatible,
+  reloadToLiveBundle,
+  stageLiveBundle,
+} from '../../core/live-update';
 
-type Phase = 'idle' | 'available' | 'downloading' | 'ready' | 'error';
+type Phase = 'idle' | 'available' | 'downloading' | 'ready' | 'staged' | 'error';
 
 function strings(en: boolean) {
   return en
@@ -33,6 +39,10 @@ function strings(en: boolean) {
         title: (v: string) => `Update ${v} available`,
         sub: 'Without Play Market — download and install in one tap',
         update: '⬇ Update',
+        fastUpdate: '⚡ Fast update (no reinstall)',
+        apkInstead: 'Full APK instead',
+        staged: 'Ready — restart the app to apply',
+        restartNow: '🔄 Restart now',
         later: 'Later',
         skip: 'Skip version',
         installing: (p: number) => `Downloading… ${Math.round(p * 100)}%`,
@@ -48,6 +58,10 @@ function strings(en: boolean) {
         title: (v: string) => `Доступно обновление ${v}`,
         sub: 'Без Play Market — скачать и поставить в один тап',
         update: '⬇ Обновить',
+        fastUpdate: '⚡ Быстрое обновление (без переустановки)',
+        apkInstead: 'Полный APK вместо',
+        staged: 'Готово — перезапустите приложение',
+        restartNow: '🔄 Перезапустить сейчас',
         later: 'Позже',
         skip: 'Пропустить версию',
         installing: (p: number) => `Скачивание… ${Math.round(p * 100)}%`,
@@ -101,6 +115,8 @@ export const AppUpdateBanner: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [blocked, setBlocked] = useState(false);
   const [failed, setFailed] = useState(false);
+  /** Быстрый путь (OTA-бандл) доступен: есть .zip + мажор совпал + ещё не стоит. */
+  const [ota, setOta] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const en =
     typeof navigator !== 'undefined' && (navigator.language || '').startsWith('en');
@@ -123,6 +139,20 @@ export const AppUpdateBanner: React.FC = () => {
         if (cancelled || !latest) return;
         if (!isNewerVersion(latest.version, installed)) return;
         if (readUpdateState().skippedVersion === latest.version) return;
+        // Быстрый путь — только при совместимом мажоре и не установленном бандле.
+        try {
+          const liveId = await getLiveBundleId();
+          if (cancelled) return;
+          if (
+            latest.bundleUrl &&
+            isBundleCompatible(latest.version, installed) &&
+            liveId !== latest.version
+          ) {
+            setOta(true);
+          }
+        } catch {
+          /* без OTA — остаётся полный APK */
+        }
         setRelease(latest);
         setPhase('available');
       } catch {
@@ -149,6 +179,7 @@ export const AppUpdateBanner: React.FC = () => {
   const startDownload = async () => {
     setFailed(false);
     setBlocked(false);
+    setOta(false);
     setPhase('downloading');
     setProgress(0);
     const id = await startApkDownload(release.apkUrl);
@@ -185,6 +216,22 @@ export const AppUpdateBanner: React.FC = () => {
     // true = системный установщик открыт, дальше ведёт Android.
   };
 
+  /** Быстрый путь: скачать web-бандл и назначить следующим (без переустановки). */
+  const startFastUpdate = async () => {
+    if (!release?.bundleUrl) return;
+    setFailed(false);
+    setPhase('downloading');
+    setProgress(0);
+    const ok = await stageLiveBundle(release.version, release.bundleUrl, setProgress);
+    if (ok) {
+      setProgress(1);
+      setPhase('staged');
+    } else {
+      setFailed(true);
+      setPhase('error');
+    }
+  };
+
   return (
     <div style={cardStyle} role="alert" aria-label="app-update">
       <div style={{ fontWeight: 800, fontSize: 15 }}>{T.title(release.version)}</div>
@@ -209,10 +256,21 @@ export const AppUpdateBanner: React.FC = () => {
         </div>
       )}
       {phase === 'available' && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button style={btnPrimary} onClick={startDownload}>
-            {T.update}
-          </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          {ota ? (
+            <button style={btnPrimary} onClick={startFastUpdate}>
+              {T.fastUpdate}
+            </button>
+          ) : (
+            <button style={btnPrimary} onClick={startDownload}>
+              {T.update}
+            </button>
+          )}
+          {ota && (
+            <button style={btnGhost} onClick={startDownload}>
+              {T.apkInstead}
+            </button>
+          )}
           <button
             style={btnGhost}
             onClick={() => {
@@ -241,6 +299,19 @@ export const AppUpdateBanner: React.FC = () => {
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <button style={btnPrimary} onClick={doInstall}>
             {T.install}
+          </button>
+        </div>
+      )}
+      {phase === 'staged' && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ opacity: 0.9, fontSize: 13 }}>{T.staged}</div>
+          <button
+            style={{ ...btnPrimary, marginTop: 8 }}
+            onClick={() => {
+              void reloadToLiveBundle();
+            }}
+          >
+            {T.restartNow}
           </button>
         </div>
       )}
