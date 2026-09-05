@@ -16,11 +16,13 @@ export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Arra
         const angle = ex.workingAngle ? `РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : '';
         const hold = ex.holdSeconds ? ` hold ${ex.holdSeconds}с` : '';
         const table = ex.isTable ? ' 🖐️' : '';
-        return `<tr><td>${esc(ex.name)}${table}</td><td>${esc(ex.muscle)}</td><td>${ex.sets}×${ex.repsRange[0]}-${ex.repsRange[1]} RIR${ex.rir}${hold}</td><td>${esc(angle)}</td><td>${esc(ex.tempoSpec || '')}</td></tr>`;
+        const comment = ex.comment ? `<div style="font-size:9px;color:#64748b">${esc(ex.comment)}</div>` : '';
+        return `<tr><td>${esc(ex.name)}${table}${comment}</td><td>${esc(ex.muscle)}</td><td>${ex.sets}×${ex.repsRange[0]}-${ex.repsRange[1]} RIR${ex.rir}${hold}</td><td>${esc(angle)}</td><td>${esc(ex.tempoSpec || '')}</td></tr>`;
       }).join('');
-      return `<h4>День ${sess.day} — ${esc(sess.sessionTag)} (${esc(sess.character)}) ${sess.tableTime ? '🖐️ стол' : ''}</h4><table border="1" cellpadding="4"><tr><th>Упражнение</th><th>Мышца</th><th>Сеты×Повт</th><th>РУ</th><th>Темп</th></tr>${exRows}</table>`;
+      const sessNote = (sess as any).note ? `<div style="font-size:10px;color:#334155;margin:2px 0">📝 ${esc((sess as any).note)}</div>` : '';
+      return `<h4>День ${sess.day} — ${esc(sess.sessionTag)} (${esc(sess.character)}) ${sess.tableTime ? '🖐️ стол' : ''}</h4>${sessNote}<table border="1" cellpadding="4"><tr><th>Упражнение</th><th>Мышца</th><th>Сеты×Повт</th><th>РУ</th><th>Темп</th></tr>${exRows}</table>`;
     }).join('<hr/>');
-    return `<h3>Неделя ${wk.week} — ${esc(wk.phase)} ${wk.deload ? '(deload)' : wk.taper ? '(taper)' : ''}</h3>${sessRows}`;
+    return `<h3>Неделя ${wk.week} — ${esc(wk.phase)} ${wk.deload ? '(deload)' : wk.taper ? '(taper)' : ''}</h3>${(wk as any).note ? `<div style="font-size:10px;color:#334155;margin:2px 0">📝 ${esc((wk as any).note)}</div>` : ''}${sessRows}`;
   }).join('<hr/>');
 
   const qrData = encodeURIComponent(`arm-plan:${plan.pattern.id}:${plan.weeks.length}w:${plan.level}`);
