@@ -3748,6 +3748,61 @@ html.app-native .native-fab:active {
   transform: scale(0.9);
 }
 
+/* Speed-dial: обёртка несёт позицию, мини-кнопки встают столбиком над FAB. */
+html.app-native .native-fab-wrap {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 18px);
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.app-native .native-fab-wrap .native-fab {
+  position: static;
+}
+
+html.app-native .native-fab-mini {
+  width: 46px;
+  height: 46px;
+  border-radius: 99px;
+  border: 1px solid rgba(140, 190, 255, 0.22);
+  cursor: pointer;
+  font-size: 21px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.92), rgba(12, 23, 40, 0.92));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: nativeFadeUp 0.22s var(--motion-spring);
+  transition: transform var(--motion-fast);
+}
+
+html.app-native .native-fab-mini:active {
+  transform: scale(0.9);
+}
+
+html.app-native .native-fab-mini:disabled {
+  opacity: 0.55;
+}
+
+/* Раскрыт: плюс поворачивается в крестик. */
+html.app-native .native-fab-wrap.open .native-fab-plus {
+  display: inline-block;
+  transform: rotate(45deg);
+}
+
+html.app-native .native-fab-plus {
+  transition: transform 0.2s ease;
+}
+
 /* 58.9 Boot/empty/toast поверх навбара. */
 html.app-native .native-boot-skeleton {
   display: grid;

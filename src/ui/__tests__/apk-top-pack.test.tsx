@@ -69,16 +69,34 @@ describe('APK TOP pack', () => {
     expect(initApkAppearance()).toBe('');
   });
 
-  it('NativeFab: рендер, hidden, клик ведёт в дневник', () => {
+  it('NativeFab speed-dial: тап раскрывает, тренинг ведёт в дневник', () => {
     let called = 0;
     const { container, rerender } = render(<NativeFab onQuickLog={() => { called += 1; }} />);
     const btn = container.querySelector('.native-fab');
     expect(btn, 'fab').not.toBeNull();
-    expect(btn?.getAttribute('aria-label')).toContain('Быстрая запись');
+    expect(btn?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('.native-fab-mini'), 'collapsed').toBeNull();
     fireEvent.click(btn!);
+    expect(btn?.getAttribute('aria-expanded')).toBe('true');
+    const minis = container.querySelectorAll('.native-fab-mini');
+    expect(minis.length).toBe(2);
+    fireEvent.click(minis[1]);
     expect(called).toBe(1);
+    expect(container.querySelector('.native-fab-mini'), 'collapsed after').toBeNull();
     rerender(<NativeFab hidden onQuickLog={() => { called += 1; }} />);
-    expect(container.querySelector('.native-fab'), 'hidden').toBeNull();
+    expect(container.querySelector('.native-fab-wrap'), 'hidden').toBeNull();
+  });
+
+  it('NativeFab: вода +250 уходит в очередь виджета', async () => {
+    const { container } = render(<NativeFab />);
+    fireEvent.click(container.querySelector('.native-fab')!);
+    const minis = container.querySelectorAll('.native-fab-mini');
+    fireEvent.click(minis[0]);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const raw = localStorage.getItem('he_widget_fallback_queue') || '[]';
+    const q = JSON.parse(raw) as { type?: string; ml?: number }[];
+    expect(q.some((e) => e.type === 'water' && e.ml === 250), 'water queued').toBe(true);
   });
 
   it('CSS-изоляция: каждый селектор native-слоёв — только html.app-native', () => {

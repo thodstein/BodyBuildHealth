@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { haptics } from '../../core/native-bridge';
+import { haptics, initNativeChrome } from '../../core/native-bridge';
 import {
   getApkTheme,
   setApkTheme,
@@ -42,6 +42,15 @@ export const AppearanceSetupCard: React.FC = () => {
     setTheme(t);
     try {
       setApkTheme(t);
+    } catch {
+      /* ignore */
+    }
+    // Статус-бар следует за темой (флагманская деталь): светлая — тёмные
+    // иконки на бумаге, тёмные — наоборот. Вне APK — no-op внутри моста.
+    try {
+      if (t === 'light') void initNativeChrome('#eef2f6', 'light');
+      else if (t === 'amoled') void initNativeChrome('#000000', 'dark');
+      else void initNativeChrome('#050b16', 'dark');
     } catch {
       /* ignore */
     }

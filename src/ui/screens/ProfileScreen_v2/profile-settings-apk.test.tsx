@@ -19,6 +19,7 @@ vi.mock('../../../core/native-bridge', () => ({
 }));
 
 import { resetAppPlatformCache } from '../../../core/app-platform';
+import { initNativeChrome } from '../../../core/native-bridge';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 
 describe('ProfileSettingsTab §4.4 (APK)', () => {
@@ -71,6 +72,10 @@ describe('ProfileSettingsTab §4.4 (APK)', () => {
     expect(localStorage.getItem('he_apk_theme_v1')).toBe('amoled');
     fireEvent.click(getByRole('radio', { name: /Светлая/ }));
     expect(localStorage.getItem('he_apk_theme_v1')).toBe('light');
+    // Статус-бар следует за темой: светлой — бумага + тёмные иконки.
+    expect(initNativeChrome as unknown as { mock: { calls: unknown[][] } }).not.toBeNull();
+    const calls = (initNativeChrome as unknown as { mock: { calls: [string, string][] } }).mock.calls;
+    expect(calls[calls.length - 1]).toEqual(['#eef2f6', 'light']);
     fireEvent.click(getByRole('radio', { name: /Тёмная/ }));
     expect(localStorage.getItem('he_apk_theme_v1')).toBeNull();
   });
