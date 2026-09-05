@@ -22,6 +22,9 @@ import { resetAppPlatformCache } from '../../../core/app-platform';
 import { initNativeChrome } from '../../../core/native-bridge';
 import { setLocale } from '../../../data/interactions-labels';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
+import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
+import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
+import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 
 describe('ProfileSettingsTab §4.4 (APK)', () => {
@@ -90,6 +93,26 @@ describe('ProfileSettingsTab §4.4 (APK)', () => {
       expect(getByRole('radiogroup', { name: 'Theme' })).not.toBeNull();
       expect(getByRole('radio', { name: /Dark/ })).not.toBeNull();
       expect(getByRole('radio', { name: /System/ })).not.toBeNull();
+    } finally {
+      setLocale('ru');
+    }
+  });
+
+  it('APK: карточки §4.4 по-английски при EN-локали', () => {
+    setLocale('en');
+    try {
+      const w = render(<WidgetsSetupCard />);
+      expect(w.getByText('Home screen widgets')).not.toBeNull();
+      expect(w.getByText('How to add manually')).not.toBeNull();
+      w.unmount();
+      const b = render(<BiometrySetupCard />);
+      // enable недоступен в jsdom без WebAuthn — видна подсказка как включить.
+      expect(b.getByText('Biometrics')).not.toBeNull();
+      b.unmount();
+      const f = render(<NativeFeaturesCard />);
+      expect(f.getByText('APK features')).not.toBeNull();
+      expect(f.getAllByText('Check').length).toBe(3);
+      f.unmount();
     } finally {
       setLocale('ru');
     }
