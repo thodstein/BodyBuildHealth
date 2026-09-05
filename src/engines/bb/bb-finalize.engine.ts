@@ -1,7 +1,24 @@
 import type { BBPlan } from './bb-builder.engine';
-import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
+import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
-import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
+import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap } from './bb-volume.engine';
+
+/**
+ * Indirect-вклад упражнения в мышцу с паритетом aggregateBBVolume
+ * (exerciseVolumeContributions): self-indirect (французский жим → трицепс,
+ * узкий жим на трицепс) НЕ считается — мышца уже получила direct за эти сеты.
+ * Без этого капы режут глубже, чем меряет валидатор (фантомный overflow),
+ * а топ-апы блокируются фантомным eff.
+ */
+function indirectToMuscle(ex: any, muscle: string): number {
+  let v = 0;
+  for (const c of indirectMuscleContributions(ex)) {
+    if (c.muscle !== muscle) continue;
+    if (normalizeBBMuscle(c.muscle) === normalizeBBMuscle((ex as any).muscle)) continue;
+    v += (ex.sets || 0) * c.coefficient;
+  }
+  return v;
+}
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -18,7 +35,7 @@ import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyL
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { expandDonorMuscles, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
+import { expandDonorMuscles, isSpecializationFocus, isSpecializationWeak, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
 import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
@@ -1324,6 +1341,28 @@ function findCatalogCandidate(muscle: string, pattern: RegExp, options: BBFinali
   });
 }
 
+/**
+ * Guard хардкодных PPL-добавок (bb-safety): штанга/трос/осевая в плане с
+ * ограничениями (equipment=['machine'], avoidAxialLoad) — нарушение, которое
+ * ловит валидатор. Без ограничений всегда true (дефолтные планы не меняются).
+ * Неизвестное имя при ограничениях → false (валидатор всё равно зафлагает).
+ */
+function pplPushAllowed(options: BBFinalizeOptions, ...names: string[]): boolean {
+  if (!options.equipment?.length && !options.avoidAxialLoad) return true;
+  for (const name of names) {
+    // Тот же резолв, что у валидатора (паритет: гард блокирует ровно то,
+    // что валидатор зафлагает — короткие имена резолвятся через алиасы).
+    const cat = resolveExerciseCatalogEntry(name);
+    if (!cat) return false;
+    if (options.avoidAxialLoad && isAxialLoadExercise(cat as any)) return false;
+    if (options.equipment?.length) {
+      const eq = Array.isArray((cat as any).equipment) ? (cat as any).equipment : [String((cat as any).equipment || '')];
+      if (eq.length && !eq.includes('bodyweight') && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+    }
+  }
+  return true;
+}
+
 function ensurePPLTraps(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
@@ -1357,6 +1396,8 @@ function ensurePPLTraps(session: any, week: any, options: BBFinalizeOptions) {
       candName = 'Шраги со штангой';
       if (working.some((e: any) => e.name === candName)) candName = 'Шраги с гантелями';
       if (working.some((e: any) => e.name === candName)) return;
+      // bb-safety: хардкод-фолбэк мимо каталога — проверяем оборудование/осевую.
+      if (!pplPushAllowed(options, candName)) return;
     }
     const w = (options.workMax && options.workMax.traps) || 60;
     session.exercises.push({
@@ -1382,6 +1423,8 @@ function ensurePPLRearDelts(session: any, week: any, options: BBFinalizeOptions)
   if (rear.length === 0) {
     const heavy = { name: 'Тяга к лицу (face pull)', id: 'face_pull' };
     const fly = { name: 'Махи в наклоне на заднюю дельту', id: 'rear_delt_fly' };
+    // bb-safety: хардкод трос/гантели — не добавляем при ограничениях.
+    if (!pplPushAllowed(options, heavy.name, fly.name)) return;
     const w = (options.workMax && options.workMax.shoulders) || 40;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
@@ -1416,6 +1459,7 @@ function ensurePPLRearDelts(session: any, week: any, options: BBFinalizeOptions)
     }
     const w = (options.workMax && options.workMax.shoulders) || 40;
     const fbName = existing.name === 'Махи в наклоне на заднюю дельту' ? 'Тяга к лицу (face pull)' : 'Махи в наклоне на заднюю дельту';
+    if (!pplPushAllowed(options, fbName)) return;
     if (!working.some((e: any) => e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'shoulders', name: fbName, exerciseName: fbName, role: 'accessory', character: 'памп',
@@ -1452,6 +1496,8 @@ function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
   const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'biceps');
   const w = (options.workMax && options.workMax.biceps) || 40;
   if (working.length === 0) {
+    // bb-safety: трос/штанга — не добавляем при ограничениях.
+    if (!pplPushAllowed(options, 'Сгибание рук на блоке (бицепс)', 'Подъём штанги на бицепс стоя')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'biceps', name: 'Сгибание рук на блоке (бицепс)', exerciseName: 'Сгибание рук на блоке (бицепс)', role: 'accessory', character: 'памп',
@@ -1480,6 +1526,7 @@ function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
     }
     const pumpExists = working.some((e: any) => /блок|cable/i.test(e.name));
     const fbName = pumpExists ? 'Подъём штанги на бицепс стоя' : 'Сгибание рук на блоке (бицепс)';
+    if (!pplPushAllowed(options, fbName)) return;
     if (!session.exercises.some((e: any) => e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'biceps', name: fbName, exerciseName: fbName, role: 'accessory', character: pumpExists ? 'тяж' : 'памп',
@@ -1516,6 +1563,8 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
   const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'triceps');
   const w = (options.workMax && options.workMax.triceps) || 50;
   if (working.length === 0) {
+    // bb-safety: EZ-штанга/трос — не добавляем при ограничениях.
+    if (!pplPushAllowed(options, 'Французский жим лёжа (EZ-гриф)', 'Разгибание рук на блоке (канат)')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'triceps', name: 'Французский жим лёжа (EZ-гриф)', exerciseName: 'Французский жим лёжа (EZ-гриф)', role: 'accessory', character: 'тяж',
@@ -1535,7 +1584,8 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
     return;
   }
   const hasOverhead = working.some((e: any) => /из.?за.*голов|overhead|француз|french/i.test(e.name || ''));
-  if (!hasOverhead && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+  if (!hasOverhead && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+    && pplPushAllowed(options, 'Французский жим лёжа (EZ-гриф)')) {
     session.exercises.push({
       muscle: 'triceps', name: 'Французский жим лёжа (EZ-гриф)', exerciseName: 'Французский жим лёжа (EZ-гриф)', role: 'accessory', character: 'тяж',
       sets: 4, repsRange: [8, 12], rir: 2, restSeconds: 90, warmupSets: [],
@@ -1544,7 +1594,8 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
     });
   }
   const hasPump = working.some((e: any) => /блок|pushdown|канат/i.test(e.name || ''));
-  if (!hasPump && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+  if (!hasPump && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+    && pplPushAllowed(options, 'Разгибание рук на блоке (канат)')) {
     session.exercises.push({
       muscle: 'triceps', name: 'Разгибание рук на блоке (канат)', exerciseName: 'Разгибание рук на блоке (канат)', role: 'accessory', character: 'памп',
       sets: 4, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1620,6 +1671,8 @@ function ensurePPLChest(session: any, week: any, options: BBFinalizeOptions) {
   const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'chest');
   const hasIncline = working.some((e: any) => /наклон|incline/i.test(e.name || ''));
   if (!hasIncline) {
+    // bb-safety: штанга — не добавляем при ограничениях оборудования/осевой.
+    if (!pplPushAllowed(options, 'Жим штанги на наклонной (30°)')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
       // hardcoded fallback ensures spec even if catalog filtered
@@ -1633,6 +1686,7 @@ function ensurePPLChest(session: any, week: any, options: BBFinalizeOptions) {
   }
   const hasHorizontal = session.exercises.filter((e: any) => e.muscle === 'chest' && !e.warmupActivator).some((e: any) => /жим.*(лёжа|лежа|гориз)|bench.*press/i.test(e.name || '') && !/наклон|incline/i.test(e.name || ''));
   if (!hasHorizontal) {
+    if (!pplPushAllowed(options, 'Жим штанги лёжа')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
       session.exercises.push({
@@ -1645,6 +1699,7 @@ function ensurePPLChest(session: any, week: any, options: BBFinalizeOptions) {
   }
   const flyCount = session.exercises.filter((e: any) => e.muscle === 'chest' && !e.warmupActivator && /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(e.name || '')).length;
   if (flyCount < 1) {
+    if (!pplPushAllowed(options, 'Сведение в кроссовере (сверху)')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
       session.exercises.push({
@@ -1663,7 +1718,9 @@ function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
   if (donors.has('back')) return;
   if ((options.excludedMuscles || []).includes('back')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
-  if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
+  // Переименование рабочих пулловеров — ДО maxEx-gate (объём не меняет,
+  // только паттерн; иначе переполненная сессия пропускает rename и тест
+  // wide/parallel падает при полном дне).
   const workingPullovers = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'back' && /пулловер|pullover|прям.*рук/i.test(e.name || ''));
   if (workingPullovers.length > 0) {
     for (const ex of workingPullovers) {
@@ -1671,7 +1728,10 @@ function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
       ex.rationale = 'PPL Pull: пулловер только разминка, заменён на тягу';
     }
   }
+  if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   if (!session.exercises.some((e: any) => e.warmupActivator)) {
+    // bb-safety: трос-разминка — не добавляем при ограничениях оборудования.
+    if (!pplPushAllowed(options, 'Пуловер на блоке с верёвкой')) return;
     const w = (options.workMax && options.workMax.back) || 60;
     session.exercises.unshift({
       muscle: 'back', name: 'Пуловер на блоке с верёвкой', exerciseName: 'Пуловер на блоке с верёвкой', role: 'accessory', character: 'памп',
@@ -1685,7 +1745,8 @@ function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
     const target = session.exercises.find((e: any) => e.muscle === 'back' && !e.warmupActivator);
     if (target) {
       target.name = 'Тяга верхнего блока широким хватом'; target.exerciseName = 'Тяга верхнего блока широким хватом'; target.rationale = 'PPL Pull: широкий/параллельный хват обязателен';
-    } else if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    } else if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Тяга верхнего блока широким хватом')) {
       // hardcoded fallback ensures spec even if catalog filtered / no back exercise at all
       const w = (options.workMax && options.workMax.back) || 60;
       session.exercises.push({
@@ -1712,7 +1773,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
   }
   if (heavyQuads) {
     const wHam = (options.workMax && options.workMax.hamstrings) || 60;
-    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /румын|rdl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /румын|rdl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Румынская тяга')) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Румынская тяга', exerciseName: 'Румынская тяга', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 75, warmupSets: [],
@@ -1757,7 +1819,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
         rationale: 'PPL Legs (хам-день): квадры разгибания лёгкие',
       });
     }
-    if (session.exercises.filter((e: any) => e.muscle === 'quads' && !e.warmupActivator).length < 3 && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (session.exercises.filter((e: any) => e.muscle === 'quads' && !e.warmupActivator).length < 3 && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Выпады с гантелями')) {
       session.exercises.push({
         muscle: 'quads', name: 'Выпады с гантелями', exerciseName: 'Выпады с гантелями', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1769,9 +1832,12 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
       ex.character = 'памп'; ex.rir = 3;
     }
     const hasWell = session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).some((e: any) => /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name || ''));
-    if (!hasWell && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    // rotationMode 'forbid': primary-состав frozen между неделями (bb-rotation-mode) —
+    // базу-колодец не добавляем (иначе w2+ отличаются от w1).
+    if (!hasWell && (options as any).rotationMode !== 'forbid' && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Гакк-присед на бицепс бедра (стопы высоко)')) {
       const wHam = (options.workMax && options.workMax.hamstrings) || 60;
-      session.exercises.unshift({
+      session.exercises.push({
         muscle: 'hamstrings', name: 'Гакк-присед на бицепс бедра (стопы высоко)', exerciseName: 'Гакк-присед на бицепс бедра (стопы высоко)', role: 'primary', character: 'тяж',
         sets: 4, repsRange: [6, 10], rir: 2, restSeconds: 120, warmupSets: [],
         workSets: Array.from({ length: 4 }, () => ({ reps: 8, rir: 2, weight: Math.round(wHam * 0.65 * 10) / 10, restSeconds: 120 })),
@@ -1910,7 +1976,11 @@ const WARMUP_LEAD: Record<string, string> = {
 function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   const backSessionCount = week.sessions.filter((session: any) => session.exercises.some((e: any) => e.muscle === 'back')).length;
-  const keptProfiles = new Set<string>();
+  // Профиль можно повторить до 2×/нед (PPL: wide и в тяж-, и в памп-Pull —
+  // bb-ppl-invariant требует широкий/параллельный в КАЖДОМ Pull); 3-й повтор
+  // (FullBody 3× одинаковые подтягивания) заменяется. Внутри сессии дубли
+  // режет sessionHasKeptVertical + финальный end-guard (≤1 vertical/сессия).
+  const keptProfiles = new Map<string, number>();
   let verticalSessionsSeen = 0;
   const sessions = [...week.sessions].sort((a: any, b: any) => a.day - b.day);
   for (const session of sessions) {
@@ -1920,37 +1990,45 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       const tagged = annotateBackExercise(exercise);
       if (tagged.movementPattern !== 'vertical_pull') continue;
       const profile = verticalPullProfile(exercise.name) || 'cable_vertical';
-      // Один профиль — максимум одна сессия. Вторая встреча того же профиля
-      // (pullup в 2-й и 3-й FullBody-сессиях) заменяется на другой профиль
-      // или row/lat работу, чтобы специализация не превращалась в ежедневные
-      // одинаковые подтягивания.
-      const shouldKeep = !sessionHasKeptVertical && !keptProfiles.has(profile);
+      // Один профиль — максимум две сессии (см. выше).
+      const shouldKeep = !sessionHasKeptVertical && (keptProfiles.get(profile) || 0) < 2;
       if (shouldKeep) {
         sessionHasKeptVertical = true;
-        keptProfiles.add(profile);
+        keptProfiles.set(profile, (keptProfiles.get(profile) || 0) + 1);
         verticalSessionsSeen += 1;
         continue;
       }
       // Сначала ищем другой вертикальный профиль (wide ↔ hammer/neutral ↔
       // underhand). Хорошая вертикальная тяга не должна исчезать только
-      // потому, что она вертикальная.
+      // потому, что она вертикальная. НО: второй вертикал в ТОЙ ЖЕ сессии
+      // сразу идёт в row-паттерн (bb-back-quality: ≤1 vertical_pull на Pull;
+      // ширина/толщина балансируются между сессиями, не внутри одной).
       const capAllowed = (candidate: any) => {
         if (!/подтяг|pull.?up|chin/i.test(candidate.name || '')) return true;
         const cap = options.bodyweightCapability;
         return !!(cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0));
       };
-      const replacement = EXERCISE_CATALOG.find((candidate: any) => {
+      // bb-safety: замена тоже уважает оборудование (иначе чиним вертикаль барбеллом в machine-only).
+      const eqAllowed = (candidate: any) => {
+        if (!options.equipment?.length) return true;
+        const eq = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
+        return !eq.length || eq.includes('bodyweight') || eq.some((e: string) => options.equipment!.includes(e));
+      };
+      const verticalAlt = sessionHasKeptVertical ? undefined : EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
         if (!capAllowed(candidate)) return false;
+        if (!eqAllowed(candidate)) return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
         if (next.movementPattern !== 'vertical_pull') return false;
         const candidateProfile = verticalPullProfile(candidate.name);
-        return candidateProfile !== null && candidateProfile !== profile && !keptProfiles.has(candidateProfile);
-      }) || EXERCISE_CATALOG.find((candidate: any) => {
+        return candidateProfile !== null && candidateProfile !== profile && (keptProfiles.get(candidateProfile) || 0) < 2;
+      });
+      const replacement = verticalAlt || EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
         if (!capAllowed(candidate)) return false;
+        if (!eqAllowed(candidate)) return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
@@ -1964,7 +2042,7 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       exercise.backSubgroup = next.backSubgroup;
       exercise.rationale = `${exercise.rationale || ''} Адаптация частоты: избыток vertical pull заменён на ${next.movementPattern}.`;
       const replacedProfile = verticalPullProfile(replacement.name);
-      if (replacedProfile) keptProfiles.add(replacedProfile);
+      if (replacedProfile) keptProfiles.set(replacedProfile, (keptProfiles.get(replacedProfile) || 0) + 1);
     }
   }
 }
@@ -2005,6 +2083,11 @@ export interface BBFinalizeOptions {
    *  (RIR 0-1, спец-частота, икры). Без него — старый режим: priorityMuscles
    *  на весь план. */
   specializationSchedule?: SpecializationSchedule;
+  /** Явное расписание блоков (пользователь передал specializationSchedule):
+   *  MEV-repair для поддерживающих мышц активных недель целится в MEV, а не
+   *  в план-таргет — симметрия с builder spec-trim (иначе repair отращивает
+   *  supporting обратно и блоки не различаются). Без флага — старый режим. */
+  specExplicitSchedule?: boolean;
   level?: string;
   volumeGoal?: 'mev' | 'mav' | 'mrv';
   phaseSafety?: boolean;
@@ -2047,6 +2130,8 @@ export interface BBFinalizeOptions {
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** Режим ротации (forbid = primary frozen между неделями). */
+  rotationMode?: 'forbid' | 'strict' | 'variety';
 }
 
 /** Специализация (методики Библиотеки): RIR-профиль (изоляции целевой мышцы
@@ -2182,22 +2267,19 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
  *  и никогда не удаляются (не вытесняют обязательную работу). */
 function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): void {
   const iso = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
-  const isPPL = isPPLPattern(options, plan);
-  // PPL-aware: intermediate PPL needs 12 exercises (rear 2× + biceps 2× + back + traps = 12),
-  // centralizedSessionLimits already returns 32/12 for PPL intermediate.
+  // Лимит упражнений — строго из централизованного источника (PPL-aware: 11
+  // для натуралов). Локальный флор 12 противоречил валидатору (кап 10→11) и
+  // пропускал 11-упражнениевые сессии — убран.
   let maxEx: number;
   if (options.maxExercises != null) {
     maxEx = options.maxExercises;
-    if (isPPL && maxEx < 12) maxEx = 12;
   } else {
     try {
       const lim = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined);
       maxEx = lim.maxExercises;
     } catch {
-      const computed = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
-      maxEx = isPPL ? Math.max(computed, 12) : computed;
+      maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
     }
-    if (isPPL && maxEx < 12) maxEx = 12;
   }
   for (const week of plan.weeks) {
     const weekNum = (week as any).week ?? (plan.weeks.indexOf(week) + 1);
@@ -2342,7 +2424,12 @@ export function markPreExhaustPairs(plan: BBPlan): void {
       const iso = working.find(e => e !== compound && e.muscle === muscle && !isCompoundEx(e) && working.indexOf(e) < working.indexOf(compound) && !e.supersetWith);
       if (!iso) continue;
       // Пред-истощение: изоляция идёт ПЕРВОЙ, компаунд сразу за ней (rest=0 на изоляции).
+      // Маркер '⚡ Пред-истощение: без отдыха →' — контракт тестов/UI (f06c841b7);
+      // pairSupersetStructure пишет только '🔗 Суперсет' (F2.8), маркер добавляем.
       pairSupersetStructure(iso, compound, week.week * 100 + (session.weekOffset || 0) * 10 + 40, 'пред-истощение');
+      if (!String((iso as any).comment || '').includes('Пред-истощение')) {
+        (iso as any).comment = `${(iso as any).comment || ''} · ⚡ Пред-истощение: без отдыха → «${compound.name}»`.replace(/^\s*·\s*/, '');
+      }
     }
   }
 }
@@ -2437,6 +2524,15 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
           const oldIsolation = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
           const newTotal = (weekDirect[muscle] || 0) - oldIsolation + cfg.target;
           if (newTotal > cap) continue; // не влезает в MRV — схему не применяем
+          // Учитываем indirect (жимы/тяги): схема не должна выталкивать
+          // EFFECTIVE за кап — иначе cap-adjust всё равно срежет, а инвариант
+          // ovf упадёт (delt_rear/GVT-кейс). Пропуск терпим тестами.
+          let weekIndirect = 0;
+          for (const s of week.sessions) for (const e of s.exercises) {
+            if ((e as any).warmupActivator) continue;
+            weekIndirect += indirectToMuscle(e, muscle);
+          }
+          if (newTotal + weekIndirect > cap * 1.15) continue;
         }
         schemeApplied.add(muscle);
         let remaining = cfg.target;
@@ -3060,7 +3156,17 @@ for (const week of next.weeks) {
           if (mrvCap && weekDirect >= mrvCap * 0.8) continue;
           // Цель: target-объём плана (MAV/MAV×1.05 и т.д.), не только MEV.
           const targetSets = plan.volumeTargets?.[e.muscle]?.targetSets;
-          const goal = targetSets && targetSets > lm.mev ? targetSets : lm.mev;
+          let goal = targetSets && targetSets > lm.mev ? targetSets : lm.mev;
+          // Spec-trim симметрия (только явное расписание, активная неделя без
+          // tradeoff, мышца не цель/фокус): билдер капнул supporting
+          // rotation-таргетом (== MEV) — repair целится в MEV, а не в
+          // план-таргет, иначе сессии < plan-split отрастают до 5 сетов и
+          // блоки не различаются. Enhanced-back стандарт ниже не тронут.
+          if ((options as any).specExplicitSchedule && options.specializationSchedule) {
+            const wNo = (week as any)?.week ?? 0;
+            const wres = specResForWeekSchedule(options.specializationSchedule, wNo);
+            if (wres.active && !tradeoffForWeek(options.specializationSchedule, wNo) && !isSpecializationWeak(e.muscle, wres) && !isSpecializationFocus(e.muscle, wres)) goal = lm.mev;
+          }
           let perSessionGoal = Math.max(2, Math.ceil(goal / f));
           // Back для enhanced 3+: allocation-стандарт на сессию (18/22),
           // а не недельный target ÷ сессии (32/2=16) — иначе день недобирает.
@@ -3387,19 +3493,47 @@ for (const week of next.weeks) {
   }
   // Финальная страховка лимита сессии (после всех проходов): ни одна сессия
   // не превышает maxWorkingSets (вторичные accessory сеты срезаются, мин. 2).
-  // PPL: тяжёлый Pull 41 сет (спина 12 + задняя 6 + трапы 5 + бицепс 10 + предплечья), лифт до 42/46.
+  // PPL-лифт 42/46 убран: централизованный лимит уже PPL-aware (30/11 натурал,
+  // 40-60 enhanced) — явный options.maxWorkingSets приоритетнее, иначе центр.
   // Optional-добивки («при наличии сил») в кап не входят.
-  const finMaxSets = isPPLPattern(options, next) ? Math.max(options.maxWorkingSets ?? 24, options.level === 'enhanced' ? 46 : 42) : (options.maxWorkingSets ?? 24);
+  const finMaxSets = options.maxWorkingSets ?? (() => {
+    try {
+      return centralizedSessionLimits(
+        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
+      ).maxWorkingSets;
+    } catch { return 24; }
+  })();
   for (const week of next.weeks) {
     for (const session of week.sessions) {
       const workingEx = session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
       let total = workingEx.reduce((a: number, e: any) => a + (e.sets || 0), 0);
       if (total <= finMaxSets) continue;
-      for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2)) {
-        while (total > finMaxSets && e.sets > 2) {
+      // PPL-минимумы сессии (bb-ppl-invariant) — трим их не трогает, режем
+      // только сверх минимумов (вторые жимы/тяги, лишние дельты/предплечья).
+      const tag = session.sessionTag || '';
+      const sessTotals: Record<string, number> = {};
+      for (const x of workingEx) sessTotals[x.muscle] = (sessTotals[x.muscle] || 0) + (x.sets || 0);
+      const sessMin: Record<string, number> = /Pull|Back/i.test(tag)
+        ? { traps: 5, biceps: 8, delt_rear: 5, shoulders: 5 }
+        : /Push|Chest/i.test(tag) ? { triceps: 10 }
+        : /Legs|Lower/i.test(tag) ? { calves: 9 } : {};
+      const isProtected = (x: any): boolean => {
+        const m = x.muscle as string;
+        if (/Legs|Lower/i.test(tag) && m === 'calves' && /стоя|standing|сидя|seated|жим.*ног|leg.?press|ослик/i.test(x.name || '')) {
+          return (x.sets || 0) <= (/стоя|standing|жим.*ног|leg.?press|ослик/i.test(x.name || '') ? 5 : 4);
+        }
+        if (m === 'traps' && /шраг|shrug/i.test(x.name || '')) return (x.sets || 0) <= 5;
+        const floor = sessMin[m];
+        if (floor == null) return false;
+        return (sessTotals[m] || 0) <= floor;
+      };
+      for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2 && !isProtected(x))) {
+        while (total > finMaxSets && e.sets > 2 && !isProtected(e)) {
           e.sets -= 1;
           if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
           total -= 1;
+          sessTotals[e.muscle] = (sessTotals[e.muscle] || 0) - 1;
         }
         if (total <= finMaxSets) break;
       }
@@ -3432,7 +3566,11 @@ for (const week of next.weeks) {
     // Post-hoc cap-adjust для ВСЕХ мышц: фактический effective = direct +
     // indirect от compound может превысить адаптированный MRV (GVT-изоляции
     // + жимы/тяги/приседы). Раньше — только triceps/shoulders/biceps.
-    const CAP_MUSCLES = ['triceps', 'shoulders', 'biceps', 'quads', 'hamstrings', 'glutes', 'chest', 'back', 'calves', 'forearms', 'traps', 'abs', 'delt_front', 'delt_mid', 'delt_rear'] as const;
+    // ПОРЯДОК: сначала большие/compound-мышцы (quads/chest/back), руки —
+    // последними. Резка больших снижает ИХ direct и ЧУЖОЙ indirect (тяги→
+    // бицепс, жимы→трицепс), освобождая место под PPL-флоры рук; иначе руки
+    // режутся первыми по завышенному indirect, а флор потом не влезает.
+    const CAP_MUSCLES = ['quads', 'hamstrings', 'glutes', 'chest', 'back', 'shoulders', 'calves', 'forearms', 'traps', 'abs', 'delt_front', 'delt_mid', 'delt_rear', 'triceps', 'biceps'] as const;
     const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
     for (const week of next.weeks) {
       const w: any = week;
@@ -3447,18 +3585,33 @@ for (const week of next.weeks) {
         let indirectTotal = 0;
         for (const s of week.sessions) for (const e of s.exercises) {
           if ((e as any).warmupActivator) continue;
-          for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirectTotal += (e.sets || 0) * c.coefficient;
+          indirectTotal += indirectToMuscle(e, muscle);
         }
         const directTotal = volume[muscle]?.directSets || 0;
+        // PPL-флор: нижняя граница резки (не только гейт входа). Новичкам флор
+        // MEV-масштаба; остальным — низ пользовательских требований
+        // (bb-ppl-invariant: biceps 8/Pull, triceps 8/Push, shrug 5, calves 9).
+        let pplFloor: number | null = null;
         if (isPPLPattern(options, next)) {
           const pullCnt = (week as any).sessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1;
           const pushCnt = (week as any).sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1;
           const legsCnt = (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1;
-          const pplMin: Record<string, number> = { traps: 5 * pullCnt, biceps: 10 * pullCnt, triceps: 10 * pushCnt, calves: 9 * legsCnt, shoulders: 6 * pullCnt, delt_rear: 6 * pullCnt, delt_mid: 3 * pushCnt } as any;
+          const isBeg = options.level === 'beginner';
+          const pplMin: Record<string, number> = isBeg
+            ? { traps: 3 * pullCnt, biceps: 4 * pullCnt, triceps: 4 * pushCnt, calves: 5 * legsCnt, shoulders: 3 * pullCnt, delt_rear: 3 * pullCnt, delt_mid: 2 * pushCnt } as any
+            : { traps: 5 * pullCnt, biceps: 8 * pullCnt, triceps: 8 * pushCnt, calves: 9 * legsCnt, shoulders: 6 * pullCnt, delt_rear: 5 * pullCnt, delt_mid: 3 * pushCnt } as any;
           const minWeekly2 = (pplMin as any)[muscle];
-          if (minWeekly2 != null && directTotal <= minWeekly2) continue;
+          // Флор ограничен сверху капом: собственный избыток выше MRV режется
+          // (иначе флор цементирует overflow), жертва чужого indirect — защищена.
+          if (minWeekly2 != null && directTotal <= Math.min(minWeekly2, cap)) continue;
+          if (minWeekly2 != null) pplFloor = Math.min(minWeekly2, cap);
         }
-        const targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
+        let targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
+        // Ниже флора не режем — но только если сам флор влезает в cap×1.15
+        // с учётом indirect (иначе флор противоречит MRV и уступает: новичок).
+        if (pplFloor != null && pplFloor + indirectTotal <= cap * 1.15) {
+          targetDirect = Math.max(targetDirect, pplFloor);
+        }
         let need = Math.max(0, directTotal - targetDirect);
         if (need <= 0) continue;
         // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
@@ -3507,10 +3660,18 @@ for (const week of next.weeks) {
           for (const s of week.sessions) for (const e of s.exercises) {
             if ((e as any).warmupActivator) continue;
             if (e.muscle === muscle) direct2 += e.sets || 0;
-            for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirect2 += (e.sets || 0) * c.coefficient;
+            indirect2 += indirectToMuscle(e, muscle);
           }
           const eff2 = direct2 + indirect2;
-          if (eff2 <= cap * 1.15) break;
+          // Резерв под восстановление PPL-минимумов топ-апом: если direct ниже
+          // флора и флор влезает в кап — режем compounds, пока не влезет флор
+          // целиком (иначе топ-ап упрётся в MRV и минимум не восстановится).
+          // Без флора/дона — старый порог cap×1.15.
+          let effTarget = cap * 1.15;
+          if (pplFloor != null && direct2 < Math.min(pplFloor, cap) && pplFloor + indirect2 <= cap * 1.15 + 2) {
+            effTarget = cap * 1.15 - (Math.min(pplFloor, cap) - direct2);
+          }
+          if (eff2 <= effTarget) break;
           const target2 = Math.max(0, Math.floor(cap - indirect2));
           const need2 = Math.max(0, direct2 - target2);
           if (need2 <= 0) break;
@@ -3526,20 +3687,158 @@ for (const week of next.weeks) {
 
   }
 
-  // Глобальный инвариант: 0 упражнений >5 сетов (Раунд 4). Аддитивные проходы
-  // (arm-guarantee/MEV-repair/добивки) могут сложить 6–8 сетов в одно упражнение
-  // в обход per-pass клампов, а объёмные схемы второй сессии той же мышцы
-  // (schemeApplied) такие упражнения пропускают. Режем только превышение,
-  // workSets синхронизируем; GVT 5+5 и остальное распределение не страдает.
+  // PPL-гарантия по-сессионных минимумов (bb-ppl-invariant): cap-adjust и
+  // тримы могут срезать руки ниже пользовательских минимумов (Pull biceps
+  // <8, Push triceps <10). Добиваем smallest-упражнение мышцы +1 сет (в
+  // пределах per-exercise капа и лимита сессии). Только intermediate+:
+  // новичок держит MEV-масштаб. Структуру (упражнения/пары) не меняем.
+  if (!options.preserveSource && (next as any).pattern?.id && options.level !== 'beginner' && isPPLPattern(options, next)) {
+    let sessCap = 30;
+    try {
+      sessCap = centralizedSessionLimits(
+        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
+      ).maxWorkingSets;
+    } catch { sessCap = 30; }
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) {
+        const tag = s.sessionTag || '';
+        const need = /Pull|Back/i.test(tag)
+          ? { muscle: 'biceps', min: 8 }
+          : /Push|Chest/i.test(tag) ? { muscle: 'triceps', min: 8 } : null;
+        if (!need) continue;
+        const items = s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle);
+        if (!items.length) continue;
+        // Добиваем до минимума циклом (распределение резки неровное: 7+9 → 8+8).
+        // Два пути: plain +1 (влезает в MRV и кап сессии) или БАЛАНС — перенос
+        // 1 сета из sibling-сессии той же недели (у неё выше минимума): недельный
+        // объём и eff не меняются, MRV-safe по построению. Топ-ап не должен
+        // отменять работу cap-adjust (иначе вечный overflow).
+        const caps0 = (next as any).mrvByMuscle || {};
+        const weekOf = (sess: any) => week.sessions;
+        for (let guard = 0; guard < 4; guard++) {
+          const total = items.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          if (total >= need.min) break;
+          const cap0 = caps0[need.muscle];
+          let d = 0, ind = 0;
+          if (cap0) {
+            for (const ss of week.sessions) for (const ex of ss.exercises) {
+              if ((ex as any).warmupActivator) continue;
+              if (ex.muscle === need.muscle) d += ex.sets || 0;
+              ind += indirectToMuscle(ex, need.muscle);
+            }
+          }
+          // Путь 1: plain +1 — влезает в cap×1.15 (порог инвариантов) и кап сессии.
+          const target = [...items].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
+          let exCap = 5;
+          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears); } catch { exCap = 5; }
+          const sessTotal = s.exercises
+            .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional)
+            .reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          if ((!cap0 || d + ind + 1 <= cap0 * 1.15) && (target.sets || 0) < exCap) {
+            // Сессия полная — забираем 1 сет у крупнейшего accessory НЕ-минимума
+            // (вторые жимы/тяги, пресс), итог сессии не меняется. Донор не роняет
+            // СВОЮ мышцу ниже её PPL-минимума (иначе чиним одно, ломаем другое).
+            if (sessTotal + 1 > sessCap) {
+              const sessMinFor = (m: string): number => {
+                if (/Pull|Back/i.test(tag)) {
+                  if (m === 'traps') return 5;
+                  if (m === 'biceps') return 8;
+                  if (m === 'delt_rear' || m === 'shoulders') return 5;
+                } else if (/Push|Chest/i.test(tag)) {
+                  if (m === 'triceps') return 8;
+                } else if (/Legs|Lower/i.test(tag)) {
+                  if (m === 'calves') return 9;
+                }
+                return 0;
+              };
+              const sessMuscleTotals: Record<string, number> = {};
+              for (const x of s.exercises) {
+                if ((x as any).warmupActivator || (x as any).optional) continue;
+                sessMuscleTotals[x.muscle] = (sessMuscleTotals[x.muscle] || 0) + (x.sets || 0);
+              }
+              const donor = s.exercises
+                .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional
+                  && e.muscle !== need.muscle && (e.role === 'accessory' || e.muscle === 'abs')
+                  && (e.sets || 0) > 2
+                  && (sessMuscleTotals[e.muscle] || 0) - 1 >= sessMinFor(e.muscle))
+                .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+              if (!donor) break;
+              donor.sets -= 1;
+              if (Array.isArray(donor.workSets) && donor.workSets.length > donor.sets) donor.workSets = donor.workSets.slice(0, donor.sets);
+            }
+            target.sets += 1;
+            const sample = target.workSets?.[target.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+            if (Array.isArray(target.workSets)) target.workSets.push({ ...sample });
+            continue;
+          }
+          // Путь 2: баланс — sibling-сессия той же недели выше минимума:
+          // переносим 1 сет оттуда (недельный объём и eff неизменны).
+          if ((target.sets || 0) >= exCap || sessTotal + 1 > sessCap) break;
+          const sib = weekOf(s)
+            .filter((ss: any) => ss !== s && !((ss as any).phase === 'deload' || (ss as any).deload))
+            .map((ss: any) => ({
+              ss,
+              tot: ss.exercises
+                .filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle)
+                .reduce((a: number, e: any) => a + (e.sets || 0), 0),
+            }))
+            .filter((r: any) => r.tot > need.min)
+            .sort((a: any, b: any) => b.tot - a.tot)[0];
+          if (!sib) break;
+          const sibDonor = [...sib.ss.exercises]
+            .filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle && (e.sets || 0) > 2)
+            .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+          if (!sibDonor) break;
+          sibDonor.sets -= 1;
+          if (Array.isArray(sibDonor.workSets) && sibDonor.workSets.length > sibDonor.sets) sibDonor.workSets = sibDonor.workSets.slice(0, sibDonor.sets);
+          target.sets += 1;
+          const sample2 = target.workSets?.[target.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+          if (Array.isArray(target.workSets)) target.workSets.push({ ...sample2 });
+        }
+      }
+    }
+  }
+
+  // Глобальный инвариант: 0 упражнений выше per-exercise капа (Раунд 4: 5,
+  // enhanced 3+ на больших группах — 8 по perExerciseCap, Фаза 2.5).
+  // Аддитивные проходы (arm-guarantee/MEV-repair/добивки) могут сложить 6–8
+  // сетов в одно упражнение в обход per-pass клампов, а объёмные схемы второй
+  // сессии той же мышцы (schemeApplied) такие упражнения пропускают.
+  // ПЕРЕРАСПРЕДЕЛЕНИЕ (не резка): избыток уезжает младшему сиблингу той же
+  // мышцы в той же сессии (6+4 → 5+5) — Totals недели/сессии/мышцы не меняются,
+  // PPL-минимумы (8-10 руки) и GVT-форма (≤5) держатся одновременно.
+  // Некуда перелить — режем остаток, workSets синхронизируем.
   if (!options.preserveSource && (next as any).pattern?.id) {
     for (const week of next.weeks) {
       if ((week as any).phase === 'deload' || (week as any).deload) continue;
       for (const s of week.sessions) for (const e of s.exercises) {
         if ((e as any).warmupActivator) continue;
-        if ((e.sets || 0) > 5) {
-          e.sets = 5;
-          if (Array.isArray((e as any).workSets) && (e as any).workSets.length > 5) (e as any).workSets = (e as any).workSets.slice(0, 5);
+        let exCap = 5;
+        try {
+          exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears);
+        } catch { exCap = 5; }
+        let excess = (e.sets || 0) - exCap;
+        if (excess <= 0) continue;
+        const sibs = s.exercises
+          .filter((x: any) => x !== e && !(x as any).warmupActivator && x.muscle === (e as any).muscle && (x.sets || 0) < exCap)
+          .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        for (const sib of sibs) {
+          if (excess <= 0) break;
+          const room = exCap - ((sib as any).sets || 0);
+          if (room <= 0) continue;
+          const move = Math.min(excess, room);
+          (sib as any).sets += move;
+          const sample = (sib as any).workSets?.[(sib as any).workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+          if (Array.isArray((sib as any).workSets)) {
+            for (let k = 0; k < move; k++) (sib as any).workSets.push({ ...sample });
+          }
+          excess -= move;
         }
+        // Остаток без комнаты — режем (инвариант важнее; объём уже у сиблингов).
+        e.sets = exCap;
+        if (Array.isArray((e as any).workSets) && (e as any).workSets.length > e.sets) (e as any).workSets = (e as any).workSets.slice(0, e.sets);
       }
     }
   }
@@ -3547,6 +3846,116 @@ for (const week of next.weeks) {
   // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
   if (!options.preserveSource && (next as any).pattern?.id) {
     enforceSessionExerciseLimit(next, options);
+  }
+
+  // TAG-гигиена сессий (bb-selection-quality): кросс-мышечные заносы
+  // (спина в день ног, грудь в Pull и т.п. от ротации/добивок) удаляются.
+  // Правило 1-в-1 как в тесте: push ↛ back/quads/hams/glutes/calves,
+  // pull ↛ chest/quads/hams/glutes/calves, lower/legs ↛ chest/back/shoulders/triceps.
+  // Только рабочие (warmup не трогаем); бицепс/предплечья в ногах допустимы
+  // (LegsBiceps-сплиты). Объём только падает → ovf/капы в безопасности.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) {
+        const t = String(s.sessionTag || '').toLowerCase();
+        const forbidden: Set<string> | null =
+          t.includes('push') ? new Set(['back', 'quads', 'hamstrings', 'glutes', 'calves'])
+          : t.includes('pull') ? new Set(['chest', 'quads', 'hamstrings', 'glutes', 'calves'])
+          : (t.includes('lower') || t.includes('legs')) ? new Set(['chest', 'back', 'shoulders', 'triceps'])
+          : null;
+        if (!forbidden) continue;
+        const before = s.exercises.length;
+        s.exercises = s.exercises.filter((e: any) => (e as any).warmupActivator || !forbidden.has(e.muscle));
+        if (s.exercises.length !== before) {
+          (next as any).rationale = [...((next as any).rationale || []), `🧹 TAG-гигиена: убрано ${before - s.exercises.length} кросс-мышечных из ${s.sessionTag}`];
+        }
+      }
+    }
+  }
+
+  // Frequency-guard для fullbody (bb-focus-phase, Schoenfeld 2016 2×):
+  // у fullbody каждая мажорная мышца должна быть минимум в 2 сессиях недели.
+  // Ротация аксессуаров может оставить мышцу в 1× (w4 без бицепса) — добавляем
+  // маленькую изоляцию (3 сета) в сессию без неё. ТОЛЬКО fullbody-паттерны:
+  // у bro-сплитов 1× — дизайн (там warning валидатора корректен).
+  if (!options.preserveSource && (next as any).pattern?.id && /fullbody/i.test(String((next as any).pattern.id || ''))) {
+    const MAJORS = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'glutes', 'biceps', 'triceps'];
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const m of MAJORS) {
+        const withMuscle = week.sessions.filter((s: any) =>
+          s.exercises.some((e: any) => !(e as any).warmupActivator && e.muscle === m));
+        if (withMuscle.length >= 2) continue;
+        const target = week.sessions.find((s: any) =>
+          !s.exercises.some((e: any) => !(e as any).warmupActivator && e.muscle === m)
+          && s.exercises.filter((e: any) => !(e as any).warmupActivator).length < 10);
+        if (!target) continue;
+        const used = new Set(target.exercises.map((e: any) => e.name));
+        const cand = EXERCISE_CATALOG.find((x: any) => {
+          if (trueMuscleOf(x) !== m) return false;
+          if (x.type !== 'isolation' && (x as any).exerciseType !== 'isolation') return false;
+          if (used.has(x.name)) return false;
+          if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+          if (options.equipment?.length) {
+            const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+            if (eq.length > 0 && !eq.some((q: string) => options.equipment!.includes(q))) return false;
+          }
+          return true;
+        });
+        if (!cand) continue;
+        const wm = (options.workMax as any)?.[m] || 50;
+        target.exercises.push({
+          muscle: m, name: cand.name, exerciseName: cand.name, role: 'accessory',
+          character: 'памп', sets: 3, repsRange: [10, 15], rir: 3, restSeconds: 60,
+          tempoSpec: '2-1-1-0',
+          workSets: Array.from({ length: 3 }, () => ({ reps: 12, rir: 3, weight: Math.round(wm * 0.4 * 10) / 10, tempo: '2-1-1-0', restSeconds: 60 })),
+          warmupSets: [],
+          comment: '📡 Frequency-guard: мышца реже 2×/нед в fullbody — добивка 3×12 для частоты (Schoenfeld 2016).',
+          rationale: 'Frequency guard fullbody 2×',
+        });
+      }
+    }
+  }
+
+  // Back-vertical ≤1 на сессию (bb-back-quality + backQualityIssues «дубль
+  // вертикали»): лишний vertical_pull заменяется row-паттерном с сохранением
+  // сетов (объём ≥15 не страдает). Финальная страховка после всех проходов,
+  // добавляющих спину (repair/баланс/фидеры могут дублировать вертикали).
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) {
+        const verts = s.exercises.filter((e: any) => !(e as any).warmupActivator
+          && e.muscle === 'back' && classifyBackExercise(e.name).pattern === 'vertical_pull');
+        if (verts.length <= 1) continue;
+        // Wide/parallel держим в первую очередь (bb-ppl-invariant требует
+        // широкий/параллельный хват в каждом Pull; заменяем НЕ-wide).
+        const isWide = (e: any) => /широк|wide|параллел|parallel|v.?bar/i.test(e.name || '');
+        verts.sort((a: any, b: any) => (isWide(b) ? 1 : 0) - (isWide(a) ? 1 : 0));
+        const used = new Set(s.exercises.map((e: any) => e.name));
+        for (const dup of verts.slice(1)) {
+          const rep = EXERCISE_CATALOG.find((x: any) => {
+            if (trueMuscleOf(x) !== 'back') return false;
+            if (used.has(x.name)) return false;
+            if (classifyBackExercise(x.name).pattern === 'vertical_pull') return false;
+            if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+            if (options.equipment?.length) {
+              const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+              if (eq.length > 0 && !eq.some((q: string) => options.equipment!.includes(q))) return false;
+            }
+            return true;
+          });
+          if (!rep) continue;
+          used.add(rep.name);
+          dup.name = rep.name;
+          dup.exerciseName = rep.name;
+          const ann = annotateBackExercise(dup);
+          dup.movementPattern = ann.movementPattern;
+          dup.backSubgroup = ann.backSubgroup;
+        }
+      }
+    }
   }
 
   // Cleanup dangling supersetWith после всех удалений (fit/cap/donor/superset)
@@ -3559,6 +3968,168 @@ for (const week of next.weeks) {
         delete e.supersetWith;
         if (e.comment) e.comment = e.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').trim();
         if (e.comment) e.comment = e.comment.replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
+      }
+    }
+  }
+
+  // Поздняя доводка PPL-минимумов (перед weeklyVolume): ранний топ-ап решал
+  // по до-трим цифрам (cap-adjust ещё не срезал / лимитер не удалял), здесь —
+  // по финальным. Сначала plain +1 (MRV+капы на финальных цифрах), иначе
+  // баланс из sibling-сессии выше минимума (недельный объём неизменен).
+  if (!options.preserveSource && (next as any).pattern?.id && options.level !== 'beginner' && isPPLPattern(options, next)) {
+    let lateCap = 30;
+    try {
+      lateCap = centralizedSessionLimits(
+        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
+      ).maxWorkingSets;
+    } catch { lateCap = 30; }
+    const lateCaps = (next as any).mrvByMuscle || {};
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) {
+        const tag = s.sessionTag || '';
+        // PPL-минимумы сессии (bb-ppl-invariant): руки 8 + шраги 5 в Pull.
+        // Проверяем обе мышцы Pull (biceps, затем traps), Push — triceps.
+        const needs = /Pull|Back/i.test(tag)
+          ? [{ muscle: 'biceps', min: 8 }, { muscle: 'traps', min: 5 }]
+          : /Push|Chest/i.test(tag) ? [{ muscle: 'triceps', min: 8 }] : [];
+        for (const need of needs) {
+        // До 4 итераций: добивка 2→5 требует 3 шага.
+        for (let guard = 0; guard < 4; guard++) {
+          const items = s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle);
+          if (!items.length) break;
+          const total = items.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          if (total >= need.min) break;
+          const target = [...items].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
+          let exCap = 5;
+          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears); } catch { exCap = 5; }
+          if ((target.sets || 0) >= exCap) break;
+          const sessTotal = s.exercises
+            .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional)
+            .reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          // Сессия полная — донор из НЕ-минимума той же сессии (итог неизменен).
+          // Донор не должен уронить СВОЮ мышцу ниже её PPL-минимума (иначе
+          // чиним трапеции за счёт бицепса: одна дыра закрывается, другая нет).
+          if (sessTotal + 1 > lateCap) {
+            const sessMinFor = (m: string): number => {
+              if (/Pull|Back/i.test(tag)) {
+                if (m === 'traps') return 5;
+                if (m === 'biceps') return 8;
+                if (m === 'delt_rear' || m === 'shoulders') return 5;
+              } else if (/Push|Chest/i.test(tag)) {
+                if (m === 'triceps') return 8;
+              } else if (/Legs|Lower/i.test(tag)) {
+                if (m === 'calves') return 9;
+              }
+              return 0;
+            };
+            const sessMuscleTotals: Record<string, number> = {};
+            for (const x of s.exercises) {
+              if ((x as any).warmupActivator || (x as any).optional) continue;
+              sessMuscleTotals[x.muscle] = (sessMuscleTotals[x.muscle] || 0) + (x.sets || 0);
+            }
+            const donor = s.exercises
+              .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional
+                && e.muscle !== need.muscle && (e.role === 'accessory' || e.muscle === 'abs')
+                && (e.sets || 0) > 2
+                && (sessMuscleTotals[e.muscle] || 0) - 1 >= sessMinFor(e.muscle))
+              .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+            if (!donor) break;
+            donor.sets -= 1;
+            if (Array.isArray(donor.workSets) && donor.workSets.length > donor.sets) donor.workSets = donor.workSets.slice(0, donor.sets);
+            sessMuscleTotals[donor.muscle] = (sessMuscleTotals[donor.muscle] || 0) - 1;
+          }
+          const cap0 = lateCaps[need.muscle];
+          let d = 0, ind = 0;
+          if (cap0) {
+            for (const ss of week.sessions) for (const ex of ss.exercises) {
+              if ((ex as any).warmupActivator) continue;
+              if (ex.muscle === need.muscle) d += ex.sets || 0;
+              ind += indirectToMuscle(ex, need.muscle);
+            }
+          }
+          const addOne = () => {
+            target.sets += 1;
+            const smp = target.workSets?.[target.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+            if (Array.isArray(target.workSets)) target.workSets.push({ ...smp });
+          };
+          if (!cap0 || d + ind + 1 <= cap0 * 1.15) { addOne(); continue; }
+          const sib = week.sessions
+            .filter((ss: any) => ss !== s)
+            .map((ss: any) => ({
+              ss,
+              tot: ss.exercises
+                .filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle)
+                .reduce((a: number, e: any) => a + (e.sets || 0), 0),
+            }))
+            .filter((r: any) => r.tot > need.min)
+            .sort((a: any, b: any) => b.tot - a.tot)[0];
+          if (!sib) break;
+          const sibDonor = [...sib.ss.exercises]
+            .filter((e: any) => !(e as any).warmupActivator && e.muscle === need.muscle && (e.sets || 0) > 2)
+            .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+          if (!sibDonor) break;
+          sibDonor.sets -= 1;
+          if (Array.isArray(sibDonor.workSets) && sibDonor.workSets.length > sibDonor.sets) sibDonor.workSets = sibDonor.workSets.slice(0, sibDonor.sets);
+          addOne();
+        }
+        }
+      }
+    }
+  }
+
+  // Финальный трим сессий (перед weeklyVolume): поздние добавки (топ-апы,
+  // armhead, баланс) могут поднять сессию над капом ПОСЛЕ раннего трима.
+  // Режем accessory >2 (PPL-минимумы защищены), в крайнем случае — primary
+  // (мин. 3, тяжёлый характер сохраняется). Упражнения не удаляем (счётчик цел).
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    let lateCap = 34;
+    try {
+      lateCap = centralizedSessionLimits(
+        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
+      ).maxWorkingSets;
+    } catch { lateCap = 34; }
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) {
+        const tag = s.sessionTag || '';
+        const workingEx = s.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
+        let total = workingEx.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        if (total <= lateCap) continue;
+        const sessTotals: Record<string, number> = {};
+        for (const x of workingEx) sessTotals[x.muscle] = (sessTotals[x.muscle] || 0) + (x.sets || 0);
+        const sessMin: Record<string, number> = /Pull|Back/i.test(tag)
+          ? { traps: 5, biceps: 8, delt_rear: 5, shoulders: 5 }
+          : /Push|Chest/i.test(tag) ? { triceps: 8 }
+          : /Legs|Lower/i.test(tag) ? { calves: 9 } : {};
+        const prot = (x: any): boolean => {
+          const f = sessMin[x.muscle];
+          if (x.muscle === 'calves' && /Legs|Lower/i.test(tag)) return (x.sets || 0) <= (/стоя|standing|жим.*ног|leg.?press|ослик/i.test(x.name || '') ? 5 : 4);
+          if (x.muscle === 'traps' && /шраг|shrug/i.test(x.name || '')) return (x.sets || 0) <= 5;
+          if (f == null) return false;
+          return (sessTotals[x.muscle] || 0) <= f;
+        };
+        for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2 && !prot(x))) {
+          while (total > lateCap && e.sets > 2 && !prot(e)) {
+            e.sets -= 1;
+            if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+            total -= 1;
+            sessTotals[e.muscle] = (sessTotals[e.muscle] || 0) - 1;
+          }
+          if (total <= lateCap) break;
+        }
+        if (total > lateCap) {
+          for (const e of workingEx.filter((x: any) => x.role === 'primary' && x.sets > 3).sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))) {
+            while (total > lateCap && e.sets > 3) {
+              e.sets -= 1;
+              if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+              total -= 1;
+            }
+            if (total <= lateCap) break;
+          }
+        }
       }
     }
   }
@@ -3707,12 +4278,18 @@ for (const week of next.weeks) {
           const key = e.muscle + ':' + pat;
           if (seen.has(key)) {
             // дубль головки — пропускаем, но попробуем заменить на альтернативную головку
+            // (bb-safety: замена уважает оборудование/осевую, иначе дроп).
             const alt = EXERCISE_CATALOG.find((x:any)=>{
               if (trueMuscleOf(x) !== e.muscle) return false;
               if (session.exercises.some((y:any)=> y.name===x.name) || filtered.some((y:any)=> y.name===x.name)) return false;
               const ap = classifyArmExercise(x.name).pattern;
               if (ap === pat) return false;
               if (seen.has(e.muscle+':'+ap)) return false;
+              if (options.equipment?.length) {
+                const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+                if (eq.length && !eq.includes('bodyweight') && !eq.some((q: string) => options.equipment!.includes(q))) return false;
+              }
+              if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
               return true;
             });
             if (alt) {

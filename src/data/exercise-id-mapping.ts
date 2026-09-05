@@ -277,6 +277,7 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   cable_hip_adduction: { bio: 'glute_bridge' },
   fire_hydrant: { bio: 'glute_bridge' },
   donkey_calf_raise: { bio: 'calf_raise' },
+  donkey_calf_raise_v2: { bio: 'calf_raise' },
   calf_raise_v2: { bio: 'calf_raise' },
   calf_raise_standing: { bio: 'calf_raise' },
   calf_raise_seated_v2: { bio: 'calf_raise' },

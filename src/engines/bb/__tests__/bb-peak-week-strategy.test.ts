@@ -9,11 +9,17 @@ import { describe, it, expect } from 'vitest';
 import { buildPeakWeek, applyTrialToPeakConfig, PHASES_BY_STRATEGY, configFromPlan } from '../bb-contest-prep.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 
+function futureShowDate(weeksOut = 3): string {
+  // Time-bomb fix (Sep 2026): хардкод '2026-09-01' протух — валидатор
+  // справедливо режет прошлое ("Дата шоу в прошлом"), buildPeakWeek отдавал [].
+  return new Date(Date.now() + weeksOut * 7 * 864e5).toISOString().slice(0, 10);
+}
+
 function cfg(over: any = {}): any {
   return {
     sex: 'male', category: 'mens_physique', weightKg: 80, bodyFatPct: 7,
     experienceLevel: 'intermediate', enhanced: false, prepCount: 2,
-    showDate: '2026-09-01', weeksOut: 3, trainingProtocol: 'bb',
+    showDate: futureShowDate(3), weeksOut: 3, trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate', waterStrategy: 'moderate', sodiumStrategy: 'cut_2d',
     ...over,
   };

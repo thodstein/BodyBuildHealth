@@ -247,16 +247,16 @@ describe('bb-prep-cycle: прогноз сушки к шоу', () => {
   it('считает целевую сухость категории и темп', () => {
     const r = buildPrepCycle(base({ showDate: isoAddDays(isoToday(), 42), weightKg: 90 }));
     const p = prepCutProjection(r.prepPlan, 90, 20);
-    expect(p.targetBodyFatPct).toBe(6); // mens_physique
-    expect(p.targetWeightKg).toBeCloseTo(76.6, 0); // lean 72 / 0.94
+    expect(p.targetBodyFatPct).toBe(7); // mens_physique (e7d3f7f5b: 6→7)
+    expect(p.targetWeightKg).toBeCloseTo(77.4, 0); // lean 72 / 0.93
     expect(p.weeklyRateKg).toBeCloseTo(0.45, 1); // 0.5%/нед от 90
     expect(p.canReachByShow).toBe(false); // ~30 нед > 6 нед до шоу
   });
 
   it('при близкой сухости — цель достижима к шоу', () => {
     const r = buildPrepCycle(base({ showDate: isoAddDays(isoToday(), 42), weightKg: 90 }));
-    const p = prepCutProjection(r.prepPlan, 90, 7); // уже почти у цели
-    expect(p.targetWeightKg).toBeCloseTo(89.0, 0);
+    const p = prepCutProjection(r.prepPlan, 90, 7); // уже у цели (7% = таргет)
+    expect(p.targetWeightKg).toBeCloseTo(90.0, 0);
     expect(p.canReachByShow).toBe(true);
   });
 

@@ -518,7 +518,8 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
       peds: snap.peds, courseIntensity: snap.courseIntensity,
       calorieSurplus: snap.calorieSurplus, proteinPerKg: snap.proteinPerKg,
       labMrvMultiplier: snap.labMrvMultiplier, trainingVolumeMode: snap.trainingVolumeMode,
-    });
+      patternId: (plan as any).pattern?.id,
+    } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined);
     const ppl = isPPLPlan(plan);
     const maxSets = ppl ? Math.max(limits.maxWorkingSets, level === 'enhanced' ? 46 : 42) : limits.maxWorkingSets;
     let capped = 0;

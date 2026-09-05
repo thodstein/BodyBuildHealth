@@ -295,9 +295,12 @@ export function ensureStrictGroupCoverage(
   exerciseCount: number,
   sessionSelectedIds: string[],
   sessionSelectedNames: string[],
-  opts?: { isPrimary?: boolean },
+  opts?: { isPrimary?: boolean; rotationMode?: string },
 ): void {
   if (opts?.isPrimary === false) return;
+  // rotationMode 'forbid' = запрет ротации: primary-упражнения строго одни и те
+  // же каждую неделю (bb-rotation-mode). Same-class замены запрещены.
+  if (opts?.rotationMode === 'forbid') return;
   const groups = STRICT_EXERCISE_GROUPS[muscle];
   if (!groups || groups.length === 0 || exDatas.length < 2) return;
   for (const g of groups) {

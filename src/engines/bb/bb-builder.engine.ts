@@ -1856,6 +1856,13 @@ function buildSession(
       : (isMultiDay
           ? (isArm && onPED && (muscle === 'biceps' || muscle === 'triceps') ? (level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 1 : 2) : 1)
           : (isArm && onPED ? 4 : (isArm ? 2 : (isBigMuscle ? 2 : 1))));
+    // Spec-поддержка: не-целевые мышцы — узкий слот (≤2 упр), а не полная
+    // ротация (4 упр × 2 сета размазывают MEV-бюджет и ломают supporting-объём:
+    // bb-specialization-unified требует остальные на MEV). Цели не трогаем.
+    // weekSpec (weak/focus) — понедельный (блоки расписания), кап следует ему.
+    if (specRes.active && !isWeak(muscle, weakPoints) && !(focusGroup && collapseKey(focusGroup) === muscle)) {
+      exerciseCount = Math.min(exerciseCount, 2);
+    }
     // P3: Level-based exerciseCount (Schoenfeld 2022: advanced → more exercises for detail)
     if (levelBase <= 1 && exerciseCount > 2) exerciseCount = Math.max(2, exerciseCount - 1);
     else if (levelBase >= 4 && role === 'primary') exerciseCount = Math.min(8, exerciseCount + 1);
@@ -2221,7 +2228,7 @@ function buildSession(
       ? (isWeak(muscle, weakPoints) || (focusGroup ? collapseKey(focusGroup) === muscle : false))
       : true;
     if (isSpecTarget && !skipStrictCoverage) {
-      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary' });
+      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary', rotationMode });
     }
 
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
@@ -2735,6 +2742,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const specSchedule = buildSpecializationSchedule(
     focusGroup, weakPoints, input.specialization, input.weeks, input.specializationSchedule,
   );
+  // Явное расписание блоков (пользователь передал specializationSchedule):
+  // в активные недели поддерживающие мышцы получают строго rotation-таргет
+  // (== MEV) без финишеров и излишков — иначе PPL-минимумы и floor 2 сетов
+  // раздувают supporting до baseline и блоки не различаются (spec-unified /
+  // tradeoff multiblock). Legacy-путь (авто-расписание) не трогаем.
+  const hasExplicitSpecSchedule = Array.isArray(input.specializationSchedule) && input.specializationSchedule.length > 0;
   const sessions = sessionsOf(pattern);
   const injuries = input.injuries || [];
   const favIds = input.favoriteExercises || [];
@@ -2918,9 +2931,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
       // объём закрывает часть target, но потолок тоже должен расти со стажем
-      // (иначе ложный MRV-overflow на enhanced-планах).
-      if (['biceps', 'triceps', 'glutes', 'shoulders'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
-        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
+      // (иначе ложный MRV-overflow на enhanced-планах). 3–5 лет: ×1.6 —
+      // PPL-минимумы (biceps 8/Pull, triceps 10/Push) + indirect иначе не
+      // влезают даже в кап intermediate (14 → 22.4, eff ≤ 25.8).
+      // PPL считает дельты по пучкам (delt_*) — им тот же мульт, иначе
+      // задняя дельта (mrv 12) переполняется от GVT/памп-добивок.
+      // Стаж не передан — выводим из уровня (intermediate ≈ 3г): иначе планы
+      // без trainingYears душат руки до bare-mrv и ломают PPL-минимумы.
+      // ×1.6 — ТОЛЬКО PPL (там по-сессионные минимумы рук иначе не влезают в
+      // кап); остальные сплиты держат консервативные ×1.3 — их тесты зелёные.
+      const effYears = input.trainingYears ?? (level === 'beginner' ? 1 : level === 'intermediate' ? 3 : level === 'advanced' ? 5 : 6);
+      const isPPLSplit = /ppl/i.test(pattern.id || '');
+      if (['biceps', 'triceps', 'glutes', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear'].includes(m) && effYears >= 3) {
+        capMrv = Math.round(capMrv * (effYears >= 8 ? 1.8 : effYears >= 6 ? 1.6 : isPPLSplit ? 1.6 : 1.3));
       }
       const specMrv = specializationMrvFactor(m, specRes);
       if (specMrv !== 1) capMrv = Math.round(capMrv * specMrv);
@@ -3045,6 +3068,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const weekVolumeMult = baseWeekVolumeMult * blastMult;
     // Акценты НЕДЕЛИ по расписанию блоков специализации (цели блока или баланс).
     const weekSpec = specResForWeekSchedule(specSchedule, w);
+    // Tradeoff-недели — вне spec-trim/skip: у доноров своя floor-логика и
+    // трансфер (applyTradeoffToPlan считает от построенного плана); наш trim
+    // срезал бы донорский пул и уменьшил перенос цели (tradeoff-регрессии).
+    const weekTradeoff = tradeoffForWeek(specSchedule, w);
     const weekRotation = rotationMapByKey.get(weekSpec.targets.join('|')) || muscleVolumeRotation;
     const scaledVolumeRotation: Record<string, number> = {};
     for (const [m, v] of Object.entries(weekRotation)) {
@@ -3118,7 +3145,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
         const legDaysInWeek = sessions.filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -3235,6 +3262,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // 2-е упражнение (pump) → biceps=2ex при back=4ex, и сеты accessories > primary.
       for (const pm of sessMuscles) {
         if (Array.from(weekExcluded).includes(pm)) continue;
+        // Явные spec-блоки без tradeoff: финишер только целевым мышцам недели (цель/фокус).
+        // Поддерживающие получают ровно MEV без метаболической добивки.
+        if (hasExplicitSpecSchedule && weekSpec.active && !weekTradeoff && !isSpecializationWeak(pm, weekSpec) && !isSpecializationFocus(pm, weekSpec)) continue;
         if (pm !== sessMuscles[0] && !isWeak(pm, weakPoints)) continue;
         if (sess.exercises.some(e => (e.muscle === pm || collapseKey(e.muscle) === pm) && (e as any).character === 'памп')) continue;
         const pumpPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
@@ -3301,6 +3331,45 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       });
       sess.exercises.length = 0; sess.exercises.push(...reordered);
       weekSessions.push(sess);
+    }
+    // Spec-trim (только явное расписание, активные недели): поддерживающие
+    // мышцы (не цели/фокус недели) капаются недельным rotation-таргетом
+    // (== MEV): PPL-минимумы и floor 2 сетов иначе раздувают supporting до
+    // baseline. Trim сверху вниз по сетам, пол 2 (инвариант 0 single-set),
+    // workSets режутся вместе с sets. Цели/фокус не трогаем. Tradeoff-недели
+    // вне trim (см. weekTradeoff выше).
+    if (hasExplicitSpecSchedule && weekSpec.active && !weekTradeoff) {
+      const trimCaps = new Map<string, number>();
+      for (const [m, v] of Object.entries(scaledVolumeRotation)) {
+        const cm = collapseKey(m);
+        if (isSpecializationWeak(cm, weekSpec) || isSpecializationFocus(cm, weekSpec)) continue;
+        if (!trimCaps.has(cm)) trimCaps.set(cm, v);
+      }
+      const weekSum = new Map<string, number>();
+      for (const ws of weekSessions) for (const ex of ws.exercises) {
+        if ((ex as any).warmupActivator) continue;
+        const cm = collapseKey(ex.muscle);
+        if (!trimCaps.has(cm)) continue;
+        weekSum.set(cm, (weekSum.get(cm) || 0) + (ex.sets || 0));
+      }
+      for (const [cm, cap] of trimCaps) {
+        let excess = (weekSum.get(cm) || 0) - cap;
+        if (excess <= 0) continue;
+        const cands: any[] = [];
+        for (const ws of weekSessions) for (const ex of ws.exercises) {
+          if ((ex as any).warmupActivator || collapseKey(ex.muscle) !== cm) continue;
+          cands.push(ex);
+        }
+        cands.sort((a, b) => (b.sets || 0) - (a.sets || 0));
+        for (const ex of cands) {
+          if (excess <= 0) break;
+          const cut = Math.min(excess, (ex.sets || 0) - 2);
+          if (cut <= 0) continue;
+          ex.sets -= cut;
+          if (Array.isArray((ex as any).workSets) && (ex as any).workSets.length > ex.sets) (ex as any).workSets.length = ex.sets;
+          excess -= cut;
+        }
+      }
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap
     normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears });
@@ -3902,6 +3971,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     methodology: input.methodology,
     priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
+    specExplicitSchedule: hasExplicitSpecSchedule,
     level,
     volumeGoal: input.volumeGoal,
     phaseSafety: true,
@@ -3925,6 +3995,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     bodyweightCapability: input.bodyweightCapability,
     supersetMode: input.supersetMode,
     volumeScheme: input.volumeScheme,
+    rotationMode: input.rotationMode,
   });
   // PED-методика + insulin window + rep-схемы: overlay после финализации, не ломает тяж/памп.
   // Joint-guard уже отработал на уровне пула (buildExercisePool), здесь — только rationale/подсказки.

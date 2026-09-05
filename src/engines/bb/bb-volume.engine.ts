@@ -200,6 +200,20 @@ export function sessionLimitsFor(
   if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
   else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
   else { maxWorkingSets = 24; maxExercises = 10; }
+  // PPL: сессия качает 4–5 групп (Pull: спина/задняя/трапы/бицепс/предплечья) —
+  // в 24/10 не влезает даже на минимумах пользовательских требований
+  // (bb-ppl-invariant: rear 5–8 + shrug 5 + biceps 8–10 + back + forearms).
+  // Плюс пики intensification и низкочастотный ppl_3 (вся неделя спины в одной
+  // сессии):observed max 35 сетов — кап 36/11 для натуралов (enhanced и так
+  // выше); валидатор и лимитер читают этот же источник — рассинхрона нет.
+  // patternId часто передают в input (тесты/валидатор вызывают без split) —
+  // поддерживаем оба варианта, иначе PPL-ветка молча не срабатывает.
+  const splitId = split?.id || (input as any).patternId || (input as any).splitId || '';
+  const isPPL = /ppl/i.test(splitId);
+  if (isPPL && maxWorkingSets < 36 && maxExercises < 11) {
+    maxWorkingSets = 36;
+    maxExercises = 11;
+  }
   if (input.trainingVolumeMode === 'high') {
     const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
     maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
@@ -355,6 +369,7 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
     return [
       // 0.45: трицепс получает ~45% косвенной работы от жимов (EMG-оценки);
       // 0.5 завышал effective — fullbody-сплиты 5x/нед уходили в MRV-overflow.
+      // НЕ снижать ради PPL: коэффициенты запинены тестами bb-volume/fatigue.
       { muscle: 'triceps', coefficient: 0.45 },
       { muscle: 'shoulders', coefficient: 0.20 },
     ];

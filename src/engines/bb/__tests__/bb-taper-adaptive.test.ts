@@ -13,10 +13,12 @@ import {
 import { buildBBPlan } from '../bb-builder.engine';
 
 function cfg(over: any = {}): any {
+  // Time-bomb fix (Sep 2026): хардкод '2026-09-01' протух — шоу должно быть в будущем.
+  const showDate = new Date(Date.now() + 2 * 7 * 864e5).toISOString().slice(0, 10);
   return {
     sex: 'male', category: 'mens_physique', weightKg: 80, bodyFatPct: 7,
     experienceLevel: 'intermediate', enhanced: false, prepCount: 2,
-    showDate: '2026-09-01', weeksOut: 2, trainingProtocol: 'bb',
+    showDate, weeksOut: 2, trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate', waterStrategy: 'moderate', sodiumStrategy: 'cut_2d',
     ...over,
   };
