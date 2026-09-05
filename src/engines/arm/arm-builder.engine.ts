@@ -17,6 +17,7 @@ import { ensureRadialFingers } from './arm-load-quant.engine';
 import { profileOpponent, matchupVolumeFor } from './arm-matchup.engine';
 import { buildRfdSession } from './arm-rfd.engine';
 import { planLrSplit } from './arm-lr-split.engine';
+import { applyContestSimToPlan } from './arm-sim-apply.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -615,6 +616,29 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     });
   }
 
+  // TOP wave-4: contestSim перестраивает последнюю неделю в генеральную репетицию (до подсчёта объёма)
+  let simRationale: string[] = [];
+  if ((input as any).contestSim === true && planWeeks.length >= 2) {
+    try {
+      const rtTarget = discipline === 'armlifting' ? Number((mergedWorkMax as any)['grip_support'] ?? NaN) : NaN;
+      const applied = applyContestSimToPlan({ pattern, weeks: planWeeks, rationale: [] } as any, {
+        level,
+        discipline,
+        strapExpected: !!(input as any).strapExpected,
+        foulIds: (input as any).foulIds,
+        targetKg: rtTarget,
+        supermatch: !!(input as any).supermatch,
+      });
+      if (applied.applied) {
+        for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = applied.plan.weeks[i];
+        simRationale = (applied.plan.rationale || []).filter((l: string) => /Contest-sim/.test(l));
+        if (applied.warning) simRationale.push(applied.warning);
+      } else if (applied.warning) {
+        simRationale = [applied.warning];
+      }
+    } catch { /* sim опционален */ }
+  }
+
   // Rationale — расширено table 3/2/1 и tendon
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
@@ -633,6 +657,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (matchupPlan) rationale.push(`Матчап: ${matchupPlan.note}`);
   if (rfdNote) rationale.push(`RFD: ${rfdNote}`);
   if (lrNote) rationale.push(lrNote);
+  for (const line of simRationale) rationale.push(line);
   const proWarnings = [...pro.warnings];
 
   // Weekly volume
