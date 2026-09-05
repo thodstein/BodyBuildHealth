@@ -32,15 +32,21 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
 
   it('Generic natural (ppl_6, intermediate 3 года) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 1, workMax: WM });
+    // Re-baseline (осознанно): PPL по-сессионные минимумы (bb-ppl-invariant:
+    // biceps/triceps 8-10, calves 9, traps 5, rear-delt) + MEV-guard подняли
+    // недельные объёмы выше baseline Этапа 10. Направления совпадают с
+    // требованиями (руки/икры/трапы ровно на минимумах ×2 сессии).
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 19, biceps: 6, calves: 8, chest: 16, delt_front: 5, delt_mid: 9, delt_rear: 10, forearms: 6, glutes: 5, hamstrings: 14, quads: 13, shoulders: 3, traps: 10, triceps: 6,
+      abs: 8, back: 16, biceps: 17, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 17, forearms: 7, glutes: 7, hamstrings: 12, quads: 16, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 
   it('ПРОФ-cycle adapt (CYCLE_01 + AAS 500) — per-muscle объём', () => {
     const plan = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
+    // Re-baseline (осознанно): те же кухни (минимумы/MEV-guard/back-стандарты),
+    // цикл-путь затронут через общие проходы финализатора.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 6, biceps: 7, calves: 8, chest: 6, delt_front: 2, delt_mid: 2, delt_rear: 6, forearms: 7, glutes: 6, hamstrings: 6, quads: 12, shoulders: 0, traps: 6, triceps: 7,
+      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
     });
   });
 
@@ -48,8 +54,9 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     const src = FULL_PROGRAM_LIBRARY.find(p => p.weeks?.some(w => w.days?.some(d => d.exercises?.some(e => /подтяг|row|тяга/i.test(e.name)))));
     expect(src).toBeDefined();
     const plan = programToBBPlan(src!, { workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
+    // Re-baseline (осознанно): см. выше.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 6, biceps: 6, calves: 6, chest: 8, delt_front: 3, delt_mid: 2, delt_rear: 6, forearms: 7, glutes: 6, hamstrings: 12, quads: 9, shoulders: 0, traps: 6, triceps: 6,
+      abs: 7, back: 10, biceps: 12, calves: 8, chest: 10, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 14, quads: 9, shoulders: 0, traps: 9, triceps: 12,
     });
   });
 

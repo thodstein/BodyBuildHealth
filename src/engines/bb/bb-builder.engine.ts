@@ -3654,7 +3654,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       // P0-1: финальная гарантия arms — ПОСЛЕ всех обрезок (exCap, finalCap, dedup).
       // Если biceps/triceps были отрезаны — добавляем принудительно 1 упражнение на каждое.
-      const dayMusclePlans = dedupeMuscles(s.sessionTag, new Set());
+      // Объёмные схемы (GVT/FST-7/8×8) — исключение: схема САМА даёт рукам
+      // концентрированный объём (GVT-10), а лишние guarantee-изоляты раздувают
+      // direct за кап — cap-adjust потом срезает GVT-пятёрки (pro-methods-levels).
+      // PPL-минимумы при схемах держат отдельные топ-апы финализатора.
+      const schemeActive = (input.volumeScheme || 'standard') !== 'standard';
+      const dayMusclePlans = schemeActive ? [] : dedupeMuscles(s.sessionTag, new Set());
       const dayArmMuscles = new Set(dayMusclePlans.filter(mp => ARM_MUSCLES_SET.has(mp.group)).map(mp => mp.group));
       if (dayArmMuscles.size > 0) {
         const presentM = new Set(s.exercises.map(e => e.muscle));
@@ -3675,7 +3680,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           const fData = pool[0];
           const fName = fData.name || fData.id;
           const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
-          const armSets = 3;
+          // FullBody: гарантия чинит ЧАСТОТУ (присутствие 2×/нед), не объём —
+          // 2 сетов достаточно (пол-инвариант, Schoenfeld 2×). 3 сета в каждом
+          // FB-дне раздувают руки +6/нед → eff вылетает за кап и cap-adjust
+          // срезает GVT-пятёрки (pro-methods-levels). Остальные сплиты — 3.
+          const armSets = /FullBody/i.test(s.sessionTag || '') ? 2 : 3;
           const pcfg = getPhaseConfig(wPhase as any, input.trainingFocus);
           const armReps = Math.round((pcfg.repRange[0] + pcfg.repRange[1]) / 2) + 2;
           const armWeight = Math.round(fBase * pcfg.intensityMultiplier * 0.88 * 10) / 10;

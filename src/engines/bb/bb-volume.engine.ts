@@ -214,6 +214,21 @@ export function sessionLimitsFor(
     maxWorkingSets = 36;
     maxExercises = 11;
   }
+  // FullBody: сессия качает 8-10 групп (против 4-5 у PPL) — в 10 упражнений
+  // не влезает даже по одному движению на мышцу + руки (bb-focus-phase:
+  // biceps 1×/нед — arm-guarantee добавлял, лимитер отрезал). Кап 12 для
+  // натуралов (сеты держит maxWorkingSets + fitBBSessionToBudget + cap-adjust,
+  // присутствие мышц сохраняется); валидатор и лимитер читают этот же источник.
+  // Сеты 24→28: 12 мышц × пол 2 = 24 — минимум присутствия; двенадцатая мышца
+  // или один 3-сетовик (25) иначе невозможны без синглов (count-benchmark).
+  // PPL-прецедент: 24/10 → 36/11 по той же причине (плотные сессии).
+  const isFB = /fullbody/i.test(splitId);
+  if (isFB && maxExercises < 12) {
+    maxExercises = 12;
+  }
+  if (isFB && maxWorkingSets < 28) {
+    maxWorkingSets = 28;
+  }
   if (input.trainingVolumeMode === 'high') {
     const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
     maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));

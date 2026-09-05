@@ -3618,7 +3618,62 @@ for (const week of next.weeks) {
         const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
         const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
-        for (const e of [...isolations, ...others]) {
+        // PPL-минимумы по-сессионно (bb-ppl-invariant: Pull biceps 8, Push
+        // triceps 8): режем сначала сессии ВЫШЕ минимума, сессии на минимуме
+        // щадим — иначе глобальный smallest-first складывает всю резку в одну
+        // сессию (6+10), а топ-апы потом не чинят (доноров нет: все accessories
+        // сидят ровно на своих минимумах). Недобранный остаток — старым путём
+        // (floor 2), чтобы не ломать overflow-инварианты. Остальные мышцы и
+        // не-PPL — строго старый путь.
+        const useSessAware = isPPLPattern(options, next) && options.level !== 'beginner'
+          && (muscle === 'biceps' || muscle === 'triceps');
+        if (useSessAware) {
+          const sessMinForCap = (s: any): number => {
+            const tag = s.sessionTag || '';
+            if (muscle === 'biceps' && /Pull|Back/i.test(tag)) return 8;
+            if (muscle === 'triceps' && /Push|Chest/i.test(tag)) return 8;
+            return 0;
+          };
+          const sessOf = new Map<any, any>();
+          const sessTot = new Map<any, number>();
+          for (const s of week.sessions) {
+            let t = 0;
+            for (const x of s.exercises) {
+              if ((x as any).warmupActivator || x.muscle !== muscle) continue;
+              sessOf.set(x, s);
+              t += x.sets || 0;
+            }
+            sessTot.set(s, t);
+          }
+          const cutOne = (e: any): void => {
+            e.sets -= 1;
+            if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+            need -= 1;
+            const s = sessOf.get(e);
+            if (s) sessTot.set(s, (sessTot.get(s) || 0) - 1);
+          };
+          const ordered = [...isolations, ...others].sort((a: any, b: any) => {
+            const sa = (sessTot.get(sessOf.get(a)) || 0) - sessMinForCap(sessOf.get(a));
+            const sb = (sessTot.get(sessOf.get(b)) || 0) - sessMinForCap(sessOf.get(b));
+            if (sb !== sa) return sb - sa;
+            return (a.sets || 0) - (b.sets || 0);
+          });
+          // Проход 1: только сессии с излишком над минимумом.
+          for (const e of ordered) {
+            if (need <= 0) break;
+            const s = sessOf.get(e);
+            while (need > 0 && (e.sets || 0) > 2 && (sessTot.get(s) || 0) > sessMinForCap(s)) cutOne(e);
+          }
+        }
+        // Объёмные схемы — режем последними: GVT-пятёрки/FST-7/8×8 это
+        // пользовательская форма (pro-methods-levels требует выживший максимум:
+        // 5×10@75с). need обычно закрывается обычными изоляциями; сортировка
+        // стабильная — внутри групп порядок sets-asc сохранён, без схем — путь
+        // байт-в-байт как раньше.
+        const isSchemeMarked = (e: any) => /GVT|FST-7|8×8/.test(String((e as any).comment || ''));
+        const cutOrder = [...isolations, ...others].sort((a: any, b: any) =>
+          (isSchemeMarked(a) ? 1 : 0) - (isSchemeMarked(b) ? 1 : 0));
+        for (const e of cutOrder) {
           if (need <= 0) break;
           while (need > 0 && e.sets > 2) {
             e.sets -= 1;
@@ -3631,6 +3686,22 @@ for (const week of next.weeks) {
         // мышцы на неделю (indirect от compound уже покрывает стимул).
         if (need > 0) {
           let weekCount = week.sessions.flatMap(s => s.exercises).filter((x: any) => x.muscle === muscle && !(x as any).warmupActivator).length;
+          // Частотная защита FullBody (validator low_training_frequency + GVT):
+          // рукам нужно 2×/нед (Schoenfeld) — не удаляем ПОСЛЕДНЕЕ упражнение
+          // biceps/triceps в сессии, если мышца останется <2 сессий в неделю.
+          // Иначе fullbody-руки схлопываются до 1× (гарантия добавила, removal
+          // удалил), а GVT не на чем держаться в единственной untapered-неделе
+          // (w1): w2/w3 сбривает taper ×0.75/×0.5. Скоуп строго FullBody —
+          // PPL/bro не трогаем (там removal работает корректно, а unmet-need
+          // каскад в compound-синглы для beginner-PPL доказан).
+          const isFBWeek = (muscle === 'biceps' || muscle === 'triceps')
+            && (week.sessions as any[]).some((s: any) => /FullBody/i.test(s.sessionTag || ''));
+          const sessWithMuscle = new Set<any>();
+          if (isFBWeek) {
+            for (const ss of week.sessions) {
+              if ((ss.exercises as any[]).some((x: any) => !(x as any).warmupActivator && x.muscle === muscle)) sessWithMuscle.add(ss);
+            }
+          }
           for (const s2 of week.sessions) {
             for (const e of [...s2.exercises]) {
               if (need <= 0) break;
@@ -3643,9 +3714,12 @@ for (const week of next.weeks) {
               // покрывает почти весь кап (indirect >= 0.9×cap), последнюю
               // изоляцию можно убрать (direct 0 — стимул даёт indirect).
               if (weekCount <= 1 && indirectTotal < cap * 0.9) break;
+              if (isFBWeek && sessWithMuscle.size <= 2
+                && ![...s2.exercises].some((x: any) => x !== e && !(x as any).warmupActivator && x.muscle === muscle)) continue;
               need -= e.sets || 0;
               weekCount -= 1;
               s2.exercises = s2.exercises.filter((x: any) => x !== e);
+              if (![...s2.exercises].some((x: any) => !(x as any).warmupActivator && x.muscle === muscle)) sessWithMuscle.delete(s2);
             }
             if (need <= 0) break;
           }
