@@ -20,6 +20,7 @@ import { planLrSplit } from './arm-lr-split.engine';
 import { applyContestSimToPlan } from './arm-sim-apply.engine';
 import { buildGripRpe } from './arm-grip-rpe.engine';
 import { analyzeTableIq } from './arm-table-iq.engine';
+import { nextImplement } from './arm-implement-ladder.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -307,12 +308,16 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   } catch { rfdNote = null; }
   const rfdOn = rfdNote != null;
   let lrNote: string | null = null;
+  let lrWeak: string | null = null;
   try {
     if (input.leftKg != null || input.rightKg != null) {
       const lr = planLrSplit({ leftKg: input.leftKg, rightKg: input.rightKg });
-      if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) lrNote = `L/R сплит: ${lr.note}`;
+      if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) {
+        lrNote = `L/R сплит: ${lr.note}`;
+        lrWeak = lr.weakArm;
+      }
     }
-  } catch { lrNote = null; }
+  } catch { lrNote = null; lrWeak = null; }
   // TOP wave-5: Table-IQ рычаги в объём (только при журнале схваток)
   let iqPlan: ReturnType<typeof analyzeTableIq> | null = null;
   try {
@@ -507,6 +512,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const filteredMuscles = tag === 'FullArm' ? ensureRadialFingers(baseFiltered) : baseFiltered;
       // TOP T2a: RFD-метка — первое speed-упражнение тяжёлой сессии в intensification (объём не меняется)
       let rfdDone = !rfdOn || phase !== 'intensification' || ch !== 'тяж';
+      // TOP wave-6: унилатеральная добивка слабой руки — 2 подхода первого подходящего упражнения идут слабой (объём тот же)
+      let uniDone = lrWeak == null;
 
       for (const mus of filteredMuscles) {
         // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
@@ -595,9 +602,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          comment: (rfdSpeed
+          comment: ((rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
-            : exTpl.technique),
+            : (exTpl.technique || '')) + ((!uniDone && lrWeak && ['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','brachialis','biceps_long','biceps_short','brachioradialis'].includes(mus))
+            ? ((uniDone = true), ` + унилатерально слабой (${lrWeak}) 2 подх.`)
+            : '') || undefined),
         });
       }
 
@@ -680,6 +689,19 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
   if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
   if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
+  // TOP wave-6: кросс-мезо лестницы — прогресс имплемента между мезоциклами
+  try {
+    const prevSnap = (input.previousPlan as any)?.inputSnapshot;
+    if (prevSnap?.ladderFrom && input.ladderFrom && prevSnap.ladderFrom === input.ladderFrom) {
+      const prev = Number(prevSnap.ladderValue);
+      const cur = Number(input.ladderValue);
+      if (Number.isFinite(prev) && prev > 0 && Number.isFinite(cur) && cur > 0) {
+        const d = Math.round(((cur - prev) / prev) * 1000) / 10;
+        const nx = nextImplement(input.ladderFrom, cur, (input.sex as string) || 'male');
+        rationale.push(`Лестница ${input.ladderFrom}: ${d >= 0 ? '+' : ''}${d}% за мезоцикл — ${nx.ready && nx.next ? `готов к ${nx.next}` : 'держать базу'}.`);
+      }
+    }
+  } catch { /* опционально */ }
   // PRO A–J: строки оркестратора (аддитивно)
   for (const line of pro.rationale) rationale.push(line);
   // TOP T1/T2a/T7a: матчап + RFD + L/R (только при заданных входах)
