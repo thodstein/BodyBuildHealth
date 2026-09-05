@@ -19,6 +19,10 @@ import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
+import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
+import { ladderAdvice } from '../../../engines/arm/arm-implement-ladder.engine';
+import { buildArmCalendar } from '../../../engines/arm/arm-calendar.engine';
+import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
@@ -100,6 +104,16 @@ export function ArmAutoConstructor() {
   const [proStrap, setProStrap] = useState<boolean>(false);
   const [proPlatImpl, setProPlatImpl] = useState<string>('rolling_thunder');
   const [proPlatTarget, setProPlatTarget] = useState<string>('');
+  // TOP T1–T8: матчап/скорость/лестница/sim/календарь (всё опционально)
+  const [topOpp, setTopOpp] = useState<string>('unknown');
+  const [topOppHand, setTopOppHand] = useState<string>('unknown');
+  const [topWD, setTopWD] = useState<string>('');
+  const [topRfd, setTopRfd] = useState<boolean>(false);
+  const [topLadder, setTopLadder] = useState<string>('');
+  const [topLadderVal, setTopLadderVal] = useState<string>('');
+  const [topSim, setTopSim] = useState<boolean>(false);
+  const [topCalPrio, setTopCalPrio] = useState<string>('B');
+  const [topCalSeries, setTopCalSeries] = useState<string>('local');
 
   const workMax = useMemo(() => {
     try {
@@ -153,6 +167,21 @@ export function ArmAutoConstructor() {
       }
       const tech = payload.data?.armTechnique;
       if (tech) setTechnique(String(tech));
+      // TOP из хаба: матчап + Table-IQ (аддитивно)
+      try {
+        const mu = payload.data?.armMatchup;
+        if (mu && typeof mu === 'object') {
+          if (mu.oppStyle) setTopOpp(String(mu.oppStyle));
+          if (mu.oppHand) setTopOppHand(String(mu.oppHand));
+          if (Number.isFinite(Number(mu.weightDeltaKg)) && Number(mu.weightDeltaKg) !== 0) setTopWD(String(mu.weightDeltaKg));
+          flash('↩ Матчап из диагностики применён');
+        }
+        const bouts = payload.data?.armBouts;
+        if (Array.isArray(bouts) && bouts.length) {
+          try { localStorage.setItem('he_arm_table_iq', JSON.stringify(bouts.slice(0, 60))); } catch {}
+          flash(`↩ Table-IQ: ${bouts.length} схваток из диагностики`);
+        }
+      } catch {}
       const bench = payload.data?.armBench;
       if (bench?.level) {
         const map: Record<string,string> = { beginner:'beginner', intermediate:'intermediate', advanced:'advanced', competitive:'advanced', elite:'enhanced' };
@@ -254,6 +283,19 @@ export function ArmAutoConstructor() {
         bench: (parseFloat(proBenchRt) > 0 || parseFloat(proBenchWristLb) > 0 || parseFloat(proBenchPron) > 0 || parseFloat(proBenchSide) > 0)
           ? { rtKg: parseFloat(proBenchRt) || undefined, wristCurlLb: parseFloat(proBenchWristLb) || undefined, pronHoldSec: parseFloat(proBenchPron) || undefined, sideKg: parseFloat(proBenchSide) || undefined }
           : undefined,
+        // TOP T1–T8 (не задано = выключено, план как раньше)
+        oppStyle: topOpp !== 'unknown' ? topOpp : undefined,
+        oppHand: topOppHand !== 'unknown' ? topOppHand : undefined,
+        weightDeltaKg: parseFloat(topWD) !== 0 && Number.isFinite(parseFloat(topWD)) ? parseFloat(topWD) : undefined,
+        rfd: topRfd || undefined,
+        ladderFrom: topLadder || undefined,
+        ladderValue: parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
+        contestSim: topSim || undefined,
+        tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
+        tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
+        calStartIso: proDate || undefined,
+        calPriority: topCalPrio,
+        calSeries: topCalSeries,
       });
       plan = finalizeArmPlan(plan, { level });
       // PRO инъекция 12 мёртвых точек (если пришли из хаба) — parity с TA
@@ -493,6 +535,67 @@ export function ArmAutoConstructor() {
                 {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: 11, cursor: 'help' }}>{f.name}</span>)}
               </div>
             </div>
+          </div>
+
+          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🥇 TOP: матчап · скорость · лестница · sim · календарь</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <label style={{ ...SMALL }}>Стиль оппонента<br/>
+                <select value={topOpp} onChange={e=>setTopOpp(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Рука оппонента<br/>
+                <select value={topOppHand} onChange={e=>setTopOppHand(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="unknown">Неизвестно</option><option value="high">High-hand</option><option value="low">Low-hand</option><option value="neutral">Нейтраль</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Оппонент Δ, кг (+ тяжелее)<br/><input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Имплемент (лестница)<br/>
+                <select value={topLadder} onChange={e=>setTopLadder(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="">—</option><option value="fat_gripz">Fat Gripz</option><option value="rolling_thunder">Rolling Thunder</option><option value="apollon_axle">Axle</option><option value="saxon_bar">Saxon</option><option value="pinch_block">Pinch Block</option><option value="hub">Hub</option><option value="coc_bullet">CoC Bullet</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Результат (кг/с)<br/><input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Приоритет старта<br/>
+                <select value={topCalPrio} onChange={e=>setTopCalPrio(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="A">A (тейпер 3н)</option><option value="B">B (тейпер 2н)</option><option value="C">C (без тейпера)</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Серия<br/>
+                <select value={topCalSeries} onChange={e=>setTopCalSeries(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="local">Локальный</option><option value="waf_worlds">WAF Worlds</option><option value="east_vs_west">East-vs-West</option><option value="super_series">Super Series</option>
+                </select>
+              </label>
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topSim} onChange={e=>setTopSim(e.target.checked)} /> Contest-sim неделя</label>
+            </div>
+            {(topOpp !== 'unknown' || topWD) && (()=>{
+              try {
+                const mp = profileOpponent({ myTechnique: technique, oppStyle: topOpp, oppHand: topOppHand, weightDeltaKg: parseFloat(topWD) || 0, strapExpected: proStrap });
+                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}.</div>;
+              } catch { return null; }
+            })()}
+            {topLadder && (()=>{
+              try {
+                const sex = linked?.profile?.personal?.sex || 'male';
+                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
+              } catch { return null; }
+            })()}
+            {(proDate && topSim) && (()=>{
+              try {
+                const sim = buildContestSimWeek({ level, discipline, strapExpected: proStrap, targetKg: parseFloat(proTargetW) || undefined, supermatch: proSupermatch });
+                return <div style={{ ...SMALL, marginTop: 6, color: '#e6a23c' }}>{sim.note} Чеклист: {sim.checklist.slice(0,3).join(' · ')}.</div>;
+              } catch { return null; }
+            })()}
+            {proDate && (()=>{
+              try {
+                const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
+                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Календарь: {cal.note}</div>;
+              } catch { return null; }
+            })()}
           </div>
 
           <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop: 14 }}>⚡ Собрать план</button>
