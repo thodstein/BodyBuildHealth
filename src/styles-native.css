@@ -27,7 +27,7 @@ html.app-native {
   --text: #f4f7ff;
   --text-dim: rgba(226, 236, 255, 0.72);
   --text-light: rgba(226, 236, 255, 0.92);
-  --text-faint: rgba(226, 236, 255, 0.45);
+  --text-faint: rgba(226, 236, 255, 0.52);
   --accent: #c9f73a;
   --accent-rgb: 201, 247, 58;
   --accent-2: #00e68a;
@@ -3676,8 +3676,8 @@ html.app-native[data-apk-theme='light'] {
   --text-dim: rgba(11, 21, 38, 0.66);
   --text-light: rgba(11, 21, 38, 0.9);
   --text-faint: rgba(11, 21, 38, 0.4);
-  --accent: #4d9e00;
-  --accent-2: #00875a;
+  --accent: #3a7300;
+  --accent-2: #006b45;
   --accent-contrast: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.78);
   --glass-border: rgba(11, 21, 38, 0.1);

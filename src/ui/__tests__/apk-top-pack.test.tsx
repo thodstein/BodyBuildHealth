@@ -327,6 +327,81 @@ describe('APK TOP pack', () => {
     ).toBe(true);
   });
 
+  it('WCAG: контрасты тем и акцентов держат AA (замер по токенам)', () => {
+    const css = readCss('styles-native.css');
+    // Достаём блок `selector { ... }` без вложенностей (токены — плоские).
+    const block = (sel: string): string => {
+      const i = css.indexOf(sel);
+      if (i < 0) throw new Error(`no block ${sel}`);
+      const open = css.indexOf('{', i);
+      const close = css.indexOf('}', open);
+      return css.slice(open + 1, close);
+    };
+    const vars = (body: string): Record<string, string> => {
+      const out: Record<string, string> = {};
+      for (const m of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+      return out;
+    };
+    const hex = (h: string): [number, number, number] => {
+      const n = parseInt(h.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const chan = (c: number) => {
+      c /= 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    const lum = (c: [number, number, number]) =>
+      0.2126 * chan(c[0]) + 0.7152 * chan(c[1]) + 0.0722 * chan(c[2]);
+    const ratio = (a: [number, number, number], b: [number, number, number]) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // Цвет токена: #hex | rgba(r,g,b,a) | rgba(var(--x-rgb), a) поверх фона.
+    const paint = (
+      v: Record<string, string>,
+      name: string,
+      bg: [number, number, number],
+    ): [number, number, number] => {
+      const raw = v[name];
+      const mHex = /^#([0-9a-fA-F]{6})$/.exec(raw);
+      if (mHex) return hex(raw);
+      const mRgba = /^rgba\(\s*(.+?)\s*,\s*([0-9.]+)\s*\)$/.exec(raw);
+      if (!mRgba) throw new Error(`unparsed ${name} = ${raw}`);
+      let trip: [number, number, number];
+      const vm = /^var\(--([\w-]+)\)$/.exec(mRgba[1]);
+      if (vm) {
+        trip = (v[vm[1]] || vars(block('html.app-native'))[vm[1]])
+          .split(',')
+          .map((s) => Number(s.trim())) as [number, number, number];
+      } else {
+        trip = mRgba[1].split(',').map((s) => Number(s.trim())) as [number, number, number];
+      }
+      const a = Number(mRgba[2]);
+      return trip.map((c, i) => Math.round(c * a + bg[i] * (1 - a))) as [number, number, number];
+    };
+
+    const navy: [number, number, number] = [5, 11, 22];
+    const paper: [number, number, number] = [238, 242, 246];
+    const base = vars(block('html.app-native'));
+    // Тёмная тема: текст 7+, остальное 4.5+.
+    expect(ratio(paint(base, 'text', navy), navy)).toBeGreaterThanOrEqual(7);
+    expect(ratio(paint(base, 'text-dim', navy), navy)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(paint(base, 'text-faint', navy), navy)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(paint(base, 'accent-contrast', navy), paint(base, 'accent', navy))).toBeGreaterThanOrEqual(4.5);
+    // Все акценты читаются на navy и несут свой контраст.
+    for (const id of ['mint', 'sky', 'violet', 'amber']) {
+      const a = { ...base, ...vars(block(`html.app-native[data-apk-accent='${id}']`)) };
+      expect(ratio(paint(a, 'accent', navy), navy), id).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(paint(a, 'accent-contrast', navy), paint(a, 'accent', navy)), id).toBeGreaterThanOrEqual(4.5);
+    }
+    // Светлая тема: текст 7+, dim/акценты 4.5+.
+    const light = { ...base, ...vars(block("html.app-native[data-apk-theme='light']")) };
+    expect(ratio(paint(light, 'text', paper), paper)).toBeGreaterThanOrEqual(7);
+    expect(ratio(paint(light, 'text-dim', paper), paper)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(paint(light, 'accent', paper), paper)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(paint(light, 'accent-2', paper), paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {
     // Дефолтный профиль уже даёт ≥ 50% — дот не горит без повода.
     expect(getNavBadges()).toEqual({ support: '', profile: '' });
