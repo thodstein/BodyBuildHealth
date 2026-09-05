@@ -6,6 +6,7 @@ import type { ArmBuilderInput } from './arm-types';
 import { buildArmPlan } from './arm-builder.engine';
 import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
+import { superSeriesYear } from './arm-calendar.engine';
 import type { UserWeek } from '../user-program/user-program.types';
 
 export interface ArmAnnualBuildResult {
@@ -74,6 +75,17 @@ export function buildArmBlock(
     planStartWeek: config.planStartWeek,
     sex: config.sex as any,
     weightClass: (config as any).weightClass || (block as any).weightClass,
+    // TOP wave-6: сквозные поля (опциональны, билдер gated)
+    oppStyle: (config as any).oppStyle,
+    oppHand: (config as any).oppHand,
+    weightDeltaKg: (config as any).weightDeltaKg,
+    rfd: (config as any).rfd,
+    gripPhase: (config as any).gripPhase,
+    ladderFrom: (config as any).ladderFrom,
+    ladderValue: (config as any).ladderValue,
+    contestSim: (config as any).contestSim,
+    leftKg: (config as any).leftKg,
+    rightKg: (config as any).rightKg,
   } as ArmBuilderInput;
 
   let plan: any = buildArmPlan(input);
@@ -105,4 +117,32 @@ export function buildArmBlock(
     peakApplied: block.phase === 'peaking',
     configHash,
   };
+}
+
+export interface ArmYearBlock {
+  blockKey: string;
+  weeks: number;
+  phase: 'base' | 'strength' | 'peaking' | 'transition';
+  priority: 'A' | 'B' | 'C';
+  focus: string;
+}
+
+/**
+ * TOP wave-6: год из шаблона серии → блоки для buildArmBlock.
+ * Приоритет A → peaking, B → strength, C → base. Чистая функция.
+ */
+export function buildArmYearBlocks(
+  series: string,
+  totalWeeks = 52,
+  baseConfig: Record<string, unknown> = {},
+): ArmYearBlock[] {
+  const tpl = superSeriesYear(series, totalWeeks);
+  return tpl.stages.map((st, i) => ({
+    blockKey: `arm-${tpl.series}-${i + 1}`,
+    weeks: st.weeks,
+    phase: (st.priority === 'A' ? 'peaking' : st.priority === 'B' ? 'strength' : 'base') as ArmYearBlock['phase'],
+    priority: st.priority,
+    focus: st.focus,
+    ...baseConfig,
+  })) as ArmYearBlock[];
 }
