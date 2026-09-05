@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 describe('DashboardScreen platform branching', () => {
-  it('1. native → PRO-home: приветствие, статистика, 9 разделов, тот же hero', async () => {
+  it('1. native → PRO-home: тот же hero + только Профиль/Магазин/Статьи', async () => {
     setCapacitorNative();
     await resetPlatform();
     render(<DashboardScreen />);
@@ -44,41 +44,26 @@ describe('DashboardScreen platform branching', () => {
     const img = document.querySelector('.native-home-bg img') as HTMLImageElement | null;
     expect(img).not.toBeNull();
     expect(img?.getAttribute('src')).toContain('hero-main.png');
-    // Приветствие
-    expect(
-      screen.getByText(/Доброе утро|Добрый день|Добрый вечер|Доброй ночи/),
-    ).not.toBeNull();
-    // Статистика
-    expect(screen.getByText('тренировок на неделе')).not.toBeNull();
-    expect(screen.getByText('вес, кг')).not.toBeNull();
-    expect(screen.getByText('сон, ч')).not.toBeNull();
-    // Все 9 разделов
-    for (const label of [
-      'Тренинг',
-      'Питание',
-      'Анализы',
-      'Риски',
-      'Фарма',
-      'БАДы',
-      'Профиль',
-      'Статьи',
-      'Магазин',
-    ]) {
-      expect(screen.getByText(label)).not.toBeNull();
-    }
+    // Только 3 кнопки — без приветствий, статистики и плиток
+    expect(screen.getByText('Профиль')).not.toBeNull();
+    expect(screen.getByText('Магазин')).not.toBeNull();
+    expect(screen.getByText('Статьи')).not.toBeNull();
+    expect(screen.queryByText(/Доброе утро|Добрый день|Добрый вечер|Доброй ночи/)).toBeNull();
+    expect(screen.queryByText('Тренинг')).toBeNull();
+    expect(screen.queryByText('тренировок на неделе')).toBeNull();
     // Герой чистый: настроек телефона тут нет — они в Профиле → Настройки
     expect(document.querySelector('.native-feature-card')).toBeNull();
     expect(screen.queryByText('Виджеты на рабочий стол')).toBeNull();
     expect(screen.queryByText('Возможности APK')).toBeNull();
   });
 
-  it('2. native → клик по плитке ведёт в раздел', async () => {
+  it('2. native → клик по кнопке ведёт в раздел', async () => {
     setCapacitorNative();
     await resetPlatform();
     const calls: string[] = [];
     render(<DashboardScreen onNavigate={(s) => calls.push(s)} />);
-    fireEvent.click(screen.getByText('Тренинг'));
-    expect(calls).toEqual(['training']);
+    fireEvent.click(screen.getByText('Профиль'));
+    expect(calls).toEqual(['profile']);
   });
 
   it('3. web/Telegram → классический hero без изменений (3 кнопки)', async () => {

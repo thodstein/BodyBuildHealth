@@ -408,6 +408,31 @@ html.app-native .native-home-content {
   margin: 0 auto;
 }
 
+/* Лендинг Главной: hero на весь экран, внизу — только 3 кнопки. */
+html.app-native .native-home-landing {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 20px);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+html.app-native .native-home-trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+html.app-native .native-home-trio .native-home-tile {
+  aspect-ratio: 1;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
 html.app-native .native-home-kicker {
   font-size: 11px;
   font-weight: 800;
