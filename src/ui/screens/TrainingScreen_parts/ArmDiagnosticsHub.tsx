@@ -38,6 +38,8 @@ import { scorePlatform, planAttempts, loadPlatformLog, savePlatformLogEntry } fr
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
+import { analyzeTableIq } from '../../../engines/arm/arm-table-iq.engine';
+import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -46,6 +48,30 @@ import { haptics, isOnline } from '../../../core/native-bridge';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
+// TOP T1/T7b: Table-IQ журнал + матчап (отдельные ключи, v4-стейт не трогаем)
+const TIQ_KEY = 'he_arm_table_iq';
+const MU_KEY = 'he_arm_matchup';
+export interface TiqBout { fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number }
+function loadTiq(): TiqBout[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(TIQ_KEY) : null;
+    const j = raw ? JSON.parse(raw) : [];
+    return Array.isArray(j) ? j.filter((b) => b && typeof b === 'object').slice(0, 60) : [];
+  } catch { return []; }
+}
+function saveTiq(bouts: TiqBout[]): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(TIQ_KEY, JSON.stringify(bouts.slice(0, 60))); } catch {}
+}
+function loadMu(): { opp: string; hand: string; wd: string } {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MU_KEY) : null;
+    const j = raw ? JSON.parse(raw) : {};
+    return { opp: String((j as any).opp || 'unknown'), hand: String((j as any).hand || 'unknown'), wd: String((j as any).wd || '') };
+  } catch { return { opp: 'unknown', hand: 'unknown', wd: '' }; }
+}
+function saveMu(mu: { opp: string; hand: string; wd: string }): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(MU_KEY, JSON.stringify(mu)); } catch {}
+}
 // D4: персистентность P1/P2-состояния (отдельный ключ, v4-стейт не трогаем)
 const P1_KEY = 'he_arm_diagnostics_hub_p1';
 function loadP1State(): Record<string, any> {
@@ -194,6 +220,25 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [attKg, setAttKg] = useState(String((p1saved as any).attKg ?? ''));
   const [attOk, setAttOk] = useState(true);
   const [attTick, setAttTick] = useState(0);
+  // TOP T1/T7b: матчап + Table-IQ журнал (свои ключи)
+  const [tiq, setTiq] = useState<TiqBout[]>(() => loadTiq());
+  const [tiqFouls, setTiqFouls] = useState('');
+  const [tiqWin, setTiqWin] = useState(true);
+  const [tiqSlip, setTiqSlip] = useState(false);
+  const [tiqStrap, setTiqStrap] = useState(false);
+  const [tiqCenter, setTiqCenter] = useState('');
+  const [tiqFinish, setTiqFinish] = useState('');
+  const [muState, setMuState] = useState(() => loadMu());
+  const addTiqBout = () => {
+    const b: TiqBout = {
+      fouls: Math.max(0, Math.round(Number(tiqFouls) || 0)),
+      win: tiqWin, slip: tiqSlip, strap: tiqStrap,
+      centerHoldSec: tiqCenter ? Number(tiqCenter) : undefined,
+      finishSec: tiqWin && tiqFinish ? Number(tiqFinish) : undefined,
+    };
+    setTiq((prev) => { const next = [...prev, b].slice(-60); saveTiq(next); return next; });
+    setTiqFouls(''); setTiqWin(true); setTiqSlip(false); setTiqStrap(false); setTiqCenter(''); setTiqFinish('');
+  };
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const handsRef = useRef<{ stop: () => void } | null>(null);
@@ -885,6 +930,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
       bilateral: bilatP0 ? { weakArm: bilatP0.weakArm, weakSets: bilatP0.weakSets, strongSets: bilatP0.strongSets } : null,
       attempts: attHistP0,
     });
+    // TOP: матчап + Table-IQ едут в конструктор тем же payload (аддитивно)
+    try {
+      (payload as any).armMatchup = { oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 };
+      if (tiq.length) (payload as any).armBouts = tiq;
+    } catch {}
     applyToPlanner({
       kind: 'weakpoints',
       label: `Арм диагностика: ${(weakPoints && weakPoints.length? weakPoints.join(',') : toApply.join(','))}`,
@@ -1337,6 +1387,47 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   return <div key={wk} style={{ flex:1, height:18, background:col, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:9, fontWeight:700 }}>{wk}:{kind[0]}</div>;
                 })}
               </div>
+            </div>
+            {/* TOP T1/T7b: матчап + Table-IQ журнал */}
+            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.16)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🥇 TOP: матчап + Table-IQ журнал</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginTop:6 }}>
+                <label style={{ fontSize:10, color:DIM }}>Оппонент<br/>
+                  <select value={muState.opp} onChange={e=>{ const v={...muState, opp:e.target.value}; setMuState(v); saveMu(v); }} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
+                    <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
+                  </select>
+                </label>
+                <label style={{ fontSize:10, color:DIM }}>Рука<br/>
+                  <select value={muState.hand} onChange={e=>{ const v={...muState, hand:e.target.value}; setMuState(v); saveMu(v); }} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
+                    <option value="unknown">—</option><option value="high">High</option><option value="low">Low</option><option value="neutral">Нейтраль</option>
+                  </select>
+                </label>
+                <label style={{ fontSize:10, color:DIM }}>Δ веса, кг<br/><input inputMode="decimal" value={muState.wd} onChange={e=>{ const v={...muState, wd:e.target.value}; setMuState(v); saveMu(v); }} placeholder="0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }} /></label>
+              </div>
+              {(()=>{ try {
+                if (muState.opp==='unknown' && !muState.wd) return null;
+                const mp = profileOpponent({ myTechnique: state.technique, oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 });
+                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}. {mp.gameplan[0]}</div>;
+              } catch { return null; } })()}
+              <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginTop:8 }}>Table-IQ: схватки ({tiq.length})</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(90px, 1fr))', gap:6, marginTop:6 }}>
+                <label style={{ fontSize:10, color:DIM }}>Фолы<br/><input inputMode="numeric" aria-label="Фолы за схватку" value={tiqFouls} onChange={e=>setTiqFouls(e.target.value)} placeholder="0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>Центр, с<br/><input inputMode="decimal" value={tiqCenter} onChange={e=>setTiqCenter(e.target.value)} placeholder="—" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>Финиш, с<br/><input inputMode="decimal" value={tiqFinish} onChange={e=>setTiqFinish(e.target.value)} placeholder="—" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+              </div>
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:6, fontSize:10, color:DIM }}>
+                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqWin} onChange={e=>setTiqWin(e.target.checked)} /> Победа</label>
+                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqSlip} onChange={e=>setTiqSlip(e.target.checked)} /> Срыв</label>
+                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqStrap} onChange={e=>setTiqStrap(e.target.checked)} /> Ремень</label>
+                <button onClick={addTiqBout} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>＋ Схватка</button>
+                {tiq.length>0 && <button onClick={()=>{ setTiq((prev)=>{ const next=prev.slice(0,-1); saveTiq(next); return next; }); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>↩ Отменить</button>}
+                {tiq.length>0 && <button onClick={()=>{ setTiq([]); saveTiq([]); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>🗑 Очистить</button>}
+              </div>
+              {(()=>{ try {
+                if (!tiq.length) return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Веди журнал схваток: фолы/срывы/ремень/центр/финиш — стол скажет, что чинить.</div>;
+                const iq = analyzeTableIq({ bouts: tiq });
+                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}><div>{iq.note}</div>{iq.levers.map((l,i)=><div key={i}>• {l}</div>)}</div>;
+              } catch { return null; } })()}
             </div>
           </div>
         )}
