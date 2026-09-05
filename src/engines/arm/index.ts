@@ -49,3 +49,4 @@ export * from './arm-lr-split.engine';
 export * from './arm-table-iq.engine';
 export * from './arm-calendar.engine';
 export * from './arm-sim-apply.engine';
+export * from './arm-table-inject.engine';

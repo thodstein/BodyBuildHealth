@@ -21,6 +21,7 @@ import { applyContestSimToPlan } from './arm-sim-apply.engine';
 import { buildGripRpe } from './arm-grip-rpe.engine';
 import { analyzeTableIq } from './arm-table-iq.engine';
 import { nextImplement } from './arm-implement-ladder.engine';
+import { injectTableCorrections } from './arm-table-inject.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -677,6 +678,21 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     } catch { /* sim опционален */ }
   }
 
+  // TOP wave-7: Table-IQ инъекция containment при срывах ≥40% (до подсчёта объёма)
+  let tableInjectNotes: string[] = [];
+  try {
+    const boutsIn = (input as any).bouts;
+    if (Array.isArray(boutsIn) && boutsIn.length) {
+      const inj = injectTableCorrections({ pattern, weeks: planWeeks, rationale: [] } as any, boutsIn, {
+        level,
+        workMax: mergedWorkMax,
+        mrvByMuscle,
+      });
+      for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
+      tableInjectNotes = inj.notes;
+    }
+  } catch { /* опционально */ }
+
   // Rationale — расширено table 3/2/1 и tendon
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
@@ -709,6 +725,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (rfdNote) rationale.push(`RFD: ${rfdNote}`);
   if (lrNote) rationale.push(lrNote);
   for (const line of simRationale) rationale.push(line);
+  for (const line of tableInjectNotes) rationale.push(line);
   const proWarnings = [...pro.warnings];
 
   // Weekly volume
