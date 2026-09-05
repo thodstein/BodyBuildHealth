@@ -56,7 +56,7 @@
   /* Apple-style card defaults (для data-theme=light) */
   --card-shadow: 0 4px 16px rgba(0,0,0,0.18);
   --hover-bg: rgba(255,255,255,0.04);
-  --text-faint: rgba(255,255,255,0.35);
+  --text-faint: rgba(255,255,255,0.5);
 }
 
 /* Светлая тема: активируется через data-theme="light" на documentElement.
@@ -67,7 +67,7 @@
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #F2F2F5;
   --text: #1D1D1F;
-  --text-dim: rgba(60,60,67,0.7);
+  --text-dim: rgba(60,60,67,0.75);
   --text-light: rgba(60,60,67,0.85);
   --card-bg: #FFFFFF;
   --card-bg-hover: #F5F5F7;
@@ -79,8 +79,9 @@
   --glass-border: rgba(60,60,67,0.12);
   --card-shadow: 0 4px 16px rgba(0,0,0,0.08);
   --hover-bg: rgba(0,0,0,0.04);
-  --text-faint: rgba(60,60,67,0.45);
+  --text-faint: rgba(60,60,67,0.6);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  --accent: #006b45;
   --accent-line: rgba(0,150,95,0.45);
   --accent-contrast: #06281c;
   --input-bg: rgba(60,60,67,0.06);
@@ -825,6 +826,9 @@ button.editor-schedule-cell {
 
 /* Focus-ring для accessibility (WCAG AAA — visible focus indicator) */
 *:focus-visible { outline: 2px solid var(--accent, #00e68a); outline-offset: 2px; }
+/* Выделение текста — фирменный акцент вместо системного синего (обе темы). */
+::selection { background: rgba(0, 230, 138, 0.35); }
+[data-theme="light"] ::selection { background: rgba(0, 135, 90, 0.3); }
 button:focus-visible, [role="button"]:focus-visible { outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
 html, body { 
