@@ -22,10 +22,12 @@ import { buildGripRpe } from './arm-grip-rpe.engine';
 import { analyzeTableIq } from './arm-table-iq.engine';
 import { nextImplement } from './arm-implement-ladder.engine';
 import { injectTableCorrections } from './arm-table-inject.engine';
+import { longevityTrackFor } from './arm-longevity.engine';
+import { injectGripProtocol } from './arm-grip-protocol.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
-function distributeArmPhases(totalWeeks: number, goal: string): Record<number, string> {
+function distributeArmPhases(totalWeeks: number, goal: string, deloadEvery = 4): Record<number, string> {
   const map: Record<number, string> = {};
   if (totalWeeks <= 0) return map;
   if (goal === 'peaking') {
@@ -37,7 +39,6 @@ function distributeArmPhases(totalWeeks: number, goal: string): Record<number, s
     }
     return map;
   }
-  const deloadEvery = 4;
   for (let w = 1; w <= totalWeeks; w++) {
     if (w % deloadEvery === 0) map[w] = 'deload';
     else if (w <= Math.ceil(totalWeeks * 0.6)) map[w] = 'accumulation';
@@ -455,7 +456,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     volumeTargets[m] = { muscle: m, frequency: freq, mev: lm.mev, mav: lm.mav, mrv, targetSets: target, minSetsPerSession: 2, maxSetsPerSession: perExerciseCap(m, level), rationale: `target ${target}` };
   }
 
-  const phaseMap = distributeArmPhases(weeks, goal);
+  // TOP wave-13: masters 50+ — делоад каждая 3-я неделя (longevity Devon-трек)
+  let mastersDeload = false;
+  try {
+    const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
+    mastersDeload = track === 'grandmaster' || track === 'supergrand';
+  } catch { mastersDeload = false; }
+  const phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
   const planWeeks: ArmWeek[] = [];
@@ -745,6 +752,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
   rationale.push(`Сплит: ${pattern.name} (${pattern.sessionsPerRotation}x/${pattern.rotationDays}дн)`);
   rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
+  if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
   const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');
   rationale.push(`Table 3/2/1: ${tableKinds} (moderate 50-75% 1-3мин / heavy 75-100% 10с-1мин / stress 100-125% 5-10с)`);
@@ -774,6 +782,24 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   for (const line of simRationale) rationale.push(line);
   for (const line of tableInjectNotes) rationale.push(line);
   if (uniBonusSets > 0) rationale.push(`L/R добивка: +${uniBonusSets} унилатеральных сетов слабой (${lrWeak}) в клампе MRV.`);
+  // TOP wave-13: отдельный peak-протокол хвата (только явная фаза, не авто)
+  try {
+    const gp = String(input.gripPhase || '').toLowerCase();
+    if (gp === 'peak' || gp === 'intensification') {
+      const gf = String((input as any).gripFocus || '').toLowerCase();
+      const gmus = gf === 'pinch' || gf === 'hub' ? 'grip_pinch' : gf === 'crush' ? 'grip_crush' : 'grip_support';
+      const holder = { pattern, weeks: planWeeks, rationale: [] as string[] };
+      const inj = injectGripProtocol(holder as any, gp === 'peak' ? 'over' : 'neg', {
+        muscle: gmus,
+        workMax: mergedWorkMax,
+        mrv: mrvByMuscle[gmus],
+        level,
+        equipment: input.equipment,
+      });
+      for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
+      for (const line of (inj.plan.rationale || [])) rationale.push(line);
+    }
+  } catch { /* опционально */ }
   const proWarnings = [...pro.warnings];
 
   // Weekly volume
