@@ -206,6 +206,7 @@ describe('ArmDiagnosticsHub PRO', () => {
     render(<ArmDiagnosticsHub />);
     expect(screen.getByText('🖨 HTML')).toBeTruthy();
     expect(screen.getByText('📥 CSV')).toBeTruthy();
+    expect(screen.getByText('🖨 Печать')).toBeTruthy();
   });
 
   it('P2 E15: снапшот замеров копит историю', () => {

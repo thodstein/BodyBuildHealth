@@ -791,6 +791,18 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  const handlePrintP0 = () => {
+    try {
+      const html = buildArmDiagnosticsHtml(exportDataP0() as any);
+      const w = window.open('', '_blank');
+      if (!w) { setInjectMsg('⚠ Всплывающие окна заблокированы — используй 🖨 HTML'); setTimeout(() => setInjectMsg(''), 2500); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch { /* noop */ }
+  };
+
   const mockGuard = useMemo(() => {
     // превью гвардов учитывает и чипы 12 точек, а не только legacy-чекбоксы (паритет с движком отчёта)
     const sideOn = state.side || state.weakPoints.some(wp => wp === 'side_mid' || wp === 'side_pin');
@@ -1589,6 +1601,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
             <button onClick={handleRollbackP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>↩ Откат</button>
           )}
           <button onClick={handleExportHtmlP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>🖨 HTML</button>
+          <button onClick={handlePrintP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>🖨 Печать</button>
           <button onClick={handleExportCsvP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>📥 CSV</button>
           {criticalSideP0 && <span style={{ fontSize: 10, color: '#ef4444' }}>🔴 критично — side только ремень/изометрия</span>}
         </div>
