@@ -369,7 +369,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               {draft.photos.map((src, i) => (
                 <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={src} alt="" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}

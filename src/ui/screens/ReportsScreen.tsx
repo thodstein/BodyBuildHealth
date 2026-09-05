@@ -153,7 +153,7 @@ export const ReportsScreen: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             {photos.map((p, i) => (
               <div key={i} style={{ width: '45%', minWidth: 140, position: 'relative' }}>
-                <img src={p.dataUrl} style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
+                <img src={p.dataUrl} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
                 <button onClick={() => handleDeletePhoto(i)} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: 'rgba(239,68,68,0.8)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                 <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 2 }}>{p.date} {p.label || ''}</div>
               </div>

@@ -1704,7 +1704,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         {row.photos && row.photos.length > 0 ? (
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             {row.photos.map((src, i) => (
-                              <img key={i} src={src} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setViewPhoto({ src, date: row.date })} />
+                              <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setViewPhoto({ src, date: row.date })} />
                             ))}
                           </div>
                         ) : (

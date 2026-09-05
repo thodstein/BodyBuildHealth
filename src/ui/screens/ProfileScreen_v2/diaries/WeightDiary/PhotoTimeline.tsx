@@ -104,6 +104,7 @@ export const PhotoTimeline: React.FC<PhotoTimelineProps> = ({ rows }) => {
                   <img
                     key={i}
                     src={src}
+                    decoding="async"
                     alt={`Progress ${entry.date} #${i + 1}`}
                     style={{
                       maxWidth: 'calc(33.333% - 6px)',

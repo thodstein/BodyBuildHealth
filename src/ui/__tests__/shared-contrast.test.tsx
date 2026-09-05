@@ -78,4 +78,21 @@ describe('shared layer WCAG', () => {
     expect(css).toContain('::selection');
     expect(css).toContain('[data-theme="light"] ::selection');
   });
+
+  it('табличные цифры в статистике (без прыжков при обновлении)', () => {
+    expect(css.replace(/\s+/g, ' ')).toContain('td, .stat-value, [data-stat]');
+  });
+});
+
+describe('below-fold images', () => {
+  const src = (p: string) =>
+    fs.readFileSync(path.join(process.cwd(), 'src', p), 'utf-8');
+  it('списки/отчёты грузят фото лениво (hero — eager, не трогаем)', () => {
+    for (const f of [
+      'ui/screens/ReportsScreen.tsx',
+      'ui/screens/ProfileScreen_v2/diaries/WeightDiary/PhotoTimeline.tsx',
+    ]) {
+      expect(src(f), f).toContain('loading="lazy"');
+    }
+  });
 });

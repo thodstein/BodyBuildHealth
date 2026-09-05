@@ -2788,6 +2788,12 @@ select option {
 .training-screen select {
   font-variant-numeric: tabular-nums;
 }
+/* Табличные цифры в статистике/таблицах — числа не «прыгают» при обновлении. */
+td,
+.stat-value,
+[data-stat] {
+  font-variant-numeric: tabular-nums;
+}
 
 /* ────────── PROGRESS BAR (анимированные, градиентные) ────────── */
 .training-screen div[style*="background: rgba(255,255,255,0.05)"][style*="height: 4px"],
