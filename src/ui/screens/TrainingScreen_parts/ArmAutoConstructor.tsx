@@ -274,12 +274,16 @@ export function ArmAutoConstructor() {
         try {
           const p: any = linked?.profile ?? {};
           const lifestyle: any = p.lifestyle ?? p.personal ?? {};
+          const per: any = p?.settings?.personal ?? p?.personal ?? {};
           return {
             bodyFat: p.personal?.bodyFat ?? p.personal?.bodyFatPct,
             leanMass: p.personal?.leanMass,
             hrvMs: lifestyle?.morningHRV ?? lifestyle?.hrvMs,
             sleepHours: lifestyle?.sleepHours,
             stressLevel: lifestyle?.stressLevel,
+            // TOP wave-14: fallback веса/возраста из профиля, если стор подгрузился после mount
+            profileWeight: Number(per?.weight) > 0 ? Number(per.weight) : undefined,
+            profileAge: Number(per?.age) > 0 ? Number(per.age) : undefined,
           };
         } catch { return {}; }
       })();
@@ -302,9 +306,9 @@ export function ArmAutoConstructor() {
         hrvMs: recovery.hrvMs,
         sleepHours: recovery.sleepHours,
         stressLevel: recovery.stressLevel,
-        // PRO A–J (пустые строки = не задано)
-        bodyWeightKg: parseFloat(proBw) > 0 ? parseFloat(proBw) : (recovery as any).bodyWeightKg,
-        ageYears: parseFloat(proAge) > 0 ? parseFloat(proAge) : undefined,
+        // PRO A–J (пустые строки = не задано; вес/возраст добираются из профиля)
+        bodyWeightKg: parseFloat(proBw) > 0 ? parseFloat(proBw) : (recovery as any).bodyWeightKg ?? (recovery as any).profileWeight,
+        ageYears: parseFloat(proAge) > 0 ? parseFloat(proAge) : (recovery as any).profileAge,
         arm: (proArm === 'left' || proArm === 'right' ? proArm : 'both') as any,
         leftKg: parseFloat(proLeft) > 0 ? parseFloat(proLeft) : undefined,
         rightKg: parseFloat(proRight) > 0 ? parseFloat(proRight) : undefined,

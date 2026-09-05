@@ -456,7 +456,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     volumeTargets[m] = { muscle: m, frequency: freq, mev: lm.mev, mav: lm.mav, mrv, targetSets: target, minSetsPerSession: 2, maxSetsPerSession: perExerciseCap(m, level), rationale: `target ${target}` };
   }
 
-  // TOP wave-13: masters 50+ — делоад каждая 3-я неделя (longevity Devon-трек)
+  // TOP wave-13: masters 50+ — делоад каждая 3-я неделя (longevity Devon-трек).
+  // Граница осознанная: 40–49 (master) хватает среза объёма ×0.9 из longevity;
+  // ускоренный каденс только с 50 (grandmaster+), где сухожилия восстанавливаются
+  // медленнее и цена пропущенного делоада выше.
   let mastersDeload = false;
   try {
     const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
