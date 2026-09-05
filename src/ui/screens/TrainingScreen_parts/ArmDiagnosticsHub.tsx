@@ -40,6 +40,7 @@ import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { analyzeTableIq } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
+import { buildRehabPlan } from '../../../engines/arm/arm-rehab.engine';
 import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -229,6 +230,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [tiqCenter, setTiqCenter] = useState('');
   const [tiqFinish, setTiqFinish] = useState('');
   const [muState, setMuState] = useState(() => loadMu());
+  // TOP T5b: return-to-pull (локальное состояние, без персиста)
+  const [rhInjury, setRhInjury] = useState('none');
+  const [rhWeeks, setRhWeeks] = useState('');
+  const [rhPain, setRhPain] = useState('');
+  const [rhSurg, setRhSurg] = useState(false);
   const addTiqBout = () => {
     const b: TiqBout = {
       fouls: Math.max(0, Math.round(Number(tiqFouls) || 0)),
@@ -1604,6 +1610,31 @@ export const ArmDiagnosticsHub: React.FC = () => {
               </div>
               <div style={{ fontSize:10, color:DIM, marginTop:6 }}>{autoregP0 ? `${autoregP0.note} · объём ×${autoregP0.volumeMult} · RIR+${autoregP0.rirShift}${autoregP0.extraRestDays ? ` · +${autoregP0.extraRestDays} дн отдыха` : ''}` : 'Нет sRPE за 7д — план без изменений'}</div>
               <div style={{ fontSize:10, color:DIM, marginTop:6 }}><b style={{ color:'#fff' }}>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length + guardsP0.humerus.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon/humerus чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon, ...guardsP0.humerus].slice(0, 5).join(' · ')}</div>
+            </div>
+            {/* TOP T5b: return-to-pull 10–16 нед */}
+            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🩹 Return-to-pull (после травмы)</div>
+              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'flex-end' }}>
+                <label style={{ fontSize:10, color:DIM }}>Травма<br />
+                  <select aria-label="Травма для return-to-pull" value={rhInjury} onChange={(e) => setRhInjury(e.target.value)} style={{ marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }}>
+                    <option value="none">—</option><option value="humerus">Перелом плеча</option><option value="ucl">UCL/связка локтя</option><option value="biceps">Бицепс</option><option value="elbow_tendon">Тендинопатия локтя</option><option value="wrist">Кисть/запястье</option>
+                  </select>
+                </label>
+                <label style={{ fontSize:10, color:DIM }}>Недель с травмы<br /><input aria-label="Недель с травмы" inputMode="numeric" value={rhWeeks} onChange={(e) => setRhWeeks(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM }}>Боль 0-10<br /><input aria-label="Боль при травме 0-10" inputMode="decimal" value={rhPain} onChange={(e) => setRhPain(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+                <label style={{ fontSize:10, color:DIM, display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={rhSurg} onChange={(e) => setRhSurg(e.target.checked)} /> Операция была</label>
+              </div>
+              {(()=>{ try {
+                if (rhInjury==='none') return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Скрининг, не диагноз: выбери травму — покажем фазу, допуски и критерии перехода.</div>;
+                const rh = buildRehabPlan({ injury: rhInjury, weeksSince: parseFloat(rhWeeks) || 0, pain: parseFloat(rhPain) || 0, surgery: rhSurg });
+                return <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:10, color:'#fff' }}><b>Фаза {rh.phase}: {rh.current.title}</b> ({rh.current.weeks})</div>
+                  <div style={{ fontSize:10, color:DIM, marginTop:2 }}>✅ {rh.current.allowed.slice(0,3).join(' · ')}</div>
+                  <div style={{ fontSize:10, color:'#ef4444', marginTop:2 }}>⛔ {rh.current.forbidden.slice(0,3).join(' · ')}</div>
+                  <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Дальше: {rh.current.criteriaToNext}</div>
+                  <div style={{ fontSize:10, color:'#f59e0b', marginTop:2 }}>{rh.redFlags[0]}</div>
+                </div>;
+              } catch { return null; } })()}
             </div>
             {showScoring && scoring && (
               <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>

@@ -46,4 +46,19 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     render(<ArmAutoConstructor />);
     expect(document.body.textContent).toContain('TOP: матчап');
   });
+
+  it('Grip-RPE превью в конструкторе', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.change(screen.getByLabelText('Grip-RPE неделя'), { target: { value: '3' } });
+    expect(document.body.textContent).toContain('Grip-RPE:');
+  });
+
+  it('recovery-таб показывает return-to-pull', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('Return-to-pull');
+    fireEvent.change(screen.getByLabelText('Травма для return-to-pull'), { target: { value: 'ucl' } });
+    fireEvent.change(screen.getByLabelText('Недель с травмы'), { target: { value: '8' } });
+    expect(document.body.textContent).toContain('Фаза 2');
+  });
 });
