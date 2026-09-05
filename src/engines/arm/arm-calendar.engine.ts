@@ -22,6 +22,7 @@ export interface ArmCalendarInput {
   startKg?: number;
   targetKg?: number;
   sex?: string;
+  totalWeeks?: number; // горизонт годового шаблона (default 52)
 }
 
 export interface ArmCalendar {
@@ -139,7 +140,7 @@ export function buildArmCalendar(input: ArmCalendarInput = {}): ArmCalendar {
     cut: { lossKg, weeklyLossKg, ratePct, targetRate, status, note: cutNote },
     milestones,
     note: `До старта ${weeksOut} нед (${phase}, ${prio}) · ${taperNote} ${cutNote}`,
-    stages: [],
+    stages: superSeriesYear(series, (input as any).totalWeeks ?? 52).stages,
   };
 }
 

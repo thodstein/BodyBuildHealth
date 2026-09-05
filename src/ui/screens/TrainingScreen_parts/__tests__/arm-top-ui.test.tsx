@@ -61,4 +61,10 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     fireEvent.change(screen.getByLabelText('Недель с травмы'), { target: { value: '8' } });
     expect(document.body.textContent).toContain('Фаза 2');
   });
+
+  it('TOP-карта: CNS-поля на месте', () => {
+    render(<ArmAutoConstructor />);
+    expect(document.body.textContent).toContain('Тяж. хвата/нед (CNS)');
+    expect(document.body.textContent).toContain('Часов с тяж. тяг');
+  });
 });

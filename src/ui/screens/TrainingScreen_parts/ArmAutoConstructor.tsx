@@ -117,6 +117,8 @@ export function ArmAutoConstructor() {
   const [topCalSeries, setTopCalSeries] = useState<string>('local');
   const [topGripWeek, setTopGripWeek] = useState<string>('');
   const [topGripPhase, setTopGripPhase] = useState<string>('auto');
+  const [topHeavy, setTopHeavy] = useState<string>('');
+  const [topPullH, setTopPullH] = useState<string>('');
 
   const workMax = useMemo(() => {
     try {
@@ -301,6 +303,10 @@ export function ArmAutoConstructor() {
         calStartIso: proDate || undefined,
         calPriority: topCalPrio,
         calSeries: topCalSeries,
+        cnsCheck: topHeavy !== '' || topPullH !== '' ? true : undefined,
+        heavyGripThisWeek: parseInt(topHeavy) >= 0 ? parseInt(topHeavy) : undefined,
+        hoursSinceHeavyPull: parseFloat(topPullH) > 0 ? parseFloat(topPullH) : undefined,
+        bouts: (()=>{ try { const raw = localStorage.getItem('he_arm_table_iq'); if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr.slice(0, 60); } } catch {} return undefined; })(),
       });
       plan = finalizeArmPlan(plan, { level });
       // PRO инъекция 12 мёртвых точек (если пришли из хаба) — parity с TA
@@ -582,6 +588,8 @@ export function ArmAutoConstructor() {
                   <option value="auto">Авто</option><option value="volume">Объём RPE7</option><option value="intensification">Интенс. RPE8</option><option value="peak">Пик RPE9</option><option value="deload">Делоад</option>
                 </select>
               </label>
+              <label style={{ ...SMALL }}>Тяж. хвата/нед (CNS)<br/><input value={topHeavy} onChange={e=>setTopHeavy(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              <label style={{ ...SMALL }}>Часов с тяж. тяг<br/><input value={topPullH} onChange={e=>setTopPullH(e.target.value)} placeholder="72" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
             </div>
             <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
