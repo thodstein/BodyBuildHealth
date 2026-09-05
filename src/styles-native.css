@@ -3866,6 +3866,33 @@ html.app-native [data-toast-root] {
   bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
 }
 
+/* Офлайн-пилюля: над навбаром, под FAB; в TG селектор не матчится. */
+html.app-native .native-offline {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 110px);
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: var(--type-callout);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ffd9a0;
+  background: rgba(60, 30, 5, 0.88);
+  border: 1px solid rgba(255, 165, 2, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: nativeFadeUp 0.25s var(--motion-spring);
+}
+
 /* 58.10 Планшеты: контент центрируется, hero остаётся на весь экран. */
 @media (min-width: 720px) {
   html.app-native .screen {

@@ -7,9 +7,16 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// native-bridge тянет TG/Web-цепочку с CSS — для FAB мокаем только haptics.
-vi.mock('../../core/native-bridge', () => ({ haptics: vi.fn() }));
+// native-bridge тянет TG/Web-цепочку с CSS — мокаем целиком.
+vi.mock('../../core/native-bridge', () => ({
+  haptics: vi.fn(),
+  isOnline: vi.fn(() => true),
+  watchOnline: vi.fn(() => () => {}),
+  initNativeChrome: vi.fn(async () => {}),
+}));
 import { NativeFab } from '../native/NativeFab';
+import { NativeOfflinePill } from '../native/NativeOfflinePill';
+import { isOnline, watchOnline } from '../../core/native-bridge';
 import { HeroImg } from '../HeroImg';
 import { getNavBadges } from '../native/nav-badges';
 // ВНИМАНИЕ: CSS читаем через process.cwd(), а НЕ через new URL(*.css,
@@ -88,15 +95,16 @@ describe('APK TOP pack', () => {
   });
 
   it('NativeFab: вода +250 уходит в очередь виджета', async () => {
+    const { waitFor } = await import('@testing-library/react');
     const { container } = render(<NativeFab />);
     fireEvent.click(container.querySelector('.native-fab')!);
     const minis = container.querySelectorAll('.native-fab-mini');
     fireEvent.click(minis[0]);
-    await new Promise((r) => setTimeout(r, 0));
-    await new Promise((r) => setTimeout(r, 0));
-    const raw = localStorage.getItem('he_widget_fallback_queue') || '[]';
-    const q = JSON.parse(raw) as { type?: string; ml?: number }[];
-    expect(q.some((e) => e.type === 'water' && e.ml === 250), 'water queued').toBe(true);
+    await waitFor(() => {
+      const raw = localStorage.getItem('he_widget_fallback_queue') || '[]';
+      const q = JSON.parse(raw) as { type?: string; ml?: number }[];
+      expect(q.some((e) => e.type === 'water' && e.ml === 250), 'water queued').toBe(true);
+    });
   });
 
   it('CSS-изоляция: каждый селектор native-слоёв — только html.app-native', () => {
@@ -240,6 +248,29 @@ describe('APK TOP pack', () => {
     expect(accents.querySelectorAll('[role="radio"]').length).toBe(6);
     fireEvent.click(getByRole('radio', { name: /Системный/ }));
     await findByText(/Android 12\+/);
+  });
+
+  it('NativeOfflinePill: в сети пусто, офлайн — пилюля', async () => {
+    const { act } = await import('@testing-library/react');
+    let cb: ((online: boolean) => void) | null = null;
+    (watchOnline as unknown as { mockImplementation: (fn: unknown) => void }).mockImplementation(
+      (c: (online: boolean) => void) => {
+        cb = c;
+        return () => {};
+      },
+    );
+    const { container, unmount } = render(<NativeOfflinePill />);
+    expect(container.querySelector('.native-offline'), 'online').toBeNull();
+    await act(async () => {
+      cb?.(false);
+    });
+    expect(container.querySelector('.native-offline')?.textContent).toContain('Офлайн');
+    await act(async () => {
+      cb?.(true);
+    });
+    expect(container.querySelector('.native-offline'), 'back online').toBeNull();
+    unmount();
+    expect(isOnline).toBeDefined();
   });
 
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {

@@ -20,6 +20,7 @@ import { isNativeApp } from './core/app-platform';
 import { setupNativeBackButton, haptics, isBiometricAvailable, authenticateWithBiometrics } from './core/native-bridge';
 import { useSwipeTabs } from './ui/native/useSwipeTabs';
 import { NativeFab } from './ui/native/NativeFab';
+import { NativeOfflinePill } from './ui/native/NativeOfflinePill';
 import { getNavBadges } from './ui/native/nav-badges';
 import { HeroImg } from './ui/HeroImg';
 
@@ -421,6 +422,8 @@ export default function App() {
       {isNativeApp() && !appLocked && initialized && (
         <NativeFab onQuickLog={() => go('training', 'diary')} />
       )}
+      {/* Офлайн-пилюля — ТОЛЬКО APK (в TG/web ветка не монтируется). */}
+      {isNativeApp() && !appLocked && initialized && <NativeOfflinePill />}
       <nav className="tabs" aria-label="Основная навигация">
         {PRIMARY_NAV.map(item => (
           <button
