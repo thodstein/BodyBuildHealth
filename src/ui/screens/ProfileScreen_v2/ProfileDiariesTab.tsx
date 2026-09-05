@@ -1040,8 +1040,8 @@ const exportAllDiariesPdf = () => {
                       })()}
                       {(() => {
                         const c = cardioLog.filter(e => e.date === todayIso() && e.completed);
-                        if (c.length) return <span>❤️ Кардио: {c.length} ({c.reduce((a,b)=>a+b.durationMin,0)} мин)</span>;
-                        return <span style={{ color: colors.textMuted }}>❤️ Кардио: —</span>;
+                        if (c.length) return <span>🏃 Кардио: {c.length} ({c.reduce((a,b)=>a+b.durationMin,0)} мин)</span>;
+                        return <span style={{ color: colors.textMuted }}>🏃 Кардио: —</span>;
                       })()}
                     </div>
                     {completion.missing.length > 0 && (
@@ -1978,7 +1978,7 @@ const exportAllDiariesPdf = () => {
                 ['⚖️ Вес', () => { setFabOpen(false); setAddWeightOpen(true); }],
                 ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
                 ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
-                ['❤️ Кардио', () => { setFabOpen(false); setAddCardioOpen(true); }],
+                ['🏃 Кардио', () => { setFabOpen(false); setAddCardioOpen(true); }],
               ] as const).map(([label, onClick], index) => (
                 <button
                   key={label}

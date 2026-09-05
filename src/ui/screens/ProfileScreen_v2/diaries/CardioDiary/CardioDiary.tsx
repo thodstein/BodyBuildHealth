@@ -1,5 +1,5 @@
 /**
- * CardioDiary.tsx — встроенный «❤️ Кардио-дневник» Профиля (вкладка Дневники).
+ * CardioDiary.tsx — встроенный «🏃 Кардио-дневник» Профиля (вкладка Дневники).
  * Журнал кардио-сессий (he_cardio_sessions) из cardio-diary.engine:
  * запись сессии (тип/минуты/ЧСС/RPE), статистика 7/28 дней, журнал с удалением,
  * план vs факт активного кардио-цикла (adherence текущей недели).
@@ -287,7 +287,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
   @media print { body { margin: 0; } }
 </style>
-<h1>❤️ Кардио-дневник</h1>
+<h1>🏃 Кардио-дневник</h1>
 <div class="summary">
   <div class="card"><b>7 дней</b><br>${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''}${stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}</div>
   <div class="card"><b>28 дней</b><br>${stats28.sessions} сесс · ${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.avgPace ? ` · ${stats28.avgPace}` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
@@ -321,7 +321,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       `}</style>
       <DiaryHeader
         accent={ACCENT}
-        title="❤️ Кардио-дневник"
+        title="🏃 Кардио-дневник"
         count={log.length}
         countLabel="сессий"
         onClose={onClose}

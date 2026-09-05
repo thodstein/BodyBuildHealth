@@ -112,7 +112,7 @@ export function buildDiariesExportHtml(data: any): string {
       e.hemato && e.hemato.totalScore > 0 ? String(e.hemato.totalScore) + '/8' : '',
       e.notes || '',
     ]; }))
-  + table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 'RPE', 'Статус', 'Заметки'],
+  + table('🏃 Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 'RPE', 'Статус', 'Заметки'],
     sortedDesc(cardioLog).map(function(e: any) { return [
       e.date,
       String(e.type).toUpperCase(),
