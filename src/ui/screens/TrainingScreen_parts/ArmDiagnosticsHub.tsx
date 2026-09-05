@@ -970,6 +970,24 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try {
       (payload as any).armMatchup = { oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 };
       if (tiq.length) (payload as any).armBouts = tiq;
+      // TOP wave-13: профиль (L/R, вес, RT) + динамика → RFD
+      const lp = parseFloat(state.leftKg);
+      const rp = parseFloat(state.rightKg);
+      const bw = parseFloat(state.bwKg);
+      const rt = parseFloat(state.rtKg);
+      if ((Number.isFinite(lp) && lp > 0) || (Number.isFinite(rp) && rp > 0) || (Number.isFinite(bw) && bw > 0) || (Number.isFinite(rt) && rt > 0)) {
+        (payload as any).armProfile = {
+          ...(Number.isFinite(lp) && lp > 0 ? { leftKg: lp } : {}),
+          ...(Number.isFinite(rp) && rp > 0 ? { rightKg: rp } : {}),
+          ...(Number.isFinite(bw) && bw > 0 ? { bwKg: bw } : {}),
+          ...(Number.isFinite(rt) && rt > 0 ? { rtKg: rt } : {}),
+        };
+      }
+      try {
+        const mets = Object.values(((dynamicReport as any)?.metrics || {})) as any[];
+        const expl = mets.filter((m) => m && Number.isFinite(Number(m.explosivePct))).map((m) => Number(m.explosivePct));
+        if (expl.length) (payload as any).armRfd = { explosivePct: Math.round((expl.reduce((a, b) => a + b, 0) / expl.length) * 10) / 10 };
+      } catch {}
     } catch {}
     applyToPlanner({
       kind: 'weakpoints',

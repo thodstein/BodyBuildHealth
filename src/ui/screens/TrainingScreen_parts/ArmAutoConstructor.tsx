@@ -121,6 +121,20 @@ export function ArmAutoConstructor() {
   const [topPullH, setTopPullH] = useState<string>('');
   const [topContinuity, setTopContinuity] = useState<boolean>(false);
   const [topGripAuto, setTopGripAuto] = useState<boolean>(false);
+  const [topExpl, setTopExpl] = useState<string>('');
+
+  // TOP wave-13: автоподстановка веса/возраста из профиля (только пустые поля)
+  useEffect(() => {
+    try {
+      const p: any = linked?.profile ?? {};
+      const per: any = p?.settings?.personal ?? p?.personal ?? {};
+      if (per && typeof per === 'object') {
+        if (Number(per.weight) > 0) setProBw((prev) => (prev === '' ? String(per.weight) : prev));
+        if (Number(per.age) > 0) setProAge((prev) => (prev === '' ? String(per.age) : prev));
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const workMax = useMemo(() => {
     try {
@@ -183,6 +197,21 @@ export function ArmAutoConstructor() {
           if (Number.isFinite(Number(mu.weightDeltaKg)) && Number(mu.weightDeltaKg) !== 0) setTopWD(String(mu.weightDeltaKg));
           flash('↩ Матчап из диагностики применён');
         }
+        // TOP wave-13: профиль хаба (L/R, вес, RT) + динамика → RFD
+        try {
+          const ap = payload.data?.armProfile;
+          if (ap && typeof ap === 'object') {
+            if (Number(ap.leftKg) > 0) setProLeft(String(ap.leftKg));
+            if (Number(ap.rightKg) > 0) setProRight(String(ap.rightKg));
+            if (Number(ap.bwKg) > 0) setProBw(String(ap.bwKg));
+            if (Number(ap.rtKg) > 0) setProBenchRt(String(ap.rtKg));
+          }
+          const ar = payload.data?.armRfd;
+          if (ar && Number.isFinite(Number(ar.explosivePct)) && Number(ar.explosivePct) > 0) {
+            setTopExpl(String(ar.explosivePct));
+            setTopRfd(true);
+          }
+        } catch {}
         const bouts = payload.data?.armBouts;
         if (Array.isArray(bouts) && bouts.length) {
           try { localStorage.setItem('he_arm_table_iq', JSON.stringify(bouts.slice(0, 60))); } catch {}
@@ -295,6 +324,7 @@ export function ArmAutoConstructor() {
         oppHand: topOppHand !== 'unknown' ? topOppHand : undefined,
         weightDeltaKg: parseFloat(topWD) !== 0 && Number.isFinite(parseFloat(topWD)) ? parseFloat(topWD) : undefined,
         rfd: topRfd || undefined,
+        explosivePct: parseFloat(topExpl) > 0 ? parseFloat(topExpl) : undefined,
         gripAuto: topGripAuto || undefined,
         gripWeek: parseInt(topGripWeek) > 0 ? parseInt(topGripWeek) : undefined,
         gripPhase: topGripPhase !== 'auto' ? topGripPhase : undefined,

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { ArmDiagnosticsHub } from '../ArmDiagnosticsHub';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
+import { applyToPlanner } from '../planner-bridge';
 
 beforeEach(() => {
   localStorage.clear();
@@ -67,6 +68,24 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(document.body.textContent).toContain('Тяж. хвата/нед (CNS)');
     expect(document.body.textContent).toContain('Часов с тяж. тяг');
     expect(document.body.textContent).toContain('Grip-RPE авто-волна');
+  });
+
+  it('мост хаб→конструктор: профиль и RFD применяются', () => {
+    render(<ArmAutoConstructor />);
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 'test',
+        data: {
+          groups: ['pronators'],
+          armProfile: { leftKg: 70, rightKg: 80, bwKg: 85, rtKg: 60 },
+          armRfd: { explosivePct: 45 },
+        },
+      } as any);
+    });
+    expect(screen.getByDisplayValue('70')).toBeTruthy();
+    expect(screen.getByDisplayValue('85')).toBeTruthy();
+    expect((screen.getByRole('checkbox', { name: /RFD speed-блок/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it('кросс-мезо: сборка с прошлым планом', () => {
