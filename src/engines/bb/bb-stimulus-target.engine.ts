@@ -903,6 +903,45 @@ export function weakHeadForZone(zone: string): string | null {
   return fallback[z] || null;
 }
 
+function splitWords(s: string): string[] {
+  return norm(s).split(/[\s,;\/\-()]+/).filter((w) => w.length > 2);
+}
+
+/**
+ * Скор соответствия тапа отклонению (0 = мимо). Длинное слово точнее короткого,
+ * полное вхождение фразы — точнее отдельных слов. Порог срабатывания — 3.
+ */
+export function scoreCheatingMatch(tap: string, deviation: string): number {
+  const tapNorm = norm(tap);
+  const devNorm = norm(deviation);
+  if (!tapNorm || !devNorm) return 0;
+  const tapWords = splitWords(tapNorm);
+  const devWords = splitWords(devNorm);
+  if (!tapWords.length || !devWords.length) return 0;
+  let s = 0;
+  for (const w of tapWords) {
+    if (devNorm.includes(w)) s += 2 + Math.min(3, w.length - 2);
+  }
+  for (const w of devWords) {
+    if (tapNorm.includes(w)) s += 1;
+  }
+  if (devNorm.includes(tapNorm) || tapNorm.includes(devNorm)) s += 3;
+  return s;
+}
+
+/** Лучшая запись читинг-карты под тап (ранжир вместо first-match). */
+export function matchCheatingEntry(
+  tap: string,
+  cheating: CheatingEntry[],
+): { entry: CheatingEntry; score: number } | null {
+  let best: { entry: CheatingEntry; score: number } | null = null;
+  for (const entry of cheating || []) {
+    const score = scoreCheatingMatch(tap, entry.deviation);
+    if (score >= 3 && (!best || score > best.score)) best = { entry, score };
+  }
+  return best;
+}
+
 export function diagnoseStimulusTarget(
   ex: { id?: string; name?: string; muscle?: string },
   ctx: StimulusCtx = {},
@@ -943,20 +982,20 @@ export function diagnoseStimulusTarget(
     missed = family.filter((h) => !hit.includes(h));
   }
 
-  // 2 setupRisk + 9 synergistTakeover — по тапам отклонений
+  // 2 setupRisk + 9 synergistTakeover — по тапам отклонений (ранжир best-match)
   const taps = (ctx.setupIssues || []).map(norm).filter(Boolean);
   if (taps.length > 0) {
     let matched = 0;
+    const seenDev = new Set<string>();
     for (const tap of taps) {
-      const words = tap.split(/[\s,;]+/).filter((w) => w.length > 2);
-      const entry = rec.cheating.find((c) => {
-        const cn = norm(c.deviation);
-        return words.some((w) => cn.includes(w)) || cn.split(/[\s,;]+/).some((w) => w.length > 2 && tap.includes(w));
-      });
-      if (entry) {
+      const hit = matchCheatingEntry(tap, rec.cheating);
+      if (hit && !seenDev.has(hit.entry.deviation)) {
+        seenDev.add(hit.entry.deviation);
         matched++;
         if (!flags.includes('synergistTakeover')) flags.push('synergistTakeover');
-        issues.push(`Утечка: ${entry.deviation} → забирает ${entry.steals}`);
+        issues.push(`Утечка: ${hit.entry.deviation} → забирает ${hit.entry.steals}`);
+      } else if (hit) {
+        matched++;
       }
     }
     if (matched > 0) {

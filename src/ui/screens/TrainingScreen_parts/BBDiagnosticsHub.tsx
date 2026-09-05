@@ -33,7 +33,7 @@ import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engin
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
-import { injectBBWeakPoints } from '../../../engines/bb/bb-diagnostics-injection.engine';
+import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 
@@ -841,7 +841,6 @@ export const BBDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
       return;
     }
-    try { localStorage.setItem('he_bb_plan_saved_prev', raw); } catch { /* noop */ }
     // dayMap/targetSets из спец-блока, темп из PROF, упражнения из топ-3
     let dayMap: Record<string, number[]> | undefined;
     let specWeeks: Array<{ targetSets: Record<string, number> }> = [];
@@ -889,6 +888,17 @@ export const BBDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 3000);
       return;
     }
+    // Снапшот — только при реальном изменении + журнал последних (для отката на N шагов)
+    try {
+      localStorage.setItem('he_bb_plan_saved_prev', raw as string);
+      const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
+      const next = pushPlanSnapshot(hist, {
+        date: new Date().toISOString().slice(0, 10),
+        label: `до инъекции ${zones.join(', ')}`,
+        plan,
+      });
+      localStorage.setItem('he_bb_plan_history', JSON.stringify(next));
+    } catch { /* noop */ }
     try {
       working.rationale = [...(working.rationale || []), `ББ-диагностика: инъекция коррекций (${zones.join(', ')})`];
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: working, date: new Date().toISOString() }));
@@ -919,6 +929,30 @@ export const BBDiagnosticsHub: React.FC = () => {
     setPlanNonce((n) => n + 1);
     try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
     setToast('↩ План восстановлен до инъекции');
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const planHistory = (() => {
+    try { return readPlanHistory(localStorage.getItem('he_bb_plan_history')); } catch { return []; }
+  })();
+
+  const handleRestoreSnapshot = (idx: number) => {
+    let snap: PlanSnapshot | null = null;
+    try {
+      const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
+      snap = hist[idx] || null;
+    } catch { /* noop */ }
+    if (!snap) return;
+    try {
+      localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: snap.plan, date: new Date().toISOString() }));
+    } catch {
+      setToast('Не влезло в хранилище — очисти старые планы');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setPlanNonce((n) => n + 1);
+    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    setToast(`↩ Восстановлен снимок ${snap.date} (${snap.label || 'без метки'})`);
     setTimeout(() => setToast(''), 2500);
   };
 
@@ -1042,6 +1076,17 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 <button onClick={handleInjectToPlan} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>
                 {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откатить инъекцию</button>}
+              </div>
+            )}
+            {planHistory.length > 0 && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, lineHeight: 1.5 }}>
+                <b style={{ color: ACCENT }}>🕓 Журнал плана ({planHistory.length}):</b>
+                {planHistory.map((s, i) => (
+                  <div key={`${s.date}-${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ color: DIM }}>{s.date} · {s.label || 'снимок'}</span>
+                    <button onClick={() => handleRestoreSnapshot(i)} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>↩ Восстановить</button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

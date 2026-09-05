@@ -148,6 +148,25 @@ describe('BBDiagnosticsHub', () => {
     expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
     expect(localStorage.getItem('he_bb_plan_saved_prev')).toBeNull();
   });
+  it('inject writes plan history and snapshot restore works', () => {
+    const saved = JSON.stringify({ plan: { weeks: [
+      { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
+    ] }, date: '2026-01-01' });
+    localStorage.setItem('he_bb_plan_saved', saved);
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
+    const hist = JSON.parse(localStorage.getItem('he_bb_plan_history') || '[]');
+    expect(hist.length).toBe(1);
+    expect(hist[0].label).toMatch(/до инъекции/);
+    expect(screen.getAllByText(/Журнал плана/)[0]).toBeInTheDocument();
+    // правим план вручную, затем восстанавливаем снимок
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: { weeks: [] } }));
+    fireEvent.click(screen.getAllByText(/Восстановить/)[0]);
+    const restored = JSON.parse(localStorage.getItem('he_bb_plan_saved') || '{}');
+    expect(restored.plan.weeks.length).toBe(1);
+    expect(restored.plan.weeks[0].sessions[0].exercises[0].exerciseName).toBe('bench_bar');
+  });
   it('inject without plan shows hint, does not crash', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getAllByText('Верх груди')[0]);

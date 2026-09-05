@@ -2107,7 +2107,7 @@ export const BbAutoConstructor: React.FC = () => {
       ],
     });
     // Новая сборка с нуля — снапшот отката инъекции протух (план другой)
-    try { localStorage.removeItem('he_bb_plan_saved_prev'); } catch { /* ignore */ }
+    try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     // ⚖️ Авто-калибровка реальных весов из training.workMaxByExercise (сохранённых на шаге «Реальные веса»)
     try {
       const stored = getProfile().settings?.training?.workMaxByExercise;
@@ -2122,7 +2122,7 @@ export const BbAutoConstructor: React.FC = () => {
       trainingVolumeMode,
     });
     // Новая сборка с нуля — снапшот отката инъекции протух (план другой)
-    try { localStorage.removeItem('he_bb_plan_saved_prev'); } catch { /* ignore */ }
+    try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     // PRO: per-muscle frequency optimization
     try {
       const sessions = loadSessions();
@@ -2210,7 +2210,7 @@ export const BbAutoConstructor: React.FC = () => {
       if (saveSafety.riskLevel === 'dangerous') { flash(`⚠ SafetyScore ${saveSafety.score}/100 — план сохранён с предупреждением, проверьте риски.`); }
       if (!planToSave.validation?.valid) { flash('⚠ План сохранён с ошибками валидации — проверьте предупреждения.'); }
       setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
-      try { localStorage.removeItem('he_bb_plan_saved_prev'); } catch { /* ignore */ }
+      try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     } catch { flash('Ошибка сохранения'); }
   };
 
@@ -2615,6 +2615,7 @@ export const BbAutoConstructor: React.FC = () => {
       try {
         localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: applyEditsToPlan(builtPlan), date: new Date().toISOString() }));
         localStorage.removeItem('he_bb_plan_saved_prev');
+        localStorage.removeItem('he_bb_plan_history');
         flash('Построенный цикл сохранён — годовой план можно строить и возвращаться');
       } catch { flash('Не удалось автосохранить цикл'); }
     }

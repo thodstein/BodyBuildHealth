@@ -15,6 +15,8 @@ import {
   HEADS_BY_MUSCLE,
   EXERCISE_STIMULUS_DB,
   weakHeadForZone,
+  scoreCheatingMatch,
+  matchCheatingEntry,
 } from '../bb-stimulus-target.engine';
 import { diagnoseExercise } from '../bb-exercise-diagnosis.engine';
 import { rankCorrectionsForWeak } from '../bb-correction-rank.engine';
@@ -563,5 +565,35 @@ describe('consistency sweep', () => {
       expect(hi).toBeLessThanOrEqual(5);
       expect(rec.headsHit.length, `${rec.key} headsHit`).toBeGreaterThan(0);
     }
+  });
+});
+
+// ── Скоринг совпадений тапов (ранжир вместо first-match) ──
+describe('cheating match scoring', () => {
+  const cheating = [
+    { deviation: 'локти вперёд/вверх', steals: 'передняя дельта' },
+    { deviation: 'раскачка корпусом', steals: 'моментум' },
+  ];
+  it('точное длинное совпадение бьёт короткое', () => {
+    const full = scoreCheatingMatch('локти ушли вперёд', 'локти вперёд/вверх');
+    const partial = scoreCheatingMatch('локти', 'локти вперёд/вверх');
+    expect(full).toBeGreaterThan(partial);
+    expect(partial).toBeGreaterThanOrEqual(3);
+  });
+  it('мусор не матчится', () => {
+    expect(scoreCheatingMatch('zzz', 'локти вперёд/вверх')).toBe(0);
+    expect(scoreCheatingMatch('', 'локти вперёд/вверх')).toBe(0);
+    expect(scoreCheatingMatch('локти', '')).toBe(0);
+  });
+  it('matchCheatingEntry выбирает лучшее, а не первое', () => {
+    const m = matchCheatingEntry('раскачка корпусом', cheating);
+    expect(m?.entry.deviation).toBe('раскачка корпусом');
+    expect(matchCheatingEntry('zzz', cheating)).toBe(null);
+    expect(matchCheatingEntry('локти', [])).toBe(null);
+  });
+  it('диагноз с двумя тапами даёт обе утечки без дублей', () => {
+    const d = diagnoseStimulusTarget({ id: 'tricep_pushdown_rope' }, { setupIssues: ['локти вперёд', 'раскачка'] });
+    expect(d.flags).toContain('synergistTakeover');
+    expect(d.issues.filter((s) => s.startsWith('Утечка:')).length).toBe(2);
   });
 });

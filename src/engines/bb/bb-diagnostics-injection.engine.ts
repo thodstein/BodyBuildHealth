@@ -166,3 +166,36 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
 export function computeBudgetBBFallback(level: string): number {
   return computeBudgetBB({ weeks: [] } as any, level);
 }
+
+/** Снапшот плана для журнала откатов (план хранится целиком — неделя обычно ~2-5 КБ). */
+export interface PlanSnapshot {
+  date: string; // ISO
+  label: string; // напр. «до инъекции chest_upper»
+  plan: unknown;
+}
+
+export const MAX_PLAN_SNAPSHOTS = 5;
+
+/** Добавить снапшот в журнал (новые в конец, кап N последних, битые записи чистятся). */
+export function pushPlanSnapshot(
+  history: PlanSnapshot[] | null | undefined,
+  entry: PlanSnapshot,
+  cap = MAX_PLAN_SNAPSHOTS,
+): PlanSnapshot[] {
+  const list = Array.isArray(history)
+    ? history.filter((s) => s && typeof s.date === 'string' && s.plan && typeof s.plan === 'object')
+    : [];
+  if (!entry || !entry.plan || typeof entry.plan !== 'object') return list;
+  const next = [...list, { date: String(entry.date || ''), label: String(entry.label || ''), plan: entry.plan }];
+  return next.slice(-Math.max(1, Math.round(cap)));
+}
+
+/** Прочитать журнал из сырого значения хранилища (терпит битые данные). */
+export function readPlanHistory(raw: unknown): PlanSnapshot[] {
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { return []; }
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((s) => s && typeof s.date === 'string' && s.plan && typeof s.plan === 'object')
+    .map((s) => ({ date: String(s.date), label: String(s.label || ''), plan: s.plan }));
+}

@@ -102,4 +102,25 @@ describe('bb-diagnostics-injection', () => {
       expect(has).toBe(true);
     }
   });
+  // журнал снапшотов плана (откат на N шагов)
+  it('pushPlanSnapshot: порядок, кап, чистка мусора', async () => {
+    const mod = await import('../bb-diagnostics-injection.engine');
+    let h: any[] = [];
+    for (let i = 1; i <= 7; i++) {
+      h = mod.pushPlanSnapshot(h, { date: `2026-08-0${i}`, label: `s${i}`, plan: { weeks: [] } });
+    }
+    expect(h.length).toBe(5);
+    expect(h[0].label).toBe('s3');
+    expect(h[4].label).toBe('s7');
+    expect(mod.pushPlanSnapshot(h, { date: 'x', label: 'bad', plan: null } as any).length).toBe(5);
+    expect(mod.pushPlanSnapshot(null, { date: '2026-08-01', label: 'a', plan: {} }).length).toBe(1);
+  });
+  it('readPlanHistory терпит битые данные', async () => {
+    const mod = await import('../bb-diagnostics-injection.engine');
+    expect(mod.readPlanHistory('not-json')).toEqual([]);
+    expect(mod.readPlanHistory(null)).toEqual([]);
+    expect(mod.readPlanHistory([{ date: '2026-08-01' }]).length).toBe(0);
+    const ok = mod.readPlanHistory(JSON.stringify([{ date: '2026-08-01', label: 'a', plan: { weeks: [] } }]));
+    expect(ok.length).toBe(1);
+  });
 });
