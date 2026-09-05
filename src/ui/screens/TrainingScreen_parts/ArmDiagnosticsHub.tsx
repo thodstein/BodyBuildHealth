@@ -38,7 +38,7 @@ import { scorePlatform, planAttempts, loadPlatformLog, savePlatformLogEntry } fr
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
-import { analyzeTableIq } from '../../../engines/arm/arm-table-iq.engine';
+import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { buildRehabPlan } from '../../../engines/arm/arm-rehab.engine';
 import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
@@ -52,7 +52,7 @@ const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 // TOP T1/T7b: Table-IQ журнал + матчап (отдельные ключи, v4-стейт не трогаем)
 const TIQ_KEY = 'he_arm_table_iq';
 const MU_KEY = 'he_arm_matchup';
-export interface TiqBout { fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number }
+export interface TiqBout { fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number; dateIso?: string }
 function loadTiq(): TiqBout[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(TIQ_KEY) : null;
@@ -236,11 +236,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [rhPain, setRhPain] = useState('');
   const [rhSurg, setRhSurg] = useState(false);
   const addTiqBout = () => {
+    const today = (() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } })();
     const b: TiqBout = {
       fouls: Math.max(0, Math.round(Number(tiqFouls) || 0)),
       win: tiqWin, slip: tiqSlip, strap: tiqStrap,
       centerHoldSec: tiqCenter ? Number(tiqCenter) : undefined,
       finishSec: tiqWin && tiqFinish ? Number(tiqFinish) : undefined,
+      dateIso: today || undefined,
     };
     setTiq((prev) => { const next = [...prev, b].slice(-60); saveTiq(next); return next; });
     setTiqFouls(''); setTiqWin(true); setTiqSlip(false); setTiqStrap(false); setTiqCenter(''); setTiqFinish('');
@@ -565,6 +567,18 @@ export const ArmDiagnosticsHub: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vbt.velocityLossPct, forceHistoryTick, painElbow, painWrist]);
 
+  // TOP wave-10: CNS-индикатор тяжёлых (RPE≥8 за 7 дней) из sRPE
+  const cnsHeavyP0 = useMemo(() => {
+    try {
+      const srpe: any[] = loadSRPESessions() as any;
+      const last7 = srpe.slice(-7);
+      if (!last7.length) return null;
+      const heavy = last7.filter((s: any) => Number(s.sRPE ?? s.srpe ?? 0) >= 8).length;
+      return { total: last7.length, heavy };
+    } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceHistoryTick]);
+
   const guardsP0 = useMemo(() => {
     const empty = { ucl: [] as string[], shoulder: [] as string[], tendon: [] as string[], humerus: [] as string[] };
     if (!armPlan) return empty;
@@ -826,6 +840,22 @@ export const ArmDiagnosticsHub: React.FC = () => {
         };
       }),
       injectionNotes: (report as any).corrections?.map((c: any) => `${c.weakPoint} → ${c.exercises[0]} @${Math.round(c.intensityPct * 100)}% в ${c.dayTags[0]}`),
+      // TOP wave-10: матчап + Table-IQ + rehab в экспорт
+      matchup: (() => { try {
+        if (muState.opp === 'unknown' && !muState.wd) return null;
+        const mp = profileOpponent({ myTechnique: state.technique, oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 });
+        return { note: mp.note, priority: mp.priorityMuscles.slice(0, 3), gameplan: mp.gameplan.slice(0, 2) };
+      } catch { return null; } })(),
+      tableIq: (() => { try {
+        if (!tiq.length) return null;
+        const iq = analyzeTableIq({ bouts: tiq });
+        return { note: iq.note, levers: iq.levers, trend: tableIqTrend(tiq).note };
+      } catch { return null; } })(),
+      rehab: (() => { try {
+        if (rhInjury === 'none') return null;
+        const rh = buildRehabPlan({ injury: rhInjury, weeksSince: parseFloat(rhWeeks) || 0, pain: parseFloat(rhPain) || 0, surgery: rhSurg });
+        return { note: rh.note, phase: rh.phase, title: rh.current.title };
+      } catch { return null; } })(),
     };
   };
 
@@ -1432,7 +1462,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
               {(()=>{ try {
                 if (!tiq.length) return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Веди журнал схваток: фолы/срывы/ремень/центр/финиш — стол скажет, что чинить.</div>;
                 const iq = analyzeTableIq({ bouts: tiq });
-                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}><div>{iq.note}</div>{iq.levers.map((l,i)=><div key={i}>• {l}</div>)}</div>;
+                const trend = tableIqTrend(tiq);
+                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}><div>{iq.note}</div>{iq.levers.map((l,i)=><div key={i}>• {l}</div>)}<div style={{ marginTop:2, color: trend.trend==='up' ? '#22c55e' : trend.trend==='down' ? '#ef4444' : DIM }}>{trend.note}</div></div>;
               } catch { return null; } })()}
             </div>
           </div>
@@ -1609,6 +1640,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize:10, color:DIM }}>Сон, ч<br /><input aria-label="Сон часов" inputMode="decimal" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} placeholder="8" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
               </div>
               <div style={{ fontSize:10, color:DIM, marginTop:6 }}>{autoregP0 ? `${autoregP0.note} · объём ×${autoregP0.volumeMult} · RIR+${autoregP0.rirShift}${autoregP0.extraRestDays ? ` · +${autoregP0.extraRestDays} дн отдыха` : ''}` : 'Нет sRPE за 7д — план без изменений'}</div>
+              {cnsHeavyP0 && (
+                <div style={{ fontSize:10, marginTop:4, color: cnsHeavyP0.heavy >= 2 ? '#f59e0b' : DIM }}>
+                  CNS: {cnsHeavyP0.heavy} тяжёлых (RPE≥8) из {cnsHeavyP0.total} за 7д{cnsHeavyP0.heavy >= 2 ? ' — план облегчается ×0.8' : ' — допуск'}
+                </div>
+              )}
               <div style={{ fontSize:10, color:DIM, marginTop:6 }}><b style={{ color:'#fff' }}>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length + guardsP0.humerus.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon/humerus чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon, ...guardsP0.humerus].slice(0, 5).join(' · ')}</div>
             </div>
             {/* TOP T5b: return-to-pull 10–16 нед */}

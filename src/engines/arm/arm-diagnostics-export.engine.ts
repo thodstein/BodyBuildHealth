@@ -33,6 +33,10 @@ export interface ArmExportData {
   points: ArmExportPoint[];
   injectionNotes?: string[];
   disclaimer?: string;
+  // TOP wave-10: матчап + Table-IQ + rehab
+  matchup?: { note: string; priority?: string[]; gameplan?: string[] } | null;
+  tableIq?: { note: string; levers?: string[]; trend?: string } | null;
+  rehab?: { note: string; phase?: number; title?: string } | null;
 }
 
 function esc(s: unknown): string {
@@ -83,9 +87,23 @@ export function buildArmDiagnosticsHtml(data: ArmExportData): string {
   const floorBlock = floors ? '<div class="crit">Floors:</div><ul>' + floors + '</ul>' : '';
   const body = rows || '<tr><td colspan="7">Точек нет — баланс</td></tr>';
   const injectBlock = notes ? '<h2>Инъекция</h2><ul>' + notes + '</ul>' : '';
+  let topBlock = '';
+  if (data.matchup) {
+    topBlock += '<h2>Матчап</h2><div class="meta">' + esc(data.matchup.note) + '</div>';
+    if (data.matchup.priority && data.matchup.priority.length) topBlock += '<div class="meta">Приоритет: ' + esc(data.matchup.priority.join(', ')) + '</div>';
+    if (data.matchup.gameplan && data.matchup.gameplan.length) topBlock += '<ul>' + data.matchup.gameplan.map(li).join('') + '</ul>';
+  }
+  if (data.tableIq) {
+    topBlock += '<h2>Table-IQ</h2><div class="meta">' + esc(data.tableIq.note) + '</div>';
+    if (data.tableIq.trend) topBlock += '<div class="meta">' + esc(data.tableIq.trend) + '</div>';
+    if (data.tableIq.levers && data.tableIq.levers.length) topBlock += '<ul>' + data.tableIq.levers.map(li).join('') + '</ul>';
+  }
+  if (data.rehab) {
+    topBlock += '<h2>Return-to-pull</h2><div class="meta">' + esc(data.rehab.note) + '</div>';
+  }
   const head = '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Арм-диагностика ' + esc(data.date) + '</title><style>body{font-family:sans-serif;max-width:900px;margin:0 auto;padding:16px;color:#111}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #999;padding:4px 6px;text-align:left}.meta{font-size:12px;color:#333;margin:8px 0}.crit{color:#b00;font-weight:bold}</style></head><body>';
   const foot = '<p class="meta">' + esc(data.disclaimer || 'Скрининг, не диагноз. Боль/онемение/щелчок — к врачу.') + '</p></body></html>';
-  return head + '<h1>Арм-диагностика — ' + esc(data.date) + '</h1><div class="meta">' + meta + '</div>' + tactic + floorBlock + '<h2>Мёртвые точки (' + data.points.length + ')</h2><table><tr><th>Точка</th><th>Карточка</th><th>Угол</th><th>Причина</th><th>Фикс</th><th>Топ-3</th><th>Дельта</th></tr>' + body + '</table>' + injectBlock + foot;
+  return head + '<h1>Арм-диагностика — ' + esc(data.date) + '</h1><div class="meta">' + meta + '</div>' + tactic + floorBlock + '<h2>Мёртвые точки (' + data.points.length + ')</h2><table><tr><th>Точка</th><th>Карточка</th><th>Угол</th><th>Причина</th><th>Фикс</th><th>Топ-3</th><th>Дельта</th></tr>' + body + '</table>' + injectBlock + topBlock + foot;
 }
 
 export function buildArmDiagnosticsCsv(data: ArmExportData): string {
@@ -99,7 +117,11 @@ export function buildArmDiagnosticsCsv(data: ArmExportData): string {
       .map(csvCell)
       .join(';');
   });
-  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n';
+  let extra = '';
+  if (data.matchup) extra += '\nmatchup;' + csvCell(data.matchup.note);
+  if (data.tableIq) extra += '\ntableiq;' + csvCell(data.tableIq.note + (data.tableIq.trend ? ' ' + data.tableIq.trend : ''));
+  if (data.rehab) extra += '\nrehab;' + csvCell(data.rehab.note);
+  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n' + (extra ? extra.replace(/^\n/, '') + '\n' : '');
 }
 
 /** BOM для Excel (явный код, без невидимых литералов). */
