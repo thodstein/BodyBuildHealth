@@ -14,6 +14,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +63,7 @@ jobs:
   # Без секретов job корректно пропускается (debug-артефакт выше не страдает).
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     # secrets нельзя использовать прямо в `if` (Invalid workflow file) —
     # поэтому пробрасываем их в env job'а (там можно), а гейты — по env.
     # Без секретов env пустые и все шаги ниже корректно пропускаются.

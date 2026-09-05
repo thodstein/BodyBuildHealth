@@ -475,5 +475,13 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
 - Новый guard `npm run verify:apk-ci` (`scripts/check-apk-workflow.mjs`):
   нет `secrets` в `if`, 4 гейта по env, одно объявление, без табов.
 
+Волна 16 — контракт keystore и гигиена CI (оба guard'а зелёные):
+
+- Сверен контракт `workflow ↔ build.gradle`: `android/keystore.properties`
+  (ключи `storeFile/storePassword/keyAlias/keyPassword`) +
+  `android/app/he-release.keystore` — guard `verify:apk-ci` теперь следит,
+  чтобы пути не разъехались.
+- `timeout-minutes: 30/45` у job'ов (защита от зависших раннеров).
+
 Осознанные остатки (не баги): бейдж-драйверы кроме interactions/profile;
 Gradle-сборка Java-слоя — только CI.
