@@ -47,9 +47,17 @@ export function getApkTheme(): ApkTheme {
   }
 }
 
+/** theme-color для chrome recent-apps/task switcher (1-в-1 с фоном темы). */
+export function themeMetaColor(theme: ApkTheme): string {
+  if (theme === 'light') return '#eef2f6';
+  if (theme === 'amoled') return '#000000';
+  return '#050b16';
+}
+
 /**
- * Применить тему: ставит/снимает data-apk-theme на <html>.
- * Вне native — no-op (TG-ветка не выполняется вообще).
+ * Применить тему: ставит/снимает data-apk-theme на <html> + красит
+ * theme-color под фон (recent-apps не спорит с приложением).
+ * Вне native — no-op для DOM (возвращает персист).
  */
 export function applyApkTheme(theme?: ApkTheme): ApkTheme {
   const next = theme === undefined ? readStored() : theme;
@@ -58,6 +66,12 @@ export function applyApkTheme(theme?: ApkTheme): ApkTheme {
     const root = document.documentElement;
     if (next) root.setAttribute('data-apk-theme', next);
     else root.removeAttribute('data-apk-theme');
+    try {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', themeMetaColor(next));
+    } catch {
+      /* ignore */
+    }
   } catch {
     /* non-DOM окружение (тесты) */
   }

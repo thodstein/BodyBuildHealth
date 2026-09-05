@@ -34,6 +34,7 @@ import {
   contrastForHex,
   writeSystemVars,
   clearSystemVars,
+  themeMetaColor,
 } from '../native/appearance';
 import { NativeEmpty } from '../native/NativeEmpty';
 import { AppearanceSetupCard } from '../native/AppearanceSetupCard';
@@ -67,6 +68,8 @@ describe('APK TOP pack', () => {
     expect(getApkTheme()).toBe('');
     // В jsdom нет Capacitor → applyApkTheme обязан быть no-op для DOM…
     applyApkTheme('amoled');
+    // …включая theme-color (Mini App и тесты не меняют chrome).
+    expect(document.querySelector('meta[name="theme-color"]')).toBeNull();
     // …но персист через setApkTheme работает везде (для будущего native-запуска).
     setApkTheme('light');
     expect(getApkTheme()).toBe('light');
@@ -74,6 +77,12 @@ describe('APK TOP pack', () => {
     setApkTheme('');
     expect(getApkTheme()).toBe('');
     expect(initApkAppearance()).toBe('');
+  });
+
+  it('themeMetaColor: recent-apps 1-в-1 с фоном темы', () => {
+    expect(themeMetaColor('')).toBe('#050b16');
+    expect(themeMetaColor('amoled')).toBe('#000000');
+    expect(themeMetaColor('light')).toBe('#eef2f6');
   });
 
   it('NativeFab speed-dial: тап раскрывает, тренинг ведёт в дневник', () => {
