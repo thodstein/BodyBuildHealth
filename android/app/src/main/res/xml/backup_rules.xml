@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TOP: автобэкап без мусора. WebView-кэш/код (десятки МБ, пересоздаётся)
+     и no_backup в облако не едут; данные приложения (профиль, дневники,
+     настройки) бэкапятся как раньше. API <= 30 (fullBackupContent). -->
+<full-backup-content>
+    <exclude domain="file" path="app_webview/" />
+    <exclude domain="file" path="code_cache/" />
+    <exclude domain="cache" path="." />
+    <exclude domain="file" path="no_backup/" />
+</full-backup-content>

@@ -400,5 +400,16 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
   Тест: колбэк `watchOnline` переключает пилюлю в обе стороны.
 - Починен флаки water-теста (`waitFor` вместо фиксированных тиков).
 
+Волна 9 — гигиена флагмана (`wake-lock` 3/3 + пак 15/15, `tsc` 0 по своим):
+
+- **Экран не гаснет mid-set**: `useWakeLock(active)` (Screen Wake Lock API,
+  гейт на APK) вшит в `SessionPlayer` на фазы warmup/main/cooldown;
+  сворачивание/ unmount отпускают, отказ ОС — тихий no-op.
+- **Бэкап без мусора**: `backup_rules.xml` (≤30) + `data_extraction_rules.xml`
+  (31+: облако и перенос) исключают `app_webview/code_cache/cache/no_backup`.
+- **Per-app языки**: `locales_config.xml` (ru/en) — системный выбор,
+  внутри приложения главнее свой переключатель.
+- XML проверены парсером (SDK локально нет — сборка за CI).
+
 Осознанные остатки (не баги): бейдж-драйверы кроме interactions;
 Gradle-сборка Java-слоя — только CI (локально нет SDK).

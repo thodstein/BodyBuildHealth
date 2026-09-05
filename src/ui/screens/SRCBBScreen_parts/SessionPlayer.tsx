@@ -15,6 +15,7 @@ import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASO
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
+import { useNativeWakeLock } from '../../native/useWakeLock';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
@@ -130,7 +131,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [profile] = useTrainingProfile();
 const [dayIdx, setDayIdx] = useState(0);
 const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
-const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
+  const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
+  // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
+  useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)

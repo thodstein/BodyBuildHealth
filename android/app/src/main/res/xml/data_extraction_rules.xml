@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TOP: то же исключение мусора для API 31+ (облако + перенос на устройство).
+     Источник истины — те же 4 пути, что в backup_rules.xml. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="app_webview/" />
+        <exclude domain="file" path="code_cache/" />
+        <exclude domain="cache" path="." />
+        <exclude domain="file" path="no_backup/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="app_webview/" />
+        <exclude domain="file" path="code_cache/" />
+        <exclude domain="cache" path="." />
+        <exclude domain="file" path="no_backup/" />
+    </device-transfer>
+</data-extraction-rules>
