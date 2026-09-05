@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 
 import com.getcapacitor.BridgeActivity;
+import com.healthengine.app.updater.AppUpdaterPlugin;
 import com.healthengine.app.widgets.WidgetBridgePlugin;
 import com.healthengine.app.widgets.WidgetStore;
 
@@ -14,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WidgetBridgePlugin.class);
+        registerPlugin(AppUpdaterPlugin.class);
         registerPlugin(DynamicColorPlugin.class);
         super.onCreate(savedInstanceState);
         ensureNotificationChannels();

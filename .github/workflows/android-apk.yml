@@ -129,3 +129,46 @@ jobs:
           name: he-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+  # Лента обновлений без сторов: по тегу v* публикует GitHub Release с APK.
+  # Приложение проверяет его через api.github.com (движок src/core/app-updater.ts,
+  # оверрайд — VITE_APP_UPDATE_URL). Подписанный APK — приоритетом (единая подпись
+  # всех CI-сборок — см. signingConfig debug в build.gradle).
+  publish:
+    needs: [build, release]
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: he-debug-apk
+          path: ./artifacts
+
+      - name: Download signed APK (if built)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: he-release-apk
+          path: ./artifacts-signed
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          FILES="./artifacts/app-debug.apk"
+          if [ -f ./artifacts-signed/app-release.apk ]; then
+            FILES="$FILES ./artifacts-signed/app-release.apk"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
+            gh release upload "$TAG" $FILES --clobber
+          else
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $FILES \
+              --title "Health Engine $TAG" \
+              --notes "APK для установки и самообновления без сторов. Ставится поверх прошлой версии (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
+          fi

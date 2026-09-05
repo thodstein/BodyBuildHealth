@@ -25,6 +25,7 @@ import './styles.css';
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { AppUpdateBanner } from './ui/native/AppUpdateBanner';
 
 function initTelegramWebApp() {
   const tg = (window as any).Telegram?.WebApp;
@@ -175,7 +176,14 @@ async function bootstrap() {
     try {
       try { initRealtime(profile.id || 'user_default'); } catch (e) { console.warn('initRealtime failed:', e); }
       const root = createRoot(app);
-      root.render(<App />);
+      // AppUpdateBanner — только native (в TG/web возвращает null);
+      // отдельный lazy-чанк не нужен: модуль крошечный, Capacitor-импорты внутри динамические.
+      root.render(
+        <>
+          <App />
+          <AppUpdateBanner />
+        </>,
+      );
     } catch (e) {
       console.error('[bootstrap] React render failed:', e);
       showBootstrapError('Ошибка рендеринга приложения: ' + ((e as Error)?.message || e));

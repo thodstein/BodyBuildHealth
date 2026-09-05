@@ -39,6 +39,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (hasKs) { signingConfig signingConfigs.release }
         }
+        debug {
+            // PRO-обновления без сторов требуют ЕДИНОЙ подписи всех CI-сборок:
+            // с keystore debug подписывается релизным ключом (без него — обычный debug-ключ).
+            if (hasKs) { signingConfig signingConfigs.release }
+        }
     }
 }
 

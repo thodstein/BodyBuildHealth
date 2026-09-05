@@ -527,3 +527,94 @@ export async function authenticateWithBiometrics(
     return false;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Self-update без сторов (APK → APK). Java: AppUpdaterPlugin          */
+/* ------------------------------------------------------------------ */
+
+export type ApkDownloadState = 'pending' | 'downloading' | 'done' | 'failed';
+
+export interface ApkDownloadStatus {
+  status: ApkDownloadState;
+  /** 0..1 (total может быть неизвестен — тогда 0 до done). */
+  progress: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function appUpdaterPlugin(): Promise<any | null> {
+  if (!isCapacitorNative()) return null;
+  try {
+    const { registerPlugin } = await import('@capacitor/core');
+    return registerPlugin('AppUpdater');
+  } catch {
+    return null;
+  }
+}
+
+/** Поставить APK в очередь DownloadManager. Возвращает downloadId или null. */
+export async function startApkDownload(url: string): Promise<number | null> {
+  try {
+    const plugin = await appUpdaterPlugin();
+    if (!plugin) return null;
+    const ret = await plugin.downloadApk({ url });
+    const id = Number(ret?.downloadId);
+    return Number.isFinite(id) && id >= 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Статус закачки. Вне native — всегда failed (баннер тихо прячется). */
+export async function pollApkDownload(downloadId: number): Promise<ApkDownloadStatus> {
+  const fallback: ApkDownloadStatus = { status: 'failed', progress: 0 };
+  try {
+    const plugin = await appUpdaterPlugin();
+    if (!plugin) return fallback;
+    const ret = await plugin.downloadStatus({ downloadId: String(downloadId) });
+    const status = String(ret?.status ?? 'failed');
+    const progress = Number(ret?.progress ?? 0);
+    return {
+      status:
+        status === 'done' || status === 'downloading' || status === 'pending'
+          ? status
+          : 'failed',
+      progress: Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Открыть скачанный APK системным установщиком.
+ * @returns true — установщик открыт; 'blocked' — запрещены неизвестные
+ * источники (вести в настройки); false — иная ошибка.
+ */
+export async function installDownloadedApk(): Promise<true | 'blocked' | false> {
+  try {
+    const plugin = await appUpdaterPlugin();
+    if (!plugin) return false;
+    await plugin.installApk();
+    return true;
+  } catch (e) {
+    try {
+      const msg = String((e as { message?: unknown })?.message ?? e);
+      if (msg.includes('UNKNOWN_SOURCES_BLOCKED')) return 'blocked';
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
+}
+
+/** Экран «Установка неизвестных приложений» для нашего пакета. */
+export async function openUnknownSourcesSettings(): Promise<boolean> {
+  try {
+    const plugin = await appUpdaterPlugin();
+    if (!plugin) return false;
+    await plugin.openUnknownSourcesSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
