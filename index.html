@@ -10,6 +10,8 @@
   <meta name="format-detection" content="telephone=no" />
   <meta name="telegram-web-app" content="true" />
   <script async src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Hero остаются те же файлы: preload лишь ускоряет первый paint (APK + TG). -->
+  <link rel="preload" as="image" href="/hero-main.png?v=20250827k" fetchpriority="high" />
   <title>Health Engine</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }

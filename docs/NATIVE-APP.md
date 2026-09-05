@@ -265,3 +265,44 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
 
 Что НЕ требует включения: хаптика, статус-бар/сплэш, кнопка «назад»,
 офлайн-режим — работают из коробки в APK.
+
+## 12. TOP-оформление APK (hero остаются, TG 1-в-1)
+
+Инварианты раунда (проверяются тестом `apk-top-pack.test.tsx`):
+
+- **Hero не тронуты**: все `<img>` (`hero-main`, `articles-hero`,
+  `risk-hero`…) и TG-ветка `DashboardScreen` — без изменений; меняется
+  только подача поверх (shade, пилюли, FAB). CSS-тест гарантирует отсутствие
+  `display:none` на hero-селекторах.
+- **TG 1-в-1**: каждый селектор `styles-native.css` / `styles-native-pro.css`
+  начинается с `html.app-native` (тест падает иначе); правки `App.tsx` /
+  `main.tsx` — аддитивные и за `isNativeApp()`-гейтом.
+
+Что вошло:
+
+- **Токены** (`styles-native.css §58`): шкала типов display→caption,
+  спейсинги, press-scale, FAB/badge/focus-переменные. Расхождений палитры
+  с `colors.xml` больше нет (navy `#050b16`/`#0a1424`, лайм `#c9f73a`).
+- **Подложка**: `bg-profile.png` в APK — `cover` + `opacity 0.22`
+  (CSS-оверрайд; в TG остался `fill` как был).
+- **Навбар**: 7 табов сохранены (паритет с TG — «5+Ещё» отклонено именно
+  ради него); премиум за счёт active-пилюли, `data-tab`/`aria-current`,
+  бейдж-точек (`data-badge`, workflows выставляют позже), компакта ≤380px.
+- **FAB** (`ui/native/NativeFab.tsx`): «＋» → дневник тренинга + haptic
+  medium; свайпы его игнорируют (fixed-оверлей в `useSwipeTabs`).
+- **Темы** (`ui/native/appearance.ts`, ключ `he_apk_theme_v1`): dark
+  (дефолт), amoled (`#000`), light. Применение — `initApkAppearance()`
+  в `main.tsx` (в TG no-op). UI-переключатель — следующим шагом в Профиле.
+- **Нативный хром**: `StatusBar overlaysWebView` (API 35+ edge-to-edge,
+  safe-area уже в CSS), SplashScreen API 31+ (фон/иконка/600мс,
+  fallback — старый `@drawable/splash`), светлые иконки баров.
+- **Виджеты**: фон/кнопка в токенах (`#0A1424`/`#0F2417`); App Shortcuts
+  (тренировка/питание/таймер → тот же `WIDGET_OPEN`-интент, что у виджетов);
+  именованные каналы уведомлений (тренировки/вода/таймер) в `MainActivity`.
+- **Perf**: preload `hero-main.png`; скелетон-shimmer, тосты над пилюлей,
+  планшетный центр ≤600px (hero остаётся fullscreen).
+
+Осознанные остатки (не баги): hero без WebP (нужен ассет-пайплайн),
+переключатель темы в UI Профиля, живые бейджи навбара (CSS готов),
+dynamic-color runtime (Android 12+), CSS-сплит native-бандла из TG
+(сейчас мёртвый груз ~60КБ — дёшево, но честно).

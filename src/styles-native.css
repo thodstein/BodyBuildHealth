@@ -3423,6 +3423,424 @@ html.app-native .pl-tools {
   }
 }
 
+/* ─── 58. APK TOP PACK — единые токены, навбар, kit, темы, motion ───
+ * Hero-блоки (§3/§10/§11) НЕ тронуты: все hero-картинки остаются как были,
+ * здесь только подача поверх (пилюли, FAB, safe-area). TG/web не задеты:
+ * каждый селектор ниже начинается с `html.app-native`. */
+html.app-native {
+  --type-display: 30px;
+  --type-h1: 24px;
+  --type-h2: 20px;
+  --type-title: 17px;
+  --type-body: 15px;
+  --type-callout: 13px;
+  --type-caption: 11px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 28px;
+  --press-scale: 0.96;
+  --motion-spring: cubic-bezier(0.22, 0.68, 0, 1);
+  --motion-fast: 0.15s ease;
+  --fab-size: 56px;
+  --badge-dot: 9px;
+  --focus-ring: 0 0 0 3px rgba(201, 247, 58, 0.35);
+}
+
+/* 58.1 Фон-подложка App: чиним растягивание (fill → cover) только в APK.
+ * TG-версия продолжает рендерить свой инлайн как раньше. */
+html.app-native main img[src*='bg-profile'] {
+  object-fit: cover !important;
+  opacity: 0.22 !important;
+}
+
+/* Пилюля локали + синк-кнопка: фирменная подача поверх инлайн-стилей. */
+html.app-native main > div > div[style*='zIndex: 1000'] button,
+html.app-native main > div > div[style*='z-index: 1000'] button {
+  border-radius: 999px !important;
+  min-height: 36px !important;
+  font-weight: 800 !important;
+}
+
+/* 58.2 Навбар: 7 табов остаются (паритет с TG), но сидят плотно и дорого.
+ * Активный — лайм-пилюля с тёмной иконкой; неактивные — приглушены. */
+html.app-native .tabs {
+  gap: 2px;
+}
+
+html.app-native .nav-btn {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 1px 6px;
+}
+
+html.app-native .nav-btn span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.app-native .nav-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Бейдж-точка: включается атрибутом data-badge (0/пусто — скрыта).
+ * workflows выставляют атрибут, визуал уже готов. */
+html.app-native .nav-btn[data-badge]:not([data-badge='']):not([data-badge='0'])::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 16px);
+  width: var(--badge-dot);
+  height: var(--badge-dot);
+  border-radius: 99px;
+  background: #ff5d5d;
+  border: 2px solid rgba(9, 18, 34, 0.9);
+  box-shadow: 0 0 8px rgba(255, 93, 93, 0.7);
+}
+
+html.app-native .nav-btn.active[data-badge]:not([data-badge='']):not([data-badge='0'])::before {
+  border-color: rgba(201, 247, 58, 0.9);
+}
+
+/* Узкие экраны: иконки и кегль ужимаются, строка не ломается. */
+@media (max-width: 380px) {
+  html.app-native .tabs {
+    left: 8px;
+    right: 8px;
+    padding: 6px 4px;
+  }
+  html.app-native .nav-btn {
+    font-size: 8px;
+    letter-spacing: 0.2px;
+  }
+}
+
+/* 58.3 HERO INTACT: подача поверх тех же картинок.
+ * Сами <img> (hero-main, articles-hero, risk-hero…) не меняются. */
+html.app-native .native-home-bg img,
+html.app-native .hero-fullscreen-img {
+  image-rendering: auto;
+}
+
+@media (orientation: landscape) {
+  html.app-native .native-home-bg img,
+  html.app-native .hero-fullscreen-img.dashboard-hero-img {
+    object-position: center center !important;
+  }
+}
+
+/* 58.4 KIT: единый набор контролов для новых native-поверхностей.
+ * Старые экраны не переписываются — kit используется точечно. */
+html.app-native .native-btn-primary,
+html.app-native .native-btn-ghost,
+html.app-native .native-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 12px 20px;
+  border-radius: 16px;
+  font-size: var(--type-body);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform var(--motion-fast), filter var(--motion-fast), box-shadow 0.2s ease;
+}
+
+html.app-native .native-btn-primary {
+  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  color: #0a1a08;
+  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+}
+
+html.app-native .native-btn-ghost {
+  background: rgba(140, 190, 255, 0.08);
+  border-color: rgba(140, 190, 255, 0.2);
+  color: #e2ecff;
+}
+
+html.app-native .native-btn-danger {
+  background: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.35);
+  color: #ff8f9a;
+}
+
+html.app-native .native-btn-primary:active,
+html.app-native .native-btn-ghost:active,
+html.app-native .native-btn-danger:active {
+  transform: scale(var(--press-scale));
+  filter: brightness(1.08);
+}
+
+html.app-native .native-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: var(--type-callout);
+  font-weight: 700;
+  background: rgba(140, 190, 255, 0.1);
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  color: #e2ecff;
+}
+
+html.app-native .native-chip[data-active='true'] {
+  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  border-color: transparent;
+  color: #0a1a08;
+}
+
+html.app-native .native-section {
+  font-size: var(--type-caption);
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(226, 236, 255, 0.55);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+html.app-native .native-divider {
+  height: 1px;
+  margin: var(--space-3) 0;
+  background: linear-gradient(90deg, transparent, rgba(140, 190, 255, 0.2), transparent);
+  border: none;
+}
+
+/* 58.5 Типографика: шкала поверх системного шрифта. */
+html.app-native .native-display {
+  font-size: var(--type-display);
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1.05;
+  color: #fff;
+}
+
+html.app-native .native-h1 {
+  font-size: var(--type-h1);
+  font-weight: 900;
+  letter-spacing: -0.6px;
+  line-height: 1.12;
+  color: #fff;
+}
+
+html.app-native .native-body {
+  font-size: var(--type-body);
+  line-height: 1.55;
+  color: var(--text-light);
+}
+
+html.app-native .native-caption {
+  font-size: var(--type-caption);
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* 58.6 Темы APK: дефолт — тёмная (как сейчас). Светлая/AMOLED — opt-in
+ * через data-apk-theme на <html> (см. ui/native/appearance.ts). */
+html.app-native[data-apk-theme='amoled'] {
+  --bg: #000;
+  --bg-primary: #000;
+  --bg-secondary: #050505;
+  --bg-tertiary: #0a0a0a;
+  --card-bg: rgba(10, 10, 10, 0.85);
+  --glass-bg: rgba(0, 0, 0, 0.7);
+}
+
+html.app-native[data-apk-theme='amoled'] body {
+  background: #000;
+}
+
+html.app-native[data-apk-theme='light'] {
+  --bg: #eef2f6;
+  --bg-primary: #eef2f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-bg-hover: #f1f5f9;
+  --text: #0b1526;
+  --text-dim: rgba(11, 21, 38, 0.66);
+  --text-light: rgba(11, 21, 38, 0.9);
+  --text-faint: rgba(11, 21, 38, 0.4);
+  --accent: #4d9e00;
+  --accent-2: #00875a;
+  --accent-contrast: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(11, 21, 38, 0.1);
+}
+
+html.app-native[data-apk-theme='light'] body {
+  background: #eef2f6;
+}
+
+html.app-native[data-apk-theme='light'] .screen h2,
+html.app-native[data-apk-theme='light'] .native-display,
+html.app-native[data-apk-theme='light'] .native-h1 {
+  color: #0b1526;
+}
+
+/* Системный контраст: усиливаем границы и текст. */
+@media (prefers-contrast: more) {
+  html.app-native {
+    --border: rgba(160, 200, 255, 0.3);
+    --text-dim: rgba(226, 236, 255, 0.85);
+  }
+}
+
+/* 58.7 Motion: единая подача появления + нажатия. */
+@keyframes nativeFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html.app-native .native-fade-up {
+  animation: nativeFadeUp 0.3s var(--motion-spring);
+}
+
+html.app-native .tabs .nav-btn,
+html.app-native .native-chip {
+  transition: transform var(--motion-fast), background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 58.8 FAB быстрой записи: над пилюлей, в safe-area. Hero не перекрывает:
+ * FAB живёт в правом нижнем углу поверх контента, hero остаётся фоном. */
+html.app-native .native-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 18px);
+  z-index: 1200;
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border-radius: 99px;
+  border: none;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  box-shadow: 0 10px 28px rgba(201, 247, 58, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform var(--motion-fast), box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.app-native .native-fab:active {
+  transform: scale(0.9);
+}
+
+/* 58.9 Boot/empty/toast поверх навбара. */
+html.app-native .native-boot-skeleton {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+html.app-native .native-skeleton {
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(100deg, rgba(140, 190, 255, 0.06) 30%, rgba(140, 190, 255, 0.14) 50%, rgba(140, 190, 255, 0.06) 70%);
+  background-size: 200% 100%;
+  animation: nativeSkeleton 1.2s linear infinite;
+}
+
+@keyframes nativeSkeleton {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+html.app-native .native-empty {
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+html.app-native .native-empty-title {
+  font-size: var(--type-title);
+  font-weight: 800;
+  color: #fff;
+  margin-top: var(--space-3);
+}
+
+html.app-native .native-empty-hint {
+  font-size: var(--type-callout);
+  color: var(--text-dim);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+html.app-native .native-empty-cta {
+  margin-top: var(--space-3);
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: 16px;
+  border: none;
+  font-weight: 800;
+  font-size: var(--type-body);
+  cursor: pointer;
+  color: #0a1a08;
+  background: linear-gradient(135deg, #c9f73a 0%, #00e68a 100%);
+  box-shadow: 0 8px 24px rgba(201, 247, 58, 0.3);
+}
+
+/* Тосты и баннеры — строго над пилюлей навигации. */
+html.app-native .toast-container,
+html.app-native [data-toast-root] {
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+}
+
+/* 58.10 Планшеты: контент центрируется, hero остаётся на весь экран. */
+@media (min-width: 720px) {
+  html.app-native .screen {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  html.app-native .tabs {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  html.app-native .native-home-content {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .native-fade-up,
+  html.app-native .native-skeleton {
+    animation: none;
+  }
+  html.app-native .native-fab:active,
+  html.app-native .native-btn-primary:active,
+  html.app-native .native-btn-ghost:active,
+  html.app-native .native-btn-danger:active {
+    transform: none;
+  }
+}
+
 /* ─── 40. NATIVE DEEP-8 — библиотека, протоколы, модалки ─────── */
 html.app-native .train-bbrec,
 html.app-native .train-bblib,

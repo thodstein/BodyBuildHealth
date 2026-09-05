@@ -19,12 +19,16 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,
-      backgroundColor: '#0a1628',
+      backgroundColor: '#050b16',
       showSpinner: false,
     },
     StatusBar: {
       style: 'dark',
-      backgroundColor: '#0a1628',
+      backgroundColor: '#050b16',
+      // API 35+ принудительно edge-to-edge: контент идёт под системные бары,
+      // отступы закрывают safe-area в styles-native(-pro).css. На старых API
+      // поведение прежнее — плашка фирменного navy.
+      overlaysWebView: true,
     },
     Keyboard: {
       // WebView не схлопывается под клавиатуру (проблема известна по TG WebView).

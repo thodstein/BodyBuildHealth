@@ -10,6 +10,7 @@ import { initPWA } from './core/pwa-manager';
 import { onViewportChanged, hapticImpact, onKeyboardClose } from './core/telegram';
 import { applyPlatformAttributes } from './core/app-platform';
 import { initNativeChrome } from './core/native-bridge';
+import { initApkAppearance } from './ui/native/appearance';
 import { initCloudSync } from './core/cloud-sync';
 import { processQueue } from './core/sync-queue';
 import { initEncryption } from './core/db-encryption';
@@ -109,6 +110,8 @@ async function bootstrap() {
   // Telegram-ветка ниже не меняется: в Mini App всё как раньше.
   let platform: 'telegram' | 'native' | 'web' = 'web';
   try { platform = applyPlatformAttributes(); } catch (e) { console.warn('applyPlatformAttributes failed:', e); }
+  // Тема APK (dark/amoled/light): внутри — гейт на native, в TG/web no-op.
+  try { initApkAppearance(); } catch (e) { console.warn('initApkAppearance failed:', e); }
   if (platform === 'native') {
     try { await initNativeChrome(); } catch (e) { console.warn('initNativeChrome failed:', e); }
   }

@@ -19,6 +19,7 @@ import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
 import { setupNativeBackButton, haptics, isBiometricAvailable, authenticateWithBiometrics } from './core/native-bridge';
 import { useSwipeTabs } from './ui/native/useSwipeTabs';
+import { NativeFab } from './ui/native/NativeFab';
 
 /** Экран блокировки входа. Рендерится ТОЛЬКО в APK при включённом блоке. */
 function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
@@ -395,10 +396,17 @@ export default function App() {
       <ToastContainer />
       <KvUpdateBanner />
       {appLocked && <NativeAppLock onUnlocked={() => setAppLocked(false)} />}
-      <nav className="tabs">
+      {/* FAB быстрой записи — ТОЛЬКО APK (в TG/web ветка не монтируется). */}
+      {isNativeApp() && !appLocked && initialized && (
+        <NativeFab onQuickLog={() => go('training', 'diary')} />
+      )}
+      <nav className="tabs" aria-label="Основная навигация">
         {PRIMARY_NAV.map(item => (
           <button
             key={item.id}
+            data-tab={item.id}
+            aria-label={item.label}
+            aria-current={tab === item.id ? 'page' : undefined}
             className={'nav-btn' + (tab === item.id ? ' active' : '')}
             onClick={() => go(item.id)}
           >

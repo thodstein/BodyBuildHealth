@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TOP: App Shortcuts (только APK; Telegram их не имеет).
+     Иконки — существующий лаунчер, новых ассетов не требует. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="he_training"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/widget_training_label"
+        android:shortcutLongLabel="@string/widget_training_desc">
+        <intent
+            android:action="com.healthengine.app.action.WIDGET_OPEN"
+            android:targetPackage="com.healthengine.app"
+            android:targetClass="com.healthengine.app.MainActivity">
+            <extra android:name="target" android:value="training" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="he_nutrition"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/widget_nutrition_label"
+        android:shortcutLongLabel="@string/widget_nutrition_desc">
+        <intent
+            android:action="com.healthengine.app.action.WIDGET_OPEN"
+            android:targetPackage="com.healthengine.app"
+            android:targetClass="com.healthengine.app.MainActivity">
+            <extra android:name="target" android:value="nutrition" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="he_timer"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/widget_timer_label"
+        android:shortcutLongLabel="@string/widget_timer_desc">
+        <intent
+            android:action="com.healthengine.app.action.WIDGET_OPEN"
+            android:targetPackage="com.healthengine.app"
+            android:targetClass="com.healthengine.app.MainActivity">
+            <extra android:name="target" android:value="training" />
+        </intent>
+    </shortcut>
+</shortcuts>
