@@ -65,3 +65,27 @@ export function checkCnsGuard(input: CnsGuardInput = {}): CnsGuardResult {
   rules.push('CNS-допуск: тяжёлый хват разрешён.');
   return { allowed: true, volumeMult: 1, rules, note: 'CNS-допуск: лимиты не превышены.' };
 }
+
+export interface CnsDiaryResult {
+  heavyDays: number;
+  volumeMult: number;
+  note: string | null;
+}
+
+/**
+ * TOP wave-4: автоподсчёт тяжёлых из дневника (последние 7 записей, sRPE≥8).
+ * 0–1 тяжёлых → без изменений; 2+ → план облегчается ×0.8 (третий тяжёлый
+ * на неделе уже был — добивать CNS нельзя). Чистая функция.
+ */
+export function cnsFromDiary(days: Array<{ srpe?: number }> | undefined | null): CnsDiaryResult {
+  const list = Array.isArray(days) ? days.slice(-7) : [];
+  const heavyDays = list.filter((d) => Number(d?.srpe ?? 0) >= 8).length;
+  if (heavyDays >= 2) {
+    return {
+      heavyDays,
+      volumeMult: 0.8,
+      note: `CNS: в дневнике уже ${heavyDays} тяжёлых (RPE≥8) за 7 дней — план облегчён ×0.8, максимумы запрещены.`,
+    };
+  }
+  return { heavyDays, volumeMult: 1, note: null };
+}

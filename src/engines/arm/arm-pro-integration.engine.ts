@@ -24,7 +24,7 @@ import { buildContestSimWeek } from './arm-contest-sim.engine';
 import { buildLongevityPlan } from './arm-longevity.engine';
 import { buildTendonFuel } from './arm-tendon-fuel.engine';
 import { buildArmWarmup } from './arm-warmup.engine';
-import { checkCnsGuard } from './arm-cns-guard.engine';
+import { checkCnsGuard, cnsFromDiary } from './arm-cns-guard.engine';
 import { planLrSplit } from './arm-lr-split.engine';
 import { analyzeTableIq } from './arm-table-iq.engine';
 import { buildArmCalendar } from './arm-calendar.engine';
@@ -138,6 +138,16 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
       replaceHeavyPronWithPulses = replaceHeavyPronWithPulses || auto.replaceHeavyPronWithPulses;
       rationale.push(`Дневник: ${auto.note}`);
       if (auto.volumeMult < 1) warnings.push(`Авторегуляция: объём ×${auto.volumeMult}, RIR+${auto.rirShift}.`);
+      // TOP wave-4: CNS-автоподсчёт тяжёлых из дневника (2+ RPE≥8 → ×0.8)
+      try {
+        const cns = cnsFromDiary(input.diary);
+        if (cns.note) {
+          volumeMult = Math.min(volumeMult, cns.volumeMult);
+          rationale.push(cns.note);
+          warnings.push(`CNS: ${cns.heavyDays} тяжёлых за 7 дней — план ×${cns.volumeMult}.`);
+          if (!cnsLine) cnsLine = cns.note;
+        }
+      } catch { /* опционально */ }
     }
   } catch { /* опционально */ }
 
@@ -385,6 +395,7 @@ export interface ArmProSummary {
   attempts: { implement: string; attempts: number[]; wrPct: number } | null;
   video: { points: number; xLoop: number; trajectory: string } | null;
   autoreg: { volumeMult: number; rirShift: number; note: string } | null;
+  cns: { heavyDays: number; volumeMult: number; note: string } | null;
 }
 
 /** Чистая сводка: те же движки, что в applyArmPro, но структурой (не строками). */
@@ -398,6 +409,7 @@ export function buildArmProSummary(input: ArmBuilderInput): ArmProSummary {
     attempts: null,
     video: null,
     autoreg: null,
+    cns: null,
   };
   try {
     if (input.bodyWeightKg != null || input.ageYears != null || input.arm) {
@@ -450,6 +462,8 @@ export function buildArmProSummary(input: ArmBuilderInput): ArmProSummary {
     if (input.diary && input.diary.length > 0) {
       const auto = autoregArmFromDiary(input.diary);
       out.autoreg = { volumeMult: auto.volumeMult, rirShift: auto.rirShift, note: auto.note };
+      const cns = cnsFromDiary(input.diary);
+      if (cns.note) out.cns = { heavyDays: cns.heavyDays, volumeMult: cns.volumeMult, note: cns.note };
     }
   } catch { /* опционально */ }
   try {

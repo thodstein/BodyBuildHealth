@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildTendonFuel } from '../arm-tendon-fuel.engine';
 import { buildArmWarmup } from '../arm-warmup.engine';
-import { checkCnsGuard } from '../arm-cns-guard.engine';
+import { checkCnsGuard, cnsFromDiary } from '../arm-cns-guard.engine';
+import { buildArmPlan } from '../arm-builder.engine';
 
 describe('arm TOP T6 fuel + warmup + CNS', () => {
   it('топливо: коллаген 15г + белок 2.2г/кг', () => {
@@ -37,5 +38,22 @@ describe('arm TOP T6 fuel + warmup + CNS', () => {
   });
   it('CNS: чисто — допуск', () => {
     expect(checkCnsGuard({ heavyGripThisWeek: 1, plannedHeavy: true, hoursSinceHeavyPull: 48 }).allowed).toBe(true);
+  });
+  it('CNS из дневника: 0–1 тяжёлых — тихо, 2+ — ×0.8', () => {
+    expect(cnsFromDiary([]).volumeMult).toBe(1);
+    expect(cnsFromDiary([{ srpe: 9 }]).note).toBeNull();
+    const r = cnsFromDiary([{ srpe: 9 }, { srpe: 8 }, { srpe: 5 }]);
+    expect(r.heavyDays).toBe(2);
+    expect(r.volumeMult).toBe(0.8);
+    expect(r.note).toMatch(/CNS/);
+  });
+  it('интеграция: дневник 2×RPE9 режет план', () => {
+    const p: any = buildArmPlan({
+      discipline: 'armwrestling', patternId: 'arm_4_upper_lower', level: 'intermediate',
+      goal: 'strength', technique: 'balanced', weeks: 4,
+      diary: [{ dateIso: '2026-09-01', srpe: 9 }, { dateIso: '2026-09-03', srpe: 9 }],
+    });
+    expect(p.rationale.join(' ')).toMatch(/CNS:/);
+    expect(p.safetyWarnings.join(' ')).toMatch(/CNS/);
   });
 });
