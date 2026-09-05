@@ -306,3 +306,53 @@ export function isPeriLikeMeal(m: { type?: string } | null | undefined): boolean
   if (t === 'preworkout' || t === 'postworkout' || t === 'intra' || t === 'presleep') return true;
   return (m as any)[INSULIN_WINDOW_MARK] === true;
 }
+
+// ─── Portable-еда (работа: без разогрева, без запаха, без контейнера) ────
+// на работу/в дорогу БЕЗ разогрева: порошки/хлопья/мюсли/хлеб/рисовые хлебцы, фрукты/ягоды,
+// орехи/масла, молочка в упаковке (йогурт/творог/кефир), консервированная рыба, варёные яйца.
+// Супы/горячие каши/жареное/фастфуд — НЕ портативны (их исключаем при portableMode).
+const NON_PORTABLE_TOKENS = ['soup','porridge_','kfc','mcd','bk_','big_mac','royale','whopper','big_smoke','pizza','french_fries','fried','cheburek','pyanse','khachapuri','shaurma','ramen','gyros','falafel_pita','pancake','pelmeni','blini','pirozhok','borscht','hot_dog','hamburger','manti','samsa','kebab','shawarma','mayonnaise','ketchup','cream_sauce','bouillon_cube','ice_cream','marmalade','cookie','chocolate','coca_cola','soda','juice_apple','juice_orange'];
+/** Портативный ли продукт для рабочего окна (единая точка — движок, корректор, ребаланс). */
+export function isPortableFood(f: { id: string; name?: string; category?: string }): boolean {
+  const lid = (f.id || '').toLowerCase();
+  const lname = (f.name || '').toLowerCase();
+  if (NON_PORTABLE_TOKENS.some(t => lid.includes(t) || lname.includes(t))) return false;
+  if (f.category === 'supplement') return true;        // порошки/батончики
+  if (f.category === 'veg_fruit') return true;          // фрукты/ягоды/сырые овощи
+  if (f.category === 'fat') {
+    // Орехи/семечки — можно есть руками. Масла/пасты — нет (нужна ложка, пачкают).
+    if (lid.includes('oil') || lid.includes('butter') || lid.includes('paste') || lid.includes('mayonnaise') || lid.includes('cream_sauce') || lid.includes('spread')) return false;
+    return true;  // орехи/семечки/сухофрукты — едим руками
+  }
+  if (f.category === 'dairy') {
+    // Только питьевые молочные (молоко/кефир в бутылке) — можно пить на работе.
+    // Творог/йогурт/сыр — требуют ложки/контейнера, пахнут.
+    if (lid.includes('milk') || lid.includes('kefir') || lid.includes('ayran')) return true;
+    return false;
+  }
+  if (f.category === 'protein') {
+    // «Хлопья на работе» = БЕЗ разогрева, БЕЗ запаха, БЕЗ контейнера.
+    // Только протеиновый порошок (сыворотка/казеин/вега) — разводится водой в шейкере.
+    // Никакого мяса, рыбы, яиц, творога — всё это требует контейнера, вилки, пахнет.
+    if (lid.includes('whey') || lid.includes('casein') || lid.includes('isolate') || lid.includes('pea_protein') || lid.includes('soy_isolate') || lid.includes('rice_protein') || lid.includes('supp_eaa') || lid.includes('bcaa') || lid.includes('collagen')) return true;
+    return false;
+  }
+  if (f.category === 'grain' || f.category === 'carb') {
+    // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
+    // buckwheat/barley (гречка/ячка — горячие) — НЕ портативны, требуют варки
+    // 'bar' убран — иначе barley ложно портативен (barley contains 'bar')
+    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','flakes','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
+  }
+  return false;
+}
+/** true если приём попадает в рабочее окно (для portable-гейта добивок). */
+export function isWorkWindowMeal(timeStr: string | undefined, ws: number | undefined, we: number | undefined): boolean {
+  if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return false;
+  const [h, m] = timeStr.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return false;
+  if (!Number.isFinite(ws) || !Number.isFinite(we)) return false;
+  const tm = h * 60 + m;
+  if (ws === we) return false;
+  if ((we as number) > (ws as number)) return tm >= (ws as number) && tm <= (we as number);
+  return tm >= (ws as number) || tm <= (we as number);
+}

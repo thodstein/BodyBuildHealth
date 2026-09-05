@@ -59,9 +59,16 @@ describe('recipeCompatibility (два рецепта в одном приёме)
     expect(c.compatible).toBe(true);
   });
 
-  it('много общих ключевых ингредиентов — несовместимы', () => {
+  it('два общих ключевых ингредиента — совместимы (v3: ротация дня решает разнообразие, не запрет)', () => {
     const a = mkRecipe({ name: 'А', ingredientIds: ['chicken_breast', 'rice_white', 'broccoli'] });
     const b = mkRecipe({ name: 'Б', ingredientIds: ['chicken_breast', 'rice_white', 'carrot'] });
+    const c = recipeCompatibility(a as any, b as any);
+    expect(c.compatible).toBe(true);
+  });
+
+  it('три общих ключевых ингредиента — несовместимы (дубль-профиль)', () => {
+    const a = mkRecipe({ name: 'А', ingredientIds: ['chicken_breast', 'rice_white', 'broccoli'] });
+    const b = mkRecipe({ name: 'Б', ingredientIds: ['chicken_breast', 'rice_white', 'broccoli'] });
     const c = recipeCompatibility(a as any, b as any);
     expect(c.compatible).toBe(false);
   });

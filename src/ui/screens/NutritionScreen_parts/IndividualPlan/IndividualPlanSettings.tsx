@@ -93,7 +93,7 @@ export const IndividualPlanSettings: React.FC = () => {
     morningTrainLoad, setMorningTrainLoad,
     allergens, toggleAllergen,
     healthIssues, setHealthIssues, toggleHealthIssue,
-    eveningLowCarb, setEveningLowCarb,
+    eveningLowCarb, setEveningLowCarb, nightCarbs, setNightCarbs,
     addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
     planType, setPlanType,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
@@ -1825,6 +1825,17 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               left: eveningLowCarb ? 27 : 3, boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
             }} />
           </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>Ночь — угли</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>0 — только казеин · 20/40 — хлеб+мёд к казеину</div>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[0, 20, 40].map(v => (
+              <button key={v} onClick={() => setNightCarbs(v)} style={{ padding: '4px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, border: nightCarbs === v ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.1)', background: nightCarbs === v ? 'rgba(99,102,241,0.2)' : 'transparent', color: nightCarbs === v ? '#a5b4fc' : 'rgba(255,255,255,0.55)' }}>{v}</button>
+            ))}
+          </div>
         </div>
       </GlassCard>
       )}

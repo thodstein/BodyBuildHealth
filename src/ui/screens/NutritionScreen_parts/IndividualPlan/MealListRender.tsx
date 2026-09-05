@@ -63,7 +63,7 @@ function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time
 }
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
-  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, proteinPreset, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, weightMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, removeMealRebalanced } = ctx as any;
+  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, proteinPreset, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, weightMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, removeMealRebalanced, rescaleSecondRecipeInMeal, removeSecondRecipeFromMeal } = ctx as any;
   const _weightMode = (weightMode === 'raw' ? 'raw' : 'cooked') as 'cooked' | 'raw';
   const _proteinPreset = PROTEIN_PRESETS.find(p => p.id === (proteinPreset || 'base'))?.gPerKg || 2.0;
   const setDayPlan = _setDayPlan as any;
@@ -323,6 +323,19 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                     }}>
                     {m.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт в приём'}
                   </button>
+                )}
+                {m.recipeApplied2 && (
+                  <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:6, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:700 }}>Масштаб 2-го:</span>
+                    {[0.5, 1, 1.5, 2].map(s => {
+                      const cur = Number((m as any).recipeAppliedData2?.portionScale ?? (m as any).recipeAppliedData2?.appliedScale ?? 1) || 1;
+                      const active = Math.abs(cur - s) < 0.01;
+                      return (
+                        <span key={s} onClick={() => rescaleSecondRecipeInMeal?.(mi, dayIdx, s)} title={`Масштаб второго рецепта ×${s} (первый не трогается, остальные приёмы пересоберутся)`} style={{ fontSize:9, padding:'3px 8px', borderRadius:7, cursor:'pointer', fontWeight:800, minHeight:28, display:'inline-flex', alignItems:'center', background: active ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)', border: active ? '1px solid rgba(245,158,11,0.5)' : '1px solid rgba(255,255,255,0.1)', color: active ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>×{s}</span>
+                      );
+                    })}
+                    <span onClick={() => removeSecondRecipeFromMeal?.(mi, dayIdx)} title="Убрать второй рецепт (первый остаётся)" style={{ fontSize:9, padding:'3px 8px', borderRadius:7, cursor:'pointer', fontWeight:700, minHeight:28, display:'inline-flex', alignItems:'center', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕ убрать 2-й</span>
+                  </div>
                 )}
                 {m.recipeSuggestions && Array.isArray(m.recipeSuggestions) && m.recipeSuggestions.length > 0 && (
                   <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>

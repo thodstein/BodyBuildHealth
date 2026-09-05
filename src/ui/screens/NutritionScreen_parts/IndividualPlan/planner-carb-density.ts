@@ -40,7 +40,10 @@ export const DENSE_CARB_LADDER: DenseCarbStep[] = [
   { id: 'dates', kind: 'dried', maxG: 60 },
   { id: 'raisins', kind: 'dried', maxG: 60 },
   { id: 'dried_apricots', kind: 'dried', maxG: 60 },
-  { id: 'cream_of_rice', kind: 'grain', maxG: 100 },
+  { id: 'corn_flakes', kind: 'grain', maxG: 150 },
+  { id: 'rice_white', kind: 'grain', maxG: 150 },
+  { id: 'bread_white', kind: 'bake', maxG: 165 },
+  { id: 'cream_of_rice', kind: 'grain', maxG: 150 },
 ];
 
 /**
@@ -50,7 +53,7 @@ export const DENSE_CARB_LADDER: DenseCarbStep[] = [
 export const EDIBILITY_CAPS: Record<string, number> = {
   // Каши готовые / сухие
   rice_white: 450, rice_brown: 450, buckwheat: 450, pasta_durum: 450, potato_boiled: 450,
-  oats: 450, oats_dry: 100, cream_of_rice: 400, bulgur: 450, millet: 400, barley: 450, quinoa: 400,
+  oats: 450, oats_dry: 100, cream_of_rice: 400, corn_flakes: 150, bulgur: 450, millet: 400, barley: 450, quinoa: 400,
   // Хлеб/выпечка/сладости
   bread_white: 165, bread_rye: 165, pryaniki: 80, sushki: 80, sugar_cookies: 60,
   honey: 60, jam: 55, marmalade: 50, zefir: 50, pastila: 50,
