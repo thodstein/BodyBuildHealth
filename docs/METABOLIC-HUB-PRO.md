@@ -90,5 +90,9 @@ DLW band ±12% Westerterp 1999 показан во всех TDEE.
 - **Гипо-гард достижим**: чекбокс «Нелечёный гипотиреоз» → `untreatedHypothyroid` в BMR (−12%); T3-низ — чекбокс в CAT2 (secondary).
 - **Персист**: снапшот хранит LEAF/LEAM-ответы, compareIds, t3Low, untreatedHypo.
 
+## PRO v4.4 — график EMA/intake + приёмы белка (Sep 2026)
+- **График «📈 Динамика 28д»** (таб Поиск): SVG без зависимостей — вес (точки) + EMA-линия (кг) + intake-бары по тем же датам (зелёные ±10% TDEE) + пунктир TDEE; `intakeSeries` 28д из дневника wired в `calcAdaptiveTDEEv3.intakeHistory` (date-join, мусор 50/20000 отфильтрован).
+- **Приёмы 3/4/5/6 — рабочие**: `proteinMeals`-стейт + персист, кнопки переключают `calcProteinTimingPro` (порция/лейцин пересчитываются).
+
 ## Тесты
-`metabolic-hub.test.ts:1` 119 тестов (84→114 +30 v4/v4-2: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность/лактация, CAT2/LEAM/return-to-play, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2/aggressive-cap, one-answer/diff-truncate, парсер PRO), `nutrition-v2-audit` 4, `rest-hooks-native` 60, `tSC` свои 0.
+`metabolic-hub.test.ts:1` 121 тест (84→114 +30 v4/v4-2: adaptive-v3 ×3, MET-60/PALpro, BMR-гарды, беременность/лактация, CAT2/LEAM/return-to-play, sweat-V2/BHI, TG/HDL/LAP/VAI/FMI, алко-хроника, DIAAS, NEATpro/AT-range/reverse-auto, goal-V2/aggressive-cap, one-answer/diff-truncate, парсер PRO), `nutrition-v2-audit` 4, `rest-hooks-native` 60, `tSC` свои 0.

@@ -924,3 +924,29 @@ describe('metabolic-hub PRO v4-3 — дедуп поколений: PAL-пари
     expect(b.flags.join(' ')).toContain('T3');
   });
 });
+
+describe('metabolic-hub PRO v4-4 — график EMA/intake + приёмы белка', () => {
+  const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
+  const wh = [
+    { date:'2026-01-01', kg:83},{date:'2026-01-04', kg:82.8},{date:'2026-01-08', kg:82.6},{date:'2026-01-11', kg:82.45},{date:'2026-01-14', kg:82.3},{date:'2026-01-17', kg:82.15},{date:'2026-01-20', kg:82.0},{date:'2026-01-23', kg:81.85},{date:'2026-01-26', kg:81.7},{date:'2026-01-29', kg:81.55}
+  ];
+  const intake = wh.map((w, i) => ({ date: w.date, kcal: 2800 - (i % 3) * 100 }));
+  it('intakeHistory перекрывает средний ккал и чистит мусор', async () => {
+    const { calcAdaptiveTDEEv3 } = await import('../metabolic-hub.engine');
+    const low = calcAdaptiveTDEEv3({ weightHistory: wh, avgIntakeKcal: 2000, bodyFatPct: 15, logDays: 12, intakeHistory: intake });
+    const high = calcAdaptiveTDEEv3({ weightHistory: wh, avgIntakeKcal: 2000, bodyFatPct: 15, logDays: 12, intakeHistory: intake.map(p => ({ ...p, kcal: p.kcal + 1000 })) });
+    expect(low).not.toBeNull(); expect(high).not.toBeNull();
+    expect(high!.tdee).toBeGreaterThan(low!.tdee + 800); // ~+1000ккал intake → ~+1000 TDEE
+    expect(low!.emaSeries.length).toBe(wh.length);
+    const noisy = calcAdaptiveTDEEv3({ weightHistory: wh, avgIntakeKcal: 2000, bodyFatPct: 15, logDays: 12, intakeHistory: [...intake, { date:'2026-01-30', kcal: 50 }, { date:'2026-01-31', kcal: 20000 }] as any });
+    expect(noisy!.tdee).toBe(low!.tdee); // 50 и 20000 отфильтрованы
+  });
+  it('приёмы белка 3/4/5/6 масштабируют порцию', async () => {
+    const { calcProteinTimingPro } = await import('../metabolic-hub.engine');
+    const total = 160;
+    expect(calcProteinTimingPro(total,80,3,'mixed',30).perMeal).toBe(Math.round(total/3));
+    expect(calcProteinTimingPro(total,80,6,'mixed',30).perMeal).toBe(Math.round(total/6));
+    expect(calcProteinTimingPro(total,80,4,'mixed',30).perMeal).toBe(Math.round(total/4));
+    expect(calcProteinTimingPro(total,80,6,'mixed',30).leucinePerMeal).toBeLessThan(calcProteinTimingPro(total,80,3,'mixed',30).leucinePerMeal);
+  });
+});
