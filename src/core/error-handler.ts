@@ -9,10 +9,38 @@ interface CrashReport {
 
 let lastAction = 'App Bootstrap';
 const MAX_REPORTS = 5;
+// После готовности приложения фоновый шум (синк, сеть, ресурсы) НЕ должен
+// ронять весь экран: иначе пользователь получает вечный цикл
+// «ошибка → перезагрузка → ошибка». Фатален только краш ДО готовности.
+let booted = false;
+
+/** Вызывать один раз после успешного первого рендера (main.tsx). */
+export function markBooted(): void {
+  booted = true;
+}
 
 export function initErrorHandler(appId: string = 'app') {
-  window.addEventListener('error', (e) => handleCrash(e.error?.message || 'Unknown Error', e.error?.stack || ''));
-  window.addEventListener('unhandledrejection', (e) => handleCrash(e.reason?.message || 'Unhandled Promise', e.reason?.stack || ''));
+  window.addEventListener('error', (e) => {
+    // Ошибка ресурса (картинка/шрифт/скрипт): e.error пуст, target — элемент.
+    // Это не краш приложения — только в лог, без оверлея.
+    try {
+      const t = e.target as unknown;
+      if (t && t !== window && typeof (t as HTMLElement).tagName === 'string') return;
+    } catch {
+      /* ниже — общий путь */
+    }
+    handleCrash(e.error?.message || 'Unknown Error', e.error?.stack || '');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    try {
+      if (e && typeof (e as PromiseRejectionEvent).preventDefault === 'function') {
+        (e as PromiseRejectionEvent).preventDefault();
+      }
+    } catch {
+      /* ignore */
+    }
+    handleCrash(e.reason?.message || 'Unhandled Promise', e.reason?.stack || '');
+  });
   
   window.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
@@ -60,8 +88,12 @@ function handleCrash(message: string, stack: string) {
     localStorage.setItem('he_crash_reports', JSON.stringify(existing));
   } catch {}
 
-  const fallback = document.getElementById('error-fallback');
-  if (fallback) fallback.style.display = 'flex';
-  
+  // Оверлей — только для фатального краша до готовности. После — тихо в лог:
+  // иначе любой фоновый чих даёт вечный цикл «ошибка → перезагрузка».
+  if (!booted) {
+    const fallback = document.getElementById('error-fallback');
+    if (fallback) fallback.style.display = 'flex';
+  }
+
   console.error('🔴 CRASH REPORT:', report);
 }
