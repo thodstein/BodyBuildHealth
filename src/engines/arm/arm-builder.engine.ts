@@ -18,6 +18,8 @@ import { profileOpponent, matchupVolumeFor } from './arm-matchup.engine';
 import { buildRfdSession } from './arm-rfd.engine';
 import { planLrSplit } from './arm-lr-split.engine';
 import { applyContestSimToPlan } from './arm-sim-apply.engine';
+import { buildGripRpe } from './arm-grip-rpe.engine';
+import { analyzeTableIq } from './arm-table-iq.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -311,6 +313,12 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) lrNote = `L/R сплит: ${lr.note}`;
     }
   } catch { lrNote = null; }
+  // TOP wave-5: Table-IQ рычаги в объём (только при журнале схваток)
+  let iqPlan: ReturnType<typeof analyzeTableIq> | null = null;
+  try {
+    const bouts = (input as any).bouts;
+    if (Array.isArray(bouts) && bouts.length) iqPlan = analyzeTableIq({ bouts });
+  } catch { iqPlan = null; }
 
   // MRV multipliers — через adaptForPEDs с tendonCap 1.5× + fallback для неизвестных педов (тест 'test_e')
   let pedMult = 1;
@@ -464,6 +472,16 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     // tendon deload первые 4 недели для beginner — ещё ×0.85 сверху уже учтённого tendonMult, но тут дополнительно для объёма
     if (level === 'beginner' && w <= 4) weekMult *= 0.92;
     const taper = isPeaking;
+    // TOP wave-5: Grip-RPE фаза недели (только при заданных gripWeek/gripPhase)
+    let gripPhaseMult = 1;
+    let gripRirAdd = 0;
+    try {
+      if (input.gripWeek != null || input.gripPhase != null) {
+        const gp = buildGripRpe({ week: (input.gripWeek ?? w) as number, phase: input.gripPhase });
+        if (gp.phase === 'deload') gripPhaseMult = 0.6;
+        else if (gp.phase === 'peak') { gripPhaseMult = 0.7; gripRirAdd = 1; }
+      }
+    } catch { gripPhaseMult = 1; gripRirAdd = 0; }
 
     const sessions: ArmSession[] = [];
     let sessionIdx = 0;
@@ -501,12 +519,23 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           role = 'accessory';
         }
         const matchupMult = matchupPlan ? matchupVolumeFor(mus, matchupPlan) : 1;
-        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult) : 6;
+        // TOP wave-5: grip-RPE фаза режет хват; Table-IQ: фолы режут side, срывы растят containment
+        const gripMult = mus.startsWith('grip_') ? gripPhaseMult : 1;
+        const iqSide = iqPlan && (iqPlan.foulRate ?? 0) >= 1 && mus === 'side_pressure' ? 0.8 : 1;
+        const iqRise = iqPlan && (iqPlan.slipRate ?? 0) >= 40 && (mus === 'risers' || mus === 'thumb') ? 1.15 : 1;
+        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult * gripMult * iqSide * iqRise) : 6;
         const target = volumeTargets[mus] ? Math.min(volumeTargets[mus].mrv, targetRaw) : 6;
         const freq = muscleFreq[mus] || 1;
-        const sets = setsFor(mus, effCh, w, target, freq);
-        const reps = repsFor(mus, effCh, phase);
-        const rir = Math.max(0, Math.min(5, rirFor(effCh, phase, w, technique) + (pro.rirShift || 0)));
+        const setsBase = setsFor(mus, effCh, w, target, freq);
+        const repsBase = repsFor(mus, effCh, phase);
+        // TOP wave-5: RFD — настоящий speed-протокол 5×3 RPE8 вместо метки (первое speed-упражнение тяжёлой intensification)
+        const rfdSpeed = rfdOn && phase === 'intensification' && effCh === 'тяж' && !rfdDone &&
+          ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus);
+        if (rfdSpeed) rfdDone = true;
+        const sets = rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
+        const reps: [number, number] = rfdSpeed ? [3, 3] : repsBase;
+        const iqRir = (mus === 'side_pressure' && iqSide < 1 ? 1 : 0) + (mus.startsWith('grip_') ? gripRirAdd : 0);
+        const rir = Math.max(0, Math.min(5, rirFor(effCh, phase, w, technique) + (pro.rirShift || 0) + iqRir));
         const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique);
         if (!exTpl) continue;
         usedInSession.add(exTpl.id);
@@ -541,7 +570,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             reps: repVal,
             rir,
             weight: wgt,
-            restSeconds: mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : effCh === 'тяж' ? 120 : 90,
+            restSeconds: rfdSpeed ? 90 : mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : effCh === 'тяж' ? 120 : 90,
             tempo: tempoForKind,
             technique: mus === 'side_pressure' && effCh === 'тяж' ? 'none' : effCh === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
             holdSeconds: hold,
@@ -566,8 +595,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          comment: (!rfdDone && ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus)
-            ? ((rfdDone = true), `RFD speed: ускорение через весь диапазон (5×3 RPE8, отдых 90с) · ${exTpl.technique || ''}`)
+          comment: (rfdSpeed
+            ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
             : exTpl.technique),
         });
       }
