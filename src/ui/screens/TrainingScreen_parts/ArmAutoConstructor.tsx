@@ -23,6 +23,7 @@ import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { ladderAdvice } from '../../../engines/arm/arm-implement-ladder.engine';
 import { buildArmCalendar } from '../../../engines/arm/arm-calendar.engine';
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
+import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
@@ -114,6 +115,8 @@ export function ArmAutoConstructor() {
   const [topSim, setTopSim] = useState<boolean>(false);
   const [topCalPrio, setTopCalPrio] = useState<string>('B');
   const [topCalSeries, setTopCalSeries] = useState<string>('local');
+  const [topGripWeek, setTopGripWeek] = useState<string>('');
+  const [topGripPhase, setTopGripPhase] = useState<string>('auto');
 
   const workMax = useMemo(() => {
     try {
@@ -288,6 +291,8 @@ export function ArmAutoConstructor() {
         oppHand: topOppHand !== 'unknown' ? topOppHand : undefined,
         weightDeltaKg: parseFloat(topWD) !== 0 && Number.isFinite(parseFloat(topWD)) ? parseFloat(topWD) : undefined,
         rfd: topRfd || undefined,
+        gripWeek: parseInt(topGripWeek) > 0 ? parseInt(topGripWeek) : undefined,
+        gripPhase: topGripPhase !== 'auto' ? topGripPhase : undefined,
         ladderFrom: topLadder || undefined,
         ladderValue: parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
         contestSim: topSim || undefined,
@@ -567,6 +572,16 @@ export function ArmAutoConstructor() {
                   <option value="local">Локальный</option><option value="waf_worlds">WAF Worlds</option><option value="east_vs_west">East-vs-West</option><option value="super_series">Super Series</option>
                 </select>
               </label>
+              <label style={{ ...SMALL }}>Grip-RPE неделя<br/>
+                <select aria-label="Grip-RPE неделя" value={topGripWeek} onChange={e=>setTopGripWeek(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="">Авто</option><option value="1">1 (объём)</option><option value="2">2 (объём)</option><option value="3">3 (интенс.)</option><option value="4">4 (делоад)</option>
+                </select>
+              </label>
+              <label style={{ ...SMALL }}>Grip-RPE фаза<br/>
+                <select value={topGripPhase} onChange={e=>setTopGripPhase(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                  <option value="auto">Авто</option><option value="volume">Объём RPE7</option><option value="intensification">Интенс. RPE8</option><option value="peak">Пик RPE9</option><option value="deload">Делоад</option>
+                </select>
+              </label>
             </div>
             <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
@@ -594,6 +609,12 @@ export function ArmAutoConstructor() {
               try {
                 const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
                 return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Календарь: {cal.note}</div>;
+              } catch { return null; }
+            })()}
+            {(topGripWeek || topGripPhase !== 'auto') && (()=>{
+              try {
+                const g = buildGripRpe({ week: parseInt(topGripWeek) || 1, phase: topGripPhase !== 'auto' ? topGripPhase : undefined });
+                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Grip-RPE: {g.note} Экстензоры {g.extensor.sets}×{g.extensor.reps} обязательно.</div>;
               } catch { return null; }
             })()}
           </div>
