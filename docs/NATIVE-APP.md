@@ -546,5 +546,14 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
 - Инвентаризация: остаток RU в `ui/native` — только комменты и тексты,
   приходящие из движков/коллеров (не зона native).
 
+Фикс CI-сборки (`mergeDebugResources` дубль + `compileDebugJavaWithJavac`):
+
+- Дубль `color/ic_launcher_background` (`colors.xml` vs штатный
+  `ic_launcher_background.xml`) ронял слияние ресурсов — дубль удалён
+  (значения побайтово совпадали), добавлен guard дублей в `verify:apk-ci`.
+- `system_accent1_*/accent2_*` внутри javadoc досрочно закрывал комментарий
+  (`*/`) — 4 ошибки javac; перефразировано + guard stray-`*/` по всем Java.
+  Урок: в комментариях Java запрещена пара звездочка-слэш даже в словах.
+
 Осознанные остатки (не баги): полный i18n остальных экранов/движков;
 Gradle-сборка Java-слоя — только CI.

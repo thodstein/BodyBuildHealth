@@ -12,11 +12,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 /**
  * DynamicColorPlugin — системный акцент Material You (Android 12+) в WebView.
  *
- * Палитра monet (system_accent1_*/accent2_*) — публичные ресурсы ОС, но их
+ * Палитра monet (system_accent1_* и accent2_*) — публичные ресурсы ОС, но их
  * точный набор зависит от версии SDK. Поэтому БЕЗ прямых ссылок на R:
  * цвета резолвятся через getIdentifier() — отсутствующий тон просто
  * пропускается, JS-сторона выбирает из того, что пришло.
- * На Android < 12 — { available: false }, JS молча остаётся на ручном акценте.
+ * На Android ниже 12 — available false, JS молча остаётся на ручном акценте.
+ * ВНИМАНИЕ: внутри javadoc нельзя писать звездочка-слэш (закрывает комментарий).
  */
 @CapacitorPlugin(name = "DynamicColor")
 public class DynamicColorPlugin extends Plugin {

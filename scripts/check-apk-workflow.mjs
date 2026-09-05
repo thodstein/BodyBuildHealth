@@ -46,6 +46,28 @@ for (const frag of [
 }
 if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у job’ов');
 
+// Java: преждевременный конец блочного комментария (звездочка-слэш внутри,
+// как было system_accent1_*/accent2_*) роняет compileDebugJavaWithJavac.
+// Вырезаем строки, затем блочные комменты — остаток */ это баг.
+{
+  const javaRoot = join(__dirname, '..', 'android', 'app', 'src', 'main', 'java');
+  const walk = (dir) => {
+    let out = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) out = out.concat(walk(p));
+      else if (e.name.endsWith('.java')) out.push(p);
+    }
+    return out;
+  };
+  for (const f of walk(javaRoot)) {
+    const src = readFileSync(f, 'utf-8')
+      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    if (src.includes('*/')) fails.push(`stray */ в ${f} (комментарий закрыт досрочно)`);
+  }
+}
+
 // mergeDebugResources падает на дублях: одно имя — один ресурс.
 // Проверяем values/*.xml (color/string/style/...) — именно так словили
 // дубль ic_launcher_background (colors.xml vs ic_launcher_background.xml).
