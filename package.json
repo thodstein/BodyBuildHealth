@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "sync-ocr-assets": "node scripts/sync-ocr-assets.mjs",
     "sync-hero-webp": "node scripts/sync-hero-webp.mjs",
+    "verify:apk-design": "node scripts/check-apk-markers.mjs",
     "postinstall": "node scripts/sync-ocr-assets.mjs"
   },
   "dependencies": {
