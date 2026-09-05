@@ -16,6 +16,18 @@ import { autoregArmFromDiary } from './arm-diary-autoreg.engine';
 import { planWeightCut, weeksUntilStart, prepPhaseForWeeksOut, legsAnchorBlock } from './arm-competition-prep.engine';
 import { parseArmTrackCsv, armPathMetrics, classifyArmTrajectory } from './arm-video-analysis.engine';
 import { planAttempts, platformWrFor } from './arm-platform.engine';
+import { profileOpponent } from './arm-matchup.engine';
+import { buildRfdSession } from './arm-rfd.engine';
+import { buildGripRpe } from './arm-grip-rpe.engine';
+import { ladderAdvice } from './arm-implement-ladder.engine';
+import { buildContestSimWeek } from './arm-contest-sim.engine';
+import { buildLongevityPlan } from './arm-longevity.engine';
+import { buildTendonFuel } from './arm-tendon-fuel.engine';
+import { buildArmWarmup } from './arm-warmup.engine';
+import { checkCnsGuard } from './arm-cns-guard.engine';
+import { planLrSplit } from './arm-lr-split.engine';
+import { analyzeTableIq } from './arm-table-iq.engine';
+import { buildArmCalendar } from './arm-calendar.engine';
 import type { ArmBuilderInput } from './arm-types';
 
 export interface ArmProResult {
@@ -33,6 +45,17 @@ export interface ArmProResult {
   cutLine: string | null;
   bilateralLine: string | null;
   legsAnchorSets: number;
+  matchupLine: string | null;
+  rfdLine: string | null;
+  gripRpeLine: string | null;
+  ladderLine: string | null;
+  simLine: string | null;
+  longevityLine: string | null;
+  fuelLine: string | null;
+  cnsLine: string | null;
+  lrLine: string | null;
+  iqLine: string | null;
+  calendarLine: string | null;
 }
 
 export function applyArmPro(input: ArmBuilderInput): ArmProResult {
@@ -49,6 +72,17 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
   let videoLine: string | null = null;
   let cutLine: string | null = null;
   let bilateralLine: string | null = null;
+  let matchupLine: string | null = null;
+  let rfdLine: string | null = null;
+  let gripRpeLine: string | null = null;
+  let ladderLine: string | null = null;
+  let simLine: string | null = null;
+  let longevityLine: string | null = null;
+  let fuelLine: string | null = null;
+  let cnsLine: string | null = null;
+  let lrLine: string | null = null;
+  let iqLine: string | null = null;
+  let calendarLine: string | null = null;
 
   // A. WAF-карточка (при наличии веса/возраста)
   try {
@@ -182,6 +216,130 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
     }
   } catch { /* опционально */ }
 
+  // TOP T1–T8: аддитивная связка (всё try/catch, вход — через as any чтобы не менять ArmBuilderInput)
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['oppStyle'] != null || ex['oppHand'] != null || ex['weightDeltaKg'] != null) {
+      const mp = profileOpponent({
+        myTechnique: String((input as { technique?: string }).technique ?? 'balanced'),
+        oppStyle: ex['oppStyle'] as string,
+        oppHand: ex['oppHand'] as string,
+        weightDeltaKg: Number(ex['weightDeltaKg'] ?? 0),
+        strapExpected: !!(input as { strapExpected?: boolean }).strapExpected,
+      });
+      matchupLine = `Матчап: ${mp.note}`;
+      rationale.push(matchupLine);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['explosivePct'] != null || ex['rfd'] === true) {
+      const rfd = buildRfdSession({
+        explosivePct: Number(ex['explosivePct'] ?? NaN),
+        fastPct: Number(ex['fastPct'] ?? NaN),
+        slowIndex: Number(ex['slowIndex'] ?? NaN),
+        level: String((input as { level?: string }).level ?? 'intermediate'),
+      });
+      rfdLine = `RFD: ${rfd.note}`;
+      rationale.push(rfdLine);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['gripWeek'] != null || ex['gripPhase'] != null) {
+      const g = buildGripRpe({ week: Number(ex['gripWeek'] ?? 1), phase: ex['gripPhase'] as string });
+      gripRpeLine = `Grip-RPE: ${g.note}`;
+      rationale.push(gripRpeLine);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['ladderFrom'] != null) {
+      ladderLine = ladderAdvice(String(ex['ladderFrom']), Number(ex['ladderValue'] ?? 0), String((input as { sex?: string }).sex ?? 'male'));
+      rationale.push(ladderLine);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['contestSim'] === true) {
+      const sim = buildContestSimWeek({
+        level: String((input as { level?: string }).level ?? 'intermediate'),
+        discipline: String((input as { discipline?: string }).discipline ?? 'armwrestling'),
+        strapExpected: !!(input as { strapExpected?: boolean }).strapExpected,
+        foulIds: ex['foulIds'] as string[],
+        targetKg: Number(ex['simTargetKg'] ?? NaN),
+        supermatch: !!(input as { supermatch?: boolean }).supermatch,
+      });
+      simLine = sim.note;
+      rationale.push(`Contest-sim: ${sim.note}`);
+    }
+  } catch { /* опционально */ }
+  try {
+    if ((input as { ageYears?: number }).ageYears != null && Number((input as { ageYears?: number }).ageYears) >= 40) {
+      const lon = buildLongevityPlan({ ageYears: Number((input as { ageYears?: number }).ageYears) });
+      longevityLine = lon.note;
+      rationale.push(longevityLine);
+      volumeMult = Math.min(volumeMult, lon.volumeMult);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['tableSession'] != null || ex['tendonFuel'] === true) {
+      const f = buildTendonFuel({ bodyWeightKg: Number((input as { bodyWeightKg?: number }).bodyWeightKg ?? 80), tableSession: ex['tableSession'] !== false });
+      fuelLine = f.note;
+      rationale.push(fuelLine);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['cnsCheck'] === true) {
+      const c = checkCnsGuard({
+        heavyGripThisWeek: Number(ex['heavyGripThisWeek'] ?? 0),
+        plannedHeavy: ex['plannedHeavy'] !== false,
+        hoursSinceHeavyPull: Number(ex['hoursSinceHeavyPull'] ?? 72),
+      });
+      cnsLine = c.note;
+      rationale.push(`CNS: ${c.note}`);
+      volumeMult = Math.min(volumeMult, c.volumeMult);
+      if (!c.allowed) warnings.push(`CNS: ${c.rules.join(' ')}`);
+    }
+  } catch { /* опционально */ }
+  try {
+    if ((input as { leftKg?: number }).leftKg != null || (input as { rightKg?: number }).rightKg != null) {
+      const lr = planLrSplit({ leftKg: Number((input as { leftKg?: number }).leftKg), rightKg: Number((input as { rightKg?: number }).rightKg) });
+      lrLine = lr.note;
+      if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) rationale.push(`L/R сплит: ${lr.note}`);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (Array.isArray(ex['bouts'])) {
+      const iq = analyzeTableIq({ bouts: ex['bouts'] as never });
+      iqLine = iq.note;
+      rationale.push(`Table-IQ: ${iq.note}`);
+      for (const l of iq.levers.slice(0, 1)) rationale.push(`Table-IQ рычаг: ${l}`);
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['calStartIso'] != null) {
+      const cal = buildArmCalendar({
+        startIso: ex['calStartIso'] as string,
+        priority: (ex['calPriority'] as string) ?? 'B',
+        series: (ex['calSeries'] as string) ?? 'local',
+        startKg: Number((input as { bodyWeightKg?: number }).bodyWeightKg ?? 0),
+        targetKg: Number((input as { targetWeightKg?: number }).targetWeightKg ?? 0),
+        sex: String((input as { sex?: string }).sex ?? 'male'),
+      });
+      calendarLine = cal.note;
+      rationale.push(`Календарь: ${cal.note}`);
+    }
+  } catch { /* опционально */ }
+  try {
+    const w = buildArmWarmup(String((input as { discipline?: string }).discipline ?? 'heavy'));
+    rationale.push(`Разминка: ${w.note}`);
+  } catch { /* опционально */ }
+
   // F-добавка: radial/fingers напоминалка (сам пул правит билдер через ensureRadialFingers в FullArm)
   try {
     void ensureRadialFingers;
@@ -202,6 +360,17 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
     cutLine,
     bilateralLine,
     legsAnchorSets,
+    matchupLine,
+    rfdLine,
+    gripRpeLine,
+    ladderLine,
+    simLine,
+    longevityLine,
+    fuelLine,
+    cnsLine,
+    lrLine,
+    iqLine,
+    calendarLine,
   };
 }
 
