@@ -59,7 +59,7 @@ export const RecoveryScreen: React.FC = () => {
   const s_label = { fontSize:9, color:'var(--text-dim)' };
 
   return (
-    <div className="screen">
+    <div className="screen recovery-screen">
       <h2>Восстановление и производительность</h2>
       <div style={{ display:'flex', gap:3, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
         {TABS.map(t => (

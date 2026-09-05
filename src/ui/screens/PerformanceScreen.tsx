@@ -81,7 +81,7 @@ export const PerformanceScreen: React.FC = () => {
   const tabs = ['blood','stacks','macro','periodization','meet','bbprep','pct','predict'];
   const labels: Record<string,string> = {blood:'🩸 Маркеры',stacks:'📦 Стеки',macro:'📐 Макро',periodization:'🔄 Периодизация',meet:'🏆 Соревн.',bbprep:'🏋 Бодибилдинг',pct:'🧬 ПКТ',predict:'🔮 Прогноз'};
 
-  return (<div className="screen">
+  return (<div className="screen perf-screen">
     <h2>⚡ Лаборатория</h2>
     <div style={{ display:'flex', gap:3, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
       {tabs.map(t => <button key={t} onClick={()=>setTab(t)} style={{ padding:'6px 10px', borderRadius:8, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', background:tab===t?'var(--accent-green)':'var(--bg-secondary)', color:tab===t?'#000':'var(--text-dim)', border:'none', fontWeight:tab===t?700:400 }}>{labels[t]}</button>)}

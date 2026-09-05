@@ -187,7 +187,7 @@ export const DayCard: React.FC<{ day: PlanDayView }> = ({ day }) => {
 
 /** Полоса фазы с цветом и подсказкой */
 export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phase, desc }) => (
-  <div style={{
+  <div className="train-phasebanner" style={{
     display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
     background: PHASE_COLORS[phase] + '14', border: `1px solid ${PHASE_COLORS[phase]}33`, marginBottom: 8,
   }}>
@@ -202,7 +202,7 @@ export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phas
 export const WeekStrip: React.FC<{
   weeks: number; phaseForWeek: (w: number) => PhaseKey; activeWeek: number; onPick: (w: number) => void;
 }> = ({ weeks, phaseForWeek, activeWeek, onPick }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
+  <div className="train-weekstrip" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
     {Array.from({ length: weeks }, (_, i) => {
       const w = i + 1; const ph = phaseForWeek(w); const active = w === activeWeek;
       return (

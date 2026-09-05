@@ -687,7 +687,7 @@ export const CheckinGuardPanel: React.FC<GuardPanelProps> = () => {
   const color = mult < 0.9 ? '#ef4444' : mult < 1 ? '#f59e0b' : '#22c55e';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + color }}>
+    <div className="train-checkinguard" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + color }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📋 Чек-ин коррекция</span>
         <span style={{ fontSize: 11, fontWeight: 700, color }}>×{mult.toFixed(2)}</span>
@@ -734,7 +734,7 @@ export const BiomechanicsPanel: React.FC<GuardPanelProps> = ({ program, dir }) =
   if (detectedLifts.length === 0) return null;
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #06b6d4' }}>
+    <div className="train-biomech" style={{ ...CARD, padding: 10, borderLeft: '3px solid #06b6d4' }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🦴 Биомеханика — диагностика движения ({detectedLifts.join(', ')})</div>
       <PlDeadpointsBarPathCard />
     </div>

@@ -2677,6 +2677,44 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 55. NATIVE DEEP-23 — экраны, баннеры, гарды, покрытие ─── */
+html.app-native .perf-screen,
+html.app-native .recovery-screen,
+html.app-native .train-phasebanner,
+html.app-native .train-weekstrip,
+html.app-native .train-checkinguard,
+html.app-native .train-biomech,
+html.app-native .pharma-reports,
+html.app-native .pharma-pep,
+html.app-native .pharma-interact,
+html.app-native .risk-matrix,
+html.app-native .risk-overview,
+html.app-native .pro-panel-section {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-phasebanner,
+html.app-native .train-weekstrip {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .perf-screen,
+  html.app-native .recovery-screen,
+  html.app-native .train-phasebanner,
+  html.app-native .train-weekstrip,
+  html.app-native .train-checkinguard,
+  html.app-native .train-biomech,
+  html.app-native .pharma-reports,
+  html.app-native .pharma-pep,
+  html.app-native .pharma-interact,
+  html.app-native .risk-matrix,
+  html.app-native .risk-overview,
+  html.app-native .pro-panel-section {
+    animation: none;
+  }
+}
+
 /* ─── 54. NATIVE DEEP-22 — кит пикеров, шаблоны, геймификация ─ */
 html.app-native .pl-popupoverlay,
 html.app-native .pl-popupnum,

@@ -272,6 +272,16 @@ import {
 } from '../screens/SRCBBScreen_parts/TrainingPopups';
 import { QuickTemplatesGrid } from '../screens/TrainingScreen_parts/ProgramQuickTemplates';
 import { GamificationScreen } from '../screens/GamificationScreen';
+import { PerformanceScreen } from '../screens/PerformanceScreen';
+import { RecoveryScreen } from '../screens/RecoveryScreen';
+import { PhaseBanner, WeekStrip } from '../screens/TrainingScreen_parts/PlanOutput';
+import { CheckinGuardPanel, BiomechanicsPanel } from '../screens/TrainingScreen_parts/ProGuardPanels';
+import { PharmaReportsTab } from '../screens/PharmaScreen_parts/PharmaReportsTab';
+import { PharmaPeptideCalc } from '../screens/PharmaScreen_parts/PharmaPeptideCalc';
+import { InteractionCheckerTab } from '../screens/PharmaScreen_parts/InteractionCheckerTab';
+import { RiskMatrix } from '../screens/RiskScreen_parts/RiskMatrix';
+import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
+import { ProPanelCollapsible } from '../screens/TrainingScreen_parts/ProPanelSection';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1950,5 +1960,69 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c6 } = render(<GamificationScreen />);
     expect(c6.querySelector('.gamification'), 'gamification').not.toBeNull();
+  });
+
+  it('63. Batch-23 корни: экраны, баннеры, гарды', () => {
+    const { container: c1 } = render(<PerformanceScreen />);
+    expect(c1.querySelector('.perf-screen'), 'perfscreen').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<RecoveryScreen />);
+    expect(c2.querySelector('.recovery-screen'), 'recoveryscreen').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<PhaseBanner phase="accumulation" />);
+    expect(c3.querySelector('.train-phasebanner'), 'phasebanner').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <WeekStrip weeks={3} phaseForWeek={() => 'accumulation' as const} activeWeek={1} onPick={() => {}} />,
+    );
+    expect(c4.querySelector('.train-weekstrip'), 'weekstrip').not.toBeNull();
+    cleanup();
+    try {
+      localStorage.setItem('he_checkin_latest', JSON.stringify({ date: '2026-01-01', sleepHours: 5 }));
+    } catch {}
+    const { container: c5 } = render(<CheckinGuardPanel />);
+    expect(c5.querySelector('.train-checkinguard'), 'checkinguard').not.toBeNull();
+    cleanup();
+    try {
+      localStorage.removeItem('he_checkin_latest');
+    } catch {}
+    const { container: c6 } = render(
+      <BiomechanicsPanel
+        program={{ bb: { weeks: [{ sessions: [{ blocks: [{ exerciseName: 'Жим лёжа', muscle: 'chest', sets: [{ reps: 10 }] }] }] }] } } as never}
+        dir="bb"
+      />,
+    );
+    expect(c6.querySelector('.train-biomech'), 'biomech').not.toBeNull();
+  });
+
+  it('64. Batch-23 корни: покрытие hooked-без-тестов (фарма, риски, панели)', () => {
+    const { container: c1 } = render(<PharmaReportsTab />);
+    expect(c1.querySelector('.pharma-reports'), 'pharmareports').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<PharmaPeptideCalc />);
+    expect(c2.querySelector('.pharma-pep'), 'pharmapep').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<InteractionCheckerTab />);
+    expect(c3.querySelector('.pharma-interact'), 'pharmainteract').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <RiskMatrix riskResult={{ mechanismDetail: {} } as never} />,
+    );
+    expect(c4.querySelector('.risk-matrix'), 'riskmatrix').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <RiskOverview
+        riskResult={{ overallNet: 10, systemBreakdown: {} } as never}
+        globalNoLabs={true}
+        noLabsSystems={[]}
+        labRiskContributions={null}
+      />,
+    );
+    expect(c5.querySelector('.risk-overview'), 'riskoverview').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <ProPanelCollapsible section={{ id: 't', title: 'Тест', content: 'текст' } as never} />,
+    );
+    expect(c6.querySelector('.pro-panel-section'), 'propanel').not.toBeNull();
   });
 });
