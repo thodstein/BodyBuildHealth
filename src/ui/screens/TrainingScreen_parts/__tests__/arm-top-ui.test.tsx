@@ -67,4 +67,21 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(document.body.textContent).toContain('Тяж. хвата/нед (CNS)');
     expect(document.body.textContent).toContain('Часов с тяж. тяг');
   });
+
+  it('кросс-мезо: сборка с прошлым планом', () => {
+    localStorage.setItem('he_arm_last_plan', JSON.stringify({
+      weeks: [{ sessions: [{ exercises: [{ muscle: 'wrist_flexors', workSets: [{ weight: 40 }] }] }] }],
+    }));
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByLabelText(/С прошлого плана/));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(document.body.textContent).toContain('Cross-meso');
+  });
+
+  it('sim-план: заметки недели видны в плане', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByLabelText(/Contest-sim неделя/));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(document.body.textContent).toContain('Contest-sim');
+  });
 });

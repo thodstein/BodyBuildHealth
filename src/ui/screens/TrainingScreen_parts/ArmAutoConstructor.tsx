@@ -119,6 +119,7 @@ export function ArmAutoConstructor() {
   const [topGripPhase, setTopGripPhase] = useState<string>('auto');
   const [topHeavy, setTopHeavy] = useState<string>('');
   const [topPullH, setTopPullH] = useState<string>('');
+  const [topContinuity, setTopContinuity] = useState<boolean>(false);
 
   const workMax = useMemo(() => {
     try {
@@ -306,6 +307,14 @@ export function ArmAutoConstructor() {
         cnsCheck: topHeavy !== '' || topPullH !== '' ? true : undefined,
         heavyGripThisWeek: parseInt(topHeavy) >= 0 ? parseInt(topHeavy) : undefined,
         hoursSinceHeavyPull: parseFloat(topPullH) > 0 ? parseFloat(topPullH) : undefined,
+        previousPlan: topContinuity ? ((): any => { try {
+          const raw = localStorage.getItem('he_arm_last_plan');
+          if (!raw) return undefined;
+          const parsed = JSON.parse(raw);
+          const weeks = (parsed as any)?.plan?.weeks || (parsed as any)?.weeks;
+          if (!Array.isArray(weeks) || !weeks.length) return undefined;
+          return (parsed as any)?.plan || parsed;
+        } catch { return undefined; } })() : undefined,
         bouts: (()=>{ try { const raw = localStorage.getItem('he_arm_table_iq'); if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr.slice(0, 60); } } catch {} return undefined; })(),
       });
       plan = finalizeArmPlan(plan, { level });
@@ -594,6 +603,7 @@ export function ArmAutoConstructor() {
             <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topSim} onChange={e=>setTopSim(e.target.checked)} /> Contest-sim неделя</label>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topContinuity} onChange={e=>setTopContinuity(e.target.checked)} /> 🔗 С прошлого плана (+2.5% веса)</label>
             </div>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {
@@ -676,13 +686,20 @@ export function ArmAutoConstructor() {
               {curWeek && (
                 <div style={{ marginTop: 10 }}>
                   <h4 style={{ color:'#fff', margin:'6px 0' }}>Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                  {curWeek.note && <div style={{ fontSize:11, color:'#e6a23c', marginBottom:6 }}>📝 {curWeek.note}</div>}
                   {curWeek.sessions.map((sess:any, si:number)=> (
                     <div key={si} style={{ border:'1px solid #1f3a5f', borderRadius:10, padding:8, marginBottom:8, background:'#0a1629' }}>
                       <div style={{ color:ACCENT, fontWeight:700, fontSize:13, marginBottom:4 }}>{sess.sessionTag} · {sess.character} {sess.tableTime ? '🖐️ стол' : ''}</div>
+                      {sess.note && <div style={{ fontSize:11, color:'#9ab', marginBottom:4 }}>📝 {sess.note}</div>}
                       {sess.exercises.map((ex:any, ei:number)=> (
-                        <div key={ei} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom: ei < sess.exercises.length-1 ? '1px solid rgba(255,255,255,0.06)' : 'none', fontSize:12 }}>
-                          <span style={{ color:'#fff' }}>{ex.name} <span style={{ color:'#9ab' }}>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                          <span style={{ color:'#9ab' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]} RIR{ex.rir}{ex.holdSeconds ? ` hold ${ex.holdSeconds}с`:''}</span>
+                        <div key={ei} style={{ padding:'4px 0', borderBottom: ei < sess.exercises.length-1 ? '1px solid rgba(255,255,255,0.06)' : 'none', fontSize:12 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}>
+                            <span style={{ color:'#fff' }}>{ex.name} <span style={{ color:'#9ab' }}>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
+                            <span style={{ color:'#9ab' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]} RIR{ex.rir}{ex.holdSeconds ? ` hold ${ex.holdSeconds}с`:''}</span>
+                          </div>
+                          {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
+                            <div style={{ color:'#5ee', fontSize:11, marginTop:2 }}>💡 {ex.comment}</div>
+                          )}
                         </div>
                       ))}
                     </div>

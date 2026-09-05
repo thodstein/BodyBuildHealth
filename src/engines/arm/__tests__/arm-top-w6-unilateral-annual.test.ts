@@ -51,6 +51,11 @@ describe('arm TOP wave-6 unilateral + meso-ladder + annual', () => {
     const flat: any = buildArmPlan({ ...BASE, ladderFrom: 'rolling_thunder', ladderValue: 62, previousPlan: prev });
     expect(flat.rationale.join(' ')).toMatch(/держать базу/);
   });
+  it('кросс-мезо веса: прошлый план даёт +2.5% базу', () => {
+    const prev: any = buildArmPlan({ ...BASE, workMax: { wrist_flexors: 40 } });
+    const next: any = buildArmPlan({ ...BASE, previousPlan: prev });
+    expect(next.rationale.join(' ')).toMatch(/Cross-meso/);
+  });
   it('годовой блок пропускает TOP-поля', () => {
     const res = buildArmBlock({ blockKey: 'top', weeks: 4, phase: 'strength' }, { level: 'intermediate', oppStyle: 'toproll', contestSim: true } as any);
     expect(res.armPlan.rationale.join(' ')).toMatch(/Матчап:/);
