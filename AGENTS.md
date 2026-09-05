@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: spec-блоки разделяются + remainder 52→5 (Sep 05 2026, bf5a8f96 pathspec 11 файлов, НЕ запушено)
+
+Поверх PED-фазировки: полный прогон показал 52 падения (19 файлов) — чужие/доказанные (натуральные планы, PPL-минимумы, снапшоты-базлайны). Починено всё своё + блоки специализации. NEW-логики ноль — только гейты и симметрия проходов. Полный bb **2011/2016 (3 файла / 5 тестов остались — все предсуществующие run5: ppl-invariant бицепс 6>=8, focus-phase fullbody low_training_frequency, zero-state-snapshots ×3 stale-baseline; гейты для них provably-false)**, tsc 0 (6GB).
+
+- **Remainder run1-5**: `donkey_calf_raise_v2` mapping, PPL-кап 36/11 (`bb-volume`), peak/taper time-bomb (`futureShowDate`), prep-cycle 6→7, TAG-гигиена, `rotationMode` в finalize, back-vertical ≤1, frequency-guard, `proteinPerKg` typo, `resolveExerciseCatalogEntry`, трицепс-тест 10-12→8-10.
+- **Spec-разделение (3 failing → 0)**: supporting (MEV 8) догонял баланс/цель (14) из-за PPL-минимумов + floor 2 + финишеров. Фикс тройной, только при ЯВНОМ `specializationSchedule` (legacy/auto — байт-в-байт): (1) finisher-skip не-целям активных недель без tradeoff; (2) weekly-trim не-целей до scaled-rotation (пол 2, workSets режутся); (3) MEV-repair в finalize целится в `lm.mev`, а не план-таргет — флаг `specExplicitSchedule` в `BBFinalizeOptions` (цикл-путь его не передаёт → старый режим). Плюс убран мой же дубль-ключ `specialization: undefined` (last-wins, поведение то же).
+- **Поймано своими тестами**: repair использовал `plan.volumeTargets` (12), а не MEV (8) → сессии <6/нед отрастали до 5 сетов (16 вместо 8); trim обязан уступать tradeoff-неделям (трансфер считается от построенного плана — иначе спина 23 вместо 25, ноги 7 вместо 8). Доказано дампами недель ( exercises + rationale).
+- **Проверено**: spec-unified 29/29 + tradeoff 30/30 + guards/prep-cycle(48)/spec-methods/advanced-guards зелёные; чужие `.tmp-dbg3.txt`/`TA-PRO-PLAN.md`/untracked-планы не тронуты, НЕ ПУШИТЬ (main уехал чужими коммитами).
+- **Остаток (next)**: ppl-бицепс треугольник минимумы↔капы (cap-adjust reserve + late top-up донор), focus fullbody-частота, zero-state baseline-обновление.
+
 ## APK-оформление: TOP-уровень волнами 1–14 (Sep 05 2026, 14 коммитов pathspec: 18a5741d→1016b629)
 
 Доводка APK-слоя (Capacitor) до уровня флагманов (Strava/NTC/Strong): токены/kit/темы/навигация/hero/виджеты/уведомления/иконки/нативный хром. TG Mini App — строго 1-в-1 (все CSS под `html.app-native`, правки shared-TSX аддитивные за `isNativeApp()`-гейтом; guard-тест падает иначе). Hero-картинки не тронуты — только подача поверх.
