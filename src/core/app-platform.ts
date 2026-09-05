@@ -83,9 +83,11 @@ export function isTelegramContext(): boolean {
  * (удобно для CI-матрицы: собрать dist строго под платформу), затем runtime.
  */
 export function detectAppPlatform(): AppPlatform {
+  // ВАЖНО: только буквальный import.meta.env.VITE_APP_PLATFORM подхватывается
+  // подстановкой Vite в проде. Через каст с ?. (как было) замена не срабатывает
+  // и оверрайд молча не работает — проверено прод-сборкой.
   try {
-    const forced = (import.meta as unknown as { env?: Record<string, string> })
-      ?.env?.VITE_APP_PLATFORM;
+    const forced: string | undefined = import.meta.env.VITE_APP_PLATFORM;
     if (forced === 'native' || forced === 'telegram' || forced === 'web')
       return forced;
   } catch {
