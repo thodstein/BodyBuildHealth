@@ -4,6 +4,7 @@
  * Главный источник травм и перегруза. Правила:
  * - 70% техника / 90% контроль / 100% только heavy-недели, ≤1×/нед;
  * - 100% запрещён в deload/peaking-1 и при tendon-нагрузке >18;
+ * - новички: первые 3 месяца только ≤70% (Almazov — без борьбы в полную силу);
  * - партнёр ±5 кг (безопасный подбор).
  */
 
@@ -20,6 +21,7 @@ export interface SparringSession {
 
 export function sparringAllowed(input: {
   intensityPct: SparringIntensity;
+  level?: string;
   phase?: string;
   isDeload?: boolean;
   isPeakingLast?: boolean;
@@ -28,6 +30,10 @@ export function sparringAllowed(input: {
 }): { allowed: boolean; warnings: string[] } {
   const warnings: string[] = [];
   const tendon = Number(input.tendonSets ?? 0);
+  // TOP wave-12: новички первые 3 месяца — только ≤70%
+  if ((input.level || '').toLowerCase() === 'beginner' && input.intensityPct >= 90) {
+    warnings.push('Новичок: первые 3 месяца только 70% техника, без борьбы в полную силу.');
+  }
   if (input.intensityPct === 100) {
     if (input.isDeload) warnings.push('100% спарринг запрещён в deload.');
     if (input.isPeakingLast) warnings.push('100% спарринг запрещён в пиковую неделю.');

@@ -24,4 +24,11 @@ describe('arm-sparring (эпик E)', () => {
     expect(t.rounds).toBeGreaterThan(h.rounds);
     expect(t.roundSec).toBeGreaterThan(h.roundSec);
   });
+  it('новичок: 90/100 запрещены первые 3 месяца', () => {
+    expect(sparringAllowed({ intensityPct: 100, level: 'beginner' }).allowed).toBe(false);
+    expect(sparringAllowed({ intensityPct: 90, level: 'beginner' }).allowed).toBe(false);
+    expect(sparringAllowed({ intensityPct: 70, level: 'beginner' }).allowed).toBe(true);
+    expect(planSparring({ intensityPct: 100, level: 'beginner' }).allowed).toBe(false);
+    expect(sparringAllowed({ intensityPct: 100, level: 'intermediate' }).allowed).toBe(true);
+  });
 });

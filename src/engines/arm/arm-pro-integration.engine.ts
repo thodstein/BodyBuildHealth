@@ -256,9 +256,9 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
   } catch { /* опционально */ }
   try {
     const ex = input as unknown as Record<string, unknown>;
-    if (ex['gripWeek'] != null || ex['gripPhase'] != null) {
+    if (ex['gripWeek'] != null || ex['gripPhase'] != null || ex['gripAuto'] === true) {
       const g = buildGripRpe({ week: Number(ex['gripWeek'] ?? 1), phase: ex['gripPhase'] as string });
-      gripRpeLine = `Grip-RPE: ${g.note}`;
+      gripRpeLine = `Grip-RPE: ${g.note}${ex['gripAuto'] === true && ex['gripWeek'] == null && ex['gripPhase'] == null ? ' (авто-волна по неделям плана)' : ''}`;
       rationale.push(gripRpeLine);
     }
   } catch { /* опционально */ }

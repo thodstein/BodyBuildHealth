@@ -89,4 +89,15 @@ describe('arm TOP wave-5 deep', () => {
       }
     }
   });
+  it('Grip-RPE авто-волна: делоадная неделя легче объёмной', () => {
+    const p: any = buildArmPlan({
+      discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate',
+      goal: 'strength', technique: 'balanced', weeks: 4, gripAuto: true,
+    });
+    expect(p.rationale.join(' ')).toMatch(/авто-волна/);
+    const g = (w: number) => Object.values<any>(p.weeklyVolume[w] || {})
+      .reduce((a: number, v: any) => a + (v.directSets || 0), 0);
+    expect(g(4)).toBeLessThan(g(2));
+    expect(validateArmPlan(p, 'intermediate').mrvOverflow || []).toEqual([]);
+  });
 });

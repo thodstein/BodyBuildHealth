@@ -128,6 +128,7 @@ export interface ArmBuilderInput {
   slowIndex?: number; // медленная сила кг/с
   gripWeek?: number; // неделя grip-RPE мезоцикла
   gripPhase?: string; // volume/intensification/peak/deload
+  gripAuto?: boolean; // авто-волна: объём→интенс→делоад по неделям плана
   ladderFrom?: string; // текущий имплемент лестницы
   ladderValue?: number; // текущий результат (кг/с)
   contestSim?: boolean; // contest-sim неделя вместо техники

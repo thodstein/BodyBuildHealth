@@ -480,12 +480,12 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     // tendon deload первые 4 недели для beginner — ещё ×0.85 сверху уже учтённого tendonMult, но тут дополнительно для объёма
     if (level === 'beginner' && w <= 4) weekMult *= 0.92;
     const taper = isPeaking;
-    // TOP wave-5: Grip-RPE фаза недели (только при заданных gripWeek/gripPhase)
+    // TOP wave-5/12: Grip-RPE фаза недели (явная или авто-волна по неделям плана)
     let gripPhaseMult = 1;
     let gripRirAdd = 0;
     let gripPhaseName: string | null = null;
     try {
-      if (input.gripWeek != null || input.gripPhase != null) {
+      if (input.gripWeek != null || input.gripPhase != null || (input as any).gripAuto === true) {
         const gp = buildGripRpe({ week: (input.gripWeek ?? w) as number, phase: input.gripPhase });
         gripPhaseName = gp.phase;
         if (gp.phase === 'deload') gripPhaseMult = 0.6;
