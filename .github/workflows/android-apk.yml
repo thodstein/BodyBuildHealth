@@ -142,6 +142,7 @@ jobs:
       contents: write
     steps:
       - name: Download debug APK
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: he-debug-apk
@@ -159,9 +160,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          FILES="./artifacts/app-debug.apk"
+          FILES=""
+          if [ -f ./artifacts/app-debug.apk ]; then
+            FILES="$FILES ./artifacts/app-debug.apk"
+          fi
           if [ -f ./artifacts-signed/app-release.apk ]; then
             FILES="$FILES ./artifacts-signed/app-release.apk"
+          fi
+          if [ -z "$FILES" ]; then
+            echo "::error::Красная сборка: ни одного APK нет — публиковать нечего, релиз не трогаем"
+            exit 1
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             # shellcheck disable=SC2086
