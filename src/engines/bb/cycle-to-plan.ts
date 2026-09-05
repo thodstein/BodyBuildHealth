@@ -16,7 +16,7 @@ import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine
 import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
-import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName } from './bb-session-order.engine';
+import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName, type SessionMethodology } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { loadSRPESessions } from '../pro/srpe-store';
@@ -394,7 +394,7 @@ export interface CycleToPlanInput {
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
   mode?: 'faithful' | 'adapt';
   /** Единая методика порядка упражнений для всех BB-источников. */
-  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  methodology?: SessionMethodology;
   /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
   trainingFocus?: BBTrainingFocus;
   /** Объёмный vs обычный — для отчёта и выбора MRV */
@@ -1431,7 +1431,7 @@ export interface ProgramToBBPlanOpts {
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
   mode?: 'faithful' | 'adapt';
   /** Единая методика порядка упражнений для всех BB-источников. */
-  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  methodology?: SessionMethodology;
   trainingFocus?: BBTrainingFocus;
   /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
   sex?: 'male' | 'female';

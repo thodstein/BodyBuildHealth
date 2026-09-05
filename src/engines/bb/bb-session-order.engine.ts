@@ -90,7 +90,7 @@ function loadRank(ex: BBExercise): number {
 
 /* ───────────────────────── Главная функция порядка ───────────────────────── */
 
-export type SessionMethodology = 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+export type SessionMethodology = 'compound_first' | 'pre_exhaust' | 'post_exhaust' | 'mountain_dog' | 'fst7' | 'hyperemia';
 
 export interface OrderOpts {
   sessionTag?: string;
@@ -98,7 +98,13 @@ export interface OrderOpts {
   primaryMuscle?: string;
   /** Методика порядка. compound_first — базовые раньше изоляции (по умолчанию).
    *  pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предварительное утомление), затем compound.
-   *  post_exhaust — compound, затем изоляция (то же что compound_first, явно). */
+   *  post_exhaust — compound, затем изоляция (то же что compound_first, явно).
+   *  mountain_dog (Meadows): лёгкая активация (изоляция RIR≥3) → тяжёлый compound →
+   *  памп → loaded stretch последним. Активация — НЕ предутомление (не в отказ).
+   *  fst7 (Rambod): как compound_first, но ВСЕ памп-изоляции основной мышцы —
+   *  финишеры в самом конце (7-сетовый финиш).
+   *  hyperemia (Sarcev): у аксессуаров памп идёт раньше тяжестей (кровь первее
+   *  веса), финишеры и стретч — в конце. */
   methodology?: SessionMethodology;
   /** Дополнительный приоритет мышц, которые должны получить первый качественный стимул. */
   priorityMuscles?: string[];
@@ -183,6 +189,11 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
  *  [5] load:             тяжелее / меньше RIR — раньше
  */
 
+/** Loaded stretch / extreme stretch — всегда последний (Meadows фаза 4, DC). */
+function isStretchHolder(name: string): boolean {
+  return /растяж|stretch|вис(?!.*тяга)|extreme.*stretch|hold.*(30|60)|пауза.*внизу/i.test((name || '').toLowerCase());
+}
+
 /** Порядок мышц в сессии: см. MUSCLE_ORDER вверху файла (каноника). */
 function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first', priorityMuscles: Set<string> = new Set()): number[] {
   const exMuscle = collapseMuscle(ex.muscle || '');
@@ -195,11 +206,21 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   // In pre-exhaust, a primary-muscle pump isolation is still the pre-fatigue
   // movement, not a finisher that belongs at the end.
   const isPrimaryIsolation = isPrimaryMuscle && !compound;
+  const exRir = Number.isFinite(ex.rir as number) ? (ex.rir as number) : 2;
   let tier: number;
   if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
   // P2-9 (audit 2026-08): post_exhaust — изоляция primary мышцы идёт СРАЗУ после compound
   // (tier=1, приоритетнее других изоляций). Раньше post_exhaust = compound_first без различий.
   else if (methodology === 'post_exhaust' && isPrimaryIsolation) tier = 1;
+  // mountain_dog (Meadows): лёгкая активация (изоляция primary, RIR≥3 — НЕ в отказ)
+  // первой, loaded stretch — последним. Остальное как compound_first.
+  else if (methodology === 'mountain_dog' && isStretchHolder(ex.name || '')) tier = 4;
+  else if (methodology === 'mountain_dog' && isPrimaryIsolation && exRir >= 3) tier = -0.5;
+  // fst7 (Rambod): лёгкий памп-праймер основной мышцы (RIR≥3, не в отказ)
+  // — front-loading the sevens (продвинутый вариант), loaded stretch — последним.
+  // Основной 7-сетовый финишер и так последний через isFinisher (tier 3).
+  else if (methodology === 'fst7' && isStretchHolder(ex.name || '')) tier = 4;
+  else if (methodology === 'fst7' && isPrimaryIsolation && exRir >= 3 && ex.character !== 'тяж') tier = -0.5;
   else if (isFinisher) tier = 3;
   else if (isPrimaryHeavy) tier = 0;
   else if (compound) tier = 1;
@@ -214,8 +235,11 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   // мышцы вклинивается между группами (ноги-спина-ноги), ломая сессию.
   const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
 
-  // Характер нагрузки: тяж (0) всегда перед памп (1) и лёг (2) даже внутри одного tier (GVT vs тяжёлые махи)
-  const charRank = ex.character === 'тяж' ? 0 : ex.character === 'памп' ? 1 : 2;
+  // Характер нагрузки: тяж (0) всегда перед памп (1) и лёг (2) даже внутри одного tier (GVT vs тяжёлые махи).
+  // hyperemia (Sarcev): у аксессуаров наоборот — кровь первее веса, памп раньше тяжестей.
+  const charRank = methodology === 'hyperemia' && !compound
+    ? (ex.character === 'памп' ? 0 : ex.character === 'лёг' ? 1 : 2)
+    : (ex.character === 'тяж' ? 0 : ex.character === 'памп' ? 1 : 2);
   let subOrder: number;
   if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;

@@ -211,7 +211,7 @@ export interface SchemeForInput {
   goal?: string;
   focus?: BBTrainingFocus;
   phase?: BBPhase;
-  pedProfile?: { hasAAS?: boolean; hasGH?: boolean; hasInsulin?: boolean; hasMGF?: boolean; hasIGF1?: boolean; ghPlusInsulin?: boolean };
+  pedProfile?: { hasAAS?: boolean; hasGH?: boolean; hasInsulin?: boolean; hasMGF?: boolean; hasIGF1?: boolean; ghPlusInsulin?: boolean; pedPhase?: 'proliferation' | 'differentiation' | 'both' };
   level?: string;
   character?: 'тяж' | 'памп' | 'лёг';
 }
@@ -228,9 +228,18 @@ export function schemeFor(input: SchemeForInput): RepSchemeId {
   if (pedProfile?.ghPlusInsulin && character === 'памп') return 'pump_15_20';
   if (pedProfile?.ghPlusInsulin && phase === 'intensification' && character === 'памп') return 'bfr';
 
-  // MGF/IGF1 — myo_reps / lengthened для памп
-  if ((pedProfile?.hasMGF || pedProfile?.hasIGF1) && character === 'памп') return 'myo_reps';
-  if ((pedProfile?.hasMGF || pedProfile?.hasIGF1) && phase === 'accumulation') return 'lengthened_partial';
+  // MGF/IGF1 — фазировка (bb-ped-phasing.engine): MGF = пролиферация
+  // сателлитов (myo-reps/lengthened + повреждение/стретч, Goldspink 2003),
+  // IGF1 = дифференцировка (памп 12-20 + углеводное окно). MGF-only
+  // поведение байт-в-байт прежнее; IGF1-only памп → pump_15_20.
+  const mgfOnly = !!pedProfile?.hasMGF && !pedProfile?.hasIGF1;
+  const igfOnly = !!pedProfile?.hasIGF1 && !pedProfile?.hasMGF;
+  const pedPhase = pedProfile?.pedPhase;
+  const proliferating = mgfOnly || (pedProfile?.hasMGF && pedProfile?.hasIGF1 && pedPhase !== 'differentiation');
+  const differentiating = igfOnly || (pedProfile?.hasMGF && pedProfile?.hasIGF1 && pedPhase === 'differentiation');
+  if (proliferating && character === 'памп') return 'myo_reps';
+  if (differentiating && character === 'памп') return 'pump_15_20';
+  if (proliferating && phase === 'accumulation') return 'lengthened_partial';
 
   // AAS heavy — DC / cluster для тяж
   if (pedProfile?.hasAAS && isAdv && character === 'тяж' && phase === 'intensification') return 'dc_rp';

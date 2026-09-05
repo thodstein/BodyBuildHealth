@@ -344,10 +344,11 @@ describe('E: String dose parsing', () => {
     expect(a.perPED[0].dose).toBe(0);
   });
 
-  it('"1,5г" (русская запятая) → dose=1.5 (не 15)', () => {
-    // P2-2 fix: .replace(',', '.') перед regex
+  it('"1,5г" (русская запятая + граммы) → dose=1500мг (не 15 и не 15000)', () => {
+    // P2-2 fix: .replace(',', '.') перед regex; г→мг ×1000 (c64d7586c).
+    // Без comma-fix было бы "15г" → 15000; без g→мг было бы 1.5.
     const a = adapt(['AAS'], { AAS: '1,5г' as any }, 'mild');
-    expect(a.perPED[0].dose).toBeCloseTo(1.5, 1);
+    expect(a.perPED[0].dose).toBeCloseTo(1500, 0);
   });
 
   it('число 500 → dose=500 (без парсинга)', () => {

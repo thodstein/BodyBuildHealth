@@ -25,7 +25,7 @@ export interface SavedBBPlan {
     autoDeload: boolean;
     deloadType: string;
     trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
-    methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+    methodology?: import('../../../engines/bb/bb-session-order.engine').SessionMethodology;
     equipment?: string[];
     specialization?: boolean;
     /** Расписание блоков специализации (сохранение/восстановление плана блоков). */

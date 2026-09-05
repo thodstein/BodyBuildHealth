@@ -3929,9 +3929,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // PED-методика + insulin window + rep-схемы: overlay после финализации, не ломает тяж/памп.
   // Joint-guard уже отработал на уровне пула (buildExercisePool), здесь — только rationale/подсказки.
   try {
-    const pedsForMeth: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => Number((input.pedDoses as any)[k]) > 0) as any) : []);
+    const parseMethDose = (v: unknown): number => {
+      if (typeof v === 'number') return v;
+      if (v == null) return 0;
+      return parseFloat(String(v).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+    };
+    const pedsForMeth: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => parseMethDose((input.pedDoses as any)[k]) > 0) as any) : []);
     if (pedsForMeth.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0)) {
-      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [] };
+      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [], totalWeeks: input.weeks };
       const meth = recommendPEDMethodology(methInput);
       // Insulin window: только памп-дни получают подсказку (тяж не трогаем)
       const ghDose = Number((input.pedDoses as any)?.['GH'] || 0);

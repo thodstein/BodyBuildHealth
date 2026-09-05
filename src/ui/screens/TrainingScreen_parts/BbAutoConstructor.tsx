@@ -2948,10 +2948,13 @@ export const BbAutoConstructor: React.FC = () => {
                       { id:'hypertrophy', label:'Гипертрофия: RIR 2-3', desc:'Умеренные веса 8-12 повт, темп 3-1-1-0.' },
                       { id:'endurance', label:'Выносливость: RIR 3-4', desc:'Лёгкие веса 15-20 повт, короткая пауза.' },
                     ]} />
-                    <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — в коде: compound_first / pre_exhaust / post_exhaust" options={[
+                    <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — в коде: compound_first / pre_exhaust / post_exhaust / mountain_dog / fst7 / hyperemia" options={[
                       { id:'compound_first', label:'Базовые → изоляция', desc:'Сначала тяжёлые многосуставные.' },
                       { id:'pre_exhaust', label:'Pre-exhaust', desc:'Изоляция первой, затем база.' },
                       { id:'post_exhaust', label:'Post-exhaust', desc:'База в полную силу, затем изоляция.' },
+                      { id:'mountain_dog', label:'Mountain Dog (Meadows)', desc:'Активация RIR≥3 → тяжёлая база → памп → стретч последним.' },
+                      { id:'fst7', label:'FST-7 порядок (Rambod)', desc:'Памп-праймер первым, финишер и стретч в конце.' },
+                      { id:'hyperemia', label:'Hyperemia (Sarcev)', desc:'У аксессуаров памп раньше тяжестей — кровь первее веса.' },
                     ]} />
                     <PopupSelect
                       label='🔥 Интенсив-техника'
@@ -3280,10 +3283,13 @@ export const BbAutoConstructor: React.FC = () => {
             { id:'hypertrophy', label:'Гипертрофия: RIR 2-3', desc:'Умеренные веса 8-12 повт, контроль темпа 3-1-1-0, объём для роста.' },
             { id:'endurance', label:'Выносливость: RIR 3-4', desc:'Лёгкие веса 15-20 повт, короткая пауза, метаболический стресс.' },
           ]} />
-          <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — влияет на силу и утомление. В коде: compound_first / pre_exhaust / post_exhaust" options={[ 
-            { id:'compound_first', label:'Базовые → изоляция (по умолчанию)', desc:'Сначала тяжёлые многосуставные на свежие мышцы — максимум веса и безопасная техника, затем изоляция. Классика для гипертрофии.' }, 
-            { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой', desc:'Изоляция целевой мышцы до базы — утомляет заранее, база добивает. Сильный памп, но вес в базе −10-15%.' }, 
-            { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция', desc:'База в полную силу, сразу изоляция без отдыха — «пробить» мышцу двойным стимулом.' }, 
+          <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — влияет на силу и утомление. В коде: compound_first / pre_exhaust / post_exhaust / mountain_dog / fst7 / hyperemia" options={[
+            { id:'compound_first', label:'Базовые → изоляция (по умолчанию)', desc:'Сначала тяжёлые многосуставные на свежие мышцы — максимум веса и безопасная техника, затем изоляция. Классика для гипертрофии.' },
+            { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой', desc:'Изоляция целевой мышцы до базы — утомляет заранее, база добивает. Сильный памп, но вес в базе −10-15%.' },
+            { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция', desc:'База в полную силу, сразу изоляция без отдыха — «пробить» мышцу двойным стимулом.' },
+            { id:'mountain_dog', label:'Mountain Dog: активация → база → памп → стретч', desc:'Лёгкая активация (RIR≥3, не в отказ) готовит связь мозг-мышца, затем тяжёлая база, памп и loaded stretch 30-60с. Для MGF-фаз и суставов.' },
+            { id:'fst7', label:'FST-7 порядок: праймер → финишер', desc:'Памп-праймер первым (front-load), тяжёлая работа в середине, 7-сетовый финишер и стретч в конце. Под GH+инсулин окно.' },
+            { id:'hyperemia', label:'Hyperemia: памп раньше тяжестей', desc:'У аксессуаров кровь первее веса — памп-изоляция перед тяжёлой, короткие паузы 30-60с. Под intra-углеводы (Sarcev).' },
           ]} />
           <PopupSelect
             label='🔥 Интенсив-техника'
@@ -3574,13 +3580,16 @@ export const BbAutoConstructor: React.FC = () => {
       <PedAdaptationCard adaptation={pedAdapt} />
       {peds.length > 0 && (() => {
         try {
-          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus });
+          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, totalWeeks: bbWeeks });
           return (
             <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика — адаптация плана под курс (тяж/памп не ломаются)</div>
               {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(59,130,246,0.08)', borderRadius:6, border:'1px solid rgba(59,130,246,0.15)' }}>🛡️ Защита суставов: тяжёлые базовые остаются тяжёлыми (RIR 1-2), но осевая нагрузка на позвоночник (присед/становая/жим стоя) заменяется на машины/блоки/тросы, темп 4-2-1-0 для контроля. Сухожилия на курсе отстают от мышц — снижаем риск травмы.</div>}
               {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(168,85,247,0.08)', borderRadius:6, border:'1px solid rgba(168,85,247,0.15)' }}>💉 Окно пампа GH+инсулин: только в памп-дни — внутри тренировки 30-60 г быстрых углеводов + 10 г EAA (незаменимые аминокислоты) для суперкомпенсации гликогена и пампа. Только на курсе GH+инсулин.</div>}
               {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(236,72,153,0.08)', borderRadius:6, border:'1px solid rgba(236,72,153,0.15)' }}>🩸 BFR доступен: окклюзионный тренинг 20-30% от 1ПМ, схема 30-15-15-15 с паузой 30 сек, только для памп-изоляций (бицепс/трицепс/дельты), не для базы. Усиливает метаболический стресс без высокой механической нагрузки.</div>}
+              {(meth.pedPhase === 'proliferation' || meth.pedPhase === 'differentiation') && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(34,197,94,0.08)', borderRadius:6, border:'1px solid rgba(34,197,94,0.15)' }}>🧬 {meth.pedPhase === 'proliferation' ? 'Фаза MGF (пролиферация): цель — повреждение + стретч (эксцентрик 3-4с, lengthened, порядок Mountain Dog)' : 'Фаза IGF1 (дифференцировка): цель — синтез белка (памп 12-20 + углеводное окно 50-80 г)'}</div>}
+              {meth.pedPhase === 'both' && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(34,197,94,0.08)', borderRadius:6, border:'1px solid rgba(34,197,94,0.15)' }}>🧬 MGF+IGF1 чередованием по неделям (не одновременно): MGF-недели — повреждение/стретч, IGF1-недели — памп + углеводное окно. Пометки в плане стоят только в свои недели.</div>}
+              {meth.insulinSafety && <div style={{ fontSize:11, color:'#fbbf24', marginBottom:4, padding:'5px 7px', background:'rgba(251,191,36,0.08)', borderRadius:6, border:'1px solid rgba(251,191,36,0.2)' }}>🛡 Инсулин {meth.insulinSafety.doseIU} IU: ≥{meth.insulinSafety.requiredCarbsG} г быстрых углеводов + 10-20 г EAA вокруг инъекции, глюкометр и сахара под рукой. Старт 3-5 IU.</div>}
               {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
               {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
               <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
@@ -4504,7 +4513,7 @@ export const BbAutoConstructor: React.FC = () => {
           const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
           const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
           const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
-          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
+          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', mountain_dog:'Mountain Dog', fst7:'FST-7 порядок', hyperemia:'Hyperemia', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
           const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
           const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
           const totalW = builtPlan.weeks.length;
@@ -4581,7 +4590,7 @@ export const BbAutoConstructor: React.FC = () => {
                 <CollapsibleCard title="7 · Выбранные методики — детально" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge={`${[bbMethodology, loadStrategy, intensityTech, volumeScheme, supersetMode, dupMode, deloadType].filter(v=>v!=='none'&&v!=='standard'&&v!=='compound_first').length} активных`}>
                   <div style={{ display:'grid', gap:8 }}>
                     {(() => {
-                      const methRu: Record<string,string> = { compound_first:'База → изоляция', pre_exhaust:'Пред-истощение', post_exhaust:'Пост-истощение', antagonistic:'Антагонисты', giant_sets:'Гигант-сеты' };
+                      const methRu: Record<string,string> = { compound_first:'База → изоляция', pre_exhaust:'Пред-истощение', post_exhaust:'Пост-истощение', mountain_dog:'Mountain Dog', fst7:'FST-7 порядок', hyperemia:'Гиперемия', antagonistic:'Антагонисты', giant_sets:'Гигант-сеты' };
                       const stratRu: Record<string,string> = { double_progression:'Двойная прогрессия', linear:'Линейная', wave:'Волновая', rpe_based:'RPE-авто', undulating:'Волновая', block:'Блочная' };
                       const techRu: Record<string,string> = { none:'—', drop_set:'Дроп-сет', rest_pause:'Рест-пауза', myo_rep:'Мио-репс', giant_set:'Гигант-сет', superset:'Суперсет' } as any;
                       const schemeRu: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };

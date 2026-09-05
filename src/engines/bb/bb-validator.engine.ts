@@ -6,7 +6,7 @@ import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { TAG_MUSCLES } from './bb-day-types';
-import { isCompoundEx } from './bb-session-order.engine';
+import { isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface BBPlanValidationIssue {
@@ -33,7 +33,7 @@ export interface BBPlanValidationOptions {
   excludedMuscles?: string[];
   avoidAxialLoad?: boolean;
   checkOrder?: boolean;
-  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  methodology?: SessionMethodology;
   /** Опыт в годах — для enhanced-лимитов сессии (60/18 вместо 24/10). */
   trainingYears?: number;
   patternId?: string;

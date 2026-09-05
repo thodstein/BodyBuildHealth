@@ -8,6 +8,7 @@
 import type { RepSchemeId } from './bb-rep-schemes.engine';
 import { schemeFor, type SchemeForInput } from './bb-rep-schemes.engine';
 import type { BBPhase } from '../periodization';
+import { resolvePedPhase, describePedPhase, insulinSafetyCheck, type PedPhase, type InsulinSafety } from './bb-ped-phasing.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
 
@@ -26,6 +27,12 @@ export interface PEDMethodology {
   periWorkout: { carbs: 'high' | 'moderate' | 'low'; intraNote?: string; warning?: string };
   /** Целевая мышца для MGF/IGF1 (локально). */
   mgfTargetMuscles: string[];
+  /** Фаза пептидного сигнала на уровне плана (both = чередование по неделям). */
+  pedPhase: PedPhase;
+  /** По-недельная фаза (длина = недели плана) при both; иначе пусто. */
+  pedPhaseByWeek: PedPhase[];
+  /** Insulin harm-reduction (null без активного инсулина). */
+  insulinSafety: InsulinSafety | null;
   /** Человекочитаемый rationale. */
   rationale: string[];
 }
@@ -42,6 +49,8 @@ export interface PEDMethodologyInput {
    * Фаза 2.9: заменяет заглушки `__mgf_target__`/`__igf_target__`.
    */
   targetMuscles?: string[];
+  /** Длина плана в неделях — для блочной фазировки MGF/IGF1 (≥8 = блоки). */
+  totalWeeks?: number;
 }
 
 function has(peds: PED[], k: PED): boolean { return peds.includes(k); }
@@ -108,9 +117,31 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
     }
   }
 
+  // Фазировка MGF/IGF1 (bb-ped-phasing): оба пептида сразу = чередование
+  // по неделям (короткий план) или блоки (≥8 нед), не одновременно.
+  const totalWeeks = Math.max(1, Math.round(input.totalWeeks || 1));
+  const bothPeptides = hasMGF && hasIGF1;
+  const pedPhase: PedPhase = bothPeptides ? 'both' : hasMGF ? 'proliferation' : hasIGF1 ? 'differentiation' : 'none';
+  const pedPhaseByWeek: PedPhase[] = bothPeptides
+    ? Array.from({ length: totalWeeks }, (_, i) => resolvePedPhase({ peds, pedDoses, weekIdx: i + 1, totalWeeks }))
+    : [];
+  if (bothPeptides) {
+    const firstDiff = pedPhaseByWeek.findIndex(p => p === 'differentiation');
+    rationale.push(totalWeeks >= 8 && firstDiff > 0
+      ? `MGF+IGF1 блоками: нед 1–${firstDiff} пролиферация (MGF), нед ${firstDiff + 1}–${totalWeeks} дифференцировка (IGF1) — одновременно мешают друг другу (Matheny 2010)`
+      : 'MGF+IGF1 чередованием: нечётные недели — пролиферация (MGF + повреждение/стретч), чётные — дифференцировка (IGF1 + углеводное окно)');
+  } else if (hasMGF || hasIGF1) {
+    rationale.push(`🧬 ${describePedPhase(pedPhase)}`);
+  }
+
+  // Insulin harm-reduction (только предупреждения, объём не меняем).
+  const safety = insulinSafetyCheck(peds, pedDoses);
+  for (const w of safety.warnings) rationale.push(`🛡 ${w}`);
+
   // Рекомендованные схемы (не форсируют, а подсказывают schemeFor)
   const pedProfile: SchemeForInput['pedProfile'] = {
     hasAAS, hasGH, hasInsulin: hasIns, hasMGF, hasIGF1, ghPlusInsulin,
+    pedPhase: pedPhase === 'both' ? 'both' : pedPhase === 'none' ? undefined : pedPhase,
   };
   const heavy = schemeFor({ ...input, phase: 'accumulation' as BBPhase, character: 'тяж', pedProfile });
   const pump = schemeFor({ ...input, phase: 'accumulation' as BBPhase, character: 'памп', pedProfile });
@@ -128,7 +159,7 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
     periWorkout = { carbs: 'moderate' };
   }
 
-  return { insulinPumpWindow, jointGuard, bfrAllowed, failureAllowed, recommendedScheme: { heavy, pump }, periWorkout, mgfTargetMuscles, rationale };
+  return { insulinPumpWindow, jointGuard, bfrAllowed, failureAllowed, recommendedScheme: { heavy, pump }, periWorkout, mgfTargetMuscles, pedPhase, pedPhaseByWeek, insulinSafety: safety.active ? safety : null, rationale };
 }
 
 /**
@@ -156,17 +187,18 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
     weeks: plan.weeks.map(w => ({ ...w, sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: [...e.workSets] })) })) })),
     rationale: [...plan.rationale],
   };
-  // Insulin window: только памп-дни (лёг/памп) — подсказка, не переписывание reps
+  // Insulin window: только памп-дни (лёг/памп) — ОДНА peri-WO пометка на
+  // сессию (intra-углеводы системные, спам в каждое упражнение не нужен).
   if (meth.insulinPumpWindow) {
+    const carbsNote = meth.insulinSafety && meth.insulinSafety.requiredCarbsG > 0
+      ? `💉 Insulin window: intra 30-60г + 10г EAA (на дозу: ≥${meth.insulinSafety.requiredCarbsG} г быстрых У)`
+      : '💉 Insulin window: intra 30-60г + 10г EAA';
     for (const w of copy.weeks) {
       if ((w as any).deload || (w as any).phase === 'deload') continue;
       for (const s of w.sessions) {
         if (s.character !== 'памп' && s.character !== 'лёг') continue;
-        for (const ex of s.exercises) {
-          if (ex.role !== 'primary' && ex.role !== 'accessory') continue;
-          const note = '💉 Insulin window: intra 30-60г + 10г EAA';
-          if (!ex.comment?.includes('Insulin window')) ex.comment = `${ex.comment || ''} | ${note}`.trim().replace(/^\|\s*/, '');
-        }
+        const first = s.exercises.find(ex => (ex.role === 'primary' || ex.role === 'accessory') && !ex.comment?.includes('Insulin window'));
+        if (first) first.comment = `${first.comment || ''} | ${carbsNote}`.trim().replace(/^\|\s*/, '');
       }
     }
     copy.rationale.push('💉 GH+insulin pump window: памп-дни получили intra-carbs подсказку (тяж дни не тронуты)');
@@ -177,9 +209,15 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
   if (meth.mgfTargetMuscles.length) {
     const targetSet = new Set(meth.mgfTargetMuscles.map(m => m.toLowerCase()));
     const canon = (m: string) => (m || '').toLowerCase();
+    const phaseByWeek = meth.pedPhaseByWeek || [];
     let marked = 0;
+    let skippedDiff = 0;
     for (const w of copy.weeks) {
       if ((w as any).deload || (w as any).phase === 'deload') continue;
+      // Both-фаза: в недели дифференцировки MGF-пометку не ставим —
+      // там работает IGF1 (чередование, а не одновременность).
+      const weekPhase = phaseByWeek[(w as any).week - 1];
+      const isDiffWeek = meth.pedPhase === 'both' && weekPhase === 'differentiation';
       for (const s of w.sessions) {
         if (s.character !== 'памп' && s.character !== 'лёг') continue;
         for (const ex of s.exercises) {
@@ -187,12 +225,13 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
           const exMuscle = canon(String(ex.muscle || ''));
           if (!exMuscle || !targetSet.has(exMuscle)) continue;
           if (ex.comment?.includes('🧬 MGF/IGF1')) continue;
+          if (isDiffWeek) { skippedDiff++; continue; }
           ex.comment = `${ex.comment || ''} | 🧬 MGF/IGF1 локально: myo-reps/lengthened приоритет`.trim().replace(/^\|\s*/, '');
           marked++;
         }
       }
     }
-    copy.rationale.push(`🧬 MGF/IGF1 локально: ${meth.mgfTargetMuscles.join(', ')} — +1 частота, памп ${marked > 0 ? `помечен в ${marked} упражнениях` : '(цель вне памп-дней — только частота через параметры сборки)'}, myo-reps/lengthened`);
+    copy.rationale.push(`🧬 MGF/IGF1 локально: ${meth.mgfTargetMuscles.join(', ')} — +1 частота, памп ${marked > 0 ? `помечен в ${marked} упражнениях` : '(цель вне памп-дней — только частота через параметры сборки)'}, myo-reps/lengthened${skippedDiff > 0 ? `; в недели дифференцировки MGF-пометка снята (${skippedDiff} упр. — там IGF1)` : ''}`);
   }
   if (meth.periWorkout.intraNote) copy.rationale.push(`🍚 Peri-WO: ${meth.periWorkout.intraNote}`);
   if (meth.periWorkout.warning) copy.rationale.push(`⚠ ${meth.periWorkout.warning}`);

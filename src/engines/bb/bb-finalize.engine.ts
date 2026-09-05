@@ -1,6 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { tidySessionExercises, orderSessionExercises, isCompoundEx } from './bb-session-order.engine';
+import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
@@ -1999,7 +1999,7 @@ function capAdaptiveSpecializationFrequency(week: any, options: BBFinalizeOption
 
 export interface BBFinalizeOptions {
   reorder?: boolean;
-  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  methodology?: SessionMethodology;
   priorityMuscles?: string[];
   /** Расписание блоков специализации — per-week цели для спец-проходов
    *  (RIR 0-1, спец-частота, икры). Без него — старый режим: priorityMuscles
@@ -3524,6 +3524,24 @@ for (const week of next.weeks) {
     }
 
 
+  }
+
+  // Глобальный инвариант: 0 упражнений >5 сетов (Раунд 4). Аддитивные проходы
+  // (arm-guarantee/MEV-repair/добивки) могут сложить 6–8 сетов в одно упражнение
+  // в обход per-pass клампов, а объёмные схемы второй сессии той же мышцы
+  // (schemeApplied) такие упражнения пропускают. Режем только превышение,
+  // workSets синхронизируем; GVT 5+5 и остальное распределение не страдает.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const s of week.sessions) for (const e of s.exercises) {
+        if ((e as any).warmupActivator) continue;
+        if ((e.sets || 0) > 5) {
+          e.sets = 5;
+          if (Array.isArray((e as any).workSets) && (e as any).workSets.length > 5) (e as any).workSets = (e as any).workSets.slice(0, 5);
+        }
+      }
+    }
   }
 
   // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
