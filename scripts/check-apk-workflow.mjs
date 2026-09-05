@@ -1,7 +1,7 @@
 // check-apk-workflow.mjs — sanity workflow android-apk.yml без GitHub:
 // нет secrets.* в `if` (Invalid workflow file), гейты release — по env,
 // отступы — пробелы, секреты объявлены в env job'а ровно один раз.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -45,6 +45,25 @@ for (const frag of [
   if (!text.includes(frag)) fails.push(`workflow не пишет ${frag}`);
 }
 if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у job’ов');
+
+// mergeDebugResources падает на дублях: одно имя — один ресурс.
+// Проверяем values/*.xml (color/string/style/...) — именно так словили
+// дубль ic_launcher_background (colors.xml vs ic_launcher_background.xml).
+{
+  const seen = new Map();
+  for (const f of readdirSync(join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values'))) {
+    if (!f.endsWith('.xml')) continue;
+    const body = readFileSync(
+      join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values', f),
+      'utf-8',
+    );
+    for (const m of body.matchAll(/<(color|string|style|dimen|bool|integer|array)\s+name="([^"]+)"/g)) {
+      const key = `${m[1]}/${m[2]}`;
+      if (seen.has(key)) fails.push(`duplicate resource ${key}: ${seen.get(key)} + ${f}`);
+      else seen.set(key, f);
+    }
+  }
+}
 
 if (fails.length > 0) {
   console.error('[check-apk-workflow] FAIL:');

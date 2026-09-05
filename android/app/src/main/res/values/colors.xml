@@ -12,5 +12,6 @@
     <color name="pro_navy_deep">#050b16</color>
     <color name="pro_accent">#c9f73a</color>
     <color name="pro_accent_2">#00e68a</color>
-    <color name="ic_launcher_background">#0a1628</color>
+    <!-- ic_launcher_background живёт в ic_launcher_background.xml — дубль здесь
+         ронял mergeDebugResources (Duplicate resources). -->
 </resources>
