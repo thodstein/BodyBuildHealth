@@ -90,8 +90,4 @@ export function candidateTAWeakPointsFromDiary(
   return [...new Set(candidates)];
 }
 
-export function diaryTrendSummary(sessions: WeakMuscleSession[]): string {
-  const weaks = detectTAWeakFromDiary(sessions);
-  if (weaks.length === 0) return 'Дневник: тренд стабилен';
-  return `Дневник: слабые ${weaks.map(w => `${w.label} ${w.deltaPct}%`).join(', ')}`;
-}
+// (V9: удалён мёртвый diaryTrendSummary — вызывающих не было; хаб строит строку сам.)

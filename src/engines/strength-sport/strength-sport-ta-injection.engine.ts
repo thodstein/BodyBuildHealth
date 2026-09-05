@@ -227,9 +227,4 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
   return { plan: copy, injected, skippedBudget, skippedDup, notes };
 }
 
-// helper для тестов: чисто вычисление бюджета (упрощённо levelBase × etc)
-// Если computeBudgetTA нет — fallback
-export function computeBudgetTAFallback(level: string): number {
-  const map: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
-  return map[level] ?? 85;
-}
+// (V9: удалён мёртвый computeBudgetTAFallback — вызывающих не было.)

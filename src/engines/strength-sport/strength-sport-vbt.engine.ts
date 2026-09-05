@@ -9,10 +9,7 @@ import {
   estimate1RMFromVelocity as baseEstimate,
   velocityLoss as baseVelocityLoss,
   velocityLossZone as baseZone,
-  thresholdForIntent,
   type VBTLift,
-  type VBTIntent,
-  type VelocityLossResult,
 } from '../pro/vbt.engine';
 import { loadLVPProfile, velocityForLVP, pctForVelocityLVP, estimate1RMLVP } from './strength-sport-lvp-calibration.engine';
 
@@ -99,12 +96,7 @@ export function taZoneForVelocity(velocity: number, exercise: string): string {
   return 'unknown';
 }
 
-export function taTargetVelocity(exercise: string, intensity: 'starting_strength' | 'speed_strength' | 'strength_speed' | 'accelerative_strength' | 'absolute_strength'): [number, number] | null {
-  const zones = TA_PEAK_VELOCITY_ZONES[exercise];
-  if (!zones) return null;
-  const z = zones.find(v => v.label === intensity);
-  return z ? z.velocity : null;
-}
+// (V9: удалён мёртвый taTargetVelocity — вызывающих не было; зоны читаются через taZoneForVelocity.)
 
 // ── FvR2 модель Sandau: snatch pull 80%/110% + vThres → snatchTh ±1.5кг ──
 export interface FvR2Input { load80: number; vmax80: number; load110: number; vmax110: number; hAcc: number; vThres: number; }
@@ -347,5 +339,5 @@ export function velocityWeightAdjustFactor(lossPct: number | null, liftId?: stri
   return 1;
 }
 
-export { thresholdForIntent };
-export type { VBTIntent, VelocityLossResult };
+// (V9: удалены мёртвые реэкспорты thresholdForIntent/VBTIntent/VelocityLossResult —
+// потребители импортируют их из pro/vbt.engine напрямую.)

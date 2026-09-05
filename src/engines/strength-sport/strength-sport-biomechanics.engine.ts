@@ -264,16 +264,7 @@ export function diagnoseTAWeakPoint(wp: WLWeakPoint): TABiomechInfo | null {
   return TA_BIOMECH[wp] ?? null;
 }
 
-export function allTABiomech(): TABiomechInfo[] {
-  return Object.values(TA_BIOMECH);
-}
-
-export function weakPointsByJoint(joint: string): WLWeakPoint[] {
-  const low = joint.toLowerCase();
-  return (Object.values(TA_BIOMECH) as TABiomechInfo[])
-    .filter(b => b.joint.toLowerCase().includes(low) || b.keyJoint.toLowerCase().includes(low))
-    .map(b => b.weakPoint);
-}
+// (V9: удалены мёртвые allTABiomech/weakPointsByJoint — вызывающих не было.)
 
 export function isValidAngleForWeakPoint(wp: WLWeakPoint, angleDeg: number): boolean {
   const b = TA_BIOMECH[wp];

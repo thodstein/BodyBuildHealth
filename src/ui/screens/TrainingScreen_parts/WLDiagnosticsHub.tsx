@@ -37,12 +37,14 @@ import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasT
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
-type WLTab = 'snatch' | 'clean' | 'jerk' | 'mobility' | 'vbt' | 'video';
+type WLTab = 'snatch' | 'clean' | 'jerk' | 'aux' | 'mobility' | 'vbt' | 'video';
 
 type WLState = {
   snatchWeak: WLWeakPoint[];
   cleanWeak: WLWeakPoint[];
   jerkWeak: WLWeakPoint[];
+  // V9-B: вспомогательные фазы (присед/тяги/жим)
+  auxWeak: WLWeakPoint[];
   barPath: BarPathDeviation | '';
   barLift: string;
   leftMax: string;
@@ -73,8 +75,7 @@ type WLState = {
   ohsTrunkUpright: boolean;
   ohsArmsOverMidfoot: boolean;
   ohsLumbarNeutral: boolean;
-  overheadSquat: string; // совместимость: старый ввод глубины (legacy)
-  ankleDorsiflex: string; // legacy deg
+  // (V9: удалены legacy overheadSquat/ankleDorsiflex — писать их было нечему с v1.)
   kneeToWallCm: string;
   ankleDeg: string;
   heelRetest: '' | 'better' | 'same';
@@ -126,6 +127,8 @@ type WLState = {
 
 const DEFAULT_STATE: WLState = {
   snatchWeak: [], cleanWeak: [], jerkWeak: [],
+  // V9-B: вспомогательные фазы
+  auxWeak: [],
   barPath: '', barLift: 'snatch',
   leftMax: '', rightMax: '',
   vbtWeight: '', vbtVel: '', vbtBest: '', vbtLast: '', vbtVthres: '',
@@ -134,7 +137,6 @@ const DEFAULT_STATE: WLState = {
   fvrLift: 'snatch' as 'snatch' | 'clean',
   lvpLift: 'snatch', lvp50: '2.70', lvp65: '2.15', lvp75: '1.80', lvp90: '1.55', lvpResult: '',
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
-  overheadSquat: '', ankleDorsiflex: '',
   kneeToWallCm: '', ankleDeg: '',
   heelRetest: '',
   imtpKg: '', isppKg: '',
@@ -166,6 +168,7 @@ const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> 
   { id: 'snatch', label: 'Рывок', icon: '🏋️', desc: '5 фаз + углы' },
   { id: 'clean', label: 'Взятие', icon: '🏋️‍♂️', desc: '3 фазы + ISPP' },
   { id: 'jerk', label: 'Толчок', icon: '🦾', desc: '3 фазы + drive' },
+  { id: 'aux', label: 'База', icon: '🦵', desc: 'присед/тяги/жим' },
   { id: 'vbt', label: 'VBT/FvR', icon: '⚡', desc: 'пик-зоны + FvR2' },
   { id: 'video', label: 'Видео', icon: '📹', desc: 'Kinovea/Enode' },
   { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'OHS 6 + асимметрия' },
@@ -238,9 +241,9 @@ export const WLDiagnosticsHub: React.FC = () => {
   }, []);
 
   const weakPoints = useMemo(() => {
-    const all: WLWeakPoint[] = [...state.snatchWeak, ...state.cleanWeak, ...state.jerkWeak];
+    const all: WLWeakPoint[] = [...state.snatchWeak, ...state.cleanWeak, ...state.jerkWeak, ...state.auxWeak];
     return Array.from(new Set(all)).slice(0, 3);
-  }, [state.snatchWeak, state.cleanWeak, state.jerkWeak]);
+  }, [state.snatchWeak, state.cleanWeak, state.jerkWeak, state.auxWeak]);
 
   const barPathDiag = useMemo(() => {
     if (!state.barPath) return null;
@@ -276,9 +279,9 @@ export const WLDiagnosticsHub: React.FC = () => {
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
     trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
     kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
-    ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : state.ankleDorsiflex ? parseFloat(state.ankleDorsiflex) : null,
+    ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
-  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.ankleDorsiflex, state.heelRetest]);
+  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
 
   const vbtLoss = useMemo(() => {
     const best = parseFloat(state.vbtBest);
@@ -564,9 +567,9 @@ export const WLDiagnosticsHub: React.FC = () => {
   }, [planNonce]);
   const planAudit = useMemo(() => auditTAPlan(planData), [planData]);
 
-  const toggleWeak = (group: 'snatch' | 'clean' | 'jerk', wp: WLWeakPoint) => {
+  const toggleWeak = (group: 'snatch' | 'clean' | 'jerk' | 'aux', wp: WLWeakPoint) => {
     setState(s => {
-      const key = group === 'snatch' ? 'snatchWeak' : group === 'clean' ? 'cleanWeak' : 'jerkWeak';
+      const key = group === 'snatch' ? 'snatchWeak' : group === 'clean' ? 'cleanWeak' : group === 'jerk' ? 'jerkWeak' : 'auxWeak';
       const arr = (s as any)[key] as WLWeakPoint[];
       const has = arr.includes(wp);
       const next = has ? arr.filter(x => x !== wp) : [...arr, wp].slice(0, 2);
@@ -579,14 +582,9 @@ export const WLDiagnosticsHub: React.FC = () => {
     const wp = planAudit.worstPhase;
     if (!wp) return;
     const grp = hubTabForPhase(wp);
-    if (!grp) {
-      setToast(`Худшая фаза «${wp}» — вспомогательная (присед/тяга), разбирается через OHS/VBT`);
-      setTimeout(() => setToast(''), 2500);
-      return;
-    }
     setTab(grp);
     setState(s => {
-      const key = grp === 'snatch' ? 'snatchWeak' : grp === 'clean' ? 'cleanWeak' : 'jerkWeak';
+      const key = grp === 'snatch' ? 'snatchWeak' : grp === 'clean' ? 'cleanWeak' : grp === 'jerk' ? 'jerkWeak' : 'auxWeak';
       const arr = (s as any)[key] as WLWeakPoint[];
       if (arr.includes(wp)) return s;
       return { ...s, [key]: [...arr, wp].slice(0, 2) };
@@ -1013,7 +1011,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ТА-диагностика — хаб движения PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 × числовые углы + bar path PRO (Vorobyev типы, SRD) + VBT пиковые зоны + FvR2 + OHS 6 + видео Kinovea/Enode.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 + база 5 × числовые углы + bar path PRO (Vorobyev типы, SRD) + VBT пиковые зоны + FvR2 + OHS 6 + видео Kinovea/Enode.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
@@ -1152,6 +1150,30 @@ export const WLDiagnosticsHub: React.FC = () => {
               </div>
               {jerkDip && <div style={{ fontSize: 10, color: jerkDip.isOptimal ? '#22c55e' : '#f59e0b', marginTop: 6 }}>Dip {jerkDip.dipCm}см за {jerkDip.dipTimeMs}мс · скорость {jerkDip.dipVelocityMs} м/с{jerkDip.drivePowerW ? ` · drive ~${jerkDip.drivePowerW}Вт` : ''} — {jerkDip.recommendation}</div>}
             </div>
+          </div>
+        )}
+
+        {tab === 'aux' && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>База — присед/тяги/жим (5 фаз, разбор как в двоеборье)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {(['squat_bottom', 'squat_mid', 'pull_start', 'pull_lockout', 'press_start'] as WLWeakPoint[]).map(wp => (
+                <button key={wp} onClick={() => toggleWeak('aux', wp)} aria-pressed={state.auxWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.auxWeak.includes(wp) ? '#f59e0b' : '#1f3a5f', background: state.auxWeak.includes(wp) ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.auxWeak.includes(wp) ? '#f59e0b' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+              ))}
+            </div>
+            {state.auxWeak.map(wp => {
+              const bio = diagnoseTAWeakPoint(wp);
+              return (
+                <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
+                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
+                  <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
+                  {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
+                  {top3Block(wp)}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1341,8 +1363,6 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
             </div>
             <button onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
-            {/* Legacy compat fields hidden but synced */}
-            <div style={{ display: 'none' }}><input value={state.overheadSquat} readOnly /><input value={state.ankleDorsiflex} readOnly /></div>
           </div>
         )}
       </div>

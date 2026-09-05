@@ -42,13 +42,7 @@ export const TRAJECTORY_LABELS: Record<TrajectoryType, string> = {
   unknown: 'Не определена',
 };
 
-export const BAR_PATH_DEVIATION_LABELS: Record<BarPathDeviationPro, string> = {
-  forward: 'Уход вперёд',
-  backward: 'Уход назад',
-  loop: 'Петля S',
-  early_pull: 'Ранний срыв',
-  soft_lockout: 'Мягкий замок',
-};
+// (V9: удалён мёртвый BAR_PATH_DEVIATION_LABELS — вызывающих не было.)
 
 /**
  * Классификация траектории — 2D PRO (X + Y vel peak, Vorobyev 4 типа по GymAware 2025)

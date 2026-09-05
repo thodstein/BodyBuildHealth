@@ -1,9 +1,11 @@
 /**
  * strength-sport-diagnostics.ts — диагностика слабых фаз ТА/стронга (порт lms/weakpoint-pl).
- * 5 отклонений штанги + 7 фаз рывка/толчка + асимметрия.
+ * 5 отклонений штанги → слабая фаза + коррекции.
+ * (V9: удалены мёртвые diagnoseAsymmetry/weakPointToRationale/LiftingPhase —
+ * асимметрия считается инлайн в хабах с порогами 7/12% Bezkorovainyi.)
  */
 
-import { WL_WEAKPOINT_LABELS, type WLWeakPoint } from './strength-sport-weakpoint';
+import { type WLWeakPoint } from './strength-sport-weakpoint';
 
 export type BarPathDeviation = 'forward' | 'backward' | 'loop' | 'early_pull' | 'soft_lockout';
 
@@ -23,8 +25,6 @@ export const BAR_PATH_CORRECTION: Record<BarPathDeviation, string[]> = {
   soft_lockout: ['push_jerk', 'split_jerk', 'jerk_recovery'],
 };
 
-export type LiftingPhase = 'off_floor' | 'mid' | 'pull_under' | 'catch' | 'overhead' | 'dip' | 'drive' | 'lockout' | 'bottom' | 'lockout_dead';
-
 export function diagnoseBarPath(lift: string, deviation: BarPathDeviation): { weak: WLWeakPoint | null; corrections: string[] } {
   const map: Record<string, Record<BarPathDeviation, WLWeakPoint>> = {
     snatch: { forward: 'snatch_mid', backward: 'snatch_off_floor', loop: 'snatch_pull_under', early_pull: 'snatch_mid', soft_lockout: 'snatch_catch' },
@@ -36,15 +36,4 @@ export function diagnoseBarPath(lift: string, deviation: BarPathDeviation): { we
   const table = map[key];
   const weak = table ? table[deviation] : null;
   return { weak: weak as WLWeakPoint | null, corrections: BAR_PATH_CORRECTION[deviation] || [] };
-}
-
-export function diagnoseAsymmetry(leftMax: number, rightMax: number, thresholdPct = 10): { isAsymmetric: boolean; weaker: 'left' | 'right' | null; diffPct: number } {
-  if (!leftMax || !rightMax) return { isAsymmetric: false, weaker: null, diffPct: 0 };
-  const diff = Math.abs(leftMax - rightMax) / Math.max(leftMax, rightMax) * 100;
-  const isAsym = diff >= thresholdPct;
-  return { isAsymmetric: isAsym, weaker: isAsym ? (leftMax < rightMax ? 'left' : 'right') : null, diffPct: Math.round(diff * 10) / 10 };
-}
-
-export function weakPointToRationale(wp: WLWeakPoint): string {
-  return WL_WEAKPOINT_LABELS[wp] || wp;
 }

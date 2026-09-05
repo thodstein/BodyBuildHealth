@@ -92,32 +92,9 @@ export async function ensurePoseModel(): Promise<boolean> {
     return hasPoseSupport();
   } catch { return false; }
 }
-export function hasVideoSupport(): boolean { return hasPoseSupport() || hasTasksVisionSupport(); }
-export function detectPoseFromVideo(frame: unknown): JointAnglesPose | null {
-  try {
-    if (typeof frame === 'object' && frame !== null) {
-      const f = frame as any;
-      if ('landmarks' in f && f.landmarks && typeof f.landmarks === 'object' && !Array.isArray(f.landmarks)) {
-        return estimateAnglesFromLandmarks(f as PoseFrame);
-      }
-      if (Array.isArray(f) && f.length >= 4) {
-        const [hip, knee, ankle, shoulder] = f;
-        if (hip && knee && ankle) return estimateAnglesFromLandmarks({ landmarks: { hip, knee, ankle, shoulder: shoulder || hip }, t: 0 });
-      }
-      // Tasks Vision result: { landmarks: [{x,y,z}] } array 33
-      if (Array.isArray(f.landmarks) && f.landmarks.length >= 23) {
-        // MediaPipe tasks: landmarks[23]=hip, 25=knee, 27=ankle, 11=shoulder
-        const arr = f.landmarks as any[];
-        const lm = (i:number)=> ({ x: arr[i]?.x ?? 0, y: arr[i]?.y ?? 0 });
-        const hip = lm(23), knee = lm(25), ankle = lm(27), shoulder = lm(11), elbow = lm(13), wrist = lm(15), foot = lm(31);
-        return estimateAnglesFromLandmarks({ landmarks: { hip, knee, ankle, shoulder, elbow, foot, wrist }, t: f.t ?? 0 });
-      }
-    }
-    const mp = (globalThis as any).Pose || (globalThis as any).BlazePose;
-    if (!mp || !frame) return null;
-    return null;
-  } catch { return null; }
-}
+
+// (V9: удалены мёртвые hasVideoSupport/detectPoseFromVideo/isPoseVerified —
+// ни вызывающих, ни тестов; live-адаптер пишется заново вместе с видео-контуром.)
 
 // Stub для MediaPipe — возвращает моки, чтобы UI не падал без модели
 export function createMockPoseStream(): PoseFrame[] {
@@ -126,11 +103,8 @@ export function createMockPoseStream(): PoseFrame[] {
     { t: 0.1, landmarks: { hip: { x: 0, y: 0 }, knee: { x: 0.1, y: -0.9 }, ankle: { x: 0, y: -1.9 }, shoulder: { x: 0, y: 1 }, elbow: { x: 0.5, y: 1 }, foot: { x: 0, y: -2.2 }, wrist: { x: 0.5, y: 1.5 } } },
   ];
 }
-export function isPoseVerified(angles: JointAnglesPose | null): boolean {
-  if (!angles) return false;
-  const st = livePoseStatus(angles);
-  return st.ok;
-}
+
+// (V9: isPoseVerified удалён вместе с группой выше.)
 
 // E8: углы суставов из CSV (экспорт трекера поз / ручной замер по кадрам).
 // Формат: t,hip,knee,ankle,shoulder[,elbow] (; или ,). Без заголовка — t,hip,knee,ankle,shoulder.

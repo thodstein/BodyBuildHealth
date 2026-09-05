@@ -45,12 +45,13 @@ describe('TA plan audit E1', () => {
     expect(all.totalSets).toBe(0);
     expect(all.deloadWeeks).toBe(full.weeks);
   });
-  it('hubTabForPhase: squat/pull/press → null', () => {
+  it('hubTabForPhase: aux для приседа/тяг/жима', () => {
     expect(hubTabForPhase('snatch_mid')).toBe('snatch');
     expect(hubTabForPhase('clean_catch')).toBe('clean');
     expect(hubTabForPhase('jerk_dip')).toBe('jerk');
-    expect(hubTabForPhase('squat_bottom')).toBeNull();
-    expect(hubTabForPhase('pull_start')).toBeNull();
+    expect(hubTabForPhase('squat_bottom')).toBe('aux');
+    expect(hubTabForPhase('pull_start')).toBe('aux');
+    expect(hubTabForPhase('press_start')).toBe('aux');
   });
   it('V7-B TA_AUX_PHASES: 5 фаз, дополнение CORE до ALL', () => {
     expect(TA_AUX_PHASES.length).toBe(5);

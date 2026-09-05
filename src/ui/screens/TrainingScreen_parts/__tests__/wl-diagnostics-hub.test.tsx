@@ -340,6 +340,30 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByText(/Проверить MediaPipe/));
     await waitFor(() => expect(container.textContent).toMatch(/проверяем|модель доступна|нет сети/), { timeout: 5000 });
   });
+  it('V9-B aux-таб: присед → биомеханика + топ-3 + причина', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /База/ }));
+    fireEvent.click(screen.getAllByText(/Присед: внизу/)[0]);
+    await waitFor(() => expect(container.textContent).toContain('Топ-3 коррекции'), { timeout: 2000 });
+    expect(container.textContent).toContain('Причина:');
+  });
+  it('V9-B aux-фаза уходит в bridge и инъекцию', async () => {
+    const miniPlan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 1, patternId: 'x',
+      weeksData: [
+        { week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'strength_day', character: 'тяж', exercises: [{ id: 'back_squat', name: 'Присед', group: 'legs', pattern: 'squat', role: 'primary', character: 'тяж', sets: 4, reps: '5', rir: 2, weight: 100, workSets: [{ reps: 5, rir: 2, weight: 100 }], warmupSets: [] }] }] },
+      ],
+      workMax: { backSquat: 120 }, rationale: [],
+    };
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /База/ }));
+    fireEvent.click(screen.getAllByText(/Тяга: старт/)[0]);
+    const btns = screen.getAllByText(/Применить в ТА-конструктор/);
+    fireEvent.click(btns[btns.length - 1]);
+    await waitFor(() => expect(container.textContent).toContain('Применено'), { timeout: 2000 });
+    expect(localStorage.getItem('he_planner_apply')).toContain('pull_start');
+  });
   it('V7-A FvR: рывок ±1.5кг, взятие — оценка', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));

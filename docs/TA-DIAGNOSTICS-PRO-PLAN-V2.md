@@ -175,6 +175,24 @@
 Остаток — только чужой/аппаратный: loadsol, kind 'TA' в annual-training, SFR для ТА,
 потребление bridge-полей конструктором, 61 чужое падение bb/lms.
 
+## 13. V9-круг «доделка всего» (✅ ВЫПОЛНЕН)
+
+Закрыт весь блок A аудита + aux-разбор из блока B:
+- **V9-A гигиена**: удалены мёртвые `allTABiomech`/`weakPointsByJoint`, `diaryTrendSummary`,
+  `diagnoseAsymmetry`/`weakPointToRationale`/`LiftingPhase`, `computeBudgetTAFallback`,
+  `BAR_PATH_DEVIATION_LABELS`, `taTargetVelocity`, реэкспорты ss-vbt, pose-тройка
+  (`hasVideoSupport`/`detectPoseFromVideo`/`isPoseVerified`), legacy-поля хаба
+  (`overheadSquat`/`ankleDorsiflex` + скрытый div + fallback); схлопнута мёртвая ветка дневника.
+  Пороговая несостыковка (dead-10% vs живые 7/12%) ушла вместе с мёртвой функцией.
+- **V9-B aux-таб «🦵 База»**: 5 фаз присед/тяги/жим с тем же конвейером (биомеханика +
+  причина + топ-3 + Δ + инъекция + спец-блок + экспорт); `hubTabForPhase` возвращает 'aux',
+  `selectWorstPhase`/`toggleWeak` расширены; итого диагностируются все 16/16 фаз.
+- Проверено: область **707/707 (49 файлов)**, hub **38/38**, **tsc exit 0**,
+  коммит pathspec, push.
+
+Остаток — только чужой/аппаратный: loadsol, kind 'TA' в annual-training, SFR для ТА,
+потребление bridge-полей конструктором, SM-цикл Sinclair у соседей, 61 чужое падение bb/lms.
+
 ## 12. V8-круг «текущий цикл Sinclair» (✅ ВЫПОЛНЕН)
 
 Сверка с интернетом показала: действует цикл **2025–2028** (M A=0.700767819/B=201.159 —

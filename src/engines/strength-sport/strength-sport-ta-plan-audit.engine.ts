@@ -202,10 +202,10 @@ export function auditTAPlan(plan: StrengthSportPlan | null | undefined): TAPlanA
   };
 }
 
-/** Группа таба хаба для фазы (snatch/clean/jerk; squat/pull/press → null = только инфо). */
-export function hubTabForPhase(wp: WLWeakPoint): 'snatch' | 'clean' | 'jerk' | null {
+/** Группа таба хаба для фазы (snatch/clean/jerk + aux для приседа/тяг/жима). */
+export function hubTabForPhase(wp: WLWeakPoint): 'snatch' | 'clean' | 'jerk' | 'aux' {
   if (wp.startsWith('snatch_')) return 'snatch';
   if (wp.startsWith('clean_')) return 'clean';
   if (wp.startsWith('jerk_')) return 'jerk';
-  return null;
+  return 'aux';
 }
