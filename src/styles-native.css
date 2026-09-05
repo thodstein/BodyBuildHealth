@@ -2677,6 +2677,48 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 57. NATIVE DEEP-25 — гарды объёма, safety-хвосты ─────── */
+html.app-native .train-realmrv,
+html.app-native .train-rircalib,
+html.app-native .train-tonnage,
+html.app-native .train-stickingpanel,
+html.app-native .train-plateauto,
+html.app-native .train-readinesspanel,
+html.app-native .train-loadguard,
+html.app-native .calc-safetyproc,
+html.app-native .calc-safetyassay,
+html.app-native .calc-safetygaps,
+html.app-native .calc-safetylabs,
+html.app-native .calc-safetydepletion {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-realmrv,
+html.app-native .train-rircalib,
+html.app-native .train-tonnage,
+html.app-native .train-stickingpanel,
+html.app-native .train-plateauto,
+html.app-native .train-readinesspanel {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-realmrv,
+  html.app-native .train-rircalib,
+  html.app-native .train-tonnage,
+  html.app-native .train-stickingpanel,
+  html.app-native .train-plateauto,
+  html.app-native .train-readinesspanel,
+  html.app-native .train-loadguard,
+  html.app-native .calc-safetyproc,
+  html.app-native .calc-safetyassay,
+  html.app-native .calc-safetygaps,
+  html.app-native .calc-safetylabs,
+  html.app-native .calc-safetydepletion {
+    animation: none;
+  }
+}
+
 /* ─── 56. NATIVE DEEP-24 — экраны, клиника, фарма/риски ────── */
 html.app-native .rep-screen,
 html.app-native .sup-clinic,

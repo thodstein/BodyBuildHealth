@@ -119,7 +119,7 @@ export const SafetyProcedures: React.FC<{ rec: SupportRecommendation }> = ({ rec
   const procedures = rec.procedures || [];
   if (procedures.length === 0) return null;
   return (
-    <div style={{ marginTop: 8 }}>
+    <div className="calc-safetyproc" style={{ marginTop: 8 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>🩸 Медицинская эскалация · только врач</div>
       {procedures.map((p, i) => (
         <div key={`${p.id}-${i}`} style={{ padding: '6px 8px', borderRadius: 7, marginBottom: 3, background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.26)', color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
@@ -138,7 +138,7 @@ export const SafetyAssayWarnings: React.FC<{ rec: SupportRecommendation }> = ({ 
   const warnings = rec.assayWarnings || [];
   if (warnings.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetyassay" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🧪 Интерпретация анализов</div>
       {warnings.map((warning, i) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.22)', color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
@@ -154,7 +154,7 @@ export const SafetyGaps: React.FC<{ rec: SupportRecommendation }> = ({ rec }) =>
   const gaps = rec.gaps || [];
   if (gaps.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetygaps" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', marginBottom: 3 }}>⚠️ Не закрытые механизмы риска</div>
       {gaps.map((g: any, i: number) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)' }}>
@@ -181,7 +181,7 @@ export const SafetyLabFindings: React.FC<{ planResult?: PlanResult }> = ({ planR
   }
   const cnt = (sev: string) => labFindings.filter((f: any) => f.severity === sev).length;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetylabs" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>🔬 Лабораторные находки (персональный мониторинг)</div>
       <div style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.7)', marginBottom: 4, padding: '3px 7px', borderRadius: 6, background: 'rgba(244,114,182,0.06)', border: '1px solid rgba(244,114,182,0.16)' }}>
         📊 Итого: <b style={{ color: '#ef4444' }}>{cnt('critical')}</b> критичных · <b style={{ color: '#f59e0b' }}>{cnt('high')}</b> высоких · <b style={{ color: '#fbbf24' }}>{cnt('medium')}</b> средних · всего {labFindings.length}
@@ -221,7 +221,7 @@ export const SafetyDepletion: React.FC<{ planResult?: PlanResult }> = ({ planRes
   const items = planResult?.depletionWarnings || [];
   if (items.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div className="calc-safetydepletion" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#fb923c', marginBottom: 3 }}>💊 Вымывание нутриентов (drug-induced depletion)</div>
       {items.map((d: any, i: number) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.18)' }}>

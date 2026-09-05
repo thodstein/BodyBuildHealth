@@ -159,7 +159,7 @@ export const RealMRVPanel: React.FC<GuardPanelProps> = ({ program, labMrvMult = 
   const multLabel = data.mult < 1 ? `снижение (${sourceLabel})` : data.mult > 1 ? `повышение (${sourceLabel})` : sourceLabel;
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + multColor }}>
+    <div className="train-realmrv" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + multColor }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📊 Реальный MRV (из истории)</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: multColor }}>{multLabel}</span>
@@ -235,7 +235,7 @@ export const RIRCalibrationPanel: React.FC<GuardPanelProps> = ({ program, dir, o
   };
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + biasColor }}>
+    <div className="train-rircalib" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + biasColor }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🎯 Калибровка RIR</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: biasColor }}>{biasLabel}</span>
@@ -338,7 +338,7 @@ export const TonnageEstimatePanel: React.FC<GuardPanelProps> = ({ program, dir }
   const intensityColor = data.uoi >= 85 ? '#ef4444' : data.uoi >= 75 ? '#f59e0b' : data.uoi >= 65 ? '#22c55e' : '#3b82f6';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + intensityColor }}>
+    <div className="train-tonnage" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + intensityColor }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📊 Тоннаж недели {data.weekNum} (пик)</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: intensityColor }}>УОИ {data.uoi}% · {intensityLabel}</span>
@@ -416,7 +416,7 @@ export const StickingPointPanel: React.FC<GuardPanelProps> = ({ program, dir, on
   if (detectedLifts.length === 0) return null;
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+    <div className="train-stickingpanel" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🎯 Срывы и слабые точки</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{detectedLifts.length} ПЛ-движений в плане</span>
@@ -505,7 +505,7 @@ export const PlateAutoPanel: React.FC<GuardPanelProps> = ({ program, dir }) => {
   if (rows.length === 0) return null;
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #06b6d4' }}>
+    <div className="train-plateauto" style={{ ...CARD, padding: 10, borderLeft: '3px solid #06b6d4' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🏋️ Блины для недели 1</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>гриф {BAR_KG}кг · веса из workMax×%</span>
@@ -625,7 +625,7 @@ export const ReadinessForecastPanel: React.FC<GuardPanelProps> = () => {
   const stroke = forecast.values[0] < 50 ? '#ef4444' : forecast.values[0] < 65 ? '#f59e0b' : '#22c55e';
 
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + stroke }}>
+    <div className="train-readinesspanel" style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + stroke }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📈 Прогноз готовности</span>
         <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>Хольт-линейный, 5 дней</span>

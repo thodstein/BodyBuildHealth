@@ -282,6 +282,22 @@ import { InteractionCheckerTab } from '../screens/PharmaScreen_parts/Interaction
 import { RiskMatrix } from '../screens/RiskScreen_parts/RiskMatrix';
 import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
 import { ProPanelCollapsible } from '../screens/TrainingScreen_parts/ProPanelSection';
+import {
+  RealMRVPanel,
+  RIRCalibrationPanel,
+  TonnageEstimatePanel,
+  StickingPointPanel,
+  PlateAutoPanel,
+  ReadinessForecastPanel,
+  LoadGuardPanel,
+} from '../screens/TrainingScreen_parts/ProGuardPanels';
+import {
+  SafetyProcedures,
+  SafetyAssayWarnings,
+  SafetyGaps,
+  SafetyLabFindings,
+  SafetyDepletion,
+} from '../screens/Calculator/CalcSafetyLayer';
 import { ReportsScreen } from '../screens/ReportsScreen';
 import { SupplementClinicScreen } from '../screens/SupplementClinicScreen';
 import { SmartAssistantScreen } from '../screens/SmartAssistantScreen';
@@ -2086,5 +2102,113 @@ describe('market + pharma + labs roots', () => {
       <ProPanelCollapsible section={{ id: 't', title: 'Тест', content: 'текст' } as never} />,
     );
     expect(c6.querySelector('.pro-panel-section'), 'propanel').not.toBeNull();
+  });
+
+  it('67. Batch-25 корни: гард-панели объёма (сид sRPE/дня)', () => {
+    const srpeSeed = [
+      { date: '2026-08-10', sRPE: 7, durationMin: 60 },
+      { date: '2026-08-12', sRPE: 6, durationMin: 55 },
+      { date: '2026-08-19', sRPE: 8, durationMin: 65 },
+      { date: '2026-08-21', sRPE: 7, durationMin: 60 },
+    ];
+    try {
+      localStorage.setItem('he_srpe_sessions', JSON.stringify(srpeSeed));
+    } catch {}
+    try {
+      localStorage.setItem(
+        'he_rir_calibration',
+        JSON.stringify([
+          { plannedRIR: 2, actualRIR: 1 },
+          { plannedRIR: 3, actualRIR: 2 },
+          { plannedRIR: 2, actualRIR: 2 },
+        ]),
+      );
+    } catch {}
+    try {
+      localStorage.setItem(
+        'he_readiness_history',
+        JSON.stringify([
+          { date: '2026-08-19', recovery: 70, fatigue: 30 },
+          { date: '2026-08-20', recovery: 72, fatigue: 28 },
+          { date: '2026-08-21', recovery: 68, fatigue: 32 },
+        ]),
+      );
+    } catch {}
+    const bbProgram = {
+      meta: { id: 't', level: 'intermediate' },
+      bb: {
+        weeks: [
+          {
+            week: 1,
+            sessions: [
+              {
+                blocks: [
+                  { exerciseName: 'Жим лёжа', muscle: 'chest', sets: [{ reps: 8, weight: 100, rir: 2 }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    } as never;
+    const { container: c1 } = render(<LoadGuardPanel program={bbProgram} />);
+    expect(c1.querySelector('.train-loadguard'), 'loadguard').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<RealMRVPanel program={bbProgram} />);
+    expect(c2.querySelector('.train-realmrv'), 'realmrv').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<RIRCalibrationPanel program={bbProgram} dir="bb" />);
+    expect(c3.querySelector('.train-rircalib'), 'rircalib').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<TonnageEstimatePanel program={bbProgram} dir="bb" />);
+    expect(c4.querySelector('.train-tonnage'), 'tonnage').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<StickingPointPanel program={bbProgram} dir="bb" />);
+    expect(c5.querySelector('.train-stickingpanel'), 'stickingpanel').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<PlateAutoPanel program={bbProgram} dir="bb" />);
+    expect(c6.querySelector('.train-plateauto'), 'plateauto').not.toBeNull();
+    cleanup();
+    const { container: c7 } = render(<ReadinessForecastPanel />);
+    expect(c7.querySelector('.train-readinesspanel'), 'readinesspanel').not.toBeNull();
+    cleanup();
+    try {
+      localStorage.removeItem('he_srpe_sessions');
+      localStorage.removeItem('he_rir_calibration');
+      localStorage.removeItem('he_readiness_history');
+    } catch {}
+  });
+
+  it('68. Batch-25 корни: safety-хвосты (процедуры, анализы, гэпы, находки, вымывание)', () => {
+    const { container: c1 } = render(
+      <SafetyProcedures
+        rec={{ procedures: [{ id: 'p1', label: 'Тест', reason: 'тест', trigger: 'тест', monitoring: ['A'] }] } as never}
+      />,
+    );
+    expect(c1.querySelector('.calc-safetyproc'), 'safetyproc').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <SafetyAssayWarnings rec={{ assayWarnings: ['тест'] } as never} />,
+    );
+    expect(c2.querySelector('.calc-safetyassay'), 'safetyassay').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(
+      <SafetyGaps rec={{ gaps: [{ organLabel: 'Тест', mechLabel: 'Тест' }] } as never} />,
+    );
+    expect(c3.querySelector('.calc-safetygaps'), 'safetygaps').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <SafetyLabFindings
+        planResult={{ labFindings: [{ system: 'cardio', severity: 'high', title: 'Тест' }] } as never}
+      />,
+    );
+    expect(c4.querySelector('.calc-safetylabs'), 'safetylabs').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <SafetyDepletion
+        planResult={{ depletionWarnings: [{ depleterName: 'A', depletedName: 'B', severity: 'x' }] } as never}
+      />,
+    );
+    expect(c5.querySelector('.calc-safetydepletion'), 'safetydepletion').not.toBeNull();
   });
 });
