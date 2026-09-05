@@ -21,7 +21,7 @@ import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-s
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { ladderAdvice } from '../../../engines/arm/arm-implement-ladder.engine';
-import { buildArmCalendar } from '../../../engines/arm/arm-calendar.engine';
+import { buildArmCalendar, superSeriesYear } from '../../../engines/arm/arm-calendar.engine';
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
@@ -608,7 +608,8 @@ export function ArmAutoConstructor() {
             {proDate && (()=>{
               try {
                 const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
-                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Календарь: {cal.note}</div>;
+                const year = topCalSeries !== 'local' ? superSeriesYear(topCalSeries) : null;
+                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Календарь: {cal.note}{year ? ` Год: ${year.note}.` : ''}</div>;
               } catch { return null; }
             })()}
             {(topGripWeek || topGripPhase !== 'auto') && (()=>{

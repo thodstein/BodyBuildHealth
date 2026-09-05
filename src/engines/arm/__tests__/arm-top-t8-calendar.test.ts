@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildArmCalendar, calWeeksOut } from '../arm-calendar.engine';
+import { buildArmCalendar, calWeeksOut, superSeriesYear } from '../arm-calendar.engine';
 
 describe('arm TOP T8 календарь', () => {
   it('обратный отсчёт', () => {
@@ -28,5 +28,18 @@ describe('arm TOP T8 календарь', () => {
   it('серии дают свои ноты', () => {
     expect(buildArmCalendar({ series: 'waf_worlds' }).milestones.join(' ')).toMatch(/24–30ч/i);
     expect(buildArmCalendar({ series: 'super_series' }).milestones.join(' ')).toMatch(/90\/96\/102/i);
+  });
+  it('годовой шаблон: сумма = total, хвост священный', () => {
+    const waf = superSeriesYear('waf_worlds', 52);
+    expect(waf.totalWeeks).toBe(52);
+    expect(waf.stages[waf.stages.length - 1].name).toBe('Пик Worlds');
+    expect(waf.stages.find((s) => s.name === 'Тейпер Worlds')?.weeks).toBe(3);
+    const ss = superSeriesYear('super_series', 52);
+    expect(ss.totalWeeks).toBe(52);
+    expect(ss.stages.map((s) => s.name)).toEqual(['База', 'Этап RT', 'Этап Axle', 'Этап Pinch/Hub', 'Финал']);
+    expect(ss.stages[ss.stages.length - 1].priority).toBe('A');
+    const short = superSeriesYear('east_vs_west', 11);
+    expect(short.totalWeeks).toBe(11);
+    expect(short.stages[0].name).not.toBe('База');
   });
 });

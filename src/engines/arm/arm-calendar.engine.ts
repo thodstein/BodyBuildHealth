@@ -32,6 +32,7 @@ export interface ArmCalendar {
   cut: { lossKg: number; weeklyLossKg: number; ratePct: number; targetRate: number; status: string; note: string };
   milestones: string[];
   note: string;
+  stages: YearStage[];
 }
 
 const DAY = 86400000;
@@ -138,5 +139,66 @@ export function buildArmCalendar(input: ArmCalendarInput = {}): ArmCalendar {
     cut: { lossKg, weeklyLossKg, ratePct, targetRate, status, note: cutNote },
     milestones,
     note: `До старта ${weeksOut} нед (${phase}, ${prio}) · ${taperNote} ${cutNote}`,
+    stages: [],
+  };
+}
+
+export interface YearStage {
+  name: string;
+  weeks: number;
+  priority: CalPriority;
+  focus: string;
+}
+
+export interface YearTemplate {
+  series: CalSeries;
+  stages: YearStage[];
+  totalWeeks: number;
+  note: string;
+}
+
+/**
+ * TOP wave-4: годовой шаблон под серию.
+ * waf_worlds — пик под Worlds (сентябрь): база → сила 12 → тейпер 3 (A) → пик 1.
+ * east_vs_west — лагерь под supermatch: база → сила 8 → тейпер 2 → пик 1.
+ * super_series — ротация имплементов RT → Axle → Pinch/Hub → финал (A).
+ * local — один базовый блок. Остаток недель уходит в базу впереди.
+ */
+export function superSeriesYear(series: string, totalWeeks = 52): YearTemplate {
+  const s = normSeries(series);
+  const total = Math.max(4, Math.min(52, Math.round(Number(totalWeeks) || 52)));
+  const tail: YearStage[] =
+    s === 'waf_worlds'
+      ? [
+        { name: 'Сила к Worlds', weeks: 12, priority: 'B', focus: 'пронация/rising/hook-дриллы RPE8–9' },
+        { name: 'Тейпер Worlds', weeks: 3, priority: 'A', focus: 'объём ×0.65→×0.45, side минимум' },
+        { name: 'Пик Worlds', weeks: 1, priority: 'A', focus: 'contest-sim + взвешивание за 24–30ч' },
+      ]
+      : s === 'east_vs_west'
+        ? [
+          { name: 'Лагерь supermatch', weeks: 8, priority: 'B', focus: 'TUT-матчап + drain на поздние раунды' },
+          { name: 'Тейпер', weeks: 2, priority: 'B', focus: 'техника + изометрия 10с' },
+          { name: 'Пик supermatch', weeks: 1, priority: 'A', focus: 'best-of-5/6, процедура Ready→Go' },
+        ]
+        : s === 'super_series'
+          ? [
+            { name: 'Этап RT', weeks: 8, priority: 'B', focus: 'support-объём RPE7 + лестница' },
+            { name: 'Этап Axle', weeks: 6, priority: 'B', focus: 'трансфер RT→Axle ×1.35' },
+            { name: 'Этап Pinch/Hub', weeks: 6, priority: 'C', focus: 'щипок + большой палец, встроен' },
+            { name: 'Финал', weeks: 4, priority: 'A', focus: 'тейпер 2 + пик, попытки 90/96/102' },
+          ]
+          : [];
+  const tailSum = tail.reduce((a, t) => a + t.weeks, 0);
+  const baseWeeks = Math.max(0, total - tailSum);
+  const stages: YearStage[] = [
+    ...(baseWeeks > 0 ? [{ name: 'База', weeks: baseWeeks, priority: 'C' as CalPriority, focus: 'техника RPE7, table 3/2/1, tendon' }] : []),
+    ...tail,
+  ];
+  // whole-year fit: если total меньше хвоста — сжать базу в ноль уже сделано; хвост не трогаем (приоритеты священны)
+  return {
+    series: s,
+    stages,
+    totalWeeks: stages.reduce((a, t) => a + t.weeks, 0),
+    note: `${s}: ${stages.map((t) => `${t.name} ${t.weeks}н(${t.priority})`).join(' → ')}`,
   };
 }
