@@ -37,18 +37,25 @@ export interface SMPoseCheckResult {
 const rom = (s: { min: number; max: number } | null): number | null =>
   s ? Math.round((s.max - s.min) * 10) / 10 : null;
 
-export function diagnoseSMPoseCarry(summary: PoseAnglesSummary, lift: 'yoke_walk' | 'farmers_walk' = 'yoke_walk'): SMPoseCheckResult | null {
+export function diagnoseSMPoseCarry(
+  summary: PoseAnglesSummary,
+  lift: 'yoke_walk' | 'farmers_walk' = 'yoke_walk',
+  sex?: string | null,
+): SMPoseCheckResult | null {
   if (!summary || summary.n < 2) return null;
   const lines: string[] = [];
   let bad = 0;
+  const female = String(sex || '').toLowerCase() === 'female';
   const hipRom = summary.hip ? rom(summary.hip) : null;
   const kneeRom = summary.knee ? rom(summary.knee) : null;
   if (hipRom == null && kneeRom == null) return null;
   const label = lift === 'yoke_walk' ? 'Йок' : 'Фермер';
+  let hipLow = false;
   if (hipRom != null) {
     if (hipRom >= SM_POSE_NORMS.yokeHipRom.min && hipRom <= SM_POSE_NORMS.yokeHipRom.max) {
       lines.push(`${label} hip ROM ${hipRom}° — норма [${SM_POSE_NORMS.yokeHipRom.min},${SM_POSE_NORMS.yokeHipRom.max}] (Hindle 37.9°)`);
     } else if (hipRom < SM_POSE_NORMS.yokeHipRom.min) {
+      hipLow = true;
       bad++;
       lines.push(`${label} hip ROM ${hipRom}° < ${SM_POSE_NORMS.yokeHipRom.min}° — укорочен: если это разгон 0-5м — норма (частота вместо длины), иначе добавь ROM (выпады/болгары)`);
     } else {
@@ -56,8 +63,10 @@ export function diagnoseSMPoseCarry(summary: PoseAnglesSummary, lift: 'yoke_walk
       lines.push(`${label} hip ROM ${hipRom}° > ${SM_POSE_NORMS.yokeHipRom.max}° — разболтан: укорот шаг 40-60см, взгляд вперёд`);
     }
   }
+  let kneeOk = false;
   if (kneeRom != null) {
     if (kneeRom >= SM_POSE_NORMS.yokeKneeRom.min && kneeRom <= SM_POSE_NORMS.yokeKneeRom.max) {
+      kneeOk = true;
       lines.push(`${label} knee ROM ${kneeRom}° — норма [${SM_POSE_NORMS.yokeKneeRom.min},${SM_POSE_NORMS.yokeKneeRom.max}] (Hindle 53.9°)`);
     } else if (kneeRom < SM_POSE_NORMS.yokeKneeRom.min) {
       bad++;
@@ -66,6 +75,12 @@ export function diagnoseSMPoseCarry(summary: PoseAnglesSummary, lift: 'yoke_walk
       bad++;
       lines.push(`${label} knee ROM ${kneeRom}° > ${SM_POSE_NORMS.yokeKneeRom.max}° — глубокий сед на ходу: жёстче кор, короче шаг`);
     }
+  }
+  // Hindle sex×interval: у женщин укороченный hip ROM на разгоне + дольше выход на
+  // макс. stride — ожидаемо; изолированный hip-low при норме колена не штрафуем.
+  if (female && hipLow && kneeOk && bad <= 2) {
+    bad = Math.min(bad, 1);
+    lines.push('Женщины: укороченный hip ROM на разгоне 0-5м — вариант нормы (Hindle interaction), смотри полный проход 15-20м');
   }
   const verdict: SMPoseCheckResult['verdict'] = bad === 0 ? 'ok' : bad >= 2 ? 'critical' : 'warn';
   return { lift, n: summary.n, verdict, lines, summary };
@@ -88,8 +103,12 @@ export function diagnoseSMPoseOverhead(summary: PoseAnglesSummary): SMPoseCheckR
   };
 }
 
-/** CSV → сводка → проверка (тип лифта: yoke/farmer/log по строке). */
-export function smPoseCheckFromCsv(csvText: string, liftId: string): { summary: PoseAnglesSummary; result: SMPoseCheckResult } | null {
+/** CSV → сводка → проверка (тип лифта: yoke/farmer/log по строке; sex — female-нормы Hindle). */
+export function smPoseCheckFromCsv(
+  csvText: string,
+  liftId: string,
+  sex?: string | null,
+): { summary: PoseAnglesSummary; result: SMPoseCheckResult } | null {
   const samples = parsePoseAnglesCsv(csvText);
   if (!samples) return null;
   const summary = summarizePoseAngles(samples);
@@ -99,7 +118,7 @@ export function smPoseCheckFromCsv(csvText: string, liftId: string): { summary: 
   if (low.includes('log') || low.includes('лог') || low.includes('press') || low.includes('axle')) {
     result = diagnoseSMPoseOverhead(summary);
   } else {
-    result = diagnoseSMPoseCarry(summary, low.includes('farmer') || low.includes('фермер') ? 'farmers_walk' : 'yoke_walk');
+    result = diagnoseSMPoseCarry(summary, low.includes('farmer') || low.includes('фермер') ? 'farmers_walk' : 'yoke_walk', sex);
   }
   if (!result) return null;
   return { summary, result };
