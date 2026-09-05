@@ -196,6 +196,14 @@ export function pickLabels(locale: Locale = 'ru'): LabelsBundle {
 
 // Глобальный locale (по умолчанию 'ru'). UI может переопределить через setLocale()
 let _currentLocale: Locale = 'ru';
-export function setLocale(loc: Locale): void { _currentLocale = loc; }
+export function setLocale(loc: Locale): void {
+  _currentLocale = loc;
+  // Скринридеры читают по <html lang>: синхронизируем (обе платформы, no-op вне DOM).
+  try {
+    document.documentElement.setAttribute('lang', loc);
+  } catch {
+    /* non-DOM окружение (тесты движков) */
+  }
+}
 export function getLocale(): Locale { return _currentLocale; }
 export function t(): LabelsBundle { return pickLabels(_currentLocale); }

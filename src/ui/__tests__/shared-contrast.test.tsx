@@ -84,6 +84,17 @@ describe('shared layer WCAG', () => {
   });
 });
 
+describe('document lang', () => {
+  it('setLocale синхронизирует <html lang> для скринридеров', async () => {
+    const { setLocale, getLocale } = await import('../../data/interactions-labels');
+    setLocale('en');
+    expect(getLocale()).toBe('en');
+    expect(document.documentElement.getAttribute('lang')).toBe('en');
+    setLocale('ru');
+    expect(document.documentElement.getAttribute('lang')).toBe('ru');
+  });
+});
+
 describe('below-fold images', () => {
   const src = (p: string) =>
     fs.readFileSync(path.join(process.cwd(), 'src', p), 'utf-8');
