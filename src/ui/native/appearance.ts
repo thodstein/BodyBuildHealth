@@ -95,6 +95,14 @@ export function setApkTheme(theme: ApkTheme): ApkTheme {
  */
 export function initApkAppearance(): ApkTheme {
   try {
+    // Boot-override из index.html отработал до paint — снимаем, дальше
+    // рулят живые data-apk-*. Иначе переживший атрибут спорил бы со сменой темы.
+    try {
+      document.documentElement.removeAttribute('data-boot-theme');
+      document.documentElement.style.removeProperty('--boot-spin');
+    } catch {
+      /* ignore */
+    }
     applyApkAccent();
     return applyApkTheme();
   } catch {

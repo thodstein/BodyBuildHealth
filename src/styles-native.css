@@ -43,6 +43,8 @@ html.app-native {
   --radius-lg: 28px;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 16px 56px rgba(0, 0, 0, 0.55);
+  /* Нативные контролы (чекбоксы/радио/ренджи) красятся акцентом сами. */
+  accent-color: var(--accent);
   --glass-bg: rgba(13, 24, 42, 0.62);
   --glass-border: rgba(140, 190, 255, 0.14);
   --font-main: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;

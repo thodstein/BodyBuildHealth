@@ -33,7 +33,31 @@
     /* Fix 100vh on mobile */
     :root { --vh: 1vh; }
     @supports (height: 1dvh) { :root { --vh: 1dvh; } }
+    /* Boot-override: красится ТОЛЬКО когда boot-скрипт ниже выставил
+       data-boot-theme (т.е. сохранена APK-тема). В TG ключей нет — 1-в-1. */
+    html[data-boot-theme='light'] body { background: #eef2f6 !important; color: #0b1526 !important; }
+    html[data-boot-theme='amoled'] body { background: #000 !important; }
+    .loading-spinner { border-top-color: var(--boot-spin, #C8F560) !important; }
   </style>
+  <script>
+    // Boot anti-flash: до первого paint подкрасить static-заглушку под
+    // сохранённую APK-тему/акцент. В TG ключей he_apk_* нет — no-op 1-в-1.
+    try {
+      var bt = null, ba = null;
+      try { bt = localStorage.getItem('he_apk_theme_v1'); ba = localStorage.getItem('he_apk_accent_v1'); } catch (e) {}
+      var ACC = { mint: '#00e68a', sky: '#38bdf8', violet: '#a78bfa', amber: '#fbbf24' };
+      var root = document.documentElement;
+      if (bt === 'light' || bt === 'amoled') root.setAttribute('data-boot-theme', bt);
+      var hex = ACC[ba] || null;
+      if (!hex && ba === 'system') {
+        try {
+          var sh = localStorage.getItem('he_apk_system_hex_v1');
+          if (sh) hex = sh.split('|')[0];
+        } catch (e) {}
+      }
+      if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) root.style.setProperty('--boot-spin', hex);
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <div id="app">

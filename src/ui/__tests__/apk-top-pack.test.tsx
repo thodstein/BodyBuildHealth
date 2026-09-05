@@ -79,10 +79,36 @@ describe('APK TOP pack', () => {
     expect(initApkAppearance()).toBe('');
   });
 
+  it('initApkAppearance: снимает boot-override после гидрации', () => {
+    document.documentElement.setAttribute('data-boot-theme', 'light');
+    document.documentElement.style.setProperty('--boot-spin', '#38bdf8');
+    initApkAppearance();
+    expect(document.documentElement.getAttribute('data-boot-theme')).toBeNull();
+    expect(document.documentElement.style.getPropertyValue('--boot-spin')).toBe('');
+  });
+
   it('themeMetaColor: recent-apps 1-в-1 с фоном темы', () => {
     expect(themeMetaColor('')).toBe('#050b16');
     expect(themeMetaColor('amoled')).toBe('#000000');
     expect(themeMetaColor('light')).toBe('#eef2f6');
+  });
+
+  it('boot anti-flash: index.html красит static-заглушку только по APK-ключам', () => {
+    const html = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+    // Ключи, без которых скрипт — no-op (в TG их нет).
+    expect(html).toContain('he_apk_theme_v1');
+    expect(html).toContain('he_apk_accent_v1');
+    expect(html).toContain('he_apk_system_hex_v1');
+    // Переопределения заге́йчены boot-атрибутом (в TG не матчится никогда).
+    expect(html).toContain("html[data-boot-theme='light']");
+    expect(html).toContain('--boot-spin');
+    // Валидация hex перед применением (без saнитизации — без инъекций).
+    expect(html).toContain('/^#[0-9a-fA-F]{6}$/');
+  });
+
+  it('accent-color: нативные контролы следуют за акцентом', () => {
+    const css = readCss('styles-native.css');
+    expect(css).toContain('accent-color: var(--accent)');
   });
 
   it('NativeFab speed-dial: тап раскрывает, тренинг ведёт в дневник', () => {
