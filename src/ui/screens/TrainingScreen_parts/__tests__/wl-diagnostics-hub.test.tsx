@@ -308,6 +308,15 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('нед 5–'), { timeout: 2000 });
     expect(JSON.parse(localStorage.getItem('he_ta_annual_sync_v1') || '{}').weeks?.[0]?.week).toBe(5);
   });
+  it('V10-A недели синка персистятся (remount)', async () => {
+    const first = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Рывок/)[0]);
+    fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
+    fireEvent.change(first.container.querySelector('input[placeholder="1"]')!, { target: { value: '7' } });
+    first.unmount();
+    const second = render(<WLDiagnosticsHub />);
+    expect((second.container.querySelector('input[placeholder="1"]') as HTMLInputElement).value).toBe('7');
+  });
   it('V7-C конец года: хвост «поддержание фаз»', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/Рывок/)[0]);

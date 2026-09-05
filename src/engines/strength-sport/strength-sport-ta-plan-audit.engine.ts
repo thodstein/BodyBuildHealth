@@ -183,9 +183,12 @@ export function auditTAPlan(plan: StrengthSportPlan | null | undefined): TAPlanA
   }
   const covered = TA_CORE_PHASES.filter(wp => byPhase[wp].covered);
   const missing = TA_CORE_PHASES.filter(wp => !byPhase[wp].covered);
+  // V10-B: худшая — минимум CORE; при полном покрытии CORE — минимум AUX
+  // (иначе кнопка «разобрать» указывала бы на покрытую фазу).
+  const worstPool = missing.length > 0 ? TA_CORE_PHASES : TA_AUX_PHASES;
   let worst: WLWeakPoint | null = null;
   let worstSets = Infinity;
-  for (const wp of TA_CORE_PHASES) {
+  for (const wp of worstPool) {
     if (byPhase[wp].sets < worstSets) { worstSets = byPhase[wp].sets; worst = wp; }
   }
   const workWeeks = weeks.length - deloadWeeks;

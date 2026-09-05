@@ -59,4 +59,20 @@ describe('TA plan audit E1', () => {
     expect(TA_AUX_PHASES.every(wp => !TA_CORE_PHASES.includes(wp))).toBe(true);
     expect(TA_AUX_PHASES.every(wp => (TA_ALL_PHASES as string[]).includes(wp))).toBe(true);
   });
+  it('V10-B полное покрытие CORE → worst из AUX', () => {
+    const mk = (id: string) => ({ id, name: id, group: 'legs', pattern: 'hinge', role: 'primary', character: 'тяж', sets: 3, reps: '3', rir: 2, weight: 60, workSets: [{ reps: 3, rir: 2, weight: 60 }], warmupSets: [] });
+    const ids = ['deficit_snatch', 'pause_snatch', 'high_hang_snatch', 'overhead_squat_v2', 'deficit_clean', 'pause_clean', 'front_squat', 'jerk_dip', 'push_press', 'split_jerk'];
+    const plan: any = {
+      id: 't', mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 1, patternId: 'x',
+      weeksData: [{ week: 1, phase: 'accumulation', sessions: [{ day: 1, week: 1, sessionTag: 'snatch_day', character: 'тяж', exercises: ids.map(mk) }] }],
+      workMax: {}, rationale: [],
+    };
+    const a = auditTAPlan(plan);
+    expect(a.hasPlan).toBe(true);
+    expect(a.missing.length).toBe(0);
+    expect(a.coveredCount).toBe(11);
+    // front_squat/overhead_squat закрывают и squat_bottom по каталогу → худший AUX: squat_mid (0)
+    expect(a.worstPhase).toBe('squat_mid');
+    expect(TA_AUX_PHASES.includes(a.worstPhase as any)).toBe(true);
+  });
 });

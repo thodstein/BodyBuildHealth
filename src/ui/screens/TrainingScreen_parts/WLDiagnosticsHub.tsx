@@ -115,6 +115,9 @@ type WLState = {
   imtpBw: string;
   // V4-B/V6-B1: ноты последней инъекции (идут в экспорт, персистятся с состоянием хаба)
   lastInjectNotes: string[];
+  // V10-A: недели годового синка (персистятся)
+  annualStartWeek: string;
+  annualEndWeek: string;
   // V3: MediaPipe live-статус + прогресс двоеборья
   poseLive: '' | 'loading' | 'ok' | 'fail';
   progBw: string;
@@ -162,6 +165,9 @@ const DEFAULT_STATE: WLState = {
   progCycle: '' as '' | '2025-2028' | '2021-2024',
   // V6-B1: старые сохранения без поля → []
   lastInjectNotes: [],
+  // V10-A: недели годового синка (персистятся; раньше терялись при remount)
+  annualStartWeek: '1',
+  annualEndWeek: '',
 };
 
 const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> = [
@@ -202,10 +208,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
   });
-  // V5-B: стартовая неделя годового синка
-  const [annualStartWeek, setAnnualStartWeek] = useState('1');
-  // V7-C: конечная неделя годового синка (пусто = длина спец-блока)
-  const [annualEndWeek, setAnnualEndWeek] = useState('');
+  // (V10-A: annualStartWeek/annualEndWeek переехали в WLState — персистятся.)
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -805,10 +808,10 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    const start = parseInt(annualStartWeek, 10);
+    const start = parseInt(state.annualStartWeek, 10);
     const startWeek = Number.isFinite(start) && start >= 1 && start <= 52 ? start : 1;
     // V7-C: явный конец года (иначе длина спец-блока); хвост — «поддержание фаз»
-    const endRaw = parseInt(annualEndWeek, 10);
+    const endRaw = parseInt(state.annualEndWeek, 10);
     const totalYearWeeks = Number.isFinite(endRaw) && endRaw > startWeek
       ? Math.min(52 - startWeek + 1, endRaw - startWeek + 1)
       : undefined;
@@ -1415,8 +1418,8 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
               <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>с нед<input value={annualStartWeek} onChange={e => setAnnualStartWeek(e.target.value)} placeholder="1" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>по<input value={annualEndWeek} onChange={e => setAnnualEndWeek(e.target.value)} placeholder="—" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>с нед<input value={state.annualStartWeek} onChange={e => setState(s => ({ ...s, annualStartWeek: e.target.value }))} placeholder="1" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>по<input value={state.annualEndWeek} onChange={e => setState(s => ({ ...s, annualEndWeek: e.target.value }))} placeholder="—" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
               <button onClick={handleAnnualSync} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
               {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>
