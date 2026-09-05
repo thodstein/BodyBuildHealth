@@ -252,6 +252,19 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('68✓ 52.1%');
   });
 
+  it('R1: график RT рисуется после двух снапшотов', () => {
+    const { container } = render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText('Попытка помост кг'), { target: { value: '60' } });
+    fireEvent.click(screen.getByText('📸 Снапшот замеров'));
+    fireEvent.change(screen.getByLabelText('Попытка помост кг'), { target: { value: '60' } });
+    expect(container.querySelectorAll('[data-bar="rt"]').length).toBe(0);
+    fireEvent.change(screen.getAllByPlaceholderText('60')[0], { target: { value: '68' } });
+    fireEvent.click(screen.getByText('📸 Снапшот замеров'));
+    fireEvent.change(screen.getAllByPlaceholderText('60')[0], { target: { value: '70' } });
+    fireEvent.click(screen.getByText('📸 Снапшот замеров'));
+    expect(container.querySelectorAll('[data-bar="rt"]').length).toBe(2);
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

@@ -37,6 +37,7 @@ import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTr
 import { scorePlatform, planAttempts, loadPlatformLog, savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
+import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
 import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -190,7 +191,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [painElbow, setPainElbow] = useState(String((p1saved as any).painElbow ?? ''));
   const [painWrist, setPainWrist] = useState(String((p1saved as any).painWrist ?? ''));
   const [sleepHours, setSleepHours] = useState(String((p1saved as any).sleepHours ?? ''));
-  const [attKg, setAttKg] = useState('');
+  const [attKg, setAttKg] = useState(String((p1saved as any).attKg ?? ''));
   const [attOk, setAttOk] = useState(true);
   const [attTick, setAttTick] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -207,10 +208,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
       localStorage.setItem(P1_KEY, JSON.stringify({
         specWeeks, trackCsv, baseXLoop,
         mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest,
-        painElbow, painWrist, sleepHours,
+        painElbow, painWrist, sleepHours, attKg,
       }));
     } catch {}
-  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours]);
+  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours, attKg]);
 
   // ACWR from diary — факт без зон
   const acwr = useMemo(() => {
@@ -530,9 +531,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try {
       const lk = state.leftKg ? parseFloat(state.leftKg) : undefined;
       const rk = state.rightKg ? parseFloat(state.rightKg) : undefined;
-      return planBilateralVolume({ leftKg: lk, rightKg: rk, baseSets: 10, mrvSets: 18 });
+      // R1: база/кап из landmarks уровня (wrist_flexors), а не хардкод 10/18
+      const lm = getArmLandmarks(state.level, 'wrist_flexors');
+      return planBilateralVolume({ leftKg: lk, rightKg: rk, baseSets: lm.mav, mrvSets: lm.mrv });
     } catch { return null; }
-  }, [state.leftKg, state.rightKg]);
+  }, [state.leftKg, state.rightKg, state.level]);
 
   const bilatHistP0 = useMemo(() => {
     try { return loadBilateralHist(); } catch { return []; }
@@ -854,26 +857,34 @@ export const ArmDiagnosticsHub: React.FC = () => {
       return;
     }
     const toApply = finalGroups.length ? finalGroups : groups;
-    const payload: any = {
+    // R1: payload через чистый билдер (база + причины/топ/spec/мобильность/ACWR/bilateral/попытки)
+    const payload: any = buildArmBridgeData({
       groups: toApply,
-      armTechnique: state.technique,
-      armWeakPoints: weakPoints || [],
-      armBiomechCards: (diag as any).biomechCards || [],
-      armCorrections: (report as any).corrections || [],
-      armScoring: (report as any).scoring,
-      armDiag: state,
-      armAngles: angles,
-      armForce: forceVecPro,
-      armVbt: vbt,
-      armDynamic: dynamicReport,
-      armBench: benchRes,
-      armTendon: derivedTendon,
-      armFindings: report.findings,
-      armHumerus: report.humerusWarnings,
-      armBalance: report.balanceWarnings,
-      armAsymmetry: report.asymmetryPct,
-      armInfo: report.info,
-    };
+      technique: state.technique,
+      weakPoints: weakPoints || [],
+      biomechCards: (diag as any).biomechCards || [],
+      corrections: (report as any).corrections || [],
+      scoring: (report as any).scoring,
+      diag: state,
+      angles,
+      force: forceVecPro,
+      vbt,
+      dynamic: dynamicReport,
+      bench: benchRes,
+      tendon: derivedTendon,
+      findings: report.findings,
+      humerus: report.humerusWarnings,
+      balance: report.balanceWarnings,
+      asymmetry: report.asymmetryPct,
+      info: report.info,
+      weakCauses: armCausesP0 as any,
+      topByPoint: armTop3P0 as any,
+      spec: armSpecP0 as any,
+      mobilityFails: armMobility.fails,
+      acwrDanger: perMuscleAcwrSumP0.danger,
+      bilateral: bilatP0 ? { weakArm: bilatP0.weakArm, weakSets: bilatP0.weakSets, strongSets: bilatP0.strongSets } : null,
+      attempts: attHistP0,
+    });
     applyToPlanner({
       kind: 'weakpoints',
       label: `Арм диагностика: ${(weakPoints && weakPoints.length? weakPoints.join(',') : toApply.join(','))}`,
@@ -1082,6 +1093,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
                   <button onClick={() => { saveArmMeasureSnapshot({ rtKg: parseFloat(state.rtKg), sideKg: parseFloat(state.sideKg), backKg: parseFloat(state.backKg), leftKg: parseFloat(state.leftKg), rightKg: parseFloat(state.rightKg) }); setMeasureTick((x) => x + 1); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>📸 Снапшот замеров</button>
                   {measureHistP0.length > 0 && <span style={{ fontSize:9, color:DIM }}>RT: {measureHistP0.slice(-5).map((h) => h.rtKg ?? '—').join(' → ')}</span>}
                 </div>
+                {/* R1: мини-график RT (последние 12) */}
+                {measureHistP0.filter((h) => h.rtKg != null).length >= 2 && (
+                  <div style={{ display:'flex', gap:2, marginTop:6, alignItems:'flex-end', height:28 }}>
+                    {(() => {
+                      const vals = measureHistP0.filter((h) => h.rtKg != null).slice(-12).map((h) => h.rtKg as number);
+                      const mx = Math.max(...vals);
+                      const mn = Math.min(...vals);
+                      const span = Math.max(1, mx - mn);
+                      return vals.map((v, i) => (
+                        <div key={i} data-bar="rt" title={`${v}кг`} style={{ flex:1, height: Math.round(6 + ((v - mn) / span) * 22), background: i === vals.length - 1 ? '#f59e0b' : 'rgba(245,158,11,0.35)', borderRadius:2 }} />
+                      ));
+                    })()}
+                  </div>
+                )}
                 {/* D4: журнал попыток помоста RT */}
                 <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
                   <label style={{ fontSize:9, color:DIM }}>Попытка RT кг<br /><input aria-label="Попытка помост кг" inputMode="decimal" value={attKg} onChange={(e) => setAttKg(e.target.value)} placeholder="вес" style={{ width:64, marginTop:2, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }} /></label>

@@ -1,6 +1,6 @@
 # Арм-диагностика PRO — план доведения до уровня ББ-хаба и Мастера 9 лифтов
 
-Статус: **ВЫПОЛНЕН 100% + D-ДОТОЧКА (D1 боли/сон → E2/E11 · D2 per-muscle ACWR → причины · D3 профиль в ранжир + ref-ratio/бенч · D4 gate от плана + персистентность P1 + журнал попыток)**. Остаток: D5 полный прогон для протокола. База: `docs/ARM-DIAGNOSTICS-EXERCISES-PLAN.md` (IMPLEMENTED: 12 точек `ARM_BIOMECH`, `ARM_CORRECTIONS`, `scoreArm` RSS, `injectArmCorrections`, хаб 5 табов `ArmDiagnosticsHub.tsx`).
+Статус: **ВЫПОЛНЕН 100% + D-ДОТОЧКА + R1 (bridge-payload обогащён · bilateral из landmarks · график RT · attKg-persist)**. Остаток: полный прогон для протокола (10122/10188, 66 чужих) + вне скоупа §5 (железо/Hands/годовой/ICS/red-flags). База: `docs/ARM-DIAGNOSTICS-EXERCISES-PLAN.md` (IMPLEMENTED: 12 точек `ARM_BIOMECH`, `ARM_CORRECTIONS`, `scoreArm` RSS, `injectArmCorrections`, хаб 5 табов `ArmDiagnosticsHub.tsx`).
 Цель — parity с `BBDiagnosticsHub` (7 табов: weak/symmetry/exercise/stimulus/volume/recovery/mobility + причины + топ-3 + симуляция + спец-блок + инъекция во все недели + откат + HTML/CSV) и Мастером движений PL (9 лифтов: фазы по углам + `phaseForReps` + bar-path 5 отклонений + VBT loss→фаза + e1RM-тренд 28д + асимметрия + MRV-бюджет + персистентность + мост в неделю-1).
 Ядро арм-билдера/периодизации — НЕ трогаем, только reuse + инъекция.
 
