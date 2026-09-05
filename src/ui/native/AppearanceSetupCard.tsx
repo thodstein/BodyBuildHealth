@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { haptics } from '../../core/native-bridge';
 import {
   getApkTheme,
   setApkTheme,
@@ -28,7 +29,16 @@ export const AppearanceSetupCard: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const tap = () => {
+    try {
+      void haptics('light');
+    } catch {
+      /* ignore */
+    }
+  };
+
   const pickTheme = (t: ApkTheme) => {
+    tap();
     setTheme(t);
     try {
       setApkTheme(t);
@@ -37,6 +47,7 @@ export const AppearanceSetupCard: React.FC = () => {
     }
   };
   const pickAccent = (a: ApkAccent) => {
+    tap();
     if (a === 'system') {
       void pickSystem();
       return;

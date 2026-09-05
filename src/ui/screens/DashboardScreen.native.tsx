@@ -20,6 +20,7 @@ import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { consumeWidgetLaunchTarget } from '../../core/widget-bridge';
 import { syncAllWidgets } from '../native/widget-sync';
+import { NativeEmpty } from '../native/NativeEmpty';
 
 export type DashboardNativeNavId =
   | 'training' | 'nutrition' | 'labs' | 'risks' | 'pharma' | 'support'
@@ -203,6 +204,18 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
             <span className="native-home-streak">🔥 {data.streak} дн. подряд</span>
           )}
         </div>
+
+        {data.totalSessions === 0 && !data.last && (
+          <div className="native-fade-up" style={{ margin: '12px 0 4px' }}>
+            <NativeEmpty
+              art="trophy"
+              title="Первая тренировка ждёт"
+              hint="Залогируйте первую сессию — здесь появятся статистика, стрик и прогресс"
+              actionLabel="🏋️ К тренингу"
+              onAction={() => onNavigate?.('training')}
+            />
+          </div>
+        )}
 
         <div className="native-home-rail native-fade-up">
           <div className="native-home-stat">
