@@ -54,7 +54,7 @@ function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
       <button
         onClick={unlock}
         disabled={busy}
-        style={{ padding: '14px 28px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 800, color: '#0a1a08', background: 'linear-gradient(135deg, #c9f73a, #00e68a)', minHeight: 52, minWidth: 220 }}
+        style={{ padding: '14px 28px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 800, color: 'var(--accent-contrast, #0a1a08)', background: 'var(--accent-gradient)', minHeight: 52, minWidth: 220 }}
       >
         {busy ? 'Ждите…' : '🖐️ Разблокировать'}
       </button>

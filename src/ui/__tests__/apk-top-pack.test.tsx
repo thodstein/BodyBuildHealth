@@ -22,7 +22,14 @@ import {
   initApkAppearance,
   getApkAccent,
   setApkAccent,
+  applySystemAccentFromDevice,
+  hexToRgbTriplet,
+  contrastForHex,
+  writeSystemVars,
+  clearSystemVars,
 } from '../native/appearance';
+import { NativeEmpty } from '../native/NativeEmpty';
+import { AppearanceSetupCard } from '../native/AppearanceSetupCard';
 
 function readCss(name: string): string {
   return fs.readFileSync(path.join(process.cwd(), 'src', name), 'utf-8');
@@ -175,6 +182,46 @@ describe('APK TOP pack', () => {
       expect(fs.existsSync(w), webp).toBe(true);
       expect(fs.statSync(w).size).toBeLessThan(fs.statSync(o).size);
     }
+  });
+
+  it('inline-TSX: NativeEmpty красится переменными, не hex', () => {
+    const { container } = render(<NativeEmpty title="Пусто" />);
+    const html = container.innerHTML;
+    expect(html).not.toContain('#c9f73a');
+    expect(html).toContain('var(--accent)');
+    expect(container.querySelector('.native-empty-title')?.textContent).toBe('Пусто');
+  });
+
+  it('system accent: hex/contrast/write/clear + персист выбора', () => {
+    expect(hexToRgbTriplet('#c9f73a')).toBe('201, 247, 58');
+    expect(hexToRgbTriplet('#00e68a')).toBe('0, 230, 138');
+    expect(hexToRgbTriplet('мусор')).toBeNull();
+    expect(hexToRgbTriplet('#fff')).toBeNull();
+    expect(contrastForHex('#c9f73a')).toBe('#0b1526');
+    expect(contrastForHex('#0b1526')).toBe('#f4f7ff');
+    expect(writeSystemVars('#8b5cf6', '#22d3ee')).toBe(true);
+    const st = document.documentElement.style;
+    expect(st.getPropertyValue('--accent')).toBe('#8b5cf6');
+    expect(st.getPropertyValue('--accent-rgb')).toBe('139, 92, 246');
+    expect(writeSystemVars('nope', '#fff')).toBe(false);
+    clearSystemVars();
+    expect(st.getPropertyValue('--accent')).toBe('');
+    setApkAccent('system');
+    expect(getApkAccent()).toBe('system');
+    setApkAccent('');
+  });
+
+  it('system accent: вне native устройство недоступно (false, без краша)', async () => {
+    await expect(applySystemAccentFromDevice()).resolves.toBe(false);
+  });
+
+  it('AppearanceSetupCard: темы + 6 акцентов, системный честно сообщает о недоступности', async () => {
+    const { getByRole, findByText } = render(<AppearanceSetupCard />);
+    expect(getByRole('radiogroup', { name: 'Тема' })).not.toBeNull();
+    const accents = getByRole('radiogroup', { name: 'Акцент' });
+    expect(accents.querySelectorAll('[role="radio"]').length).toBe(6);
+    fireEvent.click(getByRole('radio', { name: /Системный/ }));
+    await findByText(/Android 12\+/);
   });
 
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {

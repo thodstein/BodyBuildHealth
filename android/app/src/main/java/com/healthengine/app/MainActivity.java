@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WidgetBridgePlugin.class);
+        registerPlugin(DynamicColorPlugin.class);
         super.onCreate(savedInstanceState);
         ensureNotificationChannels();
         captureWidgetTarget(getIntent());

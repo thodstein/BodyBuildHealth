@@ -329,5 +329,20 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
   до первого рендера только при `platform === 'native'` (FOUC нет —
   `createRoot` позже); TG/web — только `styles.css`.
 
-Осознанные остатки (не баги): инлайн-TSX акценты (см. выше), бейдж-драйверы
-кроме interactions, Material You из системы (нужен Capacitor-плагин).
+Волна 3 — остатки волны 2 закрыты (`apk-top-pack` 13/13, `tsc` 0):
+
+- **Инлайн-TSX под акцентом**: `NativeEmpty` (stroke/fill через CSS `var()`
+  в `style` — SVG-атрибуты `var()` не понимают, статичный `DIM` остался
+  атрибутом), кнопка `NativeAppLock` (`var(--accent-gradient)` +
+  `var(--accent-contrast)`; в TG те же значения из `styles.css` — 1-в-1).
+- **Material You из системы**: локальный плагин `DynamicColorPlugin.java`
+  (`system_accent1/2/3_*` через `getIdentifier` — без compile-зависимостей,
+  ниже Android 12 → `{available:false}`) + `ui/native/dynamic-color.ts`
+  (вне APK всегда null) + выбор «Системный» в карточке оформления
+  (палитра кэшируется в `he_apk_system_hex_v1` для boot без опроса ОС,
+  контраст текста — по luminance). Недоступность объясняется честным
+  сообщением, прежний акцент сохраняется.
+
+Осознанные остатки (не баги): бейдж-драйверы кроме interactions (точка
+расширения в `nav-badges.ts`; доты — сигналы внимания, а не счётчики);
+`cap sync` в `android/assets` делает CI (иначе сотни сгенерированных диффов).

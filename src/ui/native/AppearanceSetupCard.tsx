@@ -10,6 +10,7 @@ import {
   setApkTheme,
   getApkAccent,
   setApkAccent,
+  applySystemAccentFromDevice,
   APK_ACCENTS,
   type ApkTheme,
   type ApkAccent,
@@ -24,6 +25,8 @@ const THEMES: { id: ApkTheme; label: string; hint: string }[] = [
 export const AppearanceSetupCard: React.FC = () => {
   const [theme, setTheme] = useState<ApkTheme>(() => getApkTheme());
   const [accent, setAccent] = useState<ApkAccent>(() => getApkAccent());
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const pickTheme = (t: ApkTheme) => {
     setTheme(t);
@@ -34,11 +37,33 @@ export const AppearanceSetupCard: React.FC = () => {
     }
   };
   const pickAccent = (a: ApkAccent) => {
+    if (a === 'system') {
+      void pickSystem();
+      return;
+    }
     setAccent(a);
+    setMsg(null);
     try {
       setApkAccent(a);
     } catch {
       /* ignore */
+    }
+  };
+  const pickSystem = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const ok = await applySystemAccentFromDevice();
+      if (ok) {
+        setAccent('system');
+        setMsg('✅ Системный акцент применён');
+      } else {
+        setMsg('Система недоступна — нужен Android 12+ с Material You. Остался прежний акцент');
+      }
+    } catch {
+      setMsg('Не получилось прочитать палитру системы');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -79,7 +104,8 @@ export const AppearanceSetupCard: React.FC = () => {
             className="native-chip"
             data-active={accent === a.id ? 'true' : 'false'}
             onClick={() => pickAccent(a.id)}
-            title={a.label}
+            disabled={busy}
+            title={a.id === 'system' ? 'Цвет из обоев (Android 12+)' : a.label}
           >
             <span
               aria-hidden="true"
@@ -92,10 +118,15 @@ export const AppearanceSetupCard: React.FC = () => {
                 flexShrink: 0,
               }}
             />
-            {a.label}
+            {a.id === 'system' ? '🤖 Системный' : a.label}
           </button>
         ))}
       </div>
+      {msg && (
+        <div className="native-feature-msg" role="status">
+          {msg}
+        </div>
+      )}
     </div>
   );
 };
