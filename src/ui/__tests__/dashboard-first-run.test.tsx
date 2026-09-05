@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
 import { DashboardNative } from '../screens/DashboardScreen.native';
 import { resetAppPlatformCache } from '../../core/app-platform';
+import { setLocale } from '../../data/interactions-labels';
 import {
   startSession,
   finishSession,
@@ -23,6 +24,9 @@ beforeEach(async () => {
   } catch {}
   delete (window as unknown as { Capacitor?: unknown }).Capacitor;
   resetAppPlatformCache();
+  try {
+    setLocale('ru');
+  } catch {}
 });
 
 afterEach(() => {
@@ -32,6 +36,10 @@ afterEach(() => {
   } catch {}
   delete (window as unknown as { Capacitor?: unknown }).Capacitor;
   resetAppPlatformCache();
+  try {
+    setLocale('ru');
+    vi.useRealTimers();
+  } catch {}
 });
 
 describe('DashboardNative first-run', () => {
@@ -46,6 +54,23 @@ describe('DashboardNative first-run', () => {
     // Guard от молчаливого отката: hero идёт через HeroImg (WebP + фолбэк).
     const source = container.querySelector('.native-home-bg source[type="image/webp"]');
     expect(source?.getAttribute('srcset')).toContain('hero-main.webp');
+  });
+
+  it('EN-локаль: приветствие, дата и разделы по-английски', () => {
+    // Суббота, 10:00 — детерминированное утро.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 5, 10, 0, 0));
+    setLocale('en');
+    setCapacitorNative();
+    resetAppPlatformCache();
+    render(<DashboardNative />);
+    expect(screen.getByText(/Good morning/)).not.toBeNull();
+    expect(screen.getByText(/September/)).not.toBeNull();
+    expect(screen.getByText('Training')).not.toBeNull();
+    expect(screen.getByText('Sections')).not.toBeNull();
+    expect(screen.getByText('First workout awaits')).not.toBeNull();
+    vi.useRealTimers();
+    setLocale('ru');
   });
 
   it('после первой сессии карточки нет', () => {
