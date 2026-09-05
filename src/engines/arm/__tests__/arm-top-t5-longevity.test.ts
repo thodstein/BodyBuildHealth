@@ -20,7 +20,7 @@ describe('arm TOP T5 longevity + rehab', () => {
     const a = buildLongevityPlan({ ageYears: 45, elbowPain: 0 });
     const b = buildLongevityPlan({ ageYears: 45, elbowPain: 6 });
     expect(b.volumeMult).toBeLessThan(a.volumeMult);
-    expect(b.maxsinglesPerWeek).toBe(0);
+    expect(b.maxSinglesPerWeek).toBe(0);
   });
   it('rehab фазы по неделям', () => {
     expect(buildRehabPlan({ injury: 'humerus', weeksSince: 1 }).phase).toBe(0);

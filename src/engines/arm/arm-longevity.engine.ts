@@ -22,7 +22,7 @@ export interface LongevityPlan {
   volumeMult: number; // множитель объёма билдера
   maxHeavyPerWeek: number; // тяжёлых сессий/нед (RPE≥8)
   mobilityMinPerSession: number;
-  max singlesPerWeek: number; // максимумов/нед
+  maxSinglesPerWeek: number; // максимумов/нед
   suggestLighterClass: boolean;
   rules: string[];
   note: string;
@@ -42,7 +42,7 @@ export function buildLongevityPlan(input: LongevityInput = {}): LongevityPlan {
   const inj = Math.max(0, Math.round(Number(input.injuriesCount ?? 0) || 0));
   if (track === 'open') {
     return {
-      track, volumeMult: 1, maxHeavyPerWeek: 3, mobilityMinPerSession: 5, maxsinglesPerWeek: 1,
+      track, volumeMult: 1, maxHeavyPerWeek: 3, mobilityMinPerSession: 5, maxSinglesPerWeek: 1,
       suggestLighterClass: false,
       rules: ['Полный объём по уровню.', 'Мобильность 5 мин/сессия минимум.'],
       note: 'Open-трек: без возрастных ограничений.',
@@ -70,7 +70,7 @@ export function buildLongevityPlan(input: LongevityInput = {}): LongevityPlan {
     volumeMult,
     maxHeavyPerWeek: base.maxHeavyPerWeek,
     mobilityMinPerSession: base.mobilityMinPerSession,
-    maxsinglesPerWeek: pain >= 6 ? 0 : base.singles,
+    maxSinglesPerWeek: pain >= 6 ? 0 : base.singles,
     suggestLighterClass: track !== 'master' || inj >= 2,
     rules,
     note: `${track}-трек (Devon): объём ×${volumeMult}, тяжёлых ≤${base.maxHeavyPerWeek}/нед, мобильность ≥${base.mobilityMinPerSession} мин.`,
