@@ -12,4 +12,6 @@
     <string name="widget_compliance_desc">Процент выполнения плана за неделю</string>
     <string name="widget_nutrition_label">HE · Питание</string>
     <string name="widget_nutrition_desc">Ккал дня, вода в один тап, быстрый переход в дневник</string>
+    <string name="tile_water_label">HE · Вода +250</string>
+    <string name="tile_water_desc">Быстрая запись воды без открытия приложения</string>
 </resources>

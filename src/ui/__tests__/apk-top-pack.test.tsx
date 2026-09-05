@@ -273,6 +273,25 @@ describe('APK TOP pack', () => {
     expect(isOnline).toBeDefined();
   });
 
+  it('QS Tile воды: манифест + строки + иконка + Java-логика связаны', () => {
+    const and = (p: string) =>
+      fs.readFileSync(path.join(process.cwd(), p), 'utf-8');
+    const manifest = and('android/app/src/main/AndroidManifest.xml');
+    expect(manifest).toContain('.WaterTileService');
+    expect(manifest).toContain('android.service.quicksettings.action.QS_TILE');
+    expect(manifest).toContain('BIND_QUICK_SETTINGS_TILE');
+    const strings = and('android/app/src/main/res/values/strings.xml');
+    expect(strings).toContain('tile_water_label');
+    const java = and('android/app/src/main/java/com/healthengine/app/WaterTileService.java');
+    expect(java).toContain('WidgetStore.enqueue');
+    expect(java).toContain('NutritionWidgetProvider.updateAll');
+    expect(java).toContain('"water"');
+    expect(
+      fs.existsSync(path.join(process.cwd(), 'android/app/src/main/res/drawable/ic_stat_icon_default.xml')),
+      'qs icon',
+    ).toBe(true);
+  });
+
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {
     expect(getNavBadges()).toEqual({ support: '' });
     try {
