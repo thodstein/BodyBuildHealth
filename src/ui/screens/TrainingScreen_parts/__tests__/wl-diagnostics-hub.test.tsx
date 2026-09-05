@@ -328,9 +328,11 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.change(snatchInputs[snatchInputs.length - 1], { target: { value: '100' } });
     const cjInputs = Array.from(container.querySelectorAll('input[placeholder="125"]'));
     fireEvent.change(cjInputs[cjInputs.length - 1], { target: { value: '125' } });
-    await waitFor(() => expect(container.textContent).toContain('Sinclair 285'), { timeout: 2000 });
+    await waitFor(() => expect(container.textContent).toContain('Sinclair 289'), { timeout: 2000 });
+    expect(container.textContent).toContain('2025-2028');
     fireEvent.click(screen.getByText(/📸 Снимок/));
     expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]').length).toBe(1);
+    expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]')[0].cycle).toBe('2025-2028');
   });
   it('V3 MediaPipe: кнопка проверки', async () => {
     const { container } = render(<WLDiagnosticsHub />);

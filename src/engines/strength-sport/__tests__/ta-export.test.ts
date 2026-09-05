@@ -43,6 +43,11 @@ describe('TA export v2 E14', () => {
     const html = buildWLDiagnosticsHtml(snap);
     expect(html).toContain('Sinclair');
     expect(html).toContain('285.55');
-    expect(buildWLCsv(snap)).toContain('225/1.2691/285.55');
+    expect(buildWLCsv(snap)).toContain('225/1.2691/285.55/');
+  });
+  it('V8 Sinclair с циклом', () => {
+    const snap: any = { ...BASE, sinclair: { total: 225, coeff: 1.2864, value: 289.44, cycle: '2025-2028' } };
+    expect(buildWLDiagnosticsHtml(snap)).toContain('2025-2028');
+    expect(buildWLCsv(snap)).toContain('225/1.2864/289.44/2025-2028');
   });
 });

@@ -41,8 +41,8 @@ export interface WLDiagnosticSnapshot {
   corrections?: WLCorrectionRow[];
   injectionNotes?: string[];
   attempts?: { snatch?: [number, number, number]; cj?: [number, number, number] };
-  // V4-B: Sinclair прогресса
-  sinclair?: { total: number; coeff: number | null; value: number } | null;
+  // V4-B: Sinclair прогресса; V8: цикл коэффициентов
+  sinclair?: { total: number; coeff: number | null; value: number; cycle?: string } | null;
 }
 
 export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot): string {
@@ -64,7 +64,7 @@ export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot): string {
 ${bioRows ? `<h2>Биомеханика фаз</h2><table><tr><th>Фаза</th><th>Метка</th><th>Сустав/угол</th><th>Мышцы</th><th>Причина</th></tr>${bioRows}</table>` : ''}
 ${corrRows ? `<h2>Коррекции топ-3</h2><table><tr><th>Фаза</th><th>Упражнение</th><th>Протокол</th></tr>${corrRows}</table>` : ''}
 ${att && (att.snatch || att.cj) ? `<h2>Попытки</h2><ul>${att.snatch ? `<li>Рывок: ${att.snatch.join(' / ')}</li>` : ''}${att.cj ? `<li>Толчок: ${att.cj.join(' / ')}</li>` : ''}</ul>` : ''}
-${snap.sinclair ? `<h2>Sinclair</h2><ul><li>Сумма ${esc(String(snap.sinclair.total))}кг · коэфф ${snap.sinclair.coeff != null ? esc(String(snap.sinclair.coeff)) : '—'} · Sinclair ${esc(String(snap.sinclair.value))}</li></ul>` : ''}
+${snap.sinclair ? `<h2>Sinclair${snap.sinclair.cycle ? ` (${esc(snap.sinclair.cycle)})` : ''}</h2><ul><li>Сумма ${esc(String(snap.sinclair.total))}кг · коэфф ${snap.sinclair.coeff != null ? esc(String(snap.sinclair.coeff)) : '—'} · Sinclair ${esc(String(snap.sinclair.value))}</li></ul>` : ''}
 ${injRows ? `<h2>Инъекция в план</h2><ul>${injRows}</ul>` : ''}
 <h2>Метрики</h2><ul>
 <li>Bar path: ${esc(snap.barPath || '—')}</li>
@@ -91,7 +91,7 @@ export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
     ['causes', snap.causes ? Object.entries(snap.causes).map(([k, v]) => `${k}=${v}`).join(';') : ''],
     ['corrections', (snap.corrections || []).map(c => `${c.weakPoint}:${c.corrId}@${c.protocol || ''}`).join(';')],
     ['attempts', snap.attempts ? [snap.attempts.snatch ? `snatch=${snap.attempts.snatch.join('/')}` : '', snap.attempts.cj ? `cj=${snap.attempts.cj.join('/')}` : ''].filter(Boolean).join(';') : ''],
-    ['sinclair', snap.sinclair ? `${snap.sinclair.total}/${snap.sinclair.coeff ?? ''}/${snap.sinclair.value}` : ''],
+    ['sinclair', snap.sinclair ? `${snap.sinclair.total}/${snap.sinclair.coeff ?? ''}/${snap.sinclair.value}/${snap.sinclair.cycle ?? ''}` : ''],
     ['findings', snap.findings.join('; ')],
   ];
   return rows.map(r => r.map(escCsv).join(',')).join('\n');

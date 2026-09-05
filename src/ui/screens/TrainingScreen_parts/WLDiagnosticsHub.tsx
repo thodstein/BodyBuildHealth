@@ -120,6 +120,8 @@ type WLState = {
   progSnatch: string;
   progCj: string;
   progSex: '' | 'male' | 'female';
+  // V8: цикл коэффициентов Sinclair (пусто = текущий)
+  progCycle: '' | '2025-2028' | '2021-2024';
 };
 
 const DEFAULT_STATE: WLState = {
@@ -154,6 +156,8 @@ const DEFAULT_STATE: WLState = {
   // V3: live-статус + прогресс
   poseLive: '' as '' | 'loading' | 'ok' | 'fail',
   progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
+  // V8: цикл Sinclair (пусто = текущий 2025-2028)
+  progCycle: '' as '' | '2025-2028' | '2021-2024',
   // V6-B1: старые сохранения без поля → []
   lastInjectNotes: [],
 };
@@ -327,6 +331,8 @@ export const WLDiagnosticsHub: React.FC = () => {
     try { return loadTAProgress(); } catch { return []; }
   });
   const progSexEff = state.progSex || profileSex || 'male';
+  // V8: цикл коэффициентов (дефолт — текущий)
+  const progCycleEff = (state.progCycle === '2021-2024' ? '2021-2024' : '2025-2028') as '2025-2028' | '2021-2024';
   const progCalc = useMemo(() => {
     try {
       const bw = state.progBw ? parseFloat(state.progBw) : (profileWeightKg ?? NaN);
@@ -334,12 +340,12 @@ export const WLDiagnosticsHub: React.FC = () => {
       const cj = state.progCj ? parseFloat(state.progCj) : NaN;
       if (!Number.isFinite(bw) || bw <= 0 || !Number.isFinite(sn) || !Number.isFinite(cj) || sn <= 0 || cj <= 0) return null;
       const total = Math.round((sn + cj) * 10) / 10;
-      return { bw, sn, cj, total, coeff: sinclairCoefficient(bw, progSexEff), sinclair: sinclairTotal(total, bw, progSexEff) };
+      return { bw, sn, cj, total, cycle: progCycleEff, coeff: sinclairCoefficient(bw, progSexEff, progCycleEff), sinclair: sinclairTotal(total, bw, progSexEff, progCycleEff) };
     } catch { return null; }
-  }, [state.progBw, state.progSnatch, state.progCj, progSexEff, profileWeightKg]);
+  }, [state.progBw, state.progSnatch, state.progCj, progSexEff, progCycleEff, profileWeightKg]);
   const progTrend = useMemo(() => {
-    try { return taProgressTrend(progHist, progSexEff); } catch { return null; }
-  }, [progHist, progSexEff]);
+    try { return taProgressTrend(progHist, progSexEff, progCycleEff); } catch { return null; }
+  }, [progHist, progSexEff, progCycleEff]);
   const takeProgSnapshot = () => {
     if (!progCalc) {
       setToast('Введи вес + рывок + толчок — снимать нечего');
@@ -348,7 +354,7 @@ export const WLDiagnosticsHub: React.FC = () => {
     }
     const entry: TAProgressEntry = {
       date: new Date().toISOString().slice(0, 10),
-      bodyweightKg: progCalc.bw, snatchKg: progCalc.sn, cleanJerkKg: progCalc.cj,
+      bodyweightKg: progCalc.bw, snatchKg: progCalc.sn, cleanJerkKg: progCalc.cj, cycle: progCalc.cycle,
     };
     setProgHist(prev => {
       const next = appendTAProgress(prev, entry);
@@ -846,7 +852,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
         ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
-        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair } } : {}),
+        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle } } : {}),
       } as any,
       source: 'intellectual',
     });
@@ -940,7 +946,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
       const injectNotes = Array.isArray(state.lastInjectNotes) ? state.lastInjectNotes : [];
       if (injectNotes.length) base.injectionNotes = [...injectNotes];
-      if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair };
+      if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle };
     } catch { /* noop — базовый снап */ }
     return base;
   };
@@ -1409,9 +1415,12 @@ export const WLDiagnosticsHub: React.FC = () => {
             {(['male', 'female'] as const).map(sx => (
               <button key={sx} onClick={() => setState(s => ({ ...s, progSex: sx }))} aria-pressed={progSexEff === sx} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: progSexEff === sx ? '#3b82f6' : '#1f3a5f', background: progSexEff === sx ? 'rgba(59,130,246,0.14)' : '#0a1629', color: progSexEff === sx ? '#3b82f6' : DIM, fontSize: 10 }}>{sx === 'male' ? 'Муж' : 'Жен'}</button>
             ))}
+            {(['2025-2028', '2021-2024'] as const).map(cy => (
+              <button key={cy} onClick={() => setState(s => ({ ...s, progCycle: cy }))} aria-pressed={progCycleEff === cy} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: progCycleEff === cy ? '#a855f7' : '#1f3a5f', background: progCycleEff === cy ? 'rgba(168,85,247,0.14)' : '#0a1629', color: progCycleEff === cy ? '#a855f7' : DIM, fontSize: 10 }}>{cy}</button>
+            ))}
             <button onClick={takeProgSnapshot} style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
           </div>
-          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair}</div>}
+          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle})</div>}
           {progTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
