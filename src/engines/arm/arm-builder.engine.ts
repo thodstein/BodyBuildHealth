@@ -310,15 +310,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const rfdOn = rfdNote != null;
   let lrNote: string | null = null;
   let lrWeak: string | null = null;
+  let lrPct: number | null = null;
   try {
     if (input.leftKg != null || input.rightKg != null) {
       const lr = planLrSplit({ leftKg: input.leftKg, rightKg: input.rightKg });
       if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) {
         lrNote = `L/R сплит: ${lr.note}`;
         lrWeak = lr.weakArm;
+        lrPct = lr.asymmetryPct;
       }
     }
-  } catch { lrNote = null; lrWeak = null; }
+  } catch { lrNote = null; lrWeak = null; lrPct = null; }
   // TOP wave-5: Table-IQ рычаги в объём (только при журнале схваток)
   let iqPlan: ReturnType<typeof analyzeTableIq> | null = null;
   try {
@@ -513,8 +515,6 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const filteredMuscles = tag === 'FullArm' ? ensureRadialFingers(baseFiltered) : baseFiltered;
       // TOP T2a: RFD-метка — первое speed-упражнение тяжёлой сессии в intensification (объём не меняется)
       let rfdDone = !rfdOn || phase !== 'intensification' || ch !== 'тяж';
-      // TOP wave-6: унилатеральная добивка слабой руки — 2 подхода первого подходящего упражнения идут слабой (объём тот же)
-      let uniDone = lrWeak == null;
 
       for (const mus of filteredMuscles) {
         // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
@@ -603,11 +603,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          comment: ((rfdSpeed
+          comment: (rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
-            : (exTpl.technique || '')) + ((!uniDone && lrWeak && ['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','brachialis','biceps_long','biceps_short','brachioradialis'].includes(mus))
-            ? ((uniDone = true), ` + унилатерально слабой (${lrWeak}) 2 подх.`)
-            : '') || undefined),
+            : exTpl.technique),
         });
       }
 
@@ -693,6 +691,37 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     }
   } catch { /* опционально */ }
 
+  // TOP wave-8: унилатеральные бонусные сеты слабой руки — пост-проход по готовым неделям.
+  // Только здесь виден полный недельный объём (мид-билд гард слеп к будущим сессиям + sim/inject уже применены).
+  // 1 сет при 7–12%, 2 при ≥12%; кламп в MRV и per-exercise cap; deload/taper/peaking пропускаются.
+  let uniBonusSets = 0;
+  if (lrWeak != null && (lrPct ?? 0) >= 7) {
+    try {
+      const want = (lrPct ?? 0) >= 12 ? 2 : 1;
+      const UNI = new Set(['wrist_flexors', 'wrist_extensors', 'pronators', 'supinators', 'risers', 'thumb', 'brachialis', 'biceps_long', 'biceps_short', 'brachioradialis']);
+      for (const wk of planWeeks) {
+        if ((wk as any).deload || (wk as any).taper || wk.phase === 'peaking') continue;
+        const totals: Record<string, number> = {};
+        for (const s of (wk.sessions || [])) for (const e of (s.exercises || [])) totals[e.muscle] = (totals[e.muscle] || 0) + (e.sets || 0);
+        for (const s of (wk.sessions || [])) {
+          const ex = (s.exercises || []).find((e: any) => UNI.has(e.muscle) && !/унилатерально/.test(String(e.comment || '')));
+          if (!ex) continue;
+          const mrv = mrvByMuscle[ex.muscle] ?? 99;
+          if ((totals[ex.muscle] || 0) + want > mrv || ex.sets + want > perExerciseCap(ex.muscle, level)) {
+            ex.comment = `${ex.comment || ''} + слабой (${lrWeak}): без запаса до MRV — 2 подх. из этих унилатерально`.trim();
+            continue;
+          }
+          const template: ArmSet = ex.workSets[ex.workSets.length - 1] || { reps: 10, rir: 2, weight: 0, restSeconds: 90 };
+          for (let i = 0; i < want; i++) ex.workSets.push({ ...template });
+          ex.sets += want;
+          totals[ex.muscle] += want;
+          uniBonusSets += want;
+          ex.comment = `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${want} сета сверху`.trim();
+        }
+      }
+    } catch { /* опционально */ }
+  }
+
   // Rationale — расширено table 3/2/1 и tendon
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
@@ -726,6 +755,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (lrNote) rationale.push(lrNote);
   for (const line of simRationale) rationale.push(line);
   for (const line of tableInjectNotes) rationale.push(line);
+  if (uniBonusSets > 0) rationale.push(`L/R добивка: +${uniBonusSets} унилатеральных сетов слабой (${lrWeak}) в клампе MRV.`);
   const proWarnings = [...pro.warnings];
 
   // Weekly volume

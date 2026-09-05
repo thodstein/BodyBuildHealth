@@ -47,7 +47,7 @@ export function buildArmIcs(plan: ArmPlan, startDateIso?: string): string {
       d.setDate(d.getDate() + (wk.week - 1) * 7 + (sess.day - 1));
       const dt = fmt(d);
       const summary = `Арм Н${wk.week} ${sess.sessionTag} ${sess.character}`;
-      const desc = sess.exercises.map(e => `${e.name} ${e.sets}x${e.repsRange[0]}-${e.repsRange[1]}`).join('\\n');
+      const desc = sess.exercises.map(e => `${e.name} ${e.sets}x${e.repsRange[0]}-${e.repsRange[1]}${e.comment ? ` (${e.comment})` : ''}`).join('\\n');
       ics += `BEGIN:VEVENT\r\nUID:arm-${wk.week}-${sess.day}@bbhealth\r\nDTSTART:${dt}\r\nSUMMARY:${escIcs(summary)}\r\nDESCRIPTION:${escIcs(desc)}\r\nEND:VEVENT\r\n`;
     }
   }
