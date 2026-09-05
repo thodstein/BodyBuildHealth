@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { diagnoseWeakCause, idealDeltaForZone, weeksAtMav } from '../bb-weak-cause.engine';
 import { volumeHistory28d, detectBBWeakByVolumeStable } from '../bb-weak-detection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes } from '../bb-symmetry.engine';
-import { rankCorrectionsForWeak, top3CorrectionsForWeak } from '../bb-correction-rank.engine';
+import { rankCorrectionsForWeak, top3CorrectionsForWeak, equipmentAllows } from '../bb-correction-rank.engine';
 import { buildSpecBlock, splitSetsBySessions } from '../bb-spec-block.engine';
 import { getProfExecutionProfile, tutFor, listProfMuscles } from '../bb-execution-prof.engine';
 import { diagnoseExercise } from '../bb-exercise-diagnosis.engine';
@@ -635,5 +635,25 @@ describe('rank equipment', () => {  it('без фильтра блок в пул
     const a = rankCorrectionsForWeak('triceps', null, {});
     const b = rankCorrectionsForWeak('triceps', null, { equipment: [] });
     expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+  });
+});
+
+// ── equipmentAllows: массивы после дедупа каталога ──
+describe('equipmentAllows', () => {
+  it('строка: совпадение/несовпадение как раньше', () => {
+    expect(equipmentAllows('cable', ['dumbbell'])).toBe(false);
+    expect(equipmentAllows('cable', ['cable'])).toBe(true);
+    expect(equipmentAllows('bodyweight', ['dumbbell'])).toBe(true);
+    expect(equipmentAllows('machine', [])).toBe(true);
+    expect(equipmentAllows('', ['dumbbell'])).toBe(true);
+    expect(equipmentAllows('cable', undefined)).toBe(true);
+  });
+  it('массив: пересечение проходит (дедуп P0.3)', () => {
+    expect(equipmentAllows(['barbell', 'dumbbell'], ['dumbbell'])).toBe(true);
+    expect(equipmentAllows(['barbell', 'cable'], ['dumbbell'])).toBe(false);
+    expect(equipmentAllows(['bodyweight'], ['dumbbell'])).toBe(true);
+  });
+  it('регистронезависимо', () => {
+    expect(equipmentAllows('Cable', ['cable'])).toBe(true);
   });
 });

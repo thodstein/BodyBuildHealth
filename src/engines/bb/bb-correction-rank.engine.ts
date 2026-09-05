@@ -47,6 +47,22 @@ function levelAllows(level: string | undefined, exName: string): boolean {
   return !/олимп|рывок|толчок|snatch|clean|сумо.*тяга|гудморнинг.*тяж/i.test(exName);
 }
 
+/**
+ * Фильтр оборудования зала. Дедуп каталога (P0.3) сливает одноимённые записи,
+ * превращая equipment в массив — проверяем пересечение, а не равенство строк.
+ * bodyweight/machine доступны всегда.
+ */
+export function equipmentAllows(catalogEquipment: unknown, wanted: string[] | undefined): boolean {
+  if (!wanted || wanted.length === 0) return true;
+  const list = (Array.isArray(catalogEquipment) ? catalogEquipment : [catalogEquipment])
+    .map((e) => String(e || '').toLowerCase().trim())
+    .filter(Boolean);
+  if (!list.length) return true;
+  if (list.every((e) => e === 'bodyweight' || e === 'machine')) return true;
+  const want = wanted.map((w) => String(w || '').toLowerCase().trim()).filter(Boolean);
+  return list.some((e) => want.includes(e));
+}
+
 export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: RankCtx = {}): RankedCorrection[] {
   // Гранулярная зона (chest_upper) → каноническая мышца каталога (chest); головка для бонуса — отдельно из ctx.weakHead
   let muscle = norm(weakZone);
@@ -78,10 +94,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     if (muscle && !same && !aliasOk) return false;
     if (inPlan.has(norm(c.id)) || inPlan.has(norm(c.name))) return false;
     if (!levelAllows(ctx.level, String(c.name))) return false;
-    if (ctx.equipment && ctx.equipment.length > 0) {
-      const eq = String(c.equipment || '');
-      if (eq && eq !== 'bodyweight' && eq !== 'machine' && !ctx.equipment.includes(eq)) return false;
-    }
+    if (!equipmentAllows((c as any).equipment, ctx.equipment)) return false;
     try {
       if (isMobilityRestricted(muscle) && String(c.jointStress || '').toLowerCase() === 'high' && /присед|squat|жим.*стоя|overhead/i.test(String(c.name))) return false;
     } catch { /* noop */ }

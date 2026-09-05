@@ -181,4 +181,27 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getAllByText('Верх груди')[0]);
     expect(screen.getAllByText(/мало данных/)[0]).toBeInTheDocument();
   });
+  it('HTML export runs unified batch without throwing', () => {
+    const now = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: now, exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 50, reps: 10 }] }] },
+    ]));
+    (URL as any).createObjectURL = () => 'blob:mock';
+    (URL as any).revokeObjectURL = () => {};
+    const clickSpy = (..._a: any[]) => {};
+    const origCreate = document.createElement.bind(document);
+    (document as any).createElement = ((tag: string, ...rest: any[]) => {
+      const el = origCreate(tag, ...rest) as any;
+      if (tag === 'a') el.click = clickSpy;
+      return el;
+    }) as any;
+    try {
+      render(<BBDiagnosticsHub />);
+      fireEvent.click(screen.getAllByText('Верх груди')[0]);
+      fireEvent.click(screen.getByRole('button', { name: /🖨 HTML/ }));
+      expect(screen.getAllByText(/HTML экспорт/)[0]).toBeInTheDocument();
+    } finally {
+      (document as any).createElement = origCreate;
+    }
+  });
 });
