@@ -588,10 +588,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             </p>
             {isNativeApp() && <TrainingHeroStats />}
             <div className="training-hero-zones native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {ZONE_ORDER.map(z => {
+              {ZONE_ORDER.map((z, zi) => {
                 const group = ZONES[z];
                 return (
-                <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} className="training-hero-zone" data-zone={z} style={{
+                <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} className="training-hero-zone native-fade-up" data-zone={z} style={{
+                  animationDelay: `${zi * 55}ms`,
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff',
                   transition: 'all 0.2s',

@@ -3805,6 +3805,22 @@ html.app-native .native-fab-plus {
   transition: transform 0.2s ease;
 }
 
+/* Press-эффект плиток и hero-карточек на тап (десктопный hover-JS не задет:
+ * инлайн-стили выше по приоритету, на тачскринах ховера нет). */
+html.app-native .native-home-tile,
+html.app-native .training-hero-zone,
+html.app-native .risk-hero-card,
+html.app-native .pharma-hero-card {
+  transition: transform 0.15s ease;
+}
+
+html.app-native .native-home-tile:active,
+html.app-native .training-hero-zone:active,
+html.app-native .risk-hero-card:active,
+html.app-native .pharma-hero-card:active {
+  transform: scale(0.97);
+}
+
 /* 58.9 Boot/empty/toast поверх навбара. */
 html.app-native .native-boot-skeleton {
   display: grid;

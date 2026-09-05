@@ -7,7 +7,7 @@
  * useSwipeTabs игнорирует (кнопка — fixed-оверлей).
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { haptics } from '../../core/native-bridge';
 import { toastStore } from '../../core/toast';
 import { getLocale } from '../../data/interactions-labels';
@@ -45,6 +45,25 @@ function strings() {
 export const NativeFab: React.FC<Props> = ({ onQuickLog, hidden = false, label }) => {
   const [open, setOpen] = useState(false);
   const [busyWater, setBusyWater] = useState(false);
+  // Escape закрывает меню (a11y): слушатель живёт только пока раскрыто.
+  useEffect(() => {
+    if (!open || hidden) return;
+    const onKey = (e: KeyboardEvent) => {
+      try {
+        if (e.key === 'Escape') setOpen(false);
+      } catch {
+        /* ignore */
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      try {
+        document.removeEventListener('keydown', onKey);
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [open, hidden]);
   if (hidden) return null;
   const T = strings();
   const mainLabel = label ?? T.quickActions;

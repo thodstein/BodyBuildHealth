@@ -433,6 +433,40 @@ describe('APK TOP pack', () => {
     }
   });
 
+  it('NativeFab: Escape закрывает меню', () => {
+    const { container } = render(<NativeFab />);
+    fireEvent.click(container.querySelector('.native-fab')!);
+    expect(container.querySelector('.native-fab-mini')).not.toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(container.querySelector('.native-fab-mini')).toBeNull();
+  });
+
+  it('NativeOfflinePill: показывает размер очереди', async () => {
+    const { act } = await import('@testing-library/react');
+    try {
+      localStorage.setItem(
+        'he_widget_fallback_queue',
+        JSON.stringify([
+          { type: 'water', ml: 250, ts: 1 },
+          { type: 'water', ml: 250, ts: 2 },
+        ]),
+      );
+    } catch {}
+    let cb: ((online: boolean) => void) | null = null;
+    (watchOnline as unknown as { mockImplementation: (fn: unknown) => void }).mockImplementation(
+      (c: (online: boolean) => void) => {
+        cb = c;
+        return () => {};
+      },
+    );
+    const { container, unmount } = render(<NativeOfflinePill />);
+    await act(async () => {
+      cb?.(false);
+    });
+    expect(container.querySelector('.native-offline')?.textContent).toContain('2');
+    unmount();
+  });
+
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {
     // Дефолтный профиль уже даёт ≥ 50% — дот не горит без повода.
     expect(getNavBadges()).toEqual({ support: '', profile: '' });

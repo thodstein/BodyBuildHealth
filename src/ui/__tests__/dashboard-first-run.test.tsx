@@ -73,6 +73,16 @@ describe('DashboardNative first-run', () => {
     setLocale('ru');
   });
 
+  it('плитки каскадом: animationDelay по индексу', () => {
+    setCapacitorNative();
+    resetAppPlatformCache();
+    const { container } = render(<DashboardNative />);
+    const tiles = container.querySelectorAll('.native-home-tile');
+    expect(tiles.length).toBeGreaterThan(3);
+    expect((tiles[0] as HTMLElement).style.animationDelay).toBe('0ms');
+    expect((tiles[1] as HTMLElement).style.animationDelay).toBe('45ms');
+  });
+
   it('после первой сессии карточки нет', () => {
     setCapacitorNative();
     resetAppPlatformCache();

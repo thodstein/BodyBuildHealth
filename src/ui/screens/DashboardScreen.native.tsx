@@ -386,10 +386,11 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
 
         <div className="native-home-section">{T.sections}</div>
         <div className="native-home-grid native-fade-up">
-          {T.actions.map((a) => (
+          {T.actions.map((a, ai) => (
             <button
               key={a.id}
-              className="native-home-tile"
+              className="native-home-tile native-fade-up"
+              style={{ animationDelay: `${ai * 45}ms` }}
               onClick={() => onNavigate?.(a.id)}
             >
               <span className="native-home-tile-icon">{a.icon}</span>
