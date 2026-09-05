@@ -8,6 +8,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { isOnline, watchOnline } from '../../core/native-bridge';
+import { getLocale } from '../../data/interactions-labels';
 
 export const NativeOfflinePill: React.FC = () => {
   const [online, setOnline] = useState<boolean>(() => {
@@ -35,10 +36,12 @@ export const NativeOfflinePill: React.FC = () => {
   }, []);
 
   if (online) return null;
+  const en = getLocale() === 'en';
+  const text = en ? 'Offline — data is saved locally' : 'Офлайн — данные сохраняются локально';
   return (
-    <div className="native-offline" role="status" aria-label="Нет подключения к сети">
+    <div className="native-offline" role="status" aria-label={text}>
       <span aria-hidden="true">📴</span>
-      <span>Офлайн — данные сохраняются локально</span>
+      <span>{text}</span>
     </div>
   );
 };

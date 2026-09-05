@@ -116,8 +116,7 @@ describe('APK TOP pack', () => {
     const { container, rerender } = render(<NativeFab onQuickLog={() => { called += 1; }} />);
     const btn = container.querySelector('.native-fab');
     expect(btn, 'fab').not.toBeNull();
-    expect(btn?.getAttribute('aria-expanded')).toBe('false');
-    expect(container.querySelector('.native-fab-mini'), 'collapsed').toBeNull();
+    expect(btn?.getAttribute('aria-label')).toBe('Быстрые действия');
     fireEvent.click(btn!);
     expect(btn?.getAttribute('aria-expanded')).toBe('true');
     const minis = container.querySelectorAll('.native-fab-mini');
@@ -400,6 +399,38 @@ describe('APK TOP pack', () => {
     expect(ratio(paint(light, 'text-dim', paper), paper)).toBeGreaterThanOrEqual(4.5);
     expect(ratio(paint(light, 'accent', paper), paper)).toBeGreaterThanOrEqual(4.5);
     expect(ratio(paint(light, 'accent-2', paper), paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('EN: FAB, офлайн-пилюля и системный чип по-английски', async () => {
+    const { setLocale } = await import('../../data/interactions-labels');
+    const { act } = await import('@testing-library/react');
+    setLocale('en');
+    try {
+      const fab = render(<NativeFab />);
+      fireEvent.click(fab.container.querySelector('.native-fab')!);
+      expect(
+        fab.container.querySelector('.native-fab')?.getAttribute('aria-label'),
+      ).toBe('Quick actions');
+      expect(
+        fab.container.querySelectorAll('.native-fab-mini')[0]?.getAttribute('aria-label'),
+      ).toBe('Log 250 ml of water');
+      fab.unmount();
+      let cb: ((online: boolean) => void) | null = null;
+      (watchOnline as unknown as { mockImplementation: (fn: unknown) => void }).mockImplementation(
+        (c: (online: boolean) => void) => {
+          cb = c;
+          return () => {};
+        },
+      );
+      const pill = render(<NativeOfflinePill />);
+      await act(async () => {
+        cb?.(false);
+      });
+      expect(pill.container.querySelector('.native-offline')?.textContent).toContain('Offline');
+      pill.unmount();
+    } finally {
+      setLocale('ru');
+    }
   });
 
   it('nav-badges: пусто без данных, highCount → бейдж, кап 99+', () => {

@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { haptics } from '../../core/native-bridge';
 import { toastStore } from '../../core/toast';
+import { getLocale } from '../../data/interactions-labels';
 
 interface Props {
   /** Быстрый переход в дневник тренинга. */
@@ -22,14 +23,31 @@ interface Props {
 
 const WATER_ML = 250;
 
-export const NativeFab: React.FC<Props> = ({
-  onQuickLog,
-  hidden = false,
-  label = 'Быстрые действия',
-}) => {
+function strings() {
+  if (getLocale() === 'en') {
+    return {
+      quickActions: 'Quick actions',
+      logWater: 'Log 250 ml of water',
+      logTraining: 'Quick training log',
+      waterOk: (ml: number) => `💧 +${ml} ml — will count on Home`,
+      waterFail: 'Could not log water',
+    };
+  }
+  return {
+    quickActions: 'Быстрые действия',
+    logWater: 'Записать 250 мл воды',
+    logTraining: 'Быстрая запись тренировки',
+    waterOk: (ml: number) => `💧 +${ml} мл — учтём при входе на Главную`,
+    waterFail: 'Не получилось записать воду',
+  };
+}
+
+export const NativeFab: React.FC<Props> = ({ onQuickLog, hidden = false, label }) => {
   const [open, setOpen] = useState(false);
   const [busyWater, setBusyWater] = useState(false);
   if (hidden) return null;
+  const T = strings();
+  const mainLabel = label ?? T.quickActions;
 
   const toggle = () => {
     try {
@@ -66,9 +84,9 @@ export const NativeFab: React.FC<Props> = ({
       // Ленивый импорт: TG/web-бандл виджет-мост статически не тянет.
       const { queueWaterMl } = await import('../../core/widget-bridge');
       await queueWaterMl(WATER_ML);
-      toastStore.success(`💧 +${WATER_ML} мл — учтём при входе на Главную`);
+      toastStore.success(T.waterOk(WATER_ML));
     } catch {
-      toastStore.error('Не получилось записать воду');
+      toastStore.error(T.waterFail);
     } finally {
       setBusyWater(false);
       setOpen(false);
@@ -82,7 +100,7 @@ export const NativeFab: React.FC<Props> = ({
           <button
             type="button"
             className="native-fab-mini"
-            aria-label="Записать 250 мл воды"
+            aria-label={T.logWater}
             title="💧 +250 мл"
             disabled={busyWater}
             onClick={() => void quickWater()}
@@ -92,8 +110,8 @@ export const NativeFab: React.FC<Props> = ({
           <button
             type="button"
             className="native-fab-mini"
-            aria-label="Быстрая запись тренировки"
-            title="Дневник тренинга"
+            aria-label={T.logTraining}
+            title={T.logTraining}
             onClick={quickTraining}
           >
             <span aria-hidden="true">🏋️</span>
@@ -103,9 +121,9 @@ export const NativeFab: React.FC<Props> = ({
       <button
         type="button"
         className="native-fab"
-        aria-label={label}
+        aria-label={mainLabel}
         aria-expanded={open}
-        title={label}
+        title={mainLabel}
         onClick={toggle}
       >
         <span aria-hidden="true" className="native-fab-plus">

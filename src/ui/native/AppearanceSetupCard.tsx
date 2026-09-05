@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { haptics, initNativeChrome } from '../../core/native-bridge';
+import { getLocale } from '../../data/interactions-labels';
 import {
   getApkTheme,
   setApkTheme,
@@ -17,17 +18,77 @@ import {
   type ApkAccent,
 } from './appearance';
 
-const THEMES: { id: ApkTheme; label: string; hint: string }[] = [
+const THEMES_RU: { id: ApkTheme; label: string; hint: string }[] = [
   { id: '', label: '🌙 Тёмная', hint: 'фирменный navy' },
   { id: 'amoled', label: '⬛ AMOLED', hint: 'чистый чёрный' },
   { id: 'light', label: '☀️ Светлая', hint: 'бумага' },
 ];
+
+const THEMES_EN: { id: ApkTheme; label: string; hint: string }[] = [
+  { id: '', label: '🌙 Dark', hint: 'signature navy' },
+  { id: 'amoled', label: '⬛ AMOLED', hint: 'pure black' },
+  { id: 'light', label: '☀️ Light', hint: 'paper' },
+];
+
+const ACCENT_EN: Record<string, string> = {
+  '': 'Lime',
+  mint: 'Mint',
+  sky: 'Sky',
+  violet: 'Violet',
+  amber: 'Amber',
+  system: 'System',
+};
+
+function strings() {
+  if (getLocale() === 'en') {
+    return {
+      themes: THEMES_EN,
+      cardLabel: 'APK appearance',
+      title: 'Appearance',
+      sub: 'Theme & accent · applied instantly',
+      themeSection: 'Theme',
+      themeGroup: 'Theme',
+      accentSection: 'Accent',
+      accentGroup: 'Accent',
+      systemTitle: 'Wallpaper color (Android 12+)',
+      sysOk: '✅ System accent applied',
+      sysFail: 'System unavailable — Android 12+ with Material You needed. Kept previous accent',
+      sysErr: 'Could not read system palette',
+      systemChip: '🤖 System',
+    };
+  }
+  return {
+    themes: THEMES_RU,
+    cardLabel: 'Оформление APK',
+    title: 'Оформление',
+    sub: 'Тема и акцент · применяются мгновенно',
+    themeSection: 'Тема',
+    themeGroup: 'Тема',
+    accentSection: 'Акцент',
+    accentGroup: 'Акцент',
+    systemTitle: 'Цвет из обоев (Android 12+)',
+    sysOk: '✅ Системный акцент применён',
+    sysFail: 'Система недоступна — нужен Android 12+ с Material You. Остался прежний акцент',
+    sysErr: 'Не получилось прочитать палитру системы',
+    systemChip: '🤖 Системный',
+  };
+}
+
+function accentLabel(id: ApkAccent, fallback: string): string {
+  try {
+    if (getLocale() !== 'en') return fallback;
+  } catch {
+    return fallback;
+  }
+  return ACCENT_EN[id] ?? fallback;
+}
 
 export const AppearanceSetupCard: React.FC = () => {
   const [theme, setTheme] = useState<ApkTheme>(() => getApkTheme());
   const [accent, setAccent] = useState<ApkAccent>(() => getApkAccent());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const T = strings();
 
   const tap = () => {
     try {
@@ -76,29 +137,29 @@ export const AppearanceSetupCard: React.FC = () => {
       const ok = await applySystemAccentFromDevice();
       if (ok) {
         setAccent('system');
-        setMsg('✅ Системный акцент применён');
+        setMsg(T.sysOk);
       } else {
-        setMsg('Система недоступна — нужен Android 12+ с Material You. Остался прежний акцент');
+        setMsg(T.sysFail);
       }
     } catch {
-      setMsg('Не получилось прочитать палитру системы');
+      setMsg(T.sysErr);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="native-feature-card" aria-label="Оформление APK">
+    <div className="native-feature-card" aria-label={T.cardLabel}>
       <div className="native-feature-head">
         <span className="native-feature-icon">🎨</span>
         <div>
-          <div className="native-feature-title">Оформление</div>
-          <div className="native-feature-sub">Тема и акцент · применяются мгновенно</div>
+          <div className="native-feature-title">{T.title}</div>
+          <div className="native-feature-sub">{T.sub}</div>
         </div>
       </div>
-      <div className="native-section">Тема</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label="Тема">
-        {THEMES.map((t) => (
+      <div className="native-section">{T.themeSection}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label={T.themeGroup}>
+        {T.themes.map((t) => (
           <button
             key={t.id || 'dark'}
             type="button"
@@ -113,8 +174,8 @@ export const AppearanceSetupCard: React.FC = () => {
           </button>
         ))}
       </div>
-      <div className="native-section">Акцент</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label="Акцент">
+      <div className="native-section">{T.accentSection}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label={T.accentGroup}>
         {APK_ACCENTS.map((a) => (
           <button
             key={a.id || 'lime'}
@@ -125,7 +186,7 @@ export const AppearanceSetupCard: React.FC = () => {
             data-active={accent === a.id ? 'true' : 'false'}
             onClick={() => pickAccent(a.id)}
             disabled={busy}
-            title={a.id === 'system' ? 'Цвет из обоев (Android 12+)' : a.label}
+            title={a.id === 'system' ? T.systemTitle : accentLabel(a.id, a.label)}
           >
             <span
               aria-hidden="true"
@@ -138,7 +199,7 @@ export const AppearanceSetupCard: React.FC = () => {
                 flexShrink: 0,
               }}
             />
-            {a.id === 'system' ? '🤖 Системный' : a.label}
+            {a.id === 'system' ? T.systemChip : accentLabel(a.id, a.label)}
           </button>
         ))}
       </div>

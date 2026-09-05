@@ -20,6 +20,8 @@ vi.mock('../../../core/native-bridge', () => ({
 
 import { resetAppPlatformCache } from '../../../core/app-platform';
 import { initNativeChrome } from '../../../core/native-bridge';
+import { setLocale } from '../../../data/interactions-labels';
+import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 
 describe('ProfileSettingsTab §4.4 (APK)', () => {
@@ -38,6 +40,7 @@ describe('ProfileSettingsTab §4.4 (APK)', () => {
       delete (window as any).Capacitor;
       resetAppPlatformCache();
       localStorage.clear();
+      setLocale('ru');
     } catch {}
   });
 
@@ -78,6 +81,18 @@ describe('ProfileSettingsTab §4.4 (APK)', () => {
     expect(calls[calls.length - 1]).toEqual(['#eef2f6', 'light']);
     fireEvent.click(getByRole('radio', { name: /Тёмная/ }));
     expect(localStorage.getItem('he_apk_theme_v1')).toBeNull();
+  });
+
+  it('APK: карточка оформления по-английски при EN-локали', () => {
+    setLocale('en');
+    try {
+      const { getByRole } = render(<AppearanceSetupCard />);
+      expect(getByRole('radiogroup', { name: 'Theme' })).not.toBeNull();
+      expect(getByRole('radio', { name: /Dark/ })).not.toBeNull();
+      expect(getByRole('radio', { name: /System/ })).not.toBeNull();
+    } finally {
+      setLocale('ru');
+    }
   });
 
   it('APK: выбор акцента персистится мгновенно', () => {
