@@ -1,5 +1,9 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Стронг-хаб: диагностика PRO — паритет ТА/ББ (Sep 05 2026, 6f9b679a + cd53c983 + 9104dd32 + d96f5dab)
+
+Доводка `StrongmanDiagnosticsHub` до PRO-уровня (бенчмарки: ТА-хаб 1382с/20 движков, ББ-хаб 1482с/7 табов, ПЛ-9 лифтов; источники: Hindle yoke/stone 2021, Winwood log/injuries 2014-15, Renals 2018, Legg 2019, McGill 2009, SBS grip 2024, Jamieson). NEW 19 движков `strength-sport-sm-*` (weak-cause/rank/simulator/spec-block/plan-audit/progress/anthro/asymmetry/hold/attempts-bridge/ics/annual-bridge/lvp-calibration/grip-calibration/safety/pose-check/conditioning/storage) + MOD biomechanics(logDip)/diary(LVP-e1RM)/injection(snapshot+rollback)/export(PRO-секции) + хаб (физика йока/момент камня, симулятор контеста, попытки 85/92/98, LVP-ramp, hold-тесты, anthro, прогресс, ICS/Год, OHS-история, бэкап, pose-углы, кондиция → payload конструктора). **SM-область 622/622 (44 файла) + TrainingScreen_parts/rest-hooks 686/688 (2 падения чужие: MetabolicHub goalV2, lms-builder — файлы не тронуты), tsc 0 по своим файлам.** Осознанные остатки: scoring-unify отклонён (`scoreBase` мёртв, у TA/SM разные семантики/verification), registry/conditioning-day в shared-builder — зона владельцев.
+
 ## Метаболик-хаб: PRO v4 — Adaptive v3 + MET-60 + CAT2 + Sweat V2 + DIAAS + AT-range (Sep 04 2026, 357c0cd2 + f661cf77 + 5363463b TS2741-fix + v4-3 дедуп)
 
 Полная PRO-доработка хаба калькуляторов метаболики в питании по бенчмарку 2026 (MacroFactor rolling-28д, IOC REDs CAT2 2023, ACSM/Periard, Maughan BHI, Calorique DLW). Файлы: NEW `src/core/activity-catalog.ts`, `src/core/metabolic-constants.ts`, `src/engines/metabolic-hub.engine.ts`, `src/ui/screens/Shared/MetabolicHub.tsx`, `__tests__/metabolic-hub.test.ts`, `docs/METABOLIC-HUB-PRO.md`. **119/119 тестов хаба + nutrition-v2-audit 4/4 + rest-hooks-native 60/60 + потребители 138/138, tsc 0 по всему проекту** (NODE_OPTIONS=6GB; чужой `meal-plan-engine.ts` починен владельцем).

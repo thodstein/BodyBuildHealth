@@ -556,6 +556,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       gripAsymmetry: gripAsymDiag,
       hold: holdDiag,
       anthro: anthroDiag,
+      conditioning: smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null }),
       causes: smCauses,
       rankTop: smRankTop,
       specBlock: smSpec,
