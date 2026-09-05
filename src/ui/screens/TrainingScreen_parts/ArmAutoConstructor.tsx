@@ -120,6 +120,7 @@ export function ArmAutoConstructor() {
   const [topHeavy, setTopHeavy] = useState<string>('');
   const [topPullH, setTopPullH] = useState<string>('');
   const [topContinuity, setTopContinuity] = useState<boolean>(false);
+  const [topGripAuto, setTopGripAuto] = useState<boolean>(false);
 
   const workMax = useMemo(() => {
     try {
@@ -294,6 +295,7 @@ export function ArmAutoConstructor() {
         oppHand: topOppHand !== 'unknown' ? topOppHand : undefined,
         weightDeltaKg: parseFloat(topWD) !== 0 && Number.isFinite(parseFloat(topWD)) ? parseFloat(topWD) : undefined,
         rfd: topRfd || undefined,
+        gripAuto: topGripAuto || undefined,
         gripWeek: parseInt(topGripWeek) > 0 ? parseInt(topGripWeek) : undefined,
         gripPhase: topGripPhase !== 'auto' ? topGripPhase : undefined,
         ladderFrom: topLadder || undefined,
@@ -604,6 +606,7 @@ export function ArmAutoConstructor() {
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topSim} onChange={e=>setTopSim(e.target.checked)} /> Contest-sim неделя</label>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topContinuity} onChange={e=>setTopContinuity(e.target.checked)} /> 🔗 С прошлого плана (+2.5% веса)</label>
+              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topGripAuto} onChange={e=>setTopGripAuto(e.target.checked)} /> 🌊 Grip-RPE авто-волна</label>
             </div>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {

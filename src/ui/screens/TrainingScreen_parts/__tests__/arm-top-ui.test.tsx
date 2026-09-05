@@ -66,6 +66,7 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     render(<ArmAutoConstructor />);
     expect(document.body.textContent).toContain('Тяж. хвата/нед (CNS)');
     expect(document.body.textContent).toContain('Часов с тяж. тяг');
+    expect(document.body.textContent).toContain('Grip-RPE авто-волна');
   });
 
   it('кросс-мезо: сборка с прошлым планом', () => {
