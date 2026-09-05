@@ -356,5 +356,19 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
   (`overlaysWebView`), WebP доезжают в `android/assets` (директория в
   `.gitignore` — CI регенерирует, в коммит не тянем).
 
+Волна 5 — уровень флагманов (Strava/NTC/Strong): kit внедрён в поверхности,
+иконки/уведомления починены (`ui/__tests__` 17/157 + точечные 31/31, `tsc` 0):
+
+- **Entrance-анимация**: `native-fade-up` на rail/grid/last в `DashboardNative`
+  и на карточках hero-хабов (тренинг/риски/фарма) — аддитивные классы,
+  TG 1-в-1 (стили только под `html.app-native`).
+- **Баг уведомлений**: `capacitor.config` ссылался на несуществующий
+  `ic_stat_icon_default` — создан белый вектор-ринг; пуши больше не могут
+  молча не показаться.
+- **Themed icons** (Android 13+): `ic_launcher_monochrome` (силуэт 1-в-1
+  с foreground-глифом) подключён в оба `mipmap-anydpi-v26`; сплэш получил
+  `windowSplashScreenIconBackgroundColor`. XML проверены парсером
+  (SDK локально нет — финальная сборка за CI).
+
 Осознанные остатки (не баги): бейдж-драйверы кроме interactions;
-Java-слой проверяется только сборкой CI (локально нет SDK).
+Gradle-сборка Java-слоя — только CI (локально нет SDK).

@@ -29,6 +29,8 @@
         <item name="windowSplashScreenBackground">@color/pro_navy_deep</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="windowSplashScreenAnimationDuration">600</item>
+        <!-- TOP: подложка под иконку сплэша — без неё глиф висит на голом фоне -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/pro_navy</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

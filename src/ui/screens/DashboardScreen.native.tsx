@@ -204,7 +204,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
           )}
         </div>
 
-        <div className="native-home-rail">
+        <div className="native-home-rail native-fade-up">
           <div className="native-home-stat">
             <div className="native-home-stat-v">{data.weekSessions}</div>
             <div className="native-home-stat-l">тренировок на неделе</div>
@@ -241,7 +241,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
 
         {data.last && (
           <button
-            className="native-home-last"
+            className="native-home-last native-fade-up"
             onClick={() => onNavigate?.('training')}
             aria-label="Открыть тренинг"
           >
@@ -254,7 +254,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
         )}
 
         <div className="native-home-section">Разделы</div>
-        <div className="native-home-grid">
+        <div className="native-home-grid native-fade-up">
           {ACTIONS.map((a) => (
             <button
               key={a.id}

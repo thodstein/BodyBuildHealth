@@ -911,7 +911,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(239,68,68,0.16)', color:'#ef4444' }}>ТЗ-модель</span>
               </div>
             </div>
-            <div className="risk-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="risk-hero-cards native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · полуколичественная шкала · верификация анализами.', color: '#8b5cf6' },
                 { id: 'calculations', icon: '🧮', title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника — все модели в одном месте.', color: '#22c55e' },

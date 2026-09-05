@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TOP: smallIcon для LocalNotifications (capacitor.config ссылается на
+     ic_stat_icon_default, которого не было — пуш мог молча не показаться).
+     Статус-бар требует белый силуэт: кольцо-«блин» (читается в 24dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2a10,10 0 1,0 0,20a10,10 0 1,0 0,-20ZM12,7a5,5 0 1,1 0,10a5,5 0 1,1 0,-10Z" />
+</vector>

@@ -89,7 +89,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
             </div>
           </div>
 
-          <div className="pharma-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div className="pharma-hero-cards native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {cards.map(c => (
               <button key={c.key} onClick={() => setPage(c.key)} className="pharma-hero-card" data-key={c.key} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,

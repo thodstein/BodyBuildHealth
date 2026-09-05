@@ -587,7 +587,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
             {isNativeApp() && <TrainingHeroStats />}
-            <div className="training-hero-zones" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="training-hero-zones native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
                 return (
