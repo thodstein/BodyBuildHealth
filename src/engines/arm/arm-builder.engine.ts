@@ -14,6 +14,9 @@ import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
 import { tableWeekKind, tableWeekParams } from './arm-table.engine';
 import { applyArmPro } from './arm-pro-integration.engine';
 import { ensureRadialFingers } from './arm-load-quant.engine';
+import { profileOpponent, matchupVolumeFor } from './arm-matchup.engine';
+import { buildRfdSession } from './arm-rfd.engine';
+import { planLrSplit } from './arm-lr-split.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -273,6 +276,41 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   // Бенчи → workMax: явный workMax пользователя приоритетнее
   const mergedWorkMax: Record<string, number> = { ...(pro.workMaxPatch || {}), ...(input.workMax || {}) };
 
+  // TOP T1/T2a/T7a: матчап + RFD + L/R — всё gated на новых опциональных полях (старые входы дают factor 1)
+  let matchupPlan: ReturnType<typeof profileOpponent> | null = null;
+  try {
+    if (input.oppStyle != null || input.oppHand != null || input.weightDeltaKg != null) {
+      matchupPlan = profileOpponent({
+        myTechnique: technique,
+        oppStyle: input.oppStyle,
+        oppHand: input.oppHand,
+        weightDeltaKg: input.weightDeltaKg,
+        strapExpected: input.strapExpected,
+      });
+    }
+  } catch { matchupPlan = null; }
+  let rfdNote: string | null = null;
+  try {
+    if (input.rfd === true || input.explosivePct != null || input.fastPct != null || input.slowIndex != null) {
+      const rfd = buildRfdSession({
+        explosivePct: input.explosivePct,
+        fastPct: input.fastPct,
+        slowIndex: input.slowIndex,
+        level,
+        phase: 'intensification',
+      });
+      rfdNote = rfd.allowed ? rfd.note : null;
+    }
+  } catch { rfdNote = null; }
+  const rfdOn = rfdNote != null;
+  let lrNote: string | null = null;
+  try {
+    if (input.leftKg != null || input.rightKg != null) {
+      const lr = planLrSplit({ leftKg: input.leftKg, rightKg: input.rightKg });
+      if (lr.asymmetryPct != null && lr.asymmetryPct >= 7) lrNote = `L/R сплит: ${lr.note}`;
+    }
+  } catch { lrNote = null; }
+
   // MRV multipliers — через adaptForPEDs с tendonCap 1.5× + fallback для неизвестных педов (тест 'test_e')
   let pedMult = 1;
   let pedAdapt: any = null;
@@ -448,6 +486,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       });
       // PRO F: FullArm всегда содержит radial/fingers (Praxis топ-3 + containment)
       const filteredMuscles = tag === 'FullArm' ? ensureRadialFingers(baseFiltered) : baseFiltered;
+      // TOP T2a: RFD-метка — первое speed-упражнение тяжёлой сессии в intensification (объём не меняется)
+      let rfdDone = !rfdOn || phase !== 'intensification' || ch !== 'тяж';
 
       for (const mus of filteredMuscles) {
         // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
@@ -459,7 +499,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (specSchedule.active && weekSpecs.length > 0 && !weekSpecs.includes(mus) && !['shoulder_stab','core_anchor'].includes(mus)) {
           role = 'accessory';
         }
-        const target = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1)) : 6;
+        const matchupMult = matchupPlan ? matchupVolumeFor(mus, matchupPlan) : 1;
+        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult) : 6;
+        const target = volumeTargets[mus] ? Math.min(volumeTargets[mus].mrv, targetRaw) : 6;
         const freq = muscleFreq[mus] || 1;
         const sets = setsFor(mus, effCh, w, target, freq);
         const reps = repsFor(mus, effCh, phase);
@@ -523,7 +565,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          comment: exTpl.technique,
+          comment: (!rfdDone && ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus)
+            ? ((rfdDone = true), `RFD speed: ускорение через весь диапазон (5×3 RPE8, отдых 90с) · ${exTpl.technique || ''}`)
+            : exTpl.technique),
         });
       }
 
@@ -585,6 +629,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
   // PRO A–J: строки оркестратора (аддитивно)
   for (const line of pro.rationale) rationale.push(line);
+  // TOP T1/T2a/T7a: матчап + RFD + L/R (только при заданных входах)
+  if (matchupPlan) rationale.push(`Матчап: ${matchupPlan.note}`);
+  if (rfdNote) rationale.push(`RFD: ${rfdNote}`);
+  if (lrNote) rationale.push(lrNote);
   const proWarnings = [...pro.warnings];
 
   // Weekly volume

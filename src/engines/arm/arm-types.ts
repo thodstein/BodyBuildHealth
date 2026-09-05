@@ -118,6 +118,30 @@ export interface ArmBuilderInput {
   diary?: Array<{ dateIso: string; srpe?: number; elbowPain?: number; wristPain?: number; velocityLossPct?: number | null }>;
   trackCsv?: string; // Kinovea-трекинг кисти (эпик I)
   bench?: { wristCurlLb?: number; pronHoldSec?: number; cupHoldSec?: number; cocLevel?: number; rtKg?: number; sideKg?: number };
+  // ── TOP T1–T8 (все опциональны, движок обратно совместим) ──
+  oppStyle?: string; // стиль оппонента: hook/toproll/press/balanced/unknown
+  oppHand?: string; // рука оппонента: high/low/neutral/unknown
+  weightDeltaKg?: number; // + = оппонент тяжелее
+  rfd?: boolean; // RFD speed-блок в intensification
+  explosivePct?: number; // F100/Fmax % (из динамики)
+  fastPct?: number; // F500/Fmax %
+  slowIndex?: number; // медленная сила кг/с
+  gripWeek?: number; // неделя grip-RPE мезоцикла
+  gripPhase?: string; // volume/intensification/peak/deload
+  ladderFrom?: string; // текущий имплемент лестницы
+  ladderValue?: number; // текущий результат (кг/с)
+  contestSim?: boolean; // contest-sim неделя вместо техники
+  foulIds?: string[]; // история фолов для sim-фокуса
+  tableSession?: boolean; // сегодня стол → tendon-fuel тайминг
+  tendonFuel?: boolean; // явно включить tendon-fuel строку
+  cnsCheck?: boolean; // явно проверить CNS-guard
+  heavyGripThisWeek?: number;
+  plannedHeavy?: boolean;
+  hoursSinceHeavyPull?: number;
+  bouts?: Array<{ fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number }>; // Table-IQ журнал
+  calStartIso?: string; // календарь: дата старта (дубль competitionDateIso для явности)
+  calPriority?: string; // A/B/C
+  calSeries?: string; // waf_worlds/east_vs_west/super_series/local
 }
 
 export interface ArmInjury {
