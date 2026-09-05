@@ -2677,6 +2677,44 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 56. NATIVE DEEP-24 — экраны, клиника, фарма/риски ────── */
+html.app-native .rep-screen,
+html.app-native .sup-clinic,
+html.app-native .screen.assistant,
+html.app-native .screen.substances,
+html.app-native .screen.fertility-pct,
+html.app-native .screen.peptides,
+html.app-native .pharma-reports,
+html.app-native .pharma-pep,
+html.app-native .pharma-interact,
+html.app-native .risk-matrix,
+html.app-native .risk-overview,
+html.app-native .pro-panel-section {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .rep-screen,
+html.app-native .sup-clinic {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .rep-screen,
+  html.app-native .sup-clinic,
+  html.app-native .screen.assistant,
+  html.app-native .screen.substances,
+  html.app-native .screen.fertility-pct,
+  html.app-native .screen.peptides,
+  html.app-native .pharma-reports,
+  html.app-native .pharma-pep,
+  html.app-native .pharma-interact,
+  html.app-native .risk-matrix,
+  html.app-native .risk-overview,
+  html.app-native .pro-panel-section {
+    animation: none;
+  }
+}
+
 /* ─── 55. NATIVE DEEP-23 — экраны, баннеры, гарды, покрытие ─── */
 html.app-native .perf-screen,
 html.app-native .recovery-screen,

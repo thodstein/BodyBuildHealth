@@ -40,7 +40,7 @@ export const SupplementClinicScreen: React.FC = () => {
   const clearStops = () => setStackIds(stackIds.filter((id) => !stopIds.has(id)));
 
   return (
-    <div style={{ padding: '54px 12px 24px', minHeight: '100%' }}>
+    <div className="sup-clinic" style={{ padding: '54px 12px 24px', minHeight: '100%' }}>
       <div style={{ padding: '0 4px 14px' }}>
         <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.4 }}>🧪 Клиника БАД и фармы</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>

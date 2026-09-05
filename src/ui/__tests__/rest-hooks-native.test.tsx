@@ -282,6 +282,17 @@ import { InteractionCheckerTab } from '../screens/PharmaScreen_parts/Interaction
 import { RiskMatrix } from '../screens/RiskScreen_parts/RiskMatrix';
 import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
 import { ProPanelCollapsible } from '../screens/TrainingScreen_parts/ProPanelSection';
+import { ReportsScreen } from '../screens/ReportsScreen';
+import { SupplementClinicScreen } from '../screens/SupplementClinicScreen';
+import { SmartAssistantScreen } from '../screens/SmartAssistantScreen';
+import { SubstancesScreen } from '../screens/SubstancesScreen';
+import { FertilityPCTScreen } from '../screens/FertilityPCTScreen';
+import { PeptidesScreen } from '../screens/PeptidesScreen';
+import { PharmaReportsTab } from '../screens/PharmaScreen_parts/PharmaReportsTab';
+import { PharmaPeptideCalc } from '../screens/PharmaScreen_parts/PharmaPeptideCalc';
+import { InteractionCheckerTab } from '../screens/PharmaScreen_parts/InteractionCheckerTab';
+import { RiskMatrix } from '../screens/RiskScreen_parts/RiskMatrix';
+import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1996,6 +2007,57 @@ describe('market + pharma + labs roots', () => {
   });
 
   it('64. Batch-23 корни: покрытие hooked-без-тестов (фарма, риски, панели)', () => {
+    const { container: c1 } = render(<PharmaReportsTab />);
+    expect(c1.querySelector('.pharma-reports'), 'pharmareports').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<PharmaPeptideCalc />);
+    expect(c2.querySelector('.pharma-pep'), 'pharmapep').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<InteractionCheckerTab />);
+    expect(c3.querySelector('.pharma-interact'), 'pharmainteract').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <RiskMatrix riskResult={{ mechanismDetail: {} } as never} />,
+    );
+    expect(c4.querySelector('.risk-matrix'), 'riskmatrix').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <RiskOverview
+        riskResult={{ overallNet: 10, systemBreakdown: {} } as never}
+        globalNoLabs={true}
+        noLabsSystems={[]}
+        labRiskContributions={null}
+      />,
+    );
+    expect(c5.querySelector('.risk-overview'), 'riskoverview').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(
+      <ProPanelCollapsible section={{ id: 't', title: 'Тест', content: 'текст' } as never} />,
+    );
+    expect(c6.querySelector('.pro-panel-section'), 'propanel').not.toBeNull();
+  });
+
+  it('65. Batch-24 корни: отчёты, клиника, ассистент, справочники', () => {
+    const { container: c1 } = render(<ReportsScreen />);
+    expect(c1.querySelector('.rep-screen'), 'repscreen').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(<SupplementClinicScreen />);
+    expect(c2.querySelector('.sup-clinic'), 'supclinic').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<SmartAssistantScreen />);
+    expect(c3.querySelector('.screen.assistant'), 'assistant').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(<SubstancesScreen />);
+    expect(c4.querySelector('.screen.substances'), 'substances').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(<FertilityPCTScreen />);
+    expect(c5.querySelector('.screen.fertility-pct'), 'fertility').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<PeptidesScreen />);
+    expect(c6.querySelector('.screen.peptides'), 'peptides').not.toBeNull();
+  });
+
+  it('66. Batch-24 корни: покрытие hooked-без-тестов (фарма, риски, панели)', () => {
     const { container: c1 } = render(<PharmaReportsTab />);
     expect(c1.querySelector('.pharma-reports'), 'pharmareports').not.toBeNull();
     cleanup();

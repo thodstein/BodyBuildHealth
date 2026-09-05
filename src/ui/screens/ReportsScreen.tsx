@@ -124,13 +124,13 @@ export const ReportsScreen: React.FC = () => {
   }, [photos]);
 
   if (loading || !report) {
-    return <div style={{ padding: 20, textAlign: 'center', color: colors.textMuted }}>Формирование отчёта...</div>;
+    return <div className="rep-screen" style={{ padding: 20, textAlign: 'center', color: colors.textMuted }}>Формирование отчёта...</div>;
   }
 
   const periodLabel = type === 'weekly' ? 'Неделя 7д' : 'Месяц 30д';
 
   return (
-    <div style={{ padding: '0 0 80px', maxWidth: 900, margin: '0 auto' }}>
+    <div className="rep-screen" style={{ padding: '0 0 80px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 0', flexShrink: 0, position: 'sticky', top: 0, zIndex: 20, background: '#18181b', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>📊 Комплексный отчёт</div>
         <div style={{ display: 'flex', gap: 6 }}>
