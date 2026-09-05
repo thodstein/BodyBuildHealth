@@ -483,13 +483,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     // TOP wave-5: Grip-RPE фаза недели (только при заданных gripWeek/gripPhase)
     let gripPhaseMult = 1;
     let gripRirAdd = 0;
+    let gripPhaseName: string | null = null;
     try {
       if (input.gripWeek != null || input.gripPhase != null) {
         const gp = buildGripRpe({ week: (input.gripWeek ?? w) as number, phase: input.gripPhase });
+        gripPhaseName = gp.phase;
         if (gp.phase === 'deload') gripPhaseMult = 0.6;
         else if (gp.phase === 'peak') { gripPhaseMult = 0.7; gripRirAdd = 1; }
       }
-    } catch { gripPhaseMult = 1; gripRirAdd = 0; }
+    } catch { gripPhaseMult = 1; gripRirAdd = 0; gripPhaseName = null; }
+    // TOP wave-9: один showcase-протокол хвата в неделю (peak → overcrush, intensification → negatives)
+    let gripExecDone = gripPhaseName == null || (gripPhaseName !== 'peak' && gripPhaseName !== 'intensification');
 
     const sessions: ArmSession[] = [];
     let sessionIdx = 0;
@@ -573,7 +577,6 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             }
           }
           const wgt = weightForMuscle(mus, effectiveWorkMax, pct);
-          const hold = exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined;
           workSets.push({
             reps: repVal,
             rir,
@@ -581,8 +584,21 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             restSeconds: rfdSpeed ? 90 : mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : effCh === 'тяж' ? 120 : 90,
             tempo: tempoForKind,
             technique: mus === 'side_pressure' && effCh === 'тяж' ? 'none' : effCh === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
-            holdSeconds: hold,
+            holdSeconds: exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined,
           });
+        }
+
+        // TOP wave-9: showcase-протокол хвата — один в неделю (peak → overcrush, intensification → negatives)
+        let gripShow: '' | 'over' | 'neg' = '';
+        if (!gripExecDone && mus.startsWith('grip_')) {
+          gripExecDone = true;
+          if (gripPhaseName === 'peak') {
+            gripShow = 'over';
+            for (const ws of workSets) (ws as any).holdSeconds = 12;
+          } else {
+            gripShow = 'neg';
+            for (const ws of workSets) (ws as any).tempo = '5-1-1-0';
+          }
         }
 
         exercises.push({
@@ -603,9 +619,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          comment: (rfdSpeed
+          holdSeconds: gripShow === 'over' ? 12 : (mus === 'grip_support' || mus === 'grip_pinch' || mus === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined),
+          comment: ((rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
-            : exTpl.technique),
+            : (exTpl.technique || ''))
+            + (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '') || undefined),
         });
       }
 

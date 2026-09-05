@@ -56,11 +56,21 @@ describe('arm TOP wave-6 unilateral + meso-ladder + annual', () => {
     expect(res.armPlan.rationale.join(' ')).toMatch(/Матчап:/);
     expect(res.armPlan.weeks[res.armPlan.weeks.length - 1].taper).toBe(true);
   });
-  it('годовой блок с sim: последняя неделя — репетиция', () => {
+  it('годовой блок с sim: последняя неделя — репетиция, тейпер её не дублирует', () => {
     const res = buildArmBlock({ blockKey: 'sim', weeks: 6, phase: 'strength' }, { level: 'intermediate', contestSim: true } as any);
     const last = res.armPlan.weeks[res.armPlan.weeks.length - 1];
     expect(last.taper).toBe(true);
     expect(String(last.note || '')).toMatch(/Contest-sim/);
+  });
+  it('годовой sim + тейпер: пик не режется кривой', () => {
+    const res = buildArmBlock(
+      { blockKey: 'simt', weeks: 6, phase: 'strength' },
+      { level: 'intermediate', contestSim: true, taperEnabled: true, taperWeeks: 2 } as any,
+    );
+    const last = res.armPlan.weeks[res.armPlan.weeks.length - 1];
+    expect(String(last.note || '')).toMatch(/Contest-sim/);
+    expect(String(last.note || '')).not.toContain('[arm-taper:0.45]');
+    expect(res.taperApplied).toBe(true);
   });
   it('ICS несёт комментарии (RFD/sim видны в календаре)', () => {
     const p: any = buildArmPlan({ ...BASE, rfd: true });

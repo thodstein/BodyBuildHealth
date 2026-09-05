@@ -1,10 +1,12 @@
 /**
- * arm-sim-apply.engine.ts — TOP wave-4: contest-sim применяется к плану.
+ * arm-sim-apply.engine.ts — TOP wave-4/wave-9: contest-sim применяется к плану.
  *
  * Берёт готовый ArmPlan и превращает ПОСЛЕДНЮЮ неделю в sim-неделю:
- * характер сессий → техника, сеты ×0.5 (мин 1, workSets режутся синхронно —
- * инвариант sets===workSets.length цел), RIR+2, судейская процедура и чеклист
- * в note недели/сессий. Остальные недели побайтово не трогаются.
+ * характер сессий → техника, объём → 50% от средней рабочей недели
+ * (абсолютная цель, wave-9: НЕ повторная половинка — иначе складывается
+ * с peaking-weekMult 0.45 и годовым тейпером в двойной делод), RIR+2,
+ * судейская процедура и чеклист в note недели/сессий.
+ * Инвариант sets===workSets.length цел. Остальные недели побайтово не трогаются.
  * Короткий план (<2 нед) — честный no-op с предупреждением.
  */
 
@@ -47,14 +49,24 @@ export function applyContestSimToPlan(plan: any, input: SimApplyInput = {}): Sim
   const next = clone(plan);
   const last = next.weeks[next.weeks.length - 1];
   const simDays = sim.days;
+  // Wave-9: абсолютная цель 50% от средней рабочей недели (без делодов) —
+  // не зависит от того, порезана ли последняя неделя тейпером/пиком до нас.
+  const baseWeeks = next.weeks.slice(0, -1).filter((w: any) => !w.deload);
+  const baseTotal = baseWeeks.length
+    ? baseWeeks.reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (Number(e.sets) || 0), 0), 0), 0) / baseWeeks.length
+    : 0;
+  const lastTotal = (last.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (Number(e.sets) || 0), 0), 0);
+  const factor = lastTotal > 0 && baseTotal > 0 ? Math.min(1, (baseTotal * 0.5) / lastTotal) : 0.5;
   last.taper = true;
-  last.note = `Contest-sim: ${sim.note} Чеклист: ${sim.checklist.join(' · ')}`;
+  // Wave-9: маркер идемпотентности тейпера — годовой applyArmTaperToWeeks пропускает
+  // sim-неделю сам (она и есть пик, резать её тейпер-кривой поверх = двойной делод).
+  last.note = `Contest-sim: ${sim.note} Чеклист: ${sim.checklist.join(' · ')} [arm-taper:sim]`;
   last.sessions.forEach((sess: any, si: number) => {
     sess.character = 'техника';
     const day = simDays[si % simDays.length];
     sess.note = `${day.title}: ${day.steps[0]}`;
     for (const ex of sess.exercises || []) {
-      const sets = Math.max(1, Math.round(Number(ex.sets || 1) * 0.5));
+      const sets = Math.max(1, Math.round(Number(ex.sets || 1) * factor));
       ex.sets = sets;
       if (Array.isArray(ex.workSets)) ex.workSets = ex.workSets.slice(0, sets);
       ex.rir = Math.min(5, Number(ex.rir || 0) + 2);

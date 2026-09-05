@@ -38,6 +38,21 @@ describe('arm TOP wave-5 deep', () => {
     const gripBase = base.weeks[0].sessions.flatMap((s: any) => s.exercises).find((e: any) => e.muscle === 'grip_support');
     if (gripEx && gripBase) expect(gripEx.rir).toBeGreaterThanOrEqual(gripBase.rir);
   });
+  it('Grip-RPE исполнение: peak → overcrush, intensification → negatives', () => {
+    const peak: any = buildArmPlan({ ...BASE, gripPhase: 'peak' });
+    const over = peak.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
+      .filter((e: any) => String(e.comment || '').includes('overcrush'));
+    expect(over.length).toBeGreaterThan(0);
+    expect(over[0].holdSeconds).toBe(12);
+    const inten: any = buildArmPlan({ ...BASE, gripPhase: 'intensification' });
+    const neg = inten.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
+      .filter((e: any) => String(e.comment || '').includes('negatives 5'));
+    expect(neg.length).toBeGreaterThan(0);
+    expect(neg[0].workSets[0].tempo).toBe('5-1-1-0');
+    const base: any = buildArmPlan({ ...BASE });
+    const all = base.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises);
+    expect(all.some((e: any) => /overcrush|negatives 5/.test(String(e.comment || '')))).toBe(false);
+  });
   it('Table-IQ: фолы режут side, срывы растят containment', () => {
     const base: any = buildArmPlan({ ...BASE });
     const iq: any = buildArmPlan({ ...BASE, bouts: [{ fouls: 2, slip: true, win: false }, { fouls: 1, slip: true, win: true }] });
@@ -59,5 +74,19 @@ describe('arm TOP wave-5 deep', () => {
     const html = buildArmPrintHtml(p);
     expect(html).toContain('Матчап:');
     expect(html).toContain('RFD speed 5×3');
+  });
+  it('инвариант sets===workSets после finalize на матрице (балансные добивки)', () => {
+    const pats = ['arm_4_upper_lower', 'arm_3_full', 'arm_2_table_support', 'arm_5_specialized'];
+    for (const patternId of pats) {
+      for (const technique of ['hook', 'toproll', 'press', 'balanced']) {
+        for (const level of ['beginner', 'intermediate', 'advanced']) {
+          const p: any = buildArmPlan({ discipline: 'armwrestling', patternId, level, goal: 'strength', technique, weeks: 4 });
+          const f: any = finalizeArmPlan(p, { level });
+          for (const w of f.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+            expect(e.workSets.length, `${patternId}/${technique}/${level} ${e.name}`).toBe(e.sets);
+          }
+        }
+      }
+    }
   });
 });

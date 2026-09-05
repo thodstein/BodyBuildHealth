@@ -20,7 +20,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
         last.exercises.push({
           muscle: 'supinators' as any, name: 'Супинация молотком', role: 'accessory', character: 'памп' as any,
           sets: 2, repsRange: [10,15], rir: 2,
-          workSets: [{ reps: 12, rir: 2, weight: 0, restSeconds: 90 }],
+          workSets: [{ reps: 12, rir: 2, weight: 0, restSeconds: 90 }, { reps: 12, rir: 2, weight: 0, restSeconds: 90 }],
           movementPattern: 'supination' as any, substitutionGroup: 'supination',
         });
       }
@@ -30,7 +30,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
         last.exercises.push({
           muscle: 'pronators' as any, name: 'Пронация на блоке (90)', role: 'accessory', character: 'памп' as any,
           sets: 2, repsRange: [8,12], rir: 2,
-          workSets: [{ reps: 10, rir: 2, weight: 0, restSeconds: 90 }],
+          workSets: [{ reps: 10, rir: 2, weight: 0, restSeconds: 90 }, { reps: 10, rir: 2, weight: 0, restSeconds: 90 }],
           movementPattern: 'pronation' as any, substitutionGroup: 'pronation',
         });
       }
@@ -55,7 +55,7 @@ function ensureFlexExtBalance(plan: ArmPlan): void {
         last.exercises.push({
           muscle: 'wrist_extensors' as any, name: 'Разгибание кисти со штангой', role: 'accessory', character: 'памп' as any,
           sets: 2, repsRange: [12,20], rir: 2,
-          workSets: [{ reps: 15, rir: 2, weight: 0, restSeconds: 60 }],
+          workSets: [{ reps: 15, rir: 2, weight: 0, restSeconds: 60 }, { reps: 15, rir: 2, weight: 0, restSeconds: 60 }],
         });
       }
     }
@@ -95,7 +95,7 @@ function ensureTableTime(plan: ArmPlan, targetRatio: number): void {
         wk.sessions[supportIdx].exercises.unshift({
           muscle: 'pronators' as any, name: 'Пронация на блоке (90)', role: 'primary', character: 'техника' as any,
           sets: 2, repsRange: [8,12], rir: 3,
-          workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
+          workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }, { reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
           movementPattern: 'pronation' as any, substitutionGroup: 'pronation', isTable: true,
         });
         plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% — автозамена Support→TableTech (Кузнецов VIII ≥50%)`);
@@ -266,14 +266,14 @@ function ensureGripCoverage(plan: ArmPlan): void {
       const last = wk.sessions[wk.sessions.length-1];
       if (last) last.exercises.push({
         muscle: 'grip_support' as any, name: 'Rolling Thunder (вращающаяся ручка)', role: 'accessory', character: 'памп' as any,
-        sets: 2, repsRange: [5,8], rir: 2, workSets: [{ reps: 5, rir: 2, weight: 0 }],
+        sets: 2, repsRange: [5,8], rir: 2, workSets: [{ reps: 5, rir: 2, weight: 0 }, { reps: 5, rir: 2, weight: 0 }],
       });
     }
     if (!hasPinch) {
       const last = wk.sessions[wk.sessions.length-1];
       if (last && last.exercises.length < 6) last.exercises.push({
         muscle: 'grip_pinch' as any, name: 'Щипок блинов (удержание)', role: 'accessory', character: 'памп' as any,
-        sets: 2, repsRange: [1,1], rir: 2, workSets: [{ reps: 1, rir: 2, weight: 0, holdSeconds: 10 }],
+        sets: 2, repsRange: [1,1], rir: 2, workSets: [{ reps: 1, rir: 2, weight: 0, holdSeconds: 10 }, { reps: 1, rir: 2, weight: 0, holdSeconds: 10 }],
       });
     }
   }
