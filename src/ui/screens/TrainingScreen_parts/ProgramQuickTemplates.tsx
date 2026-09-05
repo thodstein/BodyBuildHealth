@@ -32,7 +32,7 @@ export const QUICK_TEMPLATES: QuickTemplate[] = [
 export const QuickTemplatesGrid: React.FC<{
   onApply: (tpl: QuickTemplate) => void;
 }> = ({ onApply }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+  <div className="train-quicktpl" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
     {QUICK_TEMPLATES.map(tpl => (
       <button
         key={tpl.id}

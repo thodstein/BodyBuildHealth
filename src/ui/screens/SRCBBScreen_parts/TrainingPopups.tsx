@@ -13,7 +13,7 @@ const ACCENT = '#00e68a';
 const PortalOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
   if (typeof document === 'undefined') return null;
   return ReactDOM.createPortal(
-    <div style={overlay} onClick={onClose}>{children}</div>,
+    <div className="pl-popupoverlay" style={overlay} onClick={onClose}>{children}</div>,
     document.body,
   );
 };
@@ -49,7 +49,7 @@ export const PopupNumber: React.FC<{
   const [edit, setEdit] = useState(String(value));
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
-      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
+      <button className="pl-popupnum" onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
       <div style={{ fontSize: 14, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
     </button>
@@ -83,7 +83,7 @@ export const PopupSelect: React.FC<{
   const sel = options.find(o => o.id === value);
   return (
     <>
-      <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
+      <button className="pl-popupselect" onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
         <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
@@ -230,7 +230,7 @@ export const ExpandableCard: React.FC<{
   children?: React.ReactNode;
 }> = ({ title, short, full, accent = ACCENT, icon, children }) => {
   const [open, setOpen] = useState(false);
-  return <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: `1px solid ${accent}22`, padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%' }}>
+  return <div className="pl-expandcard" style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: `1px solid ${accent}22`, padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%' }}>
     <div onClick={() => full && setOpen(o => !o)} style={{ cursor: full ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: accent, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{icon ? icon + ' ' : ''}{title}</div>
       {full && <span style={{ fontSize: 10, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
@@ -244,7 +244,7 @@ export const ExpandableCard: React.FC<{
 export const MetricCard: React.FC<{
   title: string; accent?: string; icon?: string; children: React.ReactNode;
 }> = ({ title, accent = ACCENT, icon, children }) => (
-  <div style={{ marginTop: 10, padding: 12, borderRadius: 12,
+  <div className="pl-metriccard" style={{ marginTop: 10, padding: 12, borderRadius: 12,
     background: `${accent}0f`, border: `1px solid ${accent}33`,
     boxShadow: `0 0 0 1px ${accent}11` }}>
     <div style={{ fontSize: 11, fontWeight: 800, color: accent, margin: '0 0 8px', letterSpacing: 0.3, textTransform: 'uppercase' }}>{icon ? icon + ' ' : ''}{title}</div>
@@ -256,7 +256,7 @@ export const SaveButton: React.FC<{
   label?: string; savedLabel?: string; onSave: () => void; disabled?: boolean;
 }> = ({ label = '💾 Сохранить', savedLabel = '✓ Сохранено', onSave, disabled }) => {
   const [saved, setSaved] = useState(false);
-  return <button disabled={disabled} onClick={() => { onSave(); setSaved(true); setTimeout(() => setSaved(false), 1800); }}
+  return <button className="pl-savebtn" disabled={disabled} onClick={() => { onSave(); setSaved(true); setTimeout(() => setSaved(false), 1800); }}
     style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
       background: saved ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#00e68a,#00c853)',
       color: '#000', fontWeight: 800, fontSize: 12, opacity: disabled ? 0.4 : 1, transition: 'all 0.2s' }}>
@@ -270,7 +270,7 @@ export const CalcSection: React.FC<{
   /** Если true — сетка 2 колонки для содержимого */
   grid2?: boolean;
 }> = ({ icon, title, desc, accent = ACCENT, children, grid2 }) => (
-  <div style={{
+  <div className="pl-calcsection" style={{
     background: 'rgba(24,24,27,0.35)', borderRadius: 14,
     border: `1px solid ${accent}18`, overflow: 'hidden', marginBottom: 10,
   }}>
@@ -297,7 +297,7 @@ export const CalcSection: React.FC<{
 export const PopupToggle: React.FC<{
   label: string; value: boolean; onChange: (v: boolean) => void; icon?: string;
 }> = ({ label, value, onChange, icon }) => (
-  <button onClick={() => onChange(!value)} style={{
+  <button className="pl-popuptoggle" onClick={() => onChange(!value)} style={{
     display: 'flex', alignItems: 'center', gap: 8,
     padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
     background: value ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
@@ -320,7 +320,7 @@ export const PopupToggle: React.FC<{
 export const CalcResult: React.FC<{
   label: string; value: string; accent?: string; hint?: string;
 }> = ({ label, value, accent = ACCENT, hint }) => (
-  <div style={{
+  <div className="pl-calcresult" style={{
     padding: '14px 16px', borderRadius: 12, textAlign: 'center',
     background: `${accent}0d`, border: `1px solid ${accent}22`,
     marginBottom: 10,
@@ -355,7 +355,7 @@ export const PopupExerciseList: React.FC<{
   const remove = (id: string) => onChange(ids.filter(x => x !== id));
   const add = (id: string) => { if (!ids.includes(id)) onChange([...ids, id]); setQ(''); };
   return <>
-    <button onClick={() => { setQ(''); setOpen(true); }} style={{
+    <button className="pl-exerciselist" onClick={() => { setQ(''); setOpen(true); }} style={{
       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
       background: 'rgba(255,255,255,0.04)', border: `1px solid ${accent}33`, borderLeft: `3px solid ${accent}`, color: '#fff',
       transition: 'all 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
@@ -372,7 +372,7 @@ export const PopupExerciseList: React.FC<{
       <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isFilled ? accent : 'rgba(255,255,255,0.15)' }} />
     </button>
     {open && (
-      <div onClick={() => setOpen(false)} style={overlay}>
+      <div className="pl-popupoverlay" onClick={() => setOpen(false)} style={overlay}>
         <div onClick={e => e.stopPropagation()} style={sheet()}>
           <div style={topBar} />
           <div style={sheetBody}>

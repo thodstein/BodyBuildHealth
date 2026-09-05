@@ -259,6 +259,19 @@ import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
 import { SupportInteractionsView } from '../screens/SupportScreen_parts/SupportInteractionsView';
 import { RiskVerificationList } from '../screens/RiskScreen_parts/RiskVerificationList';
 import { DiagnosticsTab as PharmaDiagnosticsTab } from '../screens/PharmaScreen_parts/DiagnosticsTab';
+import {
+  PopupNumber,
+  PopupSelect,
+  ExpandableCard,
+  MetricCard,
+  SaveButton,
+  CalcSection,
+  PopupToggle,
+  CalcResult,
+  PopupExerciseList,
+} from '../screens/SRCBBScreen_parts/TrainingPopups';
+import { QuickTemplatesGrid } from '../screens/TrainingScreen_parts/ProgramQuickTemplates';
+import { GamificationScreen } from '../screens/GamificationScreen';
 
 async function resetPlatform() {
   const { resetAppPlatformCache } = await import('../../core/app-platform');
@@ -1864,5 +1877,78 @@ describe('market + pharma + labs roots', () => {
     expect(c5.querySelector('.pharma-diag'), 'pharmadiag').not.toBeNull();
     // RiskSpecMethod требует сохранённый курс (null без него) —
     // хук .risk-spec живёт в прод-ветке, здесь не проверяется.
+  });
+
+  it('61. Batch-22 корни: кит пикеров (кнопки + портал)', () => {
+    const { container: c1, unmount: unmountNum } = render(
+      <PopupNumber label="Вес" value={80} onChange={() => {}} />,
+    );
+    expect(c1.querySelector('.pl-popupnum'), 'popupnum').not.toBeNull();
+    fireEvent.click(c1.querySelector('.pl-popupnum') as HTMLElement);
+    // Портал уходит в document.body, а не в container
+    expect(document.body.querySelector('.pl-popupoverlay'), 'popupoverlay-num').not.toBeNull();
+    unmountNum();
+    cleanup();
+    const { container: c2, unmount: unmountSel } = render(
+      <PopupSelect
+        label="Цель"
+        value="a"
+        options={[{ id: 'a', label: 'Альфа' }]}
+        onChange={() => {}}
+      />,
+    );
+    expect(c2.querySelector('.pl-popupselect'), 'popupselect').not.toBeNull();
+    fireEvent.click(c2.querySelector('.pl-popupselect') as HTMLElement);
+    expect(document.body.querySelector('.pl-popupoverlay'), 'popupoverlay-sel').not.toBeNull();
+    unmountSel();
+    cleanup();
+    const { container: c3 } = render(
+      <ExpandableCard title="Тест" short="кратко" />,
+    );
+    expect(c3.querySelector('.pl-expandcard'), 'expandcard').not.toBeNull();
+    cleanup();
+    const { container: c4 } = render(
+      <MetricCard title="Метрика">
+        <div>тело</div>
+      </MetricCard>,
+    );
+    expect(c4.querySelector('.pl-metriccard'), 'metriccard').not.toBeNull();
+    cleanup();
+    const { container: c5 } = render(
+      <CalcSection icon="🧮" title="Секция">
+        <div>тело</div>
+      </CalcSection>,
+    );
+    expect(c5.querySelector('.pl-calcsection'), 'calcsection').not.toBeNull();
+  });
+
+  it('62. Batch-22 корни: кнопки кита, шаблоны, геймификация', () => {
+    const { container: c1 } = render(<SaveButton onSave={() => {}} />);
+    expect(c1.querySelector('.pl-savebtn'), 'savebtn').not.toBeNull();
+    cleanup();
+    const { container: c2 } = render(
+      <PopupToggle label="Тумблер" value={true} onChange={() => {}} />,
+    );
+    expect(c2.querySelector('.pl-popuptoggle'), 'popuptoggle').not.toBeNull();
+    cleanup();
+    const { container: c3 } = render(<CalcResult label="Итог" value="42" />);
+    expect(c3.querySelector('.pl-calcresult'), 'calcresult').not.toBeNull();
+    cleanup();
+    const { container: c4, unmount: unmountEx } = render(
+      <PopupExerciseList label="Упражнения" ids={[]} onChange={() => {}} />,
+    );
+    expect(c4.querySelector('.pl-exerciselist'), 'exerciselist').not.toBeNull();
+    fireEvent.click(c4.querySelector('.pl-exerciselist') as HTMLElement);
+    // Оверлей exerciselist — инлайн (не портал), живёт в container
+    expect(c4.querySelector('.pl-popupoverlay') ?? document.body.querySelector('.pl-popupoverlay'), 'popupoverlay-ex').not.toBeNull();
+    unmountEx();
+    cleanup();
+    const { container: c5 } = render(
+      <QuickTemplatesGrid onApply={() => {}} />,
+    );
+    expect(c5.querySelector('.train-quicktpl'), 'quicktpl').not.toBeNull();
+    cleanup();
+    const { container: c6 } = render(<GamificationScreen />);
+    expect(c6.querySelector('.gamification'), 'gamification').not.toBeNull();
   });
 });

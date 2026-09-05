@@ -2677,6 +2677,47 @@ html.app-native .sup-proto-detox {
   }
 }
 
+/* ─── 54. NATIVE DEEP-22 — кит пикеров, шаблоны, геймификация ─ */
+html.app-native .pl-popupoverlay,
+html.app-native .pl-popupnum,
+html.app-native .pl-popupselect,
+html.app-native .pl-expandcard,
+html.app-native .pl-metriccard,
+html.app-native .pl-calcsection,
+html.app-native .pl-savebtn,
+html.app-native .pl-popuptoggle,
+html.app-native .pl-calcresult,
+html.app-native .pl-exerciselist,
+html.app-native .train-quicktpl,
+html.app-native .gamification {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .pl-expandcard,
+html.app-native .pl-metriccard,
+html.app-native .pl-calcsection,
+html.app-native .pl-calcresult,
+html.app-native .train-quicktpl {
+  border-radius: 20px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pl-popupoverlay,
+  html.app-native .pl-popupnum,
+  html.app-native .pl-popupselect,
+  html.app-native .pl-expandcard,
+  html.app-native .pl-metriccard,
+  html.app-native .pl-calcsection,
+  html.app-native .pl-savebtn,
+  html.app-native .pl-popuptoggle,
+  html.app-native .pl-calcresult,
+  html.app-native .pl-exerciselist,
+  html.app-native .train-quicktpl,
+  html.app-native .gamification {
+    animation: none;
+  }
+}
+
 /* ─── 53. NATIVE DEEP-21 — исследования, панели, риски, фарма ── */
 html.app-native .sup-research,
 html.app-native .train-propanels,
