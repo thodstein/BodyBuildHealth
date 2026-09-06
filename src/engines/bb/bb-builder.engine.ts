@@ -30,6 +30,7 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { findPatternAlternative } from './bb-exercise-rotation.engine';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
+import { computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
@@ -1049,8 +1050,15 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
         let keptCount = info.exs.length;
         // BUG-FIX: гарантировать минимум 1 упражнение (floor сетов) даже если cap < floor.
         // Раньше при cap=0 или cap=1 удалялись ВСЕ упражнения → мышца без объёма.
+        // MGF-слот (+1 частота) не удаляем: он минимальный (2 сета) и ушёл бы
+        // первым, обнуляя фичу; перебор капа ограничен его 2 сетами.
         while (keptCount * floor > cap && keptCount > 1) {
-          const removed = sortedExs.pop()!;
+          let idx = -1;
+          for (let i = sortedExs.length - 1; i >= 0; i--) {
+            if (!/MGF\/IGF1 слот/.test(String((sortedExs[i] as any).comment || ''))) { idx = i; break; }
+          }
+          if (idx < 0) break;
+          const removed = sortedExs.splice(idx, 1)[0];
           toRemove.push(removed);
           keptCount--;
         }
@@ -2755,15 +2763,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // раздувают supporting до baseline и блоки не различаются (spec-unified /
   // tradeoff multiblock). Legacy-путь (авто-расписание) не трогаем.
   const hasExplicitSpecSchedule = Array.isArray(input.specializationSchedule) && input.specializationSchedule.length > 0;
-  // DC-лайт гейт (Dante — только AAS heavy + advanced/enhanced): доза парсится
-  // локально (parseMethDoseEarly определён ниже, у пост-обработки — здесь инлайн
-  // тот же разбор, без дублирования логики решения).
-  const dcDoseAAS = (() => {
-    const raw = (input.pedDoses as any)?.['AAS'];
-    if (typeof raw === 'number') return raw;
-    if (raw != null) return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
-    return 0;
-  })();
+  // DC-лайт гейт (Dante — только AAS heavy + advanced/enhanced): доза суммарно
+  // через T-eq агрегат (ключи tren/deca без 'AAS' тоже считаются).
+  const dcDoseAAS = computeAASEquivDose(input.pedDoses);
   const dcGatePass = !!input.dcMode && (level === 'advanced' || level === 'enhanced') && dcDoseAAS >= 750;
   const dcGateNote = input.dcMode && !dcGatePass
     ? `💀 DC-лайт выкл: нужен AAS ≥750 + advanced/enhanced (сейчас: AAS ${dcDoseAAS}мг, уровень ${level}).`
@@ -3867,8 +3869,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   // MGF/IGF1 локальный слот (P2.9): цель специализации получает РЕАЛЬНЫЙ +1
   // памп-день/нед (частота физически, не комментарием) — 1 изоляция 2 сета
-  // RIR 3 в сессию, где цели ещё нет, но тег подходит. Инъекции — post-workout
-  // в дни цели (dayMap ниже: дни памп-сессий цели по неделям).
+  // RIR 3 в сессию, где цели ещё нет. Инъекции — post-workout в дни цели
+  // (dayMap пишет overlay по финальному плану).
   // Сторожа: только активные MGF/IGF1-дозы И активная специализация; deload
   // пропускаем; exclude/graded уважаем; MRV-кап и лимиты сессии не рвём
   // (нет комнаты — пропуск, не насилие).
@@ -3877,10 +3879,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const igfDose = parseMethDoseEarly((input.pedDoses as any)?.['IGF1']);
     const mgfActive = mgfDose > 0 || igfDose > 0;
     if (mgfActive && specRes?.active && (specRes.targets || []).length > 0 && finalPlan.weeks.length > 0) {
-      const mgfTargets = specRes.targets.map((t: string) => collapseKey(t));
-      const dayMap: Record<string, number[]> = {};
       for (const w of finalPlan.weeks) {
         if ((w as any).phase === 'deload' || (w as any).deload) continue;
+        // Цели понедельно (явные блоки!), tradeoff-недели — вне слота
+        // (трансфер доноров считается от построенного плана).
+        if (tradeoffForWeek(specSchedule, (w as any).week)) continue;
+        const weekTargets = hasExplicitSpecSchedule
+          ? specResForWeekSchedule(specSchedule, (w as any).week).weak
+          : (specRes.targets || []);
+        const mgfTargets = weekTargets.map((t: string) => collapseKey(t));
+        if (!mgfTargets.length) continue;
         for (const tm of mgfTargets) {
           if (excludedMuscles.has(tm)) continue;
           if (gradedInjuries.some(inj => collapseKey(inj.muscle) === tm)) continue;
@@ -3896,14 +3904,26 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           }
           if (capM && weekDirect + 2 > capM) continue;
           // День для слота: строгие теги для больших мышц (иначе занос —
-          // TAG-гигиена), для малых памп-мышц — любая тренировочная сессия
-          // (финишер уместен везде; MGF колется локально 2-3×/нед, а большие
-          // дни цели обычно уже покрыты). Малые: руки/икры/предплечья/пресс/
-          // трапы/пучки дельт.
+          // TAG-гигиена), для малых памп-мышц — любая тренировочная сессия,
+          // СОВМЕСТИМАЯ с гигиеной (иначе финализатор удалит слот как занос:
+          // traps/forearms — только тяговые/верхние дни, calves — только ноги,
+          // трицепс — не ноги). MGF колется локально 2-3×/нед, а большие
+          // дни цели обычно уже покрыты.
           const strictMuscles = new Set(['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders']);
+          const LOOSE_DAY_TAGS: Record<string, string[]> = {
+            biceps: ['push', 'pull', 'upper', 'fullbody', 'arms', 'chest', 'back', 'shoulders'],
+            triceps: ['push', 'pull', 'upper', 'fullbody', 'arms', 'chest', 'back', 'shoulders'],
+            forearms: ['pull', 'upper', 'fullbody', 'arms', 'back', 'shoulders', 'torso'],
+            traps: ['pull', 'upper', 'fullbody', 'back', 'shoulders', 'torso'],
+            calves: ['legs', 'lower', 'fullbody'],
+            abs: ['push', 'pull', 'legs', 'upper', 'lower', 'fullbody', 'core', 'arms'],
+            delt_front: ['push', 'upper', 'fullbody', 'shoulders'],
+            delt_mid: ['push', 'pull', 'upper', 'fullbody', 'shoulders'],
+            delt_rear: ['pull', 'upper', 'fullbody', 'shoulders'],
+          };
           const allowedTags = strictMuscles.has(tm)
             ? (WEAKPOINT_DAY_TAGS[tm] ?? ['Legs', 'Lower', 'FullBody'])
-            : ['push', 'pull', 'legs', 'upper', 'lower', 'fullbody', 'arms', 'chest', 'back', 'shoulders'];
+            : (LOOSE_DAY_TAGS[tm] ?? ['push', 'pull', 'upper', 'fullbody', 'arms']);
           let best: any = null;
           let bestScore = -Infinity;
           for (const s of w.sessions) {
@@ -3945,16 +3965,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             comment: `🧬 MGF/IGF1 слот: +1 памп-день/нед для ${tm} (2×12-15 RIR 3 @${wgt}кг) — колите post-workout в дни цели.`,
             warmupSets: [], rationale: 'MGF pump slot: +1 частота.',
           });
-          const dayNo = w.sessions.indexOf(best) + 1;
-          if (!dayMap[tm]) dayMap[tm] = [];
-          dayMap[tm].push(dayNo);
         }
       }
-      const doseTxt = [mgfDose > 0 ? `MGF ${mgfDose}мкг` : '', igfDose > 0 ? `IGF1 ${igfDose}мкг` : ''].filter(Boolean).join(' + ');
-      for (const tm of Object.keys(dayMap)) {
-        const uniq = [...new Set(dayMap[tm])].sort((a, b) => a - b);
-        rationale.push(`💉 MGF dayMap: ${tm} — памп-дни недели: дни ${uniq.join(', ')} (колите post-workout в дни цели: ${doseTxt}; IGF1 строго с углеводами)`);
-      }
+      // dayMap-дни инъекций пишет overlay (applyPEDMethodologyToPlan) — он видит
+      // ФИНАЛЬНЫЙ план: только выжившие слоты/сессии, без stale-строк.
     }
   }
   // P0-6 (audit 2026-07): feedback-driven rebuild из дневника.

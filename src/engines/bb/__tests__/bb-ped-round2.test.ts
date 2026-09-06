@@ -100,6 +100,31 @@ describe('C: MGF +1 памп-слот + dayMap', () => {
     const noMgf = buildBBPlan(specBase);
     expect(slotOf(noMgf).length).toBe(0);
   }, 30000);
+  it('явное расписание: слоты следуют целям блоков', () => {
+    const pedAdapt = adaptForPEDs(['MGF'] as any, 20, { MGF: 200 }, 'moderate');
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'intermediate', trainingYears: 3, goal: 'mass',
+      weeks: 12, workMax: WM, weakPoints: ['forearms'], specialization: true, pedDoses: { MGF: 200 },
+      specializationSchedule: [{ weekStart: 1, weekEnd: 8, targets: ['forearms'] }, { weekStart: 9, weekEnd: 12, targets: ['biceps'] }],
+    } as any, pedAdapt);
+    // Каждый слот — в мышцу активного блока СВОЕЙ недели (не чужого блока).
+    let total = 0;
+    for (let w = 1; w <= 12; w++) {
+      if ((plan.weeks[w - 1] as any).phase === 'deload' || (plan.weeks[w - 1] as any).deload) continue;
+      const expected = w <= 8 ? ['forearms'] : ['biceps'];
+      const slots = plan.weeks[w - 1].sessions
+        .flatMap((s: any) => s.exercises)
+        .filter((e: any) => !(e as any).warmupActivator && String((e as any).comment || '').includes('MGF/IGF1'));
+      for (const sl of slots) {
+        // только настоящие слоты (пометки myo-reps/lengthened — не слоты)
+        if (!String((sl as any).comment || '').includes('MGF/IGF1 слот')) continue;
+        total++;
+        expect(expected, `нед ${w}: слот ${sl.muscle}`).toContain(String(sl.muscle));
+      }
+    }
+    expect(total, 'слоты есть').toBeGreaterThan(0);
+    expect(plan.rationale.some((r: string) => r.includes('MGF dayMap'))).toBe(true);
+  }, 30000);
 });
 
 describe('D: DC-лайт', () => {

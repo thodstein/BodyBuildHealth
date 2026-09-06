@@ -18,6 +18,7 @@
  * дней и MRV-капы не трогает. Интеграция: recommendPEDMethodology (фаза в
  * pedProfile для schemeFor) + applyPEDMethodologyToPlan (пометки по неделям).
  */
+import { computeAASEquivDose } from './bb-ped-adaptation.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
 
@@ -109,8 +110,10 @@ export function insulinSafetyCheck(peds: PED[], pedDoses?: Record<string, number
   const doseIU = doseOf(pedDoses, 'insulin');
   const active = peds.includes('insulin') && doseIU > 0;
   const warnings: string[] = [];
+  // Соло = нет AAS (включая вещества-эквиваленты: tren/deca/oxa — через
+  // T-eq агрегат, а не только ключ 'AAS') и нет GH.
   const soloWithoutAasGh =
-    active && doseOf(pedDoses, 'AAS') <= 0 && doseOf(pedDoses, 'GH') <= 0;
+    active && computeAASEquivDose(pedDoses) <= 0 && doseOf(pedDoses, 'GH') <= 0;
   if (!active) return { active, doseIU: 0, requiredCarbsG: 0, soloWithoutAasGh: false, warnings };
   warnings.push(
     `Инсулин ${doseIU} IU: обязательно ${carbsForInsulinDose(doseIU)} г быстрых углеводов вокруг инъекции (10 г/1 IU) + EAA 10–20 г — без аминокислот синтез не растёт (PMC5723243)`,

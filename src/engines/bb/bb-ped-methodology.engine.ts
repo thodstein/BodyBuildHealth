@@ -9,6 +9,8 @@ import type { RepSchemeId } from './bb-rep-schemes.engine';
 import { schemeFor, type SchemeForInput } from './bb-rep-schemes.engine';
 import type { BBPhase } from '../periodization';
 import { resolvePedPhase, describePedPhase, insulinSafetyCheck, type PedPhase, type InsulinSafety } from './bb-ped-phasing.engine';
+import { canonicalMuscle } from './bb-specialization.engine';
+import { computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { SessionMethodology } from './bb-session-order.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
@@ -71,7 +73,11 @@ function dose(doses: Record<string, number>, k: string): number {
 export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodology {
 
   const { peds, pedDoses, level } = input;
-  const AAS = dose(pedDoses, 'AAS');
+  // AAS суммарно через T-eq агрегат: ключи веществ (tren/deca/oxa) без 'AAS'
+  // тоже считаются (иначе tren-курс + инсулин ложно детектится как соло).
+  // Для текста — сырая доза из ключа, для порогов — агрегат.
+  const AASraw = dose(pedDoses, 'AAS');
+  const AAS = computeAASEquivDose(pedDoses);
   const GH = dose(pedDoses, 'GH');
   const INS = dose(pedDoses, 'insulin');
   const MGF = dose(pedDoses, 'MGF');
@@ -101,8 +107,8 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
   if (hasGH || hasIns) { bfrAllowed = true; rationale.push('BFR разрешён (GH/insulin — памп без осевой)'); }
 
   // Failure только при heavy AAS и продвинутом уровне
-  if (isHeavyAAS && isAdv) { failureAllowed = true; rationale.push(`AAS ${AAS}мг — отказ (RIR 0) разрешён на compounds`); }
-  else if (hasAAS) { rationale.push(`AAS ${AAS}мг — RIR 0 только на изоляциях, compounds RIR≥1`); }
+  if (isHeavyAAS && isAdv) { failureAllowed = true; rationale.push(`AAS ${AASraw || AAS}мг — отказ (RIR 0) разрешён на compounds`); }
+  else if (hasAAS) { rationale.push(`AAS ${AASraw || AAS}мг — RIR 0 только на изоляциях, compounds RIR≥1`); }
 
   // Insulin pump window — только когда GH+insulin вместе (синергия IGF-1 печенью)
   if (ghPlusInsulin) {
@@ -242,9 +248,24 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
   // MGF/IGF1 локально: целевая мышца в памп-сессиях получает myo-reps/lengthened
   // приоритет (реальная пометка, не только rationale). Тяж-дни не тронуты.
   if (meth.mgfTargetMuscles.length) {
-    const targetSet = new Set(meth.mgfTargetMuscles.map(m => m.toLowerCase()));
-    const canon = (m: string) => (m || '').toLowerCase();
+    // Каноническое сравнение (back_thickness ≡ back): гранулярные цели
+    // специализации матчатся с каноническими мышцами упражнений.
+    const targetSet = new Set(meth.mgfTargetMuscles.map(m => canonicalMuscle(m.toLowerCase())));
+    const canon = (m: string) => canonicalMuscle((m || '').toLowerCase());
     const phaseByWeek = meth.pedPhaseByWeek || [];
+    // Week-aware цели (явные spec-блоки!): в недели блока-2 маркируем цели
+    // блока-2, а не первичные. Без явного расписания — цели из meth.
+    // Инлайн-поиск блока (без импорта specialization-движка — избегаем
+    // runtime-цикла builder→methodology→specialization→builder).
+    const schedBlocks: any[] = ((plan as any)?.specializationSchedule?.blocks) || [];
+    const hasExplicit = schedBlocks.some(b => ((b as any).targets || []).length > 0);
+    const weekTargets = (weekNo: number): Set<string> => {
+      if (!hasExplicit) return targetSet;
+      const blk = schedBlocks.find(b => weekNo >= (b.weekStart || 0) && weekNo <= (b.weekEnd || 0));
+      const list = ((blk as any)?.targets || []) as string[];
+      if (!list.length) return new Set<string>();
+      return new Set(list.map(m => canon(m)));
+    };
     let marked = 0;
     let skippedDiff = 0;
     for (const w of copy.weeks) {
@@ -253,12 +274,13 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
       // там работает IGF1 (чередование, а не одновременность).
       const weekPhase = phaseByWeek[(w as any).week - 1];
       const isDiffWeek = meth.pedPhase === 'both' && weekPhase === 'differentiation';
+      const weekSet = weekTargets((w as any).week ?? 0);
       for (const s of w.sessions) {
         if (s.character !== 'памп' && s.character !== 'лёг') continue;
         for (const ex of s.exercises) {
           if (ex.role !== 'primary' && ex.role !== 'accessory') continue;
           const exMuscle = canon(String(ex.muscle || ''));
-          if (!exMuscle || !targetSet.has(exMuscle)) continue;
+          if (!exMuscle || !weekSet.has(exMuscle)) continue;
           if (ex.comment?.includes('🧬 MGF/IGF1')) continue;
           if (isDiffWeek) { skippedDiff++; continue; }
           ex.comment = `${ex.comment || ''} | 🧬 MGF/IGF1 локально: myo-reps/lengthened приоритет`.trim().replace(/^\|\s*/, '');
@@ -267,6 +289,28 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
       }
     }
     copy.rationale.push(`🧬 MGF/IGF1 локально: ${meth.mgfTargetMuscles.join(', ')} — +1 частота, памп ${marked > 0 ? `помечен в ${marked} упражнениях` : '(цель вне памп-дней — только частота через параметры сборки)'}, myo-reps/lengthened${skippedDiff > 0 ? `; в недели дифференцировки MGF-пометка снята (${skippedDiff} упр. — там IGF1)` : ''}`);
+    // MGF dayMap из ФИНАЛЬНОГО плана (а не из намерений билдера): дни сессий
+    // цели по неделям — только выжившие сессии. Дозы — в строке выше и safety.
+    {
+      const dayMap: Record<string, Set<number>> = {};
+      for (const w of copy.weeks) {
+        if ((w as any).deload || (w as any).phase === 'deload') continue;
+        ((w as any).sessions || []).forEach((s: any, si: number) => {
+          for (const t of meth.mgfTargetMuscles) {
+            const hit = ((s as any).exercises || []).some((ex: any) =>
+              !(ex as any).warmupActivator && canon(String(ex.muscle || '')) === canon(t));
+            if (hit) {
+              if (!dayMap[t]) dayMap[t] = new Set();
+              dayMap[t].add(si + 1);
+            }
+          }
+        });
+      }
+      for (const t of Object.keys(dayMap)) {
+        const days = [...dayMap[t]].sort((a, b) => a - b);
+        if (days.length) copy.rationale.push(`💉 MGF dayMap: ${t} — памп-дни недели: дни ${days.join(', ')} (колите post-workout в дни цели; IGF1 строго с углеводами)`);
+      }
+    }
   }
   if (meth.periWorkout.intraNote) copy.rationale.push(`🍚 Peri-WO: ${meth.periWorkout.intraNote}`);
   if (meth.periWorkout.warning) copy.rationale.push(`⚠ ${meth.periWorkout.warning}`);

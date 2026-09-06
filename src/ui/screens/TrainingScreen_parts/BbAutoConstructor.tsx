@@ -36,7 +36,7 @@ import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SUMMARY_SUBGROUP_LABEL_RU } from '../../../engines/bb/bb-summary.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
-import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { adaptForPEDs, computeAASEquivDose, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { recommendPEDMethodology, suggestMethodologyForStack } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
@@ -3039,11 +3039,11 @@ export const BbAutoConstructor: React.FC = () => {
                       label='📦 Схема объёма памп-дней'
                       value={volumeScheme}
                       onChange={v => setVolumeScheme(v as any)}
-                      hint={'В коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '') + (((pedDoses.GH || 0) >= 4) ? ' · GH≥4: joint-guard, FST-7 недоступен.' : '')}
+                      hint={'В коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((computeAASEquivDose(pedDoses)) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '') + (((pedDoses.GH || 0) >= 4) ? ' · GH≥4: joint-guard, FST-7 недоступен.' : '')}
                       options={[
                         { id: 'standard', label: 'Стандартная', desc:'Авто: тяж база, памп изоляция.' },
                         { id: 'gvt', label: 'GVT 10×10', desc:'10×10, 60%, 60-90с.' },
-                        ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
+                        ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((computeAASEquivDose(pedDoses)) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
                         { id: 'gironda', label: '8×8 Gironda', desc:'8×8, 45-60с.' },
                       ]}
                     />
@@ -3354,11 +3354,11 @@ export const BbAutoConstructor: React.FC = () => {
             label='📦 Схема объёма памп-дней'
             value={volumeScheme}
             onChange={v => setVolumeScheme(v as any)}
-            hint={'Методики для памп-изоляций (кап 5 сетов/упр; FST-7 финишер — 7 одним движением) — в коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')}
+            hint={'Методики для памп-изоляций (кап 5 сетов/упр; FST-7 финишер — 7 одним движением) — в коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((computeAASEquivDose(pedDoses)) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')}
             options={[
               { id: 'standard', label: 'Стандартная (авто)', desc:'Авто-распределение: тяж — база, памп — изоляция по необходимости. Баланс сила/объём.' },
               { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)', desc:'Немецкий объём 10×10, 60% 1ПМ, 60-90с пауза. Экстремальный объём, только для опытных.' },
-              ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
+              ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((computeAASEquivDose(pedDoses)) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
               { id: 'gironda', label: '8×8 Gironda (60с)', desc:'8×8, 45-60с пауза, умеренный вес — плотный объём Жиронды для сухой массы.' },
             ]}
           />

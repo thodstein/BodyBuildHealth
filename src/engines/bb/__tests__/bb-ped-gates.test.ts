@@ -3,6 +3,7 @@ import { buildBBPlan, type BBBuilderInput } from '../bb-builder.engine';
 import { adaptForPEDs, type PED, type CourseIntensity } from '../bb-ped-adaptation.engine';
 import { schemeFor } from '../bb-rep-schemes.engine';
 import { autoAssignIntensityTechniques } from '../bb-finalize.engine';
+import { recommendPEDMethodology } from '../bb-ped-methodology.engine';
 
 /**
  * bb-ped-gates.test.ts — гейты PED-схем (P0.3 соло-запрет, FST-7 7-in-1 гейт).
@@ -58,6 +59,24 @@ describe('FST-7 7-in-1 гейт', () => {
 });
 
 describe('Соло-инсулин: запрет FST-7/DC', () => {
+  it('tren-курс + инсулин — НЕ соло (T-eq агрегат), запрета нет', () => {
+    const plan = buildWithPED(baseInput({}), ['insulin'] as any, { insulin: 10, tren_acetate: 300 });
+    expect((plan as any).volumeScheme).toBe('fst7');
+    expect(plan.rationale.some((r: string) => r.includes('Соло-инсулин') || r.includes('соло-инсулин'))).toBe(false);
+    expect(fst7Marked(plan).length).toBeGreaterThan(0);
+  }, 30000);
+  it('tren 500 → failureAllowed (T-eq 1250 ≥ 750)', () => {
+    const m = recommendPEDMethodology({ peds: ['AAS'] as any, pedDoses: { tren: 500 }, level: 'advanced' });
+    expect(m.failureAllowed).toBe(true);
+  });
+  it('DC-гейт через агрегат: tren 400 (T-eq 1000) + advanced → ротация', () => {
+    const plan = buildWithPED(
+      { patternId: 'upper_lower_4', level: 'advanced', trainingYears: 5, goal: 'mass', weeks: 8, workMax: WM, dcMode: true } as any,
+      ['AAS'], { tren: 400 }, 'heavy',
+    );
+    expect(plan.rationale.some((r: string) => r.includes('DC-ротация'))).toBe(true);
+    expect(plan.rationale.some((r: string) => r.includes('DC-лайт выкл'))).toBe(false);
+  }, 30000);
   it('соло-инсулин + fst7 → standard + warning', () => {
     const plan = buildWithPED(baseInput({}), ['insulin'], { insulin: 10 });
     expect((plan as any).volumeScheme).toBe('standard');
