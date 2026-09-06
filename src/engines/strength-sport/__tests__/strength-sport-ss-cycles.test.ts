@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { rankSSCycle, recommendSSCycle, bulgarianGate } from '../strength-sport-ss-selector.engine';
 import { buildSSCyclePlan } from '../strength-sport-ss-cycle-to-plan.engine';
+import { buildAnnualFromSSCycles, validateSSAnnual } from '../strength-sport-ss-annual.engine';
+import { buildStrengthPrintHtml, buildStrengthCsv } from '../strength-sport-export';
 
 const WM = {
   snatch: 80, cleanJerk: 100, backSquat: 140, frontSquat: 120, deadlift: 180,
@@ -15,8 +17,8 @@ const baseInput = (over: any = {}) => ({
 }) as any;
 
 describe('ss-cycles index integrity', () => {
-  it('8 циклов, id уникальны', () => {
-    expect(SS_CYCLES.length).toBe(8);
+  it('10 циклов, id уникальны', () => {
+    expect(SS_CYCLES.length).toBe(10);
     const ids = SS_CYCLES.map(c => c.meta.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -120,7 +122,7 @@ describe('ss-cycle-to-plan faithful (дословный)', () => {
     const yoke = plan.weeksData[0].sessions.flatMap(s => s.exercises).find(e => e.id === 'yoke_walk')!;
     expect(yoke.comment).toMatch(/×0.73/);
   });
-  it('все 8 циклов строятся без throw', () => {
+  it('все циклы реестра строятся без throw', () => {
     for (const c of SS_CYCLES) {
       const plan = buildSSCyclePlan(c, baseInput({ mode: c.meta.mode === 'hybrid' ? 'hybrid' : c.meta.mode }) as any, { cycleMode: 'faithful' });
       expect(plan.weeksData.length).toBe(c.meta.weeks);
@@ -145,5 +147,102 @@ describe('ss-cycle-to-plan adapt', () => {
     // 140×0.70=98 → ×0.6=58.8 → 60 (шаг 2.5 в faithful? шаг 2.5: 58.75→60? round(58.8/2.5)=24→60)
     expect(sq.workSets[0].weight).toBeLessThan(98);
     expect(sq.comment).toMatch(/Щадящий/);
+  });
+  it('adapt: per-lift VBT-history режет объём (snatch −31% > верхнего порога 20%)', () => {
+    const faithful = buildSSCyclePlan('ss-ta-general-8', baseInput(), { cycleMode: 'faithful' });
+    const adapt = buildSSCyclePlan('ss-ta-general-8',
+      baseInput({ velocityHistory: { snatch: [1.60, 1.10] } }), { cycleMode: 'adapt' });
+    const fSets = faithful.weeksData[0].totalSets || 0;
+    const aSets = adapt.weeksData[0].totalSets || 0;
+    expect(aSets).toBeLessThan(fSets);
+  });
+  it('adapt: просадка дневника −8% режет, плато +1 сет', () => {
+    const faithful = buildSSCyclePlan('ss-ta-general-8', baseInput(), { cycleMode: 'faithful' });
+    const down = buildSSCyclePlan('ss-ta-general-8',
+      baseInput({ diaryTrend: [{ lift: 'squat', changePct: -8 }] }), { cycleMode: 'adapt' });
+    expect((down.weeksData[0].totalSets || 0)).toBeLessThan(faithful.weeksData[0].totalSets || 0);
+    const plateau = buildSSCyclePlan('ss-ta-general-8',
+      baseInput({ diaryTrend: [{ lift: 'squat', changePct: 0 }] }), { cycleMode: 'adapt' });
+    expect((plateau.weeksData[0].totalSets || 0)).toBeGreaterThan(faithful.weeksData[0].totalSets || 0);
+  });
+  it('adapt: HRV-история не роняет сборку, веса не выше faithful', () => {
+    const faithful = buildSSCyclePlan('ss-ta-general-8', baseInput(), { cycleMode: 'faithful' });
+    try { localStorage.setItem('he_hrv_log', JSON.stringify([55, 58, 52, 57, 54, 56, 53, 55])); } catch { /* noop */ }
+    let adapt;
+    try {
+      adapt = buildSSCyclePlan('ss-ta-general-8', baseInput(), { cycleMode: 'adapt' });
+    } finally {
+      try { localStorage.removeItem('he_hrv_log'); } catch { /* noop */ }
+    }
+    const fW = faithful.weeksData[0].sessions[0].exercises[0].workSets[0].weight;
+    const aW = adapt.weeksData[0].sessions[0].exercises[0].workSets[0].weight;
+    expect(aW).toBeLessThanOrEqual(fW);
+  });
+  it('весогонка: протокол в rationale, сборка без throw', () => {
+    const plan = buildSSCyclePlan('ss-ta-general-8',
+      baseInput({ weightCutKg: 3, bodyweight: 80, sex: 'male' }), { cycleMode: 'adapt' });
+    expect(plan.weeksData.length).toBe(8);
+    expect(plan.rationale.join(' ')).toMatch(/Весогонка/);
+  });
+  it('гибрид с профильным циклом — честное предупреждение', () => {
+    const plan = buildSSCyclePlan('ss-ta-general-8', baseInput({ mode: 'hybrid' }), { cycleMode: 'faithful' });
+    expect(plan.validation.warnings.join(' ')).toMatch(/Гибрид/);
+  });
+});
+
+describe('ss-selector weak/contest', () => {  it('слабый лог тянет стронг-циклы с логом вверх', () => {
+    const ranked = rankSSCycle({ mode: 'strongman', level: 'intermediate', daysPerWeek: 4, weeks: 12, weakPoints: ['log_press'] });
+    const top = ranked.filter(r => !r.blocked)[0];
+    const ids = top.cycle.weeks.flatMap(w => w.flatMap(d => d.exercises.map(e => e.id)));
+    expect(ids).toContain('log_press');
+    expect(top.reasons.join(' ')).toMatch(/слабые покрыты/);
+  });
+  it('контест-ивенты поднимают цикл с их покрытием', () => {
+    const ranked = rankSSCycle({ mode: 'strongman', level: 'intermediate', daysPerWeek: 4, weeks: 12, contestEvents: ['yoke_walk', 'atlas_stone_load'] });
+    const top = ranked.filter(r => !r.blocked)[0];
+    expect(top.reasons.join(' ')).toMatch(/контест-ивенты/);
+  });
+});
+
+describe('ss-annual из циклов', () => {
+  it('два цикла → блоки 1-8 + 9-12, валидация ок', () => {
+    const annual = buildAnnualFromSSCycles(['ss-ta-general-8', 'ss-sm-531-4'], baseInput());
+    expect(annual.totalWeeks).toBe(12);
+    expect(annual.blocks.length).toBe(2);
+    expect(annual.blocks[0].startWeek).toBe(1);
+    expect(annual.blocks[1].startWeek).toBe(9);
+    expect(validateSSAnnual(annual).ok).toBe(true);
+  });
+  it('дата старта якорится на последний блок с тейпером', () => {
+    const annual = buildAnnualFromSSCycles(['ss-ta-general-8', 'ss-sm-start-12'], baseInput(), { competitionDate: '2026-10-01', taperWeeks: 1 });
+    const last = annual.blocks[annual.blocks.length - 1];
+    expect(last.competitionDate).toBe('2026-10-01');
+    expect(last.plan?.weeksData.some(w => (w as any).taper)).toBe(true);
+  });
+  it('неизвестный id → throw', () => {
+    expect(() => buildAnnualFromSSCycles(['nope'], baseInput())).toThrow(/не найден/);
+  });
+});
+
+describe('ss-print/csv', () => {
+  it('печать содержит cycle-id, дистанции и AMRAP', () => {
+    const sm = buildSSCyclePlan('ss-sm-start-12',
+      { mode: 'strongman', goal: 'strength', level: 'beginner', weeks: 12, daysPerWeek: 4, workMax: WM } as any,
+      { cycleMode: 'faithful' });
+    const html = buildStrengthPrintHtml(sm);
+    expect(html).toContain('cycle:ss-sm-start-12');
+    expect(html).toContain('м');
+    const w531 = buildSSCyclePlan('ss-sm-531-4',
+      { mode: 'strongman', goal: 'strength', level: 'intermediate', weeks: 4, daysPerWeek: 4, workMax: WM } as any,
+      { cycleMode: 'faithful' });
+    expect(buildStrengthPrintHtml(w531)).toContain('AMRAP');
+  });
+  it('csv содержит шапку с Дист и строки ивентов', () => {
+    const sm = buildSSCyclePlan('ss-sm-start-12',
+      { mode: 'strongman', goal: 'strength', level: 'beginner', weeks: 12, daysPerWeek: 4, workMax: WM } as any,
+      { cycleMode: 'faithful' });
+    const csv = buildStrengthCsv(sm);
+    expect(csv.split('\n')[0]).toContain('Дист');
+    expect(csv).toContain('Фермер');
   });
 });

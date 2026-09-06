@@ -6,7 +6,8 @@
  *   это и есть «дословно»). Безопасность: травмы (gentle ×0.6-0.7, RIR+1) и
  *   фолбэк снарядов (STRONG_FALLBACK_COEFF + бейдж) применяются всегда.
  * - adapt: faithful + поверх гарды билдера (ACWR/outside/VBT объём, RIR-шифты,
- *   pmForWeek-дрейф по лифту).
+ *   pmForWeek-дрейф по лифту, per-lift VBT-history, diaryTrend-e1RM, HRV-вес,
+ *   весогонка-объём).
  * Привязка к дате старта: mock/taper-недели из meta якорятся к competitionDate
  * в rationale (строка «якорь: mock нед N → дата»), порядок недель не меняем.
  */
@@ -17,6 +18,9 @@ import { rirForWeek, phaseForWeek, pmForWeek } from './strength-sport-progressio
 import { tempoForSS, restForSS } from './strength-sport-loading';
 import { warmupRampFor } from './strength-sport-warmup';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
+import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, validateWeightCutProtocolSS } from './strength-sport-weight-cut.engine';
+import { hrvReport } from './strength-sport-hrv.engine';
+import { velocityWeightAdjustFactor, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
 import { getExerciseById } from '../../core/exercise-catalog';
 import { outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
 import type {
@@ -71,6 +75,58 @@ function baseForExercise(ex: SSExerciseSpec, workMax: StrengthSportInput['workMa
   return base;
 }
 
+// Пороги потерь скорости по типу лифта — паритет с билдером (PLOS 2026)
+function vbtThresholds(id: string): { low: number; high: number; isTA: boolean } {
+  const isCarryVBT = ['yoke_walk', 'farmers_walk_heavy', 'frame_carry', 'husafell_carry', 'conan_wheel', 'shield_carry', 'truck_pull', 'arm_over_arm', 'sandbag_carry', 'sled_push', 'sled_drag', 'duck_walk'].some(k => id.includes(k.replace('_walk', '')) || id === k);
+  const isTAPull = id.includes('pull') || id.includes('squat');
+  const isTA = id.includes('snatch') || id.includes('clean') || id.includes('jerk');
+  if (isTAPull) return { low: 15, high: 25, isTA };
+  if (isTA) return { low: 10, high: 20, isTA };
+  if (isCarryVBT) return { low: 15, high: 25, isTA };
+  return { low: 20, high: 30, isTA };
+}
+
+function histLossFor(id: string, vHist: Record<string, number[]> | undefined): number {
+  if (!vHist) return 0;
+  const hist = vHist[id] || vHist[id.toLowerCase()] || (vHist as any)['all'];
+  if (!Array.isArray(hist) || hist.length < 2) return 0;
+  const best = Math.max(...hist);
+  const last = hist[hist.length - 1];
+  if (!(best > 0)) return 0;
+  return ((best - last) / best) * 100;
+}
+
+// Матчинг тренда дневника — паритет с билдером (snatch/clean/squat/deadlift + exact)
+function trendFor(id: string, trends: Array<{ lift: string; changePct: number }> | null | undefined): { lift: string; changePct: number } | null {
+  if (!Array.isArray(trends) || !trends.length) return null;
+  return trends.find(tr =>
+    tr.lift === id ||
+    (id.includes('snatch') && tr.lift === 'snatch') ||
+    (id.includes('clean') && tr.lift === 'clean') ||
+    (id.includes('squat') && tr.lift === 'squat') ||
+    (id.includes('deadlift') && tr.lift === 'deadlift'),
+  ) || null;
+}
+
+// HRV-вес — паритет с билдером (dangerous ×0.85, caution ×0.94), чтение guarded
+function hrvWeightFactor(): { factor: number; zone: string | null } {
+  try {
+    if (typeof localStorage === 'undefined') return { factor: 1, zone: null };
+    const raw = localStorage.getItem('he_hrv_log');
+    if (!raw) return { factor: 1, zone: null };
+    const arr = JSON.parse(raw);
+    const vals = Array.isArray(arr)
+      ? arr.map((s: any) => s.hrvMs ?? s.hrv ?? s.value).filter((v: any) => Number.isFinite(v) && v > 0)
+      : [];
+    if (vals.length < 7) return { factor: 1, zone: null };
+    const rep = hrvReport(vals);
+    if (!rep) return { factor: 1, zone: null };
+    if ((rep as any).zone === 'dangerous') return { factor: 0.85, zone: 'dangerous' };
+    if ((rep as any).zone === 'caution') return { factor: 0.94, zone: 'caution' };
+    return { factor: 1, zone: (rep as any).zone || null };
+  } catch { return { factor: 1, zone: null }; }
+}
+
 export function buildSSCyclePlan(
   templateOrId: SSCycleTemplate | string,
   input: StrengthSportInput,
@@ -88,7 +144,16 @@ export function buildSSCyclePlan(
   const sex = (opts?.sex || (input as any).sex) as 'male' | 'female' | undefined;
   const acwr = (input as any).acwr as { ratio: number; zone: string } | null | undefined;
   const vLoss = (input as any).velocityLossPct as number | undefined;
+  const vHist = (input as any).velocityHistory as Record<string, number[]> | undefined;
+  const trends = (input as any).diaryTrend as Array<{ lift: string; changePct: number }> | null | undefined;
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
+  const bwForWc = (opts?.bodyweight || (input as any).bodyweight || 80) as number;
+  const sexForWc = ((opts?.sex || (input as any).sex || 'male') === 'female' ? 'female' : 'male') as 'male' | 'female';
+  // Весогонка — протокол как в билдере (объём режем только в adapt, валидация — всегда)
+  const wcProtoInput: any = (input as any).weightCutProtocolSS || (input as any).weightCutProtocol || null;
+  const wcLossKg: number | null = typeof (input as any).weightCutKg === 'number' ? (input as any).weightCutKg : null;
+  let wcProto: any = null;
+  try { wcProto = wcProtoInput || (wcLossKg ? buildWeightCutProtocolSS(wcLossKg, { startWeightKg: bwForWc } as any) : null); } catch { wcProto = wcProtoInput || null; }
 
   const rationale: string[] = [];
   const warnings: string[] = [];
@@ -96,6 +161,13 @@ export function buildSSCyclePlan(
   rationale.push(`📚 Интернет-цикл: ${t.meta.title} · режим ${mode === 'faithful' ? 'дословный' : 'адаптированный'}`);
   if (tm !== 1) rationale.push(`Training max ×${tm} (проценты от 90% ПМ)`);
   if (t.meta.bulgarian) rationale.push('⚠ Daily-max протокол: максимумы дня, согласие получено, следите за ACWR/суставами');
+  if (wcProto) {
+    try {
+      for (const e of validateWeightCutProtocolSS(wcProto, { bodyweightKg: bwForWc, sex: sexForWc })) warnings.push(e);
+    } catch { /* валидация весогонки недоступна */ }
+    const loss = (wcProto as any).targetLossKg ?? wcLossKg ?? '?';
+    rationale.push(`Весогонка: −${loss}кг (вода/Na/угли по протоколу, объём режется в adapt)`);
+  }
   // Якорь к дате старта
   if (input.competitionDate) {
     const anchors: string[] = [];
@@ -169,24 +241,56 @@ export function buildSSCyclePlan(
           }
         }
 
-        // Adapt-гарды объёма (faithful — без срезок, дословно)
+        // Adapt-гарды — паритет с билдером (faithful — без срезок, дословно)
         let finalSets = workSets;
         let finalRirBump = 0;
         if (mode === 'adapt') {
+          const th = vbtThresholds(espec.id);
+          const minSets = espec.id === 'tire_flip' ? 1 : 2;
           let mult = 1;
           if (outM < 1) mult *= outM;
           if (acwr?.zone === 'dangerous') { mult *= 0.65; finalRirBump += 2; }
           else if (acwr?.zone === 'caution') { mult *= 0.85; finalRirBump += 1; }
           else if (acwr?.zone === 'undertrained') mult *= 1.1;
-          if (typeof vLoss === 'number' && vLoss > 20) { mult *= 0.9; finalRirBump += 1; }
+          if (typeof vLoss === 'number' && vLoss > th.low) { mult *= 0.9; finalRirBump += 1; }
+          // Per-lift VBT-history (3 точки) — как в билдере
+          const hist = histLossFor(espec.id, vHist);
+          if (hist > th.low && finalSets.length > 2) { mult *= hist > th.high ? 0.80 : 0.90; finalRirBump += hist > th.high ? 2 : 1; }
+          // Дневник e1RM-тренд 28д: просадка −5% → −15% объёма, плато → +1 сет
+          const tr = trendFor(espec.id, trends);
+          let plateau = false;
+          if (tr) {
+            if (tr.changePct < -5) { mult *= 0.85; finalRirBump += 1; }
+            else if (tr.changePct < 2) plateau = true;
+          }
+          // Весогонка — объём недели по протоколу
+          if (wcProto) {
+            try {
+              const wcm = weightCutVolumeMultiplierSS(w, weeks, wcProto);
+              if (wcm < 1) mult *= wcm;
+            } catch { /* протокол недоступен */ }
+          }
           if (mult < 1 && finalSets.length > 2) {
-            const keep = Math.max(2, Math.round(finalSets.length * mult));
-            finalSets = finalSets.slice(0, keep);
-          } else if (mult > 1 && finalSets.length < 6) {
+            finalSets = finalSets.slice(0, Math.max(minSets, Math.round(finalSets.length * mult)));
+          } else if ((mult > 1 || plateau) && finalSets.length < 6) {
             const add = finalSets[finalSets.length - 1];
             if (add) finalSets = [...finalSets, { ...add }];
           }
           if (finalRirBump > 0) finalSets = finalSets.map(s => ({ ...s, rir: Math.min(4, s.rir + finalRirBump) }));
+          // Вес: EWMA-VBT + HRV — паритет с билдером
+          try {
+            const hArr = vHist ? (vHist[espec.id] || vHist[espec.id.toLowerCase()]) : null;
+            let ewmaLoss: number | null = null;
+            if (Array.isArray(hArr) && hArr.length >= 2) {
+              const diag = diagnoseVelocityLossEwma(hArr, th.low as any);
+              if (diag && diag.lossPct > 0) ewmaLoss = diag.lossPct;
+            }
+            const effLoss = Math.max(hist || 0, ewmaLoss || 0, typeof vLoss === 'number' ? vLoss : 0);
+            const wFactor = velocityWeightAdjustFactor(effLoss, espec.id);
+            const hrvF = hrvWeightFactor().factor;
+            const wMult = (wFactor < 1 ? wFactor : 1) * (hrvF < 1 ? hrvF : 1);
+            if (wMult < 1) finalSets = finalSets.map(s => (s.weight > 0 ? { ...s, weight: round25(s.weight * wMult) } : s));
+          } catch { /* VBT/HRV недоступны */ }
         }
 
         const comments: string[] = [];
@@ -234,6 +338,9 @@ export function buildSSCyclePlan(
 
   if (fallbackUsed.size) warnings.push(`Нет спец-снарядов — замены: ${[...fallbackUsed].join(', ')} (коэффы STRONG_FALLBACK_COEFF)`);
   if (t.meta.bulgarian) warnings.push('Daily-max: при боли ≥4/недовосстановлении — пропустить максимум дня (сайд→изометрия)');
+  if ((input as any).mode === 'hybrid' && t.meta.mode !== 'hybrid') {
+    warnings.push(`Гибрид: взят профильный цикл «${t.meta.mode}» — план собран в режиме ${ssMode}. Для микса ТА+стронг выбирайте гибридный цикл.`);
+  }
   if (mode === 'faithful' && (acwr?.zone === 'dangerous' || acwr?.zone === 'caution')) {
     warnings.push(`Дословный режим: ACWR ${acwr?.zone} НЕ резал объём (faithful). Для авто-срезок — режим adapt.`);
   }

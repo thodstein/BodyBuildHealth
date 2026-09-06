@@ -11,6 +11,8 @@ import { SS_SM_START_12 } from './ss-sm-start-12';
 import { SS_SM_TRIO_12 } from './ss-sm-trio-12';
 import { SS_SM_531_4 } from './ss-sm-531-4';
 import { SS_SM_CUBE_12 } from './ss-sm-cube-12';
+import { SS_SM_BASE_12 } from './ss-sm-base-12';
+import { SS_HB_MIX_8 } from './ss-hb-mix-8';
 
 export const SS_CYCLES: SSCycleTemplate[] = [
   SS_TA_GENERAL_8,
@@ -21,6 +23,8 @@ export const SS_CYCLES: SSCycleTemplate[] = [
   SS_SM_TRIO_12,
   SS_SM_531_4,
   SS_SM_CUBE_12,
+  SS_SM_BASE_12,
+  SS_HB_MIX_8,
 ];
 
 export function getSSCycleById(id: string): SSCycleTemplate | undefined {

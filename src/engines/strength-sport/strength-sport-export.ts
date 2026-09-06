@@ -86,6 +86,7 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   let extra = '';
   try {
     const snap: any = plan.inputSnapshot || {};
+    if (snap.cycleId) extra += `<p style="font-size:11px;margin:4px 0"><b>Интернет-цикл:</b> ${escHtml(snap.cycleId)} · ${escHtml(snap.cycleMode || 'faithful')}${snap.cycleMode === 'adapt' ? ' (с гардами ACWR/VBT)' : ' (дословно)'}</p>`;
     if (snap.contest?.events?.length) extra += `<p style="font-size:11px;margin:4px 0"><b>Контест:</b> ${snap.contest.events.map((e:any)=> e.id).join(' + ')}${snap.contest.name?` · ${escHtml(snap.contest.name)}`:''} · ${snap.contestStrategy||'balanced'}</p>`;
     if (snap.weightCutProtocolSS) extra += `<p style="font-size:11px;margin:4px 0"><b>Весогонка ТА:</b> ${snap.weightCutProtocolSS.targetLossKg}кг · вода ${snap.weightCutProtocolSS.waterMode} · Na ${snap.weightCutProtocolSS.sodiumMode}</p>`;
     if (snap.weakPoints && snap.weakPoints.length) extra += `<p style="font-size:11px;margin:4px 0"><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;

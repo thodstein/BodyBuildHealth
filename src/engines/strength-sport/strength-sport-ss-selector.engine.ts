@@ -16,6 +16,8 @@ export interface SSCycleRankInput {
   goal?: string;
   acwrZone?: string | null;
   cycleConsent?: boolean; // явное согласие на daily-max (болгарский)
+  weakPoints?: string[]; // слабые лифты/зоны — цикл с их покрытием приоритетнее
+  contestEvents?: string[]; // id ивентов заявленного контеста — цикл с ними приоритетнее
 }
 
 export interface SSCycleScore {
@@ -96,6 +98,38 @@ export function rankSSCycle(input: SSCycleRankInput): SSCycleScore[] {
     if (input.goal === 'peaking' && (m.taperWeeks?.length || m.mockWeeks?.length)) {
       score += 10;
       reasons.push('пик: есть тейпер/mock +10');
+    }
+    // Слабые лифты: покрытие токенами id упражнений цикла (×2 частота у StrongmanPlan — здесь приоритетом)
+    const cycleIds: string[] = [];
+    try {
+      for (const wk of cycle.weeks) for (const d of wk) for (const e of d.exercises) cycleIds.push(String(e.id).toLowerCase());
+    } catch { /* пустой цикл */ }
+    const weakTokens = (input.weakPoints || [])
+      .flatMap(w => String(w).toLowerCase().split(/[^a-zа-яё]+/))
+      .filter(t => t.length > 2);
+    let weakCovered = 0;
+    for (const tok of weakTokens) {
+      if (cycleIds.some(id => id.includes(tok) || tok.includes(id))) weakCovered++;
+    }
+    if (weakCovered > 0) {
+      const bonus = Math.min(16, weakCovered * 8);
+      score += bonus;
+      reasons.push(`слабые покрыты ${weakCovered} (+${bonus})`);
+    }
+    // Контест: ивенты заявки в цикле + тейпер/mock-якорь
+    const contestIds = (input.contestEvents || []).map(s => String(s).toLowerCase());
+    let contestHits = 0;
+    for (const ev of contestIds) {
+      if (cycleIds.some(id => id === ev || id.includes(ev) || ev.includes(id))) contestHits++;
+    }
+    if (contestHits > 0) {
+      const bonus = Math.min(15, contestHits * 5);
+      score += bonus;
+      reasons.push(`контест-ивенты ${contestHits} (+${bonus})`);
+      if (m.taperWeeks?.length || m.mockWeeks?.length) {
+        score += 5;
+        reasons.push('контест-якорь тейпер/mock +5');
+      }
     }
     const fit: SSCycleScore['fit'] = score >= 120 ? 'exact' : score >= 85 ? 'close' : 'stretch';
     out.push({ cycle, score, fit, reasons, fallbackNote });

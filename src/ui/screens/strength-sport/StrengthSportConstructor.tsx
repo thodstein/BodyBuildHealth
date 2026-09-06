@@ -32,6 +32,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { rankSSCycle, recommendSSCycle } from '../../../engines/strength-sport/strength-sport-ss-selector.engine';
 import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
+import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strength-sport-ss-annual.engine';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, EventCard, StrengthGantt, StrengthHeatmap, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
@@ -147,9 +148,14 @@ export const StrengthSportConstructor: React.FC = () => {
   // Ранжирование интернет-циклов под текущие параметры (селектор ss-cycles)
   const rankedCycles = useMemo(() => {
     try {
-      return rankSSCycle({ mode, level, daysPerWeek: days, weeks, equipment, goal, acwrZone: (acwr as any)?.zone || null, cycleConsent });
+      let contestEvents: string[] | undefined;
+      try {
+        const evs = (contest as any)?.events;
+        if (Array.isArray(evs)) contestEvents = evs.map((e: any) => String(e.id)).filter(Boolean);
+      } catch { contestEvents = undefined; }
+      return rankSSCycle({ mode, level, daysPerWeek: days, weeks, equipment, goal, acwrZone: (acwr as any)?.zone || null, cycleConsent, weakPoints: weakPoints.length ? weakPoints : undefined, contestEvents });
     } catch { return []; }
-  }, [mode, level, days, weeks, equipment, goal, acwr, cycleConsent]);
+  }, [mode, level, days, weeks, equipment, goal, acwr, cycleConsent, weakPoints, contest]);
 
   React.useEffect(() => {
     try {
@@ -1152,6 +1158,17 @@ export const StrengthSportConstructor: React.FC = () => {
                       saveAnnualSS(ann2); setAnnual(ann2); setMsg('✦ Сезон 2 пика собран'); setTimeout(()=>setMsg(''),2200);
                     }catch{}
                   }} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #f59e0b, #ef4444)', color:'#fff', border:'none' }}>✦ Собрать сезон 2 пика</button>
+                  <button onClick={()=>{
+                    try{
+                      const top3 = rankedCycles.filter(r=> !r.blocked).slice(0, 3).map(r=> r.cycle.meta.id);
+                      if (!top3.length) { setMsg('Нет доступных циклов'); setTimeout(()=>setMsg(''),1800); return; }
+                      const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: new Date().toISOString().slice(0,10) };
+                      const ann3 = buildAnnualFromSSCycles(top3, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks: 1 });
+                      saveAnnualSS(ann3); setAnnual(ann3);
+                      try { syncStrengthAnnualToGeneral(ann3); } catch {}
+                      setMsg(`✦ Год из циклов: ${top3.length} блока (${ann3.totalWeeks}нед)`); setTimeout(()=>setMsg(''),2200);
+                    }catch{ setMsg('Не собралось'); setTimeout(()=>setMsg(''),1800); }
+                  }} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #0A84FF, #30D158)', color:'#fff', border:'none' }}>📚 Год из топ-3 циклов</button>
                 </div>
                 <InfoBanner tone="strong">Multi-peak: GPP 4w + peak1 ({plan.weeks}w) + trans 2w + peak2 6w — {annual.totalWeeks}w → ~{annual.totalWeeks+8}w сезон</InfoBanner>
               </SectionCard>
