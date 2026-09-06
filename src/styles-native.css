@@ -4796,3 +4796,35 @@ html.app-native .native-error-retry:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
 }
+
+/* ─── 72. NUTRITION SECTIONS ────────────────────────────
+ * Только APK. Переключатель разделов в липкой шапке ленты:
+ * стекло-пилюли, активная — залита акцентом. TG/web — инлайн-стили выше. */
+html.app-native .nutrition-sections {
+  scrollbar-width: none !important;
+}
+
+html.app-native .nutrition-sections::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .nutrition-section {
+  min-height: 38px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .nutrition-section[data-active='true'] {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  border-color: transparent !important;
+  color: var(--accent-contrast) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .nutrition-section:active {
+  transform: scale(0.94);
+}
+
+html.app-native .nutrition-section:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}

@@ -134,4 +134,30 @@ describe('NutritionScreen native hero', () => {
     expect(container.querySelector('svg')).toBeNull();
     expect(container.textContent).toContain('??');
   });
+
+  it('9. волна 22: переключатель разделов меняет набор чипов', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
+    );
+    const sections = container.querySelectorAll('.nutrition-section');
+    expect(sections.length).toBe(5);
+    const plan = Array.from(sections).find((s) => s.textContent === 'План') as HTMLElement;
+    fireEvent.click(plan);
+    expect(plan.dataset.active).toBe('true');
+    const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
+    expect(chips.length).toBe(9);
+    expect(chips.some((c) => c.textContent?.includes('План'))).toBe(true);
+  });
+
+  it('10. волна 22: переключатель есть и в web (общая навигация)', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="planning"]') as HTMLElement,
+    );
+    expect(container.querySelectorAll('.nutrition-section').length).toBe(5);
+  });
 });

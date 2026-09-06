@@ -1534,11 +1534,12 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   return (
     <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
       <div className="nutrition-tabs-head" style={{
-        display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0,
+        display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 0', flexShrink:0,
         background:'#18181b',
         borderBottom:'1px solid rgba(255,255,255,0.06)',
         position:'sticky', top:0, zIndex:20,
       }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <button onClick={() => setPage('hero')} style={{
           padding:'4px 8px', cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
           border:'none', background:'transparent', display:'flex', alignItems:'center',
@@ -1564,6 +1565,29 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         <span style={{ fontSize:9, color:'#fff' }}>
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
         </span>
+        </div>
+        {/* Переключатель разделов: внутри ленты было не выйти из hero-секции */}
+        <div className="nutrition-sections" style={{
+          display:'flex', gap:6, overflowX:'auto', padding:'8px 0',
+          scrollbarWidth:'none', flexShrink:0,
+        }}>
+          {([
+            { id: 'all' as NutritionSection, label: 'Все' },
+            { id: 'diary' as NutritionSection, label: 'Дневник' },
+            { id: 'planning' as NutritionSection, label: 'План' },
+            { id: 'analytics' as NutritionSection, label: 'Аналитика' },
+            { id: 'overview' as NutritionSection, label: 'Обзор' },
+          ]).map(s => (
+            <button key={s.id} onClick={() => setNutritionSection(s.id)} className="nutrition-section" data-active={nutritionSection === s.id} style={{
+              flexShrink:0, padding:'7px 12px', borderRadius:999, cursor:'pointer',
+              fontSize:11, fontWeight: nutritionSection === s.id ? 800 : 600,
+              border: nutritionSection === s.id ? '1px solid var(--nut-accent, #00e68a)' : '1px solid rgba(255,255,255,0.08)',
+              background: nutritionSection === s.id ? 'rgba(var(--nut-accent-rgb, 0,230,138),0.14)' : 'transparent',
+              color: nutritionSection === s.id ? 'var(--nut-accent, #00e68a)' : '#fff',
+              whiteSpace:'nowrap',
+            }}>{s.label}</button>
+          ))}
+        </div>
       </div>
       {isNativeApp() && scanOpen && (
         <BarcodeScanner onProductFound={(p) => onScanProduct(p)} onClose={() => setScanOpen(false)} />
