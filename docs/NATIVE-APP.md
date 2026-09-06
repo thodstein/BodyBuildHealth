@@ -554,6 +554,11 @@ native-CSS — отдельными чанками `styles-native-*.css`, в TG-
 - `system_accent1_*/accent2_*` внутри javadoc досрочно закрывал комментарий
   (`*/`) — 4 ошибки javac; перефразировано + guard stray-`*/` по всем Java.
   Урок: в комментариях Java запрещена пара звездочка-слэш даже в словах.
+- `actions/setup-android@v3` в release-job (такого экшена нет —
+  «Unable to resolve action, repository not found»; правильный —
+  `android-actions/setup-android`, как в build-job) — исправлено +
+  guard в `verify:apk-ci` (запрет `actions/setup-android`, ровно 2
+  `android-actions/setup-android`: build + release).
 
 Волна 24 — микродетали (`apk-top-pack` 26/26 + first-run 4/4, `tsc` 0):
 

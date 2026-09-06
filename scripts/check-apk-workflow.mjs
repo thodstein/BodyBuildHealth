@@ -46,6 +46,16 @@ for (const frag of [
 }
 if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у job’ов');
 
+// Экшены установки SDK: официального actions/setup-android не существует
+// (Invalid: "Unable to resolve action actions/setup-android, repository not found") —
+// во всех job'ах обязан быть android-actions/setup-android.
+{
+  const bad = (text.match(/uses:\s*actions\/setup-android@[^\s]+/g) || []).length;
+  if (bad > 0) fails.push(`actions/setup-android (не существует): ${bad} шт — нужен android-actions/setup-android`);
+  const good = (text.match(/uses:\s*android-actions\/setup-android@[^\s]+/g) || []).length;
+  if (good !== 2) fails.push(`android-actions/setup-android: ${good}, ждали 2 (build + release)`);
+}
+
 // Java: преждевременный конец блочного комментария (звездочка-слэш внутри,
 // как было system_accent1_*/accent2_*) роняет compileDebugJavaWithJavac.
 // Вырезаем строки, затем блочные комменты — остаток */ это баг.
