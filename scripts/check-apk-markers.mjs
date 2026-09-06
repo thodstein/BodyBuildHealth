@@ -124,6 +124,8 @@ for (const sec of [
   '71. CONTENT STATES PRO',
   '72. NUTRITION SECTIONS',
   '73. MOBILE FIT',
+  '74. BOTTOM FIT',
+  '75. ANCHORED BOTTOMS',
 ]) mustContain('src/styles-native.css', sec, `css section ${sec}`);
 
 if (fails.length > 0) {
