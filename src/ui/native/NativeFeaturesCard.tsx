@@ -114,7 +114,7 @@ export const NativeFeaturesCard: React.FC = () => {
       </div>
       <div className="native-feature-list">
         <div className="native-feature-row">
-          <span className="native-feature-row-icon">🔔</span>
+          <span className="native-feature-row-icon"><NativeIcon name="bell" size={15} /></span>
           <div className="native-feature-row-body">
             <div className="native-feature-row-name">{T.notifName}</div>
             <div className="native-feature-row-desc">{T.notifDesc}</div>
@@ -124,7 +124,7 @@ export const NativeFeaturesCard: React.FC = () => {
           </button>
         </div>
         <div className="native-feature-row">
-          <span className="native-feature-row-icon">📷</span>
+          <span className="native-feature-row-icon"><NativeIcon name="camera" size={15} /></span>
           <div className="native-feature-row-body">
             <div className="native-feature-row-name">{T.cameraName}</div>
             <div className="native-feature-row-desc">{T.cameraDesc}</div>
@@ -134,7 +134,7 @@ export const NativeFeaturesCard: React.FC = () => {
           </button>
         </div>
         <div className="native-feature-row">
-          <span className="native-feature-row-icon">📤</span>
+          <span className="native-feature-row-icon"><NativeIcon name="share" size={15} /></span>
           <div className="native-feature-row-body">
             <div className="native-feature-row-name">{T.shareName}</div>
             <div className="native-feature-row-desc">{T.shareDesc}</div>

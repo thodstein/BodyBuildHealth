@@ -16,7 +16,8 @@ export type NativeIconName =
   | 'x' | 'plus'   | 'clock' | 'trash' | 'share' | 'moon'
   | 'layers' | 'inbox' | 'kettlebell' | 'syringe' | 'cross'
   | 'ruler' | 'eye' | 'cpu' | 'dot' | 'pin' | 'phone' | 'sun' | 'send'
-  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown' | 'play' | 'pause' | 'scan';
+  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown' | 'play' | 'pause' | 'scan'
+  | 'bell' | 'camera';
 
 const PATHS: Record<NativeIconName, React.ReactNode> = {
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>),
@@ -80,6 +81,8 @@ const PATHS: Record<NativeIconName, React.ReactNode> = {
   play: (<polygon points="6 3 20 12 6 21 6 3" />),
   pause: (<><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>),
   scan: (<><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="7" y1="12" x2="17" y2="12" /></>),
+  bell: (<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>),
+  camera: (<><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>),
 };
 
 export interface NativeIconProps {

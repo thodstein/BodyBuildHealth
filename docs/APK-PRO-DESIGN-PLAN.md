@@ -140,6 +140,7 @@
 16. **Волна 14 — PRO-состояния контента (пусто/stale/ошибка)**. Статус: ✅ done (NativeEmpty: 5→11 артов — shield/flask/pill/leaf/message/file под риски/анализы/фарму/БАДы/ассистента/отчёты, акцент через var; CSS §71: кромки смысла 3px, stale-шкала fresh/aging/stale, error-карточка с retry, всё под html.app-native; native-empty 10/10, apk-top-pack 26/26, tsc 0).
 17. **Волна 15 — Пустоты без эмодзи (фарма-расписание)**. Статус: ✅ done (schedule-empty: native → NativeEmptyArt clipboard 52, TG/web → 📅 1-в-1; гейт-тест исходника от молчаливого отката; pharma-course 11/11, native-empty 10/10, tsc 0).
 18. **Волна 16 — Шапки §4.4 на SVG (хром без эмодзи)**. Статус: ✅ done (4 свои карточки: оформление → sliders, виджеты → grid, биометрия → shield, возможности → zap; контрастный глиф accent-contrast на градиентной плашке; строчные эмодзи чипов/строк не тронуты осознанно; profile-settings 5/5, apk-top-pack 26/26, tsc 0).
+19. **Волна 17 — Строки возможностей на SVG**. Статус: ✅ done (NativeIcons +bell/+camera; 🔔📷📤 → bell/camera/share 15px в акценте; row-icon центрирован flex; виджет-строки с эмодзи-идентификаторами не тронуты осознанно; profile-settings 6/6, home-profile-shop 20/20, tsc 0).
 5. Тренинг hub-and-spoke + player.
 6. Питание «Сегодня» + сканер в шапке.
 7. Фарма-календарь + пуши курса.

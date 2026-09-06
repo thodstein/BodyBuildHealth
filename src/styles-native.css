@@ -1780,6 +1780,10 @@ html.app-native .native-feature-row {
 html.app-native .native-feature-row-icon {
   font-size: 22px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 
 html.app-native .native-feature-row-body {
