@@ -115,6 +115,17 @@ mustContain('index.html', 'he_apk_theme_v1', 'boot theme key');
 mustContain('index.html', "html[data-boot-theme='light']", 'boot override');
 mustContain('index.html', 'hero-main.webp', 'webp preload');
 
+// 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
+for (const sec of [
+  '67. SUPPORT + SECONDARY HEADS',
+  '68. TRAIN INTEL NAV',
+  '69. STICKY INNER NAV',
+  '70. SECONDARY CONTENT PRO',
+  '71. CONTENT STATES PRO',
+  '72. NUTRITION SECTIONS',
+  '73. MOBILE FIT',
+]) mustContain('src/styles-native.css', sec, `css section ${sec}`);
+
 if (fails.length > 0) {
   console.error(`[check-apk-markers] FAIL (${fails.length}):`);
   for (const f of fails) console.error(`  - ${f}`);

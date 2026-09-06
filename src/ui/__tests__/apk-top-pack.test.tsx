@@ -153,6 +153,7 @@ describe('APK TOP pack', () => {
       expect(m.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
     }
   });
+
   it('волна 23: мобильная посадка — safe-area сверху, скролл hero', () => {
     const css = readCss('styles-native.css');
     const i = css.indexOf('73. MOBILE FIT');
