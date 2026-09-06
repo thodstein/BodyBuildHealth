@@ -135,6 +135,7 @@
 11. **Волна 9 — БАДы + вторичные**. Статус: ✅ done (SupportHomeView: SVG-карточки + sup-accent мост; вторичным классическим экранам — PRO-подача заголовков через CSS §67 без правок TSX; протоколы/калькуляторы поддержки не тронуты).
 12. **Волна 10 — kit-дедуп**. Статус: ✅ done (единый `native/accent.ts`: alphaWith/makeAlpha/makeFill; withAlpha/labsWithAlpha/trainAlpha/shopA/artA/nutA — тонкие обёртки с тем же выхлопом, поведение доказано старыми тестами).
 13. **Волна 11 — Тренинг-интеллект навигация (добивка основных)**. Статус: ✅ done (nav.ts: 5 категорий калькуляторов 15/15 без дублей; поднав включён для calculators + липкий PRO-хром §68 + haptic на «К дашборду»; hero-вход и back оставлены на dashboard-сентинеле runtime — TG/веб поведение не менялось; training-native 8/8, apk-top-pack 26/26, tsc 0, verify:apk-design OK).
+14. **Волна 12 — Липкая внутренняя навигация (анализы/риски/фарма)**. Статус: ✅ done (pharma-subtabs класс на таб-баре; CSS §69: labs/risk/pharma саббары липнут под шапкой top:48px со стеклом, press/focus, tabular-цифры hero; TG/web не тронуты; labs-risk 8/8, pharma-support 7/7, apk-top-pack 26/26, tsc 0).
 5. Тренинг hub-and-spoke + player.
 6. Питание «Сегодня» + сканер в шапке.
 7. Фарма-календарь + пуши курса.

@@ -190,7 +190,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
       )}
 
       {/* tabs — компактные, без пилюль */}
-      <div style={{ display:'flex', gap:2, overflowX:'auto', overflowY:'hidden', marginBottom:8, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
+      <div className="pharma-subtabs" style={{ display:'flex', gap:2, overflowX:'auto', overflowY:'hidden', marginBottom:8, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
       {page === 'course' && (
         <span style={{
           display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,

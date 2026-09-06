@@ -4575,3 +4575,53 @@ html.app-native .train-inteldash button:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
 }
+
+/* ─── 69. STICKY INNER NAV (labs/risks/pharma) ──────────
+ * Только APK. Сабтабы не уезжают при скролле контента: липнут под
+ * sticky-шапкой раздела (topnav ~48px), со стеклянным фоном.
+ * TG/web не тронуты (селекторы только под html.app-native). */
+html.app-native .labs-subtabs,
+html.app-native .risk-subtabs,
+html.app-native .pharma-subtabs {
+  position: sticky !important;
+  top: 48px !important;
+  z-index: 15 !important;
+  background: rgba(9, 18, 34, 0.82) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  margin: 0 -12px !important;
+  padding: 8px 12px !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .labs-subtabs::-webkit-scrollbar,
+html.app-native .risk-subtabs::-webkit-scrollbar,
+html.app-native .pharma-subtabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .labs-subtab:active,
+html.app-native .risk-subtab:active,
+html.app-native .pharma-subtabs button:active {
+  transform: scale(0.94);
+}
+
+html.app-native .labs-subtab:focus-visible,
+html.app-native .risk-subtab:focus-visible,
+html.app-native .pharma-subtabs button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+html.app-native .labs-hero-card:active,
+html.app-native .risk-hero-card:active,
+html.app-native .pharma-hero-card:active {
+  transform: scale(0.98);
+}
+
+html.app-native .labs-hero-stat-v,
+html.app-native .labs-hero-stat-l,
+html.app-native .risk-hero-stat-v,
+html.app-native .risk-hero-stat-l {
+  font-variant-numeric: tabular-nums;
+}

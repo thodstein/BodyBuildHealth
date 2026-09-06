@@ -113,3 +113,22 @@ describe('SupportHomeView hero', () => {
     expect(s.setSection).toHaveBeenCalledWith('protocols');
   });
 });
+
+describe('волна 12: pharma-subtabs', () => {
+  it('7. калькуляторы и каталог несут липкий саббар', async () => {
+    await resetPlatform();
+    const { container } = render(<PharmaScreen />);
+    const calc = container.querySelector(
+      '.pharma-hero-card[data-key="calculators"]',
+    ) as HTMLElement;
+    fireEvent.click(calc);
+    expect(container.querySelector('.pharma-subtabs')).not.toBeNull();
+    cleanup();
+    const second = render(<PharmaScreen />);
+    const info = second.container.querySelector(
+      '.pharma-hero-card[data-key="info"]',
+    ) as HTMLElement;
+    fireEvent.click(info);
+    expect(second.container.querySelector('.pharma-subtabs')).not.toBeNull();
+  });
+});
