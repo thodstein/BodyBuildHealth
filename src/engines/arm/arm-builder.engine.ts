@@ -473,6 +473,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   // cycleId + (exact либо согласие на extend/shrink). Без cycleId — байт-в-байт.
   let phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
   let cycleNote: string | null = null;
+  // Тейпер-пресет применённого цикла: non-classic кривую накладывает финализатор
+  // (единственный тейпер-путь — двойной срез запрещён, см. weekMult ниже).
+  let cycleTaperPreset: string | null = null;
   try {
     const cid = String((input as any).cycleId || '');
     if (cid) {
@@ -483,12 +486,27 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (cm) {
           phaseMap = cm as Record<number, string>;
           cycleNote = `Цикл ${c.name} (${fit.fit}${(input as any).cycleConsent === true && fit.fit !== 'exact' ? ', по согласию' : ''}): ${c.rpe}.`;
+          if (c.taperPreset && c.taperPreset !== 'classic' && c.taperPreset !== 'none') {
+            cycleTaperPreset = c.taperPreset;
+            cycleNote += ` Тейпер-пресет: ${c.taperPreset} (финализатор, делоад/пик не режутся заранее).`;
+          }
         }
       } else if (c) {
         cycleNote = `Цикл ${c.name}: ${fit.note} — без согласия построен generic (фазы по умолчанию).`;
       }
     }
   } catch { /* цикл опционален */ }
+  // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана.
+  // Только оно идёт под кривую финализатора; срединные делоады (каждая 4-я)
+  // режутся обычным weekMult 0.6 как раньше.
+  let taperTailStart = weeks + 1;
+  try {
+    for (let w = weeks; w >= 1; w--) {
+      const ph = String((phaseMap as Record<number, string>)[w] || '');
+      if (ph === 'deload' || ph === 'peaking') taperTailStart = w;
+      else break;
+    }
+  } catch { taperTailStart = weeks + 1; }
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
   const planWeeks: ArmWeek[] = [];
@@ -503,9 +521,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     // Table 3/2/1 периодизация Kuznetsov внутри микроцикла
     const kind = tableWeekKind(w, weeks);
     const tableParams = tableWeekParams(kind);
-    // weekMult: moderate 1.0, heavy 0.85, stress 0.55 + deload 0.6 + peaking 0.45
+    // weekMult: moderate 1.0, heavy 0.85, stress 0.55 + deload 0.6 + peaking 0.45.
+    // Исключение: non-classic тейпер-пресет цикла — ХВОСТОВОЕ окно идёт полным,
+    // режет только кривая финализатора (иначе двойной срез 0.45×0.6).
+    const cycleTaperActive = cycleTaperPreset != null && (isDeload || isPeaking) && w >= taperTailStart;
     let weekMult: number;
-    if (isDeload) weekMult = 0.6;
+    if (cycleTaperActive) weekMult = 1;
+    else if (isDeload) weekMult = 0.6;
     else if (isPeaking) weekMult = 0.45;
     else if (kind === 'stress') weekMult = 0.55;
     else if (kind === 'heavy') weekMult = 0.85;

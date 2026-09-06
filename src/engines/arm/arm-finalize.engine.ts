@@ -5,6 +5,8 @@
 import type { ArmPlan } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
 import { perExerciseCap } from './arm-volume.engine';
+import { getArmCycle } from './arm-cycle-library.engine';
+import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
 
 function ensurePronSupBalance(plan: ArmPlan): void {
   for (const wk of plan.weeks) {
@@ -279,6 +281,54 @@ function ensureGripCoverage(plan: ArmPlan): void {
   }
 }
 
+function ensureCocCoverage(plan: ArmPlan): void {
+  // CoC-режим (cocWorking задан): crush-эспандер обязан быть в каждой неделе.
+  // IronMind: crush без work-сетов не растёт; extensor-баланс уже закрыт гардами.
+  const coc = String((plan.inputSnapshot as any)?.cocWorking || '');
+  if (!coc) return;
+  for (const wk of plan.weeks) {
+    let hasCrush = false;
+    for (const sess of wk.sessions) for (const ex of sess.exercises) {
+      if (ex.muscle === 'grip_crush') { hasCrush = true; break; }
+    }
+    if (hasCrush) continue;
+    const last = wk.sessions[wk.sessions.length - 1];
+    if (last && last.exercises.length < 6) {
+      last.exercises.push({
+        muscle: 'grip_crush' as any, name: 'Эспандер CoC (дробление)', role: 'accessory', character: 'памп' as any,
+        sets: 2, repsRange: [5, 7], rir: 2,
+        workSets: [{ reps: 6, rir: 2, weight: 0 }, { reps: 6, rir: 2, weight: 0 }],
+        movementPattern: 'grip_crush' as any, substitutionGroup: 'grip_crush',
+        comment: 'CoC work 1–3×5–7 в отказ (тройка warm/work/challenge — см. rationale)',
+      });
+      plan.rationale.push(`Н${wk.week}: CoC — добавлен work-эспандер 2×5–7 (режим ${coc})`);
+    }
+  }
+}
+
+function applyCycleTaperPreset(plan: ArmPlan): void {
+  // Единственный тейпер-путь для non-classic пресетов: кривая библиотеки на
+  // хвостовые делоад/пик-недели. Билдер их заранее не резал (weekMult 1.0).
+  // applyArmTaperToWeeks идемпотентен по маркеру [arm-taper:].
+  const cid = String((plan.inputSnapshot as any)?.cycleId || '');
+  if (!cid) return;
+  const preset = getArmCycle(cid)?.taperPreset;
+  if (!preset || preset === 'classic' || preset === 'none') return;
+  // Хвост = непрерывный run делоад/пик с конца (паритет с билдером).
+  const tailRev: typeof plan.weeks = [];
+  for (let i = plan.weeks.length - 1; i >= 0; i--) {
+    const wk = plan.weeks[i];
+    if ((wk as any).deload || (wk as any).taper || wk.phase === 'peaking') tailRev.unshift(wk);
+    else break;
+  }
+  if (tailRev.length === 0) return;
+  const curve = buildArmTaperCurve({ taperWeeks: Math.min(4, tailRev.length), mode: preset as ArmTaperMode });
+  if (curve.length === 0) return;
+  // Передаём ссылки хвоста: движок режет последние N переданного массива.
+  applyArmTaperToWeeks(tailRev as any, curve);
+  plan.rationale.push(`Тейпер-пресет ${preset}: кривая ${curve.map((p) => `${p.volumePct}`).join('/')} на ${curve.length} нед хвоста.`);
+}
+
 export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRatio?: number }): ArmPlan {
   const level = opts?.level || plan.level || 'intermediate';
   const tableRatio = opts?.tableRatio ?? 0.55;
@@ -287,6 +337,8 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   ensureFlexExtBalance(plan);
   ensureSidePressureGuard(plan);
   ensureGripCoverage(plan);
+  ensureCocCoverage(plan);
+  applyCycleTaperPreset(plan);
   ensureTableTime(plan, tableRatio);
   capEnforcement(plan, level);
   enforceSessionLimits(plan, level);

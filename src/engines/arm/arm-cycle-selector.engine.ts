@@ -85,3 +85,18 @@ export function explainArmCycle(id: string): string {
   if (!c) return 'Цикл не найден.';
   return `${c.name}: ${c.weeks} нед, ${c.daysPerWeek}×/нед, ${c.rpe}. ${c.note} Делоад: ${c.deloadRule}`;
 }
+
+/**
+ * Годовой мост: какой именной цикл класть на фазу макро (arm-macrocycle).
+ * hypertrophy — объёмная база; strength — силовой/гибрид; peaking — пик+тейпер;
+ * transition — минимализм/восстановление. Чисто рекомендация (строки).
+ */
+export function suggestCycleForMacroPhase(phase: string, discipline = 'armwrestling'): string[] {
+  const p = String(phase || '').toLowerCase();
+  const isLift = discipline === 'armlifting';
+  if (p === 'hypertrophy') return isLift ? ['grinder_hybrid_12', 'coc_8'] : ['strengthlog_8', 'tableready_12', 'kuznica_6_8'];
+  if (p === 'strength') return isLift ? ['grinder_hybrid_12', 'coc_12'] : ['src_toproll_12', 'kuznica_6_8', 'dobrorezov_44'];
+  if (p === 'peaking') return isLift ? ['coc_12', 'for_7'] : ['toproll_6', 'larratt_table_bloodflow'];
+  if (p === 'transition') return ['brzenk_1_1'];
+  return ['strengthlog_8'];
+}

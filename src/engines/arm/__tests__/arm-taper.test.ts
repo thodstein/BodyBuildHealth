@@ -47,4 +47,17 @@ describe('arm-taper', () => {
     const sp = weeks[0].sessions[0].exercises.find((e:any)=>e.muscle==='side_pressure').sets;
     expect(sp).toBeLessThan(wf);
   });
+  it('направление хронологично: ранняя неделя — мелкий срез, пик — глубокий', () => {
+    const mk = (w: number) => ({ week: w, sessions: [{ exercises: [{ muscle:'wrist_flexors', sets:10, rir:2, workSets: Array(10).fill({rir:2}) }] }] });
+    const weeks: any[] = [mk(1), mk(2), mk(3), mk(4)];
+    const curve = buildArmTaperCurve({ taperWeeks: 3 }); // 0.85 / 0.65 / 0.45
+    applyArmTaperToWeeks(weeks, curve);
+    const s = weeks.map((w) => w.sessions[0].exercises[0].sets);
+    expect(s[0]).toBe(10); // вне окна — не тронута
+    expect(s[1]).toBe(9); // round(10×0.85) — мелкий срез первым
+    expect(s[2]).toBe(7); // round(10×0.65)
+    expect(s[3]).toBe(5); // round(10×0.45) — пик глубже всех
+    expect(s[1]).toBeGreaterThan(s[2]);
+    expect(s[2]).toBeGreaterThan(s[3]);
+  });
 });

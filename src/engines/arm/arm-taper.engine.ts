@@ -91,7 +91,9 @@ export function applyArmTaperToWeeks<T extends { week: number; sessions: Array<{
 ): T[] {
   const total = weeks.length;
   for (let i = 0; i < curve.length; i++) {
-    const point = curve[curve.length - 1 - i]; // последняя точка = последняя неделя
+    // Кривая хронологична (первый элемент — первая неделя окна: build
+    // кладёт week:N … week:1 по порядку, где week:1 = последняя).
+    const point = curve[i];
     const wkIdx = total - curve.length + i;
     if (wkIdx < 0 || wkIdx >= total) continue;
     const wk = weeks[wkIdx];

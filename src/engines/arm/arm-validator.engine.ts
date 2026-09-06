@@ -5,6 +5,8 @@ import type { ArmPlan, ArmValidationResult } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance, checkUCLGuard, checkShoulderGuard, checkTendonGuard } from './arm-injury-guard.engine';
 import { checkAntagonistPlan } from './arm-antagonist.engine';
+import { getArmCycle } from './arm-cycle-library.engine';
+import { getArmPattern } from './arm-split-patterns';
 
 export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationResult {
   const lvl = level || plan.level || 'intermediate';
@@ -74,6 +76,21 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
     }
     const ant = checkAntagonistPlan(weekly);
     warnings.push(...ant.warnings);
+  } catch { /* опционально */ }
+  // Цикл↔сплит (только при cycleId; только warnings — valid не меняется)
+  try {
+    const cid = String((plan.inputSnapshot as any)?.cycleId || '');
+    const pid = String((plan.inputSnapshot as any)?.patternId || '');
+    const c = cid ? getArmCycle(cid) : undefined;
+    const p = pid ? getArmPattern(pid) : undefined;
+    if (c && p) {
+      const splitPerWeek = (p.sessionsPerRotation * 7) / Math.max(1, p.rotationDays);
+      if (Math.abs(splitPerWeek - c.daysPerWeek) >= 2)
+        warnings.push(`Цикл ${c.name} (${c.daysPerWeek}×/нед) vs сплит ${p.name} (~${splitPerWeek.toFixed(1)}×/нед) — частота различается ≥2, проверьте восстановление.`);
+      const tableSess = plan.weeks[0]?.sessions.filter((s) => s.tableTime).length || 0;
+      if (c.tablePerWeek > 0 && tableSess < c.tablePerWeek)
+        warnings.push(`Цикл ${c.name} просит стол ${c.tablePerWeek}×/нед, в плане ${tableSess} — добавьте TableTech (Кузнецов VIII).`);
+    }
   } catch { /* опционально */ }
   // valid — как было: только mrvOverflow + errors (tendon/ucl/shoulder — warnings, не invalid, иначе сломаем существующие планы)
   const valid = errors.length === 0 && mrvOverflow.length === 0;
