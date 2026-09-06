@@ -318,6 +318,14 @@ export function correctDayToTargets(
             if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout' || _postLocked(m) || (m as any)._insulinWindow) return;
             // v3 portable: не-портативной заменой рабочее окно не трогаем (суп в офис — нет).
             if (_needPortM(m) && !isPortableFood(bestU as any)) return;
+            // P1a: своп В завтрак — только завтрашними продуктами (иначе замена жирового
+            // пункта кладёт «батат 190 г в завтрак» в обход всех carb-гейтов).
+            if (m.type === 'breakfast') {
+              const _bu = bestU as FoodItem;
+              if ((under === 'c' && isBreakfastBannedCarb(_bu.id)) ||
+                (under === 'p' && isBreakfastBannedProtein(_bu.id)) ||
+                (under === 'f' && isBreakfastBannedFat(_bu.id))) return;
+            }
             (m.items || []).forEach((it, ii) => {
               if ((it as any)._fixedGrams) return;
               if (isCoreRecipeItem(m, it.id)) return;

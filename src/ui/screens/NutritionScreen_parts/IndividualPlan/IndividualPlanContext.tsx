@@ -328,6 +328,20 @@ const _DEFAULT_CTX: any = { calcTargets: _DEFAULT_CALC_TARGETS, profileTargets: 
 const PlanContext = createContext<PlanCtx>(_DEFAULT_CTX as PlanCtx);
 export const usePlanCtx = (): PlanCtx => useContext(PlanContext);
 
+/**
+ * P4a: явное решение о втором рецепте (чистая функция, тестируется).
+ * Вместо тихой мини-порции в закрытый приём: места нет (остаток ≤ 0) → 'abort'
+ * (пользователь жмёт ⚖️ или меняет первый); мало места (< 25% цели) → 'mini';
+ * иначе 'full'. Возвращает действие и комнату в ккал.
+ */
+export function secondRecipeRoomDecision(targetKcal: number, firstKcal: number): { action: 'abort' | 'mini' | 'full'; roomKcal: number } {
+  const t = Number.isFinite(targetKcal) && targetKcal > 0 ? targetKcal : 0;
+  const rawRoom = t - (Number.isFinite(firstKcal) ? firstKcal : 0);
+  if (t <= 0 || rawRoom <= 0) return { action: 'abort', roomKcal: 0 };
+  if (rawRoom < 0.25 * t) return { action: 'mini', roomKcal: rawRoom };
+  return { action: 'full', roomKcal: rawRoom };
+}
+
 export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null; children: React.ReactNode }> = ({ profile: _profile, course: _course, labs = [], labAnalysis, children }) => {
   // Run schema migration first — drops stale localStorage entries that would crash
   // with "cannot read properties of undefined (reading length)" on first render.
@@ -2386,16 +2400,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
     }
     // P4a: в закрытый приём второй молча мини-порцией НЕ льём (раньше: тихие 150 ккал +
-    // «день может перебрать» + ребаланс резал другие приёмы = каша). Честный выбор:
-    // замена второго идёт как раньше; новый второй в закрытый приём — только через ⚖️
-    // (shrinkFirst выше) либо замена первого. Пользователь решает явно.
-    if (_rawRoom <= 0 && !_shrinkNote && !_isReplace) {
+    // «день может перебрать» + ребаланс резал другие приёмы = каша). Решение — явное
+    // (secondRecipeRoomDecision): замена второго идёт как раньше (слот уже есть);
+    // новый второй в закрытый приём — только через ⚖️ (shrinkFirst выше) либо замена
+    // первого. Пользователь решает явно.
+    const _dec = secondRecipeRoomDecision(_targetKcal, _targetKcal - _roomKcal);
+    if (_dec.action === 'abort' && !_shrinkNote && !_isReplace) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём закрыт первым рецептом — места нет. Нажмите ⚖️ рядом с блюдом (ужать первый ×0.65 и добавить полноценно) или замените первый рецепт`, 'warning');
       setRecipePickerMeal(null);
       return;
-    } else if (_rawRoom < 0.25 * _targetKcal && !_shrinkNote && !_isReplace) {
-      if (typeof (window as any).showToast === 'function') (window as any).showToast(`ℹ️ Места под второй рецепт мало (~${Math.round(_rawRoom)} ккал) — берём мини-порцию`, 'info' as any);
-      _roomKcal = _rawRoom;
+    }
+    if (_isReplace && _roomKcal <= 0) _roomKcal = 150; // замена: слот уже есть (как раньше)
+    else if (_dec.action === 'mini' && !_shrinkNote && !_isReplace) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`ℹ️ Места под второй рецепт мало (~${Math.round(_dec.roomKcal)} ккал) — берём мини-порцию`, 'info' as any);
+      _roomKcal = _dec.roomKcal;
     }
     const scaled2 = scaleRecipeToTarget(recipe, { kcal: _roomKcal, p: _mt.p || 30, f: _mt.f || 15, c: _mt.c || 40 }, weight);
     const items2 = scaled2 ? scaled2.items : buildRecipeMealItems(recipe);

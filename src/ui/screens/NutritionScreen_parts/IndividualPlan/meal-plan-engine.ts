@@ -906,7 +906,8 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   // D-28: для завтрака никогда не используем обеденные гарниры (макароны/лапша/кус-кус/киноа)
   // даже если они прошли фильтр по ключевым словам — тест «в завтрак не попадают макароны»
   const BREAKFAST_FORBIDDEN_RE = /pasta|noodle|macaroni|spaghetti|couscous/i;
-  const _forbiddenIds = new Set(['rice_white', 'quinoa', 'rice_noodles', 'spaghetti', 'couscous']);
+  // P1a: + батат (пролезал salt-зависимо: «sweet_potato в завтраке» при oвсяном пуле из 1).
+  const _forbiddenIds = new Set(['rice_white', 'quinoa', 'rice_noodles', 'spaghetti', 'couscous', 'sweet_potato']);
   carbs = carbs.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id));
   if (carbs.length === 0) {
     // fallback к овсяному семейству из FOOD_DB
@@ -2322,6 +2323,15 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
   return { label, time, items, totals, type, rationale: rationales, mpsCheck, target: { p: proteinG, c: carbG, f: fatG } };
 }
 
+// P1a: честная фактическая строка rationale (план Anchor-Wave): шаблоны описывают
+// дизайн, эта строка — всегда факт состава. Единая точка для всех билдеров приёмов
+// (buildWholeMeal кладёт её инлайн ниже; peri/preSleep — через этот хелпер).
+function factRationale(items: MealItem[], totals: { p: number; f: number; c: number }): string[] {
+  try {
+    return [`Факт: Б${Math.round(totals.p)} Ж${Math.round(totals.f)} У${Math.round(totals.c)} · ${items.length} поз.: ${items.map(it => `${it.name} ${Math.round(it.amount || 0)} г`).join(' + ')}`];
+  } catch { return []; }
+}
+
 // ─── МЕТОД: pre-workout приём (–90 мин до тренировки) ─────────────────
 function buildPreWorkout(
   time: string, label: string, seed: number,
@@ -2385,6 +2395,7 @@ function buildPreWorkout(
       // P2-fix: используем фактический carbG вместо захардкоженной константы PREW_CARB_SLOW_G
       `Медленные углеводы ${carbG} г (гликоген, стабильная глюкоза)`,
       `Жиры ≤ ${PREW_FAT_MAX_G} г — не задерживают gastric emptying`,
+      ...factRationale(items, totals),
     ],
     mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG },
   };
@@ -2468,6 +2479,7 @@ function buildPostWorkout(
       // P2-fix: используем фактический carbG вместо захардкоженной константы POSTW_FAST_CARB_G
       `Быстрые углеводы ${carbG} г — быстрое гликоген-восстановление, ↑инсулин (vs глюкагон)`,
       `Жиры ≤ 5 г — не тормозят абсорбцию`,
+      ...factRationale(items, totals),
     ],
     mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25 },
   };
@@ -2504,6 +2516,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
       `EAA ${INTRA_EAA_G} г — предотвращение катаболизма во время длительной (>60 мин) сессии`,
       `Циклодекстрин ${_intraCarbG} г — поддержание глюкозы и гликогена (доля от дневного КБЖУ)`,
       pool.isotonic ? `Изотоник (${pool.isotonic.name}) — Na/K/Mg электролиты + углеводы, регидрация во время сессии` : 'Без жиров — максимальная скорость gastric emptying',
+      ...factRationale(items, totals),
     ],
   };
 }
@@ -2639,10 +2652,12 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
       'Mg (тыквенные семечки) 150 мг — релаксация мышц и нервной системы',
       'Киви/вишня — серотонин + антиоксиданты (+42% качество сна)',
       ...(_nightCTarget > 0 ? [`Угли ночи ${_nightCTarget} г (хлеб/мёд/банан) — по настройке «Ночь — угли»`] : []),
+      ...factRationale(items, totals),
     ] : [
       'Дневной белок достигнут — казеин не добавлен (без перебора белка)',
       'Mg (тыквенные семечки) 150 мг — релаксация мышц и нервной системы',
       'Киви/вишня — серотонин + антиоксиданты (+42% качество сна)',
+      ...factRationale(items, totals),
     ],
     mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 },
   };
