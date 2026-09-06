@@ -7,6 +7,7 @@ import React from 'react';
 import { useProfileSection } from '../../../../core/profile-manager';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 
 const BLOOD_TYPES: { id: string; label: string }[] = [
   { id: 'I+', label: 'I (резус +)' }, { id: 'I-', label: 'I (резус −)' },
@@ -32,7 +33,7 @@ export const UserPersonalSection: React.FC = React.memo(function UserPersonalSec
       id="profile-section-1-1"
       title="1.1 Основное"
       subtitle="Личные данные, антропометрия, контакты"
-      icon="👤"
+      icon={<NativeIcon name="user" size={20} />}
       color={colors.primary}
       defaultOpen
       badge={`${filled}/5 заполнено`}

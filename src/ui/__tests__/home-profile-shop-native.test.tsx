@@ -10,6 +10,7 @@ import { ProfileHero } from '../screens/ProfileScreen_v2/ProfileHero';
 import { MarketplaceScreen } from '../screens/MarketplaceScreen';
 import { ArticlesScreen } from '../screens/ArticlesScreen';
 import { loadSavedArticles, toggleSavedArticle } from '../screens/ArticlesScreen';
+import { NativeIcon, NATIVE_ICON_NAMES } from '../native/NativeIcons';
 
 function setCapacitorNative() {
   (window as unknown as { Capacitor?: unknown }).Capacitor = {
@@ -125,6 +126,32 @@ describe('Articles saved/offline (волна D)', () => {
     const firstCard = document.querySelector('.articles-hero-card') as HTMLElement | null;
     fireEvent.click(firstCard!);
     expect(screen.queryByText(/Сохранённые/)).toBeNull();
+  });
+});
+
+describe('NativeIcon (SVG-набор)', () => {
+  it('все имена рендерят svg с viewBox', () => {
+    expect(NATIVE_ICON_NAMES.length).toBeGreaterThan(20);
+    for (const name of NATIVE_ICON_NAMES) {
+      const { container, unmount } = render(<NativeIcon name={name} size={16} />);
+      const svg = container.querySelector('svg');
+      expect(svg, name).not.toBeNull();
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(svg?.innerHTML.length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it('неизвестное имя — нейтральная точка, не пустота', () => {
+    const { container } = render(<NativeIcon name="nope-unknown" />);
+    expect(container.querySelector('svg circle')).not.toBeNull();
+  });
+
+  it('size/класс прокидываются', () => {
+    const { container } = render(<NativeIcon name="heart" size={34} className="t" />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('width')).toBe('34');
+    expect(svg?.getAttribute('class')).toBe('t');
   });
 });
 

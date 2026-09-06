@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, GroupHeader, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 import { ALLERGEN_LIST } from '../../../../core/contraindications';
 
 const DIET_TYPES = [
@@ -37,7 +38,7 @@ export const UserDietSection: React.FC = React.memo(function UserDietSection() {
       id="profile-section-1-3"
       title="1.3 Питание"
       subtitle="Диета, аллергии, макронутриенты, БАДы, лекарства"
-      icon="🥗"
+      icon={<NativeIcon name="leaf" size={20} />}
       color={colors.green}
     >
       <FieldRow cols={3}>
@@ -68,7 +69,7 @@ export const UserDietSection: React.FC = React.memo(function UserDietSection() {
       </FieldRow>
 
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="⚠" title="Аллергии" color={colors.danger} />
+        <GroupHeader icon={<NativeIcon name="alertTriangle" size={14} />} title="Аллергии" color={colors.danger} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {ALLERGEN_LIST.map(a => (
             <BoolChip
@@ -83,7 +84,7 @@ export const UserDietSection: React.FC = React.memo(function UserDietSection() {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="⚠" title="Непереносимости" color={colors.warning} />
+        <GroupHeader icon={<NativeIcon name="alertTriangle" size={14} />} title="Непереносимости" color={colors.warning} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {ALLERGEN_LIST.map(a => (
             <BoolChip

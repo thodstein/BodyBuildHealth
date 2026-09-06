@@ -6,6 +6,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, GroupHeader, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 import {
   CHRONIC_CONDITIONS_LIST, ALLERGEN_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS,
 } from '../../../../core/contraindications';
@@ -63,13 +64,13 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       id="profile-section-1-2"
       title="1.2 Здоровье"
       subtitle="Хроника, аллергии, генетика, риски, системные показатели"
-      icon="🩺"
+      icon={<NativeIcon name="heart" size={20} />}
       color={colors.danger}
       badge={`${(health.chronicConditions?.length || 0) + (health.injuries?.length || 0)} записей`}
     >
       {/* Хронические заболевания */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="⚠" title="Хронические заболевания" color={colors.danger} />
+        <GroupHeader icon={<NativeIcon name="alertTriangle" size={14} />} title="Хронические заболевания" color={colors.danger} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {CHRONIC_CONDITIONS_LIST.map(c => (
             <BoolChip
@@ -92,7 +93,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Генетика */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="🧬" title="Генетика (SNP)" color={colors.purple} />
+        <GroupHeader icon={<NativeIcon name="layers" size={14} />} title="Генетика (SNP)" color={colors.purple} />
         <FieldRow cols={2}>
           {SNP_LIST.map(snp => (
             <PopupValueEditor
@@ -110,7 +111,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Кардио */}
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: `1px solid ${colors.dangerDim}` }}>
-        <GroupHeader icon="❤️" title="Кардио" color={colors.danger} style={{ marginBottom: 10 }} />
+        <GroupHeader icon={<NativeIcon name="heart" size={14} />} title="Кардио" color={colors.danger} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <PopupValueEditor
             label="Стадия АД"
@@ -180,7 +181,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Неврология */}
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
-        <GroupHeader icon="🧠" title="Неврология" color={colors.purple} style={{ marginBottom: 10 }} />
+        <GroupHeader icon={<NativeIcon name="zap" size={14} />} title="Неврология" color={colors.purple} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <SliderInput label="Дофамин (1-5)" value={health.dopamineScore} onChange={v => updateHealth({ dopamineScore: v })} min={1} max={5} color={colors.purple} direction="good" minLabel="апатия, ничего не радует" maxLabel="отличное настроение, интерес к жизни" />
           <SliderInput label="Серотонин (1-5)" value={health.serotoninScore} onChange={v => updateHealth({ serotoninScore: v })} min={1} max={5} color={colors.purple} direction="good" minLabel="подавленность, тревожность" maxLabel="спокойствие, стабильное настроение" />
@@ -207,7 +208,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* ЖКТ */}
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(34,197,94,0.05)', border: `1px solid ${colors.greenDim}` }}>
-        <GroupHeader icon="🍽" title="ЖКТ" color={colors.green} style={{ marginBottom: 10 }} />
+        <GroupHeader icon={<NativeIcon name="bowl" size={14} />} title="ЖКТ" color={colors.green} style={{ marginBottom: 10 }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'bloating', l: 'Вздутие' },
@@ -231,7 +232,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Психология */}
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
-        <GroupHeader icon="💭" title="Психология" color={colors.pink} style={{ marginBottom: 10 }} />
+        <GroupHeader icon={<NativeIcon name="message" size={14} />} title="Психология" color={colors.pink} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <SliderInput label="Страх потери (1-5)" value={health.fearOfLoss} onChange={v => updateHealth({ fearOfLoss: v })} min={1} max={5} color={colors.pink} direction="bad" minLabel="нет страха потерять форму" maxLabel="постоянно боюсь потерять результаты" />
           <SliderInput label="Одержимость зеркалом (1-5)" value={health.mirrorObsession} onChange={v => updateHealth({ mirrorObsession: v })} min={1} max={5} color={colors.pink} direction="bad" minLabel="не зациклен на внешности" maxLabel="постоянно смотрюсь в зеркало, недоволен" />
@@ -241,7 +242,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* ОДА */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="🦴" title="Опорно-двигательный аппарат" color={colors.orange} />
+        <GroupHeader icon={<NativeIcon name="move" size={14} />} title="Опорно-двигательный аппарат" color={colors.orange} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           {[
             { k: 'jointPain', l: 'Суставы' },
@@ -288,7 +289,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Эпикриз */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="📋" title="Эпикриз" color={colors.teal} />
+        <GroupHeader icon={<NativeIcon name="notebook" size={14} />} title="Эпикриз" color={colors.teal} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'pastGyno', l: 'Гинекомастия' },
@@ -309,7 +310,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Стоматология */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="🦷" title="Стоматология" color={colors.blue} />
+        <GroupHeader icon={<NativeIcon name="smile" size={14} />} title="Стоматология" color={colors.blue} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'bleedingGums', l: 'Кровоточат дёсны' },
@@ -328,7 +329,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Токсическая нагрузка */}
       <div style={{ marginBottom: 16 }}>
-        <GroupHeader icon="☣️" title="Токсическая нагрузка" color={colors.warning} />
+        <GroupHeader icon={<NativeIcon name="alertTriangle" size={14} />} title="Токсическая нагрузка" color={colors.warning} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <BoolChip
             label="Вредная работа"
@@ -345,7 +346,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
 
       {/* Аллергии и исключения */}
       <div>
-        <GroupHeader icon="💊" title="Аллергии на лекарства и исключения" color={colors.pink} />
+        <GroupHeader icon={<NativeIcon name="pill" size={14} />} title="Аллергии на лекарства и исключения" color={colors.pink} />
         <FieldRow cols={2}>
           <PopupValueEditor
             label="Аллергия на лекарства"

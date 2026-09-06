@@ -4,6 +4,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, BoolChip, GroupHeader, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 
 const WEAK_GROUPS = [
   { id: 'chest', label: 'Грудь' },
@@ -43,10 +44,10 @@ export const TrainingWeakPointsSection: React.FC = React.memo(function TrainingW
       id="profile-section-1-9"
       title="2.3 Слабые стороны и оборудование"
       subtitle="Отстающие группы, доступный инвентарь"
-      icon="🎯"
+      icon={<NativeIcon name="trendingDown" size={20} />}
       color={colors.pink}
     >
-      <GroupHeader icon="📉" title="Слабые группы мышц" color={colors.pink} />
+      <GroupHeader icon={<NativeIcon name="trendingDown" size={14} />} title="Слабые группы мышц" color={colors.pink} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
         {WEAK_GROUPS.map(g => (
           <BoolChip
@@ -59,7 +60,7 @@ export const TrainingWeakPointsSection: React.FC = React.memo(function TrainingW
         ))}
       </div>
 
-      <GroupHeader icon="🏋️" title="Доступное оборудование" color={colors.primary} style={{ marginTop: 12 }} />
+      <GroupHeader icon={<NativeIcon name="dumbbell" size={14} />} title="Доступное оборудование" color={colors.primary} style={{ marginTop: 12 }} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {EQUIPMENT.map(e => (
           <BoolChip

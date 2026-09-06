@@ -4288,6 +4288,12 @@ html.app-native .native-home-rail-icon svg {
 /* ─── 64. SHOP + ARTICLES ACCENT ──────────────────────────────
  * Только APK. Магазин/Статьи захардкожены на минт в инлайнах —
  * бренд-элементы переводим на акцент темы, категорийные цвета не трогаем. */
+html.app-native {
+  --shop-accent: var(--accent);
+  --shop-accent-rgb: var(--accent-rgb);
+  --article-accent: var(--accent);
+  --article-accent-rgb: var(--accent-rgb);
+}
 
 /* Магазин: активный таб, CTA покупки, бейдж корзины, лучшая цена. */
 html.app-native .market-tab[data-active='true'] {

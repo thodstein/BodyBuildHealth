@@ -358,14 +358,15 @@ export const labelStyle: React.CSSProperties = {
 
 /* ── Заголовок подгруппы (иконка-бокс + текст) ── */
 
-export const GroupHeader: React.FC<{ icon: string; title: string; color?: string; style?: React.CSSProperties }> = ({ icon, title, color, style }) => {
+export const GroupHeader: React.FC<{ icon: React.ReactNode; title: string; color?: string; style?: React.CSSProperties }> = ({ icon, title, color, style }) => {
   const c = color || colors.text;
   return (
     <div className="profile-grouphead" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, ...style }}>
       <span aria-hidden="true" style={{
         width: 28, height: 28, borderRadius: 8, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, background: `${withAlpha(c, '1f')}`, border: `1px solid ${withAlpha(c, '40')}`,
+        color: c,
+        background: `${withAlpha(c, '1f')}`, border: `1px solid ${withAlpha(c, '40')}`,
       }}>{icon}</span>
       <span style={{ fontSize: 12, fontWeight: 700, color: c, letterSpacing: 0.2 }}>{title}</span>
     </div>
@@ -578,7 +579,7 @@ export const SliderInput: React.FC<{
 export const AccordionSection: React.FC<{
   title: string;
   subtitle?: string;
-  icon?: string;
+  icon?: React.ReactNode;
   color?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
@@ -627,7 +628,8 @@ export const AccordionSection: React.FC<{
           <span aria-hidden="true" style={{
             width: 44, height: 44, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, background: `${withAlpha(c, '22')}`, border: `1px solid ${withAlpha(c, '44')}`,
+            color: c,
+            background: `${withAlpha(c, '22')}`, border: `1px solid ${withAlpha(c, '44')}`,
             boxShadow: `inset 0 0 14px ${withAlpha(c, '1a')}`,
           }}>{icon}</span>
         )}

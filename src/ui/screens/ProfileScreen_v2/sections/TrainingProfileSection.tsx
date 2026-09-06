@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, SliderInput, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 import { PopupExerciseList } from '../../SRCBBScreen_parts/TrainingPopups';
 
 const SPORT_TYPES = [
@@ -39,7 +40,7 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
       id="profile-section-1-7"
       title="2.1 Профиль"
       subtitle="Цель, уровень, спорт, стаж, расписание"
-      icon="🎯"
+      icon={<NativeIcon name="dumbbell" size={20} />}
       color={colors.blue}
     >
       <FieldRow cols={3}>

@@ -6,6 +6,7 @@ import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { useProfileSection } from '../../../../core/profile-manager';
 import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 
 const PRIMARY_GOALS = [
   { id: 'bulk', label: 'Набор массы' },
@@ -56,7 +57,7 @@ export const UserGoalsSection: React.FC = React.memo(function UserGoalsSection()
       id="profile-section-1-6"
       title="1.6 Цели"
       subtitle="Тренировочная цель, цели курса, таргеты"
-      icon="🎯"
+      icon={<NativeIcon name="target" size={20} />}
       color={colors.orange}
     >
       <FieldRow cols={2}>

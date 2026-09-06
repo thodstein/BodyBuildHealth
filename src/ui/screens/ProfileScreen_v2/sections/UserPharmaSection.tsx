@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 
 const PHASES = [
   { id: 'baseline', label: 'База (без курса)' },
@@ -51,7 +52,7 @@ export const UserPharmaSection: React.FC = React.memo(function UserPharmaSection
       id="profile-section-1-5"
       title="1.5 Курс / Фарма"
       subtitle="Фаза, препараты, опыт"
-      icon="💉"
+      icon={<NativeIcon name="droplet" size={20} />}
       color={colors.warning}
       badge={pharma.phase === 'course' ? 'КУРС' : ''}
     >

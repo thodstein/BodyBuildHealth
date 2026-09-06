@@ -13,6 +13,7 @@ import { consumeWidgetLaunchTarget, queueWidgetSize } from '../../core/widget-br
 import { syncAllWidgets } from '../native/widget-sync';
 import { usePullToRefresh } from '../native/usePullToRefresh';
 import { getLocale } from '../../data/interactions-labels';
+import { NativeIcon } from '../native/NativeIcons';
 import { getISOWeekNumber, getSessionsByWeek } from '../../engines/workout-logger.engine';
 import { loadFoodLog } from '../../engines/nutrition-tracker.engine';
 
@@ -24,74 +25,20 @@ interface Props {
   onNavigate?: (screen: DashboardNativeNavId) => void;
 }
 
-const STROKE = {
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.8,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-} as const;
-
-const TRIO_ICONS: Record<DashboardNativeNavId, React.ReactNode> = {
-  profile: (
-    <svg viewBox="0 0 24 24" {...STROKE}>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  ),
-  marketplace: (
-    <svg viewBox="0 0 24 24" {...STROKE}>
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
-  ),
-  articles: (
-    <svg viewBox="0 0 24 24" {...STROKE}>
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  ),
-  training: null,
-  nutrition: null,
-  labs: null,
-  risks: null,
-  pharma: null,
-  support: null,
-};
-
 const TRIO: { id: DashboardNativeNavId; icon: React.ReactNode; labelRu: string; labelEn: string }[] = [
-  { id: 'profile', icon: TRIO_ICONS.profile, labelRu: 'Профиль', labelEn: 'Profile' },
-  { id: 'marketplace', icon: TRIO_ICONS.marketplace, labelRu: 'Магазин', labelEn: 'Store' },
-  { id: 'articles', icon: TRIO_ICONS.articles, labelRu: 'Статьи', labelEn: 'Articles' },
+  { id: 'profile', icon: <NativeIcon name="user" size={34} />, labelRu: 'Профиль', labelEn: 'Profile' },
+  { id: 'marketplace', icon: <NativeIcon name="bag" size={34} />, labelRu: 'Магазин', labelEn: 'Store' },
+  { id: 'articles', icon: <NativeIcon name="bookOpen" size={34} />, labelRu: 'Статьи', labelEn: 'Articles' },
 ];
 
 /** Карусель разделов: 6 рабочих табов (трио уже ведёт в профиль/магазин/статьи). */
 const RAIL: { id: DashboardNativeNavId; icon: React.ReactNode; labelRu: string; labelEn: string }[] = [
-  {
-    id: 'training', labelRu: 'Тренинг', labelEn: 'Training',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M18 4l3 3-6 6-5-5-6 6-3-3" /><circle cx="8" cy="8" r="2" /><path d="M14 2v4" /><path d="M10 22v-8" /></svg>),
-  },
-  {
-    id: 'nutrition', labelRu: 'Питание', labelEn: 'Food',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M12 2v20" /><path d="M2 12h20" /><path d="M4.93 4.93l14.14 14.14" /><path d="M19.07 4.93L4.93 19.07" /></svg>),
-  },
-  {
-    id: 'labs', labelRu: 'Анализы', labelEn: 'Labs',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M9 3h6v7l5 8H4l5-8V3z" /><line x1="9" y1="3" x2="15" y2="3" /></svg>),
-  },
-  {
-    id: 'risks', labelRu: 'Риски', labelEn: 'Risks',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>),
-  },
-  {
-    id: 'pharma', labelRu: 'Фарма', labelEn: 'Gear',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>),
-  },
-  {
-    id: 'support', labelRu: 'БАДы', labelEn: 'Stack',
-    icon: (<svg viewBox="0 0 24 24" {...STROKE}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>),
-  },
+  { id: 'training', icon: <NativeIcon name="dumbbell" size={17} />, labelRu: 'Тренинг', labelEn: 'Training' },
+  { id: 'nutrition', icon: <NativeIcon name="bowl" size={17} />, labelRu: 'Питание', labelEn: 'Food' },
+  { id: 'labs', icon: <NativeIcon name="flask" size={17} />, labelRu: 'Анализы', labelEn: 'Labs' },
+  { id: 'risks', icon: <NativeIcon name="alertTriangle" size={17} />, labelRu: 'Риски', labelEn: 'Risks' },
+  { id: 'pharma', icon: <NativeIcon name="pill" size={17} />, labelRu: 'Фарма', labelEn: 'Gear' },
+  { id: 'support', icon: <NativeIcon name="shield" size={17} />, labelRu: 'БАДы', labelEn: 'Stack' },
 ];
 
 export interface HomeToday {

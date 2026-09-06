@@ -13,17 +13,18 @@ import { TrainingProfileSection } from './sections/TrainingProfileSection';
 import { TrainingPMSection } from './sections/TrainingPMSection';
 import { TrainingWeakPointsSection } from './sections/TrainingWeakPointsSection';
 import { colors, withAlpha } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
-const JUMP_LINKS = [
-  { id: '1-1', icon: '👤', label: 'Основное' },
-  { id: '1-2', icon: '🩺', label: 'Здоровье' },
-  { id: '1-3', icon: '🥗', label: 'Питание' },
-  { id: '1-4', icon: '🌿', label: 'Образ жизни' },
-  { id: '1-5', icon: '💉', label: 'Курс' },
-  { id: '1-6', icon: '🎯', label: 'Цели' },
-  { id: '1-7', icon: '🏋️', label: 'Тренировки' },
-  { id: '1-8', icon: '🎖️', label: 'Рекорды' },
-  { id: '1-9', icon: '📉', label: 'Слабые стороны' },
+const JUMP_LINKS: { id: string; icon: NativeIconName; label: string }[] = [
+  { id: '1-1', icon: 'user', label: 'Основное' },
+  { id: '1-2', icon: 'heart', label: 'Здоровье' },
+  { id: '1-3', icon: 'leaf', label: 'Питание' },
+  { id: '1-4', icon: 'wind', label: 'Образ жизни' },
+  { id: '1-5', icon: 'droplet', label: 'Курс' },
+  { id: '1-6', icon: 'target', label: 'Цели' },
+  { id: '1-7', icon: 'dumbbell', label: 'Тренировки' },
+  { id: '1-8', icon: 'award', label: 'Рекорды' },
+  { id: '1-9', icon: 'trendingDown', label: 'Слабые стороны' },
 ];
 
 const JUMP_COLORS: Record<string, string> = {
@@ -106,7 +107,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                <span aria-hidden="true" style={{ fontSize: 12 }}>{link.icon}</span>
+                <span aria-hidden="true" style={{ display:'inline-flex', color:c }}><NativeIcon name={link.icon} size={12} /></span>
                 {link.label}
               </button>
             );

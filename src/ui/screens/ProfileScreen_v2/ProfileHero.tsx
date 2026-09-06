@@ -8,21 +8,22 @@ import { HeroImg } from '../../HeroImg';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { isNativeApp } from '../../../core/app-platform';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 
 interface TabDef {
   id: 'user' | 'diaries' | 'settings' | 'reports';
-  icon: string;
+  icon: NativeIconName;
   label: string;
   desc: string;
   color: string;
 }
 
 const TABS: TabDef[] = [
-  { id: 'user', icon: '👤', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
-  { id: 'diaries', icon: '📓', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
-  { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
-  { id: 'settings', icon: '⚙️', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
+  { id: 'user', icon: 'user', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
+  { id: 'diaries', icon: 'notebook', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
+  { id: 'reports', icon: 'chart', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
+  { id: 'settings', icon: 'sliders', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
 ];
 
 function calcCompleteness(s: any): number {
@@ -89,12 +90,12 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
         <div>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(52,211,153,0.14)', border:'1px solid rgba(52,211,153,0.22)', color:'#34d399', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
-            <span style={{ width:5, height:5, borderRadius:5, background:'#34d399', boxShadow:'0 0 8px rgba(52,211,153,0.5)', display:'inline-block' }} /> ПРОФИЛЬ
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(var(--profile-accent-rgb, 52,211,153),0.14)', border:'1px solid rgba(var(--profile-accent-rgb, 52,211,153),0.22)', color:'var(--profile-accent, #34d399)', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
+            <span style={{ width:5, height:5, borderRadius:5, background:'var(--profile-accent, #34d399)', boxShadow:'0 0 8px rgba(var(--profile-accent-rgb, 52,211,153),0.5)', display:'inline-block' }} /> ПРОФИЛЬ
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, flexWrap:'wrap' }}>
             <span className="profile-hero-name" style={{ fontSize:22, fontWeight:900, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.9)', letterSpacing:'-0.6px', lineHeight:1 }}>{profile.name || 'Профиль'}</span>
-            {sexIcon && <span style={{ fontSize:16, color:'#34d399' }}>{sexIcon}</span>}
+            {sexIcon && <span style={{ fontSize:16, color:'var(--profile-accent, #34d399)' }}>{sexIcon}</span>}
             {phaseBadge && (
               <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, background:phaseBadge.color+'cc', color:'#0a0a0a' }}>{phaseBadge.label}</span>
             )}
@@ -127,7 +128,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
           </div>
           {filled < 8 && (
             <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:6, lineHeight:1.3 }}>
-              {filled === 0 ? '👇 Заполните основное в карточке "Пользователь"' : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
+              {filled === 0 ? 'Заполните основное в карточке «Пользователь»' : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
             </div>
           )}
           {isNativeApp() && filled < 12 && (
@@ -163,7 +164,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}
               style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.12)', boxShadow:'0 3px 12px rgba(0,0,0,0.30)', background:'rgba(18,18,20,0.62)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}
             >
-              <div aria-hidden="true" style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${withAlpha(t.color, '22')}, ${withAlpha(t.color, '10')})`, border:`1px solid ${withAlpha(t.color, '28')}`, fontSize:18, boxShadow:`0 3px 10px ${withAlpha(t.color, '20')}`, position:'relative' }}>{t.icon}</div>
+              <div aria-hidden="true" style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${withAlpha(t.color, '22')}, ${withAlpha(t.color, '10')})`, border:`1px solid ${withAlpha(t.color, '28')}`, fontSize:18, boxShadow:`0 3px 10px ${withAlpha(t.color, '20')}`, position:'relative', color:t.color }}><NativeIcon name={t.icon} size={19} /></div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{t.label}</div>
                 <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3 }}>{t.desc}</div>

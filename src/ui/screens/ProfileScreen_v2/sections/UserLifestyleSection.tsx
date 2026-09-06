@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 
 const CHRONOTYPES = [
   { id: 'lark', label: 'Жаворонок' },
@@ -25,7 +26,7 @@ export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleS
       id="profile-section-1-4"
       title="1.4 Образ жизни"
       subtitle="Сон, стресс, активность, вода, восстановление"
-      icon="🌿"
+      icon={<NativeIcon name="wind" size={20} />}
       color={colors.purple}
     >
       <FieldRow cols={3}>

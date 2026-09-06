@@ -2,6 +2,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { MOCK_MARKETPLACE_DB, getBestPrice, generateAffiliateLink } from '../../engines/marketplace.engine';
 import type { MarketplaceItem, PurchaseOption } from '../../core/types';
 import { isNativeApp } from '../../core/app-platform';
+import { NativeIcon } from '../native/NativeIcons';
+
+/** Витринный акцент: в APK идёт за темой, в TG/web — фирменный минт. */
+const SHOP_ACC = 'var(--shop-accent, #00e68a)';
+const SHOP_RGB = 'var(--shop-accent-rgb, 0,230,138)';
+const shopA = (alpha: number): string => `rgba(${SHOP_RGB}, ${alpha})`;
 
 type CategoryFilter = 'all' | 'pharma' | 'supplement' | 'vitamin';
 type SortMode = 'price' | 'category' | 'name';
@@ -15,7 +21,7 @@ const CATEGORY_LABELS: Record<CategoryFilter, string> = {
 
 const CATEGORY_GRAD: Record<string, string> = {
   pharma: 'linear-gradient(135deg, #ef4444, #dc2626)',
-  supplement: 'linear-gradient(135deg, #00e68a, #059669)',
+  supplement: 'linear-gradient(135deg, var(--shop-accent, #00e68a), #059669)',
   vitamin: 'linear-gradient(135deg, #38bdf8, #0ea5e9)',
   all: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
 };
@@ -92,7 +98,7 @@ export const MarketplaceScreen: React.FC = () => {
     <div className="screen marketplace market-root" style={{ paddingBottom: 0, fontFamily: FONT, background:'transparent' }}>
       {/* premium header */}
       <div className="market-head" style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:2, background:'rgba(10,10,15,0.58)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', margin:'-6px -6px 0', paddingLeft:12, paddingRight:12, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ width:34, height:34, borderRadius:11, background:'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,230,138,0.06))', border:'1px solid rgba(0,230,138,0.20)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, boxShadow:'0 4px 16px rgba(0,230,138,0.18)' }}>🛍️</div>
+        <div style={{ width:34, height:34, borderRadius:11, background:`linear-gradient(135deg, ${shopA(0.18)}, ${shopA(0.06)})`, border:`1px solid ${shopA(0.20)}`, display:'flex', alignItems:'center', justifyContent:'center', color:SHOP_ACC, boxShadow:`0 4px 16px ${shopA(0.18)}` }}><NativeIcon name="bag" size={17} /></div>
         <div style={{ flex:1, minWidth:0 }}>
           <h2 style={{ margin:0, fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.03em', lineHeight:1 }}>Магазин</h2>
           <div style={{ fontSize:10, color:'#fff', fontWeight:600, letterSpacing:'0.02em' }}>{items.length} товаров · лучшие цены · партнёрские ссылки</div>
@@ -110,7 +116,7 @@ export const MarketplaceScreen: React.FC = () => {
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
           boxShadow: shopTab === 'catalog' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
-        }}>📋 Каталог</button>
+        }}> <span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="grid" size={12} /></span>Каталог</button>
         <button onClick={() => setShopTab('cart')} className="market-tab" data-active={shopTab === 'cart'} style={{
           flex:1, padding:'11px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT, letterSpacing:'-0.01em',
           background: shopTab === 'cart' ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))' : 'rgba(255,255,255,0.05)',
@@ -119,7 +125,7 @@ export const MarketplaceScreen: React.FC = () => {
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
           boxShadow: shopTab === 'cart' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
-        }}>🛒 Корзина {cart.length > 0 && <span className="market-count" style={{ marginLeft:6, padding:'2px 7px', borderRadius:999, background:'#00e68a', color:'#000', fontSize:10, fontWeight:900, boxShadow:'0 2px 10px rgba(0,230,138,0.32)' }}>{cart.length}</span>}</button>
+        }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="cart" size={12} /></span>Корзина {cart.length > 0 && <span className="market-count" style={{ marginLeft:6, padding:'2px 7px', borderRadius:999, background:'#00e68a', color:'#000', fontSize:10, fontWeight:900, boxShadow:'0 2px 10px rgba(0,230,138,0.32)' }}>{cart.length}</span>}</button>
       </div>
 
       {shopTab === 'catalog' && (
@@ -168,9 +174,9 @@ export const MarketplaceScreen: React.FC = () => {
               {([['price','Цена'],['category','Категория'],['name','Название']] as [SortMode,string][]).map(([mode,label]) => (
                 <button key={mode} onClick={() => setSort(mode)} style={{
                   padding:'5px 10px', borderRadius:999, fontSize:10, cursor:'pointer', fontWeight:700, fontFamily: FONT,
-                  background: sort === mode ? 'rgba(0,230,138,0.14)' : 'transparent',
-                  border: sort === mode ? '1px solid rgba(0,230,138,0.26)' : '1px solid rgba(255,255,255,0.07)',
-                  color: sort === mode ? '#00e68a' : '#fff',
+                  background: sort === mode ? `${shopA(0.14)}` : 'transparent',
+                  border: sort === mode ? `1px solid ${shopA(0.26)}` : '1px solid rgba(255,255,255,0.07)',
+                  color: sort === mode ? SHOP_ACC : '#fff',
                 }}>{label}</button>
               ))}
             </div>
@@ -185,9 +191,9 @@ export const MarketplaceScreen: React.FC = () => {
               return (
                 <div key={item.id} className="market-card" data-expanded={isExpanded} style={{
                   background:'rgba(255,255,255,0.04)', borderRadius:16, padding:0, overflow:'hidden',
-                  border: isExpanded ? '1px solid rgba(0,230,138,0.24)' : '1px solid rgba(255,255,255,0.07)',
+                  border: isExpanded ? `1px solid ${shopA(0.24)}` : '1px solid rgba(255,255,255,0.07)',
                   backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',
-                  boxShadow: isExpanded ? '0 12px 32px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,230,138,0.10) inset' : '0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)',
+                  boxShadow: isExpanded ? `0 12px 32px rgba(0,0,0,0.28), 0 0 0 1px ${shopA(0.10)} inset` : '0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)',
                   transition:'all 0.22s cubic-bezier(0.2,0.9,0.4,1)',
                   position:'relative',
                 }}
@@ -200,9 +206,7 @@ export const MarketplaceScreen: React.FC = () => {
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:13.5, fontWeight:800, color:'#fff', letterSpacing:'-0.02em', lineHeight:1.25, display:'flex', alignItems:'center', gap:7 }}>
-                          <span style={{ width:28, height:28, borderRadius:9, background: item.category==='pharma' ? 'rgba(239,68,68,0.14)' : item.category==='supplement' ? 'rgba(0,230,138,0.14)' : 'rgba(56,189,248,0.14)', border:`1px solid ${item.category==='pharma'?'rgba(239,68,68,0.22)':item.category==='supplement'?'rgba(0,230,138,0.22)':'rgba(56,189,248,0.22)'}`, display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:13, flexShrink:0 }}>{
-                            item.category==='pharma'?'💊':item.category==='supplement'?'🧪':'💎'
-                          }</span>
+                          <span style={{ width:28, height:28, borderRadius:9, background: item.category==='pharma' ? 'rgba(239,68,68,0.14)' : item.category==='supplement' ? `${shopA(0.14)}` : 'rgba(56,189,248,0.14)', border:`1px solid ${item.category==='pharma'?'rgba(239,68,68,0.22)':item.category==='supplement'?`${shopA(0.22)}`:'rgba(56,189,248,0.22)'}`, display:'inline-flex', alignItems:'center', justifyContent:'center', color: item.category==='pharma' ? '#f87171' : item.category==='supplement' ? SHOP_ACC : '#38bdf8', flexShrink:0 }}><NativeIcon name={item.category==='pharma'?'pill':item.category==='supplement'?'flask':'gem'} size={14} /></span>
                           <span style={{ minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
                         </div>
                         <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
@@ -212,9 +216,9 @@ export const MarketplaceScreen: React.FC = () => {
                           {best && <span className="market-best" style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', padding:'3px 9px', borderRadius:999 }}>от {best.price} {best.currency}</span>}
                         </div>
                       </div>
-                      <span style={{ width:28, height:28, borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.22s', flexShrink:0 }}>▼</span>
+                      <span style={{ width:28, height:28, borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.22s', flexShrink:0 }}><NativeIcon name="chevronDown" size={12} /></span>
                     </div>
-                    {item.dailyDose && <div style={{ fontSize:11, color:'#fff', marginTop:7, display:'flex', alignItems:'center', gap:6, position:'relative' }}><span style={{ width:6, height:6, borderRadius:'50%', background:'rgba(0,230,138,0.9)', boxShadow:'0 0 8px rgba(0,230,138,0.5)', display:'inline-block' }} /> {item.dailyDose}</div>}
+                    {item.dailyDose && <div style={{ fontSize:11, color:'#fff', marginTop:7, display:'flex', alignItems:'center', gap:6, position:'relative' }}><span style={{ width:6, height:6, borderRadius:'50%', background:`${shopA(0.9)}`, boxShadow:`0 0 8px ${shopA(0.5)}`, display:'inline-block' }} /> {item.dailyDose}</div>}
                     {item.mechanisms && item.mechanisms.length > 0 && (
                       <div style={{ display:'flex', gap:5, marginTop:7, flexWrap:'wrap', position:'relative' }}>
                         {item.mechanisms.map(m => (
@@ -234,7 +238,7 @@ export const MarketplaceScreen: React.FC = () => {
                             <div style={{ display:'flex', alignItems:'center', gap:7 }}>
                               <span style={{ fontWeight:800, color:'#fff', fontSize:12 }}>{opt.platform}</span>
                               <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>{opt.price} {opt.currency}</span>
-                              {isBest && <span style={{ marginLeft:2, padding:'2px 7px', borderRadius:999, background:'rgba(0,230,138,0.14)', color:'#00e68a', fontSize:9, fontWeight:800, border:'1px solid rgba(0,230,138,0.22)' }}>✓ Лучшая</span>}
+                              {isBest && <span style={{ marginLeft:2, padding:'2px 7px', borderRadius:999, background:`${shopA(0.14)}`, color:SHOP_ACC, fontSize:9, fontWeight:800, border:`1px solid ${shopA(0.22)}` }}>✓ Лучшая</span>}
                             </div>
                             <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" className="market-buy" style={{
                               padding:'6px 13px', borderRadius:999, background:'#00e68a',
@@ -248,10 +252,10 @@ export const MarketplaceScreen: React.FC = () => {
                   <div style={{ padding:'0 12px 12px', position:'relative' }}>
                     <button onClick={e => { e.stopPropagation(); if (inCart) { const c = cart.filter((c: any) => c.id !== item.id); updateCart(c); } else { updateCart([...cart, { id: item.id, name: item.name, dose: item.dailyDose, timing: '' }]); } }} style={{
                       width:'100%', padding:'10px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT,
-                      background: inCart ? 'rgba(239,68,68,0.08)' : 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))',
-                      border: inCart ? '1px solid rgba(239,68,68,0.24)' : '1px solid rgba(0,230,138,0.24)',
-                      color: inCart ? '#f87171' : '#00e68a',
-                      backdropFilter:'blur(8px)', boxShadow: inCart ? 'none' : '0 4px 16px rgba(0,230,138,0.16)', transition:'all 0.18s',
+                      background: inCart ? 'rgba(239,68,68,0.08)' : `linear-gradient(135deg, ${shopA(0.16)}, ${shopA(0.08)})`,
+                      border: inCart ? '1px solid rgba(239,68,68,0.24)' : `1px solid ${shopA(0.24)}`,
+                      color: inCart ? '#f87171' : SHOP_ACC,
+                      backdropFilter:'blur(8px)', boxShadow: inCart ? 'none' : `0 4px 16px ${shopA(0.16)}`, transition:'all 0.18s',
                     }}>{inCart ? '✕ Убрать из корзины' : '+ В корзину'}</button>
                   </div>
                 </div>
@@ -260,7 +264,7 @@ export const MarketplaceScreen: React.FC = () => {
           </div>
           {filtered.length===0 && (
             <div style={{ marginTop:14, padding:'30px 16px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px dashed rgba(255,255,255,0.10)', textAlign:'center' }}>
-              <div style={{ fontSize:28, marginBottom:6 }}>🔍</div>
+              <div style={{ fontSize:28, marginBottom:6, color:'#fff', display:'flex', justifyContent:'center' }}><NativeIcon name="search" size={28} /></div>
               <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Ничего не найдено</div>
               <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Попробуйте сменить фильтр или сортировку</div>
             </div>
@@ -276,12 +280,12 @@ export const MarketplaceScreen: React.FC = () => {
               <button onClick={() => updateCart([])} style={{
                 padding:'7px 12px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight:700, fontFamily: FONT,
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: '#f87171',
-              }}>🗑 Очистить</button>
+              }}>Очистить</button>
             )}
           </div>
           {cart.length === 0 ? (
             <div style={{ textAlign:'center', padding:'48px 20px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(12px)' }}>
-              <div style={{ width:64, height:64, borderRadius:18, margin:'0 auto 12px', background:'radial-gradient(120% 120% at 30% 20%, rgba(0,230,138,0.16), transparent 65%)', border:'1px solid rgba(0,230,138,0.14)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, boxShadow:'0 12px 32px rgba(0,230,138,0.12)' }}>🛒</div>
+              <div style={{ width:64, height:64, borderRadius:18, margin:'0 auto 12px', background:`radial-gradient(120% 120% at 30% 20%, ${shopA(0.16)}, transparent 65%)`, border:`1px solid ${shopA(0.14)}`, display:'flex', alignItems:'center', justifyContent:'center', color:SHOP_ACC, boxShadow:`0 12px 32px ${shopA(0.12)}` }}><NativeIcon name="cart" size={28} /></div>
               <div style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:'-0.02em' }}>Корзина пуста</div>
               <div style={{ fontSize:11, color:'#fff', lineHeight:1.5, marginTop:6 }}>
                 Добавьте препараты из каталога<br/>или из плана поддержки — соберём список покупок
@@ -298,7 +302,7 @@ export const MarketplaceScreen: React.FC = () => {
                     border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)',
                     boxShadow:'0 6px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)',
                   }}>
-                    <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,230,138,0.06))', border:'1px solid rgba(0,230,138,0.18)', fontSize:17, flexShrink:0 }}>💊</div>
+                    <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:`linear-gradient(135deg, ${shopA(0.18)}, ${shopA(0.06)})`, border:`1px solid ${shopA(0.18)}`, color:SHOP_ACC, flexShrink:0 }}><NativeIcon name="pill" size={17} /></div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:12, fontWeight:800, color:'#fff', letterSpacing:'-0.01em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.name}</div>
                       <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{item.dose || '—'}{item.timing ? ` · ${item.timing}` : ''}</div>
@@ -310,10 +314,10 @@ export const MarketplaceScreen: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop:14, padding:14, background:'rgba(255,255,255,0.04)', borderRadius:16, border:'1px solid rgba(0,230,138,0.18)', backdropFilter:'blur(14px)', boxShadow:'0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+              <div style={{ marginTop:14, padding:14, background:'rgba(255,255,255,0.04)', borderRadius:16, border:`1px solid ${shopA(0.18)}`, backdropFilter:'blur(14px)', boxShadow:'0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                   <span style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:'0.04em', textTransform:'uppercase' }}>Итого</span>
-                  <span style={{ fontSize:18, fontWeight:900, color:'#00e68a', letterSpacing:'-0.03em' }}>{cart.length} <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>шт</span></span>
+                  <span style={{ fontSize:18, fontWeight:900, color:SHOP_ACC, letterSpacing:'-0.03em' }}>{cart.length} <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>шт</span></span>
                 </div>
                 <div style={{ height:1, background:'rgba(255,255,255,0.06)', marginBottom:12 }} />
                 <div style={{ display:'flex', gap:8 }}>
@@ -325,12 +329,12 @@ export const MarketplaceScreen: React.FC = () => {
                     else { navigator.clipboard.writeText(text); alert('Список скопирован в буфер'); }
                   }} style={{
                     flex:1, padding:'11px 12px', borderRadius:12, border:'none', cursor:'pointer', fontWeight:800, fontSize:12, fontFamily: FONT,
-                    background:'linear-gradient(135deg, #00e68a, #00c97a)', color:'#000', boxShadow:'0 6px 18px rgba(0,230,138,0.28)',
-                  }}>📤 Поделиться списком</button>
+                    background:'linear-gradient(135deg, var(--shop-accent, #00e68a), var(--accent-2, #00c97a))', color:'var(--accent-contrast, #000)', boxShadow:`0 6px 18px ${shopA(0.28)}`,
+                  }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="share" size={12} /></span>Поделиться списком</button>
                   <button onClick={() => updateCart([])} style={{
                     padding:'11px 14px', borderRadius:12, cursor:'pointer', fontWeight:700, fontSize:12, fontFamily: FONT,
                     background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: '#f87171',
-                  }}>🗑</button>
+                  }}><span style={{ display:'inline-flex', verticalAlign:'-1px' }}><NativeIcon name="trash" size={12} /></span></button>
                 </div>
               </div>
             </>

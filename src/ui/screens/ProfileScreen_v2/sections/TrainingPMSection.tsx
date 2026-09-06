@@ -8,6 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, GroupHeader, colors } from '../ui';
+import { NativeIcon } from '../../../native/NativeIcons';
 import {
   WORKMAX_CATEGORIES,
   countFilledWorkMaxExercises,
@@ -62,10 +63,10 @@ export const TrainingPMSection: React.FC = React.memo(function TrainingPMSection
       id="profile-section-1-8"
       title="2.2 Личные рекорды (ПМ)"
       subtitle="Главные лифты + рабочие максимумы по упражнениям (группа → упражнение → вес)"
-      icon="🏆"
+      icon={<NativeIcon name="award" size={20} />}
       color={colors.orange}
     >
-      <GroupHeader icon="🏋️" title="Главные лифты (1RM)" color={colors.orange} />
+      <GroupHeader icon={<NativeIcon name="award" size={14} />} title="Главные лифты (1RM)" color={colors.orange} />
       <FieldRow cols={3}>
         <PopupValueEditor
           label="Присед"
@@ -97,7 +98,7 @@ export const TrainingPMSection: React.FC = React.memo(function TrainingPMSection
       </FieldRow>
 
       <GroupHeader
-        icon="📈"
+        icon={<NativeIcon name="chart" size={14} />}
         title={`Рабочие максимумы по упражнениям (${filledTotal} заполнено)`}
         color={colors.orange}
         style={{ marginTop: 12 }}
