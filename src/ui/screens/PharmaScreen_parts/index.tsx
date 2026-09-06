@@ -13,6 +13,7 @@ import { MapperTab } from './MapperTab';
 import { DiagnosticsTab } from './DiagnosticsTab';
 import { PharmaPeptideCalc } from './PharmaPeptideCalc';
 import { PharmaReportsTab } from './PharmaReportsTab';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info' | 'reports';
 type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'mapper' | 'diagnostics' | 'interactions';
@@ -48,11 +49,11 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   );
 
   if (page === 'main') {
-    const cards = [
-      { key:'course' as const, icon:'💊', title:'Курс', desc:'Препараты, дозировки, фазы цикла', color:'#8b5cf6', accent:'rgba(139,92,246,0.18)', border:'rgba(139,92,246,0.28)' },
-      { key:'reports' as const, icon:'📊', title:'Фарма-отчёт', desc:'Состав · валидация · взаимодействия · риск', color:'#f59e0b', accent:'rgba(245,158,11,0.18)', border:'rgba(245,158,11,0.28)' },
-      { key:'calculators' as const, icon:'🧬', title:'Калькуляторы', desc:'PK/PD · Дозировки · Пептиды · Маппер', color:'#3b82f6', accent:'rgba(59,130,246,0.18)', border:'rgba(59,130,246,0.28)' },
-      { key:'info' as const, icon:'📚', title:'Каталог и знания', desc:'Вещества, взаимодействия, синергии', color:'#22c55e', accent:'rgba(34,197,94,0.18)', border:'rgba(34,197,94,0.28)' },
+    const cards: { key: 'course' | 'reports' | 'calculators' | 'info'; icon: NativeIconName; title: string; desc: string; color: string; accent: string; border: string }[] = [
+      { key:'course', icon:'pill', title:'Курс', desc:'Препараты, дозировки, фазы цикла', color:'#8b5cf6', accent:'rgba(139,92,246,0.18)', border:'rgba(139,92,246,0.28)' },
+      { key:'reports', icon:'chart', title:'Фарма-отчёт', desc:'Состав · валидация · взаимодействия · риск', color:'#f59e0b', accent:'rgba(245,158,11,0.18)', border:'rgba(245,158,11,0.28)' },
+      { key:'calculators', icon:'cpu', title:'Калькуляторы', desc:'PK/PD · Дозировки · Пептиды · Маппер', color:'#3b82f6', accent:'rgba(59,130,246,0.18)', border:'rgba(59,130,246,0.28)' },
+      { key:'info', icon:'bookOpen', title:'Каталог и знания', desc:'Вещества, взаимодействия, синергии', color:'#22c55e', accent:'rgba(34,197,94,0.18)', border:'rgba(34,197,94,0.28)' },
     ];
     const courseLen = linked.course?.length ?? 0;
     const risk = linked.risk?.overallNet;
@@ -73,17 +74,17 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
             {/* quick stats — без пилюль, без стекла */}
             <div className="pharma-hero-quickstats" style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:11, opacity:0.9 }}>💊</span>
+                <span style={{ display:'inline-flex', color:'#c4b5fd' }}><NativeIcon name="pill" size={11} /></span>
                 <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>В курсе <b>{courseLen}</b></span>
               </div>
               <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:11 }}>{(risk ?? 0) >=60 ? '🔴' : (risk ?? 0) >=30 ? '🟡' : '🟢'}</span>
+                <span style={{ width:8, height:8, borderRadius:'50%', background: (risk ?? 0) >=60 ? '#ef4444' : (risk ?? 0) >=30 ? '#f59e0b' : '#22c55e', display:'inline-block' }} />
                 <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Риск <b style={{ color: (risk ?? 0) >=60 ? '#ef4444' : (risk ?? 0) >=30 ? '#f59e0b' : '#00e68a' }}>{risk != null ? `${Math.round(risk)}%` : '—'}</b></span>
               </div>
               <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:11, opacity:0.9 }}>🧬</span>
+                <span style={{ display:'inline-flex', color:'#c4b5fd' }}><NativeIcon name="flask" size={11} /></span>
                 <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Каталог <b>{pharmaSubstances.length}</b></span>
               </div>
             </div>
@@ -104,7 +105,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}
               >
                 <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, background:`${c.color}18`, border:`1px solid ${c.color}22`, fontSize:18 }}>{c.icon}</div>
+                  flexShrink:0, background:`${c.color}18`, border:`1px solid ${c.color}22`, color: c.color }}><NativeIcon name={c.icon} size={19} /></div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6, textShadow:'0 1px 10px rgba(0,0,0,0.7)' }}>
                     {c.title}
@@ -123,7 +124,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   }
 
   const pageTitle: Record<PharmaPage, string> = { main:'Фармакология', course:'Курс', calculators:'Калькуляторы', info:'Каталог', reports:'Фарма-отчёт' };
-  const pageIcon: Record<PharmaPage, string> = { main:'💊', course:'💊', calculators:'🧬', info:'📚', reports:'📊' };
+  const pageIcon: Record<PharmaPage, NativeIconName> = { main:'pill', course:'syringe', calculators:'cpu', info:'bookOpen', reports:'chart' };
 
   return (
     <div className="screen pharma pharma-inner" style={{ padding:'12px 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
@@ -134,7 +135,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
           background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', backdropFilter:'blur(8px)',
         }}>← Назад</button>
         <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
-          <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.22)', fontSize:13 }}>{pageIcon[page]}</span>
+          <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.22)', color:'#c4b5fd' }}><NativeIcon name={pageIcon[page]} size={14} /></span>
           <div style={{ minWidth:0 }}>
             <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{pageTitle[page]}</div>
             <div style={{ fontSize:10, color:'#fff', lineHeight:1 }}>
@@ -144,7 +145,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         </div>
         {(page==='course' || page==='reports' || page==='info') && (
           <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            <span style={{ fontSize:10, color:'#fff' }}>{linked.course.length}💊</span>
+            <span style={{ fontSize:10, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="syringe" size={11} /> {linked.course.length}</span>
             <span style={{ fontSize:10, fontWeight:700, color: (linked.risk?.overallNet ?? 0) >=60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >=30 ? '#f59e0b' : '#00e68a' }}>{linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}</span>
           </div>
         )}
@@ -155,7 +156,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
           background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))', border:'1px solid rgba(139,92,246,0.16)', flexShrink:0,
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
         }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Сводка расчётов <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>{pharmaSubstances.length} веществ</span></div>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}><NativeIcon name="chart" size={12} /> Сводка расчётов <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>{pharmaSubstances.length} веществ</span></div>
           <div style={{ display:'flex', gap:8 }}>
             <div style={{ flex:1, padding:'10px 8px', borderRadius:12, textAlign:'center',
               background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)',
@@ -194,13 +195,13 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         <span style={{
           display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
           color:'#a78bfa', borderBottom:'2px solid #8b5cf6', marginBottom:-1,
-        }}>📋 Курс <span style={{ color:'#fff', fontWeight:700 }}>{linked.course.length}</span></span>
+        }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:5 }}><NativeIcon name="syringe" size={10} /></span>Курс <span style={{ color:'#fff', fontWeight:700 }}>{linked.course.length}</span></span>
       )}
       {page === 'reports' && (
         <span style={{
           display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
           color:'#fbbf24', borderBottom:'2px solid #f59e0b', marginBottom:-1,
-        }}>📊 Фарма-отчёт</span>
+        }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:5 }}><NativeIcon name="chart" size={10} /></span>Фарма-отчёт</span>
       )}
       {page === 'calculators' && (['pkpd','dosage','peptides','mapper','diagnostics'] as const).map(t => (
         <button key={t} onClick={() => setSubTab(t)} style={{

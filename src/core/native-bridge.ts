@@ -98,6 +98,61 @@ export async function notifyLocal(title: string, body: string): Promise<boolean>
   }
 }
 
+export interface WeeklyReminder {
+  /** Стабильный id (для отмены/перезаписи). */
+  id: number;
+  /** День недели в формате Capacitor: 1 = воскресенье … 7 = суббота. */
+  weekday: number;
+  hour: number;
+  minute: number;
+  title: string;
+  body: string;
+}
+
+/** JS-день (0 = Пн … 6 = Вс, как в дневниках/курсе) → день Capacitor (1 = Вс … 7 = Сб). */
+export function jsDayToCapacitorWeekday(jsDayMon0: number): number {
+  const jsSun0 = (jsDayMon0 + 1) % 7;
+  return jsSun0 + 1;
+}
+
+/**
+ * Еженедельные повторы (напоминания о днях инъекций и т.п.).
+ * Возвращает число поставленных. Вне native — 0. Ошибки плагина — тихий 0.
+ */
+export async function scheduleWeeklyReminders(items: WeeklyReminder[]): Promise<number> {
+  if (!isCapacitorNative() || items.length === 0) return 0;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    try {
+      await LocalNotifications.requestPermissions();
+    } catch {
+      /* ignore */
+    }
+    await LocalNotifications.schedule({
+      notifications: items.map((r) => ({
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        schedule: { on: { weekday: r.weekday, hour: r.hour, minute: r.minute } },
+      })),
+    });
+    return items.length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Снять запланированные напоминания по id. Вне native — no-op. */
+export async function cancelScheduledReminders(ids: number[]): Promise<void> {
+  if (!isCapacitorNative() || ids.length === 0) return;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Инициализация нативных push (APK). В Telegram/web — no-op (там свои механики).
  * onToken — сохранить токен на бэкенде для адресных рассылок (FCM).

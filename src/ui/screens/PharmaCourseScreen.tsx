@@ -5,6 +5,13 @@ import { checkDrugInteractions } from '../../engines/interactions-calculator';
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
+import { isNativeApp } from '../../core/app-platform';
+import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
+import { scheduleWeeklyReminders, cancelScheduledReminders } from '../../core/native-bridge';
+import {
+  loadRemindPrefs, saveRemindPrefs, buildReminderItems, allReminderIds,
+  REMINDER_DAYS_RU, type RemindPrefs,
+} from './PharmaScreen_parts/pharma-reminders';
 
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон', trenbolone: 'Тренболон', nandrolone: 'Нандролон',
@@ -25,11 +32,11 @@ const CLASS_COLORS: Record<string, string> = {
   peptide_gnrh: '#14b8a6', peptide_fat_loss: '#f97316', peptide_other: '#6b7280',
 };
 
-const CLASS_ICONS: Record<string, string> = {
-  testosterone: '💉', trenbolone: '💉', nandrolone: '💉', boldenone: '💉',
-  primobolan: '💉', drostanolone: '💉', dht_inject: '💉', dht_derivative: '💊', oral_17aa: '💊', sarm: '🧬',
-  peptide_ghrh: '🧪', peptide_ghrp: '🧪', peptide_gnrh: '🧪',
-  peptide_fat_loss: '🧪', peptide_other: '🧪', igf1: '🔬', mgf: '🔬', insulin: '🩸',
+const CLASS_ICONS: Record<string, NativeIconName> = {
+  testosterone: 'syringe', trenbolone: 'syringe', nandrolone: 'syringe', boldenone: 'syringe',
+  primobolan: 'syringe', drostanolone: 'syringe', dht_inject: 'syringe', dht_derivative: 'pill', oral_17aa: 'pill', sarm: 'target',
+  peptide_ghrh: 'flask', peptide_ghrp: 'flask', peptide_gnrh: 'flask',
+  peptide_fat_loss: 'flask', peptide_other: 'flask', igf1: 'zap', mgf: 'zap', insulin: 'droplet',
 };
 
 const FREQ_OPTIONS = [
@@ -48,7 +55,97 @@ const FREQ_SHORT: Record<string, string> = {
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];
 
 const subClassOf = (id: string) => PHARMA_DB[id]?.class ?? '';
-const classColorOf = (cls: string) => CLASS_COLORS[cls] || 'var(--accent)';
+const classColorOf = (cls: string) => CLASS_COLORS[cls] || '#8b5cf6';
+
+/** Напоминания о днях инъекций — ТОЛЬКО APK (недельные повторы через LocalNotifications). */
+export const RemindCard: React.FC = () => {
+  const [prefs, setPrefs] = useState<RemindPrefs>(() => loadRemindPrefs());
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const apply = async (next: RemindPrefs) => {
+    setPrefs(next);
+    saveRemindPrefs(next);
+    setBusy(true);
+    try {
+      await cancelScheduledReminders(allReminderIds());
+      if (!next.enabled || next.days.length === 0) {
+        setStatus(null);
+        return;
+      }
+      const n = await scheduleWeeklyReminders(
+        buildReminderItems(next, 'Инъекции по курсу', 'День приёма — отметься в дневнике курса'),
+      );
+      setStatus(n > 0 ? `Поставлено: ${n} дн. в ${next.time}` : 'Пуши недоступны на этом устройстве');
+    } catch {
+      setStatus('Не удалось поставить напоминания');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleDay = (d: number) => {
+    const days = prefs.days.includes(d) ? prefs.days.filter((x) => x !== d) : [...prefs.days, d].sort((a, b) => a - b);
+    void apply({ ...prefs, days });
+  };
+
+  return (
+    <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.16)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ display: 'inline-flex', color: '#c4b5fd' }}><NativeIcon name="clock" size={14} /></span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1 }}>Напоминания о днях инъекций</span>
+        <button
+          onClick={() => void apply({ ...prefs, enabled: !prefs.enabled })}
+          disabled={busy}
+          role="switch"
+          aria-checked={prefs.enabled}
+          aria-label="Напоминания о днях инъекций"
+          style={{
+            width: 44, height: 24, borderRadius: 999, cursor: 'pointer', border: 'none', flexShrink: 0,
+            background: prefs.enabled ? 'var(--pharma-accent, #8b5cf6)' : 'rgba(255,255,255,0.12)',
+            position: 'relative', transition: 'background 0.2s', opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <span style={{
+            position: 'absolute', top: 2, left: prefs.enabled ? 22 : 2, width: 20, height: 20,
+            borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+          }} />
+        </button>
+      </div>
+      {prefs.enabled && (
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {REMINDER_DAYS_RU.map((d, i) => {
+            const on = prefs.days.includes(i);
+            return (
+              <button
+                key={d}
+                onClick={() => toggleDay(i)}
+                aria-pressed={on}
+                aria-label={`День ${d}`}
+                style={{
+                  minWidth: 32, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 800,
+                  background: on ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
+                  border: on ? '1px solid rgba(139,92,246,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  color: on ? '#fff' : 'rgba(255,255,255,0.55)',
+                }}
+              >
+                {d}
+              </button>
+            );
+          })}
+          <input
+            type="time"
+            value={prefs.time}
+            onChange={(e) => void apply({ ...prefs, time: e.target.value || '09:00' })}
+            aria-label="Время напоминания"
+            style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '5px 8px', color: '#fff', fontSize: 12, fontWeight: 700 }}
+          />
+        </div>
+      )}
+      {status && <div role="status" style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>{status}</div>}
+    </div>
+  );
+};
 
 const pillStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -284,7 +381,7 @@ export const PharmaCourseScreen: React.FC = () => {
       {/* Header — фикс наложения: перенос, белый текст, не перекрывает инфу */}
       <div className="pc-glass" style={{ padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0, flex:'1 1 200px' }}>
-          <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, #8b5cf6, #6d28d9)', color:'#fff', fontSize:16, boxShadow:'0 4px 14px rgba(139,92,246,0.35)', flexShrink:0 }}>💊</div>
+          <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, #8b5cf6, #6d28d9)', color:'#fff', boxShadow:'0 4px 14px rgba(139,92,246,0.35)', flexShrink:0 }}><NativeIcon name="pill" size={16} /></div>
           <div style={{ minWidth:0, flex:1 }}>
             <div style={{ display:'flex', alignItems:'center', gap:7, flexWrap:'wrap' }}>
               <span style={{ fontWeight:800, fontSize:14, color:'#fff', letterSpacing:-0.3 }}>Мой курс</span>
@@ -301,9 +398,9 @@ export const PharmaCourseScreen: React.FC = () => {
             <button onClick={saveCourseHistory} className="pc-btn2" style={{
               background: 'rgba(245,158,11,0.12)', color: '#fff',
               border: '1px solid rgba(245,158,11,0.22)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
-              fontSize:11, backdropFilter:'blur(8px)',
+              fontSize:11, backdropFilter:'blur(8px)', display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
-              📦 Завершить
+              <NativeIcon name="inbox" size={12} /> Завершить
             </button>
           )}
           <button onClick={() => setShowPicker(true)} className="pc-btn2" style={{
@@ -319,27 +416,28 @@ export const PharmaCourseScreen: React.FC = () => {
 
       {/* Course start date */}
       <div className="pc-glass" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexWrap:'wrap' }}>
-        <span style={{ fontSize:11, color:'#fff', fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>📅 Старт курса</span>
+        <span style={{ fontSize:11, color:'#fff', fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}><NativeIcon name="clock" size={11} /> Старт курса</span>
         <input type="date" value={courseStartDate} onChange={e => {
           setCourseStartDate(e.target.value);
           localStorage.setItem('he_course_start_date', e.target.value);
         }} style={{ background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:'7px 10px', color:'#fff', fontSize:12, fontWeight:600, outline:'none' }} />
         {currentWeek > 0 && (
-          <span style={{ fontSize:11, color:'#fff', fontWeight:800, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'5px 9px', borderRadius:20 }}>▶ Неделя {currentWeek}</span>
+          <span style={{ fontSize:11, color:'#fff', fontWeight:800, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'5px 9px', borderRadius:20, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="chevronRight" size={10} /> Неделя {currentWeek}</span>
         )}
         <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
       </div>
 
       {/* View tabs */}
       <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
-        {([['current', '📋 Текущий'], ['schedule', '📅 Расписание'], ['graph', '📊 График'], ['history', '📚 История']] as const).map(([key, label]) => (
+        {([['current', 'notebook', 'Текущий'], ['schedule', 'clock', 'Расписание'], ['graph', 'chart', 'График'], ['history', 'bookOpen', 'История']] as const).map(([key, icon, label]) => (
           <button key={key} onClick={() => setViewTab(key)} style={{
             padding:'7px 13px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap',
             border:`1px solid ${viewTab === key ? 'rgba(139,92,246,0.38)' : 'rgba(255,255,255,0.07)'}`,
             background: viewTab === key ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(124,58,237,0.18))' : 'rgba(255,255,255,0.05)',
             color: viewTab === key ? '#fff' : '#fff',
             boxShadow: viewTab===key ? '0 4px 14px rgba(139,92,246,0.18)' : 'none',
-          }}>{label}</button>
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}><NativeIcon name={icon} size={11} />{label}</button>
         ))}
       </div>
 
@@ -368,15 +466,15 @@ export const PharmaCourseScreen: React.FC = () => {
                         width:38, height:38, borderRadius:11,
                         background:`linear-gradient(135deg, ${color}22, ${color}0d)`, border:`1px solid ${color}2a`,
                         display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:16, flexShrink:0, boxShadow:`0 4px 12px ${color}18`,
+                        color, flexShrink:0, boxShadow:`0 4px 12px ${color}18`,
                       }}>
-                        {CLASS_ICONS[cls] || '💊'}
+                        <NativeIcon name={CLASS_ICONS[cls] || 'pill'} size={16} />
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:3 }}>
                           <span style={{ fontWeight:800, fontSize:13, color:'#fff', letterSpacing:-0.2 }}>{subName(entry.substanceId)}</span>
                           <span style={{ ...pillStyle, background:`${color}18`, color, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 8px' }}>{CLASS_LABELS[cls] || cls}</span>
-                          {isActive && <span style={{ ...pillStyle, fontSize:9, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', borderRadius:20 }}>● Активен</span>}
+                          {isActive && <span style={{ ...pillStyle, fontSize:9, color:'var(--pharma-accent, #00e68a)', background:'rgba(var(--pharma-accent-rgb, 0,230,138),0.12)', border:'1px solid rgba(var(--pharma-accent-rgb, 0,230,138),0.18)', borderRadius:20 }}>● Активен</span>}
                         </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:11, color:'#fff' }}>
                           {editId === entry.id && editDraft ? (
@@ -396,7 +494,7 @@ export const PharmaCourseScreen: React.FC = () => {
                               <span style={{ color:'#fff' }}>–</span>
                               <input type="number" value={editDraft.endWeek} onChange={e => setEditDraft({ ...editDraft, endWeek: parseFloat(e.target.value) || 0 })}
                                 className="pc-input2" style={{ width:52, padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11 }} />
-                              <button onClick={saveEdit} className="pc-btn2" style={{ background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', border:'none', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800 }}>Сохранить</button>
+                              <button onClick={saveEdit} className="pc-btn2" style={{ background:'linear-gradient(135deg, var(--pharma-accent, #00e68a), var(--accent-2, #00b368))', color:'var(--accent-contrast, #000)', border:'none', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800, display:'inline-flex', alignItems:'center', gap:5 }}><NativeIcon name="check" size={11} /> Сохранить</button>
                               <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn2" style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:700 }}>✕</button>
                             </>
                           ) : (
@@ -430,7 +528,7 @@ export const PharmaCourseScreen: React.FC = () => {
             </div>
           ) : (
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 18px', borderStyle:'dashed', background:'rgba(20,20,24,0.42)' }}>
-              <div style={{ width:52, height:52, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', background:'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(59,130,246,0.12))', border:'1px solid rgba(139,92,246,0.18)', fontSize:24 }}>💊</div>
+              <div style={{ width:52, height:52, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', background:'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(59,130,246,0.12))', border:'1px solid rgba(139,92,246,0.18)', color:'#c4b5fd' }}><NativeIcon name="pill" size={24} /></div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Курс пуст</div>
               <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери класс и препарат, доза и недели настроятся автоматически</div>
               <button onClick={()=>setShowPicker(true)} className="pc-btn2" style={{ background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'none', borderRadius:12, padding:'9px 16px', fontWeight:800, fontSize:12 }}>+ Добавить первый препарат</button>
@@ -524,7 +622,8 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
               </div>
               <div className="pc-glass" style={{ padding:'12px' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам — редактируй дни <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.7 }}>{course.length} позиций · тапни день</span></div>
+                {isNativeApp() && <RemindCard />}
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}><span style={{ display: 'inline-flex', color: '#c4b5fd' }}><NativeIcon name="pill" size={13} /></span> Дозировки по препаратам — редактируй дни <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.7 }}>{course.length} позиций · тапни день</span></div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {course.map(entry => {
                     const cls = subClass(entry.substanceId);
@@ -539,8 +638,8 @@ export const PharmaCourseScreen: React.FC = () => {
                         borderLeft:`3px solid ${color}`,
                       }}>
                         <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                          <div style={{ width:26, height:26, borderRadius:8, background:`${color}16`, border:`1px solid ${color}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, flexShrink:0 }}>
-                            {CLASS_ICONS[cls] || '💊'}
+                          <div style={{ width:26, height:26, borderRadius:8, background:`${color}16`, border:`1px solid ${color}22`, display:'flex', alignItems:'center', justifyContent:'center', color, flexShrink:0 }}>
+                            <NativeIcon name={CLASS_ICONS[cls] || 'pill'} size={13} />
                           </div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</div>
@@ -573,14 +672,14 @@ export const PharmaCourseScreen: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {course.length === 0 || !graphData ? (
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
-              <div style={{ fontSize:28, marginBottom:8, opacity:0.6 }}>📊</div>
+              <div style={{ fontSize:28, marginBottom:8, opacity:0.6, display: 'flex', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}><NativeIcon name="chart" size={28} /></div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет данных для графика</div>
               <div style={{ fontSize:11, color:'#fff' }}>Добавь хотя бы один препарат</div>
             </div>
           ) : (
             <>
               <div className="pc-glass" style={{ padding:'12px' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📊 График курса <span style={{ marginLeft:'auto', fontSize:11, background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', color:'#a78bfa', padding:'3px 8px', borderRadius:20, fontWeight:800 }}>{totalWeeks} нед</span></div>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}><span style={{ display: 'inline-flex', color: '#c4b5fd' }}><NativeIcon name="chart" size={13} /></span> График курса <span style={{ marginLeft:'auto', fontSize:11, background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', color:'#a78bfa', padding:'3px 8px', borderRadius:20, fontWeight:800 }}>{totalWeeks} нед</span></div>
                 <div style={{ display:'flex', gap:0, marginBottom:6, paddingLeft:84 }}>
                   {graphData.map(w => (
                     <div key={w.week} style={{
@@ -648,10 +747,10 @@ export const PharmaCourseScreen: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {historyCourses.length === 0 ? (
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
-              <div style={{ width:48, height:48, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', fontSize:22 }}>📚</div>
+              <div style={{ width:48, height:48, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', color:'#fbbf24' }}><NativeIcon name="bookOpen" size={22} /></div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Нет сохранённых курсов</div>
               <div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>
-                Нажми «📦 Завершить курс» на вкладке «Текущий»<br />чтобы сохранить курс в историю
+                Нажми «Завершить курс» на вкладке «Текущий»<br />чтобы сохранить курс в историю
               </div>
             </div>
           ) : (
@@ -674,9 +773,9 @@ export const PharmaCourseScreen: React.FC = () => {
                       notifyDataChange();
                       setViewTab('current');
                     }} className="pc-btn2" style={{
-                      background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)',
-                      color:'#00e68a', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800,
-                    }}>↺ Восстановить</button>
+                      background:'rgba(var(--pharma-accent-rgb, 0,230,138),0.12)', border:'1px solid rgba(var(--pharma-accent-rgb, 0,230,138),0.22)',
+                      color:'var(--pharma-accent, #00e68a)', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800, display: 'inline-flex', alignItems: 'center', gap: 5,
+                    }}><NativeIcon name="check" size={11} /> Восстановить</button>
                     <button onClick={() => {
                       if (!confirm(`Удалить "${cr.name}" из истории?`)) return;
                       const newHistory = historyCourses.filter((_, j) => j !== i);
@@ -697,7 +796,7 @@ export const PharmaCourseScreen: React.FC = () => {
                         display:'flex', alignItems:'center', gap:7, padding:'6px 8px',
                         background:'rgba(0,0,0,0.22)', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', borderLeft:`2px solid ${color}`,
                       }}>
-                        <span style={{ fontSize:11 }}>{CLASS_ICONS[cls] || '💊'}</span>
+                        <span style={{ display: 'inline-flex', color, flexShrink: 0 }}><NativeIcon name={CLASS_ICONS[cls] || 'pill'} size={11} /></span>
                         <span style={{ fontSize:11, fontWeight:700, color:'#fff', flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</span>
                         <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800 }}>{entry.doseValue}{entry.doseUnit}</span>
                         <span style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)}</span>
@@ -736,7 +835,7 @@ export const PharmaCourseScreen: React.FC = () => {
               background:'linear-gradient(90deg, rgba(139,92,246,0.10), transparent)',
             }}>
               <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', fontSize:13 }}>💊</span>
+                <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', color:'#c4b5fd' }}><NativeIcon name="pill" size={14} /></span>
                 <span style={{ fontWeight:800, fontSize:14, color:'#fff' }}>Добавить препарат</span>
                 <span style={{ fontSize:10, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)' }}>{subsForClass.length} в классе</span>
               </div>
