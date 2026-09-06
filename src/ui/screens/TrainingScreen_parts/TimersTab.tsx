@@ -1,5 +1,6 @@
 import React from 'react';
 import { hapticNotify, hapticImpact } from '../../../core/telegram';
+import { NativeIcon } from '../../native/NativeIcons';
 
 type Preset = { name: string; work: number; rest: number; rounds: number };
 
@@ -202,14 +203,14 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
       {!isRunning ? (
         <button onClick={start}
           style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 14 }}>
-          ▶ Старт
+            background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <NativeIcon name="play" size={14} /> Старт
         </button>
       ) : (
         <button onClick={stop}
           style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
-            background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 14 }}>
-          ⏸ Стоп
+            background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <NativeIcon name="pause" size={14} /> Стоп
         </button>
       )}
       <button onClick={skipPhase} disabled={!isRunning}

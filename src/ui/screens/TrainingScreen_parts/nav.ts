@@ -3,14 +3,25 @@
  * Каждый инструмент (вкладка) принадлежит ровно одной зоне — дублей нет.
  */
 import type { TrainingTab } from './shared';
+import type { NativeIconName } from '../../native/NativeIcons';
 
 export type TrainingZone = 'planner' | 'training' | 'diary' | 'calculators' | 'library';
 
-export interface ZoneCategory { label: string; icon: string; tabs: TrainingTab[]; }
+/** Бренд-акцент зоны планировщика: в APK за темой, в TG/web — минт. */
+export const TRAIN_ACCENT_VAR = 'var(--train-accent, #00e68a)';
+const TRAIN_ACCENT_RGB = 'var(--train-accent-rgb, 0,230,138)';
+/** Hex — как было; акцент — rgba() через триплет. */
+export const trainAlpha = (c: string, hexAlpha: string): string => {
+  if (c !== TRAIN_ACCENT_VAR) return `${c}${hexAlpha}`;
+  const a = Math.round((parseInt(hexAlpha, 16) / 255) * 1000) / 1000;
+  return `rgba(${TRAIN_ACCENT_RGB}, ${a})`;
+};
+
+export interface ZoneCategory { label: string; icon: NativeIconName; tabs: TrainingTab[]; }
 
 export interface ZoneDef {
   title: string;
-  icon: string;
+  icon: NativeIconName;
   color: string;
   subtitle: string;
   /** Вкладки, которые рендерятся в этой зоне. У зоны 'planner' нет вкладок —
@@ -22,35 +33,35 @@ export interface ZoneDef {
 
 export const ZONES: Record<TrainingZone, ZoneDef> = {
   planner: {
-    title: '🏗 Планировщик',
-    icon: '🏗',
-    color: '#00e68a',
+    title: 'Планировщик',
+    icon: 'layers',
+    color: TRAIN_ACCENT_VAR,
     subtitle: 'ПЛ-авто / ББ-авто / Арм / Стронг+ТА / Единоборства — построение плана',
     tabs: [],
   },
   training: {
-    title: '▶️ Тренировка',
-    icon: '▶️',
+    title: 'Тренировка',
+    icon: 'play',
     color: '#22c55e',
     subtitle: 'Проведение тренировки, таймеры отдыха, учёт подходов',
     tabs: ['runtime', 'timers'],
   },
   diary: {
-    title: '📓 Дневник',
-    icon: '📓',
+    title: 'Дневник',
+    icon: 'notebook',
     color: '#a855f7',
     subtitle: 'Дневник тренировок: запись, история, прогресс, аналитика, практики, инструменты',
     tabs: ['diary', 'history', 'progress', 'analytics_lite', 'rituals', 'tools'],
     categories: [
-      { label: 'Работа', icon: '✍️', tabs: ['diary', 'history'] },
-      { label: 'Отслеживание', icon: '📈', tabs: ['progress', 'analytics_lite'] },
-      { label: 'Практики', icon: '🧠', tabs: ['rituals'] },
-      { label: 'Управление', icon: '🧰', tabs: ['tools'] },
+      { label: 'Работа', icon: 'file', tabs: ['diary', 'history'] },
+      { label: 'Отслеживание', icon: 'chart', tabs: ['progress', 'analytics_lite'] },
+      { label: 'Практики', icon: 'cpu', tabs: ['rituals'] },
+      { label: 'Управление', icon: 'sliders', tabs: ['tools'] },
     ],
   },
   calculators: {
-    title: '⚡ Интеллект тренировки',
-    icon: '⚡',
+    title: 'Интеллект тренировки',
+    icon: 'zap',
     color: '#3b82f6',
     subtitle: 'Единый пульт: нагрузка → восстановление → авторегуляция → прогноз (без дублей)',
     tabs: [
@@ -59,14 +70,14 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     ],
   },
   library: {
-    title: '📖 Библиотека',
-    icon: '📖',
+    title: 'Библиотека',
+    icon: 'bookOpen',
     color: '#f59e0b',
     subtitle: 'Каталог процессов: циклы, программы, методики, упражнения + мои',
     tabs: ['library', 'programs', 'mytraining', 'methods', 'exercises'],
     categories: [
-      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs', 'mytraining'] },
-      { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'exercises'] },
+      { label: 'Процессы', icon: 'grid', tabs: ['library', 'programs', 'mytraining'] },
+      { label: 'Знания и методики', icon: 'cpu', tabs: ['methods', 'exercises'] },
     ],
   },
 };
@@ -79,14 +90,14 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
  *  Strength ("Стронг+ТА") и Combat ("Единоборства") — изолированные силовые конструкторы,
  *  только заловая часть, внезальная нагрузка — декларация OutsideLoad. */
 export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio' | 'strength' | 'combat' | 'arm';
-export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
-  { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
-  { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
-  { id: 'manual', label: 'Ручной', icon: '✋', hint: 'Своя программа: создать с нуля, загрузить для правки' },
-  { id: 'cardio', label: 'Кардио', icon: '❤️', hint: 'Кардио-цикл: Zone 2/HIIT, фазы, taper' },
-  { id: 'strength', label: 'Стронг+ТА', icon: '🏋️', hint: 'Тяжёлая атлетика / Стронг: рывок, толчок, лог, камни, outside-load' },
-  { id: 'combat', label: 'Единоборства', icon: '🥊', hint: 'Бокс/ММА/Борьба: шея, хват, ротация, внезальная 4-5×/нед' },
-  { id: 'arm', label: 'Арм', icon: '🤝', hint: 'Армрестлинг / Армлифтинг: стол + хваты, РУ/РА, tendon-cap' },
+export const PLANNER_MODES: { id: PlannerMode; label: string; icon: NativeIconName; hint: string }[] = [
+  { id: 'pl', label: 'ПЛ-авто', icon: 'award', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
+  { id: 'bb', label: 'ББ-авто', icon: 'dumbbell', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
+  { id: 'manual', label: 'Ручной', icon: 'plus', hint: 'Своя программа: создать с нуля, загрузить для правки' },
+  { id: 'cardio', label: 'Кардио', icon: 'activity', hint: 'Кардио-цикл: Zone 2/HIIT, фазы, taper' },
+  { id: 'strength', label: 'Стронг+ТА', icon: 'target', hint: 'Тяжёлая атлетика / Стронг: рывок, толчок, лог, камни, outside-load' },
+  { id: 'combat', label: 'Единоборства', icon: 'shield', hint: 'Бокс/ММА/Борьба: шея, хват, ротация, внезальная 4-5×/нед' },
+  { id: 'arm', label: 'Арм', icon: 'move', hint: 'Армрестлинг / Армлифтинг: стол + хваты, РУ/РА, tendon-cap' },
 ];
 
 /** Порядок вывода зон на hero-экране. */

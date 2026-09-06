@@ -16,7 +16,7 @@ export type NativeIconName =
   | 'x' | 'plus'   | 'clock' | 'trash' | 'share' | 'moon'
   | 'layers' | 'inbox' | 'kettlebell' | 'syringe' | 'cross'
   | 'ruler' | 'eye' | 'cpu' | 'dot' | 'pin' | 'phone' | 'sun' | 'send'
-  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown';
+  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown' | 'play' | 'pause';
 
 const PATHS: Record<NativeIconName, React.ReactNode> = {
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>),
@@ -77,6 +77,8 @@ const PATHS: Record<NativeIconName, React.ReactNode> = {
   butterfly: (<><ellipse cx="8" cy="12" rx="4" ry="6" /><ellipse cx="16" cy="12" rx="4" ry="6" /><line x1="12" y1="8" x2="12" y2="16" /></>),
   arrowUp: (<><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></>),
   arrowDown: (<><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></>),
+  play: (<polygon points="6 3 20 12 6 21 6 3" />),
+  pause: (<><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>),
 };
 
 export interface NativeIconProps {

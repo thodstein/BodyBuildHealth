@@ -67,7 +67,9 @@ describe('TrainingScreen native hero', () => {
     ) as HTMLElement;
     expect(lib).not.toBeNull();
     fireEvent.click(lib);
-    expect(screen.getAllByText('📖 Библиотека').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Библиотека').length).toBeGreaterThan(0);
+    // Иконки зон — SVG, не эмодзи.
+    expect(lib.querySelector('svg')).not.toBeNull();
   });
 
   it('4. навигация зон работает в web (Планировщик → выбор конструктора)', async () => {
@@ -78,5 +80,12 @@ describe('TrainingScreen native hero', () => {
     ) as HTMLElement;
     fireEvent.click(planner);
     expect(screen.getAllByText(/конструкторов/).length).toBeGreaterThan(0);
+  });
+
+  it('5. trainAlpha: hex — как было, акцент — rgba', async () => {
+    const { trainAlpha, TRAIN_ACCENT_VAR } = await import('../screens/TrainingScreen_parts/nav');
+    expect(TRAIN_ACCENT_VAR).toBe('var(--train-accent, #00e68a)');
+    expect(trainAlpha('#a78bfa', '55')).toBe('#a78bfa55');
+    expect(trainAlpha(TRAIN_ACCENT_VAR, '55')).toBe('rgba(var(--train-accent-rgb, 0,230,138), 0.333)');
   });
 });

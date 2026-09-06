@@ -17,6 +17,7 @@ import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } fro
 import { groupsFromExercises } from '../../../engines/warmup-day.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
+import { NativeIcon } from '../../native/NativeIcons';
 import type { TrainingTab } from './shared';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
@@ -142,18 +143,18 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
           {plRuntime && plRuntime.days.length > 0 && (
-            <div className="card" style={{ padding: '12px', border: plRunOpen ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.08)', background: plRunOpen ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)' }}>
+            <div className="card" style={{ padding: '12px', border: plRunOpen ? '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.25)' : '1px solid rgba(255,255,255,0.08)', background: plRunOpen ? 'rgba(var(--train-accent-rgb, 0,230,138),0.06)' : 'rgba(255,255,255,0.02)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>
-                    {plRunOpen ? '▶ Выполнение плана' : '⏸ Сессия свёрнута'} · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
+                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <NativeIcon name={plRunOpen ? 'pause' : 'play'} size={12} /> {plRunOpen ? 'Выполнение плана' : 'Сессия свёрнута'} · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
                   </h3>
                   <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
                     Неделя {plRuntime.week} · {plRuntime.days.length} дн. {plRunOpen ? '· выполнение записывается в дневник' : '· прогресс сохранён, нажмите «Возобновить»'}
                   </p>
                 </div>
-                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
-                  {plRunOpen ? '⏸ Свернуть' : '▶ Возобновить'}
+                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <NativeIcon name={plRunOpen ? 'pause' : 'play'} size={10} /> {plRunOpen ? 'Свернуть' : 'Возобновить'}
                 </button>
               </div>
               <div style={{ display: plRunOpen ? 'block' : 'none' }}>
@@ -164,7 +165,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           {/* Универсальная запись из сгенерированного плана — показывается только если нет активного ПЛ/ББ плана */}
           {plRuntime && plRuntime.days.length > 0 ? null : !runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
+              <h3 style={{ margin: '0 0 8px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="play" size={14} /></span> Начать тренировку</h3>
               <p style={{ fontSize: 11, color: '#fff', margin: '0 0 10px' }}>
                 Выберите день из плана для отслеживания подходов в реальном времени.
               </p>
@@ -346,7 +347,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           aria-expanded={warmupOpen} aria-label="Разминка дня"
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', fontSize: 14, flexShrink: 0 }}>🔥</span>
+                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', flexShrink: 0 }}><NativeIcon name="zap" size={14} /></span>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка дня · персональная</div>
                               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.62)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -367,7 +368,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
                               {(['quick','standard','full'] as const).map(m => {
                                 const active = execWarmupMode === m;
-                                const cfg = m === 'quick' ? { label: '⚡ Быстро', sub: '5м', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)' } : m === 'standard' ? { label: '⚖️ Стандарт', sub: '9м', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.28)' } : { label: '🎯 Полная', sub: '14м', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.28)' };
+                                const cfg = m === 'quick' ? { label: 'Быстро', sub: '5м', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)' } : m === 'standard' ? { label: 'Стандарт', sub: '9м', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.28)' } : { label: 'Полная', sub: '14м', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.28)' };
                                 return (
                                   <button key={m} onClick={() => {
                                     setExecWarmupMode(m);
@@ -380,18 +381,18 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                               })}
                             </div>
                             {warmupBlocksExec.map((b, bi) => {
-                              const meta = b.type === 'general' ? { icon: '🏃', title: 'Общая', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
-                                : b.type === 'mobility' ? { icon: '🤸', title: 'Суставы + зоны', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)' }
-                                : b.type === 'activation' ? { icon: '⚡', title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' }
-                                : { icon: '🏋️', title: 'Подводящие', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' };
+                              const meta = b.type === 'general' ? { icon: 'activity' as const, title: 'Общая', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
+                                : b.type === 'mobility' ? { icon: 'move' as const, title: 'Суставы + зоны', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)' }
+                                : b.type === 'activation' ? { icon: 'zap' as const, title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' }
+                                : { icon: 'dumbbell' as const, title: 'Подводящие', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' };
                               const bTotal = b.exercises.length;
                               const bDone = b.exercises.filter((_: any, j: number) => execWarmupDone[`ew_${bi}_${j}`]).length;
                               const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
                               return (
                                 <div key={bi} style={{ borderRadius: 10, padding: '8px 8px 6px', background: bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`, borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}` }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 800, color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color }}>{meta.icon} {meta.title}</span>
-                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>⏱ {b.durationSec}с · {bDone}/{bTotal}</span>
+                                    <span style={{ fontSize: 10, fontWeight: 800, color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={meta.icon} size={11} /> {meta.title}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, display: 'inline-flex', alignItems: 'center', gap: 3 }}><NativeIcon name="clock" size={8} /> {b.durationSec}с · {bDone}/{bTotal}</span>
                                   </div>
                                   {b.notes && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.62)', marginBottom: 5, lineHeight: 1.3 }}>{b.notes}</div>}
                                   <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
@@ -467,8 +468,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
                   }} style={{
                      width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
-                     background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
-                   }}>▶ Старт</button>
+                     background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)', fontWeight: 700, fontSize: 14,
+                   }}> <span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="play" size={13} /></span>Старт</button>
                     {onGoToTimers && (() => {
                       const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
                       const compoundCount = dayExercises.filter((e: any) => ['squat','bench','deadlift','overhead','row','pull','lunge','hip','leg'].some(p => (e.name || '').toLowerCase().includes(p))).length;
@@ -479,9 +480,9 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                        return (
                          <button onClick={() => { setTimerInitialSettings({ work, rest: avgRest, rounds }); onGoToTimers?.({ work, rest: avgRest, rounds }); }} style={{
                           width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                          background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontWeight: 600, fontSize: 12, marginTop: 8,
+                          background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontWeight: 600, fontSize: 12, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                         }}>
-                          ⏱ Таймер для этого дня · отдых ~{avgRest}с · {rounds} раундов
+                          <NativeIcon name="clock" size={12} /> Таймер для этого дня · отдых ~{avgRest}с · {rounds} раундов
                         </button>
                       );
                     })()}
@@ -715,7 +716,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       if (rows.length === 0) return null;
                       return (
                         <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
-                          <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
+                          <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="zap" size={12} /> Разминочные подходы</div>
                           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 5)}, 1fr)`, gap: 2, color: '#fff' }}>
                             {rows.map(wu => (
                               <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
@@ -938,7 +939,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           color: restTimer <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
           backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
         }}>
-          <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', fontSize: 16, fontWeight: 800, flexShrink: 0 }}>⏱</span>
+          <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', color: '#fff', fontWeight: 800, flexShrink: 0 }}><NativeIcon name="clock" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {restTimer <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(restTimer / 60)).padStart(2, '0')}:{String(restTimer % 60).padStart(2, '0')}</div>
