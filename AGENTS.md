@@ -8,6 +8,7 @@
 - **Мёртвая ротация**: `medleyRotationForWeek` жил только в строке rationale. Теперь билдер пишет `🎯 Медли-фокус: <implement>` в `wk.note` понедельно (support→pinch→hub) — видно в UI шага плана и в печати; объём не трогаем (ротация про снаряд). Битый medleyId — тишина (без fallback-спама rolling_thunder).
 - **Осознанно НЕ делаем**: внутрицикловой недельный %прогрессии (вместо него RIR double-progression + correctionPct кросс-мезо), tablePerWeek-автоповедение (только warning валидатора — маппинг «столовые сессии StrengthLog vs tableTime» мутный), axisCheck/medleyAttempts-ввод в UI (уровень хаба/API), потребитель suggest-моста в MacrocyclePanel (shared, чужая зона).
 - **Процесс**: R6-пуш ушёл сразу (очередь была «ahead 1 свой»). Коммит строго pathspec своих. NEW тест arm-cycle-r7 (4) + UI-тест печати (1).
+- **Пост-верификация (sweep)**: широкий прогон `TrainingScreen_parts` — 657/658, единственное падение `MesocycleProgressionCard` (PL: `buildLMSPlan` week 9 «Присед T1» reps 0 — в замыкании только lms-cycles/lms-builder/карточка, моих файлов ноль, чужое предсуществующее, задокументировано и раньше). Свои правки соседей не задели.
 
 ## Арм: интернет-циклы R6 — сводка в печати + year opt-in + FOR-домен в UI (Sep 06 2026, pathspec свои, ЗАПУШЕНО)
 
