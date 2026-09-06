@@ -306,6 +306,28 @@ describe('MacrocyclePanel — сборка года по конструктор�
     expect(bb.status).toBe('built');
     expect(bb.result!.warnings?.some(w => w.includes('Импортировано'))).toBe(true);
   });
+
+  it('ARM-блок: совет арм-цикла + сборка именным циклом (suggest-мост)', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
+    await waitFor(() => expect(screen.getByText('💪 Арм (арм-авто)')).toBeTruthy());
+    // Переключаем блок на арм-конструктор.
+    fireEvent.click(screen.getByText('💪 Арм (арм-авто)'));
+    await waitFor(() => expect(screen.getByText(/Конструктор блока изменён на .*Арм/)).toBeTruthy());
+    // Селект арм-цикла + совет по фазе (первый блок — endurance → base → strengthlog_8).
+    await waitFor(() => expect(screen.getByText('Арм-цикл блока')).toBeTruthy());
+    expect(screen.getByText(/💡 Совет:/)).toBeTruthy();
+    expect(screen.getByText(/StrengthLog/)).toBeTruthy();
+    // Применяем совет одной кнопкой.
+    fireEvent.click(screen.getByText('Применить цикл'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].config.cycleId).toBe('strengthlog_8'));
+    // Собираем блок — именной цикл реально строится.
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].status).toBe('built'), { timeout: 30000 });
+    const plan = loadAnnualTrainingPlan()!;
+    expect(plan.blocks[0].ref.kind).toBe('ARM');
+    expect(plan.blocks[0].result).toBeTruthy();
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */

@@ -46,6 +46,8 @@ import {
 } from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
+import { ARM_CYCLE_LIBRARY } from '../../../engines/arm/arm-cycle-library.engine';
+import { annualBlockCycleSuggestion } from '../../../engines/arm/arm-annual';
 
 /** Единый канон недели для даты (P2-1): движок block-builders.engine, не дублируем. */
 export const macroWeekForDate = weekForDate;
@@ -949,7 +951,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
     const next = saveAnnualTrainingPlan(setAnnualBlockKind(plan, blockKey, kind));
     setAnnualPlan(next);
-    setAnnualStatusNote(`⚙️ Конструктор блока изменён на ${kind === 'PL' ? 'ПЛ' : kind === 'BB' ? 'ББ' : 'ручной'} — пересоберите блок`);
+    setAnnualStatusNote(`⚙️ Конструктор блока изменён на ${kind === 'PL' ? 'ПЛ' : kind === 'BB' ? 'ББ' : kind === 'ARM' ? '💪 Арм' : 'ручной'} — пересоберите блок`);
   };
 
   // ➕ Кросс-направление: смена конструктора + конфиг атомарно (иначе повторный
@@ -2171,7 +2173,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 if (!active) return null;
                 const statusIcon = active.status === 'built' ? '✅' : active.status === 'stale' ? '⚠' : active.status === 'error' ? '❌' : '·';
                 const statusLabel = active.status === 'built' ? 'собран' : active.status === 'stale' ? 'устарел' : active.status === 'error' ? 'ошибка' : 'не собран';
-                const kindIcon = active.ref.kind === 'PL' ? 'ПЛ' : active.ref.kind === 'BB' ? 'ББ' : '✍';
+                const kindIcon = active.ref.kind === 'PL' ? 'ПЛ' : active.ref.kind === 'BB' ? 'ББ' : active.ref.kind === 'ARM' ? '💪' : '✍';
                 return (
                   <div onClick={() => {
                     const idx = annualPlan.blocks.findIndex(x => x.ref.blockKey === active.ref.blockKey);
@@ -2205,7 +2207,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginTop: 6 }}>
                   {annualPlan.blocks.map((b, i) => {
                     const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
-                    const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
+                    const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : b.ref.kind === 'ARM' ? '💪 Арм' : '✍ Ручной';
                     const note = b.status === 'stale' ? 'изменился — пересоберите' : b.status === 'error' ? (b.error ?? 'ошибка') : b.status === 'unbuilt' ? 'не собран' : 'собран';
                     const phaseColor = (isBB ? BB_PHASE_COLOR[b.ref.phase as BBMacroPhase] : PHASE_COLOR[b.ref.phase as MacroPhase]) ?? '#888';
                     const phaseIcon = isBB ? (BB_PHASE_ICON[b.ref.phase as BBMacroPhase] ?? '') : (PHASE_ICON[b.ref.phase as MacroPhase] ?? '');
@@ -2278,6 +2280,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 const kindOptions: { id: AnnualBlockKind; label: string }[] = [
                   { id: 'PL', label: 'ПЛ (СРЦ-цикл)' },
                   { id: 'BB', label: 'ББ (ББ-авто)' },
+                  { id: 'ARM', label: '💪 Арм (арм-авто)' },
                   { id: 'MANUAL', label: '✍ Ручной' },
                 ];
                 const templateBlocks = annualPlan.blocks.filter(x => x.ref.blockKey !== b.ref.blockKey && x.status === 'built' && x.result?.weeks?.length);
@@ -2360,6 +2363,37 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined })} />
                       </div>
                     )}
+                    {b.ref.kind === 'ARM' && (() => {
+                      // Потребитель suggest-моста: совет именного арм-цикла по фазе
+                      // блока + селект. Конфиг уходит в buildArmBlock (цикл реально
+                      // строится, R4-passthrough); пусто — generic-план как раньше.
+                      let sugg: { cycleId: string; note: string } | null = null;
+                      try {
+                        const ph = String(b.ref.phase || '');
+                        const mapped = ph === 'strength' ? 'strength' : ph === 'peak' || ph === 'competition' ? 'peaking' : ph === 'transition' ? 'transition' : 'base';
+                        sugg = annualBlockCycleSuggestion(mapped as 'base' | 'strength' | 'peaking' | 'transition');
+                      } catch { sugg = null; }
+                      // Чужая ПЛ-метка (напр. cycle-16 после смены конструктора) — не арм-цикл:
+                      // селект её не показывает, совет не прячется, билдер неизвестные id игнорит.
+                      const cur = ARM_CYCLE_LIBRARY.some(c => c.id === b.config.cycleId) ? (b.config.cycleId as string) : '';
+                      return (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                          <PopupSelect label="Арм-цикл блока" value={cur}
+                            hint="Именной цикл (StrengthLog/СРЦ №4/CoC/...) для блока; пусто — generic-план"
+                            options={[{ id: '', label: '— generic-план —', desc: '' }, ...ARM_CYCLE_LIBRARY.map(c => ({ id: c.id, label: c.name, desc: `${c.weeks} нед · ${c.daysPerWeek}×/нед` }))]}
+                            onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined })} />
+                          {sugg && !cur && (
+                            <span style={{ fontSize: 10, color: '#22c55e' }}>
+                              💡 Совет: {sugg.note}{' '}
+                              <button type="button" onClick={() => applyAnnualConfig(b.ref.blockKey, { cycleId: sugg!.cycleId })}
+                                style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: 'rgba(34,197,94,0.4)', color: '#22c55e' }}>
+                                Применить цикл
+                              </button>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {b.ref.kind === 'BB' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
                         <PopupSelect label="Сплит блока" value={b.config.splitPattern ?? ''}
@@ -2577,7 +2611,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
                         <PopupSelect label="⧉ Копировать настройки из блока…" value=""
                           hint="Скопировать конструктор/конфиг (цикл, сплит, taper, пик, шаблон) из другого блока"
-                          options={otherBlocks.map(x => ({ id: x.ref.blockKey, label: `нед ${x.ref.startWeek}–${x.ref.startWeek + x.ref.weeks - 1} · ${x.ref.phase} · ${x.ref.kind === 'PL' ? 'ПЛ' : x.ref.kind === 'BB' ? 'ББ' : '✍'}`, desc: '' }))}
+                           options={otherBlocks.map(x => ({ id: x.ref.blockKey, label: `нед ${x.ref.startWeek}–${x.ref.startWeek + x.ref.weeks - 1} · ${x.ref.phase} · ${x.ref.kind === 'PL' ? 'ПЛ' : x.ref.kind === 'BB' ? 'ББ' : x.ref.kind === 'ARM' ? '💪 Арм' : '✍'}`, desc: '' }))}
                           onChange={v => { if (v) copyBlockFrom(v); }} />
                       </div>
                     )}

@@ -215,7 +215,9 @@ export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBM
       const status = exact.status === 'built' && configChanged ? 'stale' : exact.status;
       // Свежая разметка побеждает для competitionId/description (иначе после
       // замены соревнования на той же неделе пик-конфиг строился бы с устаревшей датой).
-      return { ...exact, ref: { ...exact.ref, ...ref }, status };
+      // НО kind — выбор пользователя (переключатель конструктора в панели, в т.ч. ARM):
+      // свежая разметка его не знает и сносила бы в PL/BB при каждой сборке.
+      return { ...exact, ref: { ...ref, kind: exact.ref.kind }, status };
     }
     // Тот же индекс блока, но layout изменился (недели/фаза/цикл) → результат
     // сохраняем, но помечаем stale (НЕ перезаписываем без подтверждения).
