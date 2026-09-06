@@ -4532,7 +4532,7 @@ html.app-native[data-apk-accent='amber'] {
  * читаемая кнопка «назад», press-состояния. TG/web не тронуты. */
 html.app-native .training-subnav-card {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 5;
   backdrop-filter: blur(20px);
   background: rgba(16, 31, 54, 0.72) !important;
@@ -4592,7 +4592,7 @@ html.app-native .labs-subtabs,
 html.app-native .risk-subtabs,
 html.app-native .pharma-subtabs {
   position: sticky !important;
-  top: 48px !important;
+  top: calc(env(safe-area-inset-top, 0px) + 46px) !important;
   z-index: 15 !important;
   background: rgba(9, 18, 34, 0.82) !important;
   -webkit-backdrop-filter: blur(16px) !important;
@@ -4827,4 +4827,46 @@ html.app-native .nutrition-section:active {
 html.app-native .nutrition-section:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
+}
+
+/* ─── 73. MOBILE FIT ──────────────────────────────────────
+ * Только APK. Статус-бар поверх WebView (overlaysWebView), поэтому все
+ * fixed-герои и липкие шапки съезжают ниже него через safe-area, а контент
+ * низких экранов скроллится вместо обрезки. TG/web не тронуты. */
+/* Fixed-герои ниже статус-бара + скролл на низких экранах */
+html.app-native .native-home,
+html.app-native .training-hero,
+html.app-native .training-planning,
+html.app-native .training-constructor,
+html.app-native .labs-hero,
+html.app-native .risk-hero,
+html.app-native .nutrition-hero,
+html.app-native .articles-hero,
+html.app-native .support-hero,
+html.app-native .profile-hero,
+html.app-native .pharma-hero {
+  top: env(safe-area-inset-top, 0px) !important;
+  overflow-y: auto !important;
+}
+
+/* Лендинг главной: контент не под статус-баром */
+html.app-native .native-home-landing {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+}
+
+/* Липкие шапки разделов ниже статус-бара */
+html.app-native .labs-topnav,
+html.app-native .risk-topnav,
+html.app-native .nutrition-tabs-head {
+  top: env(safe-area-inset-top, 0px) !important;
+}
+
+/* Фикс-шапка саппорта ниже статус-бара; контент компенсируем прозрачной
+ * кромкой (инлайн-паддинги секций разные — их не трогаем) */
+html.app-native .support-topbar {
+  top: env(safe-area-inset-top, 0px) !important;
+}
+
+html.app-native .screen.support-screen {
+  border-top: env(safe-area-inset-top, 0px) solid transparent !important;
 }

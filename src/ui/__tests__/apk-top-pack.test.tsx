@@ -153,6 +153,38 @@ describe('APK TOP pack', () => {
       expect(m.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
     }
   });
+  it('волна 23: мобильная посадка — safe-area сверху, скролл hero', () => {
+    const css = readCss('styles-native.css');
+    const i = css.indexOf('73. MOBILE FIT');
+    expect(i).toBeGreaterThan(-1);
+    const block = css.slice(i, i + 4000);
+    for (const sel of [
+      '.training-hero',
+      '.labs-hero',
+      '.risk-hero',
+      '.nutrition-hero',
+      '.native-home-landing',
+      '.labs-topnav',
+      '.risk-topnav',
+      '.nutrition-tabs-head',
+      '.support-topbar',
+    ]) {
+      expect(block, sel).toContain(sel);
+    }
+    expect(block).toContain('safe-area-inset-top');
+    expect(block).toContain('overflow-y: auto');
+    for (const line of block.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('/*') || t.startsWith('*')) continue;
+      if (!t.endsWith('{')) continue;
+      const sel = t.slice(0, -1).trim();
+      if (!sel || sel.startsWith('@')) continue;
+      for (const p of sel.split(',').map((s) => s.trim()).filter(Boolean)) {
+        expect(p.startsWith('html.app-native'), p).toBe(true);
+      }
+    }
+  });
+
   it('CSS-изоляция: каждый селектор native-слоёв — только html.app-native', () => {
     for (const name of ['styles-native.css', 'styles-native-pro.css']) {
       const css = readCss(name);

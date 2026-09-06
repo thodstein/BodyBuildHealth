@@ -116,7 +116,7 @@ describe('волна 12: липкая внутренняя навигация', 
     expect(block).toContain('.risk-subtabs');
     expect(block).toContain('.pharma-subtabs');
     expect(block).toContain('position: sticky');
-    expect(block).toContain('top: 48px');
+    expect(block).toContain('top: calc(env(safe-area-inset-top, 0px) + 46px)');
     // Все селекторы слоя — только под html.app-native (TG 1-в-1).
     for (const line of block.split('\n')) {
       const t = line.trim();
