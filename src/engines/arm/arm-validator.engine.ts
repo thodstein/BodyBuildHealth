@@ -4,6 +4,7 @@
 import type { ArmPlan, ArmValidationResult } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance, checkUCLGuard, checkShoulderGuard, checkTendonGuard } from './arm-injury-guard.engine';
+import { checkAntagonistPlan } from './arm-antagonist.engine';
 
 export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationResult {
   const lvl = level || plan.level || 'intermediate';
@@ -63,6 +64,17 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   warnings.push(...shoulderWarnings);
   const tendonWarnings = checkTendonGuard(plan as any);
   warnings.push(...tendonWarnings);
+  // Антагонисты (только warnings — valid не меняется, существующие планы целы)
+  try {
+    const weekly: Record<number, Record<string, number>> = {};
+    for (const wk of plan.weeks) {
+      const vol: Record<string, number> = {};
+      for (const sess of wk.sessions) for (const ex of sess.exercises) vol[ex.muscle] = (vol[ex.muscle] || 0) + ex.sets;
+      weekly[wk.week] = vol;
+    }
+    const ant = checkAntagonistPlan(weekly);
+    warnings.push(...ant.warnings);
+  } catch { /* опционально */ }
   // valid — как было: только mrvOverflow + errors (tendon/ucl/shoulder — warnings, не invalid, иначе сломаем существующие планы)
   const valid = errors.length === 0 && mrvOverflow.length === 0;
   return { valid, errors, warnings, mrvOverflow, humerusWarnings, balanceWarnings, tendonWarnings: [...tendonWarnings, ...uclWarnings, ...shoulderWarnings] };

@@ -28,6 +28,13 @@ import { checkCnsGuard, cnsFromDiary } from './arm-cns-guard.engine';
 import { planLrSplit } from './arm-lr-split.engine';
 import { analyzeTableIq } from './arm-table-iq.engine';
 import { buildArmCalendar } from './arm-calendar.engine';
+import { getArmCycle, fitCycleToWeeks } from './arm-cycle-library.engine';
+import { planCocTriple, cocWeekProtocol } from './arm-coc-ladder.engine';
+import { flatPyramidFrom5Rm, flatPyramidStep } from './arm-flat-pyramid.engine';
+import { planArmRegimen } from './arm-regimen.engine';
+import { checkHumerusAxis } from './arm-humerus-axis.engine';
+import { getMedley, simulateMedley, medleyRotationForWeek } from './arm-medley.engine';
+import { buildForWeek, forGate } from './arm-for.engine';
 import type { ArmBuilderInput } from './arm-types';
 
 export interface ArmProResult {
@@ -56,6 +63,13 @@ export interface ArmProResult {
   lrLine: string | null;
   iqLine: string | null;
   calendarLine: string | null;
+  cycleLine: string | null;
+  cocLine: string | null;
+  pyramidLine: string | null;
+  regimenLine: string | null;
+  axisLine: string | null;
+  medleyLine: string | null;
+  forLine: string | null;
 }
 
 export function applyArmPro(input: ArmBuilderInput): ArmProResult {
@@ -83,6 +97,13 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
   let lrLine: string | null = null;
   let iqLine: string | null = null;
   let calendarLine: string | null = null;
+  let cycleLine: string | null = null;
+  let cocLine: string | null = null;
+  let pyramidLine: string | null = null;
+  let regimenLine: string | null = null;
+  let axisLine: string | null = null;
+  let medleyLine: string | null = null;
+  let forLine: string | null = null;
 
   // A. WAF-карточка (при наличии веса/возраста)
   try {
@@ -345,6 +366,99 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
       rationale.push(`Календарь: ${cal.note}`);
     }
   } catch { /* опционально */ }
+  // CYCLES: именной цикл (библиотека) — строка + fit-предупреждение без согласия
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (typeof ex['cycleId'] === 'string' && ex['cycleId']) {
+      const c = getArmCycle(String(ex['cycleId']));
+      if (c) {
+        const fit = fitCycleToWeeks(c.id, Number((input as { weeks?: number }).weeks || 8));
+        cycleLine = `Цикл: ${c.name} (${fit.fit}) — ${c.rpe}. ${c.deloadRule}`;
+        rationale.push(cycleLine);
+        if (fit.needsConsent && !(ex as Record<string, unknown>)['cycleConsent']) warnings.push(`Цикл: ${fit.note}`);
+      }
+    }
+  } catch { /* опционально */ }
+  // CoC-лестница IronMind (при заданном рабочем уровне)
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (typeof ex['cocWorking'] === 'string' && ex['cocWorking']) {
+      const t = planCocTriple(String(ex['cocWorking']));
+      cocLine = `CoC: ${t.note}`;
+      rationale.push(cocLine);
+      try {
+        const ph = String((input as { goal?: string }).goal || 'strength');
+        const wp = cocWeekProtocol(ph === 'peaking' ? 'peaking' : ph === 'strength' ? 'intensification' : 'accumulation', String(ex['cocWorking']));
+        rationale.push(`CoC-неделя: ${wp.sets} — ${wp.note}`);
+      } catch { /* опционально */ }
+    }
+  } catch { /* опционально */ }
+  // Flat pyramid Bompa (при явном включении)
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['flatPyramid'] === true) {
+      const st = flatPyramidFrom5Rm(Number(ex['flatPyramidWeightKg'] || 40), 1);
+      const adv = flatPyramidStep({ ...st, sets: 3 }, true);
+      pyramidLine = `Flat pyramid: ${adv.prescription}. ${adv.note}`;
+      rationale.push(pyramidLine);
+    }
+  } catch { /* опционально */ }
+  // Режимы школ Larratt/Brzenk/Акимов
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['bloodflow'] === true || ex['heavySingles'] === true || ex['pumpkinArm'] != null || ex['neverFail'] === true || ex['brzenkMode'] === true || ex['akimovHook'] === true) {
+      const r = planArmRegimen({
+        bloodflow: ex['bloodflow'] === true,
+        pumpkinArm: (ex['pumpkinArm'] === 'left' || ex['pumpkinArm'] === 'right' ? ex['pumpkinArm'] : null) as 'left' | 'right' | null,
+        neverFail: ex['neverFail'] === true,
+        heavySingles: ex['heavySingles'] === true,
+        brzenkMode: ex['brzenkMode'] === true,
+        akimovHook: ex['akimovHook'] === true,
+        compPeriod: ex['compPeriod'] === true,
+        level: String((input as { level?: string }).level ?? 'intermediate'),
+      });
+      volumeMult = Math.min(volumeMult, r.volumeMult);
+      rirShift = Math.max(rirShift, r.rirShift);
+      for (const l of r.lines) rationale.push(l);
+      for (const wmsg of r.warnings) warnings.push(`Режим: ${wmsg}`);
+      regimenLine = r.lines[0] || null;
+    }
+  } catch { /* опционально */ }
+  // Humerus-axis 2026 (при явном чек-листе позиции)
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['axisCheck'] != null && typeof ex['axisCheck'] === 'object') {
+      const a = checkHumerusAxis(ex['axisCheck'] as never);
+      axisLine = `Ось: риск ${a.risk} (${a.score} флага). ${a.cues[0] || ''}`;
+      rationale.push(axisLine);
+      for (const wmsg of a.warnings) warnings.push(`Ось: ${wmsg}`);
+    }
+  } catch { /* опционально */ }
+  // Медли ArmliftingUSA
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (typeof ex['medleyId'] === 'string' && ex['medleyId']) {
+      const m = getMedley(String(ex['medleyId']));
+      if (m) {
+        const rot = medleyRotationForWeek(m.id, Number((input as { weeks?: number }).weeks || 1));
+        medleyLine = `Медли: ${m.note} Ротация недели → ${rot}.`;
+        rationale.push(medleyLine);
+        void simulateMedley;
+      }
+    }
+  } catch { /* опционально */ }
+  // FOR-7 (гейт уровня/CNS)
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['forMode'] === true) {
+      const g = forGate({ level: String((input as { level?: string }).level ?? 'intermediate') });
+      const p = buildForWeek((ex['forSpecialization'] as never) || 'support');
+      forLine = p.note;
+      rationale.push(`FOR-7: ${p.note}`);
+      rationale.push(`FOR rebound: ${p.rebound} ${p.retest}`);
+      if (!g.allowed) for (const wmsg of g.warnings) warnings.push(`FOR: ${wmsg}`);
+    }
+  } catch { /* опционально */ }
   try {
     const w = buildArmWarmup(String((input as { discipline?: string }).discipline ?? 'heavy'));
     rationale.push(`Разминка: ${w.note}`);
@@ -381,6 +495,13 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
     lrLine,
     iqLine,
     calendarLine,
+    cycleLine,
+    cocLine,
+    pyramidLine,
+    regimenLine,
+    axisLine,
+    medleyLine,
+    forLine,
   };
 }
 

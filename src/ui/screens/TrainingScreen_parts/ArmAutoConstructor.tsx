@@ -24,6 +24,8 @@ import { ladderAdvice } from '../../../engines/arm/arm-implement-ladder.engine';
 import { buildArmCalendar, superSeriesYear } from '../../../engines/arm/arm-calendar.engine';
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
+import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
+import { ARM_MEDLEYS } from '../../../engines/arm/arm-medley.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
@@ -122,6 +124,21 @@ export function ArmAutoConstructor() {
   const [topContinuity, setTopContinuity] = useState<boolean>(false);
   const [topGripAuto, setTopGripAuto] = useState<boolean>(false);
   const [topExpl, setTopExpl] = useState<string>('');
+  // CYCLES (интернет-библиотека, всё опционально — пусто = как раньше)
+  const [cycId, setCycId] = useState<string>('');
+  const [cycConsent, setCycConsent] = useState<boolean>(false);
+  const [cycCorr, setCycCorr] = useState<string>('');
+  const [cycCoc, setCycCoc] = useState<string>('');
+  const [cycFlat, setCycFlat] = useState<boolean>(false);
+  const [cycBlood, setCycBlood] = useState<boolean>(false);
+  const [cycNever, setCycNever] = useState<boolean>(false);
+  const [cycSingles, setCycSingles] = useState<boolean>(false);
+  const [cycPumpkin, setCycPumpkin] = useState<string>('');
+  const [cycBrzenk, setCycBrzenk] = useState<boolean>(false);
+  const [cycAkimov, setCycAkimov] = useState<boolean>(false);
+  const [cycComp, setCycComp] = useState<boolean>(false);
+  const [cycMedley, setCycMedley] = useState<string>('');
+  const [cycFor, setCycFor] = useState<boolean>(false);
 
   // TOP wave-13: автоподстановка веса/возраста из профиля (только пустые поля)
   useEffect(() => {
@@ -335,6 +352,22 @@ export function ArmAutoConstructor() {
         ladderFrom: topLadder || undefined,
         ladderValue: parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
         contestSim: topSim || undefined,
+        // CYCLES (пусто/выкл = дефолтный путь, план как раньше)
+        cycleId: cycId || undefined,
+        cycleConsent: cycConsent || undefined,
+        correctionPct: parseFloat(cycCorr) >= 0 && parseFloat(cycCorr) <= 5 ? parseFloat(cycCorr) : undefined,
+        cocWorking: cycCoc || undefined,
+        flatPyramid: cycFlat || undefined,
+        flatPyramidWeightKg: cycFlat && parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
+        bloodflow: cycBlood || undefined,
+        neverFail: cycNever || undefined,
+        heavySingles: cycSingles || undefined,
+        pumpkinArm: (cycPumpkin === 'left' || cycPumpkin === 'right' ? cycPumpkin : undefined) as any,
+        brzenkMode: cycBrzenk || undefined,
+        akimovHook: cycAkimov || undefined,
+        compPeriod: cycAkimov && cycComp ? true : undefined,
+        medleyId: cycMedley || undefined,
+        forMode: cycFor || undefined,
         tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
         tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
         calStartIso: proDate || undefined,
@@ -641,6 +674,51 @@ export function ArmAutoConstructor() {
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topSim} onChange={e=>setTopSim(e.target.checked)} /> Contest-sim неделя</label>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topContinuity} onChange={e=>setTopContinuity(e.target.checked)} /> 🔗 С прошлого плана (+2.5% веса)</label>
               <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topGripAuto} onChange={e=>setTopGripAuto(e.target.checked)} /> 🌊 Grip-RPE авто-волна</label>
+            </div>
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: '1px solid #1f3a5f', background: '#0a1629' }}>
+              <div style={{ ...SMALL, color: '#fff', fontWeight: 700, marginBottom: 8 }}>📚 Именной цикл (интернет-библиотека) — пусто = обычный план</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <label style={{ ...SMALL }}>Цикл<br/>
+                  <select value={cycId} onChange={e=>setCycId(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                    <option value="">— обычный план —</option>
+                    {ARM_CYCLE_LIBRARY.map(c=> <option key={c.id} value={c.id}>{c.name} ({c.weeks}н)</option>)}
+                  </select>
+                </label>
+                <label style={{ ...SMALL }}>Медли (армлифтинг)<br/>
+                  <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                    <option value="">—</option>
+                    {ARM_MEDLEYS.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </label>
+                <label style={{ ...SMALL }}>Коррекция %/нед (СРЦ 0.5)<br/><input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+                <label style={{ ...SMALL }}>CoC рабочий<br/>
+                  <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                    <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
+                  </select>
+                </label>
+                <label style={{ ...SMALL }}>Pumpkin-рука (Larratt)<br/>
+                  <select value={cycPumpkin} onChange={e=>setCycPumpkin(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                    <option value="">—</option><option value="left">Левая</option><option value="right">Правая</option>
+                  </select>
+                </label>
+              </div>
+              <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycConsent} onChange={e=>setCycConsent(e.target.checked)} /> Согласен на растяжение/сжатие цикла</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFlat} onChange={e=>setCycFlat(e.target.checked)} /> Flat pyramid (Bompa)</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycBlood} onChange={e=>setCycBlood(e.target.checked)} /> Bloodflow 100×</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycNever} onChange={e=>setCycNever(e.target.checked)} /> Never fail</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycSingles} onChange={e=>setCycSingles(e.target.checked)} /> Heavy singles 17–18</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycBrzenk} onChange={e=>setCycBrzenk(e.target.checked)} /> Brzenk 1+1</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAkimov} onChange={e=>setCycAkimov(e.target.checked)} /> Акимов-крюк</label>
+                {cycAkimov && <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycComp} onChange={e=>setCycComp(e.target.checked)} /> Соревн. период</label>}
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFor} onChange={e=>setCycFor(e.target.checked)} /> FOR-7 (adv+)</label>
+              </div>
+              {cycId && (()=>{
+                try {
+                  const f = fitCycleToWeeks(cycId, weeks);
+                  return <div style={{ ...SMALL, marginTop: 6, color: f.fit === 'exact' ? ACCENT : '#e6a23c' }}>Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
+                } catch { return null; }
+              })()}
             </div>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {

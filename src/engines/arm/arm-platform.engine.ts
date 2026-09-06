@@ -30,6 +30,9 @@ export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; nam
   hub: { maleKg: 45, femaleKg: 25, name: 'IronMind Hub' },
   pinch_block: { maleKg: 80, femaleKg: 45, name: 'Pinch Block' },
   coc_gripper: { maleKg: 55, femaleKg: 30, name: 'CoC (эквивалент)' },
+  grandfather_clock: { maleKg: 90, femaleKg: 50, name: 'Grandfather Clock' },
+  anvil: { maleKg: 30, femaleKg: 16, name: 'SSE Anvil' },
+  country_crush: { maleKg: 100, femaleKg: 55, name: 'Country Crush' },
 };
 
 export function platformWrFor(implement: string, sex: string): number {

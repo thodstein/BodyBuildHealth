@@ -143,6 +143,24 @@ export interface ArmBuilderInput {
   calStartIso?: string; // календарь: дата старта (дубль competitionDateIso для явности)
   calPriority?: string; // A/B/C
   calSeries?: string; // waf_worlds/east_vs_west/super_series/local
+  // ── CYCLES (интернет-библиотека, все опциональны, дефолт = как раньше) ──
+  cycleId?: string; // strengthlog_8 | tableready_12 | toproll_6 | src_toproll_12 | kuznica_6_8 | dobrorezov_44 | grinder_hybrid_12 | coc_8 | coc_12 | for_7 | brzenk_1_1 | larratt_table_bloodflow
+  cycleConsent?: boolean; // согласие на extend/shrink (fit proposed_*)
+  correctionPct?: number; // %/нед прогрессии весов (СРЦ-дефолт 0.5)
+  cocWorking?: string; // текущий CoC-уровень (guide..no4) для лестницы
+  flatPyramid?: boolean; // Bompa flat pyramid 3→5→7×5 для лифтов хвата
+  flatPyramidWeightKg?: number; // стартовый вес пирамиды
+  bloodflow?: boolean; // Larratt bloodflow-слой (вне MRV)
+  pumpkinArm?: 'left' | 'right'; // Larratt pumpkin-рука
+  neverFail?: boolean; // Larratt/школа: RIR≥1, без PR в цикле
+  heavySingles?: boolean; // Larratt 17–18 heavy singles
+  brzenkMode?: boolean; // Brzenk 1+1 минимализм
+  akimovHook?: boolean; // Акимов-блок крюка (Скотт + лямка + резина)
+  compPeriod?: boolean; // для Акимова: true — соревновательный
+  medleyId?: string; // worlds_2026 | arnold_2026 | super_series_2026 | rt_saxon_hub
+  forMode?: boolean; // FOR-7 overreach (гейт advanced/enhanced)
+  forSpecialization?: 'crush' | 'support' | 'pinch' | 'open' | 'wrist';
+  axisCheck?: { trunkRotatedTowardAttack?: boolean; wristBehindShoulder?: boolean; wristExtendedDorsally?: boolean; coldNoWarmup?: boolean; fightingFromDefense?: boolean; sideMaxAttempt?: boolean }; // humerus-axis 2026
 }
 
 export interface ArmInjury {

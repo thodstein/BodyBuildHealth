@@ -115,6 +115,18 @@ export function transferFactor(from: string, to: string): number {
   return map[key] ?? 0.8;
 }
 
+/** CoC-тройка IronMind (warm/work/challenge) — аддитивно к лестнице имплементов. */
+export function cocTripleFor(working: string): { warm: string[]; work: string; challenge: string | null; note: string } {
+  const order = ['guide', 'sport', 'trainer', 'pointfive', 'no1', 'no1_5', 'no2', 'no2_5', 'no3', 'no3_5', 'no4'];
+  const norm = String(working || 'trainer').toLowerCase().replace(/[\s._-]/g, '');
+  const alias: Record<string, string> = { guide: 'guide', sport: 'sport', trainer: 'trainer', pointfive: 'pointfive', '05': 'pointfive', no1: 'no1', '1': 'no1', no15: 'no1_5', '15': 'no1_5', no2: 'no2', '2': 'no2', no25: 'no2_5', '25': 'no2_5', no3: 'no3', '3': 'no3', no35: 'no3_5', '35': 'no3_5', no4: 'no4', '4': 'no4' };
+  const w = alias[norm] || 'trainer';
+  const idx = order.indexOf(w);
+  const warm = order.slice(Math.max(0, idx - 2), idx);
+  const challenge = idx + 1 < order.length ? order[idx + 1] : null;
+  return { warm, work: w, challenge, note: `CoC: warm ${warm.join('→') || 'мяч/резина'} 1–2×10–12 → work ${w} 1–3×5–7 в отказ → challenge ${challenge || '—'} партиалы/негативы + expanders.` };
+}
+
 /** Совет лестницы одной строкой для rationale. */
 export function ladderAdvice(current: string, value: number, sex: string): string {
   const n = nextImplement(current, value, sex);

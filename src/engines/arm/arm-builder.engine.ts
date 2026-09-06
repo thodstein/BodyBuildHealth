@@ -24,6 +24,7 @@ import { nextImplement } from './arm-implement-ladder.engine';
 import { injectTableCorrections } from './arm-table-inject.engine';
 import { longevityTrackFor } from './arm-longevity.engine';
 import { injectGripProtocol } from './arm-grip-protocol.engine';
+import { cyclePhaseMap, fitCycleToWeeks, getArmCycle } from './arm-cycle-library.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -388,8 +389,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             const mus = (ex.muscle||'').toString().toLowerCase();
             const w = ex.workSets && ex.workSets[0] ? Number(ex.workSets[0].weight) : 0;
             if (mus && Number.isFinite(w) && w>0) {
-              // +2.5% прогрессия за мезоцикл (Schoenfeld 2016, Kemp 2024)
-              const progressed = Math.round(w * 1.025 * 2)/2;
+              // Кросс-мезо прогрессия: дефолт +2.5% (Schoenfeld 2016, Kemp 2024),
+              // при заданном correctionPct (СРЦ №4 — 0.5) — ставка цикла.
+              const cp = Number((input as any).correctionPct);
+              const rate = Number.isFinite(cp) && cp >= 0 && cp <= 5 ? 1 + cp / 100 : 1.025;
+              const progressed = Math.round(w * rate * 2)/2;
               if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
             }
           }
@@ -465,7 +469,26 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
     mastersDeload = track === 'grandmaster' || track === 'supergrand';
   } catch { mastersDeload = false; }
-  const phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
+  // Именной цикл (P0): фазовая карта библиотеки поверх generic — только при
+  // cycleId + (exact либо согласие на extend/shrink). Без cycleId — байт-в-байт.
+  let phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
+  let cycleNote: string | null = null;
+  try {
+    const cid = String((input as any).cycleId || '');
+    if (cid) {
+      const fit = fitCycleToWeeks(cid, weeks);
+      const c = getArmCycle(cid);
+      if (c && (fit.fit === 'exact' || (input as any).cycleConsent === true)) {
+        const cm = cyclePhaseMap(cid, weeks);
+        if (cm) {
+          phaseMap = cm as Record<number, string>;
+          cycleNote = `Цикл ${c.name} (${fit.fit}${(input as any).cycleConsent === true && fit.fit !== 'exact' ? ', по согласию' : ''}): ${c.rpe}.`;
+        }
+      } else if (c) {
+        cycleNote = `Цикл ${c.name}: ${fit.note} — без согласия построен generic (фазы по умолчанию).`;
+      }
+    }
+  } catch { /* цикл опционален */ }
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
   const planWeeks: ArmWeek[] = [];
@@ -755,6 +778,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
   rationale.push(`Сплит: ${pattern.name} (${pattern.sessionsPerRotation}x/${pattern.rotationDays}дн)`);
   rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
+  if (cycleNote) rationale.push(cycleNote);
   if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
   const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');
