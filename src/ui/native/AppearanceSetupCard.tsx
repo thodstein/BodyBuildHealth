@@ -208,6 +208,51 @@ export const AppearanceSetupCard: React.FC = () => {
           {msg}
         </div>
       )}
+      <div className="native-section">{getLocale() === 'en' ? 'Preview' : 'Предпросмотр'}</div>
+      <div
+        aria-hidden="true"
+        style={{
+          borderRadius: 16,
+          padding: 12,
+          background: 'linear-gradient(180deg, rgba(21,38,66,0.72), rgba(12,23,40,0.72))',
+          border: '1px solid rgba(140,190,255,0.14)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span
+            style={{
+              padding: '9px 16px',
+              borderRadius: 14,
+              fontSize: 13,
+              fontWeight: 800,
+              color: 'var(--accent-contrast)',
+              background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
+              boxShadow: '0 5px 18px rgba(var(--accent-rgb), 0.35)',
+            }}
+          >
+            {getLocale() === 'en' ? 'Primary' : 'Кнопка'}
+          </span>
+          <span
+            style={{
+              padding: '6px 12px',
+              borderRadius: 14,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--accent)',
+              border: '1px solid rgba(var(--accent-rgb), 0.4)',
+              background: 'rgba(var(--accent-rgb), 0.12)',
+            }}
+          >
+            {getLocale() === 'en' ? 'Chip' : 'Чип'}
+          </span>
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div style={{ width: '68%', height: '100%', background: 'linear-gradient(90deg, var(--accent), var(--accent-2))' }} />
+        </div>
+      </div>
     </div>
   );
 };

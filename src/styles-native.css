@@ -4149,6 +4149,196 @@ html.app-native .native-home-tile-icon svg {
   filter: drop-shadow(0 4px 12px rgba(var(--accent-rgb), 0.35));
 }
 
+/* ─── 63. HOME-A: сводка дня, CTA, карусель разделов ────────────
+ * Только APK. Живые данные из дневников + очереди виджетов. */
+html.app-native .native-home-flash {
+  margin: 0 auto 8px;
+  max-width: 640px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent-contrast);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.35);
+}
+
+html.app-native .native-home-today {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+html.app-native .native-home-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 10px 4px 9px;
+  border-radius: 16px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72));
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+html.app-native .native-home-stat:active {
+  transform: scale(0.96);
+}
+
+html.app-native .native-home-stat-v {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.4);
+}
+
+html.app-native .native-home-stat-l {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(226, 236, 255, 0.6);
+}
+
+html.app-native .native-home-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  margin-bottom: 10px;
+  border-radius: 18px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  color: var(--accent-contrast);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+html.app-native .native-home-cta:active {
+  transform: scale(0.98);
+}
+
+html.app-native .native-home-cta-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accent-contrast);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+html.app-native .native-home-rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 10px;
+  padding: 2px 2px 6px;
+  scroll-snap-type: x mandatory;
+}
+
+html.app-native .native-home-rail::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .native-home-rail-item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(13, 24, 42, 0.66);
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+html.app-native .native-home-rail-item:active {
+  transform: scale(0.94);
+}
+
+html.app-native .native-home-rail-icon {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+html.app-native .native-home-rail-icon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+/* ─── 64. SHOP + ARTICLES ACCENT ──────────────────────────────
+ * Только APK. Магазин/Статьи захардкожены на минт в инлайнах —
+ * бренд-элементы переводим на акцент темы, категорийные цвета не трогаем. */
+
+/* Магазин: активный таб, CTA покупки, бейдж корзины, лучшая цена. */
+html.app-native .market-tab[data-active='true'] {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  color: var(--accent) !important;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.07)) !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-native .market-buy {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: var(--accent-contrast) !important;
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .market-count {
+  background: var(--accent) !important;
+  color: var(--accent-contrast) !important;
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.35) !important;
+}
+
+html.app-native .market-best {
+  color: var(--accent) !important;
+  background: rgba(var(--accent-rgb), 0.14) !important;
+  border-color: rgba(var(--accent-rgb), 0.24) !important;
+}
+
+html.app-native .market-search input:focus {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12) !important;
+}
+
+/* Статьи: активный чип, фокус поиска, закладка. */
+html.app-native .article-chip[data-active='true'] {
+  color: var(--accent) !important;
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.14), rgba(var(--accent-rgb), 0.06)) !important;
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+html.app-native .articles-search:focus {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(var(--accent-rgb), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .article-chip:active,
+html.app-native .article-bookmark:active,
+html.app-native .market-filter:active {
+  transform: scale(0.94);
+}
+
 /* ─── 59. APK DYNAMIC COLOR — акцент поверх var-изированных токенов ──
  * Дефолт (без атрибута) — лайм. Весь слой уже сидит на var(--accent) /
  * var(--accent-2) / --accent-rgb, поэтому переключение мгновенное и полное.

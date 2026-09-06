@@ -1,6 +1,29 @@
 import React, { useMemo, useState } from 'react';
 import { HeroImg } from '../HeroImg';
 import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
+import { isNativeApp } from '../../core/app-platform';
+
+const SAVED_KEY = 'he_articles_saved_v1';
+
+export function loadSavedArticles(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function toggleSavedArticle(id: string): string[] {
+  const cur = loadSavedArticles();
+  const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+  try {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(next.slice(0, 200)));
+  } catch {
+    /* quota — состояние останется в памяти */
+  }
+  return next;
+}
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
 
@@ -104,11 +127,32 @@ export const ArticlesScreen: React.FC = () => {
   const [category, setCategory] = useState('all');
   const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string[]>(() => loadSavedArticles());
+  const [offline, setOffline] = useState(() => {
+    try {
+      return typeof navigator !== 'undefined' && navigator.onLine === false;
+    } catch {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    if (!isNativeApp()) return;
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
 
   const articles = useMemo(() => {
     let list = getSortedArticles();
     if (listSection === 'new') list = list.slice(0, 3);
-    if (category !== 'all') list = list.filter(a => a.category === category);
+    if (category === 'saved') list = list.filter(a => saved.includes(a.id));
+    else if (category !== 'all') list = list.filter(a => a.category === category);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(a =>
@@ -118,7 +162,7 @@ export const ArticlesScreen: React.FC = () => {
       );
     }
     return list;
-  }, [category, search, listSection]);
+  }, [category, search, listSection, saved]);
 
   const openPDF = (url: string) => {
     const tg = (window as any).Telegram?.WebApp;
@@ -183,6 +227,9 @@ export const ArticlesScreen: React.FC = () => {
         onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.09)'; }}
         >← Категории</button>
         <div style={{ flex:1 }} />
+        {isNativeApp() && offline && (
+          <span className="articles-offline" style={{ fontSize:10, fontWeight:800, color:'#fbbf24', background:'rgba(251,191,36,0.10)', border:'1px solid rgba(251,191,36,0.24)', padding:'5px 10px', borderRadius:999 }}>Офлайн · читалка доступна</span>
+        )}
         <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'5px 10px', borderRadius:999 }}>{articles.length} ст.</span>
       </div>
 
@@ -192,7 +239,7 @@ export const ArticlesScreen: React.FC = () => {
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск статей — заголовок, тег, категория..." style={{
+          placeholder="Поиск статей — заголовок, тег, категория..." className="articles-search" style={{
             width:'100%', padding:'11px 36px 11px 36px', borderRadius:12,
             background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
             color:'#fff', fontSize:13, outline:'none', fontFamily: FONT,
@@ -211,10 +258,24 @@ export const ArticlesScreen: React.FC = () => {
 
       {/* Category chips — glass pills */}
       <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:12 }}>
+        {isNativeApp() && (
+          <button key="saved" onClick={() => setCategory('saved')} className="article-chip" data-active={category === 'saved'} aria-label="Сохранённые статьи" style={{
+            padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontFamily: FONT,
+            background: category === 'saved' ? 'linear-gradient(135deg, rgba(var(--accent-rgb, 0,230,138),0.16), rgba(var(--accent-rgb, 0,230,138),0.07))' : 'rgba(255,255,255,0.05)',
+            color: category === 'saved' ? 'var(--accent, #00e68a)' : '#fff',
+            border: `1px solid ${category === 'saved' ? 'rgba(var(--accent-rgb, 0,230,138),0.32)' : 'rgba(255,255,255,0.08)'}`,
+            fontWeight: category === 'saved' ? 800 : 600,
+            transition:'all 0.18s', letterSpacing:'-0.01em',
+            display:'flex', alignItems:'center', gap:6,
+          }}>
+            <span style={{ fontSize:11 }}>🔖</span>
+            Сохранённые{saved.length > 0 ? ` · ${saved.length}` : ''}
+          </button>
+        )}
         {CATEGORIES.map(c => {
           const isActive = category === c.value;
           return (
-            <button key={c.value} onClick={() => setCategory(c.value)} style={{
+            <button key={c.value} onClick={() => setCategory(c.value)} className="article-chip" data-active={isActive} style={{
               padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontFamily: FONT,
               background: isActive ? `linear-gradient(135deg, ${c.color}1f, ${c.color}12)` : 'rgba(255,255,255,0.05)',
               color: isActive ? c.color : '#fff',
@@ -276,6 +337,21 @@ export const ArticlesScreen: React.FC = () => {
               </div>
             </div>
             <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, fontWeight:700, color:'#fff' }}>{estimateReadTime(readingArticle.content||'')}′</span>
+            {isNativeApp() && (
+              <button
+                onClick={() => setSaved(toggleSavedArticle(readingArticle.id))}
+                aria-label={saved.includes(readingArticle.id) ? 'Убрать из сохранённых' : 'Сохранить для офлайна'}
+                className="article-bookmark"
+                data-active={saved.includes(readingArticle.id)}
+                style={{
+                  width:34, height:34, borderRadius:999, cursor:'pointer', flexShrink:0,
+                  background: saved.includes(readingArticle.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.16)' : 'rgba(255,255,255,0.06)',
+                  border: saved.includes(readingArticle.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.32)' : '1px solid rgba(255,255,255,0.08)',
+                  color: saved.includes(readingArticle.id) ? 'var(--accent, #00e68a)' : '#fff',
+                  fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
+                }}
+              >{saved.includes(readingArticle.id) ? '★' : '☆'}</button>
+            )}
           </div>
 
           <div style={{ flex:1, overflow:'auto', padding:'18px 16px 40px', maxWidth: 720, width:'100%', margin:'0 auto' }}>

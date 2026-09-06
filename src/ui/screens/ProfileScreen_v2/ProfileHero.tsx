@@ -7,7 +7,8 @@ import React, { useEffect, useState } from 'react';
 import { HeroImg } from '../../HeroImg';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
-import { colors } from './ui';
+import { isNativeApp } from '../../../core/app-platform';
+import { colors, withAlpha } from './ui';
 
 interface TabDef {
   id: 'user' | 'diaries' | 'settings' | 'reports';
@@ -129,6 +130,23 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               {filled === 0 ? '👇 Заполните основное в карточке "Пользователь"' : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
             </div>
           )}
+          {isNativeApp() && filled < 12 && (
+            <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
+              <button
+                type="button"
+                onClick={() => onSelectTab('user')}
+                className="profile-hero-cta"
+                style={{
+                  padding:'10px 18px', borderRadius:999, border:'none', cursor:'pointer',
+                  fontSize:12, fontWeight:900, letterSpacing:'-0.1px',
+                  color:'var(--accent-contrast, #0a1a08)',
+                  background:'linear-gradient(135deg, var(--accent, #c9f73a), var(--accent-2, #00e68a))',
+                  boxShadow:'0 8px 24px rgba(var(--accent-rgb, 201, 247, 58), 0.35)',
+                  minHeight:44,
+                }}
+              >Дозаполнить профиль →</button>
+            </div>
+          )}
         </div>
 
         <div role="navigation" aria-label="Разделы профиля" className="profile-hero-nav" style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -141,16 +159,16 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               className="profile-hero-card"
               data-id={t.id}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectTab(t.id); }}}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${t.color}40`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${t.color}18 inset`; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${withAlpha(t.color, '40')}`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${withAlpha(t.color, '18')} inset`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}
               style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.12)', boxShadow:'0 3px 12px rgba(0,0,0,0.30)', background:'rgba(18,18,20,0.62)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}
             >
-              <div aria-hidden="true" style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${t.color}22, ${t.color}10)`, border:`1px solid ${t.color}28`, fontSize:18, boxShadow:`0 3px 10px ${t.color}20`, position:'relative' }}>{t.icon}</div>
+              <div aria-hidden="true" style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${withAlpha(t.color, '22')}, ${withAlpha(t.color, '10')})`, border:`1px solid ${withAlpha(t.color, '28')}`, fontSize:18, boxShadow:`0 3px 10px ${withAlpha(t.color, '20')}`, position:'relative' }}>{t.icon}</div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{t.label}</div>
                 <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3 }}>{t.desc}</div>
               </div>
-              <span aria-hidden="true" style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`${t.color}12`, border:`1px solid ${t.color}18`, color:t.color, fontSize:13, flexShrink:0, fontWeight:700 }}>→</span>
+              <span aria-hidden="true" style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`${withAlpha(t.color, '12')}`, border:`1px solid ${withAlpha(t.color, '18')}`, color:t.color, fontSize:13, flexShrink:0, fontWeight:700 }}>→</span>
             </div>
           ))}
         </div>

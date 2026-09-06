@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { MOCK_MARKETPLACE_DB, getBestPrice, generateAffiliateLink } from '../../engines/marketplace.engine';
 import type { MarketplaceItem, PurchaseOption } from '../../core/types';
+import { isNativeApp } from '../../core/app-platform';
 
 type CategoryFilter = 'all' | 'pharma' | 'supplement' | 'vitamin';
 type SortMode = 'price' | 'category' | 'name';
@@ -47,6 +48,7 @@ export const MarketplaceScreen: React.FC = () => {
   const [sort, setSort] = useState<SortMode>('category');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [shopTab, setShopTab] = useState<ShopTab>('catalog');
+  const [query, setQuery] = useState('');
   const [cart, setCart] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('supportCart') || '[]'); } catch { return []; }
   });
@@ -69,6 +71,8 @@ export const MarketplaceScreen: React.FC = () => {
 
   const filtered = useMemo(() => {
     let list = filter === 'all' ? items : items.filter(i => i.category === filter);
+    const q = query.trim().toLowerCase();
+    if (q) list = list.filter(i => i.name.toLowerCase().includes(q));
     return list.sort((a, b) => {
       if (sort === 'price') {
         const pa = getBestPrice(a.purchaseOptions)?.price ?? Infinity;
@@ -78,7 +82,7 @@ export const MarketplaceScreen: React.FC = () => {
       if (sort === 'category') return a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
       return a.name.localeCompare(b.name);
     });
-  }, [items, filter, sort]);
+  }, [items, filter, sort, query]);
 
   if (loading) {
     return <div className="screen marketplace" style={{ padding: 24, color:'#fff', fontFamily: FONT }}>Загрузка Маркетплейс…</div>;
@@ -115,13 +119,32 @@ export const MarketplaceScreen: React.FC = () => {
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
           boxShadow: shopTab === 'cart' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
-        }}>🛒 Корзина {cart.length > 0 && <span style={{ marginLeft:6, padding:'2px 7px', borderRadius:999, background:'#00e68a', color:'#000', fontSize:10, fontWeight:900, boxShadow:'0 2px 10px rgba(0,230,138,0.32)' }}>{cart.length}</span>}</button>
+        }}>🛒 Корзина {cart.length > 0 && <span className="market-count" style={{ marginLeft:6, padding:'2px 7px', borderRadius:999, background:'#00e68a', color:'#000', fontSize:10, fontWeight:900, boxShadow:'0 2px 10px rgba(0,230,138,0.32)' }}>{cart.length}</span>}</button>
       </div>
 
       {shopTab === 'catalog' && (
         <div className="market-body" style={{ padding:'0 12px 84px', overflowY:'auto' }}>
           {/* Filters — premium chips */}
           <div className="market-filters" style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+            {isNativeApp() && (
+              <div className="market-search" style={{ position:'relative', flex:'1 1 100%', marginBottom:2 }}>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Поиск по названию..."
+                  aria-label="Поиск по каталогу"
+                  style={{
+                    width:'100%', padding:'10px 36px 10px 14px', borderRadius:12,
+                    background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
+                    color:'#fff', fontSize:13, outline:'none', fontFamily: FONT, boxSizing:'border-box',
+                  }}
+                />
+                {query && (
+                  <button onClick={() => setQuery('')} aria-label="Очистить поиск" style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:999, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', cursor:'pointer', fontSize:11 }}>✕</button>
+                )}
+              </div>
+            )}
             {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map(key => {
               const active = filter === key;
               const grad = CATEGORY_GRAD[key] || CATEGORY_GRAD.all;
@@ -186,7 +209,7 @@ export const MarketplaceScreen: React.FC = () => {
                           <span style={{ padding:'3px 9px', borderRadius:999, fontSize:10, fontWeight:800,
                             background: catGrad, color:'#fff', boxShadow:'0 2px 10px rgba(0,0,0,0.18)', letterSpacing:'0.02em'
                           }}>{CATEGORY_LABELS[item.category as CategoryFilter]}</span>
-                          {best && <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', padding:'3px 9px', borderRadius:999 }}>от {best.price} {best.currency}</span>}
+                          {best && <span className="market-best" style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', padding:'3px 9px', borderRadius:999 }}>от {best.price} {best.currency}</span>}
                         </div>
                       </div>
                       <span style={{ width:28, height:28, borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.22s', flexShrink:0 }}>▼</span>
@@ -213,7 +236,7 @@ export const MarketplaceScreen: React.FC = () => {
                               <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>{opt.price} {opt.currency}</span>
                               {isBest && <span style={{ marginLeft:2, padding:'2px 7px', borderRadius:999, background:'rgba(0,230,138,0.14)', color:'#00e68a', fontSize:9, fontWeight:800, border:'1px solid rgba(0,230,138,0.22)' }}>✓ Лучшая</span>}
                             </div>
-                            <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" style={{
+                            <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" className="market-buy" style={{
                               padding:'6px 13px', borderRadius:999, background:'#00e68a',
                               color:'#000', fontSize:11, fontWeight:800, textDecoration:'none', boxShadow:'0 4px 14px rgba(0,230,138,0.28)',
                             }}>Купить →</a>
