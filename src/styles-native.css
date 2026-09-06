@@ -4285,6 +4285,66 @@ html.app-native .native-home-rail-icon svg {
   display: block;
 }
 
+/* PRO-карточки Главной: симптомы и критические взаимодействия. */
+html.app-native .native-home-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.78), rgba(12, 23, 40, 0.78));
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  border-left: 3px solid var(--accent);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+html.app-native .native-home-alert:active {
+  transform: scale(0.98);
+}
+
+html.app-native .native-home-alert--danger {
+  border-left-color: #ef4444;
+}
+
+html.app-native .native-home-alert > svg:first-child {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+html.app-native .native-home-alert--danger > svg:first-child {
+  color: #ef4444;
+}
+
+html.app-native .native-home-alert > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+html.app-native .native-home-alert b {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+html.app-native .native-home-alert small {
+  font-size: 11px;
+  color: rgba(226, 236, 255, 0.65);
+}
+
+html.app-native .native-home-alert > svg:last-child {
+  color: rgba(226, 236, 255, 0.5);
+  flex-shrink: 0;
+}
+
 /* ─── 64. SHOP + ARTICLES ACCENT ──────────────────────────────
  * Только APK. Магазин/Статьи захардкожены на минт в инлайнах —
  * бренд-элементы переводим на акцент темы, категорийные цвета не трогаем. */

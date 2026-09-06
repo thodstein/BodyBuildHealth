@@ -11,6 +11,8 @@ import { MarketplaceScreen } from '../screens/MarketplaceScreen';
 import { ArticlesScreen } from '../screens/ArticlesScreen';
 import { loadSavedArticles, toggleSavedArticle } from '../screens/ArticlesScreen';
 import { NativeIcon, NATIVE_ICON_NAMES } from '../native/NativeIcons';
+import { DiaryCard, DIARY_META } from '../screens/ProfileScreen_v2/diary-ui';
+import { REPORT_SOURCES } from '../screens/ProfileScreen_v2/ProfileReportsTab';
 
 function setCapacitorNative() {
   (window as unknown as { Capacitor?: unknown }).Capacitor = {
@@ -152,6 +154,29 @@ describe('NativeIcon (SVG-набор)', () => {
     const svg = container.querySelector('svg');
     expect(svg?.getAttribute('width')).toBe('34');
     expect(svg?.getAttribute('class')).toBe('t');
+  });
+});
+
+describe('DiaryCard и отчёты на SVG', () => {
+  it('все типы дневников имеют иконку из набора', () => {
+    for (const key of Object.keys(DIARY_META) as (keyof typeof DIARY_META)[]) {
+      expect(NATIVE_ICON_NAMES, key).toContain(DIARY_META[key].icon);
+    }
+  });
+
+  it('DiaryCard рендерит svg-иконку типа', () => {
+    const { container } = render(
+      <DiaryCard diaryKey="sleep" count={0} last="" daysSinceLast={null} loggedToday={false} onAdd={() => {}} onOpen={() => {}} />,
+    );
+    const svg = container.querySelector('svg');
+    expect(svg).not.toBeNull();
+    expect(svg?.querySelector('path')).not.toBeNull();
+  });
+
+  it('все источники отчётов имеют иконку из набора', () => {
+    for (const src of REPORT_SOURCES) {
+      expect(NATIVE_ICON_NAMES, src.label).toContain(src.icon);
+    }
   });
 });
 

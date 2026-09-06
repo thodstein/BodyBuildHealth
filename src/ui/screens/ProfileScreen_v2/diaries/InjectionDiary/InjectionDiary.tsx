@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle, withAlpha } from '../../ui';
+import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, main as pageMain } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
 import {
@@ -452,12 +453,12 @@ const InjectionEditor: React.FC<{
             </button>
           )}
           <button
-            style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800, opacity: overVolume ? 0.45 : 1 }}
+            style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800, opacity: overVolume ? 0.45 : 1, display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center' }}
             onClick={save}
             disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim() || overVolume}
             title={overVolume ? `Объём превышает максимум ${advice?.maxVolumeMl} мл для зоны — уменьшите объём` : undefined}
           >
-            💾 Сохранить
+            <NativeIcon name="check" size={13} /> Сохранить
           </button>
         </div>
       </div>
@@ -562,11 +563,11 @@ const ScheduleItemEditor: React.FC<{
           Отмена
         </button>
         <button
-          style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800 }}
+          style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800, display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center' }}
           onClick={() => valid() && onSave(item)}
           disabled={!valid()}
         >
-          💾 Сохранить
+          <NativeIcon name="check" size={13} /> Сохранить
         </button>
       </div>
     </div>
@@ -820,7 +821,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
       `}</style>
       <DiaryHeader
         accent={ACCENT}
-        title="💉 Инъекции"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="syringe" size={18} /> Инъекции</span>}
         count={entries.length}
         onClose={onClose}
         onAdd={() => setEditor({ open: true })}

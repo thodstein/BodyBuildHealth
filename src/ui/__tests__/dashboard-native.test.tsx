@@ -21,6 +21,11 @@ beforeEach(async () => {
   delete (window as unknown as { Telegram?: unknown }).Telegram;
   delete (window as unknown as { Capacitor?: unknown }).Capacitor;
   try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  try {
     window.location.hash = '';
   } catch {
     /* ignore */
@@ -80,8 +85,7 @@ describe('DashboardScreen platform branching', () => {
     expect(document.querySelector('.native-home-tile-icon')?.textContent).not.toMatch(/👤|🛍|📚/);
   });
 
-  it('2c. native → CTA ведёт первым незакрытым; nextHomeAction — чистая логика', async () => {
-    const { nextHomeAction } = await import('../screens/DashboardScreen.native');
+  it('2c. native → CTA ведёт первым незакрытым; nextHomeAction — чистая логика', async () => {    const { nextHomeAction } = await import('../screens/DashboardScreen.native');
     expect(nextHomeAction({ trained: false, sessionsToday: 0, kcalToday: 0, queue: 0 }).id).toBe('training');
     expect(nextHomeAction({ trained: true, sessionsToday: 1, kcalToday: 500, queue: 3 }).id).toBeNull();
     expect(nextHomeAction({ trained: true, sessionsToday: 1, kcalToday: 0, queue: 0 }).id).toBe('nutrition');
@@ -93,6 +97,28 @@ describe('DashboardScreen platform branching', () => {
     expect(cta).not.toBeNull();
     cta!.click();
     expect(calls).toEqual(['training']);
+  });
+
+  it('2d. native → критические взаимодействия показывают алерт с переходом в риски', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    try {
+      localStorage.setItem('he_drug_warnings', JSON.stringify({ date: '2026-09-06', count: 3, highCount: 2, warnings: ['A+B'] }));
+    } catch {}
+    const calls: string[] = [];
+    render(<DashboardScreen onNavigate={(s) => calls.push(s)} />);
+    const alert = document.querySelector('.native-home-alert--danger') as HTMLElement | null;
+    expect(alert).not.toBeNull();
+    expect(alert?.querySelectorAll('svg').length).toBe(2);
+    alert!.click();
+    expect(calls).toEqual(['risks']);
+  });
+
+  it('2e. native → без предупреждений алертов нет', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    render(<DashboardScreen />);
+    expect(document.querySelector('.native-home-alert')).toBeNull();
   });
 
   it('3. web/Telegram → классический hero без изменений (3 кнопки)', async () => {

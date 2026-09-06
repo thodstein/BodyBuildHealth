@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
+import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
 import {
@@ -321,7 +322,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       `}</style>
       <DiaryHeader
         accent={ACCENT}
-        title="🏃 Кардио-дневник"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="activity" size={18} /> Кардио-дневник</span>}
         count={log.length}
         countLabel="сессий"
         onClose={onClose}
@@ -473,7 +474,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             <span style={labelStyle}>Заметка</span>
             <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Самочувствие, погода, интервалы…" style={{ ...inputStyle, width: '100%' }} aria-label="Заметка сессии" maxLength={300} />
           </label>
-          <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
+          <button style={{ ...btnPrimary(ACCENT), display:'inline-flex', alignItems:'center', gap:6 }} onClick={add}><NativeIcon name="check" size={13} />{editingId ? 'Обновить' : 'Записать'}</button>
           {editingId && (
             <button style={{ ...btnBase(ACCENT), background: 'rgba(255,255,255,0.06)' }} onClick={() => { setEditingId(null); setNotes(''); }}>
               ✕ Отмена

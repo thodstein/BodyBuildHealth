@@ -5,38 +5,39 @@
 
 import React from 'react';
 import { colors, withAlpha } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import type { DiaryKey } from './diary-helpers';
 
 /* ── Цветовые токены для дневников ───────────────────────────────────────── */
 
-export const DIARY_COLORS: Record<DiaryKey, { primary: string; background: string; border: string; icon: string }> = {
-  sleep: { primary: '#a78bfa', background: '#a78bfa28', border: '#a78bfa55', icon: '💤' },
-  bp: { primary: '#ef4444', background: '#ef444428', border: '#ef444455', icon: '❤️' },
-  weight: { primary: '#22c55e', background: '#22c55e28', border: '#22c55e55', icon: '⚖️' },
-  injection: { primary: '#f59e0b', background: '#f59e0b28', border: '#f59e0b55', icon: '💉' },
-  health: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: '🩺' },
-  cardio: { primary: '#4ade80', background: '#4ade8028', border: '#4ade8055', icon: '🏃' },
-  measurements: { primary: '#22c55e', background: '#22c55e28', border: '#22c55e55', icon: '⚖️' },
-  symptoms: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: '🩺' },
-  pain: { primary: '#f59e0b', background: '#f59e0b28', border: '#f59e0b55', icon: '🦴' },
-  neuro: { primary: '#a78bfa', background: '#a78bfa28', border: '#a78bfa55', icon: '🧠' },
-  acne: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: '🔴' },
-  hemato: { primary: '#3b82f6', background: '#3b82f628', border: '#3b82f655', icon: '🩸' },
+export const DIARY_COLORS: Record<DiaryKey, { primary: string; background: string; border: string; icon: NativeIconName }> = {
+  sleep: { primary: '#a78bfa', background: '#a78bfa28', border: '#a78bfa55', icon: 'moon' },
+  bp: { primary: '#ef4444', background: '#ef444428', border: '#ef444455', icon: 'heart' },
+  weight: { primary: '#22c55e', background: '#22c55e28', border: '#22c55e55', icon: 'kettlebell' },
+  injection: { primary: '#f59e0b', background: '#f59e0b28', border: '#f59e0b55', icon: 'syringe' },
+  health: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: 'cross' },
+  cardio: { primary: '#4ade80', background: '#4ade8028', border: '#4ade8055', icon: 'activity' },
+  measurements: { primary: '#22c55e', background: '#22c55e28', border: '#22c55e55', icon: 'ruler' },
+  symptoms: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: 'eye' },
+  pain: { primary: '#f59e0b', background: '#f59e0b28', border: '#f59e0b55', icon: 'zap' },
+  neuro: { primary: '#a78bfa', background: '#a78bfa28', border: '#a78bfa55', icon: 'cpu' },
+  acne: { primary: '#ec4899', background: '#ec489928', border: '#ec489955', icon: 'dot' },
+  hemato: { primary: '#3b82f6', background: '#3b82f628', border: '#3b82f655', icon: 'droplet' },
 };
 
-export const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; color: string; storageKey?: string }> = {
-  sleep: { title: 'Сон', unit: 'ч', icon: '💤', color: '#a78bfa', storageKey: 'he_sleep_diary' },
-  bp: { title: 'Давление', unit: 'мм рт.ст.', icon: '❤️', color: '#ef4444', storageKey: 'he_bp_diary' },
-  weight: { title: 'Вес и замеры', unit: 'кг / см', icon: '⚖️', color: '#22c55e' },
-  injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: 'he_injection_diary' },
-  health: { title: 'Здоровье', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_health_diary' },
-  cardio: { title: 'Кардио', unit: 'мин', icon: '🏃', color: '#4ade80', storageKey: 'he_cardio_sessions' },
-  measurements: { title: 'Замеры', unit: 'см', icon: '⚖️', color: '#22c55e' },
-  symptoms: { title: 'Симптомы', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_symptoms_diary' },
-  pain: { title: 'Боль', unit: '', icon: '🦴', color: '#f59e0b', storageKey: 'he_pain_diary' },
-  neuro: { title: 'Нейро', unit: '', icon: '🧠', color: '#a78bfa', storageKey: 'he_neuro_diary' },
-  acne: { title: 'Акне', unit: '', icon: '🔴', color: '#ec4899', storageKey: 'he_acne_diary' },
-  hemato: { title: 'Гематология', unit: '', icon: '🩸', color: '#3b82f6', storageKey: 'he_hemato_diary' },
+export const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: NativeIconName; color: string; storageKey?: string }> = {
+  sleep: { title: 'Сон', unit: 'ч', icon: 'moon', color: '#a78bfa', storageKey: 'he_sleep_diary' },
+  bp: { title: 'Давление', unit: 'мм рт.ст.', icon: 'heart', color: '#ef4444', storageKey: 'he_bp_diary' },
+  weight: { title: 'Вес и замеры', unit: 'кг / см', icon: 'kettlebell', color: '#22c55e' },
+  injection: { title: 'Инъекции', unit: '', icon: 'syringe', color: '#f59e0b', storageKey: 'he_injection_diary' },
+  health: { title: 'Здоровье', unit: '', icon: 'cross', color: '#ec4899', storageKey: 'he_health_diary' },
+  cardio: { title: 'Кардио', unit: 'мин', icon: 'activity', color: '#4ade80', storageKey: 'he_cardio_sessions' },
+  measurements: { title: 'Замеры', unit: 'см', icon: 'ruler', color: '#22c55e' },
+  symptoms: { title: 'Симптомы', unit: '', icon: 'eye', color: '#ec4899', storageKey: 'he_symptoms_diary' },
+  pain: { title: 'Боль', unit: '', icon: 'zap', color: '#f59e0b', storageKey: 'he_pain_diary' },
+  neuro: { title: 'Нейро', unit: '', icon: 'cpu', color: '#a78bfa', storageKey: 'he_neuro_diary' },
+  acne: { title: 'Акне', unit: '', icon: 'dot', color: '#ec4899', storageKey: 'he_acne_diary' },
+  hemato: { title: 'Гематология', unit: '', icon: 'droplet', color: '#3b82f6', storageKey: 'he_hemato_diary' },
 };
 
 /* ── Общие стили ─────────────────────────────────────────────────────────── */
@@ -287,7 +288,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
   history,
   largeIcon = false,
 }) => {
-  const meta = DIARY_META[diaryKey] || { title: diaryKey, color: colors.textMuted, icon: '📓' };
+  const meta = DIARY_META[diaryKey] || { title: diaryKey, color: colors.textMuted, icon: 'notebook' as NativeIconName };
   const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
   const staleColor =
     daysSinceLast !== null && daysSinceLast >= 14
@@ -349,7 +350,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               lineHeight: 1,
             }}
           >
-            <span style={{ display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
+            <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={32} /></span>
           </div>
           <div style={{ textAlign: 'center', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{meta.title}</div>
@@ -465,7 +466,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div aria-hidden="true" style={iconBadge(meta.color, diaryKey)}>
-              <span style={{ display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
+              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={20} /></span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -491,7 +492,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               </div>
             </div>
             <div style={{ flexShrink: 0 }}>
-              <span style={{ fontSize: 18, display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
+              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={18} /></span>
             </div>
           </div>
 

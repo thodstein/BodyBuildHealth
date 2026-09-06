@@ -12,6 +12,7 @@ import { ProfileSettingsTab } from './ProfileSettingsTab';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 class ProfileErrorBoundary extends React.Component<
   { children: React.ReactNode; tabName: string },
@@ -47,11 +48,11 @@ class ProfileErrorBoundary extends React.Component<
 
 type Tab = 'user' | 'diaries' | 'settings' | 'reports';
 
-const TAB_META: Record<Tab, { icon: string; title: string; color: string }> = {
-  user: { icon: '👤', title: 'Пользователь', color: colors.primary },
-  diaries: { icon: '📓', title: 'Дневники', color: colors.orange },
-  settings: { icon: '⚙️', title: 'Настройки', color: colors.purple },
-  reports: { icon: '📊', title: 'Отчёты', color: colors.blue },
+const TAB_META: Record<Tab, { icon: NativeIconName; title: string; color: string }> = {
+  user: { icon: 'user', title: 'Пользователь', color: colors.primary },
+  diaries: { icon: 'notebook', title: 'Дневники', color: colors.orange },
+  settings: { icon: 'sliders', title: 'Настройки', color: colors.purple },
+  reports: { icon: 'chart', title: 'Отчёты', color: colors.blue },
 };
 
 export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void; initialSubTab?: string }> = ({ onNavigate, initialSubTab }) => {
@@ -121,7 +122,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
             border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', minHeight: 36,
           }}
         >←</button>
-        <span aria-hidden="true" style={{ fontSize: 18 }}>{meta.icon}</span>
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: meta.color }}><NativeIcon name={meta.icon} size={18} /></span>
         <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>
           {meta.title}
         </div>

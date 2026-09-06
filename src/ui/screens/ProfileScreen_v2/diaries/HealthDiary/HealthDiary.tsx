@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors, withAlpha } from '../../ui';
+import { NativeIcon } from '../../../../native/NativeIcons';
 import { AddHealthModal } from '../../health-diary-modal';
 import {
   btnBase,
@@ -438,7 +439,7 @@ const EntryEditor: React.FC<{
           </label>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 10 }}>
-          <FieldGroup title="🦴 Суставная боль: VAS 0–10 по каждой зоне" color="#22c55e">
+          <FieldGroup title="Суставная боль: VAS 0–10 по каждой зоне" color="#22c55e">
             <div style={{ display: 'grid', gap: 6 }}>
               {PAIN_ZONES.map((z) => {
                 const value = painZones[z.id] || 0;
@@ -470,7 +471,7 @@ const EntryEditor: React.FC<{
           </div>
         </div>
         {draft.pain && (
-          <FieldGroup title="📋 Детали боли" color="#22c55e">
+          <FieldGroup title="Детали боли" color="#22c55e">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <input
                 placeholder="Время (утро/день/вечер)"
@@ -525,7 +526,7 @@ const EntryEditor: React.FC<{
             </div>
           </FieldGroup>
         )}
-        <FieldGroup title="🩺 Симптомы" color="#ec4899">
+        <FieldGroup title="Симптомы" color="#ec4899">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px auto', gap: 5 }}>
             <input
               placeholder="Название симптома"
@@ -568,7 +569,7 @@ const EntryEditor: React.FC<{
             </div>
           ))}
         </FieldGroup>
-        <FieldGroup title="🧠 Нейросимптомы" color="#ef4444">
+        <FieldGroup title="Нейросимптомы" color="#ef4444">
           <ToggleGrid
             items={NEURO_SYMPTOMS}
             values={neuroValues}
@@ -577,7 +578,7 @@ const EntryEditor: React.FC<{
           />
           <div style={{ marginTop: 7, fontSize: 11 }}>Отмечено: {score(neuroValues)}/10</div>
         </FieldGroup>
-        <FieldGroup title="🔴 Акне по зонам" color="#f97316">
+        <FieldGroup title="Акне по зонам" color="#f97316">
           <div style={{ display: 'grid', gap: 6 }}>
             {ACNE_AREAS.map((a) => (
               <div key={a.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -602,7 +603,7 @@ const EntryEditor: React.FC<{
           </div>
           <div style={{ marginTop: 7, fontSize: 11 }}>Σ {score(acneAreas)}/12</div>
         </FieldGroup>
-        <FieldGroup title="🩸 Гематологические симптомы" color="#3b82f6">
+        <FieldGroup title="Гематологические симптомы" color="#3b82f6">
           <ToggleGrid
             items={HEMATO_SYMPTOMS}
             values={hematoValues}
@@ -965,7 +966,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       `}</style>
       <DiaryHeader
         accent={ACCENT}
-        title="🩺 Здоровье"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="cross" size={18} /> Здоровье</span>}
         count={rows.length}
         onClose={onClose}
         onAdd={() => setAddOpen(true)}
@@ -1472,22 +1473,22 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         {subTab === 'painmap' && (
           <section style={{ ...card, marginBottom: 12, borderColor: '#ec489955' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-              <b>🗺 Карта зон боли · 3D</b>
+              <b style={{ display:'inline-flex', alignItems:'center', gap:6 }}><NativeIcon name="target" size={13} /> Карта зон боли · 3D</b>
               <span style={{ color: colors.textMuted, fontSize: 11 }}>
                 Клик по части тела — анализ зоны · Вращайте модель · Σ {score(mapZones)}/${PAIN_MAX}
               </span>
             </div>
             <PainZone3D zones={mapZones} onChange={setMapZones} height={460} analysisFor={(base) => zoneAnalysis[base] || null} />
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-              <button style={{ ...button, background: '#ec4899', borderColor: '#ec4899', color: '#fff' }} onClick={savePainZones}>
-                💾 Сохранить в запись за сегодня
+              <button style={{ ...button, background: '#ec4899', borderColor: '#ec4899', color: '#fff', display:'inline-flex', alignItems:'center', gap:6 }} onClick={savePainZones}>
+                <NativeIcon name="check" size={13} /> Сохранить в запись за сегодня
               </button>
-              <button style={button} onClick={() => {
+              <button style={{ ...button, display:'inline-flex', alignItems:'center', gap:6 }} onClick={() => {
                 const cleared: Record<string, number> = {};
                 for (const z of PAIN_ZONES) cleared[z.id] = 0;
                 setMapZones(cleared);
               }}>
-                🧹 Очистить
+                <NativeIcon name="trash" size={13} /> Очистить
               </button>
               <button style={button} onClick={() => setMapZones(rows[0]?.pain?.zones || {})}>
                 📋 Из последней записи

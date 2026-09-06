@@ -29,8 +29,8 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
 
     render(<ProfileDiariesTab />);
 
-    // Раскрыть секцию «Данные»
-    const dataSection = screen.getByText('💾 Данные');
+    // Раскрыть секцию «Данные» (заголовок без эмодзи — иконка SVG рядом)
+    const dataSection = screen.getByText('Данные');
     fireEvent.click(dataSection);
 
     fireEvent.click(screen.getByRole('button', { name: /Сбросить всё/ }));
@@ -50,7 +50,7 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
     localStorage.setItem('he_weight_log', JSON.stringify([{ date: today, weight: 82.5 }]));
 
     render(<ProfileDiariesTab />);
-    fireEvent.click(screen.getByText('💾 Данные'));
+    fireEvent.click(screen.getByText('Данные'));
     fireEvent.click(screen.getByRole('button', { name: /Сбросить всё/ }));
 
     const undoBtn = screen.getByRole('button', { name: /Отменить/ });

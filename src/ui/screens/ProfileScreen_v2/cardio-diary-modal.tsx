@@ -4,6 +4,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { colors } from './ui';
+import { NativeIcon } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import {
@@ -124,7 +125,7 @@ export const AddCardioModal: React.FC<AddCardioModalProps> = ({
       open={open}
       onClose={onClose}
       title="Кардио-сессия"
-      icon="🏃"
+      icon={<NativeIcon name="activity" size={28} />}
       color="#4ade80"
       subtitle={existing ? `Запись за ${existing.date} будет заменена` : 'Тип, минуты, ЧСС, RPE, км'}
       width={420}

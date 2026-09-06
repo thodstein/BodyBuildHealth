@@ -357,7 +357,7 @@ export const ArticlesScreen: React.FC = () => {
                   color: saved.includes(readingArticle.id) ? 'var(--accent, #00e68a)' : '#fff',
                   fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
                 }}
-              >{saved.includes(readingArticle.id) ? '★' : '☆'}</button>
+              >{saved.includes(readingArticle.id) ? <NativeIcon name="bookmark" size={15} filled /> : <NativeIcon name="bookmark" size={15} />}</button>
             )}
           </div>
 

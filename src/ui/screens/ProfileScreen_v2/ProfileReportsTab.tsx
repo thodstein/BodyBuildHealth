@@ -8,6 +8,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { colors } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { ReportsScreen } from '../ReportsScreen';
 
 /* ── Источники отчётов блоков (единый список для подвкладок) ── */
@@ -15,6 +16,7 @@ import { ReportsScreen } from '../ReportsScreen';
 export interface ReportSource {
   current: string;
   label: string;
+  icon: NativeIconName;
   target: string;
   archiveKeys: string[];
   color: string;
@@ -24,7 +26,8 @@ export interface ReportSource {
 export const REPORT_SOURCES: ReportSource[] = [
   {
     current: 'he_training_report_current',
-    label: '🏋️ Тренер-отчёт',
+    label: 'Тренер-отчёт',
+    icon: 'dumbbell',
     target: 'training-analytics',
     archiveKeys: ['he_training_reports'],
     color: colors.blue,
@@ -32,7 +35,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_nutrition_report_current',
-    label: '🍽 Отчёт по питанию',
+    label: 'Отчёт по питанию',
+    icon: 'leaf',
     target: 'nutrition-reports',
     archiveKeys: ['he_nutrition_report_archive'],
     color: colors.green,
@@ -40,7 +44,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_labs_report_current',
-    label: '🩺 Врач-отчёт',
+    label: 'Врач-отчёт',
+    icon: 'cross',
     target: 'labs-reports',
     archiveKeys: ['he_lab_reports'],
     color: colors.danger,
@@ -48,7 +53,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_support_reports',
-    label: '🛡 Отчёт поддержки',
+    label: 'Отчёт поддержки',
+    icon: 'shield',
     target: 'support-reports',
     archiveKeys: ['he_support_reports_archive', 'he_support_reports'],
     color: colors.purple,
@@ -56,7 +62,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_pharma_report_current',
-    label: '💊 Фарма-отчёт',
+    label: 'Фарма-отчёт',
+    icon: 'pill',
     target: 'pharma-reports',
     archiveKeys: ['he_pharma_reports'],
     color: colors.warning,
@@ -64,7 +71,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_risk_report_current',
-    label: '⚠️ Отчёт по рискам',
+    label: 'Отчёт по рискам',
+    icon: 'alertTriangle',
     target: 'risk-reports',
     archiveKeys: ['he_risk_reports'],
     color: '#f97316',
@@ -72,7 +80,8 @@ export const REPORT_SOURCES: ReportSource[] = [
   },
   {
     current: 'he_profile_reports',
-    label: '📊 Комплексный отчёт',
+    label: 'Комплексный отчёт',
+    icon: 'chart',
     target: 'custom-report',
     archiveKeys: ['he_profile_reports'],
     color: colors.orange,
@@ -104,10 +113,10 @@ export function readReportEntries(src: ReportSource): StoredReport[] {
 
 export type ReportsView = 'comprehensive' | 'blocks' | 'archive';
 
-const VIEW_TABS: { id: ReportsView; label: string; color: string }[] = [
-  { id: 'comprehensive', label: '📊 Комплексный отчёт', color: colors.blue },
-  { id: 'blocks', label: '📦 Отчёты по блокам', color: colors.teal },
-  { id: 'archive', label: '🗄 Архив отчётов', color: colors.orange },
+const VIEW_TABS: { id: ReportsView; label: string; icon: NativeIconName; color: string }[] = [
+  { id: 'comprehensive', label: 'Комплексный отчёт', icon: 'chart', color: colors.blue },
+  { id: 'blocks', label: 'Отчёты по блокам', icon: 'grid', color: colors.teal },
+  { id: 'archive', label: 'Архив отчётов', icon: 'inbox', color: colors.orange },
 ];
 
 export const ProfileReportsTab: React.FC<{
@@ -138,10 +147,14 @@ export const ProfileReportsTab: React.FC<{
               fontSize: 11,
               fontWeight: 700,
               border: `1px solid ${view === t.id ? colors.primary : colors.border}`,
-              background: view === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
+              background: view === t.id ? colors.primaryDim : 'rgba(255,255,255,0.03)',
               color: view === t.id ? colors.primary : colors.textMuted,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
+            <NativeIcon name={t.icon} size={12} />
             {t.label}
           </button>
         ))}
@@ -155,7 +168,7 @@ export const ProfileReportsTab: React.FC<{
 
       {view === 'blocks' && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2 }}>📦 Отчёты по блокам</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: colors.teal }}><NativeIcon name="grid" size={14} /></span> Отчёты по блокам</div>
           <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 10, lineHeight: 1.3 }}>
             Переход к страницам отчётов модулей: откроется именно отчёт с кнопкой генерации, а не главная страница блока.
           </div>
@@ -204,14 +217,14 @@ export const ProfileReportsTab: React.FC<{
                       justifyContent: 'center',
                       flexShrink: 0,
                       background: `${src.color}26`,
-                      fontSize: 20,
+                      color: src.color,
                     }}
                   >
-                    {src.label.split(' ')[0]}
+                    <NativeIcon name={src.icon} size={20} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>
-                      {src.label.replace(/^[^\s]+\s/, '')}
+                      {src.label}
                     </div>
                     <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{src.desc}</div>
                     <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 3, opacity: 0.8 }}>
@@ -230,7 +243,7 @@ export const ProfileReportsTab: React.FC<{
 
       {view === 'archive' && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2 }}>🗄 Архив отчётов</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: colors.orange }}><NativeIcon name="inbox" size={14} /></span> Архив отчётов</div>
           <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 10, lineHeight: 1.3 }}>
             Сохранённые отчёты всех блоков. Каждый пункт ведёт к странице отчёта своего модуля.
           </div>

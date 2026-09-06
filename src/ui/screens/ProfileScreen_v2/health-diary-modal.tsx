@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { colors } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import { loadSessions, type WorkoutExercise } from '../../../engines/workout-logger.engine';
 import type { UnifiedHealthEntry } from '../../../engines/health-diary.engine';
@@ -245,12 +246,12 @@ export const AddHealthModal: React.FC<{
     setSymptoms(p => p.filter(s => s.id !== id));
   };
 
-  const TABS: { id: TabId; icon: string; label: string; badge?: string; color: string }[] = [
-    { id: 'pain', icon: '🦴', label: 'Боль', badge: painTotal > 0 ? `${painTotal}` : undefined, color: '#22c55e' },
-    { id: 'symptoms', icon: '🩺', label: 'Симптомы', badge: symptoms.length > 0 ? `${symptoms.length}` : undefined, color: '#ec4899' },
-    { id: 'neuro', icon: '🧠', label: 'Нейро', badge: neuroTotal > 0 ? `${neuroTotal}` : undefined, color: '#ef4444' },
-    { id: 'acne', icon: '🔴', label: 'Акне', badge: acneTotal > 0 ? `${acneTotal}` : undefined, color: '#f97316' },
-    { id: 'hemato', icon: '🩸', label: 'Кровь', badge: hematoTotal > 0 ? `${hematoTotal}` : undefined, color: '#3b82f6' },
+  const TABS: { id: TabId; icon: NativeIconName; label: string; badge?: string; color: string }[] = [
+    { id: 'pain', icon: 'zap', label: 'Боль', badge: painTotal > 0 ? `${painTotal}` : undefined, color: '#22c55e' },
+    { id: 'symptoms', icon: 'eye', label: 'Симптомы', badge: symptoms.length > 0 ? `${symptoms.length}` : undefined, color: '#ec4899' },
+    { id: 'neuro', icon: 'cpu', label: 'Нейро', badge: neuroTotal > 0 ? `${neuroTotal}` : undefined, color: '#ef4444' },
+    { id: 'acne', icon: 'dot', label: 'Акне', badge: acneTotal > 0 ? `${acneTotal}` : undefined, color: '#f97316' },
+    { id: 'hemato', icon: 'droplet', label: 'Кровь', badge: hematoTotal > 0 ? `${hematoTotal}` : undefined, color: '#3b82f6' },
   ];
 
   const lastHealth = useMemo(
@@ -268,7 +269,7 @@ export const AddHealthModal: React.FC<{
       open={open}
       onClose={onClose}
       title="Запись здоровья"
-      icon="🩺"
+      icon={<NativeIcon name="cross" size={28} />}
       color="#ec4899"
       subtitle="Отмечайте все симптомы за день — можно заполнять несколько разделов"
       width={520}
@@ -343,7 +344,7 @@ export const AddHealthModal: React.FC<{
                 transition: 'all 0.15s',
               }}
             >
-              <span>{t.icon}</span>
+              <span style={{ display: 'inline-flex' }}><NativeIcon name={t.icon} size={14} /></span>
               {t.label}
               {t.badge && (
                 <span
@@ -367,7 +368,7 @@ export const AddHealthModal: React.FC<{
       {/* ── Боль ── */}
       {tab === 'pain' && (
         <>
-          <SectionCard icon="🦴" title="Боль в суставах (VAS 0–10)" color="#22c55e" badge={painTotal > 0 ? `Σ ${painTotal}` : undefined} hint="0 — нет боли, 10 — невыносимая">
+          <SectionCard icon={<NativeIcon name="zap" size={16} />} title="Боль в суставах (VAS 0–10)" color="#22c55e" badge={painTotal > 0 ? `Σ ${painTotal}` : undefined} hint="0 — нет боли, 10 — невыносимая">
             {PAIN_ZONES.map((z) => {
               const v = painZones[z.id] || 0;
               const c = painZoneColor(v);
@@ -389,7 +390,7 @@ export const AddHealthModal: React.FC<{
             })}
           </SectionCard>
 
-          <SectionCard icon="📋" title="Детали боли" color="#22c55e">
+          <SectionCard icon={<NativeIcon name="notebook" size={16} />} title="Детали боли" color="#22c55e">
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Когда</span>
               <div style={{ marginTop: 6 }}>
@@ -434,7 +435,7 @@ export const AddHealthModal: React.FC<{
 
       {/* ── Симптомы ── */}
       {tab === 'symptoms' && (
-        <SectionCard icon="🩺" title="Симптомы" color="#ec4899" badge={symptoms.length > 0 ? `${symptoms.length}` : undefined}>
+        <SectionCard icon={<NativeIcon name="eye" size={16} />} title="Симптомы" color="#ec4899" badge={symptoms.length > 0 ? `${symptoms.length}` : undefined}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: '1 1 140px' }}>
               <TextField
@@ -515,7 +516,7 @@ export const AddHealthModal: React.FC<{
 
       {/* ── Нейро ── */}
       {tab === 'neuro' && (
-        <SectionCard icon="🧠" title="Нейросимптомы" color="#ef4444" badge={neuroTotal > 0 ? `${neuroTotal}/10` : undefined}>
+        <SectionCard icon={<NativeIcon name="cpu" size={16} />} title="Нейросимптомы" color="#ef4444" badge={neuroTotal > 0 ? `${neuroTotal}/10` : undefined}>
           <ChipGroup
             options={NEURO_SYMPTOMS}
             selected={Object.entries(neuroSymptoms).filter(([, on]) => on).map(([id]) => id)}
@@ -532,7 +533,7 @@ export const AddHealthModal: React.FC<{
 
       {/* ── Акне ── */}
       {tab === 'acne' && (
-        <SectionCard icon="🔴" title="Акне (0–3)" color="#f97316" badge={acneTotal > 0 ? `Σ ${acneTotal}/12` : undefined}>
+        <SectionCard icon={<NativeIcon name="dot" size={16} />} title="Акне (0–3)" color="#f97316" badge={acneTotal > 0 ? `Σ ${acneTotal}/12` : undefined}>
           {ACNE_AREAS.map((a) => {
             const v = acneAreas[a.id] || 0;
             return (
@@ -557,7 +558,7 @@ export const AddHealthModal: React.FC<{
 
       {/* ── Гематология ── */}
       {tab === 'hemato' && (
-        <SectionCard icon="🩸" title="Гематологические симптомы" color="#3b82f6" badge={hematoTotal > 0 ? `${hematoTotal}/8` : undefined}>
+        <SectionCard icon={<NativeIcon name="droplet" size={16} />} title="Гематологические симптомы" color="#3b82f6" badge={hematoTotal > 0 ? `${hematoTotal}/8` : undefined}>
           <ChipGroup
             options={HEMATO_SYMPTOMS}
             selected={Object.entries(hematoSymptoms).filter(([, on]) => on).map(([id]) => id)}

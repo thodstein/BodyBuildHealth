@@ -25,13 +25,14 @@ import {
   btnPrimary,
   btnGhost,
 } from './diary-modals';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 /* ── Модалка веса и замеров ── */
 
-const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; label: string; unit: string }[] }[] = [
+const MEASURE_GROUPS: { title: string; icon: NativeIconName; fields: { key: string; label: string; unit: string }[] }[] = [
   {
     title: 'Торс',
-    icon: '👕',
+    icon: 'user',
     fields: [
       { key: 'waistCm', label: 'Талия', unit: 'см' },
       { key: 'chestCm', label: 'Грудь', unit: 'см' },
@@ -42,7 +43,7 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
   },
   {
     title: 'Руки',
-    icon: '💪',
+    icon: 'dumbbell',
     fields: [
       { key: 'bicepLeftCm', label: 'Бицепс L', unit: 'см' },
       { key: 'bicepRightCm', label: 'Бицепс R', unit: 'см' },
@@ -52,7 +53,7 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
   },
   {
     title: 'Ноги',
-    icon: '🦵',
+    icon: 'move',
     fields: [
       { key: 'thighLeftCm', label: 'Бедро L', unit: 'см' },
       { key: 'thighRightCm', label: 'Бедро R', unit: 'см' },
@@ -62,7 +63,7 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
   },
   {
     title: 'Состав тела',
-    icon: '🧬',
+    icon: 'layers',
     fields: [
       { key: 'bodyFat', label: 'Жир', unit: '%' },
       { key: 'muscleMass', label: 'Мышцы', unit: 'кг' },
@@ -72,13 +73,13 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
 ];
 
 /* ── Пресеты замеров: быстрые наборы полей ── */
-const MEASURE_PRESETS: { id: string; label: string; icon: string; fields: string[] }[] = [
-  { id: 'full', label: 'Полный', icon: '📋', fields: MEASURE_GROUPS.flatMap(g => g.fields.map(f => f.key)) },
-  { id: 'torso', label: 'Торс', icon: '👕', fields: ['waistCm', 'chestCm', 'hipCm', 'shoulderCm', 'neckCm'] },
-  { id: 'arms', label: 'Руки', icon: '💪', fields: ['bicepLeftCm', 'bicepRightCm', 'forearmLeftCm', 'forearmRightCm'] },
-  { id: 'legs', label: 'Ноги', icon: '🦵', fields: ['thighLeftCm', 'thighRightCm', 'calfLeftCm', 'calfRightCm'] },
-  { id: 'bodycomp', label: 'Состав', icon: '🧬', fields: ['bodyFat', 'muscleMass', 'waterMass'] },
-  { id: 'quick', label: 'Минимум', icon: '⚡', fields: ['waistCm', 'chestCm', 'bodyFat'] },
+const MEASURE_PRESETS: { id: string; label: string; icon: NativeIconName; fields: string[] }[] = [
+  { id: 'full', label: 'Полный', icon: 'grid', fields: MEASURE_GROUPS.flatMap(g => g.fields.map(f => f.key)) },
+  { id: 'torso', label: 'Торс', icon: 'user', fields: ['waistCm', 'chestCm', 'hipCm', 'shoulderCm', 'neckCm'] },
+  { id: 'arms', label: 'Руки', icon: 'dumbbell', fields: ['bicepLeftCm', 'bicepRightCm', 'forearmLeftCm', 'forearmRightCm'] },
+  { id: 'legs', label: 'Ноги', icon: 'move', fields: ['thighLeftCm', 'thighRightCm', 'calfLeftCm', 'calfRightCm'] },
+  { id: 'bodycomp', label: 'Состав', icon: 'layers', fields: ['bodyFat', 'muscleMass', 'waterMass'] },
+  { id: 'quick', label: 'Минимум', icon: 'zap', fields: ['waistCm', 'chestCm', 'bodyFat'] },
 ];
 
 interface WeightDraft {
@@ -227,7 +228,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       open={open}
       onClose={onClose}
       title="Вес и замеры тела"
-      icon="⚖️"
+      icon={<NativeIcon name="kettlebell" size={28} />}
       color="#22c55e"
       subtitle="Прошлые значения подсказывают, что измерять"
       width={460}
@@ -293,7 +294,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           }}
           title={p.label}
         >
-          {p.icon} {p.label}
+          {p.icon && <span style={{ display: 'inline-flex' }}><NativeIcon name={p.icon} size={10} /></span>} {p.label}
         </button>
       ))}
     </div>
@@ -311,7 +312,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         </div>
       )}
 
-      <SectionCard icon="⚖️" title="Вес" color="#22c55e" badge={weightDelta !== null ? `${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(1)} кг` : undefined}>
+      <SectionCard icon={<NativeIcon name="kettlebell" size={16} />} title="Вес" color="#22c55e" badge={weightDelta !== null ? `${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(1)} кг` : undefined}>
         <StepperInput value={draft.values.weight || ''} onChange={(v) => setValue('weight', v)} step={0.1} min={20} max={400} unit="кг" large invalid={weightInvalid} />
         {prevWeight !== null && (
           <div style={{ fontSize: 9, color: colors.textSubtle, marginTop: 6, textAlign: 'center' }}>
@@ -325,7 +326,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         const visibleFields = g.fields.filter(f => activeFields.includes(f.key));
         if (!visibleFields.length) return null;
         return (
-          <SectionCard key={g.title} icon={g.icon} title={g.title} color="#22c55e">
+          <SectionCard key={g.title} icon={<NativeIcon name={g.icon} size={16} />} title={g.title} color="#22c55e">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {visibleFields.map((f) => {
                 const prevVal = typeof prev?.[f.key] === 'number' ? prev[f.key] as number : null;
@@ -349,7 +350,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         );
       })}
 
-      <SectionCard icon="📝" title="Заметка и фото" color="#22c55e">
+      <SectionCard icon={<NativeIcon name="file" size={16} />} title="Заметка и фото" color="#22c55e">
         <textarea
           value={draft.notes}
           onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
@@ -457,7 +458,7 @@ export const AddWeightModal: React.FC<{ open: boolean; onClose: () => void; onSa
       open={open}
       onClose={onClose}
       title="Быстрый ввод веса"
-      icon="⚖️"
+      icon={<NativeIcon name="kettlebell" size={28} />}
       color="#22c55e"
       subtitle={existing ? `Запись за ${existing.date} будет заменена` : 'Только вес, дата, время, заметка'}
       width={400}

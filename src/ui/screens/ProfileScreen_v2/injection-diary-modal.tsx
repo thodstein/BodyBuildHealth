@@ -5,6 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { colors, BoolChip } from './ui';
+import { NativeIcon } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import {
   INJECTION_ZONES,
@@ -214,7 +215,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       open={open}
       onClose={onClose}
       title="Запись инъекции"
-      icon="💉"
+      icon={<NativeIcon name="syringe" size={28} />}
       color="#f59e0b"
       subtitle="Препарат, доза и реакция места укола"
       width={460}
@@ -416,13 +417,13 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
         />
       </div>
 
-      <SectionCard icon="📍" title="Боль в месте укола" color="#ef4444" badge={draft.painLevel !== '0' ? `${draft.painLevel}/10` : undefined}>
+      <SectionCard icon={<NativeIcon name="pin" size={16} />} title="Боль в месте укола" color="#ef4444" badge={draft.painLevel !== '0' ? `${draft.painLevel}/10` : undefined}>
         <ScalePicker value={Number(draft.painLevel) || 0} onChange={setScale('painLevel')} max={10} dense />
       </SectionCard>
-      <SectionCard icon="🪨" title="PIP (постинъекционная боль)" color="#f97316" badge={draft.pipLevel !== '0' ? `${draft.pipLevel}/10` : undefined}>
+      <SectionCard icon={<NativeIcon name="zap" size={16} />} title="PIP (постинъекционная боль)" color="#f97316" badge={draft.pipLevel !== '0' ? `${draft.pipLevel}/10` : undefined}>
         <ScalePicker value={Number(draft.pipLevel) || 0} onChange={setScale('pipLevel')} max={10} dense />
       </SectionCard>
-      <SectionCard icon="🫧" title="Отёк" color="#f59e0b" badge={draft.swelling !== '0' ? `${draft.swelling}/10` : undefined}>
+      <SectionCard icon={<NativeIcon name="droplet" size={16} />} title="Отёк" color="#f59e0b" badge={draft.swelling !== '0' ? `${draft.swelling}/10` : undefined}>
         <ScalePicker value={Number(draft.swelling) || 0} onChange={setScale('swelling')} max={10} dense />
       </SectionCard>
 
@@ -438,7 +439,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
         ))}
       </div>
 
-      <SectionCard icon="📝" title="Заметка" color="#f59e0b">
+      <SectionCard icon={<NativeIcon name="file" size={16} />} title="Заметка" color="#f59e0b">
         <textarea
           value={draft.notes}
           onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}

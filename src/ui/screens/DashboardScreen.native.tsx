@@ -14,6 +14,8 @@ import { syncAllWidgets } from '../native/widget-sync';
 import { usePullToRefresh } from '../native/usePullToRefresh';
 import { getLocale } from '../../data/interactions-labels';
 import { NativeIcon } from '../native/NativeIcons';
+import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
+import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { getISOWeekNumber, getSessionsByWeek } from '../../engines/workout-logger.engine';
 import { loadFoodLog } from '../../engines/nutrition-tracker.engine';
 
@@ -76,6 +78,47 @@ export interface HomeCta {
   labelEn: string;
 }
 
+export interface HomeAlerts {
+  symptoms: number;
+  improving: number;
+  worsening: number;
+  adherence: number;
+  drugWarnings: number;
+  drugHigh: number;
+}
+
+/** Симптомы/приверженность/взаимодействия для PRO-карточек (тихий no-op при битых данных). */
+export function readHomeAlerts(): HomeAlerts {
+  const empty: HomeAlerts = { symptoms: 0, improving: 0, worsening: 0, adherence: 0, drugWarnings: 0, drugHigh: 0 };
+  try {
+    const s = getSymptomDiaryStats() as { activeSymptoms?: number; improving?: number; worsening?: number };
+    if (s && typeof s === 'object') {
+      empty.symptoms = s.activeSymptoms || 0;
+      empty.improving = s.improving || 0;
+      empty.worsening = s.worsening || 0;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const a = getAdherenceStats() as { adherence7d?: number };
+    if (a && typeof a === 'object') empty.adherence = a.adherence7d || 0;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const raw = localStorage.getItem('he_drug_warnings');
+    const d = raw ? (JSON.parse(raw) as { count?: number; highCount?: number }) : null;
+    if (d && typeof d === 'object') {
+      empty.drugWarnings = d.count || 0;
+      empty.drugHigh = d.highCount || 0;
+    }
+  } catch {
+    /* ignore */
+  }
+  return empty;
+}
+
 /** Умная CTA: первое незакрытое за день (тренировка → очередь → питание). */
 export function nextHomeAction(t: HomeToday): HomeCta {
   if (!t.trained) return { id: 'training', labelRu: 'Время тренировки', labelEn: 'Train now' };
@@ -106,6 +149,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
   });
 
   const [today, setToday] = useState<HomeToday>(() => readHomeToday());
+  const [alerts] = useState<HomeAlerts>(() => readHomeAlerts());
   const [flash, setFlash] = useState<string | null>(null);
 
   // Виджеты: при входе на Главную — отдать очередь в дневники, запушить
@@ -192,6 +236,38 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
           </span>
         </div>
         <div style={{ flex: 1 }} />
+        {alerts.drugHigh > 0 && (
+          <button
+            type="button"
+            className="native-home-alert native-home-alert--danger native-fade-up"
+            onClick={() => onNavigate?.('risks')}
+            aria-label={en ? `Drug interactions: ${alerts.drugHigh} critical` : `Взаимодействия: ${alerts.drugHigh} критических`}
+          >
+            <NativeIcon name="alertTriangle" size={18} />
+            <span>
+              <b>{en ? 'Interactions' : 'Взаимодействия'} · {alerts.drugHigh}</b>
+              <small>{en ? 'check risks' : 'проверить риски'}</small>
+            </span>
+            <NativeIcon name="chevronRight" size={16} />
+          </button>
+        )}
+        {alerts.drugHigh === 0 && alerts.symptoms > 0 && (
+          <button
+            type="button"
+            className="native-home-alert native-fade-up"
+            onClick={() => onNavigate?.('profile')}
+            aria-label={en ? `Symptoms: ${alerts.symptoms} active` : `Симптомы: ${alerts.symptoms} активных`}
+          >
+            <NativeIcon name="activity" size={18} />
+            <span>
+              <b>{en ? 'Symptoms' : 'Симптомы'} · {alerts.symptoms}</b>
+              <small>
+                {alerts.improving > 0 ? `▲${alerts.improving} ` : ''}{alerts.worsening > 0 ? `▼${alerts.worsening} ` : ''}{en ? `adherence ${alerts.adherence}%` : `приверженность ${alerts.adherence}%`}
+              </small>
+            </span>
+            <NativeIcon name="chevronRight" size={16} />
+          </button>
+        )}
         {flash && (
           <div className="native-home-flash native-fade-up" role="status">
             {flash}

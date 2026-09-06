@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
+import { NativeIcon } from '../../../../native/NativeIcons';
 import { DiaryHeader } from '../DiaryHeader';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
 import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, getWeightLogWithPhotos, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
@@ -994,7 +995,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     >
       <DiaryHeader
         accent="#34c759"
-        title="⚖️ Вес и замеры"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="kettlebell" size={18} /> Вес и замеры</span>}
         count={rows.length}
         countLabel="записей"
         onClose={onClose}

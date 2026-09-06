@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useMemo } from 'react';
 import { colors } from './ui';
+import { NativeIcon } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import { BP_SYMPTOMS, classifyBP } from '../../../core/bp-hr-data';
 import {
@@ -210,7 +211,7 @@ export const AddBPModal: React.FC<{
       open={open}
       onClose={onClose}
       title="Запись давления"
-      icon="❤️"
+      icon={<NativeIcon name="heart" size={28} />}
       color="#ef4444"
       subtitle="Систола, диастола и пульс в покое"
       onSubmit={save}
@@ -225,7 +226,7 @@ export const AddBPModal: React.FC<{
         <TodayChip date={draft.date} onToday={() => set('date', todayIso())} />
       </div>
 
-      <SectionCard icon="🕐" title="Время и условия" color="#ef4444">
+      <SectionCard icon={<NativeIcon name="clock" size={16} />} title="Время и условия" color="#ef4444">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
           {([['morning', '🌅 Утро'], ['afternoon', '☀️ День'], ['evening', '🌆 Вечер'], ['night', '🌙 Ночь']] as const).map(([k, l]) => (
             <button
@@ -309,7 +310,7 @@ export const AddBPModal: React.FC<{
       {ppWarn && <FormBanner tone="warning">{pp! > 60 ? `Пульсовое давление ${pp} мм — расширено (>60), риск ССЗ` : `Пульсовое давление ${pp} мм — сужено (<30), проверьте измерение`}</FormBanner>}
       {mapWarn && <FormBanner tone="warning">{map! > 110 ? `СРД ${map} мм — высокое (>110), нагрузка на сердце` : `СРД ${map} мм — низкое (<60), риск гипоперфузии`}</FormBanner>}
 
-      <SectionCard icon="🫀" title="Показатели" color="#ef4444" badge={`${cat.label} ${trend}`}>
+      <SectionCard icon={<NativeIcon name="heart" size={16} />} title="Показатели" color="#ef4444" badge={`${cat.label} ${trend}`}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" invalid={sInvalid} />
           <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" invalid={dInvalid} />
@@ -388,11 +389,11 @@ export const AddBPModal: React.FC<{
         )}
 
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-          <LiveBadge color={cat.color} icon="🩺">{cat.label} {trend}</LiveBadge>
+          <LiveBadge color={cat.color} icon={<NativeIcon name="eye" size={12} />}>{cat.label} {trend}</LiveBadge>
         </div>
       </SectionCard>
 
-      <SectionCard icon="🤒" title="Симптомы" color="#ef4444" hint="Отметьте, что беспокоило во время измерения">
+      <SectionCard icon={<NativeIcon name="activity" size={16} />} title="Симптомы" color="#ef4444" hint="Отметьте, что беспокоило во время измерения">
         <ChipGroup
           options={SYMPTOM_OPTIONS}
           selected={draft.symptoms}
@@ -402,7 +403,7 @@ export const AddBPModal: React.FC<{
         />
       </SectionCard>
 
-      <SectionCard icon="💊" title="Лекарства" color="#ef4444">
+      <SectionCard icon={<NativeIcon name="pill" size={16} />} title="Лекарства" color="#ef4444">
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 12, background: draft.medicationTaken ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${draft.medicationTaken ? '#ef444444' : colors.border}` }}>
           <input
             type="checkbox"
@@ -414,7 +415,7 @@ export const AddBPModal: React.FC<{
         </label>
       </SectionCard>
 
-      <SectionCard icon="📝" title="Заметка" color="#ef4444">
+      <SectionCard icon={<NativeIcon name="file" size={16} />} title="Заметка" color="#ef4444">
         <textarea
           value={draft.notes}
           onChange={(e) => set('notes', e.target.value)}

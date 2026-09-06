@@ -23,6 +23,7 @@ import {
 import { calculateTrend } from './diaries/BPDiary/bp-trend-prediction';
 import { buildDiariesExportHtml } from './diary-pdf-export';
 import { DiaryCard } from './diary-ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
 import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
@@ -1025,23 +1026,23 @@ const exportAllDiariesPdf = () => {
                     <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: 12 }}>
                       {(() => {
                         const bp = bpEntries.find(e => e.date === todayIso());
-                        if (bp) return <span style={{ color: bp.systolic >= 140 || bp.diastolic >= 90 ? '#ef4444' : '#22c55e' }}>❤️ {bp.systolic}/{bp.diastolic} · {bp.hr} уд/мин</span>;
-                        return <span style={{ color: colors.textMuted }}>❤️ АД: —</span>;
+                        if (bp) return <span style={{ color: bp.systolic >= 140 || bp.diastolic >= 90 ? '#ef4444' : '#22c55e', display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="heart" size={12} /> {bp.systolic}/{bp.diastolic} · {bp.hr} уд/мин</span>;
+                        return <span style={{ color: colors.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="heart" size={12} /> АД: —</span>;
                       })()}
                       {(() => {
                         const w = weights.find(e => e.date === todayIso());
-                        if (w) return <span><span style={{ fontSize: 14, display: 'inline-block', lineHeight: 1 }}>⚖️</span> {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
-                        return <span style={{ color: colors.textMuted }}><span style={{ fontSize: 14, display: 'inline-block', lineHeight: 1 }}>⚖️</span> Вес: —</span>;
+                        if (w) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="kettlebell" size={13} /> {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
+                        return <span style={{ color: colors.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="kettlebell" size={13} /> Вес: —</span>;
                       })()}
                       {(() => {
                         const s = sleepEntries.find(e => e.date === todayIso());
-                        if (s) return <span>💤 {s.hours}ч · {s.quality}/5</span>;
-                        return <span style={{ color: colors.textMuted }}>💤 Сон: —</span>;
+                        if (s) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="moon" size={12} /> {s.hours}ч · {s.quality}/5</span>;
+                        return <span style={{ color: colors.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="moon" size={12} /> Сон: —</span>;
                       })()}
                       {(() => {
                         const c = cardioLog.filter(e => e.date === todayIso() && e.completed);
-                        if (c.length) return <span>🏃 Кардио: {c.length} ({c.reduce((a,b)=>a+b.durationMin,0)} мин)</span>;
-                        return <span style={{ color: colors.textMuted }}>🏃 Кардио: —</span>;
+                        if (c.length) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="activity" size={12} /> Кардио: {c.length} ({c.reduce((a,b)=>a+b.durationMin,0)} мин)</span>;
+                        return <span style={{ color: colors.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="activity" size={12} /> Кардио: —</span>;
                       })()}
                     </div>
                     {completion.missing.length > 0 && (
@@ -1081,7 +1082,7 @@ const exportAllDiariesPdf = () => {
                           lineHeight: 1,
                         }}
                       >
-                        <span style={isWeightDiaryKey(k.key) ? { transform: 'scale(1.18)', display: 'inline-block' } : undefined}>{DIARY_META[k.key].icon}</span>
+                        <span style={isWeightDiaryKey(k.key) ? { transform: 'scale(1.18)', display: 'inline-block' } : undefined}><NativeIcon name={DIARY_META[k.key].icon} size={15} /></span>
                       </div>
                     );
                   })}
@@ -1270,7 +1271,7 @@ const exportAllDiariesPdf = () => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: isWeightDiaryKey(it.key) ? 15 : 12, display: 'inline-block', transform: isWeightDiaryKey(it.key) ? 'scale(1.15)' : undefined, lineHeight: 1 }}>{it.icon}</span>
+                          <span style={{ display: 'inline-flex', lineHeight: 1 }}><NativeIcon name={it.icon} size={12} /></span>
                           <span
                             style={{
                               fontSize: 9,
@@ -1404,9 +1405,9 @@ const exportAllDiariesPdf = () => {
           })()}
 
           <AccordionSection
-            title="📓 Встроенные дневники"
+            title="Встроенные дневники"
             subtitle="6 дневников: сон, давление, вес и замеры, инъекции, здоровье, кардио"
-            icon="📓"
+            icon={<NativeIcon name="notebook" size={20} />}
             color={colors.purple}
             defaultOpen
           >
@@ -1459,7 +1460,7 @@ const exportAllDiariesPdf = () => {
                     gap: 4,
                   }}
                 >
-                  <span style={{ fontSize: isWeightDiaryKey(d.key) ? 15 : 12, display: 'inline-block', transform: isWeightDiaryKey(d.key) ? 'scale(1.15)' : undefined, lineHeight: 1 }}>{DIARY_META[d.key].icon}</span>
+                  <span style={{ display: 'inline-flex', lineHeight: 1 }}><NativeIcon name={DIARY_META[d.key].icon} size={isWeightDiaryKey(d.key) ? 15 : 12} /></span>
                   <span>{DIARY_META[d.key].title}</span>
                 </button>
               ))}
@@ -1469,7 +1470,7 @@ const exportAllDiariesPdf = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 Поиск дневника…"
+                placeholder="Поиск дневника…"
                 style={{
                   width: '100%',
                   background: 'rgba(0,0,0,0.3)',
@@ -1537,11 +1538,11 @@ const exportAllDiariesPdf = () => {
                         ? (() => {
                             const e = healthEntries[0];
                             const parts: string[] = [];
-                            if (e.pain && e.pain.totalScore > 0) parts.push(`🦴 ${e.pain.totalScore}/70`);
-                            if (Array.isArray(e.symptoms) && e.symptoms.length) parts.push(`🩺 ${e.symptoms.length}`);
-                            if (e.neuro && e.neuro.totalScore > 0) parts.push(`🧠 ${e.neuro.totalScore}/10`);
-                            if (e.acne && e.acne.totalScore > 0) parts.push(`🔴 ${e.acne.totalScore}/12`);
-                            if (e.hemato && e.hemato.totalScore > 0) parts.push(`🩸 ${e.hemato.totalScore}/8`);
+                            if (e.pain && e.pain.totalScore > 0) parts.push(`${e.pain.totalScore}/70 · боль`);
+                            if (Array.isArray(e.symptoms) && e.symptoms.length) parts.push(`${e.symptoms.length} · симпт.`);
+                            if (e.neuro && e.neuro.totalScore > 0) parts.push(`${e.neuro.totalScore}/10 · нейро`);
+                            if (e.acne && e.acne.totalScore > 0) parts.push(`${e.acne.totalScore}/12 · акне`);
+                            if (e.hemato && e.hemato.totalScore > 0) parts.push(`${e.hemato.totalScore}/8 · кровь`);
                             return parts.length ? parts.join(' · ') : undefined;
                           })()
                         : undefined
@@ -1570,7 +1571,7 @@ const exportAllDiariesPdf = () => {
               builtInDiaries.filter((d) => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()))
                 .length === 0 && (
                 <div style={{ marginTop: 12, padding: 20, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, marginBottom: 6 }}>🔍</div>
+                  <div style={{ marginBottom: 6, color: colors.textMuted, display: 'flex', justifyContent: 'center' }}><NativeIcon name="search" size={28} /></div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>Ничего не найдено</div>
                   <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>По запросу «{searchQuery}» дневников нет</div>
                   <button onClick={() => setSearchQuery('')} style={{ marginTop: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: `1px solid ${colors.border}`, color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Сбросить поиск</button>
@@ -1579,9 +1580,9 @@ const exportAllDiariesPdf = () => {
           </AccordionSection>
 
           <AccordionSection
-            title="💾 Данные"
+            title="Данные"
             subtitle="Импорт, экспорт и сброс всех дневников"
-            icon="💾"
+            icon={<NativeIcon name="inbox" size={20} />}
             color={colors.blue}
           >
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -1619,7 +1620,7 @@ const exportAllDiariesPdf = () => {
                   gap: 6,
                 }}
               >
-                🖨 Экспорт всех дневников (PDF)
+                <NativeIcon name="file" size={13} /> Экспорт всех дневников (PDF)
               </button>
               <input
                 ref={importInputRef}
@@ -1720,16 +1721,16 @@ const exportAllDiariesPdf = () => {
                   alignItems: 'center',
                   gap: 6,
                 }}
-              >
-                🗑 Сбросить всё
+                >
+                <NativeIcon name="trash" size={13} /> Сбросить всё
               </button>
             </div>
           </AccordionSection>
 
           <AccordionSection
-            title="🔗 Дневники в других блоках"
+            title="Дневники в других блоках"
             subtitle="Быстрый переход к дневнику нужного блока (с подтверждением)"
-            icon="🔗"
+            icon={<NativeIcon name="share" size={20} />}
             color={colors.blue}
           >
             <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" onNavigate={onNavigate} />
@@ -1973,13 +1974,13 @@ const exportAllDiariesPdf = () => {
           {fabOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 12, background: 'rgba(28,28,34,0.97)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)', minWidth: 160 }}>
               {([
-                ['💤 Сон', () => { setFabOpen(false); setAddSleepOpen(true); }],
-                ['❤️ Давление', () => { setFabOpen(false); setAddBPOpen(true); }],
-                ['⚖️ Вес', () => { setFabOpen(false); setAddWeightOpen(true); }],
-                ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
-                ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
-                ['🏃 Кардио', () => { setFabOpen(false); setAddCardioOpen(true); }],
-              ] as const).map(([label, onClick], index) => (
+                [{ icon: 'moon', label: 'Сон' }, () => { setFabOpen(false); setAddSleepOpen(true); }],
+                [{ icon: 'heart', label: 'Давление' }, () => { setFabOpen(false); setAddBPOpen(true); }],
+                [{ icon: 'kettlebell', label: 'Вес' }, () => { setFabOpen(false); setAddWeightOpen(true); }],
+                [{ icon: 'syringe', label: 'Инъекция' }, () => { setFabOpen(false); setAddInjectionOpen(true); }],
+                [{ icon: 'cross', label: 'Здоровье' }, () => { setFabOpen(false); setAddHealthOpen(true); }],
+                [{ icon: 'activity', label: 'Кардио' }, () => { setFabOpen(false); setAddCardioOpen(true); }],
+              ] as const).map(([{ icon, label }, onClick], index) => (
                 <button
                   key={label}
                   onClick={onClick}
@@ -1996,10 +1997,14 @@ const exportAllDiariesPdf = () => {
                     opacity: fabOpen ? 1 : 0,
                     transform: fabOpen ? 'translateX(0)' : 'translateX(20px)',
                     transition: `all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 30}ms`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                   }}
                   title={label}
                   aria-label={label}
                 >
+                  <NativeIcon name={icon as NativeIconName} size={15} />
                   {label}
                 </button>
               ))}

@@ -13,6 +13,7 @@
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
 import { colors, BoolChip, withAlpha } from './ui';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import { getWeightLog } from '../../../engines/profile-store';
 import { readDiaryEntries as readDiaryEntriesFromStorage } from '../../../engines/diary-storage';
@@ -283,14 +284,14 @@ export const HEMATO_SYMPTOMS = [
 
 export const DIARY_META: Record<
   string,
-  { title: string; unit: string; icon: string; color: string; storageKey?: string }
+  { title: string; unit: string; icon: NativeIconName; color: string; storageKey?: string }
 > = {
-  sleep: { title: 'Сон', unit: 'ч', icon: '💤', color: '#a78bfa', storageKey: 'he_sleep_diary' },
-  bp: { title: 'Давление', unit: 'мм рт.ст.', icon: '❤️', color: '#ef4444', storageKey: 'he_bp_diary' },
-  weight: { title: 'Вес и замеры', unit: 'кг / см', icon: '⚖️', color: '#22c55e' },
-  injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: 'he_injection_diary' },
-  health: { title: 'Здоровье', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_health_diary' },
-  cardio: { title: 'Кардио', unit: 'мин', icon: '🏃', color: '#4ade80', storageKey: 'he_cardio_sessions' },
+  sleep: { title: 'Сон', unit: 'ч', icon: 'moon', color: '#a78bfa', storageKey: 'he_sleep_diary' },
+  bp: { title: 'Давление', unit: 'мм рт.ст.', icon: 'heart', color: '#ef4444', storageKey: 'he_bp_diary' },
+  weight: { title: 'Вес и замеры', unit: 'кг / см', icon: 'kettlebell', color: '#22c55e' },
+  injection: { title: 'Инъекции', unit: '', icon: 'syringe', color: '#f59e0b', storageKey: 'he_injection_diary' },
+  health: { title: 'Здоровье', unit: '', icon: 'cross', color: '#ec4899', storageKey: 'he_health_diary' },
+  cardio: { title: 'Кардио', unit: 'мин', icon: 'activity', color: '#4ade80', storageKey: 'he_cardio_sessions' },
 };
 
 export const painZoneColor = (v: number) => (v <= 2 ? '#22c55e' : v <= 4 ? '#f59e0b' : v <= 7 ? '#f97316' : '#ef4444');
@@ -301,7 +302,7 @@ export const acneAreaColor = (v: number) =>
 
 /** Внутренняя карточка-секция с цветным заголовком */
 export const SectionCard: React.FC<{
-  icon?: string;
+  icon?: React.ReactNode;
   title: string;
   color: string;
   badge?: string;
@@ -341,13 +342,13 @@ export const SectionCard: React.FC<{
         <span
           aria-hidden="true"
           style={{
-            fontSize: icon === '⚖️' ? 20 : 16,
             width: 34,
             height: 34,
             borderRadius: 10,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            color,
             background: `linear-gradient(135deg, ${withAlpha(color, '40')}, ${withAlpha(color, '14')})`,
             border: `1px solid ${withAlpha(color, '50')}`,
             boxShadow: `0 3px 10px ${withAlpha(color, '26')}, inset 0 1px 0 rgba(255,255,255,0.14)`,
@@ -377,7 +378,7 @@ export const SectionCard: React.FC<{
 );
 
 /** Живой бейдж-индикатор (категория АД, дельта веса и т.п.) */
-export const LiveBadge: React.FC<{ color: string; icon?: string; children: React.ReactNode }> = ({ color, icon, children }) => (
+export const LiveBadge: React.FC<{ color: string; icon?: React.ReactNode; children: React.ReactNode }> = ({ color, icon, children }) => (
   <div
     style={{
       display: 'inline-flex', alignItems: 'center', gap: 7,
@@ -389,7 +390,7 @@ export const LiveBadge: React.FC<{ color: string; icon?: string; children: React
       animation: 'diary-badge-in 0.25s ease-out',
     }}
   >
-    {icon && <span>{icon}</span>}
+    {icon && <span style={{ display: 'inline-flex' }}>{icon}</span>}
     {children}
   </div>
 );
@@ -761,7 +762,7 @@ export const DiaryModalShell: React.FC<{
   open: boolean;
   onClose: () => void;
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   color: string;
   subtitle?: string;
   width?: number;
@@ -961,8 +962,7 @@ export const DiaryModalShell: React.FC<{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 28,
-                  lineHeight: 1,
+                  color,
                   flexShrink: 0,
                 }}
               >
@@ -988,7 +988,7 @@ export const DiaryModalShell: React.FC<{
                   }}
                   title="Давность последней записи"
                 >
-                  🕒 {daysAgoLabel(stale.days)}
+                  <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 5 }}><NativeIcon name="clock" size={10} /></span>{daysAgoLabel(stale.days)}
                 </span>
               )}
               <button
@@ -1059,7 +1059,7 @@ export const Modal: React.FC<{ open: boolean; onClose: () => void; title: string
   title,
   children,
 }) => (
-  <DiaryModalShell open={open} onClose={onClose} title={title} icon="📓" color={colors.primary} onSubmit={onClose}>
+  <DiaryModalShell open={open} onClose={onClose} title={title} icon={<NativeIcon name="notebook" size={28} />} color={colors.primary} onSubmit={onClose}>
     {children}
   </DiaryModalShell>
 );

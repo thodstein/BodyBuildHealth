@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useProfileRefresh, updateProfile, clearSnapshots } from '../../../core/profile-manager';
 import type { UnifiedSettings } from '../../../core/types';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from './ui';
+import { NativeIcon } from '../../native/NativeIcons';
 import { isNativeApp } from '../../../core/app-platform';
 import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
@@ -131,7 +132,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
       <AccordionSection
         title="4.1 Системные"
         subtitle="Единицы, уведомления, приватность"
-        icon="⚙️"
+        icon={<NativeIcon name="sliders" size={20} />}
         color={colors.blue}
       >
         <FieldRow cols={2}>
@@ -186,41 +187,41 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
       <AccordionSection
         title="4.2 Экспорт / Импорт"
         subtitle="Сохранить профиль в файл или восстановить из бэкапа"
-        icon="💾"
+        icon={<NativeIcon name="inbox" size={20} />}
         color={colors.primary}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
           <button onClick={handleExport} style={{
             ...btnStyle, borderColor: colors.primary, color: colors.primary, background: colors.primaryDim,
-          }}>📥 Экспорт в файл</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="share" size={13} /></span>Экспорт в файл</button>
           <button onClick={handleImport} style={{
             ...btnStyle, borderColor: colors.blue, color: colors.blue, background: colors.blueDim,
-          }}>📤 Импорт из файла</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="inbox" size={13} /></span>Импорт из файла</button>
           <button onClick={handleCopy} style={{
             ...btnStyle, borderColor: colors.purple, color: colors.purple, background: colors.purpleDim,
-          }}>📋 Копировать в буфер</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="file" size={13} /></span>Копировать в буфер</button>
         </div>
       </AccordionSection>
 
       <AccordionSection
         title="4.3 Сброс"
         subtitle="Очистить кэши, дневники или весь профиль"
-        icon="🗑"
+        icon={<NativeIcon name="trash" size={20} />}
         color={colors.danger}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
           <button onClick={handleClearDiaries} style={{
             ...btnStyle, borderColor: colors.warning, color: colors.warning, background: colors.warningDim,
-          }}>🗑 Очистить дневники</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="trash" size={13} /></span>Очистить дневники</button>
           <button onClick={() => {
             clearSnapshots();
             alert('✅ Снимки истории очищены');
           }} style={{
             ...btnStyle, borderColor: colors.textMuted, color: colors.textMuted, background: 'transparent',
-          }}>🧹 Очистить историю</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="clock" size={13} /></span>Очистить историю</button>
           <button onClick={handleReset} style={{
             ...btnStyle, borderColor: colors.danger, color: colors.danger, background: colors.dangerDim,
-          }}>⚠ Сбросить профиль</button>
+          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="alertTriangle" size={13} /></span>Сбросить профиль</button>
         </div>
       </AccordionSection>
 
@@ -230,7 +231,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
         <AccordionSection
           title="4.4 Телефон · APK"
           subtitle="Виджеты рабочего стола, биометрия, уведомления и камера"
-          icon="📱"
+          icon={<NativeIcon name="phone" size={20} />}
           color={colors.primary}
           id="phone-apk"
         >

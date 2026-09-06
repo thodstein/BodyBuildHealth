@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { colors, BoolChip } from './ui';
+import { NativeIcon } from '../../native/NativeIcons';
 import { todayIso } from './diary-helpers';
 import {
   DiaryModalShell,
@@ -135,7 +136,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       open={open}
       onClose={onClose}
       title="Запись сна"
-      icon="💤"
+      icon={<NativeIcon name="moon" size={28} />}
       color="#a78bfa"
       subtitle="Продолжительность, качество и режим за ночь"
       onSubmit={save}
@@ -188,7 +189,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
             transition: 'all 0.15s',
           }}
         >
-          🧪 Факторы {factorsOpen ? '▾' : '▸'}
+          <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 6 }}><NativeIcon name="flask" size={12} /></span>Факторы {factorsOpen ? '▾' : '▸'}
         </button>
         {factorCount > 0 && !factorsOpen && (
           <span
@@ -209,7 +210,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
 
       {factorsOpen && (
         <SectionCard
-          icon="🧪"
+          icon={<NativeIcon name="flask" size={16} />}
           title="Факторы"
           color="#a78bfa"
           hint="Данные для аналитики: гигиена сна, корреляции с тренировками и добавками"
@@ -275,7 +276,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
         </SectionCard>
       )}
 
-      <SectionCard icon="⏰" title="Продолжительность" color="#a78bfa">
+      <SectionCard icon={<NativeIcon name="clock" size={16} />} title="Продолжительность" color="#a78bfa">
         <StepperInput value={draft.hours} onChange={(v) => set('hours', v)} step={0.5} min={0} max={24} unit="ч" large invalid={hoursInvalid} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
           <TextField label="Лёг спать" value={draft.bedtime} onChange={(v) => set('bedtime', v)} type="time" />
@@ -283,7 +284,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
         </div>
       </SectionCard>
 
-      <SectionCard icon="🌙" title="Качество" color="#a78bfa" badge={q >= 1 && q <= 5 ? SLEEP_QUALITY_LABEL[q - 1] : undefined}>
+      <SectionCard icon={<NativeIcon name="moon" size={16} />} title="Качество" color="#a78bfa" badge={q >= 1 && q <= 5 ? SLEEP_QUALITY_LABEL[q - 1] : undefined}>
         <ScalePicker
           value={q >= 1 && q <= 5 ? q : 4}
           onChange={(v) => set('quality', String(v))}
@@ -298,7 +299,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
         </div>
       </SectionCard>
 
-      <SectionCard icon="📝" title="Пробуждения и заметки" color="#a78bfa">
+      <SectionCard icon={<NativeIcon name="file" size={16} />} title="Пробуждения и заметки" color="#a78bfa">
         <TextField
           label="Пробуждений за ночь"
           value={draft.awakenings}

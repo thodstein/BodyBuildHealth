@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
+import { NativeIcon } from '../../../../native/NativeIcons';
 import {
   btnBase,
   btnPrimary,
@@ -464,7 +465,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
       {/* Header */}
       <DiaryHeader
         accent={ACCENT}
-        title="❤️ Давление"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="heart" size={18} /> Давление</span>}
         count={rows.length}
         onClose={onClose}
         onAdd={openNew}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BoolChip, SliderInput, colors, glassCard, inputStyle } from '../../ui';
+import { NativeIcon, type NativeIconName } from '../../../../native/NativeIcons';
 import { useDiaryDraft } from '../../diary-modals';
 import {
   analyzeAllSleepCorrelations,
@@ -444,15 +445,15 @@ const SleepForm: React.FC<{
             💤 {Number(draft.hours) || '—'} ч
           </span>
           <span>⭐ {Number(draft.quality) || '—'}/5</span>
-          {draft.bedtime && draft.wakeTime && <span>🛌 {draft.bedtime}–{draft.wakeTime}</span>}
-          {Number(draft.latency) > 0 && <span>🕐 {Number(draft.latency)} мин</span>}
+          {draft.bedtime && draft.wakeTime && <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="moon" size={12} /> {draft.bedtime}–{draft.wakeTime}</span>}
+          {Number(draft.latency) > 0 && <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="clock" size={12} /> {Number(draft.latency)} мин</span>}
           {draft.alcohol && <span style={{ color: '#f87171' }}>🍷 алкоголь</span>}
           {Number(draft.stressLevel) >= 7 && <span style={{ color: '#f87171' }}>😣 стресс {draft.stressLevel}/10</span>}
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={btnPrimary} onClick={submit}>
-            💾 Сохранить
+          <button style={{ ...btnPrimary, display:'inline-flex', alignItems:'center', gap:6 }} onClick={submit}>
+            <NativeIcon name="check" size={13} /> Сохранить
           </button>
           <button style={btnGhost} onClick={onCancel}>
             Отмена
@@ -465,7 +466,7 @@ const SleepForm: React.FC<{
 
 /* ── Карточки-виджеты ──────────────────────────────────────────────────── */
 
-const StatCard: React.FC<{ icon: string; label: string; value: string; color: string; hint?: string }> = ({
+const StatCard: React.FC<{ icon: NativeIconName; label: string; value: string; color: string; hint?: string }> = ({
   icon,
   label,
   value,
@@ -498,7 +499,7 @@ const StatCard: React.FC<{ icon: string; label: string; value: string; color: st
         pointerEvents: 'none',
       }}
     />
-    <div style={{ fontSize: 16, position: 'relative' }}>{icon}</div>
+    <div style={{ color, position: 'relative' }}><NativeIcon name={icon} size={16} /></div>
     <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>
       {label}
     </small>
@@ -805,7 +806,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
 
       <DiaryHeader
         accent={ACCENT}
-        title="💤 Сон"
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="moon" size={18} /> Сон</span>}
         count={rows.length}
         onClose={onClose}
         onAdd={() => openSleepForm(blankEntry(), false)}
@@ -976,37 +977,37 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
 
         {/* Статистика */}
         <div className="sleep-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8, marginBottom: 12 }}>
-          <StatCard icon="🌙" label="Среднее" value={dist ? `${dist.mean.toFixed(1)} ч` : '—'} color={meanStatColor} hint={`медиана ${dist ? dist.median.toFixed(1) : '—'} ч`} />
-          <StatCard icon="🔻" label="Мин / Макс" value={extremes.min && extremes.max ? `${extremes.min.value}/${extremes.max.value} ч` : '—'} color={colors.purple} />
-          <StatCard icon="🔥" label="Серия" value={`${streak.current} дн.`} color={streak.current >= 7 ? '#34d399' : '#fbbf24'} hint={`лучшая ${streak.best} дн.`} />
-          <StatCard icon="⏳" label="Долг за 7д" value={`${debt.toFixed(1)} ч`} color={debt > 2 ? '#f87171' : debt > 0 ? '#fbbf24' : '#34d399'} hint={`записано ${debtCalc.recordedDays} дн.`} />
+          <StatCard icon="moon" label="Среднее" value={dist ? `${dist.mean.toFixed(1)} ч` : '—'} color={meanStatColor} hint={`медиана ${dist ? dist.median.toFixed(1) : '—'} ч`} />
+          <StatCard icon="trendingDown" label="Мин / Макс" value={extremes.min && extremes.max ? `${extremes.min.value}/${extremes.max.value} ч` : '—'} color={colors.purple} />
+          <StatCard icon="zap" label="Серия" value={`${streak.current} дн.`} color={streak.current >= 7 ? '#34d399' : '#fbbf24'} hint={`лучшая ${streak.best} дн.`} />
+          <StatCard icon="clock" label="Долг за 7д" value={`${debt.toFixed(1)} ч`} color={debt > 2 ? '#f87171' : debt > 0 ? '#fbbf24' : '#34d399'} hint={`записано ${debtCalc.recordedDays} дн.`} />
           {efficiency !== null && (
             <StatCard
-              icon="🛏"
+              icon="target"
               label="Эффективность (30д)"
               value={`${efficiency}%`}
               color={efficiency >= 85 ? '#34d399' : efficiency >= 75 ? '#fbbf24' : '#f87171'}
               hint={efficiency >= 85 ? 'норма ≥85%' : efficiency >= 75 ? 'пограничная' : 'маркер инсомнии'}
             />
           )}
-          <StatCard icon="⭐" label="Качество (7д)" value={recent.length ? `${avgQuality.toFixed(1)}/5` : '—'} color={avgQuality >= 4 ? '#34d399' : avgQuality >= 3 ? '#fbbf24' : '#f87171'} />
-          <StatCard icon="⚠️" label="Аномалии" value={String(anomalies.length)} color={anomalies.length ? '#f87171' : '#34d399'} hint={anomalies.length ? 'требуют внимания' : 'всё в порядке'} />
+          <StatCard icon="star" label="Качество (7д)" value={recent.length ? `${avgQuality.toFixed(1)}/5` : '—'} color={avgQuality >= 4 ? '#34d399' : avgQuality >= 3 ? '#fbbf24' : '#f87171'} />
+          <StatCard icon="alertTriangle" label="Аномалии" value={String(anomalies.length)} color={anomalies.length ? '#f87171' : '#34d399'} hint={anomalies.length ? 'требуют внимания' : 'всё в порядке'} />
         </div>
 
         {/* Регулярность режима */}
         {regularity && regularity.samples >= 2 && (
           <section style={{ ...glassCard, marginBottom: 12 }}>
-            <b style={{ display: 'block', marginBottom: 10 }}>🕰 Регулярность режима (14 дней)</b>
+            <b style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}><NativeIcon name="clock" size={13} /> Регулярность режима (14 дней)</b>
             <div className="sleep-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }}>
               <StatCard
-                icon="🛌"
+                icon="moon"
                 label="Разброс отбоя (σ)"
                 value={`±${regularity.bedtimeStdMin} мин`}
                 color={regularity.bedtimeStdMin <= 30 ? '#34d399' : regularity.bedtimeStdMin <= 60 ? '#fbbf24' : '#f87171'}
                 hint={regularity.bedtimeStdMin <= 30 ? 'стабильно' : regularity.bedtimeStdMin <= 60 ? 'плавает' : 'нестабильно'}
               />
               <StatCard
-                icon="⏰"
+                icon="sun"
                 label="Разброс подъёма (σ)"
                 value={`±${regularity.wakeStdMin} мин`}
                 color={regularity.wakeStdMin <= 30 ? '#34d399' : regularity.wakeStdMin <= 60 ? '#fbbf24' : '#f87171'}
@@ -1014,14 +1015,14 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
               />
               {regularity.jetlagMin !== null && (
                 <StatCard
-                  icon="✈️"
+                  icon="send"
                   label="Джетлаг выходных"
                   value={`${regularity.jetlagMin} мин`}
                   color={regularity.jetlagMin <= 30 ? '#34d399' : regularity.jetlagMin <= 60 ? '#fbbf24' : '#f87171'}
                   hint="сдвиг середины сна в выходные"
                 />
               )}
-              <StatCard icon="📊" label="Записей" value={`${regularity.samples}`} color={colors.textMuted} hint="в окне 14 дней" />
+              <StatCard icon="chart" label="Записей" value={`${regularity.samples}`} color={colors.textMuted} hint="в окне 14 дней" />
             </div>
           </section>
         )}
