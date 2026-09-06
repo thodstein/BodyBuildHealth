@@ -25,6 +25,7 @@ import { injectTableCorrections } from './arm-table-inject.engine';
 import { longevityTrackFor } from './arm-longevity.engine';
 import { injectGripProtocol } from './arm-grip-protocol.engine';
 import { cyclePhaseMap, fitCycleToWeeks, getArmCycle } from './arm-cycle-library.engine';
+import { getMedley, medleyRotationForWeek } from './arm-medley.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -716,6 +717,16 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       sessionIdx++;
     }
 
+    // R7: ротация медли — фокус-снаряд недели в note (видно в UI и печати,
+    // объём не трогаем: ротация — про снаряд, не про сеты).
+    let weekNote: string | undefined;
+    try {
+      const mid = String((input as any).medleyId || '');
+      if (mid && getMedley(mid)) {
+        const impl = medleyRotationForWeek(mid, w);
+        if (impl) weekNote = `🎯 Медли-фокус: ${impl}`;
+      }
+    } catch { weekNote = undefined; }
     planWeeks.push({
       week: w,
       phase,
@@ -723,6 +734,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       taper,
       tableRatio: sessions.filter(s => s.tableTime).length / Math.max(1, sessions.length),
       sessions,
+      ...(weekNote ? { note: weekNote } : {}),
     });
   }
 

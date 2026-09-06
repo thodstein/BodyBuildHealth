@@ -26,6 +26,7 @@ import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
 import { ARM_MEDLEYS } from '../../../engines/arm/arm-medley.engine';
+import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
@@ -850,7 +851,10 @@ export function ArmAutoConstructor() {
                     const tr = forceTrend(stats);
                     if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
                   } catch {}
-                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info });
+                  // R7: PRO-сводка в печать из inputSnapshot плана (пусто = блока нет)
+                  let proSummary: any = null;
+                  try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
+                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }} style={BTN_GHOST as any}>🖨 Печать</button>

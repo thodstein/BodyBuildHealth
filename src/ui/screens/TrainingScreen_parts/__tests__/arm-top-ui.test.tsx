@@ -123,4 +123,22 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(document.body.textContent).toMatch(/Цикл: Окно 8/);
     expect(document.body.textContent).toMatch(/согласие/);
   });
+
+  it('печать: PRO-сводка со циклом попадает в HTML', () => {
+    const origOpen = window.open;
+    const writes: string[] = [];
+    (window as any).open = () => ({ document: { write: (s: string) => writes.push(s), close: () => {} } });
+    try {
+      render(<ArmAutoConstructor />);
+      const sel = screen.getByDisplayValue('— обычный план —') as HTMLSelectElement;
+      fireEvent.change(sel, { target: { value: 'strengthlog_8' } });
+      fireEvent.click(screen.getByText('⚡ Собрать план'));
+      fireEvent.click(screen.getByText('🖨 Печать'));
+      expect(writes.length).toBe(1);
+      expect(writes[0]).toContain('PRO-сводка тренера');
+      expect(writes[0]).toContain('StrengthLog');
+    } finally {
+      (window as any).open = origOpen;
+    }
+  });
 });
