@@ -13,6 +13,7 @@ import { loadSavedArticles, toggleSavedArticle } from '../screens/ArticlesScreen
 import { NativeIcon, NATIVE_ICON_NAMES } from '../native/NativeIcons';
 import { DiaryCard, DIARY_META } from '../screens/ProfileScreen_v2/diary-ui';
 import { REPORT_SOURCES } from '../screens/ProfileScreen_v2/ProfileReportsTab';
+import { SupportHomeView } from '../screens/SupportScreen_parts/SupportHomeView';
 
 function setCapacitorNative() {
   (window as unknown as { Capacitor?: unknown }).Capacitor = {
@@ -177,6 +178,13 @@ describe('DiaryCard и отчёты на SVG', () => {
     for (const src of REPORT_SOURCES) {
       expect(NATIVE_ICON_NAMES, src.label).toContain(src.icon);
     }
+  });
+});
+
+describe('SupportHomeView (волна 9)', () => {
+  it('hero-карточки рендерят SVG, не эмодзи', () => {
+    const { container } = render(<SupportHomeView s={{}} />);
+    expect(container.querySelectorAll('.support-hero-card svg').length).toBe(3);
   });
 });
 

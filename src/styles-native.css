@@ -4351,6 +4351,29 @@ html.app-native .nutrition-scan-btn:active {
   transform: scale(0.92);
 }
 
+/* ─── 67. SUPPORT + SECONDARY HEADS ───────────────────────
+ * Только APK. Мост акцента БАДов + PRO-подача заголовков
+ * классических экранов (без правок их TSX). */
+html.app-native {
+  --sup-accent: var(--accent);
+  --sup-accent-rgb: var(--accent-rgb);
+}
+
+/* Заголовки-h2 классических экранов: акцентная плашка слева. */
+html.app-native .screen.recovery-screen > h2,
+html.app-native .screen.gamification h2,
+html.app-native .screen.plan h2,
+html.app-native .screen.fertility-pct h2,
+html.app-native .screen.peptides h2,
+html.app-native .screen.assistant h2,
+html.app-native .screen.role-management h2,
+html.app-native .screen.substances h2 {
+  border-left: 3px solid var(--accent) !important;
+  padding-left: 10px !important;
+  font-size: 19px !important;
+  letter-spacing: -0.4px !important;
+}
+
 /* ─── 64. SHOP + ARTICLES ACCENT ──────────────────────────────
  * Только APK. Магазин/Статьи захардкожены на минт в инлайнах —
  * бренд-элементы переводим на акцент темы, категорийные цвета не трогаем. */
