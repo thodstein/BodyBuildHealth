@@ -68,8 +68,20 @@ export const StrengthSportConstructor: React.FC = () => {
   const [cycleId, setCycleId] = useState<string>(() => { try { return localStorage.getItem('he_ss_cycle_v1') || ''; } catch { return ''; } });
   const [cycleMode, setCycleMode] = useState<'faithful'|'adapt'>(() => { try { return (localStorage.getItem('he_ss_cycle_mode_v1') as any) || 'faithful'; } catch { return 'faithful'; } });
   const [cycleConsent, setCycleConsent] = useState<boolean>(false);
-  // Ручной выбор циклов для годовой сборки (null = авто топ-3)
-  const [annualCycleSel, setAnnualCycleSel] = useState<string[] | null>(null);
+  // Ручной выбор циклов для годовой сборки (null = авто топ-3), персист
+  const [annualCycleSel, setAnnualCycleSel] = useState<string[] | null>(() => {
+    try {
+      const raw = localStorage.getItem('he_ss_annual_cycles_v1');
+      const arr = raw ? JSON.parse(raw) : null;
+      return Array.isArray(arr) && arr.length ? arr.map(String) : null;
+    } catch { return null; }
+  });
+  React.useEffect(() => {
+    try {
+      if (annualCycleSel && annualCycleSel.length) localStorage.setItem('he_ss_annual_cycles_v1', JSON.stringify(annualCycleSel));
+      else localStorage.removeItem('he_ss_annual_cycles_v1');
+    } catch {}
+  }, [annualCycleSel]);
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [hrv, setHrv] = useState<any>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
@@ -155,9 +167,9 @@ export const StrengthSportConstructor: React.FC = () => {
         const evs = (contest as any)?.events;
         if (Array.isArray(evs)) contestEvents = evs.map((e: any) => String(e.id)).filter(Boolean);
       } catch { contestEvents = undefined; }
-      return rankSSCycle({ mode, level, daysPerWeek: days, weeks, equipment, goal, acwrZone: (acwr as any)?.zone || null, cycleConsent, weakPoints: weakPoints.length ? weakPoints : undefined, contestEvents });
+      return rankSSCycle({ mode, level, daysPerWeek: days, weeks, equipment, goal, acwrZone: (acwr as any)?.zone || null, cycleConsent, weakPoints: weakPoints.length ? weakPoints : undefined, contestEvents, age });
     } catch { return []; }
-  }, [mode, level, days, weeks, equipment, goal, acwr, cycleConsent, weakPoints, contest]);
+  }, [mode, level, days, weeks, equipment, goal, acwr, cycleConsent, weakPoints, contest, age]);
 
   React.useEffect(() => {
     try {
@@ -799,6 +811,9 @@ export const StrengthSportConstructor: React.FC = () => {
             <div style={{ fontSize:10, color:'rgba(235,235,245,0.36)', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
           </SectionCard>
           <SectionCard icon="📚" title="Интернет-цикл" subtitle="Дословные программы ТА/стронга · перекрывает сплит ниже" accent={!!cycleId}>
+            {!cycleId && rankedCycles.filter(r=> !r.blocked).length > 0 && (
+              <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)' }}>💡 Рекомендуем цикл: <Highlight color={modeColor}>{rankedCycles.filter(r=> !r.blocked)[0].cycle.meta.title}</Highlight></div>
+            )}
             <StrengthPopupSelect label="Цикл" value={cycleId} onChange={v=> setCycleId(v)} strong={mode==='strongman'} options={[
               { id:'', label:'Без цикла — параметрический план', desc:'сплит ниже' },
               ...rankedCycles.filter(r=> !r.blocked).map(r=> ({
@@ -824,8 +839,18 @@ export const StrengthSportConstructor: React.FC = () => {
                 {(() => {
                   const tpl = getSSCycleById(cycleId);
                   if (!tpl) return null;
+                  const phaseShort: Record<string,string> = { base:'Б', build:'Н', peak:'П', deload:'Р', taper:'Т', test:'Тст' };
+                  const phaseOf = (wn: number) => tpl.meta.phases?.find(p=> wn >= p.weekStart && wn <= p.weekEnd)?.phase;
                   return (
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                        {tpl.weeks.map((wkDays, wi)=> {
+                          const wn = wi + 1;
+                          const ph = phaseOf(wn);
+                          const marks = `${(tpl.meta.mockWeeks||[]).includes(wn)?' 🏁':''}${(tpl.meta.taperWeeks||[]).includes(wn)?' 📉':''}${(tpl.meta.deloadWeeks||[]).includes(wn)?' 💤':''}`;
+                          return <span key={wn} style={{ fontSize:10, padding:'3px 7px', borderRadius:8, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.08)', color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{wn}·{wkDays.length}д·{phaseShort[ph||'']||'·'}{marks}</span>;
+                        })}
+                      </div>
                       <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', lineHeight:1.45 }}>{tpl.meta.description}</div>
                       <div style={{ fontSize:10, color:'rgba(235,235,245,0.45)' }}>{tpl.meta.howItWorks}</div>
                       {tpl.meta.needsSpecialty && !(['other','specialty'].some(e=> equipment.map(x=>String(x).toLowerCase()).includes(e)) || equipment.length===0) && (
@@ -1124,7 +1149,7 @@ export const StrengthSportConstructor: React.FC = () => {
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {annual.blocks.map((b:any) => {
                   const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
-                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}{b.competitionDate ? ' 🏁' : ''}</span>;
+                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}{((b as any).plan?.inputSnapshot as any)?.cycleId ? ` · ${String(((b as any).plan.inputSnapshot as any).cycleId).replace(/^ss-/, '')}` : ''}{b.competitionDate ? ' 🏁' : ''}</span>;
                 })}
               </div>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
@@ -1147,7 +1172,7 @@ export const StrengthSportConstructor: React.FC = () => {
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:TEXT_3 }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
                 <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>Синхронизация: <Highlight>he_strength_annual_sync_v1</Highlight> · годовой доступен в дневнике и общем плане</div>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                  {rankedCycles.filter(r=> !r.blocked).slice(0, 5).map(r=> {
+                  {rankedCycles.filter(r=> !r.blocked).map(r=> {
                     const id = r.cycle.meta.id;
                     const sel = annualCycleSel ? annualCycleSel.includes(id) : rankedCycles.filter(x=> !x.blocked).slice(0, 3).some(x=> x.cycle.meta.id===id);
                     return (

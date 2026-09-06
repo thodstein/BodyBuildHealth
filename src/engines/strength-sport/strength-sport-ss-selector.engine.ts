@@ -18,6 +18,7 @@ export interface SSCycleRankInput {
   cycleConsent?: boolean; // явное согласие на daily-max (болгарский)
   weakPoints?: string[]; // слабые лифты/зоны — цикл с их покрытием приоритетнее
   contestEvents?: string[]; // id ивентов заявленного контеста — цикл с ними приоритетнее
+  age?: number; // Masters-гейты: 40+ против 6д/нед, 50+ против daily-max
 }
 
 export interface SSCycleScore {
@@ -40,6 +41,7 @@ function hasSpecialty(equipment?: string[]): boolean {
 export function bulgarianGate(input: SSCycleRankInput): string | null {
   const lvl = LEVEL_RANK[input.level] ?? 1;
   if (lvl < 2) return 'Болгарский daily-max — только advanced/enhanced';
+  if ((input.age ?? 0) >= 50) return 'Болгарский daily-max — masters 50+: запрещён (суставы/восстановление)';
   if (!input.cycleConsent) return 'Болгарский daily-max — нужно явное согласие (чекбокс)';
   if (input.acwrZone === 'caution' || input.acwrZone === 'dangerous') return `Болгарский daily-max заблокирован: ACWR ${input.acwrZone}`;
   return null;
@@ -79,6 +81,11 @@ export function rankSSCycle(input: SSCycleRankInput): SSCycleScore[] {
     if (dDiff === 0) { score += 20; reasons.push(`дни 1-в-1 (${lo}${hi !== lo ? `→${hi}` : ''}×) +20`); }
     else if (dDiff === 1) { score -= 10; reasons.push('дни ±1 −10'); }
     else { score -= 30; reasons.push(`дни ${lo}${hi !== lo ? `→${hi}` : ''}× vs ${input.daysPerWeek}× −30`); }
+    // Masters 40+: 6-дневные циклы штрафуются (восстановление)
+    if ((input.age ?? 0) >= 40 && m.sessionsPerWeek >= 6) {
+      score -= 15;
+      reasons.push('masters 40+: 6д/нед −15');
+    }
     // Недели
     const wDiff = Math.abs(m.weeks - input.weeks);
     if (wDiff === 0) { score += 15; reasons.push('недели 1-в-1 +15'); }

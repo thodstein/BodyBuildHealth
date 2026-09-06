@@ -50,7 +50,13 @@ export function buildAnnualFromSSCycles(
     // Следующий блок — с прогрессией от построенного (ПМ растут, а не стоят)
     if (progress) {
       try {
+        const before = JSON.stringify(carryInput.workMax || {});
         carryInput = applyMesocycleProgression(built, { ...carryInput, workMax: { ...(carryInput.workMax || {}) } }) as StrengthSportInput;
+        if (JSON.stringify(carryInput.workMax || {}) === before) {
+          built.rationale.push('Год: блок без прогрессии ПМ — предыдущий мезоцикл перегружен (warnings/ACWR), следующий стартует с тех же максимумов');
+        } else {
+          built.rationale.push('Год: ПМ прогрессируют в следующий блок (кросс-мезоцикл)');
+        }
       } catch { /* прогрессия недоступна — следующий блок со стартовыми ПМ */ }
     }
   });

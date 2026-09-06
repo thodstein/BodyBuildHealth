@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
@@ -24,7 +24,7 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     const { container } = render(<StrengthSportConstructor />);
     goToSplit(container);
     fireEvent.click(screen.getByLabelText('Цикл'));
-    fireEvent.click(await screen.findByText(/общая база/));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
     await waitFor(() => expect(container.textContent).toContain('Дословно'));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-general-8'), { timeout: 5000 });
@@ -53,7 +53,7 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     const { container } = render(<StrengthSportConstructor />);
     goToSplit(container);
     fireEvent.click(screen.getByLabelText('Цикл'));
-    fireEvent.click(await screen.findByText(/общая база/));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
     await waitFor(() => expect(container.textContent).toContain('Дословно'));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-general-8'), { timeout: 5000 });
@@ -61,5 +61,20 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     const yearBtn = await screen.findByText(/Год из циклов/);
     fireEvent.click(yearBtn);
     await waitFor(() => expect(container.textContent).toContain('Год из циклов:'), { timeout: 5000 });
+  });
+
+  it('chips года переключают выбор (счётчик кнопки)', async () => {
+    const { container } = render(<StrengthSportConstructor />);
+    goToSplit(container);
+    fireEvent.click(screen.getByLabelText('Цикл'));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
+    await waitFor(() => expect(container.textContent).toContain('Дословно'));
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-general-8'), { timeout: 5000 });
+    // Кнопка показывает 3 по умолчанию; снимаем первый чип → 2
+    expect(container.textContent).toContain('Год из циклов (3)');
+    const chips = screen.getAllByText('ТА общая база — 8 недель (5 д/нед)', { exact: true });
+    fireEvent.click(chips[chips.length - 1]);
+    await waitFor(() => expect(container.textContent).toContain('Год из циклов (2)'));
   });
 });

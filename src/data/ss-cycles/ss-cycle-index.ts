@@ -15,6 +15,9 @@ import { SS_SM_BASE_12 } from './ss-sm-base-12';
 import { SS_HB_MIX_8 } from './ss-hb-mix-8';
 import { SS_SM_PEAK_4 } from './ss-sm-peak-4';
 import { SS_TA_PEAK_4 } from './ss-ta-peak-4';
+import { SS_SM_PRESS_6 } from './ss-sm-press-6';
+import { SS_TA_BASE_6 } from './ss-ta-base-6';
+import { SS_HB_TRANSIT_2 } from './ss-hb-transit-2';
 
 export const SS_CYCLES: SSCycleTemplate[] = [
   SS_TA_GENERAL_8,
@@ -29,6 +32,9 @@ export const SS_CYCLES: SSCycleTemplate[] = [
   SS_HB_MIX_8,
   SS_SM_PEAK_4,
   SS_TA_PEAK_4,
+  SS_SM_PRESS_6,
+  SS_TA_BASE_6,
+  SS_HB_TRANSIT_2,
 ];
 
 export function getSSCycleById(id: string): SSCycleTemplate | undefined {
