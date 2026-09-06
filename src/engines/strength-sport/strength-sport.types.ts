@@ -77,6 +77,10 @@ export interface StrengthSportInput {
   calorieSurplus?: number;
   proteinPerKg?: number;
   patternId?: string;
+  // Интернет-цикл ТА/стронга (ss-cycles): выбранный шаблон + режим сборки
+  cycleId?: string; // id из SS_CYCLES, напр. 'ss-ta-general-8'
+  cycleMode?: 'faithful' | 'adapt'; // faithful = дословно (дефолт), adapt = с гардами билдера
+  cycleConsent?: boolean; // явное согласие на daily-max (болгарский)
   // P0-1 + P0-7: соревнование и авторегуляция
   competitionDate?: string;
   startDate?: string;

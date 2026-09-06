@@ -29,6 +29,9 @@ import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS, moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
+import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
+import { rankSSCycle, recommendSSCycle } from '../../../engines/strength-sport/strength-sport-ss-selector.engine';
+import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, EventCard, StrengthGantt, StrengthHeatmap, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
@@ -60,6 +63,10 @@ export const StrengthSportConstructor: React.FC = () => {
   const [age, setAge] = useState<number>(30);
   const [competitionDate, setCompetitionDate] = useState<string>('');
   const [patternId, setPatternId] = useState<string>('');
+  // Интернет-цикл ТА/стронга (ss-cycles): дословный режим по умолчанию
+  const [cycleId, setCycleId] = useState<string>(() => { try { return localStorage.getItem('he_ss_cycle_v1') || ''; } catch { return ''; } });
+  const [cycleMode, setCycleMode] = useState<'faithful'|'adapt'>(() => { try { return (localStorage.getItem('he_ss_cycle_mode_v1') as any) || 'faithful'; } catch { return 'faithful'; } });
+  const [cycleConsent, setCycleConsent] = useState<boolean>(false);
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [hrv, setHrv] = useState<any>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
@@ -135,6 +142,14 @@ export const StrengthSportConstructor: React.FC = () => {
     try { return simulateContest(contest as any, workMax as any, contestStrategy as any); } catch { return null; }
   }, [contest, workMax, contestStrategy, mode]);
   React.useEffect(() => { try { localStorage.setItem('he_vbt_ss_v1', JSON.stringify(vbtMap)); } catch {} }, [vbtMap]);
+  React.useEffect(() => { try { localStorage.setItem('he_ss_cycle_v1', cycleId); } catch {} }, [cycleId]);
+  React.useEffect(() => { try { localStorage.setItem('he_ss_cycle_mode_v1', cycleMode); } catch {} }, [cycleMode]);
+  // Ранжирование интернет-циклов под текущие параметры (селектор ss-cycles)
+  const rankedCycles = useMemo(() => {
+    try {
+      return rankSSCycle({ mode, level, daysPerWeek: days, weeks, equipment, goal, acwrZone: (acwr as any)?.zone || null, cycleConsent });
+    } catch { return []; }
+  }, [mode, level, days, weeks, equipment, goal, acwr, cycleConsent]);
 
   React.useEffect(() => {
     try {
@@ -288,13 +303,29 @@ export const StrengthSportConstructor: React.FC = () => {
       contest: mode==='strongman' ? contest : undefined,
       contestStrategy: mode==='strongman' ? contestStrategy : undefined,
       diagnosticLevel: (diagnosticLevel as any) || undefined,
+      cycleId: cycleId || undefined,
+      cycleMode: cycleId ? cycleMode : undefined,
+      cycleConsent: cycleId ? cycleConsent : undefined,
       ...extra,
     } as any;
     try {
       const prev = loadStrengthSportPlans()[0];
       if (prev) input = applyMesocycleProgression(prev, input) as any;
     } catch {}
-    let p = buildStrengthSportPlan(input);
+    // Интернет-цикл (ss-cycles): дословный faithful по умолчанию, иначе параметрический билдер
+    let p: StrengthSportPlan;
+    {
+      const tpl = cycleId ? getSSCycleById(cycleId) : undefined;
+      if (tpl) {
+        // Цикл задаёт свои недели/дни — синхронизируем слайдеры под шаблон
+        if (weeks !== tpl.meta.weeks) setWeeks(tpl.meta.weeks);
+        const needDays = Math.min(tpl.meta.sessionsPerWeekMax ?? tpl.meta.sessionsPerWeek, 6);
+        if (days !== tpl.meta.sessionsPerWeek && days !== needDays) setDays(tpl.meta.sessionsPerWeek);
+        p = buildSSCyclePlan(tpl, { ...input, weeks: tpl.meta.weeks, daysPerWeek: tpl.meta.sessionsPerWeek } as any, { cycleMode, bodyweight, sex });
+      } else {
+        p = buildStrengthSportPlan(input);
+      }
+    }
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
     // Диагностика: инъекция коррекций с MRV-бюджетом (TA vs SM)
     if (weakPoints.length) {
@@ -759,7 +790,60 @@ export const StrengthSportConstructor: React.FC = () => {
             <div style={{ fontSize:11, color: TEXT_3 }}>{patternId ? <span>Выбран: <Highlight color={modeColor}>{STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}</Highlight></span> : 'Авто по режиму/дням/уровню · тапните карточку ниже'}</div>
             <div style={{ fontSize:10, color:'rgba(235,235,245,0.36)', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
           </SectionCard>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <SectionCard icon="📚" title="Интернет-цикл" subtitle="Дословные программы ТА/стронга · перекрывает сплит ниже" accent={!!cycleId}>
+            <StrengthPopupSelect label="Цикл" value={cycleId} onChange={v=> setCycleId(v)} strong={mode==='strongman'} options={[
+              { id:'', label:'Без цикла — параметрический план', desc:'сплит ниже' },
+              ...rankedCycles.filter(r=> !r.blocked).map(r=> ({
+                id: r.cycle.meta.id,
+                label: `${r.fit==='exact'?'✅ ':r.fit==='close'?'🔹 ':'▫️ '}${r.cycle.meta.title}`,
+                desc: `${r.cycle.meta.weeks}нед · ${r.cycle.meta.sessionsPerWeek}${r.cycle.meta.sessionsPerWeekMax?`→${r.cycle.meta.sessionsPerWeekMax}`:''}× · ${r.reasons.slice(0,2).join(' · ')}`,
+              })),
+            ]} />
+            {rankedCycles.some(r=> r.blocked) && (
+              <InfoBanner tone="warn">{rankedCycles.filter(r=> r.blocked).map(r=> `${r.cycle.meta.title}: ${r.blocked}`).join(' · ')}</InfoBanner>
+            )}
+            {cycleId && (
+              <>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  <ChipToggle active={cycleMode==='faithful'} onClick={()=> setCycleMode('faithful')}>📜 Дословно (дефолт)</ChipToggle>
+                  <ChipToggle active={cycleMode==='adapt'} onClick={()=> setCycleMode('adapt')}>🛡️ Адаптировать (ACWR/VBT)</ChipToggle>
+                </div>
+                <div style={{ fontSize:10, color:'rgba(235,235,245,0.52)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                  {cycleMode==='faithful'
+                    ? 'Дословно: сеты/повторы/% 1-в-1 из источника, без авто-срезок объёма. Травмы и фолбэк снарядов действуют всегда.'
+                    : 'Адаптировать: поверх дословного — срезки ACWR/outside/VBT и дрейф ПМ по лифту.'}
+                </div>
+                {(() => {
+                  const tpl = getSSCycleById(cycleId);
+                  if (!tpl) return null;
+                  return (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', lineHeight:1.45 }}>{tpl.meta.description}</div>
+                      <div style={{ fontSize:10, color:'rgba(235,235,245,0.45)' }}>{tpl.meta.howItWorks}</div>
+                      {tpl.meta.needsSpecialty && !(['other','specialty'].some(e=> equipment.map(x=>String(x).toLowerCase()).includes(e)) || equipment.length===0) && (
+                        <InfoBanner tone="warn">Нет спец-снарядов — ивенты заменятся (йок→фермер ×0.73, камень→мешок ×0.66) с бейджем в плане</InfoBanner>
+                      )}
+                      {competitionDate && (tpl.meta.mockWeeks?.length || tpl.meta.taperWeeks?.length) && (
+                        <InfoBanner tone="info">⚓ Якорь к старту {competitionDate}: mock нед {tpl.meta.mockWeeks?.join(',')||'—'} · тейпер нед {tpl.meta.taperWeeks?.join(',')||'—'} (порядок недель не меняем)</InfoBanner>
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+            {(() => {
+              const bg = rankedCycles.find(r=> r.cycle.meta.bulgarian);
+              if (!bg || !bg.blocked || !/согласие/.test(bg.blocked)) return null;
+              return (
+                <label style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:11.5, color:'#fff', background:'rgba(239,68,68,0.08)', padding:'10px 12px', borderRadius:12, border:'1px solid rgba(239,68,68,0.20)', cursor:'pointer', lineHeight:1.4 }}>
+                  <input type="checkbox" checked={cycleConsent} onChange={e=> setCycleConsent(e.target.checked)} style={{ width:18, height:18, marginTop:1, accentColor:'#ef4444' }} />
+                  <span>Понимаю риск daily-max (максимумы каждый день, только advanced+, сон 8ч). Разблокировать болгарский цикл.</span>
+                </label>
+              );
+            })()}
+          </SectionCard>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, opacity: cycleId ? 0.45 : 1 }}>
+            <div style={{ fontSize:10, color:'rgba(235,235,245,0.40)' }}>{cycleId ? 'Сплит перекрыт интернет-циклом (дни/недели из шаблона)' : 'Сплит для параметрического плана'}</div>
             {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendStrengthSportPattern(mode, days, level).id;
               const preview = p.schedule.map(s=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
@@ -787,7 +871,7 @@ export const StrengthSportConstructor: React.FC = () => {
               preview
             />
           )}
-          <button onClick={build} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'14px 16px', fontSize:13, borderRadius:14 }}>✦ Собрать план {patternId ? `· ${patternId}` : ''}</button>
+          <button onClick={build} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'14px 16px', fontSize:13, borderRadius:14 }}>✦ Собрать план {cycleId ? `· 📚 ${cycleId} (${cycleMode==='faithful'?'дословно':'adapt'})` : patternId ? `· ${patternId}` : ''}</button>
         </div>
       )}
 
