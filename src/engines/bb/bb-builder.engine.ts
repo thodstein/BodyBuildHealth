@@ -27,6 +27,7 @@ import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
+import { findPatternAlternative } from './bb-exercise-rotation.engine';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
@@ -202,6 +203,12 @@ export interface BBBuilderInput {
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** Ручной оверрайд MGF/IGF1-фазы (UI-селектор): 'auto' — по стеку.
+   *  Форсит pedPhase/pedPhaseByWeek целиком (схемы, пометки, превью). */
+  pedPhaseOverride?: 'auto' | 'proliferation' | 'differentiation';
+  /** DC-лайт (Dante): ротация-3 primary, widowmaker 1×20 квадрам, круиз-каденс.
+   *  Гейт: AAS heavy (≥750) + advanced/enhanced, иначе игнорируется с пометкой. */
+  dcMode?: boolean;
   /** Объёмный vs обычный — кнопка с пояснением, капы от уровня */
   trainingVolumeMode?: 'standard' | 'high';
   /** BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с. Только для памп-изоляций, тяж не трогает. */
@@ -2748,6 +2755,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // раздувают supporting до baseline и блоки не различаются (spec-unified /
   // tradeoff multiblock). Legacy-путь (авто-расписание) не трогаем.
   const hasExplicitSpecSchedule = Array.isArray(input.specializationSchedule) && input.specializationSchedule.length > 0;
+  // DC-лайт гейт (Dante — только AAS heavy + advanced/enhanced): доза парсится
+  // локально (parseMethDoseEarly определён ниже, у пост-обработки — здесь инлайн
+  // тот же разбор, без дублирования логики решения).
+  const dcDoseAAS = (() => {
+    const raw = (input.pedDoses as any)?.['AAS'];
+    if (typeof raw === 'number') return raw;
+    if (raw != null) return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+    return 0;
+  })();
+  const dcGatePass = !!input.dcMode && (level === 'advanced' || level === 'enhanced') && dcDoseAAS >= 750;
+  const dcGateNote = input.dcMode && !dcGatePass
+    ? `💀 DC-лайт выкл: нужен AAS ≥750 + advanced/enhanced (сейчас: AAS ${dcDoseAAS}мг, уровень ${level}).`
+    : null;
   const sessions = sessionsOf(pattern);
   const injuries = input.injuries || [];
   const favIds = input.favoriteExercises || [];
@@ -3011,6 +3031,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     deloadFreq = 4;
   } else if (input.weeks >= 4) {
     forceFinalDeload = true;
+  }
+  // DC-лайт круиз (Dante: blast 6-8 нед + cruise 10-14 дней): разгрузка каждую
+  // 6-ю неделю вместо 4-й. ACWR-danger ниже всё равно учащает (безопасность first).
+  // Пометки — позже (rationale объявлен ниже): см. dcCadenceNote у finalize.
+  let dcCadenceNote: string | null = null;
+  if (dcGatePass && input.weeks >= 6) {
+    deloadFreq = 6;
+    dcCadenceNote = '💀 DC-лайт: blast 6 нед + cruise (разгрузка каждую 6-ю неделю, Dante cruise 10-14 дней ≈ недельный делод).';
+  } else if (dcGateNote) {
+    dcCadenceNote = dcGateNote;
   }
   // P0-7 (audit 2026-07): ACWR thresholds — 1.3 = caution (display only),
   // 1.5 = enforce deload (Grgic 2020; optimum 0.8-1.3, caution 1.3-1.5, danger >1.5).
@@ -3499,11 +3529,48 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     };
   }
   let finalPlan = basePlan;
+  // PED-гейты схем — ДО пост-обработки и финализации (FST-7 7-in-1, соло-запрет).
+  // Полный meth-overlay с rationale — позже (methForGates переиспользуем).
+  const parseMethDoseEarly = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (v == null) return 0;
+    return parseFloat(String(v).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+  };
+  const pedsForMethEarly: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => parseMethDoseEarly((input.pedDoses as any)[k]) > 0) as any) : []);
+  const hasAnyPedInput = pedsForMethEarly.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0);
+  const methForGates: any = hasAnyPedInput
+    ? recommendPEDMethodology({ peds: pedsForMethEarly, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [], totalWeeks: input.weeks, phaseOverride: input.pedPhaseOverride || 'auto' })
+    : null;
+  const soloInsulinGate = !!(methForGates?.insulinSafety?.soloWithoutAasGh);
+  // FST-7 7-in-1 гейт (Rambod — только enhanced без joint-проблем) + запрет
+  // при соло-инсулине (7 сетов до отказа без анаболической базы = травма и жир).
+  // Не прошёл — volumeScheme даунгрейдится до standard; output несёт ЧЕСТНЫЙ
+  // actual (UI показывает selected vs actual), inputSnapshot — выбор юзера.
+  let effVolumeScheme = input.volumeScheme;
+  const schemeDowngradeNotes: string[] = [];
+  if (input.volumeScheme === 'fst7') {
+    if (soloInsulinGate) {
+      effVolumeScheme = 'standard';
+      schemeDowngradeNotes.push('⛔ FST-7 запрещён: соло-инсулин без AAS/GH — 7 сетов до отказа без анаболической базы (травма + жир вместо мышц). Схема: standard.');
+    } else if (level !== 'enhanced' || methForGates?.jointGuard) {
+      effVolumeScheme = 'standard';
+      schemeDowngradeNotes.push(`⛔ FST-7 7-in-1: только enhanced без joint-guard (уровень ${level}${methForGates?.jointGuard ? ', joint-guard активен' : ''}). Схема: standard (legacy 5+2).`);
+    }
+  }
+  // DC rest-pause при соло-инсулине: явный выбор техники снимается (нет базы
+  // для отказных rest-pause). Авто-назначение rest_pause в финализаторе гасится
+  // флагом soloInsulin (см. finalize options).
+  let effIntensityTechnique = (input.intensityTechnique && input.intensityTechnique !== 'none' ? input.intensityTechnique : undefined) as any;
+  if (soloInsulinGate && input.intensityTechnique === 'rest_pause') {
+    effIntensityTechnique = undefined;
+    schemeDowngradeNotes.push('⛔ Соло-инсулин: rest-pause (DC) отключён — отказные техники без анаболической базы запрещены. Техника: выкл.');
+  }
+  const fst7Seven = effVolumeScheme === 'fst7' && level === 'enhanced' && !methForGates?.jointGuard && !soloInsulinGate;
   // Применяем пост-обработку (техники/фидеры/авто-делод/загрузка/авторег) внутри buildBBPlan,
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
   // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
   // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов из BbAutoConstructor, но не расширил guard).
-  if ((input.intensityTechnique && input.intensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || input.autoRegResult) {
+  if ((effIntensityTechnique && effIntensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || input.autoRegResult) {
     finalPlan = applyPostPhaseProcessing({
       plan: basePlan,
       totalWeeks: input.weeks,
@@ -3514,7 +3581,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       acwrRatio,
       autoRegResult: input.autoRegResult,
       skipPhaseRedistribution: true,
-      intensityTechnique: input.intensityTechnique && input.intensityTechnique !== 'none' ? input.intensityTechnique : undefined,
+      intensityTechnique: effIntensityTechnique,
       weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
       level,
     });
@@ -3798,11 +3865,175 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // Финальный MRV-кап после auto-feeders
     for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload);
   }
+  // MGF/IGF1 локальный слот (P2.9): цель специализации получает РЕАЛЬНЫЙ +1
+  // памп-день/нед (частота физически, не комментарием) — 1 изоляция 2 сета
+  // RIR 3 в сессию, где цели ещё нет, но тег подходит. Инъекции — post-workout
+  // в дни цели (dayMap ниже: дни памп-сессий цели по неделям).
+  // Сторожа: только активные MGF/IGF1-дозы И активная специализация; deload
+  // пропускаем; exclude/graded уважаем; MRV-кап и лимиты сессии не рвём
+  // (нет комнаты — пропуск, не насилие).
+  {
+    const mgfDose = parseMethDoseEarly((input.pedDoses as any)?.['MGF']);
+    const igfDose = parseMethDoseEarly((input.pedDoses as any)?.['IGF1']);
+    const mgfActive = mgfDose > 0 || igfDose > 0;
+    if (mgfActive && specRes?.active && (specRes.targets || []).length > 0 && finalPlan.weeks.length > 0) {
+      const mgfTargets = specRes.targets.map((t: string) => collapseKey(t));
+      const dayMap: Record<string, number[]> = {};
+      for (const w of finalPlan.weeks) {
+        if ((w as any).phase === 'deload' || (w as any).deload) continue;
+        for (const tm of mgfTargets) {
+          if (excludedMuscles.has(tm)) continue;
+          if (gradedInjuries.some(inj => collapseKey(inj.muscle) === tm)) continue;
+          const sessionsWith = w.sessions.filter((s: any) =>
+            (s.exercises as any[]).some((x: any) => !(x as any).warmupActivator && collapseKey(x.muscle) === tm));
+          if (sessionsWith.length === 0) continue;
+          if (sessionsWith.length >= w.sessions.length) continue;
+          const capM = (mrvByMuscle as any)?.[tm];
+          let weekDirect = 0;
+          for (const s of w.sessions) for (const ex of s.exercises) {
+            if ((ex as any).warmupActivator) continue;
+            if (collapseKey(ex.muscle) === tm) weekDirect += ex.sets || 0;
+          }
+          if (capM && weekDirect + 2 > capM) continue;
+          // День для слота: строгие теги для больших мышц (иначе занос —
+          // TAG-гигиена), для малых памп-мышц — любая тренировочная сессия
+          // (финишер уместен везде; MGF колется локально 2-3×/нед, а большие
+          // дни цели обычно уже покрыты). Малые: руки/икры/предплечья/пресс/
+          // трапы/пучки дельт.
+          const strictMuscles = new Set(['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders']);
+          const allowedTags = strictMuscles.has(tm)
+            ? (WEAKPOINT_DAY_TAGS[tm] ?? ['Legs', 'Lower', 'FullBody'])
+            : ['push', 'pull', 'legs', 'upper', 'lower', 'fullbody', 'arms', 'chest', 'back', 'shoulders'];
+          let best: any = null;
+          let bestScore = -Infinity;
+          for (const s of w.sessions) {
+            if (sessionsWith.includes(s)) continue;
+            const tag = (s.sessionTag || '').toLowerCase();
+            if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
+            const working = (s.exercises as any[]).filter((x: any) => !(x as any).warmupActivator && !(x as any).optional);
+            const wSets = working.reduce((a: number, x: any) => a + (x.sets || 0), 0);
+            if (working.length + 1 > sessLimits.maxExercises) continue;
+            if (wSets + 2 > sessLimits.maxWorkingSets) continue;
+            const score = (sessLimits.maxExercises - working.length) * 10 + (sessLimits.maxWorkingSets - wSets);
+            if (score > bestScore) { bestScore = score; best = s; }
+          }
+          if (!best) continue;
+          const pool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+            const mg = collapseKey(trueMuscleOf(e) || e.group || '');
+            if (mg !== tm) return false;
+            if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+            if (isBBJunk(e)) return false;
+            if (isInappropriateBB(e)) return false;
+            if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+            if (avAxial && isAxialLoadExercise(e as any)) return false;
+            if (best.exercises.some((x: any) => (x.exerciseName || x.name) === (e.name || e.id))) return false;
+            return true;
+          });
+          if (!pool.length) continue;
+          const fData = pool[0];
+          const fName = fData.name || fData.id;
+          const fBase = (workMax as any)[tm] || DEFAULT_WORKMAX[tm] || 50;
+          const wPhase = phaseByWeek.get((w as any).week) || 'accumulation';
+          const pcfg = getPhaseConfig(wPhase as any, input.trainingFocus);
+          const wgt = Math.max(5, Math.round(fBase * pcfg.intensityMultiplier * 0.6 * 10) / 10);
+          best.exercises.push({
+            muscle: tm, name: fName, role: 'accessory' as const,
+            character: 'памп' as DayCharacter, sets: 2,
+            repsRange: [12, 15] as [number, number], rir: 3,
+            workSets: [{ reps: 13, rir: 3, weight: wgt, tempo: pcfg.tempo, restSeconds: 45 }, { reps: 13, rir: 3, weight: wgt, tempo: pcfg.tempo, restSeconds: 45 }],
+            exerciseName: fName, tempoSpec: pcfg.tempo, restSeconds: 45,
+            comment: `🧬 MGF/IGF1 слот: +1 памп-день/нед для ${tm} (2×12-15 RIR 3 @${wgt}кг) — колите post-workout в дни цели.`,
+            warmupSets: [], rationale: 'MGF pump slot: +1 частота.',
+          });
+          const dayNo = w.sessions.indexOf(best) + 1;
+          if (!dayMap[tm]) dayMap[tm] = [];
+          dayMap[tm].push(dayNo);
+        }
+      }
+      const doseTxt = [mgfDose > 0 ? `MGF ${mgfDose}мкг` : '', igfDose > 0 ? `IGF1 ${igfDose}мкг` : ''].filter(Boolean).join(' + ');
+      for (const tm of Object.keys(dayMap)) {
+        const uniq = [...new Set(dayMap[tm])].sort((a, b) => a - b);
+        rationale.push(`💉 MGF dayMap: ${tm} — памп-дни недели: дни ${uniq.join(', ')} (колите post-workout в дни цели: ${doseTxt}; IGF1 строго с углеводами)`);
+      }
+    }
+  }
   // P0-6 (audit 2026-07): feedback-driven rebuild из дневника.
   // 1) autoUpdateWeakPoints: e1RM-тренд → exit/add слабых групп
   // 2) applyFeedbackToBuild: веса/RIR/reps из факта (prescribeLoad с фактом как current)
   // 3) autoReplaceOnPlateau: e1RM flat 4+ нед → замена primary на альтернативу
   // Все три — только при наличии WorkoutSession-данных в дневнике.
+  // DC-лайт (Dante), гейт dcGatePass выше: (1) ротация-3 primary компаундов
+  // по неделям, (2) widowmaker 1×20 квадрам. Круиз-каденс уже выставлен
+  // (deloadFreq 6). Deload-недели не трогаем. Объём не меняется (swap имён +
+  // 1 сет), капы целее.
+  if (dcGatePass && finalPlan.weeks.length > 1) {
+    const firstWorkIdx = finalPlan.weeks.findIndex(w => (w as any).phase !== 'deload' && !(w as any).deload);
+    const anchor = firstWorkIdx >= 0 ? firstWorkIdx : 0;
+    const baseByMuscle = new Map<string, string>();
+    for (const s of finalPlan.weeks[anchor].sessions) {
+      for (const ex of s.exercises) {
+        if ((ex as any).warmupActivator || ex.role !== 'primary') continue;
+        if ((ex as any).type === 'isolation' || (ex as any).exerciseType === 'isolation') continue;
+        const cm = collapseKey(ex.muscle);
+        if (!baseByMuscle.has(cm)) baseByMuscle.set(cm, (ex as any).exerciseName || ex.name || '');
+      }
+    }
+    const poolByMuscle = new Map<string, string[]>();
+    const usedByMuscle = new Map<string, Set<string>>();
+    for (const [cm, base] of baseByMuscle) {
+      poolByMuscle.set(cm, [base]);
+      usedByMuscle.set(cm, new Set([base]));
+    }
+    const rotated: string[] = [];
+    finalPlan.weeks.forEach((w, wi) => {
+      if (wi <= anchor) return;
+      if ((w as any).phase === 'deload' || (w as any).deload) return;
+      for (const s of w.sessions) {
+        for (const ex of s.exercises) {
+          if ((ex as any).warmupActivator || ex.role !== 'primary') continue;
+          if ((ex as any).type === 'isolation' || (ex as any).exerciseType === 'isolation') continue;
+          const cm = collapseKey(ex.muscle);
+          const pool = poolByMuscle.get(cm);
+          const used = usedByMuscle.get(cm);
+          if (!pool || !used) continue;
+          const curName = (ex as any).exerciseName || ex.name || '';
+          if (curName !== pool[0]) continue;
+          const slot = (wi - anchor) % 3;
+          while (pool.length <= slot) {
+            const baseEntry = (EXERCISE_CATALOG as any[]).find((c: any) => (c.name || c.id) === pool[0]);
+            const pat = derivePattern(baseEntry || ({ name: pool[0] } as any));
+            const cands = (EXERCISE_CATALOG as any[]).filter((c: any) => {
+              const nm = c.name || c.id || '';
+              if (used.has(nm)) return false;
+              if (collapseKey(trueMuscleOf(c) || c.group || '') !== cm) return false;
+              if (c.exerciseType === 'isolation' || (c as any).type === 'isolation') return false;
+              if (c.type !== 'compound' && (c as any).exerciseType !== 'compound') return false;
+              if (isBBJunk(c)) return false;
+              if (eqList?.length && c.equipment && !eqList.includes(c.equipment)) return false;
+              if (excludedMuscles.has(cm)) return false;
+              return true;
+            });
+            const alt = findPatternAlternative(pat, used, cands as any);
+            const altName = alt ? ((alt as any).name || (alt as any).exerciseName || '') : '';
+            if (!altName) break;
+            pool.push(altName);
+            used.add(altName);
+          }
+          const desired = pool[(wi - anchor) % pool.length];
+          if (desired && desired !== curName) {
+            (ex as any).exerciseName = desired;
+            ex.name = desired;
+            ex.comment = `${(ex as any).comment || ''} · 💀 DC-ротация: нед ${wi + 1} — ${desired} вместо ${curName} (тот же паттерн, вес проверьте).`.replace(/^\s*·\s*/, '');
+            if (!rotated.includes(cm)) rotated.push(cm);
+          }
+        }
+      }
+    });
+    if (rotated.length) rationale.push(`💀 DC-ротация-3: ${rotated.join(', ')} — топ-лифты меняются по неделям (1-2-3-1…, тот же паттерн, объём 1-в-1).`);
+    // (2) Widowmaker — в финализаторе (пред-validation): поздние проходы
+    // (прогрессия повторов/нормализация) переписывают reps builder-добавок,
+    // поэтому 20-повторный сет ставится ПОСЛЕ них (см. dcWidowmaker).
+  }
   const workoutSessions = loadWorkoutSessions();
   if (workoutSessions.length > 0) {
     // 1) Auto-weakPoints update
@@ -3885,6 +4116,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     .map(([m, f]) => `${m}=${f}×`)
     .join(', ');
   if (freqSummary) rationale.push(`Частота на группу/нед: ${freqSummary}`);
+  // (PED-гейты схем вычислены раньше — см. блок перед applyPostPhaseProcessing:
+  // effVolumeScheme / fst7Seven / schemeDowngradeNotes / soloInsulinGate.)
   // Exercise cap is enforced by the shared finalizer's priority-aware
   // fatigue budget. Do not truncate the array here: raw tail deletion can
   // remove the only exercise for a muscle or a protected primary.
@@ -3912,7 +4145,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     trainingFocus: input.trainingFocus,
     methodology: input.methodology,
     supersetMode: input.supersetMode,
-    volumeScheme: input.volumeScheme,
+    volumeScheme: effVolumeScheme,
     dupMode: (input as any).dupMode,
     trainingYears: input.trainingYears,
     courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
@@ -4003,21 +4236,26 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
     supersetMode: input.supersetMode,
-    volumeScheme: input.volumeScheme,
+    volumeScheme: effVolumeScheme,
+    fst7Seven,
+    soloInsulin: soloInsulinGate,
+    dcWidowmaker: dcGatePass,
     rotationMode: input.rotationMode,
   });
+  if (schemeDowngradeNotes.length) {
+    for (const n of schemeDowngradeNotes) {
+      if (!finalized.rationale.includes(n)) finalized.rationale.push(n);
+    }
+  }
+  if (dcCadenceNote && !finalized.rationale.includes(dcCadenceNote)) finalized.rationale.push(dcCadenceNote);
   // PED-методика + insulin window + rep-схемы: overlay после финализации, не ломает тяж/памп.
   // Joint-guard уже отработал на уровне пула (buildExercisePool), здесь — только rationale/подсказки.
   try {
-    const parseMethDose = (v: unknown): number => {
-      if (typeof v === 'number') return v;
-      if (v == null) return 0;
-      return parseFloat(String(v).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
-    };
-    const pedsForMeth: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => parseMethDose((input.pedDoses as any)[k]) > 0) as any) : []);
-    if (pedsForMeth.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0)) {
-      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [], totalWeeks: input.weeks };
-      const meth = recommendPEDMethodology(methInput);
+    // meth уже посчитан для гейтов выше (methForGates) — переиспользуем
+    // (чистая функция, тот же вход → тот же результат).
+    const pedsForMeth: any[] = pedsForMethEarly;
+    if (methForGates) {
+      const meth: ReturnType<typeof recommendPEDMethodology> = methForGates;
       // Insulin window: только памп-дни получают подсказку (тяж не трогаем)
       const ghDose = Number((input.pedDoses as any)?.['GH'] || 0);
       const insDose = Number((input.pedDoses as any)?.['insulin'] || 0);

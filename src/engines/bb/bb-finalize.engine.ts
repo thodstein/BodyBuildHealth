@@ -2088,6 +2088,17 @@ export interface BBFinalizeOptions {
    *  в план-таргет — симметрия с builder spec-trim (иначе repair отращивает
    *  supporting обратно и блоки не различаются). Без флага — старый режим. */
   specExplicitSchedule?: boolean;
+  /** FST-7 7-in-1 разрешён (гейт в билдере: enhanced + jointGuard=false,
+   *  соло-инсулин запрещён). Без флага — legacy 5+2 (кап-5 инвариант). */
+  fst7Seven?: boolean;
+  /** Соло-инсулин без AAS/GH: отказные техники (rest_pause/DC) запрещены —
+   *  авто-назначение их пропускает. По умолчанию разрешены (backward-compat). */
+  soloInsulin?: boolean;
+  /** DC widowmaker (гейт dcMode в билдере): добивочный 20-повторный сет
+   *  квадрам. Ставится здесь (пред-validation), а не в билдере: поздние
+   *  проходы переписывают reps builder-добавок, а 20 ни с какой фазой не
+   *  совпадает. Без флага — нетронуто. */
+  dcWidowmaker?: boolean;
   level?: string;
   volumeGoal?: 'mev' | 'mav' | 'mrv';
   phaseSafety?: boolean;
@@ -2306,7 +2317,9 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
         // Изоляции с дублем мышцы исчерпаны — удаляем любые изоляции,
         // кроме мелких мышц (calves/abs/forearms/traps — у них нет compound).
         // Специализация — не удаляем цели блока.
-        candidates = working().filter((ex: any) => iso(ex.name || '') && !/calves|abs|forearms|traps/.test(ex.muscle) && !isSpecTarget(ex.muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        // MGF-слот (+1 частота) — не удаляем: он минимальный (2 сета) и ушёл
+        // бы первым, обнуляя фичу; объём держит MRV-кап и fit-бюджет.
+        candidates = working().filter((ex: any) => iso(ex.name || '') && !/calves|abs|forearms|traps/.test(ex.muscle) && !isSpecTarget(ex.muscle) && !/MGF\/IGF1 слот/.test(String((ex as any).comment || ''))).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         for (const ex of candidates) {
           if (working().length <= maxEx) break;
           session.exercises = session.exercises.filter((x: any) => x !== ex);
@@ -2488,7 +2501,21 @@ const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; r
   fst7: { target: 7, reps: [8, 12], rest: 40, label: 'FST-7' },
   gironda: { target: 8, reps: [8, 10], rest: 60, label: '8×8 Gironda' },
 };
-export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
+/** Применить схему объёма к одному упражнению (сеты/reps/отдых/workSets/коммент). */
+function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; rest: number; label: string }): void {
+  if (sets !== ex.sets || (ex.repsRange && ex.repsRange[0] !== cfg.reps[0])) {
+    ex.sets = sets;
+    ex.repsRange = cfg.reps;
+    ex.restSeconds = cfg.rest;
+    if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
+      const sample = ex.workSets[ex.workSets.length - 1];
+      ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
+    }
+    ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
+  }
+}
+
+export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Seven?: boolean }): void {
   const cfg = VOLUME_SCHEMES[scheme];
   if (!cfg) return;
   const caps = (plan as any).mrvByMuscle || {};
@@ -2535,6 +2562,15 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
           if (newTotal + weekIndirect > cap * 1.15) continue;
         }
         schemeApplied.add(muscle);
+        // FST-7 (Rambod): 7 сетов ОДНИМ финишером — только с явного разрешения
+        // (fst7Seven: enhanced + jointGuard=false, гейт в билдере; соло-инсулин
+        // запрещён). Без флага — legacy 5+2 (кап-5 инвариант цел).
+        // Финишер = последняя памп-изоляция сессии (порядок: финишер последний).
+        if (scheme === 'fst7' && opts?.fst7Seven) {
+          const fin = [...exs].reverse().find(e => (e as any).role === 'accessory') || exs[exs.length - 1];
+          assignSchemeSets(fin, 7, cfg);
+          continue;
+        }
         let remaining = cfg.target;
         for (const ex of exs) {
           if (remaining <= 0) break;
@@ -2542,16 +2578,7 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
           // с капом 5 сетов/упражнение (инвариант). FST-7: 5+2, GVT: 5+5.
           const sets = Math.min(5, remaining);
           if (sets < 2) break;
-          if (sets !== ex.sets || (ex.repsRange && ex.repsRange[0] !== cfg.reps[0])) {
-            ex.sets = sets;
-            ex.repsRange = cfg.reps;
-            ex.restSeconds = cfg.rest;
-            if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
-              const sample = ex.workSets[ex.workSets.length - 1];
-              ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
-            }
-            ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
-          }
+          assignSchemeSets(ex, sets, cfg);
           remaining -= sets;
         }
       }
@@ -3477,7 +3504,7 @@ for (const week of next.weeks) {
   // Проф-тренер назначает: cable fly → dropset, leg extension → myo_rep,
   // curl → rest_pause. Без этого 0% планов имеют intensity techniques.
   if (!options.preserveSource) {
-    autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles, options.specializationSchedule);
+    autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles, options.specializationSchedule, !(options as any).soloInsulin);
   }
   const rotation = analyzeBBRotation(next);
   next.rotationReport = rotation;
@@ -3560,7 +3587,7 @@ for (const week of next.weeks) {
     else if (options.supersetMode === 'giant') markGiantSets(next);
     if (options.methodology === 'pre_exhaust') markPreExhaustPairs(next);
     dedupeExactExercises(next);
-    if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
+    if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme, { fst7Seven: (options as any).fst7Seven });
   }
   if (!options.preserveSource && (next as any).pattern?.id) {
     // Post-hoc cap-adjust для ВСЕХ мышц: фактический effective = direct +
@@ -3710,6 +3737,12 @@ for (const week of next.weeks) {
               // Удаляем только изоляции (дубли паттернов: сгибания сидя +
               // сгибания в тренажёре и т.п.); compound-движения не трогаем.
               if (!isIsolationName(e.name || '')) continue;
+              // FST-7 7-in-1 не удаляем целиком (иначе схема бессмысленна);
+              // остаток need — через compounds ниже (как раньше).
+              if (/FST-7/.test(String((e as any).comment || ''))) continue;
+              // MGF-слот (+1 частота) не удаляем целиком — иначе теряется
+              // физическая частота (сеты и так на полу 2, резка их не трогает).
+              if (/MGF\/IGF1 слот/.test(String((e as any).comment || ''))) continue;
               // Минимум 1 изоляция на неделю — НО если косвенный объём уже
               // покрывает почти весь кап (indirect >= 0.9×cap), последнюю
               // изоляцию можно убрать (direct 0 — стимул даёт indirect).
@@ -3836,6 +3869,7 @@ for (const week of next.weeks) {
                 .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional
                   && e.muscle !== need.muscle && (e.role === 'accessory' || e.muscle === 'abs')
                   && (e.sets || 0) > 2
+                  && !/FST-7/.test(String((e as any).comment || ''))
                   && (sessMuscleTotals[e.muscle] || 0) - 1 >= sessMinFor(e.muscle))
                 .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
               if (!donor) break;
@@ -3893,6 +3927,10 @@ for (const week of next.weeks) {
         try {
           exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears);
         } catch { exCap = 5; }
+        // FST-7 7-in-1 (явное разрешение fst7Seven): финишер держит ровно 7 —
+        // не разбираем обратно на 5+2. Выше 7 — всё равно разбираем (защита
+        // от мусора). Остальные схемы — как раньше (GVT и так ≤5).
+        if ((e.sets || 0) > exCap && (e.sets || 0) <= 7 && /FST-7/.test(String((e as any).comment || ''))) continue;
         let excess = (e.sets || 0) - exCap;
         if (excess <= 0) continue;
         const sibs = s.exercises
@@ -4107,6 +4145,7 @@ for (const week of next.weeks) {
               .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional
                 && e.muscle !== need.muscle && (e.role === 'accessory' || e.muscle === 'abs')
                 && (e.sets || 0) > 2
+                && !/FST-7/.test(String((e as any).comment || ''))
                 && (sessMuscleTotals[e.muscle] || 0) - 1 >= sessMinFor(e.muscle))
               .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
             if (!donor) break;
@@ -4206,6 +4245,49 @@ for (const week of next.weeks) {
         }
       }
     }
+  }
+
+  // DC widowmaker (Dante): добивочный 1×20 к квадрицепс-упражнению.
+  // Здесь (а не в билдере): все rep-переписчики уже отработали, 20 выживает.
+  // Валидация ниже — честная (видит сет). Без флага/комнаты — пропуск.
+  if ((options as any).dcWidowmaker) {
+    const capQ = (next as any).mrvByMuscle?.['quads'];
+    const maxSets = options.maxWorkingSets ?? 30;
+    const wmQ = (options as any).workMax?.['quads'] ?? 140;
+    let hostCap = 5;
+    try { hostCap = perExerciseCap(options.level, 'quads', options.trainingYears); } catch { hostCap = 5; }
+    let widowWeeks = 0;
+    for (const week of next.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      let qDirect = 0;
+      for (const s of week.sessions) for (const ex of s.exercises) {
+        if ((ex as any).warmupActivator) continue;
+        if ((ex as any).muscle === 'quads') qDirect += ex.sets || 0;
+      }
+      if (capQ && qDirect + 1 > capQ) continue;
+      let bestHost: any = null;
+      let bestScore = -Infinity;
+      for (const s of week.sessions) {
+        const tag = (s.sessionTag || '').toLowerCase();
+        if (!/legs|lower|fullbody/.test(tag)) continue;
+        const working = (s.exercises as any[]).filter((x: any) => !(x as any).warmupActivator && !(x as any).optional);
+        const wSets = working.reduce((a: number, x: any) => a + (x.sets || 0), 0);
+        if (wSets + 1 > maxSets) continue;
+        const host = working
+          .filter((x: any) => (x as any).muscle === 'quads' && (x.sets || 0) >= 2 && (x.sets || 0) < hostCap && Array.isArray((x as any).workSets) && !String((x as any).comment || '').includes('widowmaker'))
+          .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+        if (!host) continue;
+        const score = (maxSets - wSets) * 10 + ((host as any).sets || 0);
+        if (score > bestScore) { bestScore = score; bestHost = host; }
+      }
+      if (!bestHost) continue;
+      const wgt = Math.max(20, Math.round(wmQ * 0.55 * 10) / 10);
+      bestHost.sets += 1;
+      bestHost.workSets.push({ reps: 20, rir: 2, weight: wgt, tempo: '2-1-1-0', restSeconds: 120 });
+      bestHost.comment = `${(bestHost as any).comment || ''} · 💀 DC widowmaker 1×20 @${wgt}кг (Dante — добивочный 20-повторный сет).`.replace(/^\s*·\s*/, '');
+      widowWeeks++;
+    }
+    if (widowWeeks > 0 && Array.isArray((next as any).rationale)) (next as any).rationale.push(`💀 DC widowmaker: 1×20 квадрам в ${widowWeeks} нед.`);
   }
 
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
@@ -4443,7 +4525,7 @@ for (const week of next.weeks) {
  * Только для level >= intermediate. Только для accessory/памп упражнений.
  * Не более 1 техники на упражнение, не более 2-3 на сессию.
  */
-export function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule): void {
+export function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule, allowFailureTechniques = true): void {
   if (level === 'beginner') return; // новички не используют intensity techniques
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
@@ -4467,20 +4549,24 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
         if (/кроссовер|crossover|сведение|fly|пек.?дек|бабоч/i.test(name)) {
           technique = 'dropset';
         }
-        // Leg extension → myo_rep
+        // Leg extension → myo_rep (соло-инсулин: пропуск — rest-pause протокол)
         else if (/разгибан.*ног|leg.?extension/i.test(name)) {
+          if (!allowFailureTechniques) continue;
           technique = 'myo_rep';
         }
-        // Biceps curl → rest_pause (или 21s при специализации бицепса)
+        // Biceps curl → rest_pause (или 21s при специализации бицепса).
+        // Соло-инсулин: rest_pause запрещён (отказ без базы) — пропускаем.
         else if (/сгибан.*бицепс|curl|подъём.*бицепс|подъем.*бицепс/i.test(name) && !/молот|hammer/i.test(name)) {
+          if (!allowFailureTechniques) continue;
           technique = bicepsPriority ? 'twenty_ones' : 'rest_pause';
         }
         // Triceps pushdown → dropset
         else if (/разгибан.*рук|разгибан.*блок|pushdown|трицепс.*блок/i.test(name)) {
           technique = 'dropset';
         }
-        // Lateral raise → rest_pause
+        // Lateral raise → rest_pause (соло-инсулин: пропуск, см. выше)
         else if (/махи|lateral.?raise|отведен.*рук/i.test(name)) {
+          if (!allowFailureTechniques) continue;
           technique = 'rest_pause';
         }
         // Leg curl → dropset

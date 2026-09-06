@@ -37,7 +37,7 @@ import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SU
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
-import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
+import { recommendPEDMethodology, suggestMethodologyForStack } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -584,6 +584,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [dupMuscles, setDupMuscles] = useState<string[]>([]);
   const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist' | 'same_muscle' | 'giant'>('none');
   const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
+  const [pedPhaseOverride, setPedPhaseOverride] = useState<'auto' | 'proliferation' | 'differentiation'>('auto');
+  const [dcMode, setDcMode] = useState<boolean>(false);
 
   // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
   // calorieSurplus: из профиля nutrition (если есть) или manual input. Нет в профиле → 0 (нейтрально).
@@ -743,6 +745,18 @@ export const BbAutoConstructor: React.FC = () => {
   const [bridgeMsg, setBridgeMsg] = useState('');
   // C4: flash helper — заменяет alert() для некритичных уведомлений.
   const flash = useCallback((m: string) => { setBridgeMsg(m); setTimeout(() => setBridgeMsg(''), 4000); }, []);
+  // P1.6: авто-выбор методики порядка по PED-стеку — применяем ТОЛЬКО поверх
+  // дефолта (ручной выбор не затираем). Чип ручного применения — в PED-карте.
+  useEffect(() => {
+    try {
+      if (bbMethodology !== 'compound_first') return;
+      const sug = suggestMethodologyForStack({ peds: peds as any, pedDoses });
+      if (sug) {
+        setBbMethodology(sug);
+        flash('Методика порядка обновлена под PED-стек');
+      }
+    } catch { /* suggest не должен ломать UI */ }
+  }, [peds, pedDoses]);
   // Имя для сохранения (модалка вместо prompt — prompt не работает в Telegram Mini App).
   const [namePrompt, setNamePrompt] = useState<{ title: string; value: string; onOk: (name: string) => void } | null>(null);
   const confirmName = () => {
@@ -1175,7 +1189,7 @@ export const BbAutoConstructor: React.FC = () => {
         localStorage.setItem('he_bb_auto_state_v1', JSON.stringify({
           selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus,
           bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy,
-          autoDeload, deloadType, specBlocks,
+          autoDeload, deloadType, specBlocks, pedPhaseOverride, dcMode, volumeScheme,
         }));
         if (builtPlan) localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builtPlan, date: new Date().toISOString() }));
       } catch { /* storage may be unavailable */ }
@@ -1189,7 +1203,7 @@ export const BbAutoConstructor: React.FC = () => {
       window.removeEventListener('beforeunload', persist);
       document.removeEventListener('visibilitychange', onHidden);
     };
-  }, [selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus, bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy, autoDeload, deloadType, specBlocks, builtPlan]);
+  }, [selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus, bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy, autoDeload, deloadType, specBlocks, builtPlan, pedPhaseOverride, dcMode, volumeScheme]);
   // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
   useEffect(() => {
     const handler = () => {
@@ -1656,6 +1670,8 @@ export const BbAutoConstructor: React.FC = () => {
           if (typeof state.autoDeload === 'boolean') setAutoDeload(state.autoDeload);
           if (typeof state.deloadType === 'string') setDeloadType(state.deloadType as any);
           if (Array.isArray(state.specBlocks)) setSpecBlocks(state.specBlocks as any);
+          if (typeof state.pedPhaseOverride === 'string') setPedPhaseOverride(state.pedPhaseOverride as any);
+          if (typeof state.dcMode === 'boolean') setDcMode(state.dcMode);
         }
       }
     } catch {}
@@ -1918,9 +1934,11 @@ export const BbAutoConstructor: React.FC = () => {
          deloadType,
          loadStrategy,
          autoRegResult: autoRegPayload,
-         pedDoses,
-         courseIntensity,
-         equipment: bbEquipment,
+          pedDoses,
+          courseIntensity,
+          pedPhaseOverride,
+          dcMode,
+          equipment: bbEquipment,
          methodology: bbMethodology,
          sex: linked.profile?.settings?.personal?.sex,
          // P0-5: лабораторная коррекция MRV (Ф4.28: ручной оверрайд приоритетнее)
@@ -2375,6 +2393,8 @@ export const BbAutoConstructor: React.FC = () => {
       }
     }
     if (v.params.pedDoses) setPedDoses({ ...v.params.pedDoses });
+    if ((v.params as any).pedPhaseOverride) setPedPhaseOverride((v.params as any).pedPhaseOverride);
+    if ((v.params as any).dcMode != null) setDcMode(Boolean((v.params as any).dcMode));
     if (v.params.courseIntensity) setCourseIntensity(v.params.courseIntensity as 'mild' | 'moderate' | 'heavy');
     if (v.params.autoDeload != null) setAutoDeload(Boolean(v.params.autoDeload));
     if (v.params.planMode === 'programs' || (v.params as any).planMode === 'bb_cycle' || v.params.planMode === 'generic_split') {
@@ -3019,11 +3039,11 @@ export const BbAutoConstructor: React.FC = () => {
                       label='📦 Схема объёма памп-дней'
                       value={volumeScheme}
                       onChange={v => setVolumeScheme(v as any)}
-                      hint='В коде: standard / gvt / fst7 / gironda'
+                      hint={'В коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '') + (((pedDoses.GH || 0) >= 4) ? ' · GH≥4: joint-guard, FST-7 недоступен.' : '')}
                       options={[
                         { id: 'standard', label: 'Стандартная', desc:'Авто: тяж база, памп изоляция.' },
                         { id: 'gvt', label: 'GVT 10×10', desc:'10×10, 60%, 60-90с.' },
-                        { id: 'fst7', label: 'FST-7', desc:'7×8-12, 30-45с.' },
+                        ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
                         { id: 'gironda', label: '8×8 Gironda', desc:'8×8, 45-60с.' },
                       ]}
                     />
@@ -3334,11 +3354,11 @@ export const BbAutoConstructor: React.FC = () => {
             label='📦 Схема объёма памп-дней'
             value={volumeScheme}
             onChange={v => setVolumeScheme(v as any)}
-            hint='Методики для памп-изоляций (кап 5 сетов/упр сохраняется) — в коде: standard / gvt / fst7 / gironda'
+            hint={'Методики для памп-изоляций (кап 5 сетов/упр; FST-7 финишер — 7 одним движением) — в коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')}
             options={[
               { id: 'standard', label: 'Стандартная (авто)', desc:'Авто-распределение: тяж — база, памп — изоляция по необходимости. Баланс сила/объём.' },
               { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)', desc:'Немецкий объём 10×10, 60% 1ПМ, 60-90с пауза. Экстремальный объём, только для опытных.' },
-              { id: 'fst7', label: 'FST-7 (7 сетов, 30-45с)', desc:'7 сетов по 8-12 в конце мышцы с короткой паузой — растягивает фасцию, финальный памп.' },
+              ...((bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !((pedDoses.AAS || 0) > 0) && !((pedDoses.GH || 0) > 0))) ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc:'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
               { id: 'gironda', label: '8×8 Gironda (60с)', desc:'8×8, 45-60с пауза, умеренный вес — плотный объём Жиронды для сухой массы.' },
             ]}
           />
@@ -3580,7 +3600,7 @@ export const BbAutoConstructor: React.FC = () => {
       <PedAdaptationCard adaptation={pedAdapt} />
       {peds.length > 0 && (() => {
         try {
-          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, totalWeeks: bbWeeks });
+          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, totalWeeks: bbWeeks, phaseOverride: pedPhaseOverride });
           return (
             <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика — адаптация плана под курс (тяж/памп не ломаются)</div>
@@ -3593,6 +3613,18 @@ export const BbAutoConstructor: React.FC = () => {
               {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
               {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
               <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
+              {(() => { try {
+                const sug = suggestMethodologyForStack({ peds: peds as any, pedDoses });
+                if (!sug || sug === bbMethodology) return null;
+                const sugLabel = sug === 'hyperemia' ? 'Hyperemia' : 'Mountain Dog';
+                return (<button onClick={() => { setBbMethodology(sug); flash('Методика обновлена'); }} style={{ marginTop:6, padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.4)', color:'#c4b5fd' }}>Взять: {sugLabel}</button>);
+              } catch { return null; } })()}
+              {(() => { try {
+                const sug = suggestMethodologyForStack({ peds: peds as any, pedDoses });
+                if (!sug || sug === bbMethodology) return null;
+                const sugLabel = sug === 'hyperemia' ? 'Hyperemia (GH+инсулин)' : 'Mountain Dog (MGF)';
+                return (<button onClick={() => { setBbMethodology(sug); flash('Методика порядка обновлена под PED-стек'); }} style={{ marginTop:6, padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.4)', color:'#c4b5fd' }}>Взять: {sugLabel}</button>);
+              } catch { return null; } })()}
               <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:4 }}>🔄 Все сплиты адаптируются под фарму (выбор сохранён, объём ×{(pedAdapt.combinedMrvMultiplier||1).toFixed(2)})</div>
             </div>
           );
@@ -3600,18 +3632,27 @@ export const BbAutoConstructor: React.FC = () => {
       })()}
       <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
         <button onClick={() => setBfrMode(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: bfrMode ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.04)', border: bfrMode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.1)', color: bfrMode ? '#ec4899' : '#fff' }}>{bfrMode ? '🩸 BFR включён (30-15-15-15)' : '🩸 BFR окклюзия (только памп)'}</button>
+        <button onClick={() => setDcMode(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: dcMode ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)', border: dcMode ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)', color: dcMode ? '#fca5a5' : '#fff' }}>{dcMode ? 'DC-лайт включён' : 'DC-лайт (Dante)'}</button>
         <button onClick={() => setBlastCruiseEnabled(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: blastCruiseEnabled ? 'rgba(250,204,21,0.18)' : 'rgba(255,255,255,0.04)', border: blastCruiseEnabled ? '1px solid #facc15' : '1px solid rgba(255,255,255,0.1)', color: blastCruiseEnabled ? '#facc15' : '#fff' }}>{blastCruiseEnabled ? `🔄 Blast ${blastWeeks}н / Cruise ${cruiseWeeks}н` : '🔄 Blast/Cruise выкл'}</button>
         {blastCruiseEnabled && <>
           <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
           <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
         </>}
-        <PopupSelect label='🏆 Pro-пресет (методики профи)' value={proPreset} onChange={v=>{ setProPreset(v); if(v==='dc'&&dupMode==='none') setDupMode('strength_hypertrophy' as any); if(v==='fortitude'){ setSupersetMode('giant' as any); if(volumeScheme==='standard') setVolumeScheme('fst7' as any);} }} hint='Готовые связки методик от профи-тренеров — в коде: none/dc/fortitude/meadows' options={[
+        <PopupSelect label='🏆 Pro-пресет (методики профи)' value={proPreset} onChange={v=>{ setProPreset(v); if(v==='dc'&&dupMode==='none') setDupMode('strength_hypertrophy' as any); if(v==='dc') setDcMode(true); if(v==='fortitude'){ setSupersetMode('giant' as any); if(volumeScheme==='standard') setVolumeScheme('fst7' as any);} }} hint='Готовые связки методик от профи-тренеров — в коде: none/dc/fortitude/meadows' options={[
           {id:'none',label:'Без пресета',desc:'Стандартная сборка по вашим параметрам без пресета'},
           {id:'dc',label:'DC Training (DoggCrapp)',desc:'Низкообъёмный, высокоинтенсивный: 1 тяжёлый сет Rest-Pause 11-15 повторов, прогрессия каждый раз, для продвинутых (≥3 года)'},
           {id:'fortitude',label:'Fortitude (Скотт Стивенсон)',desc:'4×6, гигант-сеты, FST-7, волновая нагрузка — объёмный пресет для опытных, требует восстановления'},
           {id:'meadows',label:'Meadows (Джон Медоуз)',desc:'Акцент на растянутой позиции, памп, медленный эксцентрик, проработка слабых мест — для гипертрофии'},
         ]} />
       </div>
+      <div style={{ fontSize:10, color:'#fff', opacity:0.65, marginTop:4 }}>DC-лайт: ротация-3 топ-лифтов + widowmaker + круиз каждые 6 нед. Гейт: AAS от 750 + advanced/enhanced.</div>
+      {((pedDoses.MGF || 0) > 0 && (pedDoses.IGF1 || 0) > 0) && (
+      <PopupSelect label='Фаза MGF/IGF1' value={pedPhaseOverride} onChange={v => setPedPhaseOverride(v as any)} hint='Вручную поверх авто-фазировки.' options={[
+        { id: 'auto', label: 'Авто (по стеку)', desc:'Авто.' },
+        { id: 'proliferation', label:'Пролиферация', desc:'Повреждение + стретч.' },
+        { id: 'differentiation', label:'Дифференцировка', desc:'Памп + углеводное окно.' },
+      ]} />
+      )}
       {bfrMode && (
         <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
           <div style={{ fontWeight:800, color:'#ec4899', marginBottom:4 }}>🩸 Что такое BFR и как работает</div>

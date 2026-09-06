@@ -321,6 +321,9 @@ export function applySchemeToPlan(
     for (const sess of week.sessions || []) {
       for (const ex of sess.exercises || []) {
         if (!ex || ex.warmupActivator) continue;
+        // Widowmaker (DC) не трогаем: добивочный 20-повторный сет переживает
+        // только если loading его не переписывает (схема дала бы фазовые повторы).
+        if (String((ex as any).comment || '').includes('widowmaker')) continue;
         // Целевой фильтр по character самого УПРАЖНЕНИЯ (не сессии) + роли.
         // Памп-primary внутри тяж-сессии (например hams в Legs D1) НЕ должен
         // получать тяж-схему — он остаётся памп-режимом.

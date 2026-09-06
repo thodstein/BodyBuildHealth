@@ -76,7 +76,22 @@ describe('Проф-методики ББ (Библиотека → Методи�
       for (const e of exs) expect(e.sets).toBeLessThanOrEqual(5);
     });
 
-    it('FST-7: 7 сетов суммарно (5+2), отдых 40с', () => {
+    it('FST-7: 7 сетов ОДНИМ финишером (Rambod), отдых 40с — только с fst7Seven', () => {
+      const plan: any = {
+        weeks: [{ phase: 'accumulation', sessions: [
+          { day: 1, exercises: [mkEx('biceps', 'Сгибания'), mkEx('biceps', 'Молотки')] },
+        ] }],
+      };
+      applyVolumeScheme(plan, 'fst7', { fst7Seven: true });
+      const exs = plan.weeks[0].sessions[0].exercises;
+      const fin = exs.find((e: any) => (e.comment || '').includes('FST-7'));
+      expect(fin, 'финишер с меткой FST-7').toBeTruthy();
+      expect(fin.sets).toBe(7);
+      expect(fin.restSeconds).toBe(40);
+      expect(fin.repsRange[0]).toBe(8);
+    });
+
+    it('FST-7 без флага: legacy 5+2 (кап-5 инвариант)', () => {
       const plan: any = {
         weeks: [{ phase: 'accumulation', sessions: [
           { day: 1, exercises: [mkEx('biceps', 'Сгибания'), mkEx('biceps', 'Молотки')] },
@@ -86,7 +101,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
       const exs = plan.weeks[0].sessions[0].exercises;
       const total = exs.reduce((s: number, e: any) => s + e.sets, 0);
       expect(total).toBe(7);
-      expect(exs[0].restSeconds).toBe(40);
+      for (const e of exs) expect(e.sets).toBeLessThanOrEqual(5);
     });
 
     it('Gironda 8×8: 8 сетов суммарно, reps 8-10, отдых 60с', () => {

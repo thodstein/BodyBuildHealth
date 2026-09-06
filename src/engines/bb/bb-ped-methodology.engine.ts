@@ -9,6 +9,7 @@ import type { RepSchemeId } from './bb-rep-schemes.engine';
 import { schemeFor, type SchemeForInput } from './bb-rep-schemes.engine';
 import type { BBPhase } from '../periodization';
 import { resolvePedPhase, describePedPhase, insulinSafetyCheck, type PedPhase, type InsulinSafety } from './bb-ped-phasing.engine';
+import type { SessionMethodology } from './bb-session-order.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
 
@@ -51,6 +52,12 @@ export interface PEDMethodologyInput {
   targetMuscles?: string[];
   /** Длина плана в неделях — для блочной фазировки MGF/IGF1 (≥8 = блоки). */
   totalWeeks?: number;
+  /**
+   * Ручной оверрайд фазы (UI-селектор): 'auto' (по стеку), 'proliferation'
+   * (форсить MGF-режим все недели), 'differentiation' (форсить IGF1-режим).
+   * Применяется к pedPhase и pedPhaseByWeek целиком.
+   */
+  phaseOverride?: 'auto' | 'proliferation' | 'differentiation';
 }
 
 function has(peds: PED[], k: PED): boolean { return peds.includes(k); }
@@ -62,6 +69,7 @@ function dose(doses: Record<string, number>, k: string): number {
 }
 
 export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodology {
+
   const { peds, pedDoses, level } = input;
   const AAS = dose(pedDoses, 'AAS');
   const GH = dose(pedDoses, 'GH');
@@ -119,13 +127,19 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
 
   // Фазировка MGF/IGF1 (bb-ped-phasing): оба пептида сразу = чередование
   // по неделям (короткий план) или блоки (≥8 нед), не одновременно.
+  // Ручной оверрайд из UI форсит фазу на все недели (оба пептида включительно).
   const totalWeeks = Math.max(1, Math.round(input.totalWeeks || 1));
   const bothPeptides = hasMGF && hasIGF1;
-  const pedPhase: PedPhase = bothPeptides ? 'both' : hasMGF ? 'proliferation' : hasIGF1 ? 'differentiation' : 'none';
-  const pedPhaseByWeek: PedPhase[] = bothPeptides
-    ? Array.from({ length: totalWeeks }, (_, i) => resolvePedPhase({ peds, pedDoses, weekIdx: i + 1, totalWeeks }))
-    : [];
-  if (bothPeptides) {
+  const override = input.phaseOverride === 'proliferation' || input.phaseOverride === 'differentiation' ? input.phaseOverride : null;
+  const pedPhase: PedPhase = override ?? (bothPeptides ? 'both' : hasMGF ? 'proliferation' : hasIGF1 ? 'differentiation' : 'none');
+  const pedPhaseByWeek: PedPhase[] = override
+    ? Array.from({ length: totalWeeks }, () => override)
+    : bothPeptides
+      ? Array.from({ length: totalWeeks }, (_, i) => resolvePedPhase({ peds, pedDoses, weekIdx: i + 1, totalWeeks }))
+      : [];
+  if (override) {
+    rationale.push(`🧬 Фаза вручную: ${describePedPhase(override)} — все ${totalWeeks} нед (оверрайд авто-фазировки)`);
+  } else if (bothPeptides) {
     const firstDiff = pedPhaseByWeek.findIndex(p => p === 'differentiation');
     rationale.push(totalWeeks >= 8 && firstDiff > 0
       ? `MGF+IGF1 блоками: нед 1–${firstDiff} пролиферация (MGF), нед ${firstDiff + 1}–${totalWeeks} дифференцировка (IGF1) — одновременно мешают друг другу (Matheny 2010)`
@@ -167,6 +181,27 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
  * - insulinPumpWindow: только памп-дни получают pump_15_20 + intra note (тяж дни не трогает)
  * - jointGuard: фильтр пула уже применён при отборе (см bb-joint-guard), здесь только помечает rationale
  */
+/**
+ * Авто-выбор методики порядка по PED-стеку (P1.6).
+ * - GH+инсулин (окно: GH≥2 + INS≥5) → 'hyperemia' (памп-окно диктует структуру:
+ *   кровь первее веса, intra-углеводы работают в пампе).
+ * - MGF (любая доза) → 'mountain_dog' (нужны повреждение/эксцентрик/lengthened/
+ *   стретч — фазы 1+4 Meadows; обычный pre_exhaust — противоположность).
+ * - Конфликт (GH+INS+MGF): побеждает hyperemia — метаболическое окно
+ *   определяет сессию, MGF-повреждение добирается эксцентриком внутри.
+ * - FST-7/DC НЕ авто: gated manual options (enhanced+jointGuard=false /
+ *   AAS-heavy+advanced) — см. гейты билдера.
+ * - Иначе null (оставить выбор юзера). Чистая функция.
+ */
+export function suggestMethodologyForStack(input: { peds: PED[]; pedDoses?: Record<string, number> }): SessionMethodology | null {
+  const doses = input.pedDoses || {};
+  const peds = input.peds || [];
+  const ghPlusInsulin = has(peds, 'GH') && has(peds, 'insulin') && dose(doses, 'GH') >= 2 && dose(doses, 'insulin') >= 5;
+  if (ghPlusInsulin) return 'hyperemia';
+  if (has(peds, 'MGF') && dose(doses, 'MGF') > 0) return 'mountain_dog';
+  return null;
+}
+
 export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BBPlan, meth: PEDMethodology): import('./bb-builder.engine').BBPlan {
   if (!meth.insulinPumpWindow && !meth.jointGuard && !meth.mgfTargetMuscles.length) {
     // Даже без окна — добавить periWorkout rationale

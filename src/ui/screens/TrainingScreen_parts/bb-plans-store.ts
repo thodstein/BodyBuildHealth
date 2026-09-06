@@ -26,6 +26,10 @@ export interface SavedBBPlan {
     deloadType: string;
     trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
     methodology?: import('../../../engines/bb/bb-session-order.engine').SessionMethodology;
+    /** Ручной оверрайд MGF/IGF1-фазы (auto = по стеку). */
+    pedPhaseOverride?: 'auto' | 'proliferation' | 'differentiation';
+    /** DC-лайт (Dante): ротация-3 + widowmaker + круиз-каденс. */
+    dcMode?: boolean;
     equipment?: string[];
     specialization?: boolean;
     /** Расписание блоков специализации (сохранение/восстановление плана блоков). */
