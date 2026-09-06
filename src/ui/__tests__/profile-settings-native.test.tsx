@@ -73,6 +73,24 @@ describe('ProfileSettingsTab phone section', () => {
     await resetPlatform();
     render(<ProfileSettingsTab />);
     fireEvent.click(screen.getByText('4.4 Телефон · APK'));
-    expect(screen.getByText('🔐', { selector: '.native-feature-icon' })).not.toBeNull();
+    // Шапка — SVG-щит, не эмодзи (PRO-правило 1.4).
+    const icons = document.querySelectorAll('.native-feature-icon');
+    expect(icons.length).toBeGreaterThanOrEqual(4);
+    for (const el of Array.from(icons)) {
+      expect(el.querySelector('svg'), el.textContent).not.toBeNull();
+      expect(el.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
+
+  it('5. волна 16: все 4 шапки §4.4 — штриховые SVG 24×24', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    render(<ProfileSettingsTab />);
+    fireEvent.click(screen.getByText('4.4 Телефон · APK'));
+    const svgs = document.querySelectorAll('.native-feature-icon svg');
+    expect(svgs.length).toBeGreaterThanOrEqual(4);
+    for (const svg of Array.from(svgs)) {
+      expect(svg.getAttribute('viewBox')).toBe('0 0 24 24');
+    }
   });
 });

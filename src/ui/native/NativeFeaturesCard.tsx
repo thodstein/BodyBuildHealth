@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { NativeIcon } from './NativeIcons';
 import { notifyLocal, pickPhoto, shareText } from '../../core/native-bridge';
 import { getLocale } from '../../data/interactions-labels';
 
@@ -105,7 +106,7 @@ export const NativeFeaturesCard: React.FC = () => {
   return (
     <div className="native-feature-card" aria-label={T.cardLabel}>
       <div className="native-feature-head">
-        <span className="native-feature-icon">⚡</span>
+        <span className="native-feature-icon" style={{ color: 'var(--accent-contrast)' }}><NativeIcon name="zap" size={20} /></span>
         <div>
           <div className="native-feature-title">{T.title}</div>
           <div className="native-feature-sub">{T.sub}</div>
