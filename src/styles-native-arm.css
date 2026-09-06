@@ -518,3 +518,193 @@ html.app-native .train-arm.arm-apk [data-arm='week-pills'] button {
     animation: none !important;
   }
 }
+
+/* ─── 19. ХАБ ДИАГНОСТИКИ (.train-armdiag) — та же PRO-подача ───────
+ * Янтарная айдентика хаба сохраняется (инлайн-цвета не трогаем),
+ * слой доводит геометрию/тач/тейпы: липкие табы, крупные поля,
+ * snap-полосы замеров, аккуратные шиты экспорта. */
+html.app-native .train-armdiag.arm-apk {
+  position: relative;
+  animation: armApkIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.app-native .train-armdiag.arm-apk > div:not([data-arm='hub-head']) {
+  background: linear-gradient(180deg, var(--arm-navy-1), var(--arm-navy-2)) !important;
+  border: 1px solid var(--arm-edge) !important;
+  border-radius: 20px !important;
+  padding: 16px !important;
+  margin: 0 0 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(var(--accent-rgb), 0.35) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  animation: armApkIn 0.35s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hub-head'] {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  margin: 0 0 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 2px 0 rgba(245, 158, 11, 0.45) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  animation: armApkIn 0.35s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hub-tabs'] {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  margin: 0 -4px 12px !important;
+  border-radius: 18px !important;
+  background: rgba(9, 18, 34, 0.8) !important;
+  border: 1px solid var(--arm-edge) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hub-tabs']::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hub-tabs'] button {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  font-size: 12px !important;
+  border-radius: 14px !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hub-tabs'] button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .train-armdiag.arm-apk button {
+  min-height: 44px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+}
+
+html.app-native .train-armdiag.arm-apk button:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .train-armdiag.arm-apk button[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22), 0 6px 18px rgba(245, 158, 11, 0.28) !important;
+}
+
+html.app-native .train-armdiag.arm-apk label:not(:has(> input[type='checkbox'])) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  min-width: 0 !important;
+}
+
+html.app-native .train-armdiag.arm-apk label:has(> input[type='checkbox']) {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+html.app-native .train-armdiag.arm-apk input:not([type='checkbox']):not([type='radio']) {
+  min-height: 48px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  background: var(--arm-field) !important;
+  border: 1px solid rgba(140, 190, 255, 0.2) !important;
+  color: rgb(255, 255, 255) !important;
+  padding: 10px 12px !important;
+  font-size: 16px !important;
+  outline: none !important;
+}
+
+html.app-native .train-armdiag.arm-apk select {
+  min-height: 48px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  background: var(--arm-field) !important;
+  border: 1px solid rgba(140, 190, 255, 0.2) !important;
+  color: rgb(255, 255, 255) !important;
+  padding: 10px 12px !important;
+  font-size: 15px !important;
+  outline: none !important;
+}
+
+html.app-native .train-armdiag.arm-apk input:focus {
+  border-color: rgba(var(--accent-rgb), 0.6) !important;
+  box-shadow: 0 0 0 3px var(--arm-ring) !important;
+}
+
+html.app-native .train-armdiag.arm-apk select:focus {
+  border-color: rgba(var(--accent-rgb), 0.6) !important;
+  box-shadow: 0 0 0 3px var(--arm-ring) !important;
+}
+
+html.app-native .train-armdiag.arm-apk select option {
+  background-color: rgb(10, 20, 36);
+  color: rgb(255, 255, 255);
+}
+
+html.app-native .train-armdiag.arm-apk input[type='checkbox'] {
+  width: 22px !important;
+  height: 22px !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--accent) !important;
+  cursor: pointer !important;
+}
+
+html.app-native .train-armdiag.arm-apk div[style*='rgb(10, 22, 41)'] {
+  background: linear-gradient(180deg, rgba(23, 42, 72, 0.9), rgba(13, 25, 44, 0.9)) !important;
+  border: 1px solid var(--arm-edge) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.app-native .train-armdiag.arm-apk div[style*='auto-fit'] {
+  gap: 10px !important;
+}
+
+/* ─── 20. ХАБ: узкие + reduced-motion ─────────────────────────────── */
+@media (max-width: 420px) {
+  html.app-native .train-armdiag.arm-apk > div:not([data-arm='hub-head']) {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+  html.app-native .train-armdiag.arm-apk [data-arm='hub-head'] {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armdiag.arm-apk {
+    animation: none !important;
+  }
+  html.app-native .train-armdiag.arm-apk > div:not([data-arm='hub-head']) {
+    animation: none !important;
+  }
+  html.app-native .train-armdiag.arm-apk [data-arm='hub-head'] {
+    animation: none !important;
+  }
+}

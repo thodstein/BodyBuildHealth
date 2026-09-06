@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
+import { ArmDiagnosticsHub } from '../ArmDiagnosticsHub';
 import { ensureArmApkStyles, resetArmApkStylesForTest } from '../arm-apk-loader';
 import { resetAppPlatformCache } from '../../../../core/app-platform';
 
@@ -113,6 +114,9 @@ describe('APK arm pack', () => {
       '.train-armtech',
       '.train-armgrip',
       '.train-armheatmap',
+      '.train-armdiag.arm-apk',
+      "[data-arm='hub-head']",
+      "[data-arm='hub-tabs']",
       '.arm-apk-backdrop',
       '.arm-apk-sheet',
       '.arm-apk-toast',
@@ -159,5 +163,24 @@ describe('APK arm pack', () => {
     const { container } = render(<ArmAutoConstructor />);
     const root = container.querySelector('.train-arm');
     expect(root?.classList.contains('arm-apk'), 'apk class in native').toBe(true);
+  });
+
+  it('хаб TG 1-в-1: корень без arm-apk, табы-хук на месте', () => {
+    const { container } = render(<ArmDiagnosticsHub />);
+    const root = container.querySelector('.train-armdiag');
+    expect(root, 'hub root').not.toBeNull();
+    expect(root?.getAttribute('class')).toBe('train-armdiag');
+    expect(container.querySelector("[data-arm='hub-head']"), 'hub head').not.toBeNull();
+    expect(container.querySelector("[data-arm='hub-tabs']"), 'hub tabs').not.toBeNull();
+  });
+
+  it('хаб native: корень arm-apk', () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = {
+      isNativePlatform: () => true,
+    };
+    resetAppPlatformCache();
+    const { container } = render(<ArmDiagnosticsHub />);
+    const root = container.querySelector('.train-armdiag');
+    expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
   });
 });

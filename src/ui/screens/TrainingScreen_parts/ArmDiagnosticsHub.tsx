@@ -46,6 +46,8 @@ import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scori
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { haptics, isOnline } from '../../../core/native-bridge';
+import { isNativeApp } from '../../../core/app-platform';
+import { ensureArmApkStyles } from './arm-apk-loader';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
@@ -1103,10 +1105,15 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; } };
   }, [showCam]);
 
+  // APK-слой: подгрузка styles-native-arm.css только в native (в TG/web no-op).
+  useEffect(() => {
+    ensureArmApkStyles();
+  }, []);
+
   return (
-    <div className="train-armdiag" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
+    <div className={isNativeApp() ? 'train-armdiag arm-apk' : 'train-armdiag'} style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       {/* Header score */}
-      <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08))', border: '1px solid rgba(245,158,11,0.22)', position: 'relative', overflow: 'hidden' }}>
+      <div data-arm="hub-head" style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08))', border: '1px solid rgba(245,158,11,0.22)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(245,158,11,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🤝</div>
@@ -1164,7 +1171,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
         </div>
 
         {/* Sub-tabs */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div data-arm="hub-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
           {TAB_DEFS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'6px 12px', borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#f59e0b' : '#1f3a5f', background: tab===t.id ? 'rgba(245,158,11,0.14)' : '#0a1629', color: tab===t.id ? '#f59e0b' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
               {t.icon} {t.label}
