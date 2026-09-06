@@ -141,6 +141,18 @@ describe('APK TOP pack', () => {
     });
   });
 
+  it('волна 19: FAB-мини — штриховые SVG без эмодзи', async () => {
+    const { container } = render(<NativeFab />);
+    fireEvent.click(container.querySelector('.native-fab')!);
+    const minis = container.querySelectorAll('.native-fab-mini');
+    expect(minis.length).toBe(2);
+    for (const m of Array.from(minis)) {
+      const svg = m.querySelector('svg');
+      expect(svg, m.getAttribute('aria-label')).not.toBeNull();
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(m.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
   it('CSS-изоляция: каждый селектор native-слоёв — только html.app-native', () => {
     for (const name of ['styles-native.css', 'styles-native-pro.css']) {
       const css = readCss(name);

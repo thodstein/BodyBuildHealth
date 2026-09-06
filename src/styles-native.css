@@ -3886,7 +3886,7 @@ html.app-native .native-fab-mini {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--accent);
   background: linear-gradient(180deg, rgba(21, 38, 66, 0.92), rgba(12, 23, 40, 0.92));
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(20px);

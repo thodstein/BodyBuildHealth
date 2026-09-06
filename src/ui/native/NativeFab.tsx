@@ -2,12 +2,13 @@
  * NativeFab.tsx — FAB speed-dial быстрой записи. ТОЛЬКО APK (монтируется
  * в App.tsx внутри isNativeApp()-ветки). Telegram/web модуль не импортируют.
  *
- * Тап по «＋» раскрывает два мини-действия: 💧 +250 мл (в очередь виджета —
- * разберётся при входе на Главную) и 🏋️ дневник тренинга. Свайпы хук
+ * Тап по «＋» раскрывает два мини-действия: вода +250 мл (в очередь виджета —
+ * разберётся при входе на Главную) и дневник тренинга. Свайпы хук
  * useSwipeTabs игнорирует (кнопка — fixed-оверлей).
  */
 
 import React, { useEffect, useState } from 'react';
+import { NativeIcon } from './NativeIcons';
 import { haptics } from '../../core/native-bridge';
 import { toastStore } from '../../core/toast';
 import { getLocale } from '../../data/interactions-labels';
@@ -120,11 +121,11 @@ export const NativeFab: React.FC<Props> = ({ onQuickLog, hidden = false, label }
             type="button"
             className="native-fab-mini"
             aria-label={T.logWater}
-            title="💧 +250 мл"
+            title="+250 мл"
             disabled={busyWater}
             onClick={() => void quickWater()}
           >
-            <span aria-hidden="true">💧</span>
+            <span aria-hidden="true" style={{ display: 'inline-flex' }}><NativeIcon name="droplet" size={20} /></span>
           </button>
           <button
             type="button"
@@ -133,7 +134,7 @@ export const NativeFab: React.FC<Props> = ({ onQuickLog, hidden = false, label }
             title={T.logTraining}
             onClick={quickTraining}
           >
-            <span aria-hidden="true">🏋️</span>
+            <span aria-hidden="true" style={{ display: 'inline-flex' }}><NativeIcon name="dumbbell" size={20} /></span>
           </button>
         </>
       )}
