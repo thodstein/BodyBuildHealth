@@ -143,6 +143,7 @@
 19. **Волна 17 — Строки возможностей на SVG**. Статус: ✅ done (NativeIcons +bell/+camera; 🔔📷📤 → bell/camera/share 15px в акценте; row-icon центрирован flex; виджет-строки с эмодзи-идентификаторами не тронуты осознанно; profile-settings 6/6, home-profile-shop 20/20, tsc 0).
 20. **Волна 18 — Строки виджетов на SVG**. Статус: ✅ done (WIDGETS RU/EN: icon string→NativeIconName — dumbbell/clock/chart/bowl; рендер через NativeIcon 15; profile-settings 7/7; tsc по своим 0 — 1 ошибка в чужом dirty day-target-corrector.ts не тронута).
 21. **Волна 19 — FAB-мини на SVG**. Статус: ✅ done (💧🏋️ → droplet/dumbbell 20 в акценте; title без эмодзи; тост 💧 оставлен — текст сообщения; по ходу пойман и починен собственный сломанный edit (потерян opener CSS-изоляции) до коммита; apk-top-pack 27/27, tsc 0).
+22. **Волна 20 — Баннер обновлений за акцентом**. Статус: ✅ done (кнопки ⬇⚡🔄📲 → чистый текст RU/EN; градиент/кромка #c9f73a → var(--accent(-rgb)/-contrast) — фиолет/янтарь больше не получают лаймовый баннер; NEW app-update-banner 3/3 с моками платформы; tsc 0).
 5. Тренинг hub-and-spoke + player.
 6. Питание «Сегодня» + сканер в шапке.
 7. Фарма-календарь + пуши курса.

@@ -38,15 +38,15 @@ function strings(en: boolean) {
     ? {
         title: (v: string) => `Update ${v} available`,
         sub: 'Without Play Market — download and install in one tap',
-        update: '⬇ Update',
-        fastUpdate: '⚡ Fast update (no reinstall)',
+        update: 'Update',
+        fastUpdate: 'Fast update (no reinstall)',
         apkInstead: 'Full APK instead',
         staged: 'Ready — restart the app to apply',
-        restartNow: '🔄 Restart now',
+        restartNow: 'Restart now',
         later: 'Later',
         skip: 'Skip version',
         installing: (p: number) => `Downloading… ${Math.round(p * 100)}%`,
-        install: '📲 Install',
+        install: 'Install',
         allowUnknown:
           'Installation is blocked — allow it: Settings → Apps → Health Engine → Install unknown apps, then tap Install again.',
         openSettings: 'Open settings',
@@ -57,15 +57,15 @@ function strings(en: boolean) {
     : {
         title: (v: string) => `Доступно обновление ${v}`,
         sub: 'Без Play Market — скачать и поставить в один тап',
-        update: '⬇ Обновить',
-        fastUpdate: '⚡ Быстрое обновление (без переустановки)',
+        update: 'Обновить',
+        fastUpdate: 'Быстрое обновление (без переустановки)',
         apkInstead: 'Полный APK вместо',
         staged: 'Готово — перезапустите приложение',
-        restartNow: '🔄 Перезапустить сейчас',
+        restartNow: 'Перезапустить сейчас',
         later: 'Позже',
         skip: 'Пропустить версию',
         installing: (p: number) => `Скачивание… ${Math.round(p * 100)}%`,
-        install: '📲 Установить',
+        install: 'Установить',
         allowUnknown:
           'Установка заблокирована — разрешите: Настройки → Приложения → Health Engine → Установка неизвестных приложений, затем нажмите «Установить» ещё раз.',
         openSettings: 'Открыть настройки',
@@ -83,7 +83,7 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 18,
   padding: '12px 14px',
   background: 'rgba(9, 18, 34, 0.96)',
-  border: '1px solid rgba(201, 247, 58, 0.35)',
+  border: '1px solid rgba(var(--accent-rgb, 201, 247, 58), 0.35)',
   boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55)',
   color: '#f4f7ff',
   fontFamily:
@@ -96,8 +96,8 @@ const btnPrimary: React.CSSProperties = {
   borderRadius: 12,
   border: 'none',
   fontWeight: 700,
-  background: 'linear-gradient(135deg, #c9f73a 0%, #00e68a 100%)',
-  color: '#0a1a08',
+  background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
+  color: 'var(--accent-contrast)',
 };
 
 const btnGhost: React.CSSProperties = {
@@ -250,7 +250,7 @@ export const AppUpdateBanner: React.FC = () => {
             style={{
               width: `${Math.round(progress * 100)}%`,
               height: '100%',
-              background: 'linear-gradient(135deg, #c9f73a 0%, #00e68a 100%)',
+              background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
             }}
           />
         </div>
