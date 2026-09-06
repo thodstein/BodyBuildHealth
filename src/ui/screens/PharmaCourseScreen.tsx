@@ -7,6 +7,7 @@ import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
 import { isNativeApp } from '../../core/app-platform';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
+import { NativeEmptyArt } from '../native/NativeEmpty';
 import { scheduleWeeklyReminders, cancelScheduledReminders } from '../../core/native-bridge';
 import {
   loadRemindPrefs, saveRemindPrefs, buildReminderItems, allReminderIds,
@@ -589,7 +590,11 @@ export const PharmaCourseScreen: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {course.length === 0 ? (
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
-              <div style={{ fontSize:28, marginBottom:8, opacity:0.7 }}>📅</div>
+              {isNativeApp() ? (
+                <NativeEmptyArt kind="clipboard" size={52} />
+              ) : (
+                <div style={{ fontSize:28, marginBottom:8, opacity:0.7 }}>📅</div>
+              )}
               <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет препаратов</div>
               <div style={{ fontSize:11, color:'#fff' }}>Добавь препараты на вкладке «Текущий»</div>
             </div>

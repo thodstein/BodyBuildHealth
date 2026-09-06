@@ -129,3 +129,24 @@ describe('PharmaCourseScreen напоминания (волна 7)', () => {
     await expect(cancelScheduledReminders([1])).resolves.toBeUndefined();
   });
 });
+
+describe('волна 15: пустое расписание без эмодзи', () => {
+  it('native-гейт: исходник ведёт пустое расписание на SVG-арт', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'PharmaCourseScreen.tsx'),
+      'utf-8',
+    );
+    // Импорт кита + гейт рядом с пустым расписанием (защита от молчаливого отката).
+    expect(src).toContain("from '../native/NativeEmpty'");
+    const emptyIdx = src.indexOf('Нет препаратов');
+    expect(emptyIdx).toBeGreaterThan(-1);
+    const window = src.slice(Math.max(0, emptyIdx - 600), emptyIdx);
+    expect(window).toContain('isNativeApp()');
+    expect(window).toContain('NativeEmptyArt');
+    expect(window).toContain('clipboard');
+    // TG-классика с 📅 на месте (1-в-1, ветка else).
+    expect(src.slice(emptyIdx - 600, emptyIdx + 400)).toContain('📅');
+  });
+});
