@@ -1,0 +1,528 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * styles-native-strongman.css — APK PRO-оформление стронг-планировщика
+ * (ТА + силовой экстрим: StrengthSportConstructor + StrengthUI).
+ *
+ * Правила слоя (как в styles-native.css / styles-native-arm.css):
+ *  1. КАЖДЫЙ селектор начинается с `html.app-native` — в TG Mini App
+ *     и web ни одно правило не матчится (TG 1-в-1, проверено тестом
+ *     apk-strongman-pack: изоляция + отсутствие прячущих hero правил).
+ *  2. Файл грузится ТОЛЬКО в native через strongman-apk-loader
+ *     (динамический import за гейтом isNativeApp) — в TG-бандл не
+ *     попадает вообще.
+ *  3. Цвета — только var() + числовые rgb/rgba (hex нет) — акцент
+ *     и темы APK подхватываются бесплатно, включая системный чип.
+ *  4. Инлайн-стили TSX не трогаем: переопределения — через понятные
+ *     data-ss хуки и класс ss-apk на корне, всё аддитивно за
+ *     isNativeApp(). Янтарь стронга — через --ss-amber-rgb.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. SS-ТОКЕНЫ (только native, наследуют глобальные) ───────────── */
+html.app-native {
+  --ss-edge: rgba(140, 190, 255, 0.14);
+  --ss-edge-soft: rgba(140, 190, 255, 0.1);
+  --ss-glow: rgba(var(--accent-rgb), 0.32);
+  --ss-wash: rgba(var(--accent-rgb), 0.1);
+  --ss-ring: rgba(var(--accent-rgb), 0.16);
+  --ss-amber-rgb: 245, 158, 11;
+  --ss-amber-wash: rgba(245, 158, 11, 0.1);
+  --ss-amber-edge: rgba(245, 158, 11, 0.2);
+  --ss-blue-rgb: 96, 165, 250;
+  --ss-green-rgb: 48, 209, 88;
+  --ss-red-rgb: 255, 59, 48;
+  --ss-navy-1: rgba(21, 38, 66, 0.82);
+  --ss-navy-2: rgba(12, 23, 40, 0.82);
+  --ss-field: rgba(6, 13, 29, 0.9);
+}
+
+/* ─── 2. КОРЕНЬ ПЛАНИРОВЩИКА ───────────────────────────────────────── */
+html.app-native .train-strong.ss-apk {
+  position: relative;
+  animation: ssApkIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── 3. HERO — стекло с янтарной кромкой стронга ──────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='hero'] {
+  border-radius: 22px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  animation: ssApkIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .train-strong.ss-apk [data-ss='hero-cta'] {
+  min-height: 44px !important;
+  border-radius: 14px !important;
+}
+
+/* ─── 4. ШАГИ — липкая стеклянная лента с пилюлями ─────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='steps'] {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+  padding: 8px !important;
+  margin: 0 -4px 12px !important;
+  border-radius: 18px !important;
+  background: rgba(9, 18, 34, 0.8) !important;
+  border: 1px solid var(--ss-edge) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='steps'] button {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  border-radius: 14px !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='steps'] button:active {
+  transform: scale(0.94) !important;
+}
+
+/* ─── 5. FLASH-СООБЩЕНИЕ — тост-баннер ─────────────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='msg'] {
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.45 !important;
+  margin: 0 0 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  backdrop-filter: blur(18px) !important;
+  animation: ssApkPop 0.32s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+/* ─── 6. СЕКЦИИ — фирменное стекло поверх kit ──────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='section'] {
+  border-radius: 20px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(var(--accent-rgb), 0.35) !important;
+  animation: ssApkIn 0.35s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='section-strong'] {
+  border-radius: 20px !important;
+  border-color: var(--ss-amber-edge) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 2px 0 rgba(245, 158, 11, 0.45) !important;
+  animation: ssApkIn 0.35s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+/* ─── 7. КРАСИВЫЕ ПОПАПЫ — бэкдроп + шит с пружиной ────────────────── */
+html.app-native .ss-apk-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 500 !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  background: rgba(2, 6, 14, 0.6) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  padding: 0 !important;
+  animation: ssApkFade 0.22s ease !important;
+}
+
+html.app-native .ss-apk-sheet {
+  width: 100% !important;
+  max-width: 440px !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  border-radius: 24px 24px 0 0 !important;
+  background: rgb(22, 32, 52) !important;
+  border: 1px solid var(--ss-edge) !important;
+  border-bottom: none !important;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  animation: ssApkSheetUp 0.34s cubic-bezier(0.22, 0.9, 0.28, 1) !important;
+}
+
+html.app-native .ss-apk-sheet::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .ss-apk-handle {
+  width: 40px !important;
+  height: 5px !important;
+  border-radius: 3px !important;
+  background: rgba(140, 190, 255, 0.3) !important;
+  margin: 10px auto 0 !important;
+}
+
+html.app-native .ss-apk-option {
+  min-height: 56px !important;
+  padding: 12px 14px !important;
+  border-radius: 14px !important;
+  gap: 2px !important;
+}
+
+html.app-native .ss-apk-option:active {
+  transform: scale(0.98) !important;
+  background: var(--ss-wash) !important;
+}
+
+html.app-native .ss-apk-done {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: rgb(6, 20, 12) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  border: none !important;
+  box-shadow: 0 8px 24px var(--ss-glow) !important;
+}
+
+html.app-native .ss-apk-done:active {
+  transform: scale(0.97) !important;
+}
+
+/* ─── 8. ПРЕСЕТЫ КОНТЕСТА — крупные пилюли ─────────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='presets'] {
+  gap: 8px !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='presets'] button {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border-radius: 14px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='presets'] button:active {
+  transform: scale(0.94) !important;
+}
+
+/* ─── 9. КОНТЕСТ-БОКС — янтарное стекло + крупные поля ─────────────── */
+html.app-native .train-strong.ss-apk [data-ss='contest'] {
+  border-radius: 18px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(52, 36, 10, 0.5), rgba(28, 20, 8, 0.5)) !important;
+  border: 1px solid var(--ss-amber-edge) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='contest'] input:not([type='checkbox']) {
+  min-height: 48px !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  background: var(--ss-field) !important;
+  border: 1px solid rgba(140, 190, 255, 0.2) !important;
+  color: rgb(255, 255, 255) !important;
+  padding: 10px 12px !important;
+  font-size: 16px !important;
+  outline: none !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='contest'] input:focus {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='contest'] select {
+  min-height: 48px !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  background: var(--ss-field) !important;
+  border: 1px solid rgba(140, 190, 255, 0.2) !important;
+  color: rgb(255, 255, 255) !important;
+  padding: 10px 12px !important;
+  font-size: 15px !important;
+  outline: none !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='contest'] select option {
+  background-color: rgb(10, 20, 36);
+  color: rgb(255, 255, 255);
+}
+
+html.app-native .train-strong.ss-apk [data-ss='contest'] input[type='checkbox'] {
+  width: 22px !important;
+  height: 22px !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--accent) !important;
+  cursor: pointer !important;
+}
+
+/* ─── 10. СПЛИТ-КАРТОЧКИ — PRO-плитки с активной кромкой ───────────── */
+html.app-native .train-strong.ss-apk [data-ss='split-list'] {
+  gap: 10px !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='split-list'] > button {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  min-height: 76px !important;
+  text-align: left !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='split-list'] > button:active {
+  transform: scale(0.98) !important;
+}
+
+/* ─── 11. КНОПКА СБОРКИ — hero-CTA на всю ширину ───────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='build'] {
+  min-height: 56px !important;
+  border-radius: 18px !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 8px 24px var(--ss-glow) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='build']:active {
+  transform: scale(0.98) !important;
+}
+
+/* ─── 12. ПОПЫТКИ — моно-цифры и пилюли ────────────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='attempts'] {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='attempts'] [data-ss='attempt-pill'] {
+  min-height: 44px !important;
+  border-radius: 14px !important;
+  padding: 10px 14px !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 13. НЕДЕЛИ — аккордеон с крупной шапкой ──────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='week'] {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  animation: ssApkIn 0.35s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week'] > button:first-child {
+  min-height: 60px !important;
+  padding: 14px !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week'] > button:first-child:active {
+  opacity: 0.85 !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week'] input:not([type='checkbox']) {
+  min-height: 48px !important;
+  box-sizing: border-box !important;
+  border-radius: 12px !important;
+  background: var(--ss-field) !important;
+  border: 1px solid rgba(140, 190, 255, 0.2) !important;
+  color: rgb(255, 255, 255) !important;
+  font-size: 16px !important;
+  outline: none !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week'] input:focus {
+  border-color: rgba(var(--accent-rgb), 0.6) !important;
+  box-shadow: 0 0 0 3px var(--ss-ring) !important;
+}
+
+/* ─── 14. УПРАЖНЕНИЯ — карточки с топ-кромкой ──────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='exercise'] {
+  border-radius: 16px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='set-row'] {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='set-row'] input {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+  font-size: 15px !important;
+  text-align: center !important;
+}
+
+/* ─── 15. ЭКСПОРТ — сетка крупных кнопок ───────────────────────────── */
+html.app-native .train-strong.ss-apk [data-ss='exports'] button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  transition: transform 0.15s ease !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='exports'] button:active {
+  transform: scale(0.96) !important;
+}
+
+/* ─── 16. GANTT / HEATMAP / MEDLEY — дыхание и крупные чипы ────────── */
+html.app-native .train-strong.ss-apk [data-ss='gantt'] {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  background: rgba(6, 13, 29, 0.6) !important;
+  border: 1px solid var(--ss-edge-soft) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='heatmap'] {
+  gap: 10px !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='medley'] {
+  border-radius: 20px !important;
+  border-color: var(--ss-amber-edge) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(245, 158, 11, 0.4) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='cycle-note'] {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── 17. RANGE — палец 28px, светящийся трек ──────────────────────── */
+html.app-native .train-strong.ss-apk input[type='range'] {
+  min-height: 28px !important;
+  accent-color: var(--accent) !important;
+}
+
+html.app-native .train-strong.ss-apk input[type='range']::-webkit-slider-thumb {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+/* ─── 18. ФОРМЫ ПЛАНА — читаемые лейблы ────────────────────────────── */
+html.app-native .train-strong.ss-apk label:has(> input[type='checkbox']) {
+  min-height: 48px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+}
+
+html.app-native .train-strong.ss-apk input[type='checkbox'] {
+  width: 22px !important;
+  height: 22px !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--accent) !important;
+  cursor: pointer !important;
+}
+
+html.app-native .train-strong.ss-apk select option {
+  background-color: rgb(10, 20, 36);
+  color: rgb(255, 255, 255);
+}
+
+/* ─── 19. MOTION — пружина шита, каскад секций ─────────────────────── */
+@keyframes ssApkIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ssApkSheetUp {
+  from {
+    opacity: 0.4;
+    transform: translateY(64px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ssApkFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ssApkPop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+html.app-native .train-strong.ss-apk [data-ss='section'] {
+  animation-delay: 0.02s;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week']:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week']:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week']:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='week']:nth-child(n+5) {
+  animation-delay: 0.16s;
+}
+
+/* ─── 20. УЗКИЕ ЭКРАНЫ — всё в одну колонку ────────────────────────── */
+@media (max-width: 380px) {
+  html.app-native .train-strong.ss-apk [data-ss='steps'] button {
+    font-size: 11px !important;
+    padding: 10px 10px !important;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='hero'] {
+    border-radius: 18px !important;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='exports'] button {
+    min-height: 48px !important;
+    font-size: 13px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-strong.ss-apk {
+    animation: none;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='hero'] {
+    animation: none;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='section'] {
+    animation: none;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='section-strong'] {
+    animation: none;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='week'] {
+    animation: none;
+  }
+  html.app-native .ss-apk-backdrop {
+    animation: none;
+  }
+  html.app-native .ss-apk-sheet {
+    animation: none;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='msg'] {
+    animation: none;
+  }
+}

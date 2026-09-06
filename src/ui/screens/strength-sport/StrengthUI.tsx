@@ -163,7 +163,7 @@ export const SectionCard: React.FC<{
   hint?: string;
   children: React.ReactNode;
 }> = ({ id, title, subtitle, icon, right, accent, strong, hint, children }) => (
-  <div className="kit-section" style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
+  <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
       <div style={{ ...ROW, marginBottom: 2 }}>
         {icon && (
@@ -341,9 +341,9 @@ export const StrengthPopupSelect: React.FC<{ label: string; value: string | unde
         <span style={{ fontSize: 15, color: strong ? '#f59e0b' : '#00e68a', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 10, color: TEXT_3 }}>▾</span></span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
-            <div style={POP_HANDLE} />
+        <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
+            <div className="ss-apk-handle" style={POP_HANDLE} />
             <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
               {sel?.desc && <span style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
@@ -352,7 +352,7 @@ export const StrengthPopupSelect: React.FC<{ label: string; value: string | unde
               {options.map(o => {
                 const active = value === o.id;
                 return (
-                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{
+                  <button key={o.id} className="ss-apk-option" onClick={() => { onChange(o.id); setOpen(false); }} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
                     fontFamily: SF, background: active ? (strong ? 'rgba(245,158,11,0.12)' : 'rgba(0,230,138,0.12)') : 'transparent',
                     border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`, transition: 'background 0.18s',
@@ -366,7 +366,7 @@ export const StrengthPopupSelect: React.FC<{ label: string; value: string | unde
               })}
             </div>
             <div style={{ padding: '8px 16px' }}>
-              <button onClick={() => setOpen(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
+              <button className="ss-apk-done" onClick={() => setOpen(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -387,9 +387,9 @@ export const StrengthPopupNumber: React.FC<{ label: string; value: number; min?:
         <span style={{ fontSize: 17, color: accent, fontWeight: 600, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
-            <div style={POP_HANDLE} />
+        <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
+            <div className="ss-apk-handle" style={POP_HANDLE} />
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
               <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: accent, height: 6, borderRadius: 999 }} />
@@ -397,7 +397,7 @@ export const StrengthPopupNumber: React.FC<{ label: string; value: number; min?:
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
                 {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
-                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>Готово</button>
+                <button className="ss-apk-done" onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>Готово</button>
               </div>
             </div>
           </div>
@@ -419,7 +419,7 @@ export const EventCard: React.FC<{
   const totalCap = events.reduce((a, e) => a + e.timeCapS, 0);
   const medleyCap = Math.max(totalCap - 10, totalDist > 0 ? 60 : 0);
   return (
-    <div style={{ ...CARD_STRONG, padding: 14, gap: 10 }}>
+    <div data-ss="medley" style={{ ...CARD_STRONG, padding: 14, gap: 10 }}>
       <div style={ROW}>
         <span style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT_STRONG, fontSize: 14 }}>⛓️</span>
         <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontFamily: SF }}>{title}</div><div style={{ fontSize: 11, color: TEXT_2, fontFamily: SF }}>{subtitle} · <span style={{ color: ACCENT_STRONG }}>{totalDist}м / cap {medleyCap}с</span></div></div>
@@ -456,7 +456,7 @@ export const StrengthGantt: React.FC<{
     else grouped.push({ key, weeks: 1, color });
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div data-ss="gantt" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', height: 22, borderRadius: 8, overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.18)' }}>
         {grouped.map((g, i) => (
           <div key={i} title={`${PHASE_RU[g.key] || g.key}: ${g.weeks}нед`} style={{ flex: g.weeks, background: g.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none' }}>{g.weeks >= 2 ? (PHASE_RU[g.key] || g.key) : ''}</div>
@@ -483,7 +483,7 @@ export const StrengthHeatmap: React.FC<{
     { key: 'squat_deadlift', label: 'Присед+Тяга', icon: '🦵', ids: ['back_squat', 'front_squat', 'squat', 'hack_squat', 'deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'rdl'], unit: 'sets' },
   ];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div data-ss="heatmap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {rows.map(row => (
         <div key={row.key} style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.04)' }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: row.strong ? ACCENT_STRONG : ACCENT, minWidth: 72, display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11 }}>{row.icon}</span>{row.label}</span>
