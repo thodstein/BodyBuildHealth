@@ -4717,3 +4717,78 @@ html.app-native .sup-clinic {
     animation: none;
   }
 }
+
+/* ─── 71. CONTENT STATES PRO ────────────────────────────
+ * Только APK. Состояния контента (§1.6 плана) едиными утилитами:
+ * кромки смысла, stale-шкала давности, error-карточка с retry.
+ * TG/web не тронуты (селекторы только под html.app-native). */
+html.app-native .native-edge-ok,
+html.app-native .native-edge-warn,
+html.app-native .native-edge-bad,
+html.app-native .native-edge-info {
+  border-left-width: 3px !important;
+  border-left-style: solid !important;
+}
+
+html.app-native .native-edge-ok {
+  border-left-color: #22c55e !important;
+}
+
+html.app-native .native-edge-warn {
+  border-left-color: #f59e0b !important;
+}
+
+html.app-native .native-edge-bad {
+  border-left-color: #ef4444 !important;
+}
+
+html.app-native .native-edge-info {
+  border-left-color: var(--accent) !important;
+}
+
+html.app-native .native-stale {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .native-stale[data-level='fresh'] {
+  color: #22c55e !important;
+  background: rgba(34, 197, 94, 0.12) !important;
+  border: 1px solid rgba(34, 197, 94, 0.22) !important;
+}
+
+html.app-native .native-stale[data-level='aging'] {
+  color: #fbbf24 !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+  border: 1px solid rgba(245, 158, 11, 0.22) !important;
+}
+
+html.app-native .native-stale[data-level='stale'] {
+  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  border: 1px solid rgba(239, 68, 68, 0.22) !important;
+}
+
+html.app-native .native-error {
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(239, 68, 68, 0.22) !important;
+  border-left: 3px solid #ef4444 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  padding: 14px !important;
+}
+
+html.app-native .native-error-retry:active {
+  transform: scale(0.94);
+}
+
+html.app-native .native-error-retry:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}

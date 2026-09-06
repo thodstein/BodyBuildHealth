@@ -8,7 +8,9 @@
 
 import React from 'react';
 
-export type EmptyArtKind = 'plate' | 'dumbbell' | 'chart' | 'clipboard' | 'trophy';
+export type EmptyArtKind =
+  | 'plate' | 'dumbbell' | 'chart' | 'clipboard' | 'trophy'
+  | 'shield' | 'flask' | 'pill' | 'leaf' | 'message' | 'file';
 
 const DIM = 'rgba(140, 190, 255, 0.45)';
 // Цвета акцента — через CSS-переменные (следуют за выбором в Оформлении).
@@ -73,6 +75,59 @@ function Art({ kind }: { kind: EmptyArtKind }): React.ReactElement {
         </g>
       );
     case 'clipboard':
+      return (
+        <g>
+          <rect x="30" y="20" width="36" height="56" rx="8" {...common} style={FILL_STYLE} />
+          <rect x="40" y="12" width="16" height="10" rx="4" {...dim} />
+          <path d="M38 40 h20 M38 50 h20 M38 60 h13" {...dim} />
+          <path d="M60 64 l4 4 8 -8" {...common} />
+        </g>
+      );
+    case 'shield':
+      return (
+        <g>
+          <path d="M48 14 l26 10 v20 c0 18 -12 28 -26 34 c-14 -6 -26 -16 -26 -34 v-20 z" {...common} style={FILL_STYLE} />
+          <path d="M40 46 l6 6 12 -12" {...common} />
+        </g>
+      );
+    case 'flask':
+      return (
+        <g>
+          <path d="M40 14 h16 M44 14 v20 l-16 30 a6 6 0 0 0 5 8 h30 a6 6 0 0 0 5 -8 l-16 -30 v-20" {...common} style={FILL_STYLE} />
+          <path d="M32 56 h32" {...dim} />
+          <circle cx="48" cy="64" r="3" style={DOT_STYLE} />
+        </g>
+      );
+    case 'pill':
+      return (
+        <g>
+          <rect x="28" y="38" width="40" height="20" rx="10" transform="rotate(-30 48 48)" {...common} style={FILL_STYLE} />
+          <path d="M40 56 l16 -16" {...dim} />
+          <circle cx="62" cy="30" r="3" style={DOT_STYLE} />
+        </g>
+      );
+    case 'leaf':
+      return (
+        <g>
+          <path d="M48 78 c-16 -4 -24 -18 -22 -40 c22 -2 36 6 40 28 c1 6 -2 10 -8 12 z" {...common} style={FILL_STYLE} />
+          <path d="M34 62 c8 -10 18 -18 30 -24" {...dim} />
+        </g>
+      );
+    case 'message':
+      return (
+        <g>
+          <path d="M22 24 h52 a8 8 0 0 1 8 8 v28 a8 8 0 0 1 -8 8 h-30 l-14 12 v-12 h-8 a8 8 0 0 1 -8 -8 v-28 a8 8 0 0 1 8 -8 z" {...common} style={FILL_STYLE} />
+          <path d="M34 42 h28 M34 52 h18" {...dim} />
+        </g>
+      );
+    case 'file':
+      return (
+        <g>
+          <path d="M34 12 h20 l12 12 v42 a6 6 0 0 1 -6 6 h-26 a6 6 0 0 1 -6 -6 v-48 a6 6 0 0 1 6 -6 z" {...common} style={FILL_STYLE} />
+          <path d="M54 12 v12 h12" {...dim} />
+          <path d="M38 46 h20 M38 56 h20 M38 66 h12" {...dim} />
+        </g>
+      );
     default:
       return (
         <g>

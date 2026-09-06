@@ -42,10 +42,22 @@ afterEach(async () => {
 });
 
 describe('NativeEmpty kit', () => {
-  it('1. все 5 артов рендерят SVG', () => {
-    for (const kind of ['plate', 'dumbbell', 'chart', 'trophy', 'clipboard'] as const) {
+  it('1. все 11 артов рендерят SVG', () => {
+    for (const kind of ['plate', 'dumbbell', 'chart', 'trophy', 'clipboard', 'shield', 'flask', 'pill', 'leaf', 'message', 'file'] as const) {
       const { container, unmount } = render(<NativeEmptyArt kind={kind} />);
-      expect(container.querySelector('.native-empty-art svg')).not.toBeNull();
+      const svg = container.querySelector('.native-empty-art svg');
+      expect(svg, kind).not.toBeNull();
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 96 96');
+      unmount();
+    }
+  });
+
+  it('1b. арты красятся переменными акцента, не hex', () => {
+    for (const kind of ['shield', 'flask', 'pill', 'leaf', 'message', 'file'] as const) {
+      const { container, unmount } = render(<NativeEmptyArt kind={kind} />);
+      const html = container.innerHTML;
+      expect(html, kind).toContain('var(--accent)');
+      expect(html, kind).not.toMatch(/#c9f73a|#00e68a/i);
       unmount();
     }
   });
@@ -129,9 +141,36 @@ describe('CompetitionPlansView + EmptyState', () => {
     expect(container.querySelector('.custom-art')).not.toBeNull();
   });
 
-  it('8. EmptyState: по умолчанию иконка-эмодзи', () => {
+  it('8. EmptyState: по умолчанию иконка-эмодзи', async () => {
     const { container } = render(<EmptyState icon="📭" title="Пусто" />);
     expect(screen.getByText('📭')).not.toBeNull();
     expect(container.querySelector('.custom-art')).toBeNull();
+  });
+});
+
+describe('CSS §71 (состояния контента)', () => {
+  it('9. кромки/stale/error под html.app-native', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'styles-native.css'), 'utf-8');
+    const i = css.indexOf('71. CONTENT STATES PRO');
+    expect(i).toBeGreaterThan(-1);
+    const block = css.slice(i, i + 5000);
+    for (const sel of ['.native-edge-ok', '.native-edge-warn', '.native-edge-bad', '.native-edge-info', '.native-stale', '.native-error']) {
+      expect(block, sel).toContain(sel);
+    }
+    expect(block).toContain("data-level='fresh'");
+    expect(block).toContain("data-level='stale'");
+    expect(block).toContain('tabular-nums');
+    for (const line of block.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('/*') || t.startsWith('*')) continue;
+      if (!t.endsWith('{')) continue;
+      const sel = t.slice(0, -1).trim();
+      if (!sel || sel.startsWith('@')) continue;
+      for (const p of sel.split(',').map((s) => s.trim()).filter(Boolean)) {
+        expect(p.startsWith('html.app-native'), p).toBe(true);
+      }
+    }
   });
 });
