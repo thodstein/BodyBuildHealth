@@ -169,16 +169,30 @@ export function buildArmYearBlocks(
   series: string,
   totalWeeks = 52,
   baseConfig: Record<string, unknown> = {},
+  opts: { suggestCycles?: boolean; discipline?: string } = {},
 ): ArmYearBlock[] {
   const tpl = superSeriesYear(series, totalWeeks);
-  return tpl.stages.map((st, i) => ({
-    blockKey: `arm-${tpl.series}-${i + 1}`,
-    weeks: st.weeks,
-    phase: (st.priority === 'A' ? 'peaking' : st.priority === 'B' ? 'strength' : 'base') as ArmYearBlock['phase'],
-    priority: st.priority,
-    focus: st.focus,
-    ...baseConfig,
-  })) as ArmYearBlock[];
+  return tpl.stages.map((st, i) => {
+    const phase = (st.priority === 'A' ? 'peaking' : st.priority === 'B' ? 'strength' : 'base') as ArmYearBlock['phase'];
+    // R6 opt-in: блоки несут рекомендованный именной цикл (потребитель
+    // annualBlockCycleSuggestion). По умолчанию выключено — байт-в-байт.
+    let cycleFields: Record<string, unknown> = {};
+    if (opts.suggestCycles) {
+      try {
+        const s = annualBlockCycleSuggestion(phase, opts.discipline || 'armwrestling');
+        cycleFields = { suggestedCycleId: s.cycleId, suggestedCycleNote: s.note };
+      } catch { cycleFields = {}; }
+    }
+    return {
+      blockKey: `arm-${tpl.series}-${i + 1}`,
+      weeks: st.weeks,
+      phase,
+      priority: st.priority,
+      focus: st.focus,
+      ...baseConfig,
+      ...cycleFields,
+    };
+  }) as ArmYearBlock[];
 }
 
 /**

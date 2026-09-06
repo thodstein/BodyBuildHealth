@@ -139,6 +139,7 @@ export function ArmAutoConstructor() {
   const [cycComp, setCycComp] = useState<boolean>(false);
   const [cycMedley, setCycMedley] = useState<string>('');
   const [cycFor, setCycFor] = useState<boolean>(false);
+  const [cycForSpec, setCycForSpec] = useState<string>('support');
 
   // TOP wave-13: автоподстановка веса/возраста из профиля (только пустые поля)
   useEffect(() => {
@@ -378,6 +379,7 @@ export function ArmAutoConstructor() {
         compPeriod: cycAkimov && cycComp ? true : undefined,
         medleyId: cycMedley || undefined,
         forMode: cycFor || undefined,
+        forSpecialization: cycFor ? (cycForSpec as any) : undefined,
         tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
         tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
         calStartIso: proDate || undefined,
@@ -722,6 +724,11 @@ export function ArmAutoConstructor() {
                 <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAkimov} onChange={e=>setCycAkimov(e.target.checked)} /> Акимов-крюк</label>
                 {cycAkimov && <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycComp} onChange={e=>setCycComp(e.target.checked)} /> Соревн. период</label>}
                 <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFor} onChange={e=>setCycFor(e.target.checked)} /> FOR-7 (adv+)</label>
+                {cycFor && <label style={{ ...SMALL }}>FOR-домен<br/>
+                  <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)} style={{ background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px' }}>
+                    <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
+                  </select>
+                </label>}
               </div>
               {cycId && (()=>{
                 try {

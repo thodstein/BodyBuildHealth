@@ -2,12 +2,36 @@
  * arm-export.engine.ts — экспорт арм-плана (print / ics), как bb-export / pl-export.
  */
 import type { ArmPlan } from './arm-types';
+import type { ArmProSummary } from './arm-pro-integration.engine';
 
 function esc(s: string): string {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Array<{ level: string; text: string }>; humerusWarnings?: string[]; balanceWarnings?: string[]; asymmetryPct?: number; benchLevel?: string; fatigue?: string; trend?: string; info?: string[] }): string {
+/**
+ * R6: структурированная PRO-сводка тренера в печати (потребитель
+ * buildArmProSummary — раньше сводка жила только в движке/тестах).
+ * Все пользовательские строки через esc (XSS-safe). Без сводки — пусто.
+ */
+export function buildArmProSummaryHtml(s: ArmProSummary | null | undefined): string {
+  if (!s) return '';
+  const rows: string[] = [];
+  if (s.waf) rows.push(`WAF ${esc(s.waf.ageGroup)} · кат. ${esc(s.waf.weightClass)} кг · зачётов ${s.waf.entries} — ${esc(s.waf.weighInNote)}`);
+  if (s.bilateral) rows.push(`L/R: асимметрия ${s.bilateral.asymmetryPct}% (слабая ${esc(s.bilateral.weakArm)} ${s.bilateral.weakSets}/${s.bilateral.strongSets})`);
+  if (s.cut) rows.push(`Сгонка: ${esc(s.cut.note)}`);
+  if (s.cycle) rows.push(`Цикл: ${esc(s.cycle.name)} (${s.cycle.weeks} нед, fit ${esc(s.cycle.fit)}, тейпер ${esc(s.cycle.taperPreset)})`);
+  if (s.medley) rows.push(`Медли: ${esc(s.medley.name)} — лучшие ${s.medley.best.join(' + ')} = ${s.medley.total}`);
+  if (s.coc) rows.push(`CoC: work ${esc(s.coc.working)}${s.coc.challenge ? ` → challenge ${esc(s.coc.challenge)}` : ''}`);
+  if (s.regimen) rows.push(`Режим: ${s.regimen.lines.map(esc).join(' · ')}`);
+  if (s.supermatch) rows.push(`Суперматч: ${s.supermatch.rounds} раундов, TUT ${s.supermatch.tutSec}с`);
+  if (s.sparring) rows.push(`Спарринг ${s.sparring.intensityPct}%: ${s.sparring.allowed ? 'допущен' : 'ЗАПРЕЩЁН'}`);
+  if (s.attempts) rows.push(`Помост ${esc(s.attempts.implement)}: ${s.attempts.attempts.join(' / ')} (${s.attempts.wrPct}% WR)`);
+  if (s.autoreg) rows.push(`Авторегуляция: объём ×${s.autoreg.volumeMult}, RIR+${s.autoreg.rirShift}`);
+  if (rows.length === 0) return '';
+  return `<div style="margin:10px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f0fdf4"><h3 style="margin:0 0 6px;color:#15803d">📋 PRO-сводка тренера</h3><div style="font-size:11px;color:#334155">${rows.map((r) => `<div>• ${r}</div>`).join('')}</div></div>`;
+}
+
+export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Array<{ level: string; text: string }>; humerusWarnings?: string[]; balanceWarnings?: string[]; asymmetryPct?: number; benchLevel?: string; fatigue?: string; trend?: string; info?: string[] }, proSummary?: ArmProSummary | null): string {
   const phaseColor: Record<string, string> = { accumulation:'#22c55e', intensification:'#f59e0b', deload:'#60a5fa', peaking:'#ef4444' };
   const gantt = `<div style="display:flex;gap:2px;margin:8px 0">${plan.weeks.map(wk=>`<div style="flex:1;height:18px;background:${phaseColor[wk.phase]||'#94a3b8'};border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700">${wk.week}</div>`).join('')}</div><div style="display:flex;gap:8px;font-size:10px;color:#64748b;margin-bottom:8px"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px"></span> накопление <span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px"></span> интенсификация <span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px"></span> пик <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:2px"></span> делод</div>`;
   const rows = plan.weeks.map(wk => {
@@ -33,7 +57,8 @@ export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Arra
   const infoBlock = diagnostics?.info?.length ? `<div style="font-size:10px;color:#64748b;margin-top:4px">${diagnostics.info.map(esc).join(' · ')}</div>` : '';
   const diagBlock = diagnostics ? `<div style="margin:10px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc"><h3 style="margin:0 0 6px;color:#b45309">🔬 Диагностика — сустав/сухожилие (механизм)</h3><div style="font-size:11px;color:#334155">${jointFindings || '<div>Нет данных</div>'}${humerusBlock}${balanceBlock}<div style="margin-top:6px">Асимметрия ${diagnostics.asymmetryPct ?? '—'}% · Bench ${esc(diagnostics.benchLevel||'—')}</div><div>${esc(diagnostics.fatigue||'')} ${esc(diagnostics.trend||'')}</div></div><div style="font-size:10px;color:#64748b;margin-top:4px">WR RT M 130.5 / F 77.2 · WAF весовые · Каталог 72 · tendonCap 1.2× vs Muscle 1.7×</div>${infoBlock}</div>` : '';
   const header = `<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px"><div style="flex:1"><h1 style="margin:0">🤝 Арм-план — ${esc(plan.pattern.name)}</h1><p style="margin:4px 0;font-size:11px;color:#64748b">${plan.weeks.length} нед · ${esc(plan.level||'')} · ${esc(plan.discipline||'')} · ${esc(plan.technique||'')} · ${new Date().toLocaleDateString('ru-RU')}</p><p style="margin:6px 0;font-size:11px">${plan.rationale.map(r=>esc(r)).join('<br/>')}</p></div><div style="text-align:center"><img src="${qrUrl}" width="110" height="110" style="border:1px solid #e2e8f0;border-radius:8px" alt="QR"/><div style="font-size:9px;color:#94a3b8;margin-top:4px">QR: ${esc(plan.pattern.id)}</div></div></div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Арм-план ${esc(plan.pattern.name)}</title><style>body{font-family:system-ui;padding:20px} table{border-collapse:collapse;width:100%} h3{color:#0a6} h4{color:#333} @media print{body{padding:10px} img{max-width:110px}}</style></head><body>${header}${diagBlock}${gantt}${rows}<p style="margin-top:16px;font-size:10px;color:#94a3b8">PRO: РУ/РА/РН, tendonCap 1.2× vs Muscle 1.7×, humerus guard ≤10%/нед RIR≥2, table ≥50% — Кузнецов VIII, WR RT 130.5/77.2, каталог 72. Печать: Ctrl+P → Save as PDF.</p><script>window.onload=()=>window.print()</script></body></html>`;
+  const proBlock = buildArmProSummaryHtml(proSummary);
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Арм-план ${esc(plan.pattern.name)}</title><style>body{font-family:system-ui;padding:20px} table{border-collapse:collapse;width:100%} h3{color:#0a6} h4{color:#333} @media print{body{padding:10px} img{max-width:110px}}</style></head><body>${header}${proBlock}${diagBlock}${gantt}${rows}<p style="margin-top:16px;font-size:10px;color:#94a3b8">PRO: РУ/РА/РН, tendonCap 1.2× vs Muscle 1.7×, humerus guard ≤10%/нед RIR≥2, table ≥50% — Кузнецов VIII, WR RT 130.5/77.2, каталог 72. Печать: Ctrl+P → Save as PDF.</p><script>window.onload=()=>window.print()</script></body></html>`;
 }
 
 export function buildArmIcs(plan: ArmPlan, startDateIso?: string): string {

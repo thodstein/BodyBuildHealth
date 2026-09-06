@@ -104,4 +104,23 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     expect(document.body.textContent).toContain('Contest-sim');
   });
+
+  it('FOR-7: включение показывает селект домена', () => {
+    render(<ArmAutoConstructor />);
+    expect(document.body.textContent).not.toContain('FOR-домен');
+    fireEvent.click(screen.getByLabelText(/FOR-7/));
+    expect(document.body.textContent).toContain('FOR-домен');
+    fireEvent.change(screen.getByDisplayValue('Поддержка'), { target: { value: 'crush' } });
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(document.body.textContent).toContain('FOR-7');
+  });
+
+  it('цикл: выбор toproll_6 показывает fit-подсказку', () => {
+    render(<ArmAutoConstructor />);
+    const sel = screen.getByDisplayValue('— обычный план —') as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: 'toproll_6' } });
+    // окно 8 vs цикл 6 → proposed + просьба согласия
+    expect(document.body.textContent).toMatch(/Цикл: Окно 8/);
+    expect(document.body.textContent).toMatch(/согласие/);
+  });
 });
