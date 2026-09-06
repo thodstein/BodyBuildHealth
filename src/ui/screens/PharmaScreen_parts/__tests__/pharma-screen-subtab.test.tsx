@@ -21,7 +21,7 @@ describe('PharmaScreen — initialSubTab', () => {
     await waitFor(() => {
       expect(screen.queryByText('Фармакология')).toBeNull();
     });
-    expect(screen.getByText(/📋 Курс/)).toBeTruthy();
+    expect(screen.getAllByText('Курс').length).toBeGreaterThan(0);
   });
 
   it("'reports' — открывает страницу «Фарма-отчёт» с кнопкой генерации", async () => {

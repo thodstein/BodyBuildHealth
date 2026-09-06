@@ -1,6 +1,7 @@
 /**
- * dashboard-first-run.test.tsx — лендинг Главной APK: hero + 3 кнопки
- * (Профиль/Магазин/Статьи), без приветствий/статистики/плиток.
+ * dashboard-first-run.test.tsx — лендинг Главной APK: hero + сводка дня +
+ * CTA + карусель разделов + 3 кнопки (Профиль/Магазин/Статьи),
+ * без приветствий.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
@@ -39,7 +40,7 @@ afterEach(() => {
 });
 
 describe('DashboardNative landing', () => {
-  it('только hero + 3 кнопки, без приветствий и статистики', () => {
+  it('hero + сводка + CTA + карусель + 3 кнопки, без приветствий', () => {
     setCapacitorNative();
     resetAppPlatformCache();
     const { container } = render(<DashboardNative />);
@@ -49,7 +50,10 @@ describe('DashboardNative landing', () => {
     expect(screen.getByText('Магазин')).not.toBeNull();
     expect(screen.getByText('Статьи')).not.toBeNull();
     expect(screen.queryByText(/Доброе утро|Добрый день|Добрый вечер|Доброй ночи/)).toBeNull();
-    expect(screen.queryByText('Тренинг')).toBeNull();
+    // Карусель разделов (волна A): 6 рабочих табов с SVG.
+    expect(container.querySelectorAll('.native-home-rail-item').length).toBe(6);
+    expect(container.querySelectorAll('.native-home-today .native-home-stat').length).toBe(3);
+    expect(container.querySelector('.native-home-cta')).not.toBeNull();
     expect(screen.queryByText('Разделы')).toBeNull();
   });
 
