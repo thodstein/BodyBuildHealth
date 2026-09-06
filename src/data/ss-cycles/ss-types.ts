@@ -31,6 +31,8 @@ export interface SSExerciseSpec {
   group: string; // olympic/legs/back/shoulders/strongman/accessory
   coef: number; // коэф. тяжести (как в lms)
   sets: SSSetSpec[];
+  /** Роль в сессии (для methodology-порядка и accessory-first срезок). Дефолт primary. */
+  role?: 'primary' | 'accessory';
   /** Переопределение базы ПМ: ключ workMax (deadlift/backSquat/...) вместо авто-определения. */
   base?: string;
   /** Множитель к базе (аксессуары: тяга в наклоне 0.5 от тяги, махи 0.3 от жима). */

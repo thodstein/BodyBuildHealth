@@ -18,6 +18,11 @@ import { rirForWeek, phaseForWeek, pmForWeek } from './strength-sport-progressio
 import { tempoForSS, restForSS } from './strength-sport-loading';
 import { warmupRampFor } from './strength-sport-warmup';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
+import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER } from './strength-sport-taper.engine';
+import { applyDUP } from './strength-sport-dup';
+import { applyIntensity } from './strength-sport-intensity';
+import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
+import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
 import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, validateWeightCutProtocolSS } from './strength-sport-weight-cut.engine';
 import { hrvReport } from './strength-sport-hrv.engine';
 import { velocityWeightAdjustFactor, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
@@ -108,6 +113,51 @@ function trendFor(id: string, trends: Array<{ lift: string; changePct: number }>
   ) || null;
 }
 
+// Недельный бюджет сетов — формула билдера (level × PED × lab × nutrition × recovery)
+function ssWeeklyBudget(input: StrengthSportInput, wcProto: any): number {
+  const levelBase: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
+  const baseSets = levelBase[(input.level as string) || 'intermediate'] ?? 85;
+  let mrvMult = 1;
+  try { mrvMult = adaptForPEDsSS(input.peds, (input as any).pedDoses, (input as any).courseIntensity, !!wcProto)?.mrvMult ?? 1; } catch { /* PED недоступны */ }
+  const lab = (input as any).labMrvMultiplier ?? 1;
+  let nut = 1;
+  try { nut = computeNutritionMultiplier({ calorieSurplus: (input as any).calorieSurplus, proteinPerKg: (input as any).proteinPerKg } as any); } catch { /* noop */ }
+  let rec = 1;
+  try {
+    rec = computeRecoveryMultiplier({ bodyFat: (input as any).bodyFat, leanMass: (input as any).leanMass, hrvMs: (input as any).hrvMs, sleepHours: (input as any).sleepHours, stressLevel: (input as any).stressLevel });
+  } catch { /* noop */ }
+  return Math.round(baseSets * mrvMult * lab * nut * rec);
+}
+
+// Порядок методики — как orderByMethod билдера (по role; faithful порядок не трогаем)
+function orderByMethodSS(exs: StrengthSportExercise[], method?: string): StrengthSportExercise[] {
+  if (method === 'pre_exhaust') return [...exs].sort((a, b) => (a.role === 'accessory' ? -1 : 1) - (b.role === 'accessory' ? -1 : 1));
+  if (method === 'post_exhaust') return [...exs].sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
+  return exs;
+}
+
+// Дата-тейпер по дням до старта — паритет с билдером (cessation + Winwood/WL)
+function dateTaperForWeek(id: string, w: number, weeks: number, phase: string, ssMode: string, compDate: string | undefined, startDate: string | undefined): { setsMult: number; weightMult: number; rir: number; kind: 'cessation' | 'winwood'; daysOut: number } | null {
+  if (!compDate || !startDate) return null;
+  try {
+    const wkStart = new Date(startDate);
+    wkStart.setDate(wkStart.getDate() + (w - 1) * 7);
+    const daysOut = Math.round((new Date(compDate).getTime() - wkStart.getTime()) / 86400000);
+    if (daysOut < 0 || daysOut > 14 || phase === 'deload') return null;
+    if (ssMode === 'weightlifting') {
+      if (daysOut < 4) return { setsMult: 0.60, weightMult: 0.90, rir: 2, kind: 'cessation', daysOut };
+      const tw: any = daysOut <= 7 ? (WL_TAPER as any)[1] : (WL_TAPER as any)[2];
+      if (!tw) return null;
+      return { setsMult: tw.volumeMult, weightMult: tw.intensityPctMult, rir: tw.assistance === 'none' ? 3 : tw.assistance === 'reduced' ? 2 : -1, kind: 'winwood', daysOut };
+    }
+    const need = (TAPER_CESSATION_DAYS as any)[id] ?? 5;
+    if (daysOut < need) return { setsMult: 0.45, weightMult: 0.50, rir: 3, kind: 'cessation', daysOut };
+    const tw: any = daysOut <= 3 ? (WINWOOD_TAPER as any)[1] : (WINWOOD_TAPER as any)[2];
+    if (!tw) return null;
+    return { setsMult: tw.volumeMult, weightMult: tw.intensityPctMult, rir: tw.assistance === 'none' ? 3 : tw.assistance === 'reduced' ? 2 : -1, kind: 'winwood', daysOut };
+  } catch { return null; }
+}
+
 // HRV-вес — паритет с билдером (dangerous ×0.85, caution ×0.94), чтение guarded
 function hrvWeightFactor(): { factor: number; zone: string | null } {
   try {
@@ -178,6 +228,10 @@ export function buildSSCyclePlan(
 
   const fallbackUsed = new Set<string>();
   const weeksData: StrengthSportWeek[] = [];
+  const contestEvents: any[] = Array.isArray((input as any).contest?.events) ? (input as any).contest.events : [];
+  const budget = ssWeeklyBudget(input, wcProto);
+  let methodologyNoted = false;
+  let dateTaperApplied = false;
 
   for (let w = 1; w <= weeks; w++) {
     const days: SSDaySpec[] = t.weeks[w - 1] || [];
@@ -195,9 +249,13 @@ export function buildSSCyclePlan(
         const meta = exMeta(espec.id, espec.name, espec.group);
         const base = baseForExercise(espec, input.workMax || {});
         const gentle = gentleFactor(espec.id, input.injuries as any);
-        const workSets: StrengthSportSet[] = [];
+        let workSets: StrengthSportSet[] = [];
         let totalSets = 0;
         for (const ss of espec.sets) totalSets += ss.sets;
+        // Контест-цель и дата-тейпер недели — как в билдере (оба режима)
+        const ce = contestEvents.find((e: any) => e && e.id === espec.id);
+        const dateTaper = dateTaperForWeek(espec.id, w, weeks, phase, ssMode, input.competitionDate, (input as any).startDate);
+        let contestHit = false;
 
         for (const ss of espec.sets) {
           // Вес: faithful — ПМ × % дословно; adapt — через pmForWeek-дрейф
@@ -220,6 +278,15 @@ export function buildSSCyclePlan(
           }
           // Травмы — всегда (безопасность выше дословности)
           if (gentle < 1 && weight > 0) weight = round25(weight * gentle);
+          // Контест-прогрессия к заявке — паритет с билдером (оба режима)
+          if (ce && ce.weight > 0 && weight > 0 && !isDeload && dateTaper?.kind !== 'winwood') {
+            const progress = weeks > 1 ? (w - 1) / (weeks - 1) : 1;
+            const targetW = ce.weight;
+            const startW = Math.round(targetW * 0.85 / 2.5) * 2.5;
+            const contestW = Math.round((startW + (targetW - startW) * progress) / 2.5) * 2.5;
+            weight = Math.min(contestW, Math.max(weight, contestW * 0.85));
+            contestHit = true;
+          }
           let rir = ss.rir ?? rirForWeek(w, weeks, goal, isOly(espec.id));
           if (isDeload || isTaper) rir = 4;
           else if (gentle < 1) rir = Math.min(4, rir + 1);
@@ -239,6 +306,20 @@ export function buildSSCyclePlan(
             else if ((EVENT_META as any)[espec.id]?.defaultTimeCapS) (ws as any).timeCapS = (EVENT_META as any)[espec.id].defaultTimeCapS;
             workSets.push(ws);
           }
+        }
+
+        // Контест-дистанция + дата-тейпер — как в билдере (оба режима)
+        let dateTaperNote: string | null = null;
+        if (ce?.distanceM && isCarryEvent(espec.id)) {
+          workSets.forEach((ws: any) => { ws.distanceM = ce.distanceM; if (ce.timeCapS) ws.timeCapS = ce.timeCapS; });
+        }
+        if (dateTaper) {
+          const minS = espec.id === 'tire_flip' ? 1 : 2;
+          if (workSets.length > minS) workSets = workSets.slice(0, Math.max(minS, Math.round(workSets.length * dateTaper.setsMult)));
+          if (dateTaper.weightMult < 1) workSets = workSets.map(s => (s.weight > 0 ? { ...s, weight: round25(s.weight * dateTaper.weightMult) } : s));
+          if (dateTaper.rir >= 0) workSets = workSets.map(s => ({ ...s, rir: dateTaper.rir }));
+          dateTaperNote = `Дата-тейпер ${dateTaper.daysOut}д до старта`;
+          dateTaperApplied = true;
         }
 
         // Adapt-гарды — паритет с билдером (faithful — без срезок, дословно)
@@ -295,6 +376,9 @@ export function buildSSCyclePlan(
 
         const comments: string[] = [];
         if (espec.sets.some(s => s.amrap)) comments.push('AMRAP последнего сета (с запасом, без гроба)');
+        if (contestHit && ce) comments.push(`Контест-прогрессия → ${ce.weight}кг`);
+        if (ce?.distanceM && isCarryEvent(espec.id)) comments.push(`Дистанция контеста ${ce.distanceM}м`);
+        if (dateTaperNote) comments.push(dateTaperNote);
         if (!hasSpecialty && isStrong(espec.id)) {
           const coeff = (STRONG_FALLBACK_COEFF as any)[espec.id] ?? 0.85;
           comments.push(`Замена без снаряда ×${coeff}`);
@@ -308,7 +392,7 @@ export function buildSSCyclePlan(
           name: meta.name,
           group: meta.group,
           pattern: meta.pattern,
-          role: 'primary',
+          role: ((espec as any).role || 'primary') as any,
           character: d.character,
           sets: finalSets.length,
           reps: finalSets.length ? String(finalSets[0].reps) : '—',
@@ -331,7 +415,32 @@ export function buildSSCyclePlan(
       } as StrengthSportSession);
     }
 
-    const totalSets = sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.sets, 0), 0);
+    // Методика порядка — как в билдере (только adapt; faithful держит раскладку источника)
+    const methodology = (input as any).methodology as string | undefined;
+    if (mode === 'adapt' && methodology && methodology !== 'compound_first') {
+      for (const s of sessions) s.exercises = orderByMethodSS(s.exercises, methodology);
+      if (!methodologyNoted) { rationale.push(`Методика ${methodology}: порядок в сессиях переупорядочен (adapt)`); methodologyNoted = true; }
+    } else if (mode === 'faithful' && methodology && methodology !== 'compound_first' && !methodologyNoted) {
+      warnings.push(`Дословный режим: порядок методики ${methodology} не применялся (faithful держит раскладку источника)`);
+      methodologyNoted = true;
+    }
+
+    // Кап недельного бюджета — формула билдера (adapt режет accessory-first, faithful предупреждает)
+    let totalSets = sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.sets, 0), 0);
+    if (mode === 'adapt' && totalSets > budget) {
+      const over0 = totalSets - budget;
+      let over = over0;
+      const all = sessions.flatMap(s => s.exercises).sort((a, b) => (a.role === 'accessory' ? 0 : 1) - (b.role === 'accessory' ? 0 : 1));
+      for (const e of all) {
+        const minS = e.id === 'tire_flip' ? 1 : 2;
+        while (over > 0 && e.sets > minS) { e.sets--; e.workSets.pop(); over--; }
+        if (over <= 0) break;
+      }
+      totalSets = sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.sets, 0), 0);
+      warnings.push(`Нед ${w}: объём ${over0 + budget} > бюджет ${budget} — срезан accessory-first (adapt)`);
+    } else if (mode === 'faithful' && totalSets > budget) {
+      warnings.push(`Нед ${w}: объём ${totalSets} > бюджет ${budget} — оставлен дословно (faithful)`);
+    }
     const totalTonnage = sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.workSets.reduce((q, ws) => q + ws.weight * ws.reps, 0), 0), 0);
     weeksData.push({ week: w, phase, deload: isDeload, taper: isTaper, sessions, totalSets, totalTonnage } as StrengthSportWeek);
   }
@@ -343,6 +452,9 @@ export function buildSSCyclePlan(
   }
   if (mode === 'faithful' && (acwr?.zone === 'dangerous' || acwr?.zone === 'caution')) {
     warnings.push(`Дословный режим: ACWR ${acwr?.zone} НЕ резал объём (faithful). Для авто-срезок — режим adapt.`);
+  }
+  if (dateTaperApplied && input.competitionDate) {
+    rationale.push(`Дата-тейпер к старту ${input.competitionDate}: ближние недели ужаты по Winwood/cessation (как в билдере)`);
   }
 
   const snap: any = {
@@ -365,5 +477,19 @@ export function buildSSCyclePlan(
     rationale,
     inputSnapshot: snap,
   };
+  // DUP / интенсив-техника поверх цикла — как в билдере (только adapt)
+  const dupMode = (input as any).dupMode as string | undefined;
+  const intensityTech = (input as any).intensityTech as string | undefined;
+  if (mode === 'adapt') {
+    if (dupMode && dupMode !== 'off') {
+      try { applyDUP({ weeksData, level: plan.level, rationale: [] } as any, dupMode as any); rationale.push(`DUP ${dupMode} применён поверх цикла`); } catch { /* DUP недоступен */ }
+    }
+    if (intensityTech && intensityTech !== 'none') {
+      try { applyIntensity({ weeksData, level: plan.level, rationale: [] } as any, intensityTech as any); rationale.push(`Интенсив-техника ${intensityTech} применена поверх цикла`); } catch { /* техника недоступна */ }
+    }
+  } else if ((dupMode && dupMode !== 'off') || (intensityTech && intensityTech !== 'none')) {
+    warnings.push('Дословный режим: DUP/интенсив-техника проигнорированы (faithful)');
+    plan.validation = { ok: errors.length === 0, warnings, errors };
+  }
   return plan;
 }

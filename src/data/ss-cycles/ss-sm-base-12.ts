@@ -18,16 +18,16 @@ const day = (tag: SSDaySpec['tag'], character: SSDaySpec['character'], ...exerci
 
 const pressAccessories = (): SSExerciseSpec[] => [
   ex('pullup', 'Подтягивания (или резина ×2 повторы)', 'back', 0.6, [s(0, 5, 5)], { bodyweight: true }),
-  ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1 }),
+  ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
   ex('ohp', 'Жим сидя с пола (Z-press)', 'shoulders', 0.7, [s(0.50, 8, 2)]),
-  ex('lateral_raise', 'Подъёмы через стороны 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1 }),
-  ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench' }),
-  ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench' }),
+  ex('lateral_raise', 'Подъёмы через стороны 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
+  ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
+  ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench', role: 'accessory' }),
 ];
 
 const legFinisher = (): SSExerciseSpec[] => [
-  ex('rdl', 'Наклоны/GHR (задняя цепь)', 'legs', 0.6, [s(0.40, 8, 3)], { base: 'deadlift', baseMult: 1 }),
-  ex('ab_rollout', 'Ролик для пресса', 'accessory', 0.3, [s(0, 8, 3)], { bodyweight: true }),
+  ex('rdl', 'Наклоны/GHR (задняя цепь)', 'legs', 0.6, [s(0.40, 8, 3)], { base: 'deadlift', baseMult: 1, role: 'accessory' }),
+  ex('ab_rollout', 'Ролик для пресса', 'accessory', 0.3, [s(0, 8, 3)], { bodyweight: true, role: 'accessory' }),
 ];
 
 // bump — шаг правила источника (+2.5кг ≈ +0.025 к % приседа/тяги каждую волну)
@@ -38,25 +38,25 @@ function monday(w: number, bump: number): SSDaySpec {
   if (w === 2) return day('overhead_day', 'тяж',
     ex('clean_and_jerk', 'Взятие + жим 80-85% 5x5', 'olympic', 1.3, [s(0.80, 5, 3), s(0.85, 5, 2)]),
     ex('pullup', 'Подтягивания 5x8', 'back', 0.6, [s(0, 8, 5)], { bodyweight: true }),
-    ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1 }),
+    ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
     ex('ohp', 'Жим сидя с пола (Z-press)', 'shoulders', 0.7, [s(0.50, 8, 2)]),
-    ex('lateral_raise', 'Подъёмы 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1 }),
-    ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench' }),
-    ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench' }));
+    ex('lateral_raise', 'Подъёмы 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
+    ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
+    ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench', role: 'accessory' }));
   if (w === 3) return day('overhead_day', 'тяж',
     ex('ohp', 'Жим стоя со стоек x5', 'shoulders', 1.2, [s(0.78 + bump, 5, 3)]),
     ex('pullup', 'Подтягивания 5x10', 'back', 0.6, [s(0, 10, 5)], { bodyweight: true }),
-    ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1 }),
+    ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
     ex('ohp', 'Жим сидя с пола (Z-press)', 'shoulders', 0.7, [s(0.50, 8, 2)]),
-    ex('lateral_raise', 'Подъёмы 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1 }),
-    ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench' }),
-    ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench' }));
+    ex('lateral_raise', 'Подъёмы 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
+    ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
+    ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench', role: 'accessory' }));
   if (w === 4) return day('overhead_day', 'лёг',
     ex('ohp', 'Жим со стоек 60% 3x5 (делод)', 'shoulders', 0.8, [s(0.60, 5, 3)]),
-    ex('rope_climb', 'Канат x5', 'back', 0.5, [s(0, 1, 5)], { bodyweight: true }),
+    ex('rope_climb', 'Канат x5', 'back', 0.5, [s(0, 1, 5)], { bodyweight: true, role: 'accessory' }),
     ex('pullup', 'Подтягивания 3x5', 'back', 0.5, [s(0, 5, 3)], { bodyweight: true }),
-    ex('face_pull', 'Протяжка к лицу 3x20', 'shoulders', 0.4, [s(0.30, 20, 3)], { base: 'overheadPress', baseMult: 1 }),
-    ex('db_press', 'Жим гантелей сидя 3x10', 'shoulders', 0.6, [s(0.50, 10, 3)], { base: 'bench' }));
+    ex('face_pull', 'Протяжка к лицу 3x20', 'shoulders', 0.4, [s(0.30, 20, 3)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
+    ex('db_press', 'Жим гантелей сидя 3x10', 'shoulders', 0.6, [s(0.50, 10, 3)], { base: 'bench', role: 'accessory' }));
   // Волна 2 (нед.5 показана в источнике, нед.6-7 — её продолжением)
   return day('overhead_day', 'тяж',
     ex('clean_and_jerk', 'Взятие + жим 75-85% 3x3', 'olympic', 1.3, [s(0.75, 3, 1), s(0.80, 3, 1), s(0.85, 3, 1)]),
@@ -76,9 +76,9 @@ function tuesday(w: number, bump: number): SSDaySpec {
   if (waveW === 4) {
     return day('squat_day', 'лёг',
       ex('back_squat', 'Присед 60% 5x5 (делод)', 'legs', 0.8, bsq),
-      ex('bulgarian_split', 'Выпады с весом тела 2x50м', 'legs', 0.4, [s(0, 20, 2)], { bodyweight: true }),
+      ex('bulgarian_split', 'Выпады с весом тела 2x50м', 'legs', 0.4, [s(0, 20, 2)], { bodyweight: true, role: 'accessory' }),
       ex('sled_push_sprint', 'Сани/покрышка 5x25м', 'strongman', 0.5, [s(0.55, 1, 5, { distanceM: 25 })]),
-      ex('plank', 'Планка 3x60с', 'accessory', 0.2, [s(0, 60, 3)], { bodyweight: true }));
+      ex('plank', 'Планка 3x60с', 'accessory', 0.2, [s(0, 60, 3)], { bodyweight: true, role: 'accessory' }));
   }
   const carry = waveW === 2
     ? ex('sandbag_carry', 'Фронтальная переноска 2x50м', 'strongman', 0.8, [s(0.65, 1, 2, { distanceM: 50, timeCapS: 90 })])
@@ -87,22 +87,22 @@ function tuesday(w: number, bump: number): SSDaySpec {
     ex('front_squat', 'Фронтальный с паузой (пирамида)', 'legs', 1.2, paused),
     ex('back_squat', 'Присед задний 2x8', 'legs', 1.2, bsq),
     carry,
-    ex('bulgarian_split', 'Выпады со штангой', 'legs', 0.6, [s(0.30, waveW === 1 ? 8 : 10, 3)], { base: 'backSquat' }),
+    ex('bulgarian_split', 'Выпады со штангой', 'legs', 0.6, [s(0.30, waveW === 1 ? 8 : 10, 3)], { base: 'backSquat', role: 'accessory' }),
     ...(waveW === 3
       ? [ex('sled_push_sprint', 'Сани/покрышка 5x50м, отдых 2 мин', 'strongman', 0.7, [s(0.65, 1, 5, { distanceM: 50, timeCapS: 120 })])]
       : [ex('sled_drag', 'Тяга покрышки спиной 2x25м', 'strongman', 0.6, [s(0.60, 1, 2, { distanceM: 25, timeCapS: 60 })])]),
-    ex('plank', 'Планка с весом 3x60с', 'accessory', 0.3, [s(0, 60, 3)], { bodyweight: true }));
+    ex('plank', 'Планка с весом 3x60с', 'accessory', 0.3, [s(0, 60, 3)], { bodyweight: true, role: 'accessory' }));
 }
 
 function thursday(w: number, _bump: number): SSDaySpec {
   const waveW = w <= 4 ? w : w <= 8 ? w - 4 : w - 8;
   if (waveW === 4) {
     return day('overhead_day', 'лёг',
-      ex('db_press', 'Жим гантелей наклонный 2x20', 'shoulders', 0.5, [s(0.50, 20, 2)], { base: 'bench' }),
-      ex('row_db', 'Тяга гантели 2x20', 'back', 0.4, [s(0.25, 20, 2)], { base: 'deadlift', baseMult: 1 }),
-      ex('hammer_curl', 'Молотки 3x12', 'shoulders', 0.3, [s(0.20, 12, 3)], { base: 'bench' }),
-      ex('db_shrug', 'Шраги 3x12', 'back', 0.3, [s(0.40, 12, 3)], { base: 'deadlift', baseMult: 1 }),
-      ex('tricep_pushdown', 'Трицепс 3x15', 'shoulders', 0.3, [s(0.15, 15, 3)], { base: 'bench' }),
+      ex('db_press', 'Жим гантелей наклонный 2x20', 'shoulders', 0.5, [s(0.50, 20, 2)], { base: 'bench', role: 'accessory' }),
+      ex('row_db', 'Тяга гантели 2x20', 'back', 0.4, [s(0.25, 20, 2)], { base: 'deadlift', baseMult: 1, role: 'accessory' }),
+      ex('hammer_curl', 'Молотки 3x12', 'shoulders', 0.3, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
+      ex('db_shrug', 'Шраги 3x12', 'back', 0.3, [s(0.40, 12, 3)], { base: 'deadlift', baseMult: 1, role: 'accessory' }),
+      ex('tricep_pushdown', 'Трицепс 3x15', 'shoulders', 0.3, [s(0.15, 15, 3)], { base: 'bench', role: 'accessory' }),
       ex('farmers_walk_heavy', 'Фермер 5x25м', 'strongman', 0.6, [s(0.65, 1, 5, { distanceM: 25, timeCapS: 60 })]));
   }
   const ohpSets = waveW === 1 ? [s(0.60, 10, 5)] : waveW === 2 ? [s(0.62, 10, 4)] : [s(0.65, 8, 5)];
@@ -111,11 +111,11 @@ function thursday(w: number, _bump: number): SSDaySpec {
   return day('overhead_day', 'тяж',
     ex('ohp', 'Жим стоя строго', 'shoulders', 1.1, ohpSets),
     ex('yoke_walk', 'Йок 5x25м', 'strongman', 1.1, [s(0.75, 1, 5, { distanceM: 25, timeCapS: 60 })]),
-    ex('db_press', 'Жим гантелей наклонный', 'shoulders', 0.7, dbSets, { base: 'bench' }),
-    ex('row_db', 'Тяга гантели', 'back', 0.6, rowSets, { base: 'deadlift', baseMult: 1 }),
-    ex('hammer_curl', 'Молотки 3x12', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench' }),
-    ex('db_shrug', 'Шраги 3x10-12', 'back', 0.4, [s(0.40, 12, 3)], { base: 'deadlift', baseMult: 1 }),
-    ex('tricep_pushdown', 'Трицепс 3x15', 'shoulders', 0.4, [s(0.15, 15, 3)], { base: 'bench' }));
+    ex('db_press', 'Жим гантелей наклонный', 'shoulders', 0.7, dbSets, { base: 'bench', role: 'accessory' }),
+    ex('row_db', 'Тяга гантели', 'back', 0.6, rowSets, { base: 'deadlift', baseMult: 1, role: 'accessory' }),
+    ex('hammer_curl', 'Молотки 3x12', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
+    ex('db_shrug', 'Шраги 3x10-12', 'back', 0.4, [s(0.40, 12, 3)], { base: 'deadlift', baseMult: 1, role: 'accessory' }),
+    ex('tricep_pushdown', 'Трицепс 3x15', 'shoulders', 0.4, [s(0.15, 15, 3)], { base: 'bench', role: 'accessory' }));
 }
 
 function saturday(w: number, bump: number): SSDaySpec {

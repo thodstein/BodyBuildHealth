@@ -8,7 +8,7 @@
 import type { SSCycleTemplate, SSDaySpec, SSExerciseSpec, SSSetSpec } from './ss-types';
 
 const s = (pct: number, reps: number, sets = 1, extra?: Partial<SSSetSpec>): SSSetSpec => ({ pct, reps, sets, ...extra });
-const ex = (id: string, name: string, group: string, coef: number, sets: SSSetSpec[]): SSExerciseSpec => ({ id, name, group, coef, sets });
+const ex = (id: string, name: string, group: string, coef: number, sets: SSSetSpec[], extra?: Partial<SSExerciseSpec>): SSExerciseSpec => ({ id, name, group, coef, sets, ...extra });
 const day = (tag: SSDaySpec['tag'], character: SSDaySpec['character'], ...exercises: SSExerciseSpec[]): SSDaySpec => ({ tag, character, exercises });
 
 // Рампа классики и приседа по неделям (дословно волна источника)
@@ -43,7 +43,7 @@ function buildWeek(w: number): SSDaySpec[] {
       ex('power_snatch', 'Рывок в полуприсед', 'olympic', 1.0, [s(Math.max(0.60, c - 0.05), 3, 4)]),
       ex('power_clean', 'Взятие в полуприсед', 'olympic', 1.0, [s(Math.max(0.60, c - 0.05), 3, 4)]),
       ex('muscle_snatch', 'Рывок силой рук', 'olympic', 0.6, [s(0.55, 3, 3)]),
-      ex('jerk_dip', 'Полуприсед толчковый', 'olympic', 0.6, [s(0.80, 5, 3)]),
+      ex('jerk_dip', 'Полуприсед толчковый', 'olympic', 0.6, [s(0.80, 5, 3)], { role: 'accessory' }),
     ),
     day('pull_day', 'тяж',
       ex('snatch', 'Рывок классический', 'olympic', 1.4, [s(c, 3, 2), s(Math.min(0.90, c + 0.05), 2, 3)]),

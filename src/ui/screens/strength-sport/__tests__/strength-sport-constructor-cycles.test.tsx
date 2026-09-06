@@ -48,4 +48,18 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-bulgarian'), { timeout: 5000 });
     expect(container.textContent).toContain('Daily-max');
   });
+
+  it('кнопка года собирает год из выбранных циклов', async () => {
+    const { container } = render(<StrengthSportConstructor />);
+    goToSplit(container);
+    fireEvent.click(screen.getByLabelText('Цикл'));
+    fireEvent.click(await screen.findByText(/общая база/));
+    await waitFor(() => expect(container.textContent).toContain('Дословно'));
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-general-8'), { timeout: 5000 });
+    // Annual-карточка появляется (автосборка из истории), жмём год из циклов
+    const yearBtn = await screen.findByText(/Год из циклов/);
+    fireEvent.click(yearBtn);
+    await waitFor(() => expect(container.textContent).toContain('Год из циклов:'), { timeout: 5000 });
+  });
 });

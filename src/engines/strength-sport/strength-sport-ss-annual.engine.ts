@@ -1,12 +1,14 @@
 /**
  * strength-sport-ss-annual.engine.ts — годовой план из интернет-циклов.
  * Каждый id собирается своим шаблоном (buildSSCyclePlan, дословно/adapt),
- * блоки компонуются через buildAnnualWithTaper: дата старта якорится
- * на последний блок (mock/тейпер цикла + taperWeeks).
+ * ПМ прогрессируют между блоками (applyMesocycleProgression — следующий блок
+ * стартует с максимумов предыдущего, а не с тех же), блоки компонуются через
+ * buildAnnualWithTaper: дата старта якорится на последний блок.
  * Ядро annual (strength-sport-annual) не меняется — только композиция.
  */
 import { getSSCycleById } from '../../data/ss-cycles/ss-cycle-index';
 import { buildSSCyclePlan, type SSCycleMode } from './strength-sport-ss-cycle-to-plan.engine';
+import { applyMesocycleProgression } from './strength-sport-mesocycle';
 import { buildAnnualWithTaper, validateAnnualSS, type AnnualSS } from './strength-sport-annual';
 import type { StrengthSportInput, StrengthSportPlan } from './strength-sport.types';
 
@@ -14,6 +16,8 @@ export interface SSAnnualBuildOpts {
   cycleMode?: SSCycleMode; // дефолт faithful
   competitionDate?: string;
   taperWeeks?: number;
+  /** false = каждый блок со стартовыми ПМ (legacy); true (дефолт) = прогрессия между блоками */
+  progressBetweenBlocks?: boolean;
 }
 
 export function buildAnnualFromSSCycles(
@@ -23,21 +27,32 @@ export function buildAnnualFromSSCycles(
 ): AnnualSS {
   if (!cycleIds.length) throw new Error('Нет циклов для годового плана');
   const mode = opts?.cycleMode || 'faithful';
-  const plans: StrengthSportPlan[] = cycleIds.map((id, idx) => {
+  const progress = opts?.progressBetweenBlocks ?? true;
+  const plans: StrengthSportPlan[] = [];
+  let carryInput: StrengthSportInput = baseInput;
+  cycleIds.forEach((id, idx) => {
     const t = getSSCycleById(id);
     if (!t) throw new Error(`SS-цикл не найден: ${id}`);
     const last = idx === cycleIds.length - 1;
     const days = Math.min(t.meta.sessionsPerWeekMax ?? t.meta.sessionsPerWeek, 6);
-    return buildSSCyclePlan(
+    const blockInput = {
+      ...carryInput,
+      weeks: t.meta.weeks,
+      daysPerWeek: days,
+      competitionDate: last ? opts?.competitionDate || baseInput.competitionDate : undefined,
+    } as StrengthSportInput;
+    const built = buildSSCyclePlan(
       t,
-      {
-        ...baseInput,
-        weeks: t.meta.weeks,
-        daysPerWeek: days,
-        competitionDate: last ? opts?.competitionDate || baseInput.competitionDate : undefined,
-      } as StrengthSportInput,
+      blockInput,
       { cycleMode: mode, bodyweight: (baseInput as any).bodyweight, sex: (baseInput as any).sex },
     );
+    plans.push(built);
+    // Следующий блок — с прогрессией от построенного (ПМ растут, а не стоят)
+    if (progress) {
+      try {
+        carryInput = applyMesocycleProgression(built, { ...carryInput, workMax: { ...(carryInput.workMax || {}) } }) as StrengthSportInput;
+      } catch { /* прогрессия недоступна — следующий блок со стартовыми ПМ */ }
+    }
   });
   const annual = buildAnnualWithTaper(plans, {
     competitionDate: opts?.competitionDate || baseInput.competitionDate,
