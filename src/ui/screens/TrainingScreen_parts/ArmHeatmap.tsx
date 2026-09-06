@@ -1,12 +1,13 @@
 /**
  * ArmHeatmap.tsx — тепловая карта для арм-плана (PRO).
  * Зеркало MesoHeatmap.tsx, но для 8 ключевых арм-групп.
+ * Редизайн на arm-design-system; логика и строки 1-в-1.
  */
 import React, { useMemo, useState } from 'react';
-import { CARD, DIM, DIM_STRONG, ACCENT } from './training-ui';
 import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engine';
 import type { ArmPlan } from '../../../engines/arm/arm-types';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
+import { AdCard } from './arm-design-system';
 
 const ARM_MUSCLES = ['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','grip_crush','thumb','side_pressure','back_pressure','shoulder_stab'] as const;
 
@@ -56,61 +57,63 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
   };
 
   return (
-    <div className="train-armheatmap" style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔥 Тепловая карта — арм</span>
-        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weeks} нед × {ARM_MUSCLES.length} групп</span>
-      </div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
-        🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <svg width={svgW} height={svgH} style={{ display: 'block' }} viewBox={`0 0 ${svgW} ${svgH}`}>
-          {Array.from({ length: weeks }, (_, wi) => (
-            <text key={wi} x={labelW + cellW * (wi + 0.5)} y={10} fontSize="9" fill={DIM} textAnchor="middle">{wi + 1}</text>
-          ))}
-          {ARM_MUSCLES.map((m, mi) => {
-            const lm = lmByMuscle[m];
-            return (
-              <g key={m}>
-                <text x={labelW - 4} y={18 + cellH * mi + cellH * 0.6} fontSize="9" fill={DIM_STRONG} textAnchor="end">{ARM_MUSCLE_RU[m] ?? m}</text>
-                {Array.from({ length: weeks }, (_, wi) => {
-                  const sets = grid[m]?.[wi] ?? 0;
-                  const c = colorFor(sets, lm);
-                  const isHover = hoverCell?.m === m && hoverCell?.w === wi;
-                  return (
-                    <g key={wi}>
-                      <rect
-                        x={labelW + cellW * wi}
-                        y={14 + cellH * mi}
-                        width={cellW - 1}
-                        height={cellH - 1}
-                        rx={2}
-                        fill={c}
-                        stroke={isHover ? '#fff' : 'transparent'}
-                        strokeWidth={isHover ? 1.5 : 0}
-                        onMouseEnter={() => setHoverCell({ m, w: wi })}
-                        onMouseLeave={() => setHoverCell(null)}
-                        onClick={() => onToast?.(`${ARM_MUSCLE_RU[m] ?? m}, нед ${wi + 1}: ${sets} сетов${lm ? ` (MRV ${lm.mrv})` : ''}`)}
-                        style={{ cursor: 'pointer' }}
-                      />
-                      <text x={labelW + cellW * (wi + 0.5)} y={14 + cellH * mi + cellH * 0.65} fontSize="8" fill={sets > 0 ? '#fff' : 'rgba(255,255,255,0.25)'} textAnchor="middle" pointerEvents="none">
-                        {sets > 0 ? sets : ''}
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      {hoverCell && (
-        <div style={{ fontSize: 10, color: 'var(--text-light, #fff)', marginTop: 4, fontFamily: 'monospace' }}>
-          {ARM_MUSCLE_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {grid[hoverCell.m]?.[hoverCell.w] ?? 0} сетов
-          {lmByMuscle[hoverCell.m] && ` (MEV ${lmByMuscle[hoverCell.m]!.mev} MAV ${lmByMuscle[hoverCell.m]!.mav} MRV ${lmByMuscle[hoverCell.m]!.mrv})`}
+    <div className="train-armheatmap">
+      <AdCard>
+        <div className="ad-sec-h">
+          <div className="ad-sec-t">🔥 Тепловая карта — арм</div>
+          <span className="ad-muted">{weeks} нед × {ARM_MUSCLES.length} групп</span>
         </div>
-      )}
+        <div className="ad-muted">
+          🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
+        </div>
+        <div className="ad-heat">
+          <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} role="img" aria-label="Тепловая карта объёма">
+            {Array.from({ length: weeks }, (_, wi) => (
+              <text key={wi} x={labelW + cellW * (wi + 0.5)} y={10} fontSize="9" fill="var(--text-dim, #9ab)" textAnchor="middle">{wi + 1}</text>
+            ))}
+            {ARM_MUSCLES.map((m, mi) => {
+              const lm = lmByMuscle[m];
+              return (
+                <g key={m}>
+                  <text x={labelW - 4} y={18 + cellH * mi + cellH * 0.6} fontSize="9" fill="var(--text-light, #fff)" textAnchor="end">{ARM_MUSCLE_RU[m] ?? m}</text>
+                  {Array.from({ length: weeks }, (_, wi) => {
+                    const sets = grid[m]?.[wi] ?? 0;
+                    const c = colorFor(sets, lm);
+                    const isHover = hoverCell?.m === m && hoverCell?.w === wi;
+                    return (
+                      <g key={wi}>
+                        <rect
+                          x={labelW + cellW * wi}
+                          y={14 + cellH * mi}
+                          width={cellW - 1}
+                          height={cellH - 1}
+                          rx={2}
+                          fill={c}
+                          stroke={isHover ? '#fff' : 'transparent'}
+                          strokeWidth={isHover ? 1.5 : 0}
+                          onMouseEnter={() => setHoverCell({ m, w: wi })}
+                          onMouseLeave={() => setHoverCell(null)}
+                          onClick={() => onToast?.(`${ARM_MUSCLE_RU[m] ?? m}, нед ${wi + 1}: ${sets} сетов${lm ? ` (MRV ${lm.mrv})` : ''}`)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <text x={labelW + cellW * (wi + 0.5)} y={14 + cellH * mi + cellH * 0.65} fontSize="8" fill={sets > 0 ? '#fff' : 'rgba(255,255,255,0.25)'} textAnchor="middle" pointerEvents="none">
+                          {sets > 0 ? sets : ''}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        {hoverCell && (
+          <div className="ad-muted ad-code">
+            {ARM_MUSCLE_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {grid[hoverCell.m]?.[hoverCell.w] ?? 0} сетов
+            {lmByMuscle[hoverCell.m] && ` (MEV ${lmByMuscle[hoverCell.m]!.mev} MAV ${lmByMuscle[hoverCell.m]!.mav} MRV ${lmByMuscle[hoverCell.m]!.mrv})`}
+          </div>
+        )}
+      </AdCard>
     </div>
   );
 };

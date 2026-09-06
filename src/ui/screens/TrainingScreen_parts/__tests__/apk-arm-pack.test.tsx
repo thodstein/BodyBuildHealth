@@ -141,17 +141,16 @@ describe('APK arm pack', () => {
     const root = container.querySelector('.train-arm');
     expect(root, 'root').not.toBeNull();
     expect(root?.classList.contains('arm-apk'), 'no apk class in TG').toBe(false);
-    expect(root?.getAttribute('class')).toBe('train-arm');
+    expect(root?.classList.contains('ad-wrap'), 'design root').toBe(true);
     expect(container.querySelector("[data-arm='steps']"), 'steps hook').not.toBeNull();
     expect(container.querySelector("[data-arm='split-list']")).toBeNull();
   });
 
-  it('legacy-navy боксы сериализуются в rgb — CSS-хук их накрывает', () => {
+  it('дизайн-система: карточки и контролы на классах', () => {
     const { container } = render(<ArmAutoConstructor />);
-    const boxes = Array.from(container.querySelectorAll('div[style]')).filter((d) =>
-      (d.getAttribute('style') || '').includes('rgb(10, 22, 41)'),
-    );
-    expect(boxes.length, 'navy boxes matched by CSS hook').toBeGreaterThan(0);
+    expect(container.querySelectorAll('.ad-card').length, 'ad cards').toBeGreaterThan(0);
+    expect(container.querySelectorAll('.ad-chip').length, 'ad chips').toBeGreaterThan(0);
+    expect(container.querySelectorAll('.ad-field').length, 'ad fields').toBeGreaterThan(0);
   });
 
   it('native: корень arm-apk, загрузчик запускает импорт', () => {
@@ -169,7 +168,7 @@ describe('APK arm pack', () => {
     const { container } = render(<ArmDiagnosticsHub />);
     const root = container.querySelector('.train-armdiag');
     expect(root, 'hub root').not.toBeNull();
-    expect(root?.getAttribute('class')).toBe('train-armdiag');
+    expect(root?.classList.contains('arm-apk'), 'no hub apk class in TG').toBe(false);
     expect(container.querySelector("[data-arm='hub-head']"), 'hub head').not.toBeNull();
     expect(container.querySelector("[data-arm='hub-tabs']"), 'hub tabs').not.toBeNull();
   });
@@ -198,7 +197,7 @@ describe('APK arm pack', () => {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(document.body.textContent, tab).toMatch(marker);
     }
-    expect(document.querySelector('.train-arm')?.getAttribute('class')).toBe('train-arm');
+    expect(document.querySelector('.train-arm')?.classList.contains('arm-apk'), 'no apk in TG walk').toBe(false);
   });
 
   it('весь хаб: 5 табов переключаются без падений (TG)', () => {

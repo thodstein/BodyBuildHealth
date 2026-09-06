@@ -1,0 +1,806 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * arm-design.css — дизайн-система арм-планировщика (все платформы).
+ *
+ * Единый визуальный язык: ArmAutoConstructor (6 шагов) + ArmDiagnosticsHub
+ * (5 табов) + Grip/Tech/Heatmap-карточки. Подключается статическим import
+ * из arm-design-system.tsx (как SupportVisualUpgrade.css из своего экрана) —
+ * shared-файлы и main.tsx не тронуты.
+ *
+ * Правила:
+ *  1. КАЖДЫЙ селектор начинается с :is(.train-arm, .train-armdiag,
+ *     .train-armtech, .train-armgrip, .train-armheatmap) — за пределы
+ *     арм-поверхностей ничего не утекает (проверено тестом).
+ *  2. Цвета — через глобальные var() с тёмными фолбэками: темы/акцент
+ *     приложения подхватываются бесплатно.
+ *  3. Логика в TSX не меняется — только классы; все строки/aria/роли
+ *     прежние (контракты arm-top-ui / hub / heatmap / rest-hooks).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) {
+  --ad-bg: var(--glass-bg, rgba(26, 28, 38, 0.55));
+  --ad-bg2: rgba(255, 255, 255, 0.04);
+  --ad-bg3: rgba(255, 255, 255, 0.07);
+  --ad-edge: var(--glass-border, rgba(255, 255, 255, 0.09));
+  --ad-edge2: rgba(255, 255, 255, 0.14);
+  --ad-text: var(--text, #fff);
+  --ad-dim: var(--text-dim, rgba(226, 236, 255, 0.72));
+  --ad-faint: rgba(226, 236, 255, 0.5);
+  --ad-acc: var(--accent, #00e68a);
+  --ad-acc-ink: var(--accent-contrast, #06281c);
+  --ad-amber: #f59e0b;
+  --ad-red: #ef4444;
+  --ad-green: #22c55e;
+  --ad-cyan: #5eead4;
+  --ad-field: rgba(6, 13, 29, 0.85);
+  --ad-r: 18px;
+  --ad-r-sm: 12px;
+  --ad-shadow: var(--glass-shadow, 0 10px 30px rgba(0, 0, 0, 0.35));
+}
+
+/* ─── Корень ─────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag).ad-wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 12px;
+  color: var(--ad-text);
+  animation: adIn 0.32s cubic-bezier(0.22, 0.68, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-armdiag).ad-wrap {
+  max-width: 860px;
+}
+
+/* ─── Шапка ──────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 12px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-head-ic {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  box-shadow: 0 6px 18px rgba(0, 230, 138, 0.3);
+}
+
+:is(.train-armdiag) .ad-head-ic {
+  background: linear-gradient(135deg, var(--ad-amber), var(--ad-red));
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3);
+}
+
+:is(.train-arm, .train-armdiag) .ad-head-tx {
+  flex: 1;
+  min-width: 0;
+}
+
+:is(.train-arm, .train-armdiag) .ad-head-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  color: var(--ad-text);
+}
+
+:is(.train-arm, .train-armdiag) .ad-head-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-head-side {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: var(--ad-r-sm);
+  background: var(--ad-bg2);
+  border: 1px solid var(--ad-edge);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ─── Шаги/табы — липкая лента ───────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-steps {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 8px;
+  margin: 0 -4px 12px;
+  border-radius: 18px;
+  background: var(--ad-bg);
+  border: 1px solid var(--ad-edge);
+  box-shadow: var(--ad-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+:is(.train-arm, .train-armdiag) .ad-steps::-webkit-scrollbar {
+  display: none;
+}
+
+:is(.train-arm, .train-armdiag) .ad-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ad-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+:is(.train-arm, .train-armdiag) .ad-step:active {
+  transform: scale(0.95);
+}
+
+:is(.train-arm, .train-armdiag) .ad-step-n {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-step[data-active='true'] {
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  color: var(--ad-acc-ink);
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0, 230, 138, 0.3);
+}
+
+:is(.train-arm, .train-armdiag) .ad-step[data-active='true'] .ad-step-n {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: transparent;
+  color: inherit;
+}
+
+:is(.train-armdiag) .ad-step[data-active='true'] {
+  background: linear-gradient(135deg, var(--ad-amber), #f97316);
+  color: #1a0e02;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3);
+}
+
+/* ─── Карточки и секции ──────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-card {
+  background: var(--ad-bg);
+  border: 1px solid var(--ad-edge);
+  border-radius: var(--ad-r);
+  box-shadow: var(--ad-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  padding: 16px;
+  margin: 0 0 12px;
+  animation: adIn 0.32s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec {
+  border-radius: var(--ad-r-sm);
+  border: 1px solid var(--ad-edge);
+  background: var(--ad-bg2);
+  padding: 12px;
+  margin-top: 12px;
+}
+
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-t {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  color: var(--ad-text);
+}
+
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-hint {
+  font-size: 11px;
+  color: var(--ad-dim);
+  line-height: 1.5;
+  margin: -6px 0 10px;
+}
+
+/* ─── Сетки ──────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-grid {
+  display: grid;
+  gap: 10px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-grid[data-cols='2'] {
+  grid-template-columns: 1fr 1fr;
+}
+
+:is(.train-arm, .train-armdiag) .ad-grid[data-cols='3'] {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+:is(.train-arm, .train-armdiag) .ad-grid[data-cols='auto'] {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+:is(.train-arm, .train-armdiag) .ad-grid[data-cols='auto-sm'] {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+
+:is(.train-arm, .train-armdiag) .ad-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ─── Поля ───────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-field > input,
+:is(.train-arm, .train-armdiag) .ad-field > select,
+:is(.train-arm, .train-armdiag) .ad-field > textarea {
+  margin-top: 0;
+}
+
+:is(.train-arm, .train-armdiag) input:not([type='checkbox']):not([type='radio']):not([type='file']),
+:is(.train-arm, .train-armdiag) select,
+:is(.train-arm, .train-armdiag) textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  border-radius: var(--ad-r-sm);
+  background: var(--ad-field);
+  border: 1px solid var(--ad-edge2);
+  color: var(--ad-text);
+  padding: 10px 12px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+:is(.train-arm, .train-armdiag) select {
+  font-size: 15px;
+}
+
+:is(.train-arm, .train-armdiag) textarea {
+  min-height: 88px;
+  resize: vertical;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+:is(.train-arm, .train-armdiag) textarea.ad-mono {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+:is(.train-arm, .train-armdiag) input:focus,
+:is(.train-arm, .train-armdiag) select:focus,
+:is(.train-arm, .train-armdiag) textarea:focus {
+  border-color: var(--ad-acc);
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.16);
+}
+
+:is(.train-arm, .train-armdiag) select option {
+  background-color: #0a1424;
+  color: #fff;
+}
+
+:is(.train-arm, .train-armdiag) input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+:is(.train-arm, .train-armdiag) .ad-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ad-dim);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+:is(.train-arm, .train-armdiag) input[type='checkbox'],
+:is(.train-arm, .train-armdiag) input[type='radio'] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--ad-acc);
+  cursor: pointer;
+}
+
+/* ─── Чипы ───────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-chip {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ad-edge2);
+  background: var(--ad-bg2);
+  color: var(--ad-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-chip:active {
+  transform: scale(0.95);
+}
+
+:is(.train-arm, .train-armdiag) .ad-chip[data-active='true'] {
+  background: rgba(0, 230, 138, 0.14);
+  border-color: var(--ad-acc);
+  color: var(--ad-acc);
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.12);
+}
+
+:is(.train-armdiag) .ad-chip[data-active='true'] {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: var(--ad-amber);
+  color: var(--ad-amber);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+:is(.train-arm, .train-armdiag) .ad-chip[data-tone='red'][data-active='true'] {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: var(--ad-red);
+  color: var(--ad-red);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+:is(.train-arm, .train-armdiag) .ad-chip[data-tone='green'][data-active='true'] {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: var(--ad-green);
+  color: #4ade80;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+:is(.train-arm, .train-armdiag) .ad-chip[data-dim='true'] {
+  opacity: 0.55;
+}
+
+/* ─── Кнопки ─────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn:active {
+  transform: scale(0.96);
+  filter: brightness(1.12);
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn[data-variant='primary'] {
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  color: var(--ad-acc-ink);
+  box-shadow: 0 8px 24px rgba(0, 230, 138, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn[data-variant='amber'] {
+  background: linear-gradient(135deg, var(--ad-amber), #f97316);
+  color: #1a0e02;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn[data-variant='ghost'] {
+  background: transparent;
+  border-color: var(--ad-edge2);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn[data-variant='dark'] {
+  background: var(--ad-bg3);
+  border-color: var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn-block {
+  width: 100%;
+}
+
+:is(.train-arm, .train-armdiag) .ad-btn-hero {
+  min-height: 54px;
+  font-size: 15px;
+  border-radius: 16px;
+}
+
+/* ─── Баннеры ────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-banner {
+  border-radius: var(--ad-r-sm);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  border: 1px solid var(--ad-edge);
+  background: var(--ad-bg2);
+  color: var(--ad-text);
+  margin: 0 0 12px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-banner[data-tone='ok'] {
+  background: rgba(0, 230, 138, 0.1);
+  border-color: rgba(0, 230, 138, 0.35);
+}
+
+:is(.train-arm, .train-armdiag) .ad-banner[data-tone='warn'] {
+  background: rgba(245, 158, 11, 0.09);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+:is(.train-arm, .train-armdiag) .ad-banner[data-tone='bad'] {
+  background: rgba(239, 68, 68, 0.09);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ─── Статистика ─────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-stat {
+  border-radius: var(--ad-r-sm);
+  border: 1px solid var(--ad-edge);
+  border-top: 2px solid var(--ad-acc);
+  background: var(--ad-bg2);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+:is(.train-armdiag) .ad-stat {
+  border-top-color: var(--ad-amber);
+}
+
+:is(.train-arm, .train-armdiag) .ad-stat-v {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  color: var(--ad-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:is(.train-arm, .train-armdiag) .ad-stat-l {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ad-dim);
+  margin-top: 2px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-stat-s {
+  font-size: 11px;
+  color: var(--ad-dim);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Списки и строки ────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-kv:last-child {
+  border-bottom: none;
+}
+
+:is(.train-arm, .train-armdiag) .ad-kv > span:first-child {
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-kv > span:last-child {
+  color: var(--ad-text);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.train-arm, .train-armdiag) .ad-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px 10px;
+  scroll-snap-type: x proximity;
+}
+
+:is(.train-arm, .train-armdiag) .ad-strip::-webkit-scrollbar {
+  display: none;
+}
+
+:is(.train-arm, .train-armdiag) .ad-strip > * {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+:is(.train-arm, .train-armdiag) .ad-pill {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ad-edge2);
+  background: var(--ad-bg2);
+  color: var(--ad-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+:is(.train-arm, .train-armdiag) .ad-pill:active {
+  transform: scale(0.94);
+}
+
+:is(.train-arm, .train-armdiag) .ad-pill[data-active='true'] {
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  border-color: transparent;
+  color: var(--ad-acc-ink);
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0, 230, 138, 0.3);
+}
+
+:is(.train-armdiag) .ad-pill[data-active='true'] {
+  background: linear-gradient(135deg, var(--ad-amber), #f97316);
+  color: #1a0e02;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3);
+}
+
+/* ─── Сессии и упражнения плана ──────────────────────────────────── */
+:is(.train-arm) .ad-sess {
+  border: 1px solid var(--ad-edge);
+  border-left: 3px solid var(--ad-acc);
+  border-radius: var(--ad-r-sm);
+  background: var(--ad-bg2);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+:is(.train-arm) .ad-sess-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ad-acc);
+  margin-bottom: 8px;
+}
+
+:is(.train-arm) .ad-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm) .ad-ex {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+
+:is(.train-arm) .ad-ex:last-child {
+  border-bottom: none;
+}
+
+:is(.train-arm) .ad-ex-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+:is(.train-arm) .ad-ex-nm {
+  color: var(--ad-text);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+:is(.train-arm) .ad-ex-nm > span {
+  color: var(--ad-dim);
+  font-weight: 400;
+}
+
+:is(.train-arm) .ad-ex-vl {
+  flex-shrink: 0;
+  color: var(--ad-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+:is(.train-arm, .train-armdiag) .ad-tip {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ad-cyan);
+  margin-top: 6px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-muted {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+/* ─── Тепловая карта / видео / бары ──────────────────────────────── */
+:is(.train-armheatmap) .ad-heat {
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: var(--ad-r-sm);
+}
+
+:is(.train-armheatmap) .ad-heat::-webkit-scrollbar {
+  display: none;
+}
+
+:is(.train-armheatmap) .ad-heat svg {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--ad-r-sm);
+}
+
+:is(.train-armheatmap) .ad-heat svg rect {
+  rx: 4px;
+}
+
+:is(.train-armdiag) .ad-video {
+  border-radius: var(--ad-r-sm);
+  border: 1px solid var(--ad-edge);
+  background: #000;
+  width: 100%;
+  max-height: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+:is(.train-armdiag) .ad-bars {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 28px;
+  margin-top: 6px;
+}
+
+:is(.train-armdiag) .ad-bars > [data-bar] {
+  flex: 1;
+  border-radius: 3px;
+  min-width: 3px;
+}
+
+/* ─── Тост ───────────────────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-toast {
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  background: rgba(0, 230, 138, 0.12);
+  border: 1px solid rgba(0, 230, 138, 0.35);
+  color: var(--ad-text);
+  margin: 0 0 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  animation: adPop 0.3s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────── */
+@keyframes adIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes adPop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Узкие экраны ──────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  :is(.train-arm, .train-armdiag) .ad-grid[data-cols='2'],
+  :is(.train-arm, .train-armdiag) .ad-grid[data-cols='3'] {
+    grid-template-columns: 1fr;
+  }
+  :is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-card {
+    padding: 12px;
+  }
+  :is(.train-arm, .train-armdiag) .ad-head-title {
+    font-size: 19px;
+  }
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :is(.train-arm, .train-armdiag).ad-wrap {
+    animation: none;
+  }
+  :is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-card {
+    animation: none;
+  }
+  :is(.train-arm, .train-armdiag) .ad-toast {
+    animation: none;
+  }
+}

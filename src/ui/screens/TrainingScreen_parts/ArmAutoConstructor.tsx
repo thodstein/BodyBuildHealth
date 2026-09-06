@@ -2,6 +2,7 @@
  * ArmAutoConstructor.tsx — PRO-конструктор армрестлинг/армлифтинг.
  * Изолирован, как BbAutoConstructor, но для arm-движка.
  * 6 шагов: params → grip → split → plan → quality → export.
+ * Редизайн на arm-design-system; логика, строки и aria 1-в-1.
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
@@ -34,11 +35,9 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
-import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui';
+import { AdRoot, AdHead, AdSteps, AdCard, AdSec, AdGrid, AdField, AdCheck, AdChip, AdBtn, AdBanner, type AdStepDef } from './arm-design-system';
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
-import { isNativeApp } from '../../../core/app-platform';
-import { ensureArmApkStyles } from './arm-apk-loader';
 
 type Step = 'params'|'grip'|'split'|'plan'|'quality'|'weights';
 
@@ -67,6 +66,15 @@ const GRIP_FOCI = [
   { id: 'crush', label: 'Дробление (CoC)' },
   { id: 'hub', label: 'Hub' },
 ] as const;
+
+const STEP_DEFS: AdStepDef[] = [
+  { id: 'params', label: '🎛 Параметры' },
+  { id: 'grip', label: '✊ Хват' },
+  { id: 'split', label: '🗓 Сплит' },
+  { id: 'plan', label: '📋 План' },
+  { id: 'quality', label: '📊 Качество' },
+  { id: 'weights', label: '🏋️ Веса' },
+];
 
 export function ArmAutoConstructor() {
   const [step, setStep] = useState<Step>('params');
@@ -166,11 +174,6 @@ export function ArmAutoConstructor() {
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // APK-слой: подгрузка styles-native-arm.css только в native (в TG/web no-op).
-  useEffect(() => {
-    ensureArmApkStyles();
   }, []);
 
   const workMax = useMemo(() => {
@@ -304,6 +307,7 @@ export function ArmAutoConstructor() {
       }
     } catch { effDays = daysPerWeek; }
     return rankArmSplits({ level, goal: goal as any, technique, discipline, daysPerWeek: effDays, gripFocus, weakPoints, specialization });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization, cycId]);
 
   const best = useMemo(() => ranked[0]?.pattern, [ranked]);
@@ -460,139 +464,127 @@ export function ArmAutoConstructor() {
   const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
 
   return (
-    <div className={isNativeApp() ? 'train-arm arm-apk' : 'train-arm'} style={{ maxWidth: 980, margin: '0 auto', padding: 12 }}>
-      <h2 style={H}>🤝 Арм-конструктор PRO</h2>
-      <p style={SMALL}>Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard.</p>
+    <AdRoot rootClass="train-arm" maxWidth={980}>
+      <AdHead
+        icon="🤝"
+        title="Арм-конструктор PRO"
+        sub="Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard."
+        side={best ? (<><div>{best.name}</div><div className="ad-muted">{ranked[0]?.score ?? 0} баллов</div></>) : '—'}
+      />
 
-      <div data-arm="steps" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {(['params','grip','split','plan','quality','weights'] as Step[]).map(s => (
-          <button key={s} onClick={()=>setStep(s)} style={{ ...STEP_PILL(step===s), background: step===s ? ACCENT : 'rgba(255,255,255,0.06)', color: step===s ? '#001' : '#fff' }}>
-            {s === 'params' ? '🎛 Параметры' : s === 'grip' ? '✊ Хват' : s === 'split' ? '🗓 Сплит' : s === 'plan' ? '📋 План' : s === 'quality' ? '📊 Качество' : '🏋️ Веса'}
-          </button>
-        ))}
-      </div>
+      <AdSteps steps={STEP_DEFS} active={step} onSelect={(id) => setStep(id as Step)} hook="steps" />
 
-      {msg && <div data-arm="msg" style={{ ...CARD, background: 'rgba(0,230,138,0.12)', borderColor: ACCENT, color: '#fff' }}>{msg}</div>}
+      {msg && <div className="ad-toast" data-arm="msg">{msg}</div>}
 
       {step === 'params' && (
-        <div style={CARD}>
-          <h3 style={H}>🎛 Параметры</h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <label style={SMALL}>Дисциплина<br/>
-              <select value={discipline} onChange={e=>setDiscipline(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }}>
-                {DISCIPLINES.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
-              </select>
-            </label>
-            <label style={SMALL}>Техника (стол)<br/>
-              <select value={technique} onChange={e=>setTechnique(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }}>
-                {TECHNIQUES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
-              </select>
-            </label>
-            <label style={SMALL}>Уровень<br/>
-              <select value={level} onChange={e=>setLevel(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }}>
-                <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option><option value="enhanced">Enhanced</option>
-              </select>
-            </label>
-            <label style={SMALL}>Цель<br/>
-              <select value={goal} onChange={e=>setGoal(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }}>
-                {GOALS.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
-              </select>
-            </label>
-            <label style={SMALL}>Недель<br/>
-              <input type="number" min={2} max={52} value={weeks} onChange={e=>setWeeks(Math.max(2,Math.min(52, parseInt(e.target.value)||8)))} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }} />
-            </label>
-            <label style={SMALL}>Дней/нед<br/>
-              <input type="number" min={2} max={6} value={daysPerWeek} onChange={e=>setDaysPerWeek(Math.max(2,Math.min(6, parseInt(e.target.value)||4)))} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:8 }} />
-            </label>
-          </div>
+        <AdCard>
+          <AdSec title="🎛 Параметры">
+            <AdGrid cols="2">
+              <AdField label="Дисциплина">
+                <select value={discipline} onChange={e=>setDiscipline(e.target.value)}>
+                  {DISCIPLINES.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+                </select>
+              </AdField>
+              <AdField label="Техника (стол)">
+                <select value={technique} onChange={e=>setTechnique(e.target.value)}>
+                  {TECHNIQUES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </AdField>
+              <AdField label="Уровень">
+                <select value={level} onChange={e=>setLevel(e.target.value)}>
+                  <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option><option value="enhanced">Enhanced</option>
+                </select>
+              </AdField>
+              <AdField label="Цель">
+                <select value={goal} onChange={e=>setGoal(e.target.value)}>
+                  {GOALS.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
+                </select>
+              </AdField>
+              <AdField label="Недель">
+                <input type="number" min={2} max={52} value={weeks} onChange={e=>setWeeks(Math.max(2,Math.min(52, parseInt(e.target.value)||8)))} />
+              </AdField>
+              <AdField label="Дней/нед">
+                <input type="number" min={2} max={6} value={daysPerWeek} onChange={e=>setDaysPerWeek(Math.max(2,Math.min(6, parseInt(e.target.value)||4)))} />
+              </AdField>
+            </AdGrid>
+          </AdSec>
 
           {discipline !== 'armwrestling' && (
-            <div style={{ marginTop: 10 }}>
-              <div style={SMALL}>Хват-фокус</div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <AdSec title="Хват-фокус">
+              <div className="ad-row">
                 {GRIP_FOCI.map(g=> (
-                  <button key={g.id} onClick={()=>setGripFocus(g.id)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: gripFocus===g.id ? ACCENT : '#1f3a5f', background: gripFocus===g.id ? 'rgba(0,230,138,0.15)' : '#0a1629', color: gripFocus===g.id ? ACCENT : '#9ab', cursor:'pointer' }}>{g.label}</button>
+                  <AdChip key={g.id} active={gripFocus===g.id} onClick={()=>setGripFocus(g.id)}>{g.label}</AdChip>
                 ))}
               </div>
-            </div>
+            </AdSec>
           )}
 
-          <div style={{ marginTop: 12 }}>
-            <div style={SMALL}>Слабые зоны (1–2, специализация ×1.3) — мышцы</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <AdSec title="Слабые зоны (1–2, специализация ×1.3) — мышцы">
+            <div className="ad-row">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
-                <button key={m} onClick={()=>toggleWeak(m)} aria-pressed={weakPoints.includes(m)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: weakPoints.includes(m) ? ACCENT : '#1f3a5f', background: weakPoints.includes(m) ? 'rgba(0,230,138,0.15)' : '#0a1629', color: weakPoints.includes(m) ? ACCENT : '#9ab', cursor:'pointer', fontSize:12 }}>{ARM_MUSCLE_RU[m] || m}</button>
+                <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
               ))}
             </div>
-            <div style={{ marginTop: 6, display:'flex', gap:6, alignItems:'center' }}>
-              <label style={{ ...SMALL, display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={specialization} onChange={e=>setSpecialization(e.target.checked)} /> Специализация (блок 6 нед + баланс)</label>
-              {specialization && <span style={{ color: ACCENT, fontSize:12 }}>{specPreview.rationale}</span>}
-            </div>
-          </div>
+            <AdCheck checked={specialization} onChange={setSpecialization} label="Специализация (блок 6 нед + баланс)" />
+            {specialization && <span className="ad-tip">{specPreview.rationale}</span>}
+          </AdSec>
           {diagWeakPoints.length>0 && (
-            <div style={{ marginTop: 10, padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🎯 Мёртвые точки из диагностики (инъекция 3× @% в план)</div>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+            <AdBanner tone="warn">
+              <b>🎯 Мёртвые точки из диагностики (инъекция 3× @% в план)</b>
+              <div className="ad-row">
                 {diagWeakPoints.map(wp=> (
-                  <span key={wp} style={{ padding:'4px 8px', borderRadius:999, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b', fontSize:11 }}>{wp}</span>
+                  <span key={wp} className="ad-tag">{wp}</span>
                 ))}
               </div>
-              <div style={{ marginTop:6 }}>
-                <button onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); } catch{} }} style={{ padding:'4px 8px', borderRadius:6, background:'#0a1629', border:'1px solid #1f3a5f', color:'#9ab', cursor:'pointer', fontSize:11 }}>✕ Сбросить мёртвые точки</button>
-                <span style={{ ...SMALL, marginLeft:8 }}>Инъекция: per-day dedup, budget 85, humerus guard</span>
+              <div className="ad-row">
+                <AdBtn variant="dark" onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); } catch{} }}>✕ Сбросить мёртвые точки</AdBtn>
+                <span className="ad-muted">Инъекция: per-day dedup, budget 85, humerus guard</span>
               </div>
-            </div>
+            </AdBanner>
           )}
 
-          <div style={{ marginTop: 12, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-              <label style={{ ...SMALL, display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
-                <input type="checkbox" checked={showPed} onChange={e=>setShowPed(e.target.checked)} /> 💉 На курсе (PED)
-              </label>
-              {showPed && (
-                <select value={courseIntensity} onChange={e=>setCourseIntensity(e.target.value as any)} style={{ marginLeft:'auto', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'4px 8px', fontSize:12 }}>
-                  <option value="mild">Мягкий</option><option value="moderate">Средний</option><option value="heavy">Тяжёлый</option>
-                </select>
-              )}
-            </div>
+          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете.">
+            <AdCheck checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {[
-                  ['test_e','Тест энантат мг/нед'],
-                  ['tren_a','Тренболон мг/нед'],
-                  ['bold_u','Болденон мг/нед'],
-                ].map(([k,label])=> (
-                  <label key={k} style={{ ...SMALL }}>
-                    {label}<br/>
-                    <input
-                      type="number"
-                      value={pedDoses[k] ?? ''}
-                      onChange={e=>{
-                        const v = parseFloat(e.target.value);
-                        setPedDoses(prev=> {
-                          const n={...prev};
-                          if (Number.isFinite(v) && v>0) n[k]=v; else delete n[k];
-                          return n;
-                        });
-                      }}
-                      placeholder="0"
-                      style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}
-                    />
-                  </label>
-                ))}
-              </div>
+              <>
+                <AdField label="Интенсивность курса">
+                  <select value={courseIntensity} onChange={e=>setCourseIntensity(e.target.value as any)}>
+                    <option value="mild">Мягкий</option><option value="moderate">Средний</option><option value="heavy">Тяжёлый</option>
+                  </select>
+                </AdField>
+                <AdGrid cols="2">
+                  {[
+                    ['test_e','Тест энантат мг/нед'],
+                    ['tren_a','Тренболон мг/нед'],
+                    ['bold_u','Болденон мг/нед'],
+                  ].map(([k,label])=> (
+                    <AdField key={k} label={label}>
+                      <input
+                        type="number"
+                        value={pedDoses[k] ?? ''}
+                        onChange={e=>{
+                          const v = parseFloat(e.target.value);
+                          setPedDoses(prev=> {
+                            const n={...prev};
+                            if (Number.isFinite(v) && v>0) n[k]=v; else delete n[k];
+                            return n;
+                          });
+                        }}
+                        placeholder="0"
+                      />
+                    </AdField>
+                  ))}
+                </AdGrid>
+              </>
             )}
-            <div style={{ ...SMALL, marginTop:6, color:'#6a8a9a' }}>TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете.</div>
-          </div>
+          </AdSec>
 
-          <div style={{ marginTop: 12 }}>
+          <div>
             <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           </div>
 
-          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🏋️ Рабочие максимумы (для прогрессии веса)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%).">
+            <AdGrid cols="3">
               {[
                 ['wrist_flexors','Кисть (кг)'],
                 ['pronators','Пронация (кг)'],
@@ -602,294 +594,328 @@ export function ArmAutoConstructor() {
                 ['grip_pinch','Pinch (кг)'],
                 ['default','База (кг)'],
               ].map(([k,label]) => (
-                <label key={k} style={{ ...SMALL }}>
-                  {label}<br/>
-                  <input value={workMaxEdit[k]||''} onChange={e=> setWorkMaxEdit(prev=> ({...prev, [k]: e.target.value}))} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} />
-                </label>
+                <AdField key={k} label={label}>
+                  <input value={workMaxEdit[k]||''} onChange={e=> setWorkMaxEdit(prev=> ({...prev, [k]: e.target.value}))} placeholder="—" inputMode="decimal" />
+                </AdField>
               ))}
-            </div>
-            <div style={{ ...SMALL, marginTop:6, color:'#6a8a9a' }}>Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%).</div>
-          </div>
+            </AdGrid>
+          </AdSec>
 
-          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <label style={{ ...SMALL }}>Вес, кг<br/><input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Возраст<br/><input value={proAge} onChange={e=>setProAge(e.target.value)} placeholder="30" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Рука<br/>
-                <select value={proArm} onChange={e=>setProArm(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+          <AdSec title="🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг">
+            <AdGrid cols="3">
+              <AdField label="Вес, кг">
+                <input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
+              </AdField>
+              <AdField label="Возраст">
+                <input value={proAge} onChange={e=>setProAge(e.target.value)} placeholder="30" inputMode="numeric" />
+              </AdField>
+              <AdField label="Рука">
+                <select value={proArm} onChange={e=>setProArm(e.target.value)}>
                   <option value="both">Обе (2 зачёта)</option><option value="left">Левая</option><option value="right">Правая</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Дата старта<br/><input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Целевой вес, кг<br/><input value={proTargetW} onChange={e=>setProTargetW(e.target.value)} placeholder="85" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Спарринг<br/>
-                <select value={proSpar} onChange={e=>setProSpar(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Дата старта">
+                <input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} />
+              </AdField>
+              <AdField label="Целевой вес, кг">
+                <input value={proTargetW} onChange={e=>setProTargetW(e.target.value)} placeholder="85" inputMode="decimal" />
+              </AdField>
+              <AdField label="Спарринг">
+                <select value={proSpar} onChange={e=>setProSpar(e.target.value)}>
                   <option value="off">Выкл</option><option value="70">70% техника</option><option value="90">90% контроль</option><option value="100">100% (heavy-нед)</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Сила левой, кг<br/><input value={proLeft} onChange={e=>setProLeft(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Сила правой, кг<br/><input value={proRight} onChange={e=>setProRight(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Партнёр Δ, кг<br/><input value={proSparDelta} onChange={e=>setProSparDelta(e.target.value)} placeholder="0" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>RT бенч, кг<br/><input value={proBenchRt} onChange={e=>setProBenchRt(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Wrist curl, lb<br/><input value={proBenchWristLb} onChange={e=>setProBenchWristLb(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Pron hold, с<br/><input value={proBenchPron} onChange={e=>setProBenchPron(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Side, кг<br/><input value={proBenchSide} onChange={e=>setProBenchSide(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>sRPE (дневник)<br/><input value={proSrpe} onChange={e=>setProSrpe(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Боль локтя 0-10<br/><input value={proElbow} onChange={e=>setProElbow(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-            </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={proSupermatch} onChange={e=>setProSupermatch(e.target.checked)} /> Суперматч best-of-5/6</label>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={proStrap} onChange={e=>setProStrap(e.target.checked)} /> Ожидается ремень</label>
+              </AdField>
+              <AdField label="Сила левой, кг">
+                <input value={proLeft} onChange={e=>setProLeft(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Сила правой, кг">
+                <input value={proRight} onChange={e=>setProRight(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Партнёр Δ, кг">
+                <input value={proSparDelta} onChange={e=>setProSparDelta(e.target.value)} placeholder="0" inputMode="decimal" />
+              </AdField>
+              <AdField label="RT бенч, кг">
+                <input value={proBenchRt} onChange={e=>setProBenchRt(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Wrist curl, lb">
+                <input value={proBenchWristLb} onChange={e=>setProBenchWristLb(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Pron hold, с">
+                <input value={proBenchPron} onChange={e=>setProBenchPron(e.target.value)} placeholder="—" inputMode="numeric" />
+              </AdField>
+              <AdField label="Side, кг">
+                <input value={proBenchSide} onChange={e=>setProBenchSide(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="sRPE (дневник)">
+                <input value={proSrpe} onChange={e=>setProSrpe(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Боль локтя 0-10">
+                <input value={proElbow} onChange={e=>setProElbow(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+            </AdGrid>
+            <div className="ad-row">
+              <AdCheck checked={proSupermatch} onChange={setProSupermatch} label="Суперматч best-of-5/6" />
+              <AdCheck checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
             </div>
             {(proBw || proAge) && (()=>{ try {
               const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any });
-              return <div style={{ ...SMALL, marginTop: 8, color: ACCENT }}>WAF {card.ageGroup} · кат. {card.weightClass.label} кг · {card.weighInNote}</div>;
+              return <div className="ad-tip">WAF {card.ageGroup} · кат. {card.weightClass.label} кг · {card.weighInNote}</div>;
             } catch { return null; } })()}
             {proSupermatch && (()=>{
               const sm = buildSupermatchPlan({ level });
-              return <div style={{ ...SMALL, marginTop: 6, color: '#e6a23c' }}>Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с · TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.</div>;
+              return <div className="ad-tip">Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с · TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.</div>;
             })()}
             {(proLeft && proRight) && (()=>{ try {
               const b = planBilateralVolume({ leftKg: parseFloat(proLeft), rightKg: parseFloat(proRight), baseSets: 10, mrvSets: 16 });
               if (b.asymmetryPct == null) return null;
-              return <div style={{ ...SMALL, marginTop: 6, color: b.asymmetryPct >= 12 ? '#f87171' : ACCENT }}>L/R: асимметрия {b.asymmetryPct}% — {b.note}</div>;
+              return <div className="ad-tip">L/R: асимметрия {b.asymmetryPct}% — {b.note}</div>;
             } catch { return null; } })()}
             {(proBw && proTargetW && proDate) && (()=>{ try {
               const weeksOut = weeksUntilStart(undefined, proDate);
               const cut = planWeightCut({ startKg: parseFloat(proBw), targetKg: parseFloat(proTargetW), weeksOut, sex: linked?.profile?.personal?.sex });
-              return <div style={{ ...SMALL, marginTop: 6, color: cut.status === 'too_fast' ? '#f87171' : ACCENT }}>Сгонка: {cut.note}</div>;
+              return <div className="ad-tip">Сгонка: {cut.note}</div>;
             } catch { return null; } })()}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ ...SMALL, marginBottom: 4 }}>WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} style={{ padding: '3px 8px', borderRadius: 999, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: 11, cursor: 'help' }}>{f.name}</span>)}
+            <div>
+              <div className="ad-muted">WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
+              <div className="ad-row">
+                {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} className="ad-tag">{f.name}</span>)}
               </div>
             </div>
-          </div>
+          </AdSec>
 
-          <div style={{ marginTop: 10, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🥇 TOP: матчап · скорость · лестница · sim · календарь</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <label style={{ ...SMALL }}>Стиль оппонента<br/>
-                <select value={topOpp} onChange={e=>setTopOpp(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+          <AdSec title="🥇 TOP: матчап · скорость · лестница · sim · календарь">
+            <AdGrid cols="3">
+              <AdField label="Стиль оппонента">
+                <select value={topOpp} onChange={e=>setTopOpp(e.target.value)}>
                   <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Рука оппонента<br/>
-                <select value={topOppHand} onChange={e=>setTopOppHand(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Рука оппонента">
+                <select value={topOppHand} onChange={e=>setTopOppHand(e.target.value)}>
                   <option value="unknown">Неизвестно</option><option value="high">High-hand</option><option value="low">Low-hand</option><option value="neutral">Нейтраль</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Оппонент Δ, кг (+ тяжелее)<br/><input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Имплемент (лестница)<br/>
-                <select value={topLadder} onChange={e=>setTopLadder(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Оппонент Δ, кг (+ тяжелее)">
+                <input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" inputMode="decimal" />
+              </AdField>
+              <AdField label="Имплемент (лестница)">
+                <select value={topLadder} onChange={e=>setTopLadder(e.target.value)}>
                   <option value="">—</option><option value="fat_gripz">Fat Gripz</option><option value="rolling_thunder">Rolling Thunder</option><option value="apollon_axle">Axle</option><option value="saxon_bar">Saxon</option><option value="pinch_block">Pinch Block</option><option value="hub">Hub</option><option value="coc_bullet">CoC Bullet</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Результат (кг/с)<br/><input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Приоритет старта<br/>
-                <select value={topCalPrio} onChange={e=>setTopCalPrio(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Результат (кг/с)">
+                <input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" inputMode="decimal" />
+              </AdField>
+              <AdField label="Приоритет старта">
+                <select value={topCalPrio} onChange={e=>setTopCalPrio(e.target.value)}>
                   <option value="A">A (тейпер 3н)</option><option value="B">B (тейпер 2н)</option><option value="C">C (без тейпера)</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Серия<br/>
-                <select value={topCalSeries} onChange={e=>setTopCalSeries(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Серия">
+                <select value={topCalSeries} onChange={e=>setTopCalSeries(e.target.value)}>
                   <option value="local">Локальный</option><option value="waf_worlds">WAF Worlds</option><option value="east_vs_west">East-vs-West</option><option value="super_series">Super Series</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Grip-RPE неделя<br/>
-                <select aria-label="Grip-RPE неделя" value={topGripWeek} onChange={e=>setTopGripWeek(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Grip-RPE неделя">
+                <select aria-label="Grip-RPE неделя" value={topGripWeek} onChange={e=>setTopGripWeek(e.target.value)}>
                   <option value="">Авто</option><option value="1">1 (объём)</option><option value="2">2 (объём)</option><option value="3">3 (интенс.)</option><option value="4">4 (делоад)</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Grip-RPE фаза<br/>
-                <select value={topGripPhase} onChange={e=>setTopGripPhase(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+              </AdField>
+              <AdField label="Grip-RPE фаза">
+                <select value={topGripPhase} onChange={e=>setTopGripPhase(e.target.value)}>
                   <option value="auto">Авто</option><option value="volume">Объём RPE7</option><option value="intensification">Интенс. RPE8</option><option value="peak">Пик RPE9</option><option value="deload">Делоад</option>
                 </select>
-              </label>
-              <label style={{ ...SMALL }}>Тяж. хвата/нед (CNS)<br/><input value={topHeavy} onChange={e=>setTopHeavy(e.target.value)} placeholder="—" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-              <label style={{ ...SMALL }}>Часов с тяж. тяг<br/><input value={topPullH} onChange={e=>setTopPullH(e.target.value)} placeholder="72" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
+              </AdField>
+              <AdField label="Тяж. хвата/нед (CNS)">
+                <input value={topHeavy} onChange={e=>setTopHeavy(e.target.value)} placeholder="—" inputMode="numeric" />
+              </AdField>
+              <AdField label="Часов с тяж. тяг">
+                <input value={topPullH} onChange={e=>setTopPullH(e.target.value)} placeholder="72" inputMode="decimal" />
+              </AdField>
+            </AdGrid>
+            <div className="ad-row">
+              <AdCheck checked={topRfd} onChange={setTopRfd} label="RFD speed-блок (5×3 RPE8)" />
+              <AdCheck checked={topSim} onChange={setTopSim} label="Contest-sim неделя" />
+              <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
+              <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topRfd} onChange={e=>setTopRfd(e.target.checked)} /> RFD speed-блок (5×3 RPE8)</label>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topSim} onChange={e=>setTopSim(e.target.checked)} /> Contest-sim неделя</label>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topContinuity} onChange={e=>setTopContinuity(e.target.checked)} /> 🔗 С прошлого плана (+2.5% веса)</label>
-              <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={topGripAuto} onChange={e=>setTopGripAuto(e.target.checked)} /> 🌊 Grip-RPE авто-волна</label>
-            </div>
-            <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: '1px solid #1f3a5f', background: '#0a1629' }}>
-              <div style={{ ...SMALL, color: '#fff', fontWeight: 700, marginBottom: 8 }}>📚 Именной цикл (интернет-библиотека) — пусто = обычный план</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <label style={{ ...SMALL }}>Цикл<br/>
-                  <select value={cycId} onChange={e=>setCycId(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+            <AdSec title="📚 Именной цикл (интернет-библиотека) — пусто = обычный план">
+              <AdGrid cols="2">
+                <AdField label="Цикл">
+                  <select value={cycId} onChange={e=>setCycId(e.target.value)}>
                     <option value="">— обычный план —</option>
                     {ARM_CYCLE_LIBRARY.map(c=> <option key={c.id} value={c.id}>{c.name} ({c.weeks}н)</option>)}
                   </select>
-                </label>
-                <label style={{ ...SMALL }}>Медли (армлифтинг)<br/>
-                  <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                </AdField>
+                <AdField label="Медли (армлифтинг)">
+                  <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)}>
                     <option value="">—</option>
                     {ARM_MEDLEYS.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
-                </label>
-                <label style={{ ...SMALL }}>Коррекция %/нед (СРЦ 0.5)<br/><input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-                <label style={{ ...SMALL }}>CoC рабочий<br/>
-                  <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                </AdField>
+                <AdField label="Коррекция %/нед (СРЦ 0.5)">
+                  <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
+                </AdField>
+                <AdField label="CoC рабочий">
+                  <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)}>
                     <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
                   </select>
-                </label>
-                <label style={{ ...SMALL }}>Pumpkin-рука (Larratt)<br/>
-                  <select value={cycPumpkin} onChange={e=>setCycPumpkin(e.target.value)} style={{ width:'100%', background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
+                </AdField>
+                <AdField label="Pumpkin-рука (Larratt)">
+                  <select value={cycPumpkin} onChange={e=>setCycPumpkin(e.target.value)}>
                     <option value="">—</option><option value="left">Левая</option><option value="right">Правая</option>
                   </select>
-                </label>
-              </div>
-              <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycConsent} onChange={e=>setCycConsent(e.target.checked)} /> Согласен на растяжение/сжатие цикла</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFlat} onChange={e=>setCycFlat(e.target.checked)} /> Flat pyramid (Bompa)</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycBlood} onChange={e=>setCycBlood(e.target.checked)} /> Bloodflow 100×</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycNever} onChange={e=>setCycNever(e.target.checked)} /> Never fail</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycSingles} onChange={e=>setCycSingles(e.target.checked)} /> Heavy singles 17–18</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycBrzenk} onChange={e=>setCycBrzenk(e.target.checked)} /> Brzenk 1+1</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAkimov} onChange={e=>setCycAkimov(e.target.checked)} /> Акимов-крюк</label>
-                {cycAkimov && <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycComp} onChange={e=>setCycComp(e.target.checked)} /> Соревн. период</label>}
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFor} onChange={e=>setCycFor(e.target.checked)} /> FOR-7 (adv+)</label>
-                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAxisOn} onChange={e=>setCycAxisOn(e.target.checked)} /> Ось humerus-2026</label>
-                {cycFor && <label style={{ ...SMALL }}>FOR-домен<br/>
-                  <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)} style={{ background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px' }}>
-                    <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
-                  </select>
-                </label>}
+                </AdField>
+              </AdGrid>
+              <div className="ad-row">
+                <AdCheck checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />
+                <AdCheck checked={cycFlat} onChange={setCycFlat} label="Flat pyramid (Bompa)" />
+                <AdCheck checked={cycBlood} onChange={setCycBlood} label="Bloodflow 100×" />
+                <AdCheck checked={cycNever} onChange={setCycNever} label="Never fail" />
+                <AdCheck checked={cycSingles} onChange={setCycSingles} label="Heavy singles 17–18" />
+                <AdCheck checked={cycBrzenk} onChange={setCycBrzenk} label="Brzenk 1+1" />
+                <AdCheck checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
+                {cycAkimov && <AdCheck checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
+                <AdCheck checked={cycFor} onChange={setCycFor} label="FOR-7 (adv+)" />
+                <AdCheck checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
+                {cycFor && (
+                  <AdField label="FOR-домен">
+                    <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)}>
+                      <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
+                    </select>
+                  </AdField>
+                )}
               </div>
               {cycAxisOn && (
-                <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap', padding: 8, borderRadius: 8, border: '1px dashed #1f3a5f' }}>
-                  <span style={{ ...SMALL, color: '#fff' }}>Ось кисть–локоть–плечо (что было):</span>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axTrunk} onChange={e=>setAxTrunk(e.target.checked)} /> Скрут корпуса в атаку</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axMisalign} onChange={e=>setAxMisalign(e.target.checked)} /> Ось разорвана</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axBehind} onChange={e=>setAxBehind(e.target.checked)} /> Запястье позади плеча</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axDorsal} onChange={e=>setAxDorsal(e.target.checked)} /> Кисть разогнута назад</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axCold} onChange={e=>setAxCold(e.target.checked)} /> Холод без разминки</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axDefense} onChange={e=>setAxDefense(e.target.checked)} /> Борьба из защиты</label>
-                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axSideMax} onChange={e=>setAxSideMax(e.target.checked)} /> Макс бокового</label>
-                </div>
+                <AdSec title="Ось кисть–локоть–плечо (что было):">
+                  <div className="ad-row">
+                    <AdCheck checked={axTrunk} onChange={setAxTrunk} label="Скрут корпуса в атаку" />
+                    <AdCheck checked={axMisalign} onChange={setAxMisalign} label="Ось разорвана" />
+                    <AdCheck checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
+                    <AdCheck checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
+                    <AdCheck checked={axCold} onChange={setAxCold} label="Холод без разминки" />
+                    <AdCheck checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
+                    <AdCheck checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
+                  </div>
+                </AdSec>
               )}
               {cycMedley && (()=>{
                 let events: Array<{ implement: string }> = [];
                 try { events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>; } catch { events = []; }
                 if (!events.length) return null;
                 return (
-                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, border: '1px dashed #1f3a5f' }}>
-                    <div style={{ ...SMALL, color: '#fff', marginBottom: 6 }}>Попытки медли (факт → сводка):</div>
+                  <AdSec title="Попытки медли (факт → сводка):">
                     {events.map((ev, i)=>(
-                      <label key={i} style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>{ev.implement}
-                        <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" style={{ width: 70, background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px' }} />
+                      <label key={i} className="ad-check">{ev.implement}
+                        <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" inputMode="decimal" />
                         <input aria-label={`Попытка ${i + 1} удачна`} type="checkbox" checked={medAttOk[i] !== false} onChange={e=>setMedAttOk(prev=>prev.map((v, j)=>j===i?e.target.checked:v))} />
                       </label>
                     ))}
-                  </div>
+                  </AdSec>
                 );
               })()}
               {cycId && (()=>{
                 try {
                   const f = fitCycleToWeeks(cycId, weeks);
-                  return <div style={{ ...SMALL, marginTop: 6, color: f.fit === 'exact' ? ACCENT : '#e6a23c' }}>Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
+                  return <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
                 } catch { return null; }
               })()}
-            </div>
+            </AdSec>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {
                 const mp = profileOpponent({ myTechnique: technique, oppStyle: topOpp, oppHand: topOppHand, weightDeltaKg: parseFloat(topWD) || 0, strapExpected: proStrap });
-                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}.</div>;
+                return <div className="ad-tip">Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}.</div>;
               } catch { return null; }
             })()}
             {topLadder && (()=>{
               try {
                 const sex = linked?.profile?.personal?.sex || 'male';
-                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
+                return <div className="ad-tip">{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
               } catch { return null; }
             })()}
             {(proDate && topSim) && (()=>{
               try {
                 const sim = buildContestSimWeek({ level, discipline, strapExpected: proStrap, targetKg: parseFloat(proTargetW) || undefined, supermatch: proSupermatch });
-                return <div style={{ ...SMALL, marginTop: 6, color: '#e6a23c' }}>{sim.note} Чеклист: {sim.checklist.slice(0,3).join(' · ')}.</div>;
+                return <div className="ad-tip">{sim.note} Чеклист: {sim.checklist.slice(0,3).join(' · ')}.</div>;
               } catch { return null; }
             })()}
             {proDate && (()=>{
               try {
                 const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
                 const year = topCalSeries !== 'local' ? superSeriesYear(topCalSeries) : null;
-                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Календарь: {cal.note}{year ? ` Год: ${year.note}.` : ''}</div>;
+                return <div className="ad-tip">Календарь: {cal.note}{year ? ` Год: ${year.note}.` : ''}</div>;
               } catch { return null; }
             })()}
             {(topGripWeek || topGripPhase !== 'auto') && (()=>{
               try {
                 const g = buildGripRpe({ week: parseInt(topGripWeek) || 1, phase: topGripPhase !== 'auto' ? topGripPhase : undefined });
-                return <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>Grip-RPE: {g.note} Экстензоры {g.extensor.sets}×{g.extensor.reps} обязательно.</div>;
+                return <div className="ad-tip">Grip-RPE: {g.note} Экстензоры {g.extensor.sets}×{g.extensor.reps} обязательно.</div>;
               } catch { return null; }
             })()}
-          </div>
+          </AdSec>
 
-          <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop: 14 }}>⚡ Собрать план</button>
-          <div style={{ ...SMALL, marginTop: 6 }}>Лучший сплит: <b style={{ color:ACCENT }}>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
-        </div>
+          <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
+          <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+        </AdCard>
       )}
 
       {step === 'grip' && (
-        <div style={CARD}>
+        <AdCard>
           <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
-          <div style={{ marginTop: 12, ...SMALL }}>
-            <b style={{ color:'#fff' }}>Хват-типы (StrongShop / IronMind):</b> support (Rolling Thunder 60мм вращающаяся, Axle 58мм DOH) · pinch (Saxon 3" / Hub) · crush (CoC). Рекомендация — {best?.name}.
+          <div className="ad-muted">
+            <b>Хват-типы (StrongShop / IronMind):</b> support (Rolling Thunder 60мм вращающаяся, Axle 58мм DOH) · pinch (Saxon 3&quot; / Hub) · crush (CoC). Рекомендация — {best?.name}.
           </div>
-        </div>
+        </AdCard>
       )}
 
       {step === 'split' && (
-        <div style={CARD}>
-          <h3 style={H}>🗓 Выбор сплита</h3>
-          <p style={SMALL}>Ранжирование по уровню/цели/технике/хватe/дням ({daysPerWeek}/нед). Зелёный — лучший.</p>
-          <div data-arm="split-list" style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {ranked.slice(0,6).map((r,i)=> (
-              <div key={r.pattern.id} onClick={()=>setPatternId(r.pattern.id)} style={{ padding:10, borderRadius:12, border: `1px solid ${patternId===r.pattern.id ? ACCENT : i===0 ? 'rgba(0,230,138,0.4)' : '#1f3a5f'}`, background: patternId===r.pattern.id ? 'rgba(0,230,138,0.12)' : i===0 ? 'rgba(0,230,138,0.06)' : '#0a1629', cursor:'pointer' }}>
-                <div style={{ color:'#fff', fontWeight:700 }}>{i===0 ? '★ ' : ''}{r.pattern.name} <span style={{ color:'#9ab', fontWeight:400 }}>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span> <span style={{ float:'right', color: ACCENT }}>{r.score}</span></div>
-                <div style={{ color:'#9ab', fontSize:12 }}>{r.pattern.description}</div>
-                {r.rationale.length>0 && <div style={{ color:'#5ee', fontSize:11 }}>{r.rationale.join(' · ')}</div>}
-                {r.warnings.length>0 && <div style={{ color:'#e6a23c', fontSize:11 }}>⚠ {r.warnings.join(' · ')}</div>}
-              </div>
-            ))}
-          </div>
-          <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop:12 }}>⚡ Собрать с выбранным сплитом</button>
-        </div>
+        <AdCard>
+          <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
+            <div className="ad-list" data-arm="split-list">
+              {ranked.slice(0,6).map((r,i)=> (
+                <div key={r.pattern.id} className="ad-sec" data-active={patternId===r.pattern.id} onClick={()=>setPatternId(r.pattern.id)} role="button" tabIndex={0} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setPatternId(r.pattern.id); }}>
+                  <div><b>{i===0 ? '★ ' : ''}{r.pattern.name}</b> <span className="ad-muted">— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span> <span className="ad-stat-v">{r.score}</span></div>
+                  <div className="ad-muted">{r.pattern.description}</div>
+                  {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
+                  {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
+                </div>
+              ))}
+            </div>
+          </AdSec>
+          <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать с выбранным сплитом</AdBtn>
+        </AdCard>
       )}
 
       {step === 'plan' && (
-        <div style={CARD}>
-          {!builtPlan ? <div style={SMALL}>План не собран — вернись в «Параметры».</div> : (
+        <AdCard>
+          {!builtPlan ? <div className="ad-muted">План не собран — вернись в «Параметры».</div> : (
             <>
-              <h3 style={H}>📋 План — {builtPlan.pattern.name}</h3>
-              <div style={SMALL}>{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
-              <div data-arm="week-pills" style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+              <AdSec title={`📋 План — ${builtPlan.pattern.name}`}>
+                <div className="ad-muted">{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
+              </AdSec>
+              <div className="ad-strip" data-arm="week-pills">
                 {builtPlan.weeks.map((w:any)=> (
-                  <button key={w.week} onClick={()=>setWeekSel(w.week)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: weekSel===w.week ? ACCENT : '#1f3a5f', background: weekSel===w.week ? ACCENT : '#0a1629', color: weekSel===w.week ? '#001' : '#9ab', fontWeight: weekSel===w.week ? 700 : 400, cursor:'pointer' }}>
+                  <button key={w.week} className="ad-pill" data-active={weekSel===w.week} onClick={()=>setWeekSel(w.week)}>
                     Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}
                   </button>
                 ))}
               </div>
               {curWeek && (
-                <div style={{ marginTop: 10 }}>
-                  <h4 style={{ color:'#fff', margin:'6px 0' }}>Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
-                  {curWeek.note && <div style={{ fontSize:11, color:'#e6a23c', marginBottom:6 }}>📝 {curWeek.note}</div>}
+                <div>
+                  <h4 className="ad-sec-t">Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                  {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   {curWeek.sessions.map((sess:any, si:number)=> (
-                    <div key={si} style={{ border:'1px solid #1f3a5f', borderRadius:10, padding:8, marginBottom:8, background:'#0a1629' }}>
-                      <div style={{ color:ACCENT, fontWeight:700, fontSize:13, marginBottom:4 }}>{sess.sessionTag} · {sess.character} {sess.tableTime ? '🖐️ стол' : ''}</div>
-                      {sess.note && <div style={{ fontSize:11, color:'#9ab', marginBottom:4 }}>📝 {sess.note}</div>}
+                    <div key={si} className="ad-sess">
+                      <div className="ad-sess-h">{sess.sessionTag} · {sess.character} {sess.tableTime ? '🖐️ стол' : ''}</div>
+                      {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
                       {sess.exercises.map((ex:any, ei:number)=> (
-                        <div key={ei} style={{ padding:'4px 0', borderBottom: ei < sess.exercises.length-1 ? '1px solid rgba(255,255,255,0.06)' : 'none', fontSize:12 }}>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}>
-                            <span style={{ color:'#fff' }}>{ex.name} <span style={{ color:'#9ab' }}>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span style={{ color:'#9ab' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]} RIR{ex.rir}{ex.holdSeconds ? ` hold ${ex.holdSeconds}с`:''}</span>
+                        <div key={ei} className="ad-ex">
+                          <div className="ad-ex-top">
+                            <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
+                            <span className="ad-ex-vl">{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]} RIR{ex.rir}{ex.holdSeconds ? ` hold ${ex.holdSeconds}с`:''}</span>
                           </div>
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
-                            <div style={{ color:'#5ee', fontSize:11, marginTop:2 }}>💡 {ex.comment}</div>
+                            <div className="ad-tip">💡 {ex.comment}</div>
                           )}
                         </div>
                       ))}
@@ -897,8 +923,8 @@ export function ArmAutoConstructor() {
                   ))}
                 </div>
               )}
-              <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
-                <button onClick={()=>{
+              <div className="ad-row">
+                <AdBtn variant="ghost" onClick={()=>{
                   let diag: any = null;
                   try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
                   // fatigue/trend из force-history если есть
@@ -915,101 +941,103 @@ export function ArmAutoConstructor() {
                   const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
-                }} style={BTN_GHOST as any}>🖨 Печать</button>
-                <button onClick={()=>{
+                }}>🖨 Печать</AdBtn>
+                <AdBtn variant="ghost" onClick={()=>{
                   const ics = buildArmIcs(builtPlan);
                   const blob = new Blob([ics], { type:'text/calendar' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href=url; a.download='arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
-                }} style={BTN_GHOST as any}>📅 .ics</button>
+                }}>📅 .ics</AdBtn>
               </div>
             </>
           )}
-        </div>
+        </AdCard>
       )}
 
       {step === 'quality' && (
-        <div style={CARD}>
-          {!builtPlan ? <div style={SMALL}>Сначала собери план.</div> : (
+        <AdCard>
+          {!builtPlan ? <div className="ad-muted">Сначала собери план.</div> : (
             <>
-              <h3 style={H}>📊 Качество</h3>
-              <div style={SMALL}><b style={{ color:'#fff' }}>{builtPlan.report?.summary}</b></div>
-              <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                <div style={{ background:'#0a1629', border:'1px solid #1f3a5f', borderRadius:10, padding:8 }}>
-                  <div style={{ color:ACCENT, fontWeight:700, fontSize:12 }}>Фазы</div>
-                  <div style={{ color:'#9ab', fontSize:12 }}>{builtPlan.report?.phaseRationale.join(' · ')}</div>
+              <AdSec title="📊 Качество">
+                <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
+                <div className="ad-stats">
+                  <div className="ad-stat">
+                    <div className="ad-stat-v">Фазы</div>
+                    <div className="ad-stat-s">{builtPlan.report?.phaseRationale.join(' · ')}</div>
+                  </div>
+                  <div className="ad-stat">
+                    <div className="ad-stat-v">Объём</div>
+                    <div className="ad-stat-s">{builtPlan.report?.volumeSummary.join(' · ')}</div>
+                  </div>
                 </div>
-                <div style={{ background:'#0a1629', border:'1px solid #1f3a5f', borderRadius:10, padding:8 }}>
-                  <div style={{ color:ACCENT, fontWeight:700, fontSize:12 }}>Объём</div>
-                  <div style={{ color:'#9ab', fontSize:12 }}>{builtPlan.report?.volumeSummary.join(' · ')}</div>
+                {builtPlan.validation && (
+                  <div>
+                    {builtPlan.validation.errors.length>0 && <div className="ad-tip">❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</div>}
+                    {builtPlan.validation.warnings.length>0 && <div className="ad-tip">⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</div>}
+                    {builtPlan.validation.valid && <div className="ad-tip">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</div>}
+                  </div>
+                )}
+                <div className="ad-muted">
+                  {builtPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
+                  {builtPlan.report?.gripRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
                 </div>
-              </div>
-              {builtPlan.validation && (
-                <div style={{ marginTop:8 }}>
-                  {builtPlan.validation.errors.length>0 && <div style={{ color:'#ff6b6b', fontSize:12 }}>❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</div>}
-                  {builtPlan.validation.warnings.length>0 && <div style={{ color:'#e6a23c', fontSize:12, marginTop:4 }}>⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</div>}
-                  {builtPlan.validation.valid && <div style={{ color:ACCENT, fontSize:12 }}>✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</div>}
-                </div>
-              )}
-              <div style={{ marginTop:8, color:'#9ab', fontSize:12 }}>
-                {builtPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
-                {builtPlan.report?.gripRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
-              </div>
-              <div style={{ marginTop: 10 }}>
+              </AdSec>
+              <div>
                 <ArmHeatmap plan={builtPlan} onToast={flash} />
               </div>
-              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.16)', fontSize: 11, color: '#e6a23c' }}>
-                <b style={{color:'#f59e0b'}}>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
-              </div>
+              <AdBanner tone="warn">
+                <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
+              </AdBanner>
             </>
           )}
-        </div>
+        </AdCard>
       )}
 
       {step === 'weights' && (
-        <div style={CARD}>
-          <h3 style={H}>🏋️ Веса — детали</h3>
-          <p style={SMALL}>Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.</p>
-          {!builtPlan ? <div style={SMALL}>Сначала собери план в «Параметры».</div> : (
-            <>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {Object.entries(workMax).map(([k,v])=> (
-                  <div key={k} style={{ padding:'6px 8px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', fontSize:12, color:'#fff' }}>{k}: <b style={{color:ACCENT}}>{String(v)} кг</b></div>
-                ))}
-              </div>
-              <div style={{ marginTop:10, fontSize:12, color:'#9ab' }}>Пример веса в плане (неделя 1, тяж): {(() => {
-                try {
-                  const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];
-                  if (!ex) return '—';
-                  return `${ex.name} — ${ex.workSets[0]?.weight ?? 0} кг × ${ex.workSets[0]?.reps} RIR${ex.rir} (${ex.tempoSpec})`;
-                } catch { return '—'; }
-              })()}</div>
-              {discipline === 'armlifting' && (
-                <div style={{ marginTop:10, border:'1px solid #1f3a5f', borderRadius:10, padding:8, background:'#0a1629' }}>
-                  <div style={{ color:'#fff', fontWeight:700, fontSize:12, marginBottom:6 }}>🏟 Помост: план попыток (опенер 90 / 96 / 102%)</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <label style={{ ...SMALL }}>Снаряд<br/>
-                      <select value={proPlatImpl} onChange={e=>setProPlatImpl(e.target.value)} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}>
-                        {Object.entries(PLATFORM_WR).map(([id, r])=><option key={id} value={id}>{r.name}</option>)}
-                      </select>
-                    </label>
-                    <label style={{ ...SMALL }}>Цель, кг<br/><input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }} /></label>
-                  </div>
-                  <div style={{ ...SMALL, marginTop:6 }}>{(()=>{
-                    const t = parseFloat(proPlatTarget);
-                    if (!(t > 0)) return 'Введите цель — покажем раскладку попыток и %WR.';
-                    const att = planAttempts(t);
-                    const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
-                    const pct = Math.round((t / wr) * 1000) / 10;
-                    return `Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`;
-                  })()}</div>
-                </div>
-              )}
-              <button onClick={handleBuild} style={{ ...BTN, width:'100%', marginTop:10 }}>🔄 Пересобрать с весами</button>
-            </>
-          )}
-        </div>
+        <AdCard>
+          <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
+            {!builtPlan ? <div className="ad-muted">Сначала собери план в «Параметры».</div> : (
+              <>
+                <AdGrid cols="2">
+                  {Object.entries(workMax).map(([k,v])=> (
+                    <div key={k} className="ad-kv"><span>{k}:</span><span>{String(v)} кг</span></div>
+                  ))}
+                </AdGrid>
+                <div className="ad-muted">Пример веса в плане (неделя 1, тяж): {(() => {
+                  try {
+                    const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];
+                    if (!ex) return '—';
+                    return `${ex.name} — ${ex.workSets[0]?.weight ?? 0} кг × ${ex.workSets[0]?.reps} RIR${ex.rir} (${ex.tempoSpec})`;
+                  } catch { return '—'; }
+                })()}</div>
+                {discipline === 'armlifting' && (
+                  <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)">
+                    <AdGrid cols="2">
+                      <AdField label="Снаряд">
+                        <select value={proPlatImpl} onChange={e=>setProPlatImpl(e.target.value)}>
+                          {Object.entries(PLATFORM_WR).map(([id, r])=><option key={id} value={id}>{r.name}</option>)}
+                        </select>
+                      </AdField>
+                      <AdField label="Цель, кг">
+                        <input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" inputMode="decimal" />
+                      </AdField>
+                    </AdGrid>
+                    <div className="ad-muted">{(()=>{
+                      const t = parseFloat(proPlatTarget);
+                      if (!(t > 0)) return 'Введите цель — покажем раскладку попыток и %WR.';
+                      const att = planAttempts(t);
+                      const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
+                      const pct = Math.round((t / wr) * 1000) / 10;
+                      return `Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`;
+                    })()}</div>
+                  </AdSec>
+                )}
+                <AdBtn variant="primary" block onClick={handleBuild}>🔄 Пересобрать с весами</AdBtn>
+              </>
+            )}
+          </AdSec>
+        </AdCard>
       )}
-    </div>
+    </AdRoot>
   );
 }
