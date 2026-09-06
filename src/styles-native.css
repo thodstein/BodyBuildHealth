@@ -4870,3 +4870,26 @@ html.app-native .support-topbar {
 html.app-native .screen.support-screen {
   border-top: env(safe-area-inset-top, 0px) solid transparent !important;
 }
+
+/* ─── 74. BOTTOM FIT ──────────────────────────────────────
+ * Только APK. Контент вторичных экранов не уходит под плавающую
+ * пилюлю навигации; глобальные тосты — над ней с учётом safe-area.
+ * TG/web не тронуты. */
+html.app-native .screen.gamification,
+html.app-native .screen.recovery-screen,
+html.app-native .screen.plan,
+html.app-native .screen.fertility-pct,
+html.app-native .screen.peptides,
+html.app-native .screen.assistant,
+html.app-native .screen.role-management,
+html.app-native .screen.substances,
+html.app-native .screen.predictive-analytics,
+html.app-native .screen.perf-screen,
+html.app-native .rep-screen,
+html.app-native .sup-clinic {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+}
+
+html.app-native .toast-container {
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+}

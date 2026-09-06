@@ -186,6 +186,34 @@ describe('APK TOP pack', () => {
     }
   });
 
+  it('волна 24: низы не под пилюлей — safe-area снизу', () => {
+    const css = readCss('styles-native.css');
+    const i = css.indexOf('74. BOTTOM FIT');
+    expect(i).toBeGreaterThan(-1);
+    const block = css.slice(i, i + 3000);
+    for (const sel of [
+      '.screen.gamification',
+      '.screen.fertility-pct',
+      '.rep-screen',
+      '.sup-clinic',
+      '.toast-container',
+    ]) {
+      expect(block, sel).toContain(sel);
+    }
+    expect(block).toContain('safe-area-inset-bottom');
+    expect(block).toContain('var(--nav-height)');
+    for (const line of block.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('/*') || t.startsWith('*')) continue;
+      if (!t.endsWith('{')) continue;
+      const sel = t.slice(0, -1).trim();
+      if (!sel || sel.startsWith('@')) continue;
+      for (const p of sel.split(',').map((s) => s.trim()).filter(Boolean)) {
+        expect(p.startsWith('html.app-native'), p).toBe(true);
+      }
+    }
+  });
+
   it('CSS-изоляция: каждый селектор native-слоёв — только html.app-native', () => {
     for (const name of ['styles-native.css', 'styles-native-pro.css']) {
       const css = readCss(name);
