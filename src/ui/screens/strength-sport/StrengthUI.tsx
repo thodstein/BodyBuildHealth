@@ -26,9 +26,9 @@ export const TEXT_2 = 'rgba(235,235,245,0.60)';
 export const TEXT_3 = 'rgba(235,235,245,0.30)';
 export const SEPARATOR = 'rgba(84,84,88,0.36)';
 
-export const RADIUS_LG = 14;
-export const RADIUS_MD = 10;
-export const RADIUS_SM = 8;
+export const RADIUS_LG = 18;
+export const RADIUS_MD = 14;
+export const RADIUS_SM = 10;
 
 const SF = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif';
 
@@ -36,10 +36,10 @@ export const CARD: React.CSSProperties = {
   background: GLASS_BG,
   border: `0.5px solid ${GLASS_BORDER}`,
   borderRadius: RADIUS_LG,
-  padding: 16,
+  padding: 18,
   display: 'flex',
   flexDirection: 'column',
-  gap: 12,
+  gap: 14,
   boxShadow: GLASS_SHADOW,
   backdropFilter: VIBRANCY,
   WebkitBackdropFilter: VIBRANCY,
@@ -58,7 +58,7 @@ export const CARD_HERO: React.CSSProperties = {
   background: 'rgba(44,44,46,0.84)',
   borderColor: 'rgba(84,84,88,0.32)',
   boxShadow: '0 4px 24px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.24)',
-  padding: 18,
+  padding: 20,
   gap: 14,
 };
 export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontFamily: SF };
@@ -69,70 +69,73 @@ export const LABEL: React.CSSProperties = {
 export const HINT: React.CSSProperties = { fontSize: 13, color: TEXT_2, lineHeight: 1.45, fontFamily: SF, fontWeight: 400 };
 export const HINT_SM: React.CSSProperties = { fontSize: 11, color: TEXT_3, lineHeight: 1.4, fontFamily: SF };
 export const BTN: React.CSSProperties = {
-  padding: '11px 18px',
+  padding: '14px 20px',
   borderRadius: RADIUS_MD,
-  fontSize: 15,
-  fontWeight: 600,
+  fontSize: 16,
+  fontWeight: 700,
   cursor: 'pointer',
   border: '0.5px solid rgba(84,84,88,0.36)',
   background: 'rgba(58,58,60,0.72)',
   color: TEXT_1,
-  minHeight: 44,
+  minHeight: 52,
   whiteSpace: 'nowrap',
   fontFamily: SF,
-  letterSpacing: -0.01 * 15,
+  letterSpacing: -0.01 * 16,
   transition: 'all 0.20s cubic-bezier(0.2,0,0,1)',
   backdropFilter: 'blur(20px)',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.22)',
 };
 export const BTN_PRIMARY: React.CSSProperties = {
   ...BTN,
-  background: ACCENT,
+  background: ACCENT_GRAD,
   border: 'none',
-  color: '#000',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.30)',
-  fontWeight: 600,
+  color: '#06281c',
+  boxShadow: '0 6px 20px rgba(0,230,138,0.28), inset 0 1px 0 rgba(255,255,255,0.25)',
+  fontWeight: 800,
 };
 export const BTN_GHOST: React.CSSProperties = {
   ...BTN,
   background: 'rgba(0,230,138,0.12)',
   border: '0.5px solid rgba(0,230,138,0.24)',
   color: ACCENT,
+  boxShadow: 'none',
 };
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 32, padding: '7px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 40, padding: '10px 16px', fontSize: 14, borderRadius: 10, fontWeight: 700 };
 export const INPUT: React.CSSProperties = {
   background: 'rgba(58,58,60,0.72)',
   border: '0.5px solid rgba(84,84,88,0.36)',
   borderRadius: RADIUS_MD,
-  padding: '10px 12px',
+  padding: '13px 14px',
   color: TEXT_1,
   fontSize: 17,
   fontWeight: 400,
   fontFamily: SF,
   outline: 'none',
   width: '100%',
+  minHeight: 52,
   transition: 'border-color 0.20s, background 0.20s',
   backdropFilter: 'blur(20px)',
 };
 export const CHIP: React.CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 20,
-  fontSize: 13,
-  fontWeight: 590,
+  padding: '11px 18px',
+  borderRadius: 22,
+  fontSize: 14,
+  fontWeight: 600,
   cursor: 'pointer',
   border: '0.5px solid rgba(84,84,88,0.36)',
   background: 'rgba(58,58,60,0.72)',
   color: TEXT_1,
   whiteSpace: 'nowrap',
-  minHeight: 34,
+  minHeight: 44,
   fontFamily: SF,
   transition: 'all 0.18s cubic-bezier(0.2,0,0,1)',
 };
 export const CHIP_ACTIVE: React.CSSProperties = {
   ...CHIP,
   border: `0.5px solid ${ACCENT}`,
-  background: ACCENT,
-  color: '#000',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.20)',
+  background: ACCENT_GRAD,
+  color: '#06281c',
+  boxShadow: '0 4px 16px rgba(0,230,138,0.30), inset 0 1px 0 rgba(255,255,255,0.25)',
 };
 export const PHASE_COLOR: Record<string, string> = {
   accumulation: '#0A84FF',
@@ -165,17 +168,18 @@ export const SectionCard: React.FC<{
 }> = ({ id, title, subtitle, icon, right, accent, strong, hint, children }) => (
   <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
-      <div style={{ ...ROW, marginBottom: 2 }}>
+      <div style={{ ...ROW, marginBottom: 4 }}>
         {icon && (
           <span style={{
-            width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: strong ? ACCENT_STRONG : accent ? ACCENT : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
-            fontSize: 14, flexShrink: 0, fontFamily: SF,
+            width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: strong ? ACCENT_GRAD_STRONG : accent ? ACCENT_GRAD : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
+            fontSize: 17, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
+            boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : accent ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
           }}>{icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 15, fontFamily: SF }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
+          <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 17, fontFamily: SF, lineHeight: 1.2 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 13, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
         </div>
         {right}
       </div>
@@ -186,22 +190,22 @@ export const SectionCard: React.FC<{
 );
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
   <div className="kit-stat" style={{
-    flex: '1 1 110px', padding: '12px 12px', borderRadius: 12,
-    background: 'rgba(58,58,60,0.48)', border: `0.5px solid ${SEPARATOR}`, display: 'flex', flexDirection: 'column', gap: 3,
-    fontFamily: SF,
+    flex: '1 1 120px', padding: '14px', borderRadius: 16,
+    background: 'linear-gradient(180deg, rgba(64,64,68,0.55), rgba(58,58,60,0.42))', border: `0.5px solid ${SEPARATOR}`, borderTop: `2px solid ${color}55`, display: 'flex', flexDirection: 'column', gap: 4,
+    fontFamily: SF, boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
   }}>
-    <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 4 }}>
-      {icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}
+    <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 700, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 4 }}>
+      {icon && <span style={{ fontSize: 12 }}>{icon}</span>}{label}
     </span>
-    <span style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, letterSpacing: -0.02 * 22, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-    {sub && <span style={{ fontSize: 11, color: TEXT_3, fontFamily: SF }}>{sub}</span>}
+    <span style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, letterSpacing: -0.02 * 26, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    {sub && <span style={{ fontSize: 12, color: TEXT_3, fontFamily: SF }}>{sub}</span>}
   </div>
 );
 export const Badge: React.FC<{ color?: string; bg?: string; border?: string; icon?: string; children: React.ReactNode }> = ({ color = TEXT_1, bg = 'rgba(58,58,60,0.72)', border = SEPARATOR, icon, children }) => (
   <span style={{
-    fontSize: 13, fontWeight: 590, color, background: bg, border: `0.5px solid ${border}`, borderRadius: 20,
-    padding: '4px 10px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4,
-    fontFamily: SF, letterSpacing: -0.01 * 13,
+    fontSize: 13, fontWeight: 600, color, background: bg, border: `0.5px solid ${border}`, borderRadius: 22,
+    padding: '6px 12px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5,
+    fontFamily: SF, letterSpacing: -0.01 * 13, lineHeight: 1.3,
   }}>{icon && <span style={{ fontSize: 12 }}>{icon}</span>}{children}</span>
 );
 export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent' | 'strong'; children: React.ReactNode }> = ({ tone = 'info', children }) => {
@@ -212,27 +216,28 @@ export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent' | '
     : { color: '#64D2FF', bg: 'rgba(100,210,255,0.10)', border: 'rgba(100,210,255,0.18)', icon: 'ℹ︎' };
   return (
     <div role="status" style={{
-      fontSize: 13, color: pal.color, background: pal.bg, border: `0.5px solid ${pal.border}`,
-      borderRadius: 10, padding: '10px 12px', lineHeight: 1.45, fontFamily: SF, display: 'flex', gap: 8, alignItems: 'flex-start',
+      fontSize: 14, color: pal.color, background: pal.bg, border: `0.5px solid ${pal.border}`,
+      borderRadius: 14, padding: '12px 14px', lineHeight: 1.5, fontFamily: SF, display: 'flex', gap: 10, alignItems: 'flex-start',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
     }}>
-      <span style={{ fontSize: 13, marginTop: 0, flexShrink: 0, fontFamily: SF }}>{pal.icon}</span>
+      <span style={{ fontSize: 16, marginTop: 0, flexShrink: 0, fontFamily: SF }}>{pal.icon}</span>
       <span style={{ flex: 1, fontWeight: 400 }}>{children}</span>
     </div>
   );
 };
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string; strong?: boolean }> = ({ icon, text, desc, strong }) => (
-  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 0 6px 12px', borderLeft: `2px solid ${strong ? ACCENT_STRONG : ACCENT}`, margin: '4px 0', fontFamily: SF }}>
-    <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 13 }}>{icon}</span>{text}
+  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 0 8px 14px', borderLeft: `3px solid ${strong ? ACCENT_STRONG : ACCENT}`, borderRadius: '0 10px 10px 0', background: strong ? 'rgba(245,158,11,0.05)' : 'rgba(0,230,138,0.04)', margin: '6px 0', fontFamily: SF }}>
+    <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 14 }}>{icon}</span>{text}
     </span>
-    {desc && <span style={{ fontSize: 11, color: 'rgba(235,235,245,0.30)', lineHeight: 1.4, fontFamily: SF }}>{desc}</span>}
+    {desc && <span style={{ fontSize: 12, color: 'rgba(235,235,245,0.42)', lineHeight: 1.45, fontFamily: SF }}>{desc}</span>}
   </div>
 );
-export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 4 }) => {
+export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 8 }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" className="kit-progress" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
-      <div style={{ height: '100%', borderRadius: height / 2, width: pct + '%', background: color, transition: 'width 0.40s cubic-bezier(0.2,0,0,1)' }} />
+    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" className="kit-progress" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ height: '100%', borderRadius: height / 2, width: pct + '%', background: `linear-gradient(90deg, ${color}, ${color})`, boxShadow: `0 0 12px ${color}88`, transition: 'width 0.40s cubic-bezier(0.2,0,0,1)' }} />
     </div>
   );
 };
@@ -247,15 +252,15 @@ export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; childr
   </button>
 );
 export const Field: React.FC<{ label?: string; hint?: string; error?: string; children: React.ReactNode }> = ({ label, hint, error, children }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 148px', minWidth: 0, fontFamily: SF }}>
-    {label && <span style={{ fontSize: 11, color: 'rgba(235,235,245,0.60)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>{label}</span>}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '1 1 148px', minWidth: 0, fontFamily: SF }}>
+    {label && <span style={{ fontSize: 11, color: 'rgba(235,235,245,0.60)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1.2, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>{label}</span>}
     {children}
-    {hint && !error && <span style={{ fontSize: 11, color: 'rgba(235,235,245,0.30)', lineHeight: 1.4, fontFamily: SF }}>{hint}</span>}
-    {error && <span style={{ fontSize: 12, color: '#FF3B30', fontWeight: 590, fontFamily: SF }}>⚠ {error}</span>}
+    {hint && !error && <span style={{ fontSize: 12, color: 'rgba(235,235,245,0.38)', lineHeight: 1.45, fontFamily: SF }}>{hint}</span>}
+    {error && <span style={{ fontSize: 13, color: '#FF3B30', fontWeight: 600, fontFamily: SF }}>⚠ {error}</span>}
   </div>
 );
 export const Highlight: React.FC<{ color?: string; children: React.ReactNode }> = ({ color = ACCENT, children }) => (
-  <span style={{ background: `${color}14`, color, padding: '2px 6px', borderRadius: 6, fontWeight: 590, fontSize: '0.94em', fontFamily: SF, border: `0.5px solid ${color}18` }}>{children}</span>
+  <span style={{ background: `${color}1A`, color, padding: '3px 8px', borderRadius: 8, fontWeight: 600, fontSize: '0.94em', fontFamily: SF, border: `0.5px solid ${color}22`, whiteSpace: 'nowrap' }}>{children}</span>
 );
 
 // ─── сильный (стронг) акцент-варианты ───
@@ -270,18 +275,19 @@ export const CARD_STRONG: React.CSSProperties = {
 };
 export const BTN_STRONG: React.CSSProperties = {
   ...BTN,
-  background: ACCENT_STRONG,
+  background: ACCENT_GRAD_STRONG,
   border: 'none',
   color: '#fff',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.22)',
+  boxShadow: '0 6px 20px rgba(245,158,11,0.30), inset 0 1px 0 rgba(255,255,255,0.25)',
+  fontWeight: 800,
 };
-export const SELECT: React.CSSProperties = { ...INPUT, appearance: 'none' as any, cursor: 'pointer', fontSize: 15 };
+export const SELECT: React.CSSProperties = { ...INPUT, appearance: 'none' as any, cursor: 'pointer', fontSize: 16, minHeight: 52 };
 export const CHIP_STRONG_ACTIVE: React.CSSProperties = {
   ...CHIP,
   border: `0.5px solid ${ACCENT_STRONG}`,
-  background: ACCENT_STRONG,
+  background: ACCENT_GRAD_STRONG,
   color: '#fff',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+  boxShadow: '0 4px 16px rgba(245,158,11,0.30), inset 0 1px 0 rgba(255,255,255,0.25)',
 };
 export const MODE_RU: Record<string, string> = { weightlifting: 'Тяжёлая атлетика', strongman: 'Силовой экстрим', hybrid: 'Гибрид' };
 export const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', transition: 'Переход', taper: 'Тапер', integration: 'Интеграция' };
@@ -293,11 +299,11 @@ export const SESSION_TAG_RU: Record<string, string> = { snatch_day: 'Рывок'
 export const SectionNav: React.FC<{ items: { id: string; label: string }[]; activeId?: string; onSelect?: (id: string) => void }> = ({ items, activeId, onSelect }) => {
   const goTo = (id: string) => { if (onSelect) { onSelect(id); return; } const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   return (
-    <div style={{ display: 'flex', gap: 6, padding: 4, background: 'rgba(58,58,60,0.72)', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }}>
+    <div style={{ display: 'flex', gap: 6, padding: 6, background: 'rgba(58,58,60,0.72)', borderRadius: 16, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'none' }}>
       {items.map(n => {
         const active = activeId ? activeId === n.id : false;
         return (
-          <button key={n.id} onClick={() => goTo(n.id)} aria-pressed={active} style={{ padding: '6px 12px', borderRadius: 7, fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer', fontFamily: SF, border: 'none', background: active ? '#fff' : 'transparent', color: active ? '#000' : TEXT_2, boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none', transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap', flexShrink: 0 }}>{n.label}</button>
+          <button key={n.id} onClick={() => goTo(n.id)} aria-pressed={active} style={{ padding: '10px 16px', borderRadius: 11, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: SF, border: 'none', background: active ? '#fff' : 'transparent', color: active ? '#000' : TEXT_2, boxShadow: active ? '0 2px 8px rgba(0,0,0,0.22)' : 'none', transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap', flexShrink: 0, minHeight: 44 }}>{n.label}</button>
         );
       })}
     </div>
@@ -308,10 +314,10 @@ export const Divider: React.FC = () => <div style={{ height: 0.5, background: SE
 
 export const CardHeader: React.FC<{ icon: string; title: string; subtitle?: string; right?: React.ReactNode; strong?: boolean }> = ({ icon, title, subtitle, right, strong }) => (
   <div style={ROW}>
-    <span style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, fontFamily: SF, background: strong ? ACCENT_STRONG : ACCENT, color: '#fff', border: `0.5px solid ${strong ? STRONG_BORDER : ACCENT_BORDER}` }}>{icon}</span>
+    <span style={{ width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0, fontFamily: SF, background: strong ? ACCENT_GRAD_STRONG : ACCENT_GRAD, color: strong ? '#fff' : '#06281c', border: `0.5px solid ${strong ? STRONG_BORDER : ACCENT_BORDER}`, boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : '0 4px 14px rgba(0,230,138,0.28)' }}>{icon}</span>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 15, fontFamily: SF }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
+      <div style={{ fontSize: 16, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 16, fontFamily: SF, lineHeight: 1.2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 13, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
     </div>
     {right}
   </div>
@@ -322,12 +328,14 @@ export const HighlightStrong: React.FC<{ children: React.ReactNode }> = ({ child
 );
 
 // ─── Apple sheets ───
-const POP_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0 };
-const POP_SHEET: React.CSSProperties = { width: '100%', maxWidth: 420, maxHeight: '78vh', overflowY: 'auto', borderRadius: '16px 16px 0 0', background: '#1C1C1E', borderTop: `0.5px solid ${SEPARATOR}`, boxShadow: '0 -8px 32px rgba(0,0,0,0.32)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' };
-const POP_HANDLE: React.CSSProperties = { width: 36, height: 5, borderRadius: 3, background: 'rgba(120,120,128,0.36)', margin: '8px auto 0' };
+const SS_POP_ANIM = `@keyframes ssPopFade{from{opacity:0}to{opacity:1}}@keyframes ssPopSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`;
+const POP_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.60)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'ssPopFade 0.22s ease' };
+const POP_SHEET: React.CSSProperties = { width: '100%', maxWidth: 440, maxHeight: '82vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: `0.5px solid ${SEPARATOR}`, borderBottom: 'none', boxShadow: '0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'ssPopSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)' };
+const POP_HANDLE: React.CSSProperties = { width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' };
 const popCardBtn: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 600, textAlign: 'center', minHeight: 52, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, fontFamily: SF,
+  width: '100%', padding: '12px 14px', borderRadius: 16, cursor: 'pointer', fontSize: 11, fontWeight: 700, textAlign: 'center', minHeight: 60, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, fontFamily: SF,
   background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, transition: 'all 0.18s',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
 };
 
 export const StrengthPopupSelect: React.FC<{ label: string; value: string | undefined; options: { id: string; label: string; desc?: string }[]; onChange: (v: string) => void; strong?: boolean }> = ({ label, value, options, onChange, strong }) => {
@@ -337,36 +345,37 @@ export const StrengthPopupSelect: React.FC<{ label: string; value: string | unde
   return (
     <>
       <button onClick={() => setOpen(true)} style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
-        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 15, color: strong ? '#f59e0b' : '#00e68a', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 10, color: TEXT_3 }}>▾</span></span>
+        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 700, fontFamily: SF }}>{label}</span>
+        <span style={{ fontSize: 17, color: strong ? '#f59e0b' : '#00e68a', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 11, color: TEXT_3 }}>▾</span></span>
       </button>
       {open && (
         <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
+          <style>{SS_POP_ANIM}</style>
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, borderTop: `2px solid ${strong ? ACCENT_STRONG : ACCENT}` }} role="dialog" aria-modal="true" aria-label={label}>
             <div className="ss-apk-handle" style={POP_HANDLE} />
-            <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
-              {sel?.desc && <span style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
+            <div style={{ padding: '16px 16px 10px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
+              {sel?.desc && <span style={{ fontSize: 12, color: accent, background: strong ? 'rgba(245,158,11,0.12)' : 'rgba(0,230,138,0.12)', padding: '4px 10px', borderRadius: 22, border: strong ? '0.5px solid rgba(245,158,11,0.24)' : '0.5px solid rgba(0,230,138,0.24)', fontFamily: SF, fontWeight: 600 }}>{sel.desc}</span>}
             </div>
-            <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {options.map(o => {
                 const active = value === o.id;
                 return (
                   <button key={o.id} className="ss-apk-option" onClick={() => { onChange(o.id); setOpen(false); }} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
-                    fontFamily: SF, background: active ? (strong ? 'rgba(245,158,11,0.12)' : 'rgba(0,230,138,0.12)') : 'transparent',
-                    border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`, transition: 'background 0.18s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 16px', borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const, minHeight: 60,
+                    fontFamily: SF, background: active ? (strong ? 'rgba(245,158,11,0.16)' : 'rgba(0,230,138,0.16)') : 'rgba(255,255,255,0.02)',
+                    border: active ? (strong ? '0.5px solid rgba(245,158,11,0.30)' : '0.5px solid rgba(0,230,138,0.30)') : '0.5px solid transparent', transition: 'background 0.18s',
                   }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? accent : TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 13, color: accent }}>✓</span>}</span>
-                      {o.desc && <span style={{ fontSize: 12, color: active ? accent : TEXT_2, fontFamily: SF, marginTop: 2, display: 'block', lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
+                      <span style={{ fontSize: 18, fontWeight: active ? 700 : 500, color: active ? accent : TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 15, color: accent }}>✓</span>}</span>
+                      {o.desc && <span style={{ fontSize: 13, color: active ? accent : TEXT_2, fontFamily: SF, marginTop: 3, display: 'block', lineHeight: 1.4, opacity: active ? 0.95 : 0.8 }}>{o.desc}</span>}
                     </span>
                   </button>
                 );
               })}
             </div>
-            <div style={{ padding: '8px 16px' }}>
-              <button className="ss-apk-done" onClick={() => setOpen(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
+            <div style={{ padding: '4px 16px 12px' }}>
+              <button className="ss-apk-done" onClick={() => setOpen(false)} style={{ width: '100%', padding: '14px', borderRadius: 14, background: strong ? ACCENT_GRAD_STRONG : ACCENT_GRAD, border: 'none', color: strong ? '#fff' : '#06281c', fontSize: 17, fontWeight: 800, fontFamily: SF, cursor: 'pointer', minHeight: 52, boxShadow: strong ? '0 6px 20px rgba(245,158,11,0.30)' : '0 6px 20px rgba(0,230,138,0.28)' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -388,16 +397,17 @@ export const StrengthPopupNumber: React.FC<{ label: string; value: number; min?:
       </button>
       {open && (
         <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
+          <style>{SS_POP_ANIM}</style>
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360, borderTop: `2px solid ${strong ? ACCENT_STRONG : ACCENT}` }} role="dialog" aria-modal="true" aria-label={label}>
             <div className="ss-apk-handle" style={POP_HANDLE} />
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
-              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: accent, height: 6, borderRadius: 999 }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
-                {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
-                <button className="ss-apk-done" onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>Готово</button>
+            <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
+              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: accent, height: 8, borderRadius: 999 }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '13px 14px', borderRadius: 14, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 19, fontWeight: 600, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums', minHeight: 52 }} />
+                {suffix && <span style={{ fontSize: 14, color: TEXT_2, fontFamily: SF, fontWeight: 600 }}>{suffix}</span>}
+                <button className="ss-apk-done" onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '13px 24px', borderRadius: 14, border: 'none', background: accent, color: strong ? '#fff' : '#06281c', fontWeight: 800, fontSize: 16, fontFamily: SF, cursor: 'pointer', minHeight: 52, boxShadow: '0 6px 20px rgba(0,0,0,0.30)' }}>Готово</button>
               </div>
             </div>
           </div>
@@ -419,15 +429,15 @@ export const EventCard: React.FC<{
   const totalCap = events.reduce((a, e) => a + e.timeCapS, 0);
   const medleyCap = Math.max(totalCap - 10, totalDist > 0 ? 60 : 0);
   return (
-    <div data-ss="medley" style={{ ...CARD_STRONG, padding: 14, gap: 10 }}>
+    <div data-ss="medley" style={{ ...CARD_STRONG, padding: 16, gap: 12 }}>
       <div style={ROW}>
-        <span style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT_STRONG, fontSize: 14 }}>⛓️</span>
-        <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontFamily: SF }}>{title}</div><div style={{ fontSize: 11, color: TEXT_2, fontFamily: SF }}>{subtitle} · <span style={{ color: ACCENT_STRONG }}>{totalDist}м / cap {medleyCap}с</span></div></div>
+        <span style={{ width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT_GRAD_STRONG, fontSize: 17, boxShadow: '0 4px 14px rgba(245,158,11,0.30)' }}>⛓️</span>
+        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, fontFamily: SF, lineHeight: 1.2 }}>{title}</div><div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2 }}>{subtitle} · <span style={{ color: ACCENT_STRONG, fontWeight: 700 }}>{totalDist}м / cap {medleyCap}с</span></div></div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {events.map(ev => (
-          <div key={ev.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, fontFamily: SF }}>{ev.label} {ev.weight ? <span style={{ color: TEXT_3 }}>{ev.weight}кг</span> : null}</span><span style={{ fontSize: 10, color: TEXT_3, fontFamily: SF }}>{ev.distanceM}м · {ev.timeCapS}с</span></div>
+          <div key={ev.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF }}>{ev.label} {ev.weight ? <span style={{ color: TEXT_3, fontWeight: 500 }}>{ev.weight}кг</span> : null}</span><span style={{ fontSize: 12, color: ACCENT_STRONG, fontFamily: SF, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{ev.distanceM}м · {ev.timeCapS}с</span></div>
             {onChange ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}><span style={LABEL}>Дистанция</span><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="range" min={10} max={50} step={5} value={ev.distanceM} onChange={e => onChange(ev.id, { distanceM: Number(e.target.value) })} style={{ flex: 1, accentColor: ACCENT_STRONG }} /><span style={{ fontSize: 11, color: ACCENT_STRONG, fontVariantNumeric: 'tabular-nums', minWidth: 32, textAlign: 'right' }}>{ev.distanceM}м</span></div></div>
@@ -456,18 +466,18 @@ export const StrengthGantt: React.FC<{
     else grouped.push({ key, weeks: 1, color });
   }
   return (
-    <div data-ss="gantt" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', height: 22, borderRadius: 8, overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.18)' }}>
+    <div data-ss="gantt" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', height: 32, borderRadius: 12, overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.10)', background: 'rgba(0,0,0,0.20)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
         {grouped.map((g, i) => (
-          <div key={i} title={`${PHASE_RU[g.key] || g.key}: ${g.weeks}нед`} style={{ flex: g.weeks, background: g.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none' }}>{g.weeks >= 2 ? (PHASE_RU[g.key] || g.key) : ''}</div>
+          <div key={i} title={`${PHASE_RU[g.key] || g.key}: ${g.weeks}нед`} style={{ flex: g.weeks, background: `linear-gradient(180deg, ${g.color}, ${g.color}CC)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.14)' : 'none', textShadow: '0 1px 4px rgba(0,0,0,0.45)', fontFamily: SF }}>{g.weeks >= 2 ? (PHASE_RU[g.key] || g.key) : ''}</div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {grouped.map((g, i) => (
-          <span key={i} style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: TEXT_2, fontFamily: SF }}><span style={{ width: 10, height: 10, borderRadius: 3, background: g.color, display: 'inline-block' }} />{PHASE_RU[g.key] || g.key} {g.weeks}нед</span>
+          <span key={i} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: TEXT_2, fontFamily: SF, fontWeight: 600, background: 'rgba(255,255,255,0.03)', padding: '5px 10px', borderRadius: 22, border: '0.5px solid rgba(255,255,255,0.06)' }}><span style={{ width: 12, height: 12, borderRadius: 4, background: g.color, display: 'inline-block', boxShadow: `0 0 8px ${g.color}66` }} />{PHASE_RU[g.key] || g.key} {g.weeks}нед</span>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>Нед 1</span><span>Нед {total}</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}><span>Нед 1</span><span>Нед {total}</span></div>
     </div>
   );
 };
@@ -483,11 +493,11 @@ export const StrengthHeatmap: React.FC<{
     { key: 'squat_deadlift', label: 'Присед+Тяга', icon: '🦵', ids: ['back_squat', 'front_squat', 'squat', 'hack_squat', 'deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'rdl'], unit: 'sets' },
   ];
   return (
-    <div data-ss="heatmap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div data-ss="heatmap" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {rows.map(row => (
-        <div key={row.key} style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.04)' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: row.strong ? ACCENT_STRONG : ACCENT, minWidth: 72, display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11 }}>{row.icon}</span>{row.label}</span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+        <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', borderRadius: 16, border: '0.5px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: row.strong ? ACCENT_STRONG : ACCENT, minWidth: 76, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ fontSize: 13 }}>{row.icon}</span>{row.label}</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
             {weeksData.map(wk => {
               const cnt = row.unit === 'meters'
                 ? wk.sessions.flatMap(s => s.exercises.filter(e => row.ids.includes(e.id))).reduce((a, e) => a + e.workSets.reduce((x, s) => x + ((s as any).distanceM || 20), 0), 0)
@@ -495,8 +505,8 @@ export const StrengthHeatmap: React.FC<{
                   ? wk.sessions.flatMap(s => s.exercises.filter(e => row.ids.includes(e.id))).reduce((a, e) => a + e.workSets.reduce((x, s) => x + s.reps, 0), 0)
                   : wk.sessions.flatMap(s => s.exercises.filter(e => row.ids.includes(e.id))).reduce((a, e) => a + e.sets, 0);
               const col = cnt === 0 ? 'rgba(255,255,255,0.06)' : cnt < 10 ? '#f59e0b' : cnt < 20 ? '#eab308' : '#30d158';
-              const bg = cnt === 0 ? 'rgba(255,255,255,0.03)' : col + '18';
-              return <span key={wk.week} style={{ padding: '4px 8px', borderRadius: 10, background: bg, border: `0.5px solid ${col}22`, color: cnt === 0 ? TEXT_3 : col, fontSize: 10.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>Н{wk.week}: {cnt}{row.unit === 'meters' ? 'м' : ''}</span>;
+              const bg = cnt === 0 ? 'rgba(255,255,255,0.03)' : col + '1F';
+              return <span key={wk.week} style={{ padding: '6px 10px', borderRadius: 12, background: bg, border: `0.5px solid ${col}30`, color: cnt === 0 ? TEXT_3 : col, fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>Н{wk.week}: {cnt}{row.unit === 'meters' ? 'м' : ''}</span>;
             })}
           </div>
         </div>
