@@ -443,7 +443,12 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
         const rot = medleyRotationForWeek(m.id, Number((input as { weeks?: number }).weeks || 1));
         medleyLine = `Медли: ${m.note} Ротация недели → ${rot}.`;
         rationale.push(medleyLine);
-        void simulateMedley;
+        const att = (input as unknown as { medleyAttempts?: Array<{ eventIdx: number; weightKg: number; success: boolean }> }).medleyAttempts;
+        if (Array.isArray(att) && att.length > 0) {
+          const sim = simulateMedley(m.id, att);
+          medleyLine += ` Факт: ${sim.best.join(' + ')} = ${sim.total}.`;
+          rationale.push(`Медли-факт: лучшие ${sim.best.join(' + ')} = ${sim.total} (${sim.done.some(Boolean) ? 'есть срывы — opener занизить' : 'все события открыты'}).`);
+        }
       }
     }
   } catch { /* опционально */ }

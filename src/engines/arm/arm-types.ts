@@ -158,6 +158,7 @@ export interface ArmBuilderInput {
   akimovHook?: boolean; // Акимов-блок крюка (Скотт + лямка + резина)
   compPeriod?: boolean; // для Акимова: true — соревновательный
   medleyId?: string; // worlds_2026 | arnold_2026 | super_series_2026 | rt_saxon_hub
+  medleyAttempts?: Array<{ eventIdx: number; weightKg: number; success: boolean }>; // факт попыток → сводка simulateMedley
   forMode?: boolean; // FOR-7 overreach (гейт advanced/enhanced)
   forSpecialization?: 'crush' | 'support' | 'pinch' | 'open' | 'wrist';
   axisCheck?: { trunkRotatedTowardAttack?: boolean; wristBehindShoulder?: boolean; wristExtendedDorsally?: boolean; coldNoWarmup?: boolean; fightingFromDefense?: boolean; sideMaxAttempt?: boolean }; // humerus-axis 2026
