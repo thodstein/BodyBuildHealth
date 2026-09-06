@@ -124,4 +124,20 @@ describe('ProfileSettingsTab phone section', () => {
       expect(el.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
     }
   });
+
+  it('8. волна 27: чипы тем и системный — SVG без эмодзи', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    render(<ProfileSettingsTab />);
+    fireEvent.click(screen.getByText('4.4 Телефон · APK'));
+    const themeGroup = screen.getByRole('radiogroup', { name: 'Тема' });
+    const themeRadios = themeGroup.querySelectorAll('[role="radio"]');
+    expect(themeRadios.length).toBe(3);
+    expect(themeGroup.querySelectorAll('svg').length).toBe(2);
+    const accentGroup = screen.getByRole('radiogroup', { name: 'Акцент' });
+    expect(accentGroup.querySelectorAll('svg').length).toBeGreaterThanOrEqual(1);
+    for (const g of [themeGroup, accentGroup]) {
+      expect(g.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
 });

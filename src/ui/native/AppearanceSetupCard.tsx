@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { NativeIcon } from './NativeIcons';
+import { NativeIcon, type NativeIconName } from './NativeIcons';
 import { haptics, initNativeChrome } from '../../core/native-bridge';
 import { getLocale } from '../../data/interactions-labels';
 import {
@@ -19,16 +19,16 @@ import {
   type ApkAccent,
 } from './appearance';
 
-const THEMES_RU: { id: ApkTheme; label: string; hint: string }[] = [
-  { id: '', label: '🌙 Тёмная', hint: 'фирменный navy' },
-  { id: 'amoled', label: '⬛ AMOLED', hint: 'чистый чёрный' },
-  { id: 'light', label: '☀️ Светлая', hint: 'бумага' },
+const THEMES_RU: { id: ApkTheme; label: string; hint: string; icon?: NativeIconName; swatch?: string }[] = [
+  { id: '', label: 'Тёмная', hint: 'фирменный navy', icon: 'moon' },
+  { id: 'amoled', label: 'AMOLED', hint: 'чистый чёрный', swatch: '#000000' },
+  { id: 'light', label: 'Светлая', hint: 'бумага', icon: 'sun' },
 ];
 
-const THEMES_EN: { id: ApkTheme; label: string; hint: string }[] = [
-  { id: '', label: '🌙 Dark', hint: 'signature navy' },
-  { id: 'amoled', label: '⬛ AMOLED', hint: 'pure black' },
-  { id: 'light', label: '☀️ Light', hint: 'paper' },
+const THEMES_EN: { id: ApkTheme; label: string; hint: string; icon?: NativeIconName; swatch?: string }[] = [
+  { id: '', label: 'Dark', hint: 'signature navy', icon: 'moon' },
+  { id: 'amoled', label: 'AMOLED', hint: 'pure black', swatch: '#000000' },
+  { id: 'light', label: 'Light', hint: 'paper', icon: 'sun' },
 ];
 
 const ACCENT_EN: Record<string, string> = {
@@ -55,7 +55,7 @@ function strings() {
       sysOk: '✅ System accent applied',
       sysFail: 'System unavailable — Android 12+ with Material You needed. Kept previous accent',
       sysErr: 'Could not read system palette',
-      systemChip: '🤖 System',
+      systemChip: 'System',
     };
   }
   return {
@@ -71,7 +71,7 @@ function strings() {
     sysOk: '✅ Системный акцент применён',
     sysFail: 'Система недоступна — нужен Android 12+ с Material You. Остался прежний акцент',
     sysErr: 'Не получилось прочитать палитру системы',
-    systemChip: '🤖 Системный',
+      systemChip: 'Системный',
   };
 }
 
@@ -171,6 +171,21 @@ export const AppearanceSetupCard: React.FC = () => {
             onClick={() => pickTheme(t.id)}
             title={t.hint}
           >
+            {t.icon ? (
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}><NativeIcon name={t.icon} size={13} /></span>
+            ) : t.swatch ? (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 3,
+                  background: t.swatch,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
             {t.label}
           </button>
         ))}
@@ -189,17 +204,21 @@ export const AppearanceSetupCard: React.FC = () => {
             disabled={busy}
             title={a.id === 'system' ? T.systemTitle : accentLabel(a.id, a.label)}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: 99,
-                background: a.swatch,
-                boxShadow: '0 0 6px rgba(0,0,0,0.4)',
-                flexShrink: 0,
-              }}
-            />
+            {a.id === 'system' ? (
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}><NativeIcon name="phone" size={12} /></span>
+            ) : (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 99,
+                  background: a.swatch,
+                  boxShadow: '0 0 6px rgba(0,0,0,0.4)',
+                  flexShrink: 0,
+                }}
+              />
+            )}
             {a.id === 'system' ? T.systemChip : accentLabel(a.id, a.label)}
           </button>
         ))}
