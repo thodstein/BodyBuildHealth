@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { NativeIcon } from './NativeIcons';
+import { NativeIcon, type NativeIconName } from './NativeIcons';
 import {
   requestPinWidget,
   type WidgetKind,
@@ -12,18 +12,18 @@ import {
 import { getLocale } from '../../data/interactions-labels';
 import { syncAllWidgets } from './widget-sync';
 
-const WIDGETS_RU: { kind: WidgetKind; icon: string; name: string; desc: string }[] = [
-  { kind: 'training', icon: '🏋️', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
-  { kind: 'timer', icon: '⏱️', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
-  { kind: 'compliance', icon: '📊', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
-  { kind: 'nutrition', icon: '🍽️', name: 'Питание', desc: 'Ккал дня, вода +250/+500 в один тап, переход в дневник' },
+const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
+  { kind: 'training', icon: 'dumbbell', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
+  { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
+  { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Ккал дня, вода +250/+500 в один тап, переход в дневник' },
 ];
 
-const WIDGETS_EN: { kind: WidgetKind; icon: string; name: string; desc: string }[] = [
-  { kind: 'training', icon: '🏋️', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
-  { kind: 'timer', icon: '⏱️', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
-  { kind: 'compliance', icon: '📊', name: 'Compliance', desc: 'Weekly plan completion percent' },
-  { kind: 'nutrition', icon: '🍽️', name: 'Nutrition', desc: 'Day kcal, water +250/+500 in one tap, jump to diary' },
+const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
+  { kind: 'training', icon: 'dumbbell', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
+  { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
+  { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Day kcal, water +250/+500 in one tap, jump to diary' },
 ];
 
 const PIN_REASON_RU: Record<string, string> = {
@@ -156,7 +156,7 @@ export const WidgetsSetupCard: React.FC = () => {
       <div className="native-feature-list">
         {T.widgets.map((w) => (
           <div key={w.kind} className="native-feature-row">
-            <span className="native-feature-row-icon">{w.icon}</span>
+            <span className="native-feature-row-icon"><NativeIcon name={w.icon} size={15} /></span>
             <div className="native-feature-row-body">
               <div className="native-feature-row-name">{w.name}</div>
               <div className="native-feature-row-desc">{w.desc}</div>

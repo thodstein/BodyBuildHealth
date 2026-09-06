@@ -93,7 +93,6 @@ describe('ProfileSettingsTab phone section', () => {
       expect(svg.getAttribute('viewBox')).toBe('0 0 24 24');
     }
   });
-
   it('6. волна 17: строки возможностей — SVG bell/camera/share без эмодзи', async () => {
     setCapacitorNative();
     await resetPlatform();
@@ -103,6 +102,22 @@ describe('ProfileSettingsTab phone section', () => {
     expect(card).not.toBeNull();
     const rows = card!.querySelectorAll('.native-feature-row-icon');
     expect(rows.length).toBe(3);
+    for (const el of Array.from(rows)) {
+      expect(el.querySelector('svg'), el.textContent).not.toBeNull();
+      expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(el.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
+
+  it('7. волна 18: строки виджетов — SVG видов без эмодзи', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    render(<ProfileSettingsTab />);
+    fireEvent.click(screen.getByText('4.4 Телефон · APK'));
+    const card = document.querySelector('[aria-label="Виджеты рабочего стола"]');
+    expect(card).not.toBeNull();
+    const rows = card!.querySelectorAll('.native-feature-row-icon');
+    expect(rows.length).toBe(4);
     for (const el of Array.from(rows)) {
       expect(el.querySelector('svg'), el.textContent).not.toBeNull();
       expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
