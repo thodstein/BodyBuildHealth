@@ -59,10 +59,8 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
   return (
     <div className="train-armheatmap">
       <AdCard>
-        <div className="ad-sec-h">
-          <div className="ad-sec-t">🔥 Тепловая карта — арм</div>
-          <span className="ad-muted">{weeks} нед × {ARM_MUSCLES.length} групп</span>
-        </div>
+        <div className="ad-sec-t">🔥 Тепловая карта — арм</div>
+        <div className="ad-muted">{weeks} нед × {ARM_MUSCLES.length} групп</div>
         <div className="ad-muted">
           🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
         </div>

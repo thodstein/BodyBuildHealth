@@ -23,6 +23,13 @@ function readArmCss(): string {
   return fs.readFileSync(path.join(process.cwd(), 'src', 'styles-native-arm.css'), 'utf-8');
 }
 
+function readBaseCss(): string {
+  return fs.readFileSync(
+    path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-design.css'),
+    'utf-8',
+  );
+}
+
 function splitTopLevel(sel: string): string[] {
   // Делим только по запятым верхнего уровня: rgb(10, 22, 41) внутри
   // селектора делить нельзя (иначе ложные срабатывания изоляции).
@@ -97,30 +104,45 @@ describe('APK arm pack', () => {
     expect(selectorProblems(readArmCss())).toEqual([]);
   });
 
+  it('базовый CSS не утекает: каждый селектор — :is(.train-arm…)', () => {
+    const css = readBaseCss();
+    const bad: string[] = [];
+    for (const rawLine of css.split('\n')) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('/*') || line.startsWith('*') || line.startsWith('//')) continue;
+      if (!line.endsWith('{')) continue;
+      const sel = line.slice(0, -1).trim();
+      if (!sel) continue;
+      if (sel.startsWith('@')) continue;
+      if (sel.startsWith('from') || sel.startsWith('to')) continue;
+      for (const p of splitTopLevel(sel).map((s) => s.trim()).filter(Boolean)) {
+        if (p.startsWith('@')) continue;
+        if (/^:is\(\.train-arm/.test(p)) continue;
+        bad.push(p);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
   it('без hex-литералов: только var()/rgb (темы и акцент — бесплатно)', () => {
     const css = readArmCss();
     const hexHits = css.split('\n').filter((l) => /#[0-9a-fA-F]{3}\b/.test(l));
     expect(hexHits).toEqual([]);
   });
 
-  it('хуки слоя на месте: корень, шаги, сплит, недели, попапы', () => {
+  it('хуки слоя на месте: корни, шаги, карточки, CTA, чипы', () => {
     const css = readArmCss();
     for (const hook of [
       '.train-arm.arm-apk',
-      "[data-arm='steps']",
-      "[data-arm='msg']",
-      "[data-arm='split-list']",
-      "[data-arm='week-pills']",
-      '.train-armtech',
-      '.train-armgrip',
-      '.train-armheatmap',
       '.train-armdiag.arm-apk',
-      "[data-arm='hub-head']",
-      "[data-arm='hub-tabs']",
-      '.arm-apk-backdrop',
-      '.arm-apk-sheet',
-      '.arm-apk-toast',
-      'armApkSheetUp',
+      '.ad-steps',
+      '.ad-card',
+      ".ad-btn[data-variant='primary']",
+      ".ad-btn[data-variant='amber']",
+      ".ad-chip[data-active='true']",
+      '.ad-pill',
+      '.ad-step',
+      'armApkIn',
       'prefers-reduced-motion',
     ]) {
       expect(css, hook).toContain(hook);

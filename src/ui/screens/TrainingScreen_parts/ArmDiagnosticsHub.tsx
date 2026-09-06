@@ -12,15 +12,20 @@ import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-i
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
 import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, createHandsProcessor, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
-import { estimateForceVector, getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
+import { estimateForceVector } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport } from '../../../engines/arm/arm-dynamic-force.engine';
 import { loadForceTrials, addForceTrial, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
-import { resolveArmLevelByTests, wafWeightClassFor, benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
+import { resolveArmLevelByTests, wafWeightClassFor } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
-import { CARD, DIM, ACCENT } from './training-ui';
-import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, isValidAngleForArmWeakPoint, angleJointForWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
+import { AdRoot, AdCard } from './arm-design-system';
+import { LEVEL_OPTS, TAB_DEFS, WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
+import type { HubTab, TiqBout } from './arm-hub-shared';
+import { HubHead, HubControls, HubOutput, HubP0Panel, HubTableStrip, HubAction } from './arm-hub-panels';
+import { HubGripTab, HubWristTab } from './arm-hub-tabs1';
+import { HubPressureTab, HubStrengthTab, HubRecoveryTab } from './arm-hub-tabs2';
+import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
 import { diagnoseArmWeakCause } from '../../../engines/arm/arm-weak-cause.engine';
@@ -34,27 +39,24 @@ import { assessArmMobility, mobilityFailForWeakPoint, applyArmMobilityToProfile 
 import { autoregArmFromDiary, type ArmDiaryDay } from '../../../engines/arm/arm-diary-autoreg.engine';
 import { checkUCLGuard, checkShoulderGuard, checkTendonGuard } from '../../../engines/arm/arm-injury-guard.engine';
 import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTrend } from '../../../engines/arm/arm-bilateral.engine';
-import { scorePlatform, planAttempts, loadPlatformLog, savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
+import { scorePlatform, planAttempts, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { buildRehabPlan } from '../../../engines/arm/arm-rehab.engine';
-import { loadArmMeasureHistory, saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
-import { scoreArm, scoreColor, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
+import { loadArmMeasureHistory } from '../../../engines/arm/arm-force-history.store';
+import { scoreArm, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
-import { haptics, isOnline } from '../../../core/native-bridge';
-import { isNativeApp } from '../../../core/app-platform';
-import { ensureArmApkStyles } from './arm-apk-loader';
+import { haptics } from '../../../core/native-bridge';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
 // TOP T1/T7b: Table-IQ журнал + матчап (отдельные ключи, v4-стейт не трогаем)
 const TIQ_KEY = 'he_arm_table_iq';
 const MU_KEY = 'he_arm_matchup';
-export interface TiqBout { fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number; dateIso?: string }
 function loadTiq(): TiqBout[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(TIQ_KEY) : null;
@@ -84,8 +86,6 @@ function loadP1State(): Record<string, any> {
     return j && typeof j === 'object' ? j : {};
   } catch { return {}; }
 }
-
-type HubTab = 'grip' | 'wrist' | 'pressure' | 'strength' | 'recovery';
 
 type ArmDiagState = {
   rtKg: string;
@@ -137,32 +137,6 @@ const DEFAULT_STATE: ArmDiagState = {
   vbtWeight: '', vbtReps: '', vbtVel: '',
   fingerKg: '', fingerMs: '', hammerKg: '', hammerMs: '', hookKg: '', hookMs: '', cupKg: '', cupMs: '',
   wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '',
-};
-
-const LEVEL_OPTS = [
-  { id: 'beginner', label: 'Новичок' },
-  { id: 'intermediate', label: 'Средний' },
-  { id: 'advanced', label: 'Продвинутый' },
-  { id: 'enhanced', label: 'Enhanced' },
-];
-
-const TAB_DEFS: Array<{ id: HubTab; label: string; icon: string; desc: string }> = [
-  { id: 'grip', label: 'Хват', icon: '✊', desc: 'RT/Axle/Pinch + WR 130.5/77.2' },
-  { id: 'wrist', label: 'Кисть/Ротация', icon: '🤚', desc: '12 мёртвых точек + РУ/РА + VBT' },
-  { id: 'pressure', label: 'Давление', icon: '💥', desc: 'Side/Back + humerus + table 3/2/1' },
-  { id: 'strength', label: 'Сила', icon: '⚡', desc: 'F/t F100/F500 + асимметрия + бенчмарки' },
-  { id: 'recovery', label: 'Сухожилие/Восстановление', icon: '🛡️', desc: 'Tendon + ACWR + fatigue' },
-];
-
-const WEAK_GROUPS: Array<{ title: string; points: ArmWeakPoint[] }> = [
-  { title: 'Кисть', points: ['cup_start','cup_hold','rising_top','contain_fingers'] },
-  { title: 'Ротация', points: ['pron_open','pron_lock','sup_cup','sup_drag'] },
-  { title: 'Давление', points: ['side_mid','side_pin','back_start','back_drag'] },
-];
-
-const WP_LABEL_SHORT: Record<ArmWeakPoint,string> = {
-  cup_start: 'Cup старт', cup_hold: 'Cup hold', rising_top: 'Rising', pron_open: 'Pron откр', pron_lock: 'Pron lock',
-  sup_cup: 'Sup cup', sup_drag: 'Sup drag', side_mid: 'Side mid', side_pin: 'Side pin', back_start: 'Back старт', back_drag: 'Back drag', contain_fingers: 'Пальцы',
 };
 
 export const ArmDiagnosticsHub: React.FC = () => {
@@ -1105,737 +1079,78 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; } };
   }, [showCam]);
 
-  // APK-слой: подгрузка styles-native-arm.css только в native (в TG/web no-op).
-  useEffect(() => {
-    ensureArmApkStyles();
-  }, []);
+  // Презентационный контекст для arm-hub-tabs/panels (вычислено выше, тела 1-в-1).
+  const setMob = (key: string, v: boolean) => {
+    const map: Record<string, (b: boolean) => void> = { mobWristFlex: setMobWristFlex, mobWristExt: setMobWristExt, mobPron: setMobPron, mobSup: setMobSup, mobElbow: setMobElbow };
+    map[key]?.(v);
+  };
+  const mob = { mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow };
+  const rh = { injury: rhInjury, weeks: rhWeeks, pain: rhPain, surg: rhSurg };
+  const setRh = (p: { injury?: string; weeks?: string; pain?: string; surg?: boolean }) => {
+    if (p.injury !== undefined) setRhInjury(p.injury);
+    if (p.weeks !== undefined) setRhWeeks(p.weeks);
+    if (p.pain !== undefined) setRhPain(p.pain);
+    if (p.surg !== undefined) setRhSurg(p.surg);
+  };
+  const undoTiqBout = () => { setTiq((prev)=>{ const next=prev.slice(0,-1); saveTiq(next); return next; }); };
+  const clearTiqBouts = () => { setTiq([]); saveTiq([]); };
+  const onSaveBilat = () => { const lk = parseFloat(state.leftKg); const rk = parseFloat(state.rightKg); if (Number.isFinite(lk) && Number.isFinite(rk) && lk > 0 && rk > 0) { saveBilateralEntry(lk, rk); setBilatTick((x) => x + 1); } };
+  const onResetDynamic = () => { const s = { fingerKg:'',fingerMs:'',hammerKg:'',hammerMs:'',hookKg:'',hookMs:'',cupKg:'',cupMs:'' }; setState(prev=> ({...prev, ...s})); };
+  const onMobToProfile = () => { const s = applyArmMobilityToProfile(armMobility.restrictions); setMobMsg(`✓ Мобильность ${s} → профиль`); setTimeout(() => setMobMsg(''), 2500); };
+  const setTrackCsvClear = () => setTrackCsv('');
+  const H: any = {
+    state, setState, report, diag, angles, angleValid, anglesVerified, recAngles, autoPoint,
+    hasWeak, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, bwNum,
+    applyToConstructor, tab, setTab, toggleWeakPoint, clearWeakPoints, toggleLegacy,
+    handleVideoFile, showCam, setShowCam, videoRef,
+    trackCsv, setTrackCsv, setTrackCsvClear, trackMetrics, trackType, trackSrd, setBaseXLoop,
+    platformP0, measureHistP0, setMeasureTick,
+    attKg, setAttKg, attOk, setAttOk, setAttTick, attHistP0,
+    vbt, vbtThP0, vbtThresholdForWeakPoint,
+    mockGuard, tablePreview,
+    muState, setMuState, saveMu,
+    tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap,
+    tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts,
+    dynamicReport, bilatP0, bilatTrendP0, bilatHistP0, onSaveBilat,
+    handleAddTrialsToHistory, onResetDynamic, forceHistory,
+    acwr, tendonAcwr, landmarks, tendonWeeklyLimit, perMuscleAcwrSumP0,
+    armMobility, mob, setMob, mobRetest, setMobRetest, onMobToProfile, mobMsg,
+    painElbow, setPainElbow, painWrist, setPainWrist, sleepHours, setSleepHours,
+    autoregP0, cnsHeavyP0, guardsP0, armPlan,
+    rh, setRh, buildRehabPlanFn: buildRehabPlan, scoreLabel,
+    specWeeks, setSpecWeeks, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0,
+    diaryTrendsP0, diarySuggestP0,
+    handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0,
+    injectMsg, criticalSideP0,
+  };
 
   return (
-    <div className={isNativeApp() ? 'train-armdiag arm-apk' : 'train-armdiag'} style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
-      {/* Header score */}
-      <div data-arm="hub-head" style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08))', border: '1px solid rgba(245,158,11,0.22)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(245,158,11,0.14),transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🤝</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Арм-диагностика — PRO MAX хаб</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>5 таба × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR</div>
-          </div>
-          <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: hasWeak ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border:`1px solid ${hasWeak ? 'rgba(245,158,11,0.22)' : 'rgba(34,197,94,0.22)'}` }}>
-            <div style={{ fontSize:11, fontWeight:700, color: hasWeak? '#f59e0b' : '#22c55e' }}>{hasWeak ? ((state.weakPoints.length? state.weakPoints.join(', ') : report.weakMuscles.join(', '))) : 'баланс'}</div>
-            <div style={{ fontSize:9, color: DIM }}>{hasWeak ? `${(report as any).weakPoints?.length||0} мёртвых точек · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
-          </div>
-          {showScoring && scoring && (
-            <div style={{ textAlign:'center', padding:'8px 10px', borderRadius:10, background: `rgba(${scoring.level==='ok'?'34,197,94': scoring.level==='warn'?'245,158,11':'239,68,68'},0.12)`, border:'1px solid rgba(255,255,255,0.12)', minWidth:70 }}>
-              <div style={{ fontSize:18, fontWeight:900, color: scoreColor(scoring.level), lineHeight:1 }}>{scoring.score}</div>
-              <div style={{ fontSize:9, color: DIM }}>{scoreLabel(scoring.score)} · v{Math.round(scoring.verification*100)}%</div>
-              {scoring.floors.length>0 && <div style={{ fontSize:8, color:'#ef4444' }}>{scoring.floors[0]}</div>}
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: benchRes.level==='competitive'?'rgba(34,197,94,0.12)':'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: benchRes.level==='competitive'?'#22c55e':DIM }}>{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.totalScore})</span>
-          {report.asymmetryPct!=null && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Асимметрия {report.asymmetryPct}%</span>}
-        </div>
-        <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
-           Выбери <b style={{color:'#f59e0b'}}>12 мёртвых точек</b> (группы Кисть/Ротация/Давление) + провалы + хват + углы + 4 теста силы (кг+мс) + VBT → получи биомех-карточки (угол {`{0-20°при 110°}`}) + коррекции из каталога. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Арм-конструктор»</b> отправит мёртвые точки + динамику. RSS оверлей — только при видео/VBT/истории. Видео — опционально (BlazePose/HANDS).
-        </div>
-        {showScoring && scoring && <div style={{ marginTop:6, fontSize:10, color:DIM, padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)' }}>{scoring.findings.slice(0,3).map(f=>f.text).join(' · ')} {scoring.floors.length? `· floor: ${scoring.floors.join(', ')}` : ''} · v{Math.round(scoring.verification*100)}% (видео 0.35+VBT 0.35+история 0.30)</div>}
-        {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
-      </div>
+    <AdRoot rootClass="train-armdiag" maxWidth={860}>
+      <HubHead H={H} />
 
-      {/* Controls */}
-      <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'flex-end' }}>
-          <label style={{ fontSize: 11, color: DIM }}>Уровень<br/>
-            <select value={state.level} onChange={e=>setState(s=>({...s, level:e.target.value}))} style={{ marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}>
-              {LEVEL_OPTS.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
-          </label>
-          <label style={{ fontSize: 11, color: DIM }}>Техника<br/>
-            <select value={state.technique} onChange={e=>setState(s=>({...s, technique:e.target.value}))} style={{ marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}>
-              <option value="balanced">Сбалансировано</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option>
-            </select>
-          </label>
-          <label style={{ fontSize: 11, color: DIM }}>Вес кг<br/><input inputMode="decimal" value={state.bwKg} onChange={e=>setState(s=>({...s, bwKg:e.target.value}))} placeholder="80" style={{ width:70, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-          <label style={{ fontSize: 11, color: DIM }}>Пол<br/>
-            <select value={state.sex} onChange={e=>setState(s=>({...s, sex:e.target.value}))} style={{ marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }}>
-              <option value="male">М</option><option value="female">Ж</option>
-            </select>
-          </label>
-          <label style={{ fontSize: 11, color: DIM }}>Класс WAF<br/><input value={weightClassAuto} readOnly style={{ width:60, marginTop:4, background:'#0a1629', color:DIM, border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-            <button onClick={applyToConstructor} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>→ Применить в Арм-конструктор</button>
-          </div>
-        </div>
-
-        {/* Sub-tabs */}
-        <div data-arm="hub-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-          {TAB_DEFS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'6px 12px', borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#f59e0b' : '#1f3a5f', background: tab===t.id ? 'rgba(245,158,11,0.14)' : '#0a1629', color: tab===t.id ? '#f59e0b' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
+      <AdCard>
+        <HubControls H={H} />
 
         {/* Tab content */}
-        {tab==='grip' && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 12 }}>
-              <label style={{ fontSize: 11, color: DIM }}>RT кг<br/><input inputMode="decimal" value={state.rtKg} onChange={e=>setState(s=>({...s, rtKg:e.target.value}))} placeholder="60" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Axle кг<br/><input inputMode="decimal" value={state.axleKg} onChange={e=>setState(s=>({...s, axleKg:e.target.value}))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Pinch сек<br/><input inputMode="decimal" value={state.pinchSec} onChange={e=>setState(s=>({...s, pinchSec:e.target.value}))} placeholder="15" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Left кг<br/><input inputMode="decimal" value={state.leftKg} onChange={e=>setState(s=>({...s, leftKg:e.target.value}))} placeholder="50" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Right кг<br/><input inputMode="decimal" value={state.rightKg} onChange={e=>setState(s=>({...s, rightKg:e.target.value}))} placeholder="55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector · WAF {weightClassAuto}</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b style={{color:ACCENT}}>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%${forceVecPro.asymmetryPct>=12?' 🔴':forceVecPro.asymmetryPct>=7?' 🟠':' 🟢'}` : ''}</div>
-                <div style={{ fontSize:9, color:DIM, marginTop:4 }}>WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
-                {/* E13 P2: помост %WR + попытки */}
-                {platformP0 && (
-                  <div style={{ fontSize:10, color:DIM, marginTop:4 }}>🏟 Помост RT: {platformP0.bestKg}кг = <b style={{ color:ACCENT }}>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')} · {platformP0.note}</div>
-                )}
-                <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Весогонка WAF: М −0.5%/нед · Ж −0.4%/нед · L/R — отдельные зачёты</div>
-                {/* E15 P2: снапшот замеров */}
-                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
-                  <button onClick={() => { saveArmMeasureSnapshot({ rtKg: parseFloat(state.rtKg), sideKg: parseFloat(state.sideKg), backKg: parseFloat(state.backKg), leftKg: parseFloat(state.leftKg), rightKg: parseFloat(state.rightKg) }); setMeasureTick((x) => x + 1); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>📸 Снапшот замеров</button>
-                  {measureHistP0.length > 0 && <span style={{ fontSize:9, color:DIM }}>RT: {measureHistP0.slice(-5).map((h) => h.rtKg ?? '—').join(' → ')}</span>}
-                </div>
-                {/* R1: мини-график RT (последние 12) */}
-                {measureHistP0.filter((h) => h.rtKg != null).length >= 2 && (
-                  <div style={{ display:'flex', gap:2, marginTop:6, alignItems:'flex-end', height:28 }}>
-                    {(() => {
-                      const vals = measureHistP0.filter((h) => h.rtKg != null).slice(-12).map((h) => h.rtKg as number);
-                      const mx = Math.max(...vals);
-                      const mn = Math.min(...vals);
-                      const span = Math.max(1, mx - mn);
-                      return vals.map((v, i) => (
-                        <div key={i} data-bar="rt" title={`${v}кг`} style={{ flex:1, height: Math.round(6 + ((v - mn) / span) * 22), background: i === vals.length - 1 ? '#f59e0b' : 'rgba(245,158,11,0.35)', borderRadius:2 }} />
-                      ));
-                    })()}
-                  </div>
-                )}
-                {/* D4: журнал попыток помоста RT */}
-                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
-                  <label style={{ fontSize:9, color:DIM }}>Попытка RT кг<br /><input aria-label="Попытка помост кг" inputMode="decimal" value={attKg} onChange={(e) => setAttKg(e.target.value)} placeholder="вес" style={{ width:64, marginTop:2, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }} /></label>
-                  <button onClick={() => setAttOk((v) => !v)} aria-pressed={attOk} style={{ alignSelf:'flex-end', padding:'5px 10px', borderRadius:8, border:'1px solid', borderColor: attOk ? 'rgba(34,197,94,0.3)' : '#ef4444', background: attOk ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', color: attOk ? '#22c55e' : '#ef4444', cursor:'pointer', fontSize:10 }}>{attOk ? '✓ взята' : '✗ сорвана'}</button>
-                  <button onClick={() => { const w = parseFloat(attKg); if (Number.isFinite(w) && w > 0) { savePlatformLogEntry({ implement: 'rolling_thunder', sex: state.sex, weightKg: w, success: attOk }); setAttKg(''); setAttTick((x) => x + 1); } }} style={{ alignSelf:'flex-end', padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>💾 Попытку</button>
-                  {attHistP0.length > 0 && <span style={{ fontSize:9, color:DIM }}>Попытки: {attHistP0.slice(-5).map((h) => `${h.weightKg}${h.success ? '✓' : '✗'} ${h.wrPct}%`).join(' · ')}</span>}
-                </div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>VBT</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
-                {vbtThP0 && <div style={{ fontSize:9, color:DIM, marginTop:2 }}>Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
-                <div style={{ display:'flex', gap:6, marginTop:6 }}>
-                  <input inputMode="decimal" value={state.vbtWeight} onChange={e=>setState(s=>({...s, vbtWeight:e.target.value}))} placeholder="кг" style={{ flex:1, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                  <input inputMode="numeric" value={state.vbtReps} onChange={e=>setState(s=>({...s, vbtReps:e.target.value}))} placeholder="повт" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                  <input inputMode="decimal" value={state.vbtVel} onChange={e=>setState(s=>({...s, vbtVel:e.target.value}))} placeholder="м/с" style={{ width:60, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                </div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: benchRes.level==='beginner'?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Бенчмарки · {benchRes.level}</div>
-                <div style={{ fontSize:10, color:DIM }}>{benchRes.details.map(d=>`${d.id}:${d.value}→${d.level}`).join(' · ') || 'введи WristCurl/Coc'}</div>
-                <div style={{ fontSize:10, color: DIM, marginTop:4 }}>{benchAdviceForLevel(benchRes.level)}</div>
-              </div>
-            </div>
-            {(state.pinchSec && parseFloat(state.pinchSec) < 10) || (state.rtKg && parseFloat(state.rtKg) < 60) ? (
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginBottom:8 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>Слабое звено хвата → коррекция (contain_fingers)</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
-                  {state.pinchSec && parseFloat(state.pinchSec) < 10 ? `Pinch ${state.pinchSec}с <10с → hub_pinch / plate_pinch_hold 3×15с @60% · ` : ''}
-                  {state.rtKg && parseFloat(state.rtKg) < 60 ? `RT ${state.rtKg}кг <60 → rolling_thunder / apollon_axle DOH 3×5 @60%` : ''}
-                </div>
-                <button onClick={()=>toggleWeakPoint('contain_fingers')} aria-pressed={state.weakPoints.includes('contain_fingers')} style={{ marginTop:6, padding:'5px 10px', borderRadius:999, border:'1px solid', borderColor: state.weakPoints.includes('contain_fingers') ? '#f59e0b' : '#1f3a5f', background: state.weakPoints.includes('contain_fingers') ? 'rgba(245,158,11,0.16)' : '#0a1629', color: state.weakPoints.includes('contain_fingers') ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:600 }}>
-                  {state.weakPoints.includes('contain_fingers') ? '✓ contain_fingers выбрана' : '+ Добавить contain_fingers'}
-                </button>
-              </div>
-            ) : null}
-            <div style={{ fontSize:10, color:DIM }}>Нормы IronMind: RT 55 avg /84 accomplished /130.5 WR M /77.2 WR F. Axle Saxon WR 133кг. Side/back нормированы на WAF класс.</div>
-          </div>
-        )}
+        {tab==='grip' && <HubGripTab H={H} />}
 
-        {tab==='wrist' && (
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Локоть°<br/><input inputMode="decimal" value={state.elbowDeg} onChange={e=>setState(s=>({...s, elbowDeg:e.target.value}))} placeholder="110" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Предплечье°<br/><input inputMode="decimal" value={state.forearmDeg} onChange={e=>setState(s=>({...s, forearmDeg:e.target.value}))} placeholder="90" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Кисть°<br/><input inputMode="decimal" value={state.wristDeg} onChange={e=>setState(s=>({...s, wristDeg:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Направление<br/>
-                <select value={state.direction} onChange={e=>setState(s=>({...s, direction:e.target.value as any}))} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }}>
-                  <option value="to_little">К мизинцу</option><option value="to_middle">К среднему</option><option value="to_thumb">К большому</option>
-                </select>
-              </label>
-            </div>
-            <div style={{ padding:'8px 10px', borderRadius:8, background: angleValid.valid? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', border:`1px solid ${angleValid.valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}`, marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color: angleValid.valid?'#22c55e':'#ef4444' }}>РУ: {angles.elbowDeg}° · {angles.direction} · pron {angles.pronDeg}° sup {angles.supDeg}° · {anglesVerified?'✓ верифицировано':'○ ручной ввод'}</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{angleValid.valid? '✓ В допуске' : angleValid.warnings.join(' · ')}</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Рекомендация для {state.technique}: {recAngles.elbowDeg}° {recAngles.direction} (hasVideoSupport: {hasVideoSupport()?'да':'нет — подключи Hands/BlazePose'})</div>
-            </div>
-            {autoPoint && !state.weakPoints.includes(autoPoint) && (
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginBottom:8 }}>
-                <div style={{ fontSize:10, color:DIM }}>Авто по углам ({angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°): похожа на <b style={{ color:'#f59e0b' }}>{autoPoint}</b> — {ARM_BIOMECH[autoPoint].label}</div>
-                <button onClick={()=>toggleWeakPoint(autoPoint)} style={{ marginTop:6, padding:'5px 10px', borderRadius:999, border:'1px solid #f59e0b', background:'rgba(245,158,11,0.12)', color:'#f59e0b', cursor:'pointer', fontSize:10, fontWeight:600 }}>+ Добавить {autoPoint}</button>
-              </div>
-            )}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
-              <div style={{ fontSize:11, color:DIM }}>📹 Видео (BlazePose/HANDS) — опционально</div>
-              <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки.</div>
-              {!isOnline() && <div style={{ fontSize:10, color:'#f59e0b', marginTop:4 }}>📴 Офлайн (APK): Hands-модель грузится из CDN и недоступна — камера покажет картинку без live-углов, вводи углы вручную или JSON.</div>}
-              <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' }}>
-                <button onClick={()=> setShowCam(v=>!v)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid', borderColor: showCam?'#22c55e':'#1f3a5f', background: showCam?'rgba(34,197,94,0.14)':'#0a1629', color: showCam?'#22c55e':DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</button>
-                <label style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:11 }}>📁 JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
-              </div>
-              {/* E8 P1: Kinovea CSV трекинга кисти → метрики + тип + SRD */}
-              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', textAlign:'left' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>📊 Kinovea CSV трекинга кисти (t,x,y)</div>
-                <textarea value={trackCsv} onChange={(e) => setTrackCsv(e.target.value)} placeholder={'t,x,y\n0,0,0\n0.1,1.2,0.5'} rows={3} style={{ width:'100%', marginTop:6, background:'#060d1a', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px 8px', fontSize:10, fontFamily:'monospace' }} />
-                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                  <button onClick={() => { try { if (trackMetrics) { setBaseXLoop(String(trackMetrics.xLoop)); localStorage.setItem('he_arm_track_base', String(trackMetrics.xLoop)); } } catch {} }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>📌 База SRD</button>
-                  <button onClick={() => setTrackCsv('')} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>🗑 Очистить</button>
-                </div>
-                {trackMetrics && (
-                  <div style={{ fontSize:10, color:DIM, marginTop:6 }}>
-                    xLoop {trackMetrics.xLoop} · yMax {trackMetrics.yMax} · vMax {trackMetrics.vMax} · точек {trackMetrics.points} · тип <b style={{ color:ACCENT }}>{trackType === 'inside_hook' ? 'hook внутрь' : trackType === 'outside_toproll' ? 'toproll наружу' : 'press прямо'}</b>
-                    {trackSrd && <span> · {trackSrd}</span>}
-                  </div>
-                )}
-              </div>
-              <div style={{ marginTop:6, width:'100%', minHeight:90, background:'rgba(255,255,255,0.03)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:11, border:'1px solid rgba(255,255,255,0.04)', flexDirection:'column', gap:4, position:'relative', overflow:'hidden' }}>
-                {showCam ? (
-                  <>
-                    <video ref={videoRef} autoPlay muted playsInline style={{ width:'100%', maxHeight:140, borderRadius:8, background:'#000' }} />
-                    <div style={{ position:'absolute', bottom:4, left:4, right:4, display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
-                      <span style={{ padding:'2px 6px', borderRadius:999, background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:10 }}>Элбоу {angles.elbowDeg}°</span>
-                      <span style={{ padding:'2px 6px', borderRadius:999, background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:10 }}>{angles.direction}</span>
-                      <span style={{ padding:'2px 6px', borderRadius:999, background: angleValid.valid?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)', color:'#fff', fontSize:10 }}>{angleValid.valid?'✓':'⚠'}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>video preview — PRO: BlazePose + angleBetween()</div>
-                    <div style={{ fontSize:10 }}>Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {hasVideoSupport()?'Hands ready':'нужен Hands'}</div>
-                  </>
-                )}
-              </div>
-            </div>
-            {/* 12 мёртвых точек — группы Кисть/Ротация/Давление (PRO) */}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginTop:8 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🎯 12 мёртвых точек — выбери 1-3 (как WLDiagnosticsHub) · техника {state.technique} · до 3</div>
-              <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-                {WEAK_GROUPS.map(g=> (
-                  <div key={g.title} style={{ flex:'1 1 160px', minWidth:160 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:DIM, marginBottom:4 }}>{g.title} {g.title==='Кисть'?'🤚' : g.title==='Ротация'?'🔄':'💥'}</div>
-                    <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                      {g.points.map(wp=>{
-                        const sel = state.weakPoints.includes(wp);
-                        const bio = ARM_BIOMECH[wp];
-                        const isForTech = bio.technique.includes(state.technique) || bio.technique.includes('all') || state.technique==='balanced';
-                        // подсвечиваем релевантные технике
-                        return (
-                          <button key={wp} onClick={()=>toggleWeakPoint(wp)} aria-pressed={sel} title={`${bio.label} ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° ${bio.keyJoint} → ${bio.corrections[0]}`}
-                            style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: sel ? '#f59e0b' : isForTech ? '#1f3a5f' : 'rgba(255,255,255,0.08)', background: sel ? 'rgba(245,158,11,0.16)' : isForTech ? '#0a1629' : 'rgba(255,255,255,0.02)', color: sel ? '#f59e0b' : isForTech ? DIM : 'rgba(255,255,255,0.4)', cursor:'pointer', fontSize:10, fontWeight:600, opacity: isForTech?1:0.6 }}>
-                            {WP_LABEL_SHORT[wp]} {isForTech? '●':''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
-                <span style={{ fontSize:10, color:DIM }}>Выбрано: {state.weakPoints.length? state.weakPoints.join(', ') : '—'} {state.weakPoints.length>=3? '(макс 3)' : ''}</span>
-                {state.weakPoints.length>0 && <button onClick={clearWeakPoints} style={{ padding:'4px 8px', borderRadius:999, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>✕ Сбросить</button>}
-                <span style={{ marginLeft:'auto', fontSize:9, color:DIM }}>Фильтр ● = для техники {state.technique}</span>
-              </div>
-              {/* Биомех-карточки выбранных */}
-              {state.weakPoints.length>0 && (
-                <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
-                  {(diag as any).biomechCards?.map((c:any)=> {
-                    const aj = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint);
-                    const curDeg = aj==='wrist' ? (parseFloat(state.wristDeg)||10) : aj==='elbow' ? (parseFloat(state.elbowDeg)||110) : (parseFloat(state.forearmDeg)||90);
-                    const valid = aj==='none' ? null : isValidAngleForArmWeakPoint(c.weakPoint, curDeg);
-                    const corr = ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint];
-                    return (
-                      <div key={c.weakPoint} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:`1px solid ${valid===null?'rgba(255,255,255,0.12)':valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{c.label}</span>
-                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: valid===null?'rgba(255,255,255,0.06)':valid?'rgba(34,197,94,0.14)':'rgba(239,68,68,0.14)', color: valid===null?DIM:valid?'#22c55e':'#ef4444', border:`1px solid ${valid===null?'rgba(255,255,255,0.12)':valid?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}` }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
-                          <span style={{ fontSize:10, color:DIM }}>{c.technique.join('/')} · {c.weakMuscles.join('/')}</span>
-                        </div>
-                        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{c.reason}</div>
-                        <div style={{ fontSize:10, color:'#5ee', marginTop:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).warnPct}/{vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).stopPct}%</div>
-                        {corr && <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Сеты {corr.sets}×{corr.repsRange[0]}-{corr.repsRange[1]} RIR{corr.rir}{corr.holdSeconds?` hold ${corr.holdSeconds}с`:''} → день {corr.dayTags[0]} · группа {corr.substitutionGroup}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8, opacity:0.7 }}>
-              <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>Legacy провалы (совместимость):</span>
-              {[
-                ['cup','Кисть открывается (cup)'],
-                ['rising','Пальцы уходят (rising)'],
-                ['pron','Топролл не держит (pron)'],
-                ['sup','Хук проваливается (sup)'],
-              ].map(([k,label]) => (
-                <button key={k} onClick={()=>toggleLegacy(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'5px 8px', borderRadius:999, border:'1px dashed', borderColor:(state as any)[k] ? '#f59e0b' : '#1f3a5f', background:(state as any)[k] ? 'rgba(245,158,11,0.10)' : '#0a1629', color:(state as any)[k] ? '#f59e0b' : DIM, cursor:'pointer', fontSize:10, fontWeight:500 }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {tab==='wrist' && <HubWristTab H={H} />}
 
-        {tab==='pressure' && (
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Side кг (блок)<br/><input value={state.sideKg} onChange={e=>setState(s=>({...s, sideKg:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Back кг (тяга)<br/><input value={state.backKg} onChange={e=>setState(s=>({...s, backKg:e.target.value}))} placeholder="50" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-            </div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              {[
-                ['side','Не дожимает боком (side)'],
-                ['back','Тяга слабая (back)'],
-              ].map(([k,label]) => (
-                <button key={k} onClick={()=>toggleLegacy(k as any)} aria-pressed={!!(state as any)[k]} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor:(state as any)[k] ? '#ef4444' : '#1f3a5f', background:(state as any)[k] ? 'rgba(239,68,68,0.12)' : '#0a1629', color:(state as any)[k] ? '#ef4444' : DIM, cursor:'pointer', fontSize:11, fontWeight:600 }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* Быстрый выбор 4 точек давления */}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', marginBottom:8 }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:6 }}>Мёртвые точки давления (быстрый выбор) · side/back — humerus guard</div>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                {(['side_mid','side_pin','back_start','back_drag'] as ArmWeakPoint[]).map(wp=>{
-                  const sel = state.weakPoints.includes(wp);
-                  const bio = ARM_BIOMECH[wp];
-                  return (
-                    <button key={wp} onClick={()=>toggleWeakPoint(wp)} aria-pressed={sel} title={`${bio.label} ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.corrections[0]}`}
-                      style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: sel ? '#ef4444' : '#1f3a5f', background: sel ? 'rgba(239,68,68,0.14)' : '#0a1629', color: sel ? '#ef4444' : DIM, cursor:'pointer', fontSize:10, fontWeight:600 }}>
-                      {WP_LABEL_SHORT[wp]} {bio.intensityPct*100===60?'60%':'70%'}
-                    </button>
-                  );
-                })}
-              </div>
-              {state.weakPoints.filter(wp=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).length>0 && (
-                <div style={{ marginTop:6, fontSize:10, color:DIM }}>
-                  Выбрано давления: {state.weakPoints.filter(wp=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).join(', ')}
-                  <span style={{ color:'#ef4444', marginLeft:8 }}>⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
-                </div>
-              )}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: mockGuard.humerus.length? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${mockGuard.humerus.length?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: mockGuard.humerus.length?'#ef4444':'#22c55e' }}>Humerus (side)</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Force Vector PRO</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} · Total {forceVecPro.totalScore} {forceVecPro.asymmetryPct!=null? `· Асим ${forceVecPro.asymmetryPct}%`:''}</div>
-                <div style={{ fontSize:10, color:DIM }}>Side ref {Math.round(bwNum*0.6)}кг · Back ref {Math.round(bwNum*0.8)}кг · WAF {weightClassAuto}</div>
-              </div>
-            </div>
-            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол</div>
-              <div style={{ display:'flex', gap:2, marginTop:6 }}>
-                {tablePreview.map(({ wk, kind }) => {
-                  const col = kind==='moderate'? '#22c55e' : kind==='heavy'? '#f59e0b' : '#ef4444';
-                  return <div key={wk} style={{ flex:1, height:18, background:col, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:9, fontWeight:700 }}>{wk}:{kind[0]}</div>;
-                })}
-              </div>
-            </div>
-            {/* TOP T1/T7b: матчап + Table-IQ журнал */}
-            <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.16)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🥇 TOP: матчап + Table-IQ журнал</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginTop:6 }}>
-                <label style={{ fontSize:10, color:DIM }}>Оппонент<br/>
-                  <select value={muState.opp} onChange={e=>{ const v={...muState, opp:e.target.value}; setMuState(v); saveMu(v); }} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
-                    <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
-                  </select>
-                </label>
-                <label style={{ fontSize:10, color:DIM }}>Рука<br/>
-                  <select value={muState.hand} onChange={e=>{ const v={...muState, hand:e.target.value}; setMuState(v); saveMu(v); }} style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }}>
-                    <option value="unknown">—</option><option value="high">High</option><option value="low">Low</option><option value="neutral">Нейтраль</option>
-                  </select>
-                </label>
-                <label style={{ fontSize:10, color:DIM }}>Δ веса, кг<br/><input inputMode="decimal" value={muState.wd} onChange={e=>{ const v={...muState, wd:e.target.value}; setMuState(v); saveMu(v); }} placeholder="0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:11 }} /></label>
-              </div>
-              {(()=>{ try {
-                if (muState.opp==='unknown' && !muState.wd) return null;
-                const mp = profileOpponent({ myTechnique: state.technique, oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 });
-                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}. {mp.gameplan[0]}</div>;
-              } catch { return null; } })()}
-              <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginTop:8 }}>Table-IQ: схватки ({tiq.length})</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(90px, 1fr))', gap:6, marginTop:6 }}>
-                <label style={{ fontSize:10, color:DIM }}>Фолы<br/><input inputMode="numeric" aria-label="Фолы за схватку" value={tiqFouls} onChange={e=>setTiqFouls(e.target.value)} placeholder="0" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>Центр, с<br/><input inputMode="decimal" value={tiqCenter} onChange={e=>setTiqCenter(e.target.value)} placeholder="—" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>Финиш, с<br/><input inputMode="decimal" value={tiqFinish} onChange={e=>setTiqFinish(e.target.value)} placeholder="—" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-              </div>
-              <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:6, fontSize:10, color:DIM }}>
-                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqWin} onChange={e=>setTiqWin(e.target.checked)} /> Победа</label>
-                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqSlip} onChange={e=>setTiqSlip(e.target.checked)} /> Срыв</label>
-                <label style={{ display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={tiqStrap} onChange={e=>setTiqStrap(e.target.checked)} /> Ремень</label>
-                <button onClick={addTiqBout} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>＋ Схватка</button>
-                {tiq.length>0 && <button onClick={()=>{ setTiq((prev)=>{ const next=prev.slice(0,-1); saveTiq(next); return next; }); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>↩ Отменить</button>}
-                {tiq.length>0 && <button onClick={()=>{ setTiq([]); saveTiq([]); }} style={{ padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>🗑 Очистить</button>}
-              </div>
-              {(()=>{ try {
-                if (!tiq.length) return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Веди журнал схваток: фолы/срывы/ремень/центр/финиш — стол скажет, что чинить.</div>;
-                const iq = analyzeTableIq({ bouts: tiq });
-                const trend = tableIqTrend(tiq);
-                return <div style={{ fontSize:10, color:DIM, marginTop:6 }}><div>{iq.note}</div>{iq.levers.map((l,i)=><div key={i}>• {l}</div>)}<div style={{ marginTop:2, color: trend.trend==='up' ? '#22c55e' : trend.trend==='down' ? '#ef4444' : DIM }}>{trend.note}</div></div>;
-              } catch { return null; } })()}
-            </div>
-          </div>
-        )}
+        {tab==='pressure' && <HubPressureTab H={H} />}
 
-        {tab==='strength' && (
-          <div>
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b' }}>4 теста Bezkorovainyi — ARM1 Device FB5k (патент #43082)</div>
-              <div style={{ fontSize:10, color:DIM }}>finger_flex (сгибание пальцев) · hammer (разгиб. молот) · hook (крюк) · cup (сгибание кисти). Введи силу кг + время достижения макс мс → получи F/t, F100, F500, градиент, F/m.</div>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
-              {[
-                ['fingerKg','fingerMs','Finger flex кг/мс'],
-                ['hammerKg','hammerMs','Hammer кг/мс'],
-                ['hookKg','hookMs','Hook кг/мс'],
-                ['cupKg','cupMs','Cup кг/мс'],
-              ].map(([kKg,kMs,label])=> (
-                <div key={kKg} style={{ padding:'8px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                  <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{label}</div>
-                  <input inputMode="decimal" value={(state as any)[kKg]} onChange={e=>setState(s=>({...s, [kKg]:e.target.value}))} placeholder="кг" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11, marginBottom:4 }} />
-                  <input inputMode="numeric" value={(state as any)[kMs]} onChange={e=>setState(s=>({...s, [kMs]:e.target.value}))} placeholder="мс" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Динамика — F/t градиент</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
-                  {(dynamicReport as any)?.avgFt ? `Avg F/t ${(dynamicReport as any).avgFt} кг/с · Total ${(dynamicReport as any).totalF}кг · Avg ${(dynamicReport as any).avgF}кг` : 'Введи 4 теста → F/t'}
-                  {(dynamicReport as any)?.tactic ? <div style={{ marginTop:4, color:ACCENT }}><b>Тактика:</b> {(dynamicReport as any).tactic}</div> : null}
-                </div>
-                {dynamicReport && (dynamicReport as any).metrics && (
-                  <div style={{ fontSize:10, color:DIM, marginTop:6 }}>
-                    {Object.entries((dynamicReport as any).metrics).map(([k,v]: any)=> v ? <div key={k}>{k}: F{v.fMax} F/t{v.ftIndex} F100{v.f100}({v.explosivePct}%) F500{v.f500}({v.fastPct}%) t0.5F{v.t05F}мс</div> : null)}
-                  </div>
-                )}
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background: (dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.08)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${(dynamicReport as any)?.asymmetry?.level==='critical'?'rgba(239,68,68,0.2)': (dynamicReport as any)?.asymmetry?.level==='warn'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:11, fontWeight:700, color: (dynamicReport as any)?.asymmetry?.level==='critical'?'#ef4444': (dynamicReport as any)?.asymmetry?.level==='warn'?'#f59e0b':'#22c55e' }}>Асимметрия L/R</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}% — ${(dynamicReport as any).asymmetry.advice}` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}% ${forceVecPro.asymmetryPct>=12?'🔴':forceVecPro.asymmetryPct>=7?'🟠':'🟢'}` : 'Введи left/right хват или finger/hook обе руки')}</div>
-                {/* E12 P1: bilateral-план + история */}
-                {bilatP0 && (
-                  <div style={{ fontSize:10, color:DIM, marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                    <b style={{ color:'#fff' }}>Bilateral:</b> {bilatP0.note} · слабая {bilatP0.weakArm || '—'} {bilatP0.weakSets} / сильная {bilatP0.strongArm || '—'} {bilatP0.strongSets} {bilatP0.withinMrv ? '· в MRV ✓' : '· вне MRV ⚠'}
-                    {bilatTrendP0 && <div style={{ marginTop:2 }}>{bilatTrendP0.text}</div>}
-                    {bilatHistP0.length > 0 && <div style={{ marginTop:2 }}>История: {bilatHistP0.slice(-6).map((h) => `${h.asymmetryPct}%`).join(' → ')}</div>}
-                    <button onClick={() => { const lk = parseFloat(state.leftKg); const rk = parseFloat(state.rightKg); if (Number.isFinite(lk) && Number.isFinite(rk) && lk > 0 && rk > 0) { saveBilateralEntry(lk, rk); setBilatTick((x) => x + 1); } }} style={{ marginTop:6, padding:'5px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10 }}>💾 Сохранить L/R замер</button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:11, color:DIM }}>Wrist curl lb<br/><input inputMode="decimal" value={state.wristCurlLb} onChange={e=>setState(s=>({...s, wristCurlLb:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Pron hold с<br/><input inputMode="numeric" value={state.pronHoldSec} onChange={e=>setState(s=>({...s, pronHoldSec:e.target.value}))} placeholder="20" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>Cup hold с<br/><input inputMode="numeric" value={state.cupHoldSec} onChange={e=>setState(s=>({...s, cupHoldSec:e.target.value}))} placeholder="25" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-              <label style={{ fontSize:11, color:DIM }}>CoC lvl<br/><input inputMode="decimal" value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', fontSize:12 }} /></label>
-            </div>
-            <div style={{ padding:'8px 10px', borderRadius:8, background: benchRes.level==='competitive'?'rgba(34,197,94,0.08)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color: benchRes.level==='competitive'?'#22c55e':'#fff' }}>Авто-уровень: {benchRes.level} · score {benchRes.avgScore} · {benchAdviceForLevel(benchRes.level)}</div>
-              <div style={{ fontSize:10, color:DIM }}>{benchRes.details.map(d=>`${d.id}:${d.value}→${d.level}`).join(' · ') || '—'}</div>
-              <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Пороги: wrist curl 0/25/45/70/95 lb · pron 0/10/25/45/65с · cup 0/15/30/50/70с · CoC 0/1/1.5/2/2.5 · RT 0/45/75/100/120кг</div>
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={handleAddTrialsToHistory} style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.2)', color:'#22c55e', fontWeight:700, cursor:'pointer', fontSize:11 }}>💾 Сохранить 4 теста в историю (12-нед avg/max/min)</button>
-              <button onClick={()=> { const s = { fingerKg:'',fingerMs:'',hammerKg:'',hammerMs:'',hookKg:'',hookMs:'',cupKg:'',cupMs:'' }; setState(prev=> ({...prev, ...s})); }} style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', color:DIM, cursor:'pointer', fontSize:11 }}>🗑 Сброс динамик</button>
-            </div>
-            {/* F/t → мёртвые точки (авто) */}
-            {dynamicReport && (dynamicReport as any).metrics && (
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginTop:8 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>F/t → мёртвые точки (авто-подсказка)</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
-                  {(dynamicReport as any).metrics.finger_flex && (dynamicReport as any).metrics.finger_flex.ftIndex < 30 ? 'finger_flex низкая → contain_fingers (pinch) · ' : ''}
-                  {(dynamicReport as any).metrics.hammer && (dynamicReport as any).metrics.hammer.ftIndex < 30 ? 'hammer низкая → sup_drag/back_drag · ' : ''}
-                  {(dynamicReport as any).metrics.hook && (dynamicReport as any).metrics.hook.fMax < 30 ? 'hook низкая → sup_cup/sup_drag · ' : ''}
-                  {(dynamicReport as any).metrics.cup && (dynamicReport as any).metrics.cup.f500 < 25 ? 'cup низкая → cup_start/hold · ' : ''}
-                  {!((dynamicReport as any).metrics.finger_flex?.ftIndex<30 || (dynamicReport as any).metrics.hammer?.ftIndex<30 || (dynamicReport as any).metrics.hook?.fMax<30 || (dynamicReport as any).metrics.cup?.f500<25) ? 'Все F/t в допуске — баланс' : ''}
-                </div>
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
-                  {[
-                    { id:'contain_fingers', need: (dynamicReport as any).metrics.finger_flex?.ftIndex<30 },
-                    { id:'sup_drag', need: (dynamicReport as any).metrics.hammer?.ftIndex<30 },
-                    { id:'sup_cup', need: (dynamicReport as any).metrics.hook?.fMax<30 },
-                    { id:'cup_start', need: (dynamicReport as any).metrics.cup?.f500<25 },
-                  ].filter(x=>x.need).map(x=> (
-                    <button key={x.id} onClick={()=>toggleWeakPoint(x.id as ArmWeakPoint)} style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: state.weakPoints.includes(x.id as ArmWeakPoint)? '#f59e0b':'#1f3a5f', background: state.weakPoints.includes(x.id as ArmWeakPoint)? 'rgba(245,158,11,0.14)':'#0a1629', color: state.weakPoints.includes(x.id as ArmWeakPoint)? '#f59e0b':DIM, cursor:'pointer', fontSize:10 }}>{x.id} {state.weakPoints.includes(x.id as ArmWeakPoint)?'✓':'+'}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {forceHistory.stats.length>0 && (
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>История 12 нед — avg/max/min + fatigue</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4, display:'flex', gap:2 }}>
-                  {forceHistory.stats.map((w:any)=> (
-                    <div key={w.week} style={{ flex:1, textAlign:'center', padding:'2px 0', background:'rgba(255,255,255,0.04)', borderRadius:4 }}>
-                      <div style={{ color:'#22c55e', fontWeight:700 }}>{w.avg}</div>
-                      <div style={{ color:'#ef4444' }}>{w.max}</div>
-                      <div style={{ color:'#60a5fa' }}>{w.min}</div>
-                      <div style={{ color: w.fatiguePct>10?'#ef4444':'#22c55e', fontSize:9 }}>{w.fatiguePct}%</div>
-                      <div style={{ fontSize:8, color:DIM }}>W{w.week}</div>
-                    </div>
-                  ))}
-                </div>
-                {forceHistory.fatigue && <div style={{ fontSize:10, color: forceHistory.fatigue.improving?'#22c55e':'#ef4444', marginTop:4 }}>{forceHistory.fatigue.text}</div>}
-                {forceHistory.trend && <div style={{ fontSize:10, color:DIM }}>{forceHistory.trend.text}</div>}
-              </div>
-            )}
-          </div>
-        )}
+        {tab==='strength' && <HubStrengthTab H={H} />}
 
-        {tab==='recovery' && (
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>ACWR {acwr? acwr.ratio.toFixed(2) : '—'}</div>
-                <div style={{ fontSize:10, color:DIM }}>{acwr? `Острая/хроническая — факт` : 'нет данных (нужен дневник sRPE)'}</div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Tendon ACWR {tendonAcwr? tendonAcwr.ratio.toFixed(2) : '—'}</div>
-                <div style={{ fontSize:10, color:DIM }}>{tendonAcwr? `Tendon — факт` : 'нет tendon-данных'}</div>
-              </div>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Tendon Load · лимит {tendonWeeklyLimit(state.level)}</div>
-                <div style={{ fontSize:10, color:DIM }}>{report.tendonLoad} сетов/нед · Side MRV {landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Beginner 12 / Inter 16 / Adv 18 / Enh 22 — GripStrength F1 3с эксцентрик</div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Дополнительно</div>
-                <div style={{ fontSize:10, color:DIM }}>Техника: {state.technique} · Уровень: {state.level} · Направление: {state.direction} · Углы: {angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°</div>
-                <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Видео: {hasVideoSupport()?'поддерживается':'—'} · Ввод: {anglesVerified?'углы в допуске':'ручной'}</div>
-              </div>
-            </div>
-            <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
-              <b style={{ color:'#fff' }}>ACWR — факт:</b> ACWR {acwr ? acwr.ratio : '—'} — факт {acwr ? '' : '(нужен дневник sRPE ≥2 сесс.)'} {tendonAcwr ? `· Tendon ACWR ${tendonAcwr.ratio} — факт` : ''}
-              {/* D2: per-muscle сводка */}
-              {(perMuscleAcwrSumP0.danger.length > 0 || perMuscleAcwrSumP0.caution.length > 0) && (
-                <span> · Per-muscle: {perMuscleAcwrSumP0.danger.length > 0 && <b style={{ color:'#ef4444' }}>🔴 {perMuscleAcwrSumP0.danger.join(', ')}</b>} {perMuscleAcwrSumP0.caution.length > 0 && <span style={{ color:'#f59e0b' }}>🟠 {perMuscleAcwrSumP0.caution.join(', ')}</span>}</span>
-              )}
-            </div>
-            {/* E10 P1: мобильность ROM + retest → профиль */}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🦿 Мобильность · score {armMobility.score} {armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}</div>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
-                {[
-                  ['mobWristFlex', mobWristFlex, setMobWristFlex, 'Сгиб кисти ≥80°'],
-                  ['mobWristExt', mobWristExt, setMobWristExt, 'Разгиб ≥70°'],
-                  ['mobPron', mobPron, setMobPron, 'Пронация ≥80°'],
-                  ['mobSup', mobSup, setMobSup, 'Супинация ≥80°'],
-                  ['mobElbow', mobElbow, setMobElbow, 'Локоть полный'],
-                ].map(([key, val, set, label]: any) => (
-                  <button key={key} onClick={() => set(!val)} aria-pressed={!!val} style={{ padding:'5px 8px', borderRadius:999, border:'1px solid', borderColor: val ? 'rgba(34,197,94,0.3)' : '#ef4444', background: val ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', color: val ? '#22c55e' : '#ef4444', cursor:'pointer', fontSize:10 }}>{label}</button>
-                ))}
-              </div>
-              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
-                <label style={{ fontSize:10, color:DIM }}>Reverse-retest<br />
-                  <select value={mobRetest} onChange={(e) => setMobRetest(e.target.value as any)} style={{ marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }}>
-                    <option value="">—</option><option value="better">Лучше</option><option value="same">Так же</option>
-                  </select>
-                </label>
-                <button onClick={() => { const s = applyArmMobilityToProfile(armMobility.restrictions); setMobMsg(`✓ Мобильность ${s} → профиль`); setTimeout(() => setMobMsg(''), 2500); }} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #1f3a5f', background:'#0a1629', color:DIM, cursor:'pointer', fontSize:10, fontWeight:700 }}>→ В профиль</button>
-                {armMobility.retestHint && <span style={{ fontSize:10, color:DIM }}>{armMobility.retestHint}</span>}
-                {mobMsg && <span style={{ fontSize:10, color:'#22c55e' }}>{mobMsg}</span>}
-              </div>
-            </div>
-            {/* E11 P1 + D1: авторегуляция из дневника + ручные боли/сон + гварды UCL/плечо/tendon/humerus */}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🔄 Авторегуляция (sRPE 7д + VBT + боли)</div>
-              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                <label style={{ fontSize:10, color:DIM }}>Локоть 0-10<br /><input aria-label="Боль локоть 0-10" inputMode="decimal" value={painElbow} onChange={(e) => setPainElbow(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>Запястье 0-10<br /><input aria-label="Боль запястье 0-10" inputMode="decimal" value={painWrist} onChange={(e) => setPainWrist(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>Сон, ч<br /><input aria-label="Сон часов" inputMode="decimal" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} placeholder="8" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-              </div>
-              <div style={{ fontSize:10, color:DIM, marginTop:6 }}>{autoregP0 ? `${autoregP0.note} · объём ×${autoregP0.volumeMult} · RIR+${autoregP0.rirShift}${autoregP0.extraRestDays ? ` · +${autoregP0.extraRestDays} дн отдыха` : ''}` : 'Нет sRPE за 7д — план без изменений'}</div>
-              {cnsHeavyP0 && (
-                <div style={{ fontSize:10, marginTop:4, color: cnsHeavyP0.heavy >= 2 ? '#f59e0b' : DIM }}>
-                  CNS: {cnsHeavyP0.heavy} тяжёлых (RPE≥8) из {cnsHeavyP0.total} за 7д{cnsHeavyP0.heavy >= 2 ? ' — план облегчается ×0.8' : ' — допуск'}
-                </div>
-              )}
-              <div style={{ fontSize:10, color:DIM, marginTop:6 }}><b style={{ color:'#fff' }}>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length + guardsP0.humerus.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon/humerus чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon, ...guardsP0.humerus].slice(0, 5).join(' · ')}</div>
-            </div>
-            {/* TOP T5b: return-to-pull 10–16 нед */}
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🩹 Return-to-pull (после травмы)</div>
-              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'flex-end' }}>
-                <label style={{ fontSize:10, color:DIM }}>Травма<br />
-                  <select aria-label="Травма для return-to-pull" value={rhInjury} onChange={(e) => setRhInjury(e.target.value)} style={{ marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:10 }}>
-                    <option value="none">—</option><option value="humerus">Перелом плеча</option><option value="ucl">UCL/связка локтя</option><option value="biceps">Бицепс</option><option value="elbow_tendon">Тендинопатия локтя</option><option value="wrist">Кисть/запястье</option>
-                  </select>
-                </label>
-                <label style={{ fontSize:10, color:DIM }}>Недель с травмы<br /><input aria-label="Недель с травмы" inputMode="numeric" value={rhWeeks} onChange={(e) => setRhWeeks(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>Боль 0-10<br /><input aria-label="Боль при травме 0-10" inputMode="decimal" value={rhPain} onChange={(e) => setRhPain(e.target.value)} placeholder="0" style={{ width:56, marginTop:4, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM, display:'flex', alignItems:'center', gap:4 }}><input type="checkbox" checked={rhSurg} onChange={(e) => setRhSurg(e.target.checked)} /> Операция была</label>
-              </div>
-              {(()=>{ try {
-                if (rhInjury==='none') return <div style={{ fontSize:10, color:DIM, marginTop:6 }}>Скрининг, не диагноз: выбери травму — покажем фазу, допуски и критерии перехода.</div>;
-                const rh = buildRehabPlan({ injury: rhInjury, weeksSince: parseFloat(rhWeeks) || 0, pain: parseFloat(rhPain) || 0, surgery: rhSurg });
-                return <div style={{ marginTop:6 }}>
-                  <div style={{ fontSize:10, color:'#fff' }}><b>Фаза {rh.phase}: {rh.current.title}</b> ({rh.current.weeks})</div>
-                  <div style={{ fontSize:10, color:DIM, marginTop:2 }}>✅ {rh.current.allowed.slice(0,3).join(' · ')}</div>
-                  <div style={{ fontSize:10, color:'#ef4444', marginTop:2 }}>⛔ {rh.current.forbidden.slice(0,3).join(' · ')}</div>
-                  <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Дальше: {rh.current.criteriaToNext}</div>
-                  <div style={{ fontSize:10, color:'#f59e0b', marginTop:2 }}>{rh.redFlags[0]}</div>
-                </div>;
-              } catch { return null; } })()}
-            </div>
-            {showScoring && scoring && (
-              <div style={{ fontSize:10, color:DIM, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 }}>
-                <b style={{ color: scoreColor(scoring.level) }}>RSS {scoring.score} {scoreLabel(scoring.score)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.slice(0,2).map(f=>f.text).join(' · ')}
-              </div>
-            )}
-            {forceHistory.stats.length>0 && (
-              <div style={{ padding:'8px 10px', borderRadius:8, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Fatigue 12-нед (патент WO2026106582A1)</div>
-                <div style={{ fontSize:10, color:DIM }}>Avg {forceHistory.stats[0]?.avg}→{forceHistory.stats[forceHistory.stats.length-1]?.avg} · Max {forceHistory.stats[0]?.max}→{forceHistory.stats[forceHistory.stats.length-1]?.max} · Fatigue {forceHistory.fatigue?.first}%→{forceHistory.fatigue?.last}% ({forceHistory.fatigue?.improving? '↓ адаптация':'↑ усталость'})</div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+        {tab==='recovery' && <HubRecoveryTab H={H} />}
+      </AdCard>
 
-      {/* Diagnostics output — механизм-ориентированная + 12 мёртвых точек */}
-      <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🔬 Диагностика — мёртвые точки (12) + сустав/сухожилие</div>
-        <div style={{ fontSize:11, color:DIM, marginBottom:8 }}>{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''} {(report as any).weakPoints?.length? `· точек ${(report as any).weakPoints.join(', ')}` : ''}</div>
-        {report.findings.length>3 && <div style={{ fontSize:10, color:DIM, marginTop:6, maxHeight:80, overflowY:'auto', padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)' }}>{report.findings.map((f:any,i:number)=><div key={i} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e', marginBottom:2 }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
-        {/* 12 точек карточки */}
-        {(diag as any).biomechCards?.length ? (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
-            {(diag as any).biomechCards.map((c:any)=>(
-              <div key={c.weakPoint} style={{ padding:'10px 12px', borderRadius:10, background:'#0a1629', border:'1px solid rgba(245,158,11,0.18)' }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:4 }}>
-                  <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{c.label}</span>
-                  <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(245,158,11,0.12)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.18)' }}>{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint}</span>
-                  <span style={{ fontSize:10, color:DIM }}>{c.weakMuscles.join('/')}</span>
-                  <span style={{ marginLeft:'auto', fontSize:10, color: (()=>{ const aj2 = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint); if (aj2==='none') return DIM; const d2 = aj2==='wrist' ? angles.wristDeg : aj2==='elbow' ? angles.elbowDeg : angles.forearmDeg; return isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, d2) ? '#22c55e' : '#ef4444'; })() }}>{(()=>{ const aj3 = angleJointForWeakPoint(c.weakPoint as ArmWeakPoint); if (aj3==='none') return '• угол н/п'; const d3 = aj3==='wrist' ? angles.wristDeg : aj3==='elbow' ? angles.elbowDeg : angles.forearmDeg; return isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, d3) ? '✅' : '⚠ вне диапазона'; })()}</span>
-                </div>
-                <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{c.reason}</div>
-                <div style={{ fontSize:11, color:'#5ee', marginBottom:4 }}><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT warn {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).warnPct}%/stop {vbtThresholdForWeakPoint(c.weakPoint as ArmWeakPoint).stopPct}%</div>
-                <div style={{ fontSize:10, color:DIM }}>День {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.dayTags[0] || '—'} · {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.sets}×{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.repsRange.join('-')} RIR{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.rir} {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds?`hold ${ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds}с`:''} · {c.technique.join('/')}</div>
-              </div>
-            ))}
-          </div>
-        ) : diag.priorities.length===0 ? <div style={{ fontSize:11, color:DIM, marginTop:8 }}>Слабые зоны не выявлены — баланс. {dynamicReport && (dynamicReport as any).asymmetry ? `· ${(dynamicReport as any).tactic}` : ''}</div> : (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
-            {diag.priorities.map((p,i)=>(
-              <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'#0a1629', border:'1px solid #1f3a5f' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                  <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{ARM_MUSCLE_RU[p.muscle as any] || p.muscle}</span>
-                  <span style={{ fontSize:10, color:DIM }}>{p.reason}</span>
-                </div>
-                <div style={{ fontSize:11, color:'#5ee', marginBottom:6 }}>{p.exercises.join(' · ')}</div>
-                <div style={{ fontSize:10, color:DIM }}>MEV {getArmLandmarks(state.level, p.muscle).mev} · MAV {getArmLandmarks(state.level, p.muscle).mav} · MRV <b style={{color:'#fff'}}>{getArmLandmarks(state.level, p.muscle).mrv}</b> · Tendon {getArmLandmarks(state.level, p.muscle).mrv <=9?'низкий (humerus)':''}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {(report as any).corrections?.length ? (
-          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.12)', fontSize:10, color:DIM }}>
-            <b style={{color:'#00e68a'}}>Инъекция в план (предпросмотр):</b> {(report as any).corrections.map((c:any)=> `${c.weakPoint}→${c.exercises[0]} @${Math.round(c.intensityPct*100)}% в ${c.dayTags[0]}`).join(' · ')}
-            <div style={{ marginTop:4, color:DIM }}>Дней инъекции: {Array.from(new Set((report as any).corrections.map((c:any)=>c.dayTags[0]))).join(', ')} · per-day dedup, budget {(report as any).scoring ? `RSS ${(report as any).scoring.score}` : ''}</div>
-          </div>
-        ) : null}
-        {dynamicReport && (dynamicReport as any).metrics && (
-          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)', fontSize:10, color:DIM }}>
-            <b style={{color:'#f59e0b'}}>Динамика F/t:</b> avgFt {(dynamicReport as any).avgFt ?? '—'} кг/с · total {(dynamicReport as any).totalF ?? '—'}кг · tactic {(dynamicReport as any).tactic} · {Object.entries((dynamicReport as any).metrics).map(([k,v]:any)=> v? `${k}:${v.ftIndex}`:'' ).filter(Boolean).join(' · ') || ''}
-          </div>
-        )}
-        {showScoring && scoring && (
-          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:DIM }}>
-            <b style={{color: scoreColor(scoring.level)}}>RSS {scoring.score} {scoreLabel(scoring.score)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.map(f=>f.text).join(' · ')} {scoring.floors.length? `· floor ${scoring.floors.join(', ')}` : ''}
-          </div>
-        )}
-      </div>
+      <HubOutput H={H} />
 
-      {/* P0 PRO: план → аудит → причины → топ-3 → спец-блок → инъекция → дневник */}
-      <div style={{ ...CARD, padding: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)' }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🧬 P0 PRO — план → причины → топ-3 → спец-блок → инъекция</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
-          {armAudit ? `Аудит плана: покрытие ${armAudit.covered.length}/12 (${armAudit.coveragePct}%) · стол ${(armAudit.tableRatio * 100).toFixed(0)}% · статика ${armAudit.staticSets}/динамика ${armAudit.dynamicSets}${armAudit.duplicates.length ? ` · дубли: ${armAudit.duplicates.slice(0, 3).join(', ')}` : ''}` : 'Нет плана арм (he_arm_plan_saved / he_arm_last_plan) — собери в Арм-конструкторе; причины и топ-3 работают и без плана'}
-          {armWorst ? ` · 🎯 худшая из выбранных: ${armWorst}` : ''}
-        </div>
-        {state.weakPoints.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-            {state.weakPoints.map((wp) => {
-              const cause = (armCausesP0 as any)[wp];
-              const top = (armTop3P0 as any)[wp] || [];
-              const sim = (() => { try { return simulateArmInjection(armPlan as any, wp); } catch { return null; } })();
-              return (
-                <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid rgba(0,230,138,0.18)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{wp} {cause ? `· ${cause.cause} (${Math.round(cause.confidence * 100)}%)` : ''}</div>
-                  {cause && <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{cause.evidence.join(' · ')} → <b style={{ color: ACCENT }}>{cause.fix}</b></div>}
-                  {top.length > 0 && <div style={{ fontSize: 10, color: '#5ee', marginTop: 4 }}>Топ-3: {top.map((t: any) => `${t.id} (${t.score})`).join(' · ')} {sim ? `· Δ ${sim.summary}` : ''}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
-          {armSpecP0 ? `${armSpecP0.summary} · волна: ${armSpecP0.weeks.slice(0, 4).map((w) => `Н${w.week}:${w.kind}`).join(' ')}` : ''}
-          {diaryTrendsP0.length ? ` · 📊 дневник: ${diaryTrendsP0.map((t) => `${t.muscle} ${t.deltaPct}% (${t.status})`).join(', ')}` : ' · 📊 дневник: нет e1RM-тренда (нужны сессии 28-56д)'}
-          {diarySuggestP0.length ? ` → подсказка: ${diarySuggestP0.join(', ')}` : ''}
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ fontSize: 10, color: DIM }}>Нед спец-блока<br />
-            <input inputMode="numeric" value={specWeeks} onChange={(e) => setSpecWeeks(e.target.value)} style={{ width: 56, marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
-          </label>
-          {armWorst && !state.weakPoints.includes(armWorst as any) && (
-            <button onClick={() => toggleWeakPoint(armWorst as any)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🎯 Худшая в плане: {armWorst} → разобрать</button>
-          )}
-          {diarySuggestP0.length > 0 && (
-            <button onClick={() => { for (const p of diarySuggestP0.slice(0, 3)) if (!state.weakPoints.includes(p as any)) toggleWeakPoint(p as any); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: '#0a1629', color: DIM, cursor: 'pointer', fontSize: 11 }}>📊 Дневник → в слабые ({diarySuggestP0.slice(0, 3).join(', ')})</button>
-          )}
-          <button onClick={handleInjectP0} style={{ padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#0aa)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({state.weakPoints.length || 0})</button>
-          {hasInjectPrev && (
-            <button onClick={handleRollbackP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>↩ Откат</button>
-          )}
-          <button onClick={handleExportHtmlP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>🖨 HTML</button>
-          <button onClick={handlePrintP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>🖨 Печать</button>
-          <button onClick={handleExportCsvP0} style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', color: DIM, cursor: 'pointer', fontSize: 11 }}>📥 CSV</button>
-          {criticalSideP0 && <span style={{ fontSize: 10, color: '#ef4444' }}>🔴 критично — side только ремень/изометрия</span>}
-        </div>
-        {injectMsg && <div style={{ marginTop: 6, fontSize: 11, color: injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? '#22c55e' : '#f59e0b' }}>{injectMsg}</div>}
-      </div>
+      <HubP0Panel H={H} />
 
-      {/* Table periodization */}
-      <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол</div>
-        <div style={{ display:'flex', gap:2, marginBottom:6 }}>
-          {tablePreview.map(({ wk, kind }) => {
-            const col = kind==='moderate'? '#22c55e' : kind==='heavy'? '#f59e0b' : '#ef4444';
-            return <div key={wk} style={{ flex:1, height:18, background:col, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:9, fontWeight:700 }}>{wk}:{kind[0]}</div>;
-          })}
-        </div>
-        <div style={{ fontSize:10, color:DIM }}>≥50% тренировок — стол. Тейпер 2–3 нед: 0.65/0.45, side×0.5, RIR+1/+2. Moderate 50-75% 1-3мин / Heavy 75-100% 10с-1мин / Stress 100-125% 5-10с.</div>
-        {forceHistory.trend && <div style={{ fontSize:10, color:ACCENT, marginTop:4 }}>{forceHistory.trend.text}</div>}
-      </div>
+      <HubTableStrip H={H} />
 
-      {/* Action */}
-      <div style={{ ...CARD, padding: 12, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.16)' }}>
-        <button onClick={applyToConstructor} style={{ width:'100%', padding:'10px 14px', borderRadius:8, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Арм-конструктор ({(state.weakPoints.length? state.weakPoints.join(', ') : diag.weakMuscles.slice(0,2).join(', ')) || (dynamicReport && Object.keys((dynamicReport as any).metrics||{}).length ? 'динамика' : 'баланс')} · {(state.weakPoints.length? `${state.weakPoints.length} точек` : `${diag.weakMuscles.length} мышц`)})</button>
-        <div style={{ fontSize:10, color:DIM, marginTop:6, textAlign:'center' }}>Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
-        {(diag as any).biomechCards?.length ? <div style={{ fontSize:10, color:DIM, marginTop:4, textAlign:'center' }}>Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}
-      </div>
-    </div>
+      <HubAction H={H} />
+    </AdRoot>
   );
 };
 

@@ -44,9 +44,7 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
   return (
     <div className="train-armtech">
       <AdCard>
-        <div className="ad-sec-h">
-          <div className="ad-sec-t">🎯 Диагностика слабых звеньев</div>
-        </div>
+        <div className="ad-sec-t">🎯 Диагностика слабых звеньев</div>
         <p className="ad-muted">Где проваливаешься за столом? Отметь — получишь слабые мышцы и упражнения.</p>
         <div className="ad-row">
           <select value={technique} onChange={e => setTechnique(e.target.value)} aria-label="Техника">

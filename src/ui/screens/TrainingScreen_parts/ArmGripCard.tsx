@@ -38,9 +38,7 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
   return (
     <div className="train-armgrip">
       <AdCard>
-        <div className="ad-sec-h">
-          <div className="ad-sec-t">✊ Хват — диагностика</div>
-        </div>
+        <div className="ad-sec-t">✊ Хват — диагностика</div>
         <p className="ad-muted">Введи максимумы — увидишь слабые зоны хвата.</p>
         <AdGrid cols="auto-sm">
           <AdField label="Rolling Thunder (кг)">

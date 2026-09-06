@@ -86,6 +86,7 @@ export function AdSteps({
         <button
           key={s.id}
           aria-label={s.label}
+          aria-pressed={active === s.id}
           data-active={active === s.id}
           className="ad-step"
           onClick={() => onSelect(s.id)}
@@ -93,7 +94,7 @@ export function AdSteps({
           <span className="ad-step-n" aria-hidden>
             {i + 1}
           </span>
-          <span>{s.label}</span>
+          {s.label}
         </button>
       ))}
     </div>
@@ -121,9 +122,7 @@ export function AdSec({
 }) {
   return (
     <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})}>
-      <div className="ad-sec-h">
-        <div className="ad-sec-t">{title}</div>
-      </div>
+      <div className="ad-sec-t">{title}</div>
       {hint ? <div className="ad-sec-hint">{hint}</div> : null}
       {children}
     </div>

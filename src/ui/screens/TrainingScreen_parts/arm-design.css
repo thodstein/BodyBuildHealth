@@ -208,14 +208,11 @@
   margin-top: 12px;
 }
 
-:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-h {
+:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-t {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
-}
-
-:is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-t {
+  margin: 0 0 10px;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.1px;
