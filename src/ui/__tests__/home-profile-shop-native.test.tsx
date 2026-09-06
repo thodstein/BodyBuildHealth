@@ -220,3 +220,49 @@ describe('CSS §63–64 (волны A–D)', () => {
     expect(block).not.toMatch(/#c9f73a|#00e68a/i);
   });
 });
+
+describe('CSS §67 + §70 (вторичный контент PRO)', () => {
+  const css = fs.readFileSync(path.join(process.cwd(), 'src', 'styles-native.css'), 'utf-8');
+
+  it('§67: все вторичные корни с акцентной плашкой h2', () => {
+    for (const sel of [
+      '.screen.gamification',
+      '.screen.recovery-screen',
+      '.screen.plan',
+      '.screen.fertility-pct',
+      '.screen.peptides',
+      '.screen.assistant',
+      '.screen.role-management',
+      '.screen.substances',
+      '.screen.predictive-analytics',
+      '.screen.perf-screen',
+      '.rep-screen',
+      '.sup-clinic',
+    ]) {
+      expect(css, sel).toContain(sel);
+    }
+    expect(css).toContain('border-left: 3px solid var(--accent)');
+  });
+
+  it('§70: стекло-карточки + press/focus + tabular, всё под html.app-native', () => {
+    const i = css.indexOf('70. SECONDARY CONTENT PRO');
+    expect(i).toBeGreaterThan(-1);
+    const block = css.slice(i, i + 6000);
+    expect(block).toContain('.screen.gamification .card');
+    expect(block).toContain('backdrop-filter: blur(20px)');
+    expect(block).toContain('font-variant-numeric: tabular-nums');
+    expect(block).toContain(':active');
+    expect(block).toContain(':focus-visible');
+    expect(block).toContain('prefers-reduced-motion');
+    for (const line of block.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('/*') || t.startsWith('*')) continue;
+      if (!t.endsWith('{')) continue;
+      const sel = t.slice(0, -1).trim();
+      if (!sel || sel.startsWith('@')) continue;
+      for (const p of sel.split(',').map((s) => s.trim()).filter(Boolean)) {
+        expect(p.startsWith('html.app-native'), p).toBe(true);
+      }
+    }
+  });
+});

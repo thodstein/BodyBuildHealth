@@ -4367,7 +4367,11 @@ html.app-native .screen.fertility-pct h2,
 html.app-native .screen.peptides h2,
 html.app-native .screen.assistant h2,
 html.app-native .screen.role-management h2,
-html.app-native .screen.substances h2 {
+html.app-native .screen.substances h2,
+html.app-native .screen.predictive-analytics h2,
+html.app-native .screen.perf-screen h2,
+html.app-native .rep-screen h2,
+html.app-native .sup-clinic h2 {
   border-left: 3px solid var(--accent) !important;
   padding-left: 10px !important;
   font-size: 19px !important;
@@ -4624,4 +4628,92 @@ html.app-native .labs-hero-stat-l,
 html.app-native .risk-hero-stat-v,
 html.app-native .risk-hero-stat-l {
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── 70. SECONDARY CONTENT PRO ─────────────────────────
+ * Только APK. Вторичные экраны (§67) получают PRO-подачу контента
+ * без правок их TSX: стекло-карточки, акцентные кромки смысла,
+ * табличные цифры, press/focus, вход-моушн. TG/web не тронуты. */
+html.app-native .screen.gamification .card,
+html.app-native .screen.recovery-screen .card,
+html.app-native .screen.plan .card,
+html.app-native .screen.fertility-pct .card,
+html.app-native .screen.peptides .card,
+html.app-native .screen.assistant .card,
+html.app-native .screen.role-management .card,
+html.app-native .screen.substances .card,
+html.app-native .screen.predictive-analytics .card,
+html.app-native .screen.perf-screen .card {
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+html.app-native .rep-screen .rep-card,
+html.app-native .sup-clinic .sup-block {
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.app-native .screen.gamification button:active,
+html.app-native .screen.recovery-screen button:active,
+html.app-native .screen.plan button:active,
+html.app-native .screen.fertility-pct button:active,
+html.app-native .screen.peptides button:active,
+html.app-native .screen.assistant button:active,
+html.app-native .screen.role-management button:active,
+html.app-native .screen.substances button:active,
+html.app-native .screen.predictive-analytics button:active,
+html.app-native .screen.perf-screen button:active,
+html.app-native .rep-screen button:active,
+html.app-native .sup-clinic button:active {
+  transform: scale(0.97);
+}
+
+html.app-native .screen.gamification button:focus-visible,
+html.app-native .screen.recovery-screen button:focus-visible,
+html.app-native .screen.plan button:focus-visible,
+html.app-native .screen.fertility-pct button:focus-visible,
+html.app-native .screen.peptides button:focus-visible,
+html.app-native .screen.assistant button:focus-visible,
+html.app-native .screen.role-management button:focus-visible,
+html.app-native .screen.substances button:focus-visible,
+html.app-native .screen.predictive-analytics button:focus-visible,
+html.app-native .screen.perf-screen button:focus-visible,
+html.app-native .rep-screen button:focus-visible,
+html.app-native .sup-clinic button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+html.app-native .screen.gamification,
+html.app-native .screen.recovery-screen,
+html.app-native .screen.plan,
+html.app-native .screen.fertility-pct,
+html.app-native .screen.peptides,
+html.app-native .screen.assistant,
+html.app-native .rep-screen,
+html.app-native .sup-clinic {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .screen.gamification .card,
+  html.app-native .screen.recovery-screen .card,
+  html.app-native .screen.plan .card,
+  html.app-native .screen.fertility-pct .card,
+  html.app-native .screen.peptides .card,
+  html.app-native .screen.assistant .card,
+  html.app-native .screen.role-management .card,
+  html.app-native .screen.substances .card,
+  html.app-native .screen.predictive-analytics .card,
+  html.app-native .screen.perf-screen .card {
+    animation: none;
+  }
 }
