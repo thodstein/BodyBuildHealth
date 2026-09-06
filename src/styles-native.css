@@ -4345,6 +4345,12 @@ html.app-native .native-home-alert > svg:last-child {
   flex-shrink: 0;
 }
 
+/* ─── 66. NUTRITION SCAN ──────────────────────────────
+ * Только APK. Кнопка сканера в шапке вкладок. */
+html.app-native .nutrition-scan-btn:active {
+  transform: scale(0.92);
+}
+
 /* ─── 64. SHOP + ARTICLES ACCENT ──────────────────────────────
  * Только APK. Магазин/Статьи захардкожены на минт в инлайнах —
  * бренд-элементы переводим на акцент темы, категорийные цвета не трогаем. */
@@ -4413,6 +4419,8 @@ html.app-native {
   --labs-accent-rgb: var(--accent-rgb);
   --train-accent: var(--accent);
   --train-accent-rgb: var(--accent-rgb);
+  --nut-accent: var(--accent);
+  --nut-accent-rgb: var(--accent-rgb);
 }
 
 /* ─── 59. APK DYNAMIC COLOR — акцент поверх var-изированных токенов ──

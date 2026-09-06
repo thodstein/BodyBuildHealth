@@ -100,4 +100,38 @@ describe('NutritionScreen native hero', () => {
     expect(container.querySelector('.native-skeleton-row')).not.toBeNull();
     expect(container.querySelectorAll('.native-skeleton').length).toBeGreaterThan(0);
   });
+
+  it('6. native → hero-карточки с SVG, в шапке сканер', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    const cards = container.querySelectorAll('.nutrition-hero-card svg');
+    expect(cards.length).toBe(2);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
+    );
+    expect(container.querySelector('.nutrition-scan-btn')).not.toBeNull();
+    expect(container.querySelector('.nutrition-scan-btn svg')).not.toBeNull();
+  });
+
+  it('7. web → сканера в шапке нет (классика 1-в-1)', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
+    );
+    expect(container.querySelector('.nutrition-scan-btn')).toBeNull();
+  });
+
+  it('8. ModernHero маппит эмодзи в SVG, неизвестное — как было', async () => {
+    await resetPlatform();
+    const { ModernHero } = await import('../screens/NutritionScreen_parts/nutrition-modern-kit');
+    const { container, rerender } = render(
+      <ModernHero icon="🛒" title="T" subtitle="S" />,
+    );
+    expect(container.querySelector('svg')).not.toBeNull();
+    rerender(<ModernHero icon="??" title="T" subtitle="S" />);
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.textContent).toContain('??');
+  });
 });

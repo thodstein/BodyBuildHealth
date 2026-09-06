@@ -21,7 +21,9 @@ import { Achievements } from './NutritionScreen_parts/Achievements';
 import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
 import { PeriWorkoutCard } from './NutritionScreen_parts/PeriWorkoutCard';
 import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeeklyComparison';
-import { readDiaryV2, onDiaryChangeV2 } from './NutritionScreen_parts/diary-storage-v2';
+import { readDiaryV2, onDiaryChangeV2, addMealEntryV2 } from './NutritionScreen_parts/diary-storage-v2';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { NativeIcon } from '../native/NativeIcons';
 import { MetabolicHub } from './Shared/MetabolicHub';
 import { RecipesTabModern } from './NutritionScreen_parts/RecipesTabModern';
 import { ModernHero, ModernPill, ModernSearch, modernCardBg } from './NutritionScreen_parts/nutrition-modern-kit';
@@ -1273,6 +1275,28 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const linked = useDataLink();
   const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');
+  const [scanOpen, setScanOpen] = useState(false);
+
+  const onScanProduct = (p: { name?: string; kcal?: number; protein?: number; fat?: number; carbs?: number }) => {
+    try {
+      const item = productToFoodItem(p as any);
+      const today = new Date().toISOString().split('T')[0];
+      addMealEntryV2(today, 'snack', {
+        name: String(item.name || 'Сканированный продукт').slice(0, 120),
+        kcal: Math.max(0, Math.round(item.kcal || 0)),
+        p: Math.max(0, Math.round(item.protein || 0)),
+        f: Math.max(0, Math.round(item.fat || 0)),
+        c: Math.max(0, Math.round(item.carbs || 0)),
+        qty: 100,
+      });
+      setScanOpen(false);
+      setTab('diary');
+      setPage('tabs');
+      setNutritionSection('diary');
+    } catch {
+      setScanOpen(false);
+    }
+  };
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
@@ -1486,14 +1510,14 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           )}
           <div className="nutrition-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
-              { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
-              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, каталог, рецепты, рестораны, справочник', color: '#f97316' },
+              { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: 'notebook' as const, title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
+              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: 'bowl' as const, title: 'Планирование питания', desc: 'План, каталог, рецепты, рестораны, справочник', color: '#f97316' },
             ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} className="nutrition-hero-card" data-section={card.section} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)',
               }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '20', fontSize:20 }}>{card.icon}</div>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '20', color: card.color }}><NativeIcon name={card.icon} size={20} /></div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:1, color: card.color, letterSpacing:-0.2 }}>{card.title}</div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>{card.desc}</div>
@@ -1520,10 +1544,30 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           border:'none', background:'transparent', display:'flex', alignItems:'center',
         }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
+        {isNativeApp() && (
+          <button
+            onClick={() => setScanOpen(true)}
+            aria-label="Сканировать штрихкод"
+            title="Сканировать штрихкод"
+            className="nutrition-scan-btn"
+            style={{
+              width:36, height:36, borderRadius:12, cursor:'pointer', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              background:'rgba(var(--nut-accent-rgb, 0,230,138),0.12)',
+              border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.25)',
+              color:'var(--nut-accent, #00e68a)',
+            }}
+          >
+            <NativeIcon name="scan" size={17} />
+          </button>
+        )}
         <span style={{ fontSize:9, color:'#fff' }}>
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
         </span>
       </div>
+      {isNativeApp() && scanOpen && (
+        <BarcodeScanner onProductFound={(p) => onScanProduct(p)} onClose={() => setScanOpen(false)} />
+      )}
 
       {/* V2 adjustments bar — shows on mealplan tab */}
       {tab === 'mealplan' && (function() {
@@ -1551,7 +1595,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         return (
           <div style={{ display:'flex', gap:3, padding:'4px 8px', overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
             {active.map((a,i) => (
-              <span key={i} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)', whiteSpace:'nowrap' }}>{a}</span>
+              <span key={i} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(var(--nut-accent-rgb, 0,230,138),0.1)', color:'var(--nut-accent, #00e68a)', border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.2)', whiteSpace:'nowrap' }}>{a}</span>
             ))}
           </div>
         );

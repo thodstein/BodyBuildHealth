@@ -16,7 +16,7 @@ export type NativeIconName =
   | 'x' | 'plus'   | 'clock' | 'trash' | 'share' | 'moon'
   | 'layers' | 'inbox' | 'kettlebell' | 'syringe' | 'cross'
   | 'ruler' | 'eye' | 'cpu' | 'dot' | 'pin' | 'phone' | 'sun' | 'send'
-  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown' | 'play' | 'pause';
+  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown' | 'play' | 'pause' | 'scan';
 
 const PATHS: Record<NativeIconName, React.ReactNode> = {
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>),
@@ -79,6 +79,7 @@ const PATHS: Record<NativeIconName, React.ReactNode> = {
   arrowDown: (<><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></>),
   play: (<polygon points="6 3 20 12 6 21 6 3" />),
   pause: (<><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>),
+  scan: (<><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="7" y1="12" x2="17" y2="12" /></>),
 };
 
 export interface NativeIconProps {
