@@ -4893,3 +4893,18 @@ html.app-native .sup-clinic {
 html.app-native .toast-container {
   bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
 }
+
+/* ─── 75. ANCHORED BOTTOMS ───────────────────────────────
+ * Только APK. Точечные fixed-тосты/кнопки с классами-якорями —
+ * над пилюлей навигации с учётом safe-area. TG/web — инлайн bottom:20. */
+html.app-native .nutrition-rt-toast,
+html.app-native .nut-diary-toast,
+html.app-native .recipes-toast,
+html.app-native .sup-catalog-toast,
+html.app-native .symptom-toast {
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+}
+
+html.app-native .nut-diary-fab {
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+}

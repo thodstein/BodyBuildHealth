@@ -485,7 +485,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
 
       {/* TOAST */}
       {planToast && (
-        <div style={{
+        <div className="symptom-toast" style={{
           position: 'fixed', bottom: 20, left: 16, right: 16, zIndex: 200,
           padding: '10px 14px', borderRadius: 12,
           background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(0,230,138,0.3)',

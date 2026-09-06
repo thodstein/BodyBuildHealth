@@ -43,6 +43,10 @@ function readCss(name: string): string {
   return fs.readFileSync(path.join(process.cwd(), 'src', name), 'utf-8');
 }
 
+function readSrc(rel: string): string {
+  return fs.readFileSync(path.join(process.cwd(), rel), 'utf-8');
+}
+
 describe('APK TOP pack', () => {
   beforeEach(() => {
     try {
@@ -503,6 +507,37 @@ describe('APK TOP pack', () => {
       pill.unmount();
     } finally {
       setLocale('ru');
+    }
+  });
+
+  it('волна 25: якоря низов на месте + посадка §75', () => {
+    const css = readCss('styles-native.css');
+    const i = css.indexOf('75. ANCHORED BOTTOMS');
+    expect(i).toBeGreaterThan(-1);
+    const block = css.slice(i, i + 3000);
+    const anchors: [string, string][] = [
+      ['src/ui/screens/NutritionScreen.tsx', 'nutrition-rt-toast'],
+      ['src/ui/screens/NutritionScreen_parts/NutritionDiary.tsx', 'nut-diary-toast'],
+      ['src/ui/screens/NutritionScreen_parts/NutritionDiary.tsx', 'nut-diary-fab'],
+      ['src/ui/screens/NutritionScreen_parts/RecipesTabModern.tsx', 'recipes-toast'],
+      ['src/ui/screens/SupportScreen_parts/SupportCatalogView.tsx', 'sup-catalog-toast'],
+      ['src/ui/screens/SupportScreen_parts/SymptomSolverTab.tsx', 'symptom-toast'],
+    ];
+    for (const [file, cls] of anchors) {
+      expect(block, cls).toContain(`.${cls}`);
+      const src = readSrc(file);
+      expect(src, `${file}#${cls}`).toContain(cls);
+    }
+    expect(block).toContain('safe-area-inset-bottom');
+    for (const line of block.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('/*') || t.startsWith('*')) continue;
+      if (!t.endsWith('{')) continue;
+      const sel = t.slice(0, -1).trim();
+      if (!sel || sel.startsWith('@')) continue;
+      for (const p of sel.split(',').map((s) => s.trim()).filter(Boolean)) {
+        expect(p.startsWith('html.app-native'), p).toBe(true);
+      }
     }
   });
 

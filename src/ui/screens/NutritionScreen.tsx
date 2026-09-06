@@ -567,7 +567,7 @@ const RestaurantTab: React.FC = () => {
   }, [filtered, portions]);
   const clearSelection = () => setPortions({});
   return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {rtToast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600 }}>{rtToast}</div>}
+      {rtToast && <div className="nutrition-rt-toast" style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600 }}>{rtToast}</div>}
       <ModernHero icon="🍽" title="Рестораны" subtitle="Фастфуд с точным КБЖУ — выбирай кухню, порцию и сразу в корзину или план. Порции не суммируются в фоне — считается только выбранное." count={restaurantDishes.length} stats={[
         { k:'Позиций', v: restaurantDishes.length, sub:'блюд', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
         { k:'Выбрано', v: totals.count, sub:'блюд', col: totals.count>0?'#00e68a':'rgba(255,255,255,0.3)', bg: totals.count>0?'rgba(0,230,138,0.08)':'rgba(255,255,255,0.03)' },

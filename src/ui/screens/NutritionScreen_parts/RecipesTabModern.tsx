@@ -453,7 +453,7 @@ export const RecipesTabModern: React.FC = () => {
           </div>
         </div>
       )}
-      {toast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:300, padding:'10px 16px', borderRadius:12, background:'#202023', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontSize:11, fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>{toast}</div>}
+      {toast && <div className="recipes-toast" style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:300, padding:'10px 16px', borderRadius:12, background:'#202023', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontSize:11, fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>{toast}</div>}
 
       {/* Create modal */}
       {showRecipeModal && (

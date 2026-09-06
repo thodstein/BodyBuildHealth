@@ -604,7 +604,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   return (
     <div className="food-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
-        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 999,
+        <div className="nut-diary-toast" style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 999,
           padding: '10px 24px', borderRadius: 14, background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.3)', color: '#fff', fontSize: 12, fontWeight: 600, letterSpacing: '-0.1px' }}>
           {toast}
@@ -945,7 +945,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         )}
       </div>
       {tab !== 'add' && (
-        <button onClick={()=>setTab('add')} aria-label="Быстро добавить" style={{ position:'fixed', bottom:20, right:20, width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', boxShadow:'0 6px 20px rgba(0,230,138,0.35)', fontSize:26, cursor:'pointer', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:700 }}>＋</button>
+        <button onClick={()=>setTab('add')} aria-label="Быстро добавить" className="nut-diary-fab" style={{ position:'fixed', bottom:20, right:20, width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', boxShadow:'0 6px 20px rgba(0,230,138,0.35)', fontSize:26, cursor:'pointer', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:700 }}>＋</button>
       )}
 
       {/* Modern popups */}
