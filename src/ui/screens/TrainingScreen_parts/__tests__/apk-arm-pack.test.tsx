@@ -10,7 +10,7 @@
  *    загрузчик CSS — no-op), в native — класс arm-apk + загрузка стилей.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
@@ -182,5 +182,51 @@ describe('APK arm pack', () => {
     const { container } = render(<ArmDiagnosticsHub />);
     const root = container.querySelector('.train-armdiag');
     expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
+  });
+
+  it('весь конструктор: 6 шагов рендерятся без падений (TG)', () => {
+    render(<ArmAutoConstructor />);
+    const steps: Array<[string, RegExp]> = [
+      ['🎛 Параметры', /Рабочие максимумы/],
+      ['✊ Хват', /Хват — диагностика/],
+      ['🗓 Сплит', /Выбор сплита/],
+      ['📋 План', /План не собран/],
+      ['📊 Качество', /Сначала собери план/],
+      ['🏋️ Веса', /Веса — детали/],
+    ];
+    for (const [tab, marker] of steps) {
+      fireEvent.click(screen.getByRole('button', { name: tab }));
+      expect(document.body.textContent, tab).toMatch(marker);
+    }
+    expect(document.querySelector('.train-arm')?.getAttribute('class')).toBe('train-arm');
+  });
+
+  it('весь хаб: 5 табов переключаются без падений (TG)', () => {
+    render(<ArmDiagnosticsHub />);
+    for (const name of [/✊ Хват/, /Кисть\/Ротация/, /Давление/, /⚡ Сила/, /Сухожилие/]) {
+      const btn = screen.getByRole('button', { name });
+      fireEvent.click(btn);
+      expect(btn.getAttribute('aria-pressed'), String(name)).toBe('true');
+    }
+    expect(document.querySelector("[data-arm='hub-head']"), 'hub head alive').not.toBeNull();
+  });
+
+  it('весь планировщик в native: класс arm-apk держится на всех шагах и табах', () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = {
+      isNativePlatform: () => true,
+    };
+    resetAppPlatformCache();
+    const c = render(<ArmAutoConstructor />);
+    for (const tab of ['🎛 Параметры', '✊ Хват', '🗓 Сплит', '📋 План', '📊 Качество', '🏋️ Веса']) {
+      fireEvent.click(screen.getByRole('button', { name: tab }));
+      expect(c.container.querySelector('.train-arm')?.classList.contains('arm-apk'), tab).toBe(true);
+    }
+    c.unmount();
+    cleanup();
+    const h = render(<ArmDiagnosticsHub />);
+    for (const name of [/✊ Хват/, /Кисть\/Ротация/, /Давление/, /⚡ Сила/, /Сухожилие/]) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      expect(h.container.querySelector('.train-armdiag')?.classList.contains('arm-apk'), String(name)).toBe(true);
+    }
   });
 });

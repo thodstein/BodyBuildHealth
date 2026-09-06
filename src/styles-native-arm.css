@@ -708,3 +708,37 @@ html.app-native .train-armdiag.arm-apk div[style*='auto-fit'] {
     animation: none !important;
   }
 }
+
+/* ─── 21. ДОВОДКА: video / файл-кнопка / ghost-экспорт / мини-бары ── */
+html.app-native .train-armdiag.arm-apk video {
+  border-radius: 16px !important;
+  border: 1px solid var(--arm-edge) !important;
+  background: rgb(0, 0, 0) !important;
+  max-height: 220px !important;
+  width: 100% !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-armdiag.arm-apk label:has(> input[type='file']) {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+html.app-native .train-arm.arm-apk button:active {
+  filter: brightness(1.12) !important;
+}
+
+html.app-native .train-armdiag.arm-apk button:active {
+  filter: brightness(1.12) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-bar='rt'] {
+  border-radius: 3px !important;
+  min-width: 3px !important;
+}
