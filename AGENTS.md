@@ -1,5 +1,18 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: PED-доводка до полного плана (Sep 06 2026, f23b537e pathspec 9 файлов, НЕ запушено)
+
+Закрыты все 6 пунктов аудита Доводки (P0 был цел; P1.6/P1.7-D/P2.9/P2.10/P2.12 не хватало). Полный bb **2036/2036 (178 файлов)**, tsc 0 по своим, UI TrainingScreen 654/655 + SRCBB 140/140 (1 чужой PL MesocycleProgressionCard).
+
+- **FST-7 7-in-1**: `applyVolumeScheme(plan, scheme, {fst7Seven})` — финишер получает 7 одним движением (legacy без флага 5+2 цел); exemptions точечно: redistribution/re removal/доноры щадят метку FST-7, set-cut очередь уже щадила; normalize/fit pre-scheme не трогают. Гейт в билдере (enhanced + !jointGuard + !solo, иначе даунгрейд до standard с честным actual в output). Матрицы не тронуты (intermediate → legacy). Тест 5+2 переписан под 7-in-1 осознанно.
+- **Соло-запрет**: fst7→standard + rest_pause→off (input) + autoAssign-флаг `soloInsulin` (rest_pause/myo_rep скип, dropset жив) + schemeFor dc_rp структурно недостижим без AAS (запинено тестом).
+- **Фаза вручную**: `phaseOverride` в recommend/builder/UI-селектор (только при обоих пептидах) + persist/restore/build.
+- **Авто-методика**: `suggestMethodologyForStack` (GH+INS→hyperemia, MGF→mountain_dog, конфликт→hyperemia) + UI авто-применение поверх дефолта + чип.
+- **MGF-слот**: реальный +1 памп (2 сета) в сессию без цели + dayMap-дни инъекций в rationale; сторожа (дозы, spec, deload, травмы, MRV, лимиты); строгим мышцам — только валидные дни, малым — любая сессия; limiter-pass2/removal щадят метку.
+- **DC-лайт**: `dcMode` + гейт (AAS≥750 + advanced/enhanced) + ротация-3 primary (`findPatternAlternative`, объём 1-в-1) + widowmaker добивочным 20-сетом в финализаторе пред-validation (builder-версия умирала под rep-переписчиками; пол-инвариант!) + круиз-каденс 6 + UI-тоггл/пресет/persist.
+- **Поймано**: stray-`</div>` в JSX (бисекция батчами через esbuild — парсер врал про строку); TDZ `peds` в useEffect (перенос за flash); tsc any-индекс (ReturnType-аннотация).
+- **NEW тесты**: bb-ped-gates 7 + bb-ped-round2 15. Чужие файлы не тронуты, НЕ ПУШИТЬ.
+
 ## ББ-авто: финал-5 закрыт — bb 2012/2012, ноль падений (Sep 06 2026, e08031a4 pathspec 4 файла, НЕ запушено)
 
 Остаток run5 (5 падений) разобран дампами до первопричин, все починены без NEW-логики. Полный bb **2012/2012 (175 файлов)**, tsc 0 по своим (чужие nutrition `dayCarbUses`-ошибки не тронуты), manual-constructor 49/49.
