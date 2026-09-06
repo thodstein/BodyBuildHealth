@@ -18,6 +18,7 @@ import { rirForWeek, phaseForWeek, pmForWeek } from './strength-sport-progressio
 import { tempoForSS, restForSS } from './strength-sport-loading';
 import { warmupRampFor } from './strength-sport-warmup';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
+import { SS_TAG_MUSCLES } from './strength-sport-day-types';
 import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER } from './strength-sport-taper.engine';
 import { applyDUP } from './strength-sport-dup';
 import { applyIntensity } from './strength-sport-intensity';
@@ -506,7 +507,9 @@ export function buildSSCyclePlan(
         week: w,
         sessionTag: d.tag,
         character: d.character,
+        focus: (SS_TAG_MUSCLES[d.tag] || []).join(', '),
         exercises,
+        durationMin: exercises.length * 12 + 10,
       } as StrengthSportSession);
     }
 

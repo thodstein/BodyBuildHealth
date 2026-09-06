@@ -68,5 +68,10 @@ export function buildAnnualFromSSCycles(
 }
 
 export function validateSSAnnual(annual: AnnualSS): { ok: boolean; warnings: string[]; errors: string[] } {
-  return validateAnnualSS(annual);
+  const base = validateAnnualSS(annual);
+  const warnings = [...base.warnings];
+  if (annual.totalWeeks > 52) {
+    warnings.push(`Год длиннее 52 недель: ${annual.totalWeeks} нед — урежьте блоки или разбейте на сезоны`);
+  }
+  return { ok: base.ok, warnings, errors: base.errors };
 }

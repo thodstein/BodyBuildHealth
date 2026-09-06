@@ -77,4 +77,13 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     fireEvent.click(chips[chips.length - 1]);
     await waitFor(() => expect(container.textContent).toContain('Год из циклов (2)'));
   });
+
+  it('превью показывает понедельную структуру до сборки', async () => {
+    const { container } = render(<StrengthSportConstructor />);
+    goToSplit(container);
+    fireEvent.click(screen.getByLabelText('Цикл'));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
+    await waitFor(() => expect(container.textContent).toContain('Н1·5д'));
+    expect(container.textContent).toContain('Н8·5д');
+  });
 });

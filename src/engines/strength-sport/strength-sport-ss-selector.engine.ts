@@ -28,6 +28,7 @@ export interface SSCycleScore {
   reasons: string[];
   blocked?: string; // причина блокировки (болгарский без согласия и т.п.)
   fallbackNote?: string; // предупреждение про фолбэк снарядов
+  weeksNote?: string; // честная пометка при расхождении длительности с запросом
 }
 
 const LEVEL_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, enhanced: 3 };
@@ -86,11 +87,17 @@ export function rankSSCycle(input: SSCycleRankInput): SSCycleScore[] {
       score -= 15;
       reasons.push('masters 40+: 6д/нед −15');
     }
-    // Недели
+    // Недели (+ честная пометка при сильном расхождении — план будет длиннее/короче запроса)
     const wDiff = Math.abs(m.weeks - input.weeks);
+    let weeksNote: string | undefined;
     if (wDiff === 0) { score += 15; reasons.push('недели 1-в-1 +15'); }
     else if (wDiff <= 2) { score -= 5; reasons.push(`недели ±${wDiff} −5`); }
-    else { score -= 20; reasons.push(`недели ${m.weeks} vs ${input.weeks} −20`); }
+    else {
+      score -= 20; reasons.push(`недели ${m.weeks} vs ${input.weeks} −20`);
+      weeksNote = m.weeks > input.weeks
+        ? `План длиннее запроса на ${wDiff} нед (возьмутся все ${m.weeks} нед цикла)`
+        : `План короче запроса на ${wDiff} нед (цикл ${m.weeks} нед — доберите блоком)`;
+    }
     // Снаряды
     let fallbackNote: string | undefined;
     if (m.needsSpecialty && !specialty) {
@@ -138,8 +145,20 @@ export function rankSSCycle(input: SSCycleRankInput): SSCycleScore[] {
         reasons.push('контест-якорь тейпер/mock +5');
       }
     }
+    // Цели масса/техника/поддержание: объём и характер (циклы силовые по построению — честная дифференциация)
+    if (input.goal === 'hypertrophy') {
+      let w1sets = 0;
+      try { for (const d of cycle.weeks[0]) for (const e of d.exercises) for (const s of e.sets) w1sets += s.sets; } catch { w1sets = 0; }
+      if (w1sets >= 60) { score += 8; reasons.push(`масса: объём нед.1 ${w1sets} сетов +8`); }
+    } else if (input.goal === 'technique') {
+      const hasTechDay = cycle.weeks.some(wk => wk.some(d => d.tag === 'technique_day' || d.character === 'памп'));
+      if (hasTechDay) { score += 8; reasons.push('техника: есть техничные дни +8'); }
+      if (m.bulgarian) { score -= 10; reasons.push('техника: daily-max −10'); }
+    } else if (input.goal === 'maintenance' && m.weeks <= 6) {
+      score += 8; reasons.push('поддержание: короткий цикл +8');
+    }
     const fit: SSCycleScore['fit'] = score >= 120 ? 'exact' : score >= 85 ? 'close' : 'stretch';
-    out.push({ cycle, score, fit, reasons, fallbackNote });
+    out.push({ cycle, score, fit, reasons, fallbackNote, weeksNote });
   }
   out.sort((a, b) => b.score - a.score);
   return out;

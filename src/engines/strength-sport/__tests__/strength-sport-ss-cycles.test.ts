@@ -435,3 +435,43 @@ describe('ss-export xlsx/ics', () => {
     expect(ics).toContain('2026');
   });
 });
+
+describe('ss-r5: сессии, селектор-цели, год-52, покрытие', () => {
+  it('сессии несут durationMin и focus (паритет с билдером)', () => {
+    const plan = buildSSCyclePlan('ss-ta-general-8', baseInput(), { cycleMode: 'faithful' });
+    const s = plan.weeksData[0].sessions[0];
+    expect(s.durationMin).toBe(s.exercises.length * 12 + 10);
+    expect(s.focus).toBeTruthy();
+  });
+  it('weeksNote при сильном расхождении длительности', () => {
+    const ranked = rankSSCycle({ mode: 'strongman', level: 'intermediate', daysPerWeek: 4, weeks: 16 });
+    const c531 = ranked.find(r => r.cycle.meta.id === 'ss-sm-531-4')!;
+    expect(c531.weeksNote).toMatch(/короче/);
+  });
+  it('цели масса/техника/поддержание дифференцируют', () => {
+    const hyp = rankSSCycle({ mode: 'weightlifting', level: 'intermediate', daysPerWeek: 5, weeks: 8, goal: 'hypertrophy' });
+    expect(hyp.find(r => r.cycle.meta.id === 'ss-ta-general-8')!.reasons.join(' ')).toMatch(/масса/);
+    const tech = rankSSCycle({ mode: 'weightlifting', level: 'intermediate', daysPerWeek: 5, weeks: 8, goal: 'technique' });
+    expect(tech.find(r => r.cycle.meta.id === 'ss-ta-general-8')!.reasons.join(' ')).toMatch(/техника/);
+    const maint = rankSSCycle({ mode: 'strongman', level: 'intermediate', daysPerWeek: 4, weeks: 4, goal: 'maintenance' });
+    expect(maint.find(r => r.cycle.meta.id === 'ss-sm-531-4')!.reasons.join(' ')).toMatch(/поддержание/);
+  });
+  it('год >52 недель — warning', () => {
+    const annual = buildAnnualFromSSCycles(
+      ['ss-sm-start-12', 'ss-sm-trio-12', 'ss-sm-cube-12', 'ss-ta-complete-12', 'ss-ta-soviet-8'],
+      baseInput(),
+    );
+    expect(annual.totalWeeks).toBeGreaterThan(52);
+    expect(validateSSAnnual(annual).warnings.join(' ')).toMatch(/52/);
+  });
+  it('библиотека покрывает режимы × уровни × длительности', () => {
+    const modes = new Set(SS_CYCLES.map(c => c.meta.mode));
+    expect(modes.has('weightlifting') && modes.has('strongman') && modes.has('hybrid')).toBe(true);
+    for (const lvl of ['beginner', 'intermediate', 'advanced', 'enhanced']) {
+      expect(SS_CYCLES.some(c => (c.meta.level as string[]).includes(lvl)), lvl).toBe(true);
+    }
+    expect(SS_CYCLES.some(c => c.meta.weeks <= 4)).toBe(true);
+    expect(SS_CYCLES.some(c => c.meta.weeks >= 5 && c.meta.weeks <= 8)).toBe(true);
+    expect(SS_CYCLES.some(c => c.meta.weeks >= 12)).toBe(true);
+  });
+});
