@@ -4511,7 +4511,67 @@ html.app-native[data-apk-accent='amber'] {
   html.app-native .sup-proto-glp1,
   html.app-native .sup-proto-hair,
   html.app-native .sup-proto-inj,
-  html.app-native .sup-proto-women {
+  html.app-native .sup-proto-women,
+  html.app-native .train-inteldash,
+  html.app-native .training-subnav-card {
     animation: none;
   }
+}
+
+/* ─── 68. TRAIN INTEL NAV ──────────────────────────────
+ * Только APK. Удобная навигация внутри «Интеллекта тренировки»:
+ * липкий поднав по категориям, современная подача дашборда,
+ * читаемая кнопка «назад», press-состояния. TG/web не тронуты. */
+html.app-native .training-subnav-card {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  backdrop-filter: blur(20px);
+  background: rgba(16, 31, 54, 0.72) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.app-native .training-subnav {
+  scrollbar-width: none;
+}
+
+html.app-native .training-subnav::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .training-subnav button:active {
+  transform: scale(0.94);
+}
+
+html.app-native .train-inteldash {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+html.app-native .train-inteldash > div {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-inteldash button:active {
+  transform: scale(0.97);
+}
+
+html.app-native .train-inteldash [style*='font-variant-numeric'],
+html.app-native .training-hero-stat-v,
+html.app-native .training-hero-stat-l {
+  font-variant-numeric: tabular-nums;
+}
+
+html.app-native .training-hero-zone:active {
+  transform: scale(0.98);
+}
+
+html.app-native .training-hero-zone:focus-visible,
+html.app-native .training-subnav button:focus-visible,
+html.app-native .train-inteldash button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
 }

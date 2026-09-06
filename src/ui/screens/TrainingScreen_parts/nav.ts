@@ -65,6 +65,13 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
       'intelligence_hub', 'strength_analysis', 'quality_hub', 'diagnostics_hub', 'arm_diagnostics_hub', 'wl_diagnostics_hub', 'strongman_diagnostics_hub', 'bb_diagnostics_hub', 'joints_ortho', 'periodization_taper_hub',
       'exercise_lab', 'volume_hub', 'tempo_hub', 'mix_hub', 'metabolic_hub',
     ],
+    categories: [
+      { label: 'Показатели', icon: 'chart', tabs: ['intelligence_hub', 'strength_analysis', 'metabolic_hub'] },
+      { label: 'Качество и диагностика', icon: 'shield', tabs: ['quality_hub', 'diagnostics_hub', 'arm_diagnostics_hub', 'wl_diagnostics_hub', 'strongman_diagnostics_hub', 'bb_diagnostics_hub', 'joints_ortho'] },
+      { label: 'Инструменты сборки', icon: 'layers', tabs: ['volume_hub', 'exercise_lab', 'tempo_hub'] },
+      { label: 'Периодизация', icon: 'target', tabs: ['periodization_taper_hub'] },
+      { label: 'Подготовка', icon: 'zap', tabs: ['mix_hub'] },
+    ],
   },
   library: {
     title: 'Библиотека',

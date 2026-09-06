@@ -722,7 +722,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
       )}
 
-      {zone && zone !== 'planner' && zone !== 'calculators' && (() => {
+      {zone && zone !== 'planner' && (() => {
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
@@ -889,7 +889,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           // Показываем конкретный инструмент с кнопкой назад
           const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', marginBottom: 6 };
           return (<>
-            <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
+            <button style={backBtnStyle} onClick={() => { hapticImpact('light'); setTab('runtime'); }}>← К дашборду</button>
             {effectiveTab === 'intelligence_hub' && <InfoErrorBoundary label="Интеллект — единый пульт"><UnifiedIntelligenceHub /></InfoErrorBoundary>}
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'norms' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}

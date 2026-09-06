@@ -88,4 +88,49 @@ describe('TrainingScreen native hero', () => {
     expect(trainAlpha('#a78bfa', '55')).toBe('#a78bfa55');
     expect(trainAlpha(TRAIN_ACCENT_VAR, '55')).toBe('rgba(var(--train-accent-rgb, 0,230,138), 0.333)');
   });
+
+  it('6. волна 11: hero «Интеллект» ведёт в дашборд, а не в runtime', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    const { container } = render(<TrainingScreen />);
+    const intel = container.querySelector(
+      '.training-hero-zone[data-zone="calculators"]',
+    ) as HTMLElement;
+    expect(intel).not.toBeNull();
+    fireEvent.click(intel);
+    // Дашборд интеллекта рендерится (заголовок), runtime-зона не открыта.
+    expect(screen.getAllByText(/Интеллект тренировки/).length).toBeGreaterThan(0);
+    expect(container.querySelector('.train-inteldash')).not.toBeNull();
+  });
+
+  it('7. волна 11: nav categories покрывают все 15 вкладок без дублей', async () => {
+    const { ZONES } = await import('../screens/TrainingScreen_parts/nav');
+    const calc = ZONES.calculators;
+    expect(calc.categories?.length).toBe(5);
+    const flat = (calc.categories ?? []).flatMap((c) => c.tabs);
+    expect(new Set(flat).size).toBe(flat.length);
+    expect(new Set(flat).size).toBe(calc.tabs.length);
+    for (const t of calc.tabs) expect(flat).toContain(t);
+  });
+
+  it('8. волна 11: поднав интеллекта с группами + «К дашборду» возвращается', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    const { container } = render(<TrainingScreen />);
+    const intel = container.querySelector(
+      '.training-hero-zone[data-zone="calculators"]',
+    ) as HTMLElement;
+    fireEvent.click(intel);
+    // Группы поднава на месте (5 категорий).
+    expect(container.querySelectorAll('.training-subnav-card').length).toBeGreaterThanOrEqual(5);
+    expect(screen.getAllByText('Показатели').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Качество и диагностика').length).toBeGreaterThanOrEqual(1);
+    // Уход в инструмент и возврат назад.
+    const strengthBtn = screen.getAllByText(/Анализ силы/)[0] as HTMLElement;
+    fireEvent.click(strengthBtn);
+    const back = screen.getAllByText(/К дашборду/)[0] as HTMLElement;
+    expect(back).not.toBeNull();
+    fireEvent.click(back);
+    expect(container.querySelector('.train-inteldash')).not.toBeNull();
+  });
 });
