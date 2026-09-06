@@ -3,11 +3,12 @@ import { MOCK_MARKETPLACE_DB, getBestPrice, generateAffiliateLink } from '../../
 import type { MarketplaceItem, PurchaseOption } from '../../core/types';
 import { isNativeApp } from '../../core/app-platform';
 import { NativeIcon } from '../native/NativeIcons';
+import { makeFill } from '../native/accent';
 
 /** Витринный акцент: в APK идёт за темой, в TG/web — фирменный минт. */
 const SHOP_ACC = 'var(--shop-accent, #00e68a)';
 const SHOP_RGB = 'var(--shop-accent-rgb, 0,230,138)';
-const shopA = (alpha: number): string => `rgba(${SHOP_RGB}, ${alpha})`;
+const shopA = makeFill(SHOP_RGB);
 
 type CategoryFilter = 'all' | 'pharma' | 'supplement' | 'vitamin';
 type SortMode = 'price' | 'category' | 'name';

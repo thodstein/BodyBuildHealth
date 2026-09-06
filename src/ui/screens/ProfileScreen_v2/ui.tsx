@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
+import { makeAlpha } from '../../native/accent';
 
 export const colors = {
   bg: 'rgba(28,28,32,0.65)',
@@ -40,12 +41,9 @@ export const colors = {
  * полупрозрачные производные идут через withAlpha(): для hex — та же
  * строка что раньше, для акцента — rgba() через rgb-триплет. */
 export const PROFILE_ACCENT_VAR = 'var(--profile-accent, #34d399)';
-const PROFILE_ACCENT_RGB_VAR = 'var(--profile-accent-rgb, 52, 211, 153)';
-export const withAlpha = (c: string, hexAlpha: string): string => {
-  if (c !== PROFILE_ACCENT_VAR) return `${c}${hexAlpha}`;
-  const a = Math.round((parseInt(hexAlpha, 16) / 255) * 1000) / 1000;
-  return `rgba(${PROFILE_ACCENT_RGB_VAR}, ${a})`;
-};
+export const PROFILE_ACCENT_RGB_VAR = 'var(--profile-accent-rgb, 52, 211, 153)';
+/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же). */
+export const withAlpha = makeAlpha(PROFILE_ACCENT_VAR, PROFILE_ACCENT_RGB_VAR);
 
 /* ── Enhanced Design System: Gradients, Animations, Glassmorphism ──────── */
 

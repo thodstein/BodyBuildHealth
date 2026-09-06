@@ -4,18 +4,15 @@
  */
 import type { TrainingTab } from './shared';
 import type { NativeIconName } from '../../native/NativeIcons';
+import { makeAlpha } from '../../native/accent';
 
 export type TrainingZone = 'planner' | 'training' | 'diary' | 'calculators' | 'library';
 
 /** Бренд-акцент зоны планировщика: в APK за темой, в TG/web — минт. */
 export const TRAIN_ACCENT_VAR = 'var(--train-accent, #00e68a)';
-const TRAIN_ACCENT_RGB = 'var(--train-accent-rgb, 0,230,138)';
-/** Hex — как было; акцент — rgba() через триплет. */
-export const trainAlpha = (c: string, hexAlpha: string): string => {
-  if (c !== TRAIN_ACCENT_VAR) return `${c}${hexAlpha}`;
-  const a = Math.round((parseInt(hexAlpha, 16) / 255) * 1000) / 1000;
-  return `rgba(${TRAIN_ACCENT_RGB}, ${a})`;
-};
+export const TRAIN_ACCENT_RGB = 'var(--train-accent-rgb, 0,230,138)';
+/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же). */
+export const trainAlpha = makeAlpha(TRAIN_ACCENT_VAR, TRAIN_ACCENT_RGB);
 
 export interface ZoneCategory { label: string; icon: NativeIconName; tabs: TrainingTab[]; }
 

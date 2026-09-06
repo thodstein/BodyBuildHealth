@@ -1,11 +1,12 @@
 
 import React from 'react';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
+import { makeFill } from '../../native/accent';
 
 /** Витринный акцент питания: в APK за темой, в TG/web — минт. */
 export const NUT_ACC = 'var(--nut-accent, #00e68a)';
 const NUT_RGB = 'var(--nut-accent-rgb, 0,230,138)';
-const nutA = (alpha: number): string => `rgba(${NUT_RGB}, ${alpha})`;
+const nutA = makeFill(NUT_RGB);
 
 /** Эмодзи витрин → SVG. Неизвестное — как было (совместимость). */
 const HERO_ICONS: Record<string, NativeIconName> = {

@@ -11,6 +11,7 @@ import { MarketplaceScreen } from '../screens/MarketplaceScreen';
 import { ArticlesScreen } from '../screens/ArticlesScreen';
 import { loadSavedArticles, toggleSavedArticle } from '../screens/ArticlesScreen';
 import { NativeIcon, NATIVE_ICON_NAMES } from '../native/NativeIcons';
+import { alphaWith, makeAlpha, makeFill } from '../native/accent';
 import { DiaryCard, DIARY_META } from '../screens/ProfileScreen_v2/diary-ui';
 import { REPORT_SOURCES } from '../screens/ProfileScreen_v2/ProfileReportsTab';
 import { SupportHomeView } from '../screens/SupportScreen_parts/SupportHomeView';
@@ -185,6 +186,21 @@ describe('SupportHomeView (волна 9)', () => {
   it('hero-карточки рендерят SVG, не эмодзи', () => {
     const { container } = render(<SupportHomeView s={{}} />);
     expect(container.querySelectorAll('.support-hero-card svg').length).toBe(3);
+  });
+});
+
+describe('accent.ts (единый мост)', () => {
+  it('alphaWith: hex — сквозной, var — rgba', () => {
+    expect(alphaWith('var(--x)', 'var(--x-rgb)', '#aabbcc', '44')).toBe('#aabbcc44');
+    expect(alphaWith('var(--x)', 'var(--x-rgb)', 'var(--x)', '44')).toBe('rgba(var(--x-rgb), 0.267)');
+  });
+
+  it('makeAlpha/makeFill — фабрики с тем же выхлопом', () => {
+    const wa = makeAlpha('var(--x)', 'var(--x-rgb)');
+    expect(wa('#112233', '22')).toBe('#11223322');
+    expect(wa('var(--x)', '22')).toBe('rgba(var(--x-rgb), 0.133)');
+    const fill = makeFill('var(--x-rgb)');
+    expect(fill(0.14)).toBe('rgba(var(--x-rgb), 0.14)');
   });
 });
 

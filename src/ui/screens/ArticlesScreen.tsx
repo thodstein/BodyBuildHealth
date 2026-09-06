@@ -3,11 +3,12 @@ import { HeroImg } from '../HeroImg';
 import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
 import { isNativeApp } from '../../core/app-platform';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
+import { makeFill } from '../native/accent';
 
 /** Читалка/хром за акцентом темы; категории — свои семантические цвета. */
 const ART_ACC = 'var(--article-accent, #00e68a)';
 const ART_RGB = 'var(--article-accent-rgb, 0,230,138)';
-const artA = (alpha: number): string => `rgba(${ART_RGB}, ${alpha})`;
+const artA = makeFill(ART_RGB);
 
 const SAVED_KEY = 'he_articles_saved_v1';
 
