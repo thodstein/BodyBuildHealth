@@ -66,6 +66,15 @@ describe('DashboardScreen platform branching', () => {
     expect(calls).toEqual(['profile']);
   });
 
+  it('2b. native → иконки трио — штриховые SVG (не эмодзи)', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    render(<DashboardScreen />);
+    const icons = document.querySelectorAll('.native-home-tile-icon svg');
+    expect(icons.length).toBe(3);
+    expect(document.querySelector('.native-home-tile-icon')?.textContent).not.toMatch(/👤|🛍|📚/);
+  });
+
   it('3. web/Telegram → классический hero без изменений (3 кнопки)', async () => {
     await resetPlatform();
     render(<DashboardScreen />);

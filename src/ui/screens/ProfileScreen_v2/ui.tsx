@@ -12,8 +12,8 @@ export const colors = {
   text: '#fff',
   textMuted: 'rgba(255,255,255,0.55)',
   textSubtle: 'rgba(255,255,255,0.35)',
-  primary: '#34d399',
-  primaryDim: 'rgba(52,211,153,0.15)',
+  primary: 'var(--profile-accent, #34d399)',
+  primaryDim: 'rgba(var(--profile-accent-rgb, 52, 211, 153), 0.15)',
   warning: '#f59e0b',
   warningDim: 'rgba(245,158,11,0.15)',
   danger: '#ef4444',
@@ -30,6 +30,21 @@ export const colors = {
   orangeDim: 'rgba(245,158,11,0.15)',
   teal: '#14b8a6',
   tealDim: 'rgba(20,184,166,0.15)',
+};
+
+/* ── Акцент темы в инлайн-стилях ────────────────────────────────────────
+ * colors.primary — это var(--profile-accent, #34d399): в APK мост
+ * styles-native.css (§62) кладёт туда системный --accent, в TG/web —
+ * фолбэк #34d399 (1-в-1, без изменений).
+ * Hex+alpha конкатенация (`${c}44`) с var() невалидна, поэтому ВСЕ
+ * полупрозрачные производные идут через withAlpha(): для hex — та же
+ * строка что раньше, для акцента — rgba() через rgb-триплет. */
+export const PROFILE_ACCENT_VAR = 'var(--profile-accent, #34d399)';
+const PROFILE_ACCENT_RGB_VAR = 'var(--profile-accent-rgb, 52, 211, 153)';
+export const withAlpha = (c: string, hexAlpha: string): string => {
+  if (c !== PROFILE_ACCENT_VAR) return `${c}${hexAlpha}`;
+  const a = Math.round((parseInt(hexAlpha, 16) / 255) * 1000) / 1000;
+  return `rgba(${PROFILE_ACCENT_RGB_VAR}, ${a})`;
 };
 
 /* ── Enhanced Design System: Gradients, Animations, Glassmorphism ──────── */
@@ -130,8 +145,8 @@ export const chip = (active: boolean, color: string): React.CSSProperties => ({
   padding: '0 12px',
   borderRadius: 999,
   cursor: 'pointer',
-  border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.1)'}`,
-  background: active ? `${color}1f` : 'transparent',
+  border: `1px solid ${active ? `${withAlpha(color, '55')}` : 'rgba(255,255,255,0.1)'}`,
+  background: active ? `${withAlpha(color, '1f')}` : 'transparent',
   color: active ? color : colors.textMuted,
   fontSize: 11.5,
   fontWeight: 500,
@@ -145,11 +160,11 @@ export const chipGlass = (active: boolean, color: string): React.CSSProperties =
   padding: '0 12px',
   borderRadius: 999,
   cursor: 'pointer',
-  border: `1px solid ${active ? `${color}66` : c.glassBorder}`,
-  background: active ? `${color}22` : c.glass,
+  border: `1px solid ${active ? `${withAlpha(color, '66')}` : c.glassBorder}`,
+  background: active ? `${withAlpha(color, '22')}` : c.glass,
   backdropFilter: 'blur(16px) saturate(180%)',
   WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-  boxShadow: active ? `0 2px 10px ${color}33, inset 0 1px 0 ${c.glassHighlight}` : `inset 0 1px 0 ${c.glassHighlight}`,
+  boxShadow: active ? `0 2px 10px ${withAlpha(color, '33')}, inset 0 1px 0 ${c.glassHighlight}` : `inset 0 1px 0 ${c.glassHighlight}`,
   color: active ? color : colors.textMuted,
   fontSize: 11.5,
   fontWeight: 500,
@@ -242,21 +257,21 @@ export const chartLine = (color: string, width = 2, dash?: string): React.CSSPro
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
   strokeDasharray: dash,
-  filter: `drop-shadow(0 2px 4px ${color}44)`,
+  filter: `drop-shadow(0 2px 4px ${withAlpha(color, '44')})`,
 });
 
 export const chartArea = (color: string, opacity = 0.15): React.CSSProperties => ({
   fill: color,
   fillOpacity: opacity,
-  filter: `drop-shadow(0 4px 12px ${color}33)`,
+  filter: `drop-shadow(0 4px 12px ${withAlpha(color, '33')})`,
 });
 
 export const glowRing = (color: string, size = 8): React.CSSProperties => ({
   width: size,
   height: size,
   borderRadius: '50%',
-  background: `radial-gradient(circle at 30% 30%, ${color}cc, ${color}33 60%, transparent 100%)`,
-  boxShadow: `0 0 ${size * 2}px ${color}66, inset 0 0 ${size}px ${color}44`,
+  background: `radial-gradient(circle at 30% 30%, ${withAlpha(color, 'cc')}, ${withAlpha(color, '33')} 60%, transparent 100%)`,
+  boxShadow: `0 0 ${size * 2}px ${withAlpha(color, '66')}, inset 0 0 ${size}px ${withAlpha(color, '44')}`,
 });
 
 export const flexCenter: React.CSSProperties = {
@@ -350,7 +365,7 @@ export const GroupHeader: React.FC<{ icon: string; title: string; color?: string
       <span aria-hidden="true" style={{
         width: 28, height: 28, borderRadius: 8, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, background: `${c}1f`, border: `1px solid ${c}40`,
+        fontSize: 14, background: `${withAlpha(c, '1f')}`, border: `1px solid ${withAlpha(c, '40')}`,
       }}>{icon}</span>
       <span style={{ fontSize: 12, fontWeight: 700, color: c, letterSpacing: 0.2 }}>{title}</span>
     </div>
@@ -471,11 +486,11 @@ export const BoolChip: React.FC<{
         fontWeight: 600,
         cursor: 'pointer',
         border: `1px solid ${checked ? c : colors.border}`,
-        background: checked ? `${c}22` : 'transparent',
+        background: checked ? `${withAlpha(c, '22')}` : 'transparent',
         color: checked ? c : colors.textMuted,
         transition: 'all 0.15s',
         minHeight: 34,
-        boxShadow: checked ? `0 2px 10px ${c}22` : 'none',
+        boxShadow: checked ? `0 2px 10px ${withAlpha(c, '22')}` : 'none',
       }}
     >
       {checked ? '✓ ' : ''}{label}
@@ -511,7 +526,7 @@ export const SliderInput: React.FC<{
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               fontSize: 11, fontWeight: 700, color: c,
-              background: `${c}1a`, border: `1px solid ${c}33`,
+              background: `${withAlpha(c, '1a')}`, border: `1px solid ${withAlpha(c, '33')}`,
               padding: '1px 8px', borderRadius: 8, minWidth: 36, textAlign: 'center',
             }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
           </span>
@@ -524,7 +539,7 @@ export const SliderInput: React.FC<{
         }} />
         <div style={{
           position: 'absolute', left: 0, width: `${pct}%`, height: 4, borderRadius: 2,
-          background: `linear-gradient(90deg, ${c}55, ${c})`,
+          background: `linear-gradient(90deg, ${withAlpha(c, '55')}, ${c})`,
         }} />
         <input
           type="range"
@@ -541,9 +556,9 @@ export const SliderInput: React.FC<{
         <div style={{
           position: 'absolute', left: `calc(${pct}% - 9px)`,
           width: 18, height: 18, borderRadius: '50%',
-          background: `radial-gradient(circle at 35% 30%, ${c}, ${c}cc)`,
+          background: `radial-gradient(circle at 35% 30%, ${c}, ${withAlpha(c, 'cc')})`,
           border: `2px solid ${c}`,
-          boxShadow: `0 0 0 4px ${c}2e, 0 2px 8px ${c}55`,
+          boxShadow: `0 0 0 4px ${withAlpha(c, '2e')}, 0 2px 8px ${withAlpha(c, '55')}`,
           pointerEvents: 'none',
           transition: 'left 0.1s',
         }} />
@@ -589,7 +604,7 @@ export const AccordionSection: React.FC<{
       {/* Акцентная полоса сверху в цвет секции */}
       <div aria-hidden="true" style={{
         height: 3, width: '100%',
-        background: `linear-gradient(90deg, ${c}, ${c}26 55%, transparent)`,
+        background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '26')} 55%, transparent)`,
       }} />
       <button
         type="button"
@@ -612,8 +627,8 @@ export const AccordionSection: React.FC<{
           <span aria-hidden="true" style={{
             width: 44, height: 44, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, background: `${c}22`, border: `1px solid ${c}44`,
-            boxShadow: `inset 0 0 14px ${c}1a`,
+            fontSize: 20, background: `${withAlpha(c, '22')}`, border: `1px solid ${withAlpha(c, '44')}`,
+            boxShadow: `inset 0 0 14px ${withAlpha(c, '1a')}`,
           }}>{icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -621,8 +636,8 @@ export const AccordionSection: React.FC<{
             <span style={{ fontSize: 15, fontWeight: 800, color: c, letterSpacing: -0.2 }}>{title}</span>
             {badge && (
               <span style={{
-                fontSize: 10, fontWeight: 700, color: c, background: `${c}22`,
-                padding: '2px 8px', borderRadius: 8, border: `1px solid ${c}33`,
+                fontSize: 10, fontWeight: 700, color: c, background: `${withAlpha(c, '22')}`,
+                padding: '2px 8px', borderRadius: 8, border: `1px solid ${withAlpha(c, '33')}`,
                 whiteSpace: 'nowrap',
               }}>{badge}</span>
             )}
@@ -632,7 +647,7 @@ export const AccordionSection: React.FC<{
         <span style={{
           width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: open ? `${c}22` : 'rgba(255,255,255,0.05)',
+          background: open ? `${withAlpha(c, '22')}` : 'rgba(255,255,255,0.05)',
           fontSize: 13, color: open ? c : colors.textMuted,
           transition: 'transform 0.2s',
           transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -814,8 +829,8 @@ export const PopupValueEditor: React.FC<{
           position: 'relative',
           background: 'rgba(255,255,255,0.05)',
           borderRadius: 12,
-          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
-          boxShadow: hasValue ? `0 2px 14px ${c}14` : 'none',
+          border: `1px solid ${hasValue ? `${withAlpha(c, '44')}` : colors.border}`,
+          boxShadow: hasValue ? `0 2px 14px ${withAlpha(c, '14')}` : 'none',
           padding: '10px 34px 10px 12px',
           cursor: 'pointer',
           display: 'flex',
@@ -830,11 +845,11 @@ export const PopupValueEditor: React.FC<{
           transition: 'all 0.15s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = `${c}66`;
+          e.currentTarget.style.borderColor = `${withAlpha(c, '66')}`;
           e.currentTarget.style.transform = 'translateY(-1px)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = hasValue ? `${c}44` : colors.border;
+          e.currentTarget.style.borderColor = hasValue ? `${withAlpha(c, '44')}` : colors.border;
           e.currentTarget.style.transform = 'translateY(0)';
         }}
       >
@@ -853,8 +868,8 @@ export const PopupValueEditor: React.FC<{
           position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
           width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hasValue ? `${c}22` : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
+          background: hasValue ? `${withAlpha(c, '22')}` : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${hasValue ? `${withAlpha(c, '44')}` : colors.border}`,
           color: hasValue ? c : colors.textSubtle, fontSize: 9,
         }}>✎</span>
       </button>
@@ -880,7 +895,7 @@ export const PopupValueEditor: React.FC<{
               maxHeight: '82vh',
               display: 'flex', flexDirection: 'column',
               background: 'linear-gradient(180deg, #202026, #16161a)',
-              border: `1px solid ${c}2e`, borderBottom: 'none',
+              border: `1px solid ${withAlpha(c, '2e')}`, borderBottom: 'none',
               borderRadius: '22px 22px 0 0',
               boxShadow: '0 -12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
               animation: 'pve-sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -888,7 +903,7 @@ export const PopupValueEditor: React.FC<{
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${c}26 70%, transparent)` }} />
+            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '26')} 70%, transparent)` }} />
             <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
               <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.16)' }} />
             </div>
@@ -896,8 +911,8 @@ export const PopupValueEditor: React.FC<{
               <span aria-hidden="true" style={{
                 width: 34, height: 34, borderRadius: 11, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `linear-gradient(135deg, ${c}2e, ${c}14)`,
-                border: `1px solid ${c}44`, fontSize: 15, color: c,
+                background: `linear-gradient(135deg, ${withAlpha(c, '2e')}, ${withAlpha(c, '14')})`,
+                border: `1px solid ${withAlpha(c, '44')}`, fontSize: 15, color: c,
               }}>{type === 'select' ? '✓' : type === 'number' ? '#' : '✎'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: colors.text, letterSpacing: -0.2 }}>{label}</div>
@@ -968,9 +983,9 @@ export const PopupValueEditor: React.FC<{
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
                         padding: '10px 12px', borderRadius: 12, cursor: 'pointer', marginBottom: 6,
-                        background: sel ? `linear-gradient(135deg, ${c}22, ${c}0d)` : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${sel ? `${c}55` : colors.border}`,
-                        boxShadow: sel ? `0 2px 12px ${c}1f` : 'none',
+                        background: sel ? `linear-gradient(135deg, ${withAlpha(c, '22')}, ${withAlpha(c, '0d')})` : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${sel ? `${withAlpha(c, '55')}` : colors.border}`,
+                        boxShadow: sel ? `0 2px 12px ${withAlpha(c, '1f')}` : 'none',
                         transition: 'all 0.15s', color: colors.text, minHeight: 46,
                         animation: 'pve-row-in 0.22s ease both',
                         animationDelay: `${Math.min(i * 18, 216)}ms`,
@@ -981,7 +996,7 @@ export const PopupValueEditor: React.FC<{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: `2px solid ${sel ? c : 'rgba(255,255,255,0.22)'}`,
                         background: sel ? c : 'transparent',
-                        boxShadow: sel ? `0 0 0 4px ${c}22` : 'none',
+                        boxShadow: sel ? `0 0 0 4px ${withAlpha(c, '22')}` : 'none',
                         transition: 'all 0.15s',
                       }}>
                         {sel && <span style={{ color: '#000', fontSize: 10, fontWeight: 900 }}>✓</span>}
@@ -1002,7 +1017,7 @@ export const PopupValueEditor: React.FC<{
                       {sel && (
                         <span style={{
                           fontSize: 10, color: c, fontWeight: 700, flexShrink: 0,
-                          background: `${c}1a`, border: `1px solid ${c}33`,
+                          background: `${withAlpha(c, '1a')}`, border: `1px solid ${withAlpha(c, '33')}`,
                           padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap',
                         }}>текущее</span>
                       )}
@@ -1102,10 +1117,10 @@ export const PopupValueEditor: React.FC<{
                   <button
                     onClick={commit}
                     style={{
-                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${c}bb)`,
+                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${withAlpha(c, 'bb')})`,
                       border: `1px solid ${c}`,
                       color: '#000', cursor: 'pointer', fontWeight: 700,
-                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${c}3d`,
+                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
                     }}
                   >Сохранить</button>
                 </div>
@@ -1150,10 +1165,10 @@ export const PopupValueEditor: React.FC<{
                   <button
                     onClick={commit}
                     style={{
-                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${c}bb)`,
+                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${withAlpha(c, 'bb')})`,
                       border: `1px solid ${c}`,
                       color: '#000', cursor: 'pointer', fontWeight: 700,
-                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${c}3d`,
+                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
                     }}
                   >Сохранить</button>
                 </div>

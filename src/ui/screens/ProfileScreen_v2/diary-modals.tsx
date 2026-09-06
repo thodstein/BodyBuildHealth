@@ -12,7 +12,7 @@
  * Public API (open/onClose/onSave и экспорты) сохранён для обратной совместимости.
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { colors, BoolChip } from './ui';
+import { colors, BoolChip, withAlpha } from './ui';
 import { todayIso } from './diary-helpers';
 import { getWeightLog } from '../../../engines/profile-store';
 import { readDiaryEntries as readDiaryEntriesFromStorage } from '../../../engines/diary-storage';
@@ -143,11 +143,11 @@ export const btnPrimary = (color: string): React.CSSProperties => ({
   borderRadius: 14,
   fontSize: 13,
   fontWeight: 800,
-  background: `linear-gradient(135deg, ${color}, ${color}99)`,
+  background: `linear-gradient(135deg, ${color}, ${withAlpha(color, '99')})`,
   color: '#08120c',
   border: 'none',
   cursor: 'pointer',
-  boxShadow: `0 5px 18px ${color}38, inset 0 1px 0 rgba(255,255,255,0.32)`,
+  boxShadow: `0 5px 18px ${withAlpha(color, '38')}, inset 0 1px 0 rgba(255,255,255,0.32)`,
   transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
 });
 export const btnGhost: React.CSSProperties = {
@@ -313,8 +313,8 @@ export const SectionCard: React.FC<{
     className="diary-section"
     style={{
       borderRadius: 18,
-      background: `linear-gradient(180deg, ${color}14, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
-      border: `1px solid ${color}34`,
+      background: `linear-gradient(180deg, ${withAlpha(color, '14')}, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
+      border: `1px solid ${withAlpha(color, '34')}`,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 0 rgba(0,0,0,0.2)`,
       padding: 16,
       marginBottom: 12,
@@ -332,7 +332,7 @@ export const SectionCard: React.FC<{
         width: 150,
         height: 150,
         borderRadius: '50%',
-        background: `radial-gradient(circle, ${color}22, transparent 70%)`,
+        background: `radial-gradient(circle, ${withAlpha(color, '22')}, transparent 70%)`,
         pointerEvents: 'none',
       }}
     />
@@ -348,9 +348,9 @@ export const SectionCard: React.FC<{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: `linear-gradient(135deg, ${color}40, ${color}14)`,
-            border: `1px solid ${color}50`,
-            boxShadow: `0 3px 10px ${color}26, inset 0 1px 0 rgba(255,255,255,0.14)`,
+            background: `linear-gradient(135deg, ${withAlpha(color, '40')}, ${withAlpha(color, '14')})`,
+            border: `1px solid ${withAlpha(color, '50')}`,
+            boxShadow: `0 3px 10px ${withAlpha(color, '26')}, inset 0 1px 0 rgba(255,255,255,0.14)`,
             flexShrink: 0,
             lineHeight: 1,
           }}
@@ -362,9 +362,9 @@ export const SectionCard: React.FC<{
       {badge && (
         <span
           style={{
-        fontSize: 11, fontWeight: 800, color, background: `${color}2c`,
+        fontSize: 11, fontWeight: 800, color, background: `${withAlpha(color, '2c')}`,
         padding: '3px 10px', borderRadius: 999, marginLeft: 'auto',
-        border: `1px solid ${color}50`,
+        border: `1px solid ${withAlpha(color, '50')}`,
           }}
         >
           {badge}
@@ -382,10 +382,10 @@ export const LiveBadge: React.FC<{ color: string; icon?: string; children: React
     style={{
       display: 'inline-flex', alignItems: 'center', gap: 7,
       fontSize: 12, fontWeight: 800, color,
-      background: `linear-gradient(135deg, ${color}2c, ${color}12)`,
-      border: `1px solid ${color}5c`,
+      background: `linear-gradient(135deg, ${withAlpha(color, '2c')}, ${withAlpha(color, '12')})`,
+      border: `1px solid ${withAlpha(color, '5c')}`,
       borderRadius: 999, padding: '7px 16px',
-      boxShadow: `0 4px 14px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.12)`,
+      boxShadow: `0 4px 14px ${withAlpha(color, '2e')}, inset 0 1px 0 rgba(255,255,255,0.12)`,
       animation: 'diary-badge-in 0.25s ease-out',
     }}
   >
@@ -517,11 +517,11 @@ export const ScalePicker: React.FC<{
               fontSize: dense ? 11 : 12,
               fontWeight: 800,
               border: `1px solid ${active ? c : 'rgba(255,255,255,0.1)'}`,
-              background: active ? `${c}32` : 'rgba(255,255,255,0.035)',
+              background: active ? `${withAlpha(c, '32')}` : 'rgba(255,255,255,0.035)',
               color: active ? c : colors.textMuted,
               transition: 'all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1)',
               transform: active ? 'translateY(-2px) scale(1.05)' : undefined,
-              boxShadow: active ? `0 5px 18px ${c}52, inset 0 1px 0 rgba(255,255,255,0.16)` : undefined,
+              boxShadow: active ? `0 5px 18px ${withAlpha(c, '52')}, inset 0 1px 0 rgba(255,255,255,0.16)` : undefined,
             }}
           >
             {labels ? labels(v) : v}
@@ -672,9 +672,9 @@ export const ChipGroup: React.FC<{
               fontWeight: 700,
               textAlign: 'left',
               border: `1px solid ${on ? c : 'rgba(255,255,255,0.1)'}`,
-              background: on ? `${c}2e` : 'rgba(255,255,255,0.04)',
+              background: on ? `${withAlpha(c, '2e')}` : 'rgba(255,255,255,0.04)',
               color: on ? c : colors.textMuted,
-              boxShadow: on ? `0 3px 14px ${c}36` : undefined,
+              boxShadow: on ? `0 3px 14px ${withAlpha(c, '36')}` : undefined,
               transition: 'all 0.15s',
             }}
           >
@@ -736,7 +736,7 @@ export const TextField: React.FC<{
           style={{
             ...fieldInput,
             colorScheme: 'dark',
-            borderColor: invalid ? '#ef444466' : accent ? `${accent}66` : undefined,
+            borderColor: invalid ? '#ef444466' : accent ? `${withAlpha(accent, '66')}` : undefined,
             boxShadow: invalid ? '0 0 0 3px rgba(239,68,68,0.12)' : undefined,
             paddingRight: unit || invalid ? 30 : 12,
           }}
@@ -821,11 +821,11 @@ export const DiaryModalShell: React.FC<{
           50% { transform: translate(14px, -10px) scale(1.18); opacity: 1; }
         }
         .dm-overlay { animation: dm-fade-in 0.2s ease-out; }
-        .dm-body { scrollbar-width: thin; scrollbar-color: ${color}55 transparent; }
+        .dm-body { scrollbar-width: thin; scrollbar-color: ${withAlpha(color, '55')} transparent; }
         .dm-body::-webkit-scrollbar { width: 6px; }
         .dm-body::-webkit-scrollbar-track { background: transparent; }
-        .dm-body::-webkit-scrollbar-thumb { background: ${color}44; border-radius: 999px; }
-        .dm-body::-webkit-scrollbar-thumb:hover { background: ${color}77; }
+        .dm-body::-webkit-scrollbar-thumb { background: ${withAlpha(color, '44')}; border-radius: 999px; }
+        .dm-body::-webkit-scrollbar-thumb:hover { background: ${withAlpha(color, '77')}; }
         .dm-card input, .dm-card select, .dm-card textarea {
           transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
         }
@@ -836,9 +836,9 @@ export const DiaryModalShell: React.FC<{
         }
         .dm-card button:focus-visible { outline: 2px solid rgba(0,230,138,0.55); outline-offset: 2px; }
         .dm-card .dm-icon-box {
-          background: linear-gradient(135deg, ${color}3c, ${color}14);
-          border: 1px solid ${color}5c;
-          box-shadow: 0 6px 18px ${color}30, inset 0 1px 0 rgba(255,255,255,0.16);
+          background: linear-gradient(135deg, ${withAlpha(color, '3c')}, ${withAlpha(color, '14')});
+          border: 1px solid ${withAlpha(color, '5c')};
+          box-shadow: 0 6px 18px ${withAlpha(color, '30')}, inset 0 1px 0 rgba(255,255,255,0.16);
         }
         .dm-card .dm-close-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .dm-card .dm-ghost-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); }
@@ -882,12 +882,12 @@ export const DiaryModalShell: React.FC<{
             margin: 'auto',
             background:
               'linear-gradient(165deg, rgba(36,36,48,0.98), rgba(19,19,26,0.98) 55%, rgba(13,13,18,0.99))',
-            border: `1px solid ${color}42`,
+            border: `1px solid ${withAlpha(color, '42')}`,
             borderRadius: 26,
             padding: 0,
             color: colors.text,
             animation: 'dm-pop 0.22s cubic-bezier(0.32, 0.72, 0.28, 1)',
-            boxShadow: `0 0 0 1px ${color}14, 0 30px 90px rgba(0,0,0,0.68), 0 0 60px ${color}1a, inset 0 1px 0 rgba(255,255,255,0.09)`,
+            boxShadow: `0 0 0 1px ${withAlpha(color, '14')}, 0 30px 90px rgba(0,0,0,0.68), 0 0 60px ${withAlpha(color, '1a')}, inset 0 1px 0 rgba(255,255,255,0.09)`,
           }}
         >
           <form
@@ -919,7 +919,7 @@ export const DiaryModalShell: React.FC<{
                 width: 200,
                 height: 200,
                 borderRadius: '50%',
-                background: `radial-gradient(circle, ${color}26, transparent 70%)`,
+                background: `radial-gradient(circle, ${withAlpha(color, '26')}, transparent 70%)`,
                 filter: 'blur(24px)',
                 pointerEvents: 'none',
                 animation: 'dm-aurora 6s ease-in-out infinite',
@@ -929,8 +929,8 @@ export const DiaryModalShell: React.FC<{
               style={{
                 padding: '18px 20px',
                 borderRadius: '26px 26px 0 0',
-                background: `linear-gradient(135deg, ${color}2e, ${color}10 45%, transparent)`,
-                borderBottom: `1px solid ${color}24`,
+                background: `linear-gradient(135deg, ${withAlpha(color, '2e')}, ${withAlpha(color, '10')} 45%, transparent)`,
+                borderBottom: `1px solid ${withAlpha(color, '24')}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 13,
@@ -1015,7 +1015,7 @@ export const DiaryModalShell: React.FC<{
             </div>
             <div className="dm-body" style={{ padding: 18, overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
             {footer ?? (
-              <div style={{ display: 'flex', gap: 10, padding: '16px 20px 20px', borderTop: `1px solid ${color}24`, flexShrink: 0, background: 'rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '16px 20px 20px', borderTop: `1px solid ${withAlpha(color, '24')}`, flexShrink: 0, background: 'rgba(0,0,0,0.2)' }}>
                 {fill && fill.total > 0 && (
                   <div
                     title={`Заполнено ${fill.current}/${fill.total}`}
@@ -1029,7 +1029,7 @@ export const DiaryModalShell: React.FC<{
                           height: '100%',
                           width: `${Math.min(100, (fill.current / fill.total) * 100)}%`,
                           borderRadius: 999,
-                          background: `linear-gradient(90deg, ${color}88, ${color})`,
+                          background: `linear-gradient(90deg, ${withAlpha(color, '88')}, ${color})`,
                           transition: 'width 0.35s cubic-bezier(0.32, 0.72, 0.28, 1)',
                         }}
                       />

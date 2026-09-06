@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { colors } from '../../ui';
+import { colors, withAlpha } from '../../ui';
 import { AddHealthModal } from '../../health-diary-modal';
 import {
   btnBase,
@@ -267,7 +267,7 @@ const FieldGroup: React.FC<{ title: string; color?: string; children: React.Reac
   color = colors.primary,
   children,
 }) => (
-  <section style={{ ...card, marginBottom: 10, borderColor: `${color}55` }}>
+  <section style={{ ...card, marginBottom: 10, borderColor: `${withAlpha(color, '55')}` }}>
     <h3 style={{ margin: '0 0 9px', fontSize: 13, color }}>{title}</h3>
     {children}
   </section>
@@ -292,7 +292,7 @@ const ToggleGrid: React.FC<{
             minHeight: 44,
             textAlign: 'left',
             borderColor: active ? color : 'rgba(255,255,255,0.12)',
-            background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+            background: active ? `${withAlpha(color, '22')}` : 'rgba(255,255,255,0.04)',
             color: active ? color : colors.text,
           }}
         >

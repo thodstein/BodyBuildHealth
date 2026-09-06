@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { colors } from './ui';
+import { colors, withAlpha } from './ui';
 import type { DiaryKey } from './diary-helpers';
 
 /* ── Цветовые токены для дневников ───────────────────────────────────────── */
@@ -57,14 +57,14 @@ export const cardStyles = {
     overflow: 'hidden',
   } as React.CSSProperties,
   stale: (color: string) => ({
-    background: `linear-gradient(135deg, ${color}14, transparent)`,
-    border: `1px solid ${color}77`,
+    background: `linear-gradient(135deg, ${withAlpha(color, '14')}, transparent)`,
+    border: `1px solid ${withAlpha(color, '77')}`,
     borderLeft: `3px solid ${color}`,
-    boxShadow: `0 4px 14px ${color}22, 0 2px 8px rgba(0,0,0,0.3)`,
+    boxShadow: `0 4px 14px ${withAlpha(color, '22')}, 0 2px 8px rgba(0,0,0,0.3)`,
   } as React.CSSProperties),
   normal: (color: string) => ({
     background: 'rgba(28,28,32,0.85)',
-    border: `1px solid ${color}44`,
+    border: `1px solid ${withAlpha(color, '44')}`,
     borderLeft: `3px solid ${color}`,
     boxShadow: '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
   } as React.CSSProperties),
@@ -89,12 +89,12 @@ export const iconBadge = (color: string, _diaryKey?: string) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: `${color}22`,
-  border: `1px solid ${color}44`,
+  background: `${withAlpha(color, '22')}`,
+  border: `1px solid ${withAlpha(color, '44')}`,
   fontSize: 20,
   lineHeight: 1,
   flexShrink: 0,
-  boxShadow: `0 2px 10px ${color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
+  boxShadow: `0 2px 10px ${withAlpha(color, '18')}, inset 0 1px 0 rgba(255,255,255,0.06)`,
 } as React.CSSProperties);
 
 /* ── Статус-чипы (заполнено/сегодня/устарело) ────────────────────────────── */
@@ -104,7 +104,7 @@ export const statusChip = (color: string, filled: boolean) => ({
   height: 32,
   borderRadius: 8,
   cursor: 'pointer',
-  background: filled ? `${color}33` : 'rgba(255,255,255,0.04)',
+  background: filled ? `${withAlpha(color, '33')}` : 'rgba(255,255,255,0.04)',
   border: `1px solid ${filled ? color : 'rgba(255,255,255,0.08)'}`,
   display: 'flex',
   alignItems: 'center',
@@ -123,7 +123,7 @@ export const progressBar = (status: 'met' | 'exceeded' | 'below' | undefined, co
     status === 'met' ? `linear-gradient(180deg, #22c55e, #16a34a)` :
     status === 'exceeded' ? `linear-gradient(180deg, #4ade80, #22c55e)` :
     status === 'below' ? `linear-gradient(180deg, #f59e0b, #d97706)` :
-    `linear-gradient(180deg, ${color}, ${color}dd)`,
+    `linear-gradient(180deg, ${color}, ${withAlpha(color, 'dd')})`,
   opacity: 0.9,
 } as React.CSSProperties);
 
@@ -163,11 +163,11 @@ export const btnPrimary = (color: string) => ({
   borderRadius: 14,
   fontSize: 13,
   fontWeight: 800,
-  background: `linear-gradient(135deg, ${color}, ${color}99)`,
+  background: `linear-gradient(135deg, ${color}, ${withAlpha(color, '99')})`,
   color: '#08120c',
   border: 'none',
   cursor: 'pointer',
-  boxShadow: `0 5px 18px ${color}38, inset 0 1px 0 rgba(255,255,255,0.32)`,
+  boxShadow: `0 5px 18px ${withAlpha(color, '38')}, inset 0 1px 0 rgba(255,255,255,0.32)`,
   transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
 } as React.CSSProperties);
 
@@ -240,8 +240,8 @@ export const SectionCard: React.FC<SectionCardProps> = ({
     className="diary-section"
     style={{
       borderRadius: 18,
-      background: `linear-gradient(180deg, ${color}14, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
-      border: `1px solid ${color}34`,
+      background: `linear-gradient(180deg, ${withAlpha(color, '14')}, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
+      border: `1px solid ${withAlpha(color, '34')}`,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 0 rgba(0,0,0,0.2)`,
       padding: 16,
       marginBottom: 12,
@@ -253,7 +253,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
       {icon && <span style={{ fontSize: 18, display: 'inline-block', lineHeight: 1 }}>{icon}</span>}
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</h3>
-      {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: `${color}33`, color }}>{badge}</span>}
+      {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: `${withAlpha(color, '33')}`, color }}>{badge}</span>}
     </div>
     {hint && <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 10 }}>{hint}</div>}
     {children}

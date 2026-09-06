@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
+import { colors, glassCard, inputStyle, labelStyle, selectStyle, withAlpha } from '../../ui';
 import { btnBase, btnPrimary, chip, chipActive, main as pageMain } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
 import {
@@ -114,8 +114,8 @@ const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }>
   value,
   tone = colors.primary,
 }) => (
-  <div className="diary-card" style={{ ...card, minWidth: 138, flex: '1 1 138px', background: `linear-gradient(135deg, ${tone}14, transparent 70%), rgba(28,28,32,0.72)`, borderLeft: `2px solid ${tone}88`, position: 'relative', overflow: 'hidden' }}>
-    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${tone}12, transparent 62%)`, pointerEvents: 'none' }} />
+    <div className="diary-card" style={{ ...card, minWidth: 138, flex: '1 1 138px', background: `linear-gradient(135deg, ${withAlpha(tone, '14')}, transparent 70%), rgba(28,28,32,0.72)`, borderLeft: `2px solid ${withAlpha(tone, '88')}`, position: 'relative', overflow: 'hidden' }}>
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${withAlpha(tone, '12')}, transparent 62%)`, pointerEvents: 'none' }} />
     <div style={{ ...labelStyle, marginBottom: 6, position: 'relative', color: 'rgba(255,255,255,0.44)', fontWeight: 700, letterSpacing: '0.5px' }}>{label}</div>
     <strong style={{ fontSize: 21, color: tone, position: 'relative', letterSpacing: '-0.3px' }}>{value}</strong>
   </div>

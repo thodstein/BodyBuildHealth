@@ -4112,6 +4112,43 @@ html.app-native .sup-proto-women {
   animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1);
 }
 
+/* ─── 62. HOME HERO FULL + TRIO SVG + PROFILE ACCENT ────────────
+ * Только APK. TG/web не затрагиваются (все селекторы под html.app-native,
+ * TSX-классика и HeroImg не меняются).
+ * 62.1 hero Главной: картинка целиком с верхней части (contain, без дрифта).
+ * 62.2 иконки трио — штриховые SVG в цвете акцента (эмодзи убраны из TSX).
+ * 62.3 мост акцента в Профиль: primary инлайн-стилей идёт за --accent. */
+
+/* 62.3 Мост: ProfileScreen_v2 colors.primary = var(--profile-accent). */
+html.app-native {
+  --profile-accent: var(--accent);
+  --profile-accent-rgb: var(--accent-rgb);
+}
+
+/* 62.1 Hero Главной виден полностью: верх картинки не режется. */
+html.app-native .native-home-bg img {
+  object-fit: contain !important;
+  object-position: center top !important;
+  animation: none !important;
+}
+
+html.app-native .native-home-shade {
+  background:
+    linear-gradient(180deg, rgba(5, 11, 22, 0.28) 0%, rgba(5, 11, 22, 0.02) 32%, rgba(5, 11, 22, 0.55) 62%, rgba(5, 11, 22, 0.96) 100%) !important;
+}
+
+/* 62.2 Трио: SVG 34px в цвете акцента вместо эмодзи. */
+html.app-native .native-home-tile-icon {
+  color: var(--accent);
+}
+
+html.app-native .native-home-tile-icon svg {
+  width: 34px;
+  height: 34px;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(var(--accent-rgb), 0.35));
+}
+
 /* ─── 59. APK DYNAMIC COLOR — акцент поверх var-изированных токенов ──
  * Дефолт (без атрибута) — лайм. Весь слой уже сидит на var(--accent) /
  * var(--accent-2) / --accent-rgb, поэтому переключение мгновенное и полное.

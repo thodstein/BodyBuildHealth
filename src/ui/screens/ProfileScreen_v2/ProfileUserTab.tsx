@@ -12,7 +12,7 @@ import { UserGoalsSection } from './sections/UserGoalsSection';
 import { TrainingProfileSection } from './sections/TrainingProfileSection';
 import { TrainingPMSection } from './sections/TrainingPMSection';
 import { TrainingWeakPointsSection } from './sections/TrainingWeakPointsSection';
-import { colors } from './ui';
+import { colors, withAlpha } from './ui';
 
 const JUMP_LINKS = [
   { id: '1-1', icon: '👤', label: 'Основное' },
@@ -86,8 +86,8 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
                   borderRadius: 16,
                   fontSize: 11,
                   fontWeight: 600,
-                  border: `1px solid ${c}55`,
-                  background: `${c}12`,
+                  border: `1px solid ${withAlpha(c, '55')}`,
+                  background: `${withAlpha(c, '12')}`,
                   color: c,
                   cursor: 'pointer',
                   minHeight: 32,
@@ -98,11 +98,11 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `${c}26`;
+                  e.currentTarget.style.background = `${withAlpha(c, '26')}`;
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = `${c}12`;
+                  e.currentTarget.style.background = `${withAlpha(c, '12')}`;
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >

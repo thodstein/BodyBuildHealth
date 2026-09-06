@@ -3,7 +3,7 @@
  * Стекло + акцентная полоска, единая типографика, меню экспорта — стекло.
  */
 import React, { useState } from 'react';
-import { colors } from '../ui';
+import { colors, withAlpha } from '../ui';
 import { btnBase, btnPrimary, btnGhost, menuItem } from './diary-page-styles';
 
 export interface DiaryHeaderAction {
@@ -78,7 +78,7 @@ export const DiaryHeader: React.FC<{
           left: 0,
           right: 0,
           height: 2,
-          background: `linear-gradient(90deg, ${accent}, ${accent}66 45%, transparent 92%)`,
+          background: `linear-gradient(90deg, ${accent}, ${withAlpha(accent, '66')} 45%, transparent 92%)`,
           opacity: 0.95,
         }}
       />
@@ -116,8 +116,8 @@ export const DiaryHeader: React.FC<{
             fontSize: 11,
             fontWeight: 700,
             color: accent,
-            background: `${accent}14`,
-            border: `1px solid ${accent}30`,
+            background: `${withAlpha(accent, '14')}`,
+            border: `1px solid ${withAlpha(accent, '30')}`,
             borderRadius: 999,
             padding: '2px 9px',
             letterSpacing: '0.2px',
@@ -132,7 +132,7 @@ export const DiaryHeader: React.FC<{
       <div style={{ flex: 1, minWidth: 12 }} />
       {extra}
 
-      <button className="diary-header-btn" style={{ ...btnPrimary(accent), minHeight: 40, boxShadow: `0 4px 18px ${accent}32, inset 0 1px 0 rgba(255,255,255,0.15)` }} onClick={onAdd}>
+      <button className="diary-header-btn" style={{ ...btnPrimary(accent), minHeight: 40, boxShadow: `0 4px 18px ${withAlpha(accent, '32')}, inset 0 1px 0 rgba(255,255,255,0.15)` }} onClick={onAdd}>
         {addLabel}
       </button>
 
@@ -145,7 +145,7 @@ export const DiaryHeader: React.FC<{
       {undoActive && onUndo && (
         <button
           className="diary-header-btn"
-          style={{ ...btnBase(accent), minHeight: 40, borderColor: `${accent}55`, color: accent, background: `${accent}10`, fontWeight: 700 }}
+          style={{ ...btnBase(accent), minHeight: 40, borderColor: `${withAlpha(accent, '55')}`, color: accent, background: `${withAlpha(accent, '10')}`, fontWeight: 700 }}
           onClick={onUndo}
         >
           {undoLabel}
@@ -182,7 +182,7 @@ export const DiaryHeader: React.FC<{
                 background: 'rgba(22,22,26,0.92)',
                 backdropFilter: 'blur(20px) saturate(160%)',
                 WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-                border: `1px solid ${accent}33`,
+                border: `1px solid ${withAlpha(accent, '33')}`,
                 boxShadow: '0 18px 46px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.06)',
                 display: 'grid',
                 gap: 2,
