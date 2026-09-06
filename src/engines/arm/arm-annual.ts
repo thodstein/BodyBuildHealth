@@ -6,6 +6,7 @@ import type { ArmBuilderInput } from './arm-types';
 import { buildArmPlan } from './arm-builder.engine';
 import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
+import { getArmCycle } from './arm-cycle-library.engine';
 import { superSeriesYear } from './arm-calendar.engine';
 import type { UserWeek } from '../user-program/user-program.types';
 
@@ -86,18 +87,50 @@ export function buildArmBlock(
     contestSim: (config as any).contestSim,
     leftKg: (config as any).leftKg,
     rightKg: (config as any).rightKg,
+    // Интернет-циклы R4: годовой мост в деле — блок умеет строиться именным
+    // циклом (фазы/тейпер-пресет/коррекция берутся из библиотеки).
+    cycleId: (config as any).cycleId,
+    cycleConsent: (config as any).cycleConsent,
+    correctionPct: (config as any).correctionPct,
+    cocWorking: (config as any).cocWorking,
+    flatPyramid: (config as any).flatPyramid,
+    flatPyramidWeightKg: (config as any).flatPyramidWeightKg,
+    bloodflow: (config as any).bloodflow,
+    pumpkinArm: (config as any).pumpkinArm,
+    neverFail: (config as any).neverFail,
+    heavySingles: (config as any).heavySingles,
+    brzenkMode: (config as any).brzenkMode,
+    akimovHook: (config as any).akimovHook,
+    compPeriod: (config as any).compPeriod,
+    medleyId: (config as any).medleyId,
+    medleyAttempts: (config as any).medleyAttempts,
+    forMode: (config as any).forMode,
+    forSpecialization: (config as any).forSpecialization,
+    axisCheck: (config as any).axisCheck,
   } as ArmBuilderInput;
 
   let plan: any = buildArmPlan(input);
   plan = finalizeArmPlan(plan, { level: input.level });
 
-  // taper — WAF-специфичный: A 3н 0.85/0.65/0.45 side×0.7/0.5/0.3, B 2н, C 0
+  // taper — WAF-специфичный: A 3н 0.85/0.65/0.45 side×0.7/0.5/0.3, B 2н, C 0.
+  // Исключение: non-classic пресет цикла — тейпер уже наложен финализатором
+  // (хвост размечен [arm-taper:]), годовая классика поверх не идёт, иначе
+  // срез ляжет не на те недели (маркированные пропускаются точечно).
   let taperApplied = false;
   const taperWeeksEff = config.taperEnabled ? (config.taperWeeks ?? defaultTaper) : 0;
   if (taperWeeksEff > 0) {
-    const curve = buildArmTaperCurve({ taperWeeks: taperWeeksEff, gripFocus: config.gripFocus as any });
-    applyArmTaperToWeeks(plan.weeks, curve);
-    taperApplied = true;
+    let cycleOwnsTaper = false;
+    try {
+      const preset = getArmCycle(String((config as any).cycleId || ''))?.taperPreset;
+      cycleOwnsTaper = !!preset && preset !== 'classic' && preset !== 'none';
+    } catch { cycleOwnsTaper = false; }
+    if (cycleOwnsTaper) {
+      taperApplied = true; // тейпер есть — наложен пресетом цикла в finalize
+    } else {
+      const curve = buildArmTaperCurve({ taperWeeks: taperWeeksEff, gripFocus: config.gripFocus as any });
+      applyArmTaperToWeeks(plan.weeks, curve);
+      taperApplied = true;
+    }
   }
 
   const weeksOut = armPlanToUserWeeks(plan);
