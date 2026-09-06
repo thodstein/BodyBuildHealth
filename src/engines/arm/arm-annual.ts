@@ -7,6 +7,7 @@ import { buildArmPlan } from './arm-builder.engine';
 import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
+import { suggestCycleForMacroPhase } from './arm-cycle-selector.engine';
 import { superSeriesYear } from './arm-calendar.engine';
 import type { UserWeek } from '../user-program/user-program.types';
 
@@ -178,4 +179,25 @@ export function buildArmYearBlocks(
     focus: st.focus,
     ...baseConfig,
   })) as ArmYearBlock[];
+}
+
+/**
+ * Интернет-циклы R5: совет именного цикла для годового блока — потребитель
+ * suggestCycleForMacroPhase без залезания в чужие UI (MacrocyclePanel —
+ * shared). Возвращает первый подходящий + строку для rationale/печати.
+ * 'base' маппится на hypertrophy (объёмная база).
+ */
+export function annualBlockCycleSuggestion(
+  phase: 'base' | 'strength' | 'peaking' | 'transition',
+  discipline = 'armwrestling',
+): { cycleId: string; note: string } {
+  const macro = phase === 'base' ? 'hypertrophy' : phase;
+  const ids = suggestCycleForMacroPhase(macro, discipline);
+  const top = getArmCycle(ids[0]);
+  return {
+    cycleId: ids[0],
+    note: top
+      ? `Годовой блок «${phase}» → цикл ${top.name} (${top.weeks} нед, ${top.rpe})`
+      : `Годовой блок «${phase}» → цикл ${ids[0]}`,
+  };
 }

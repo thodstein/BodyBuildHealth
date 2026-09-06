@@ -273,8 +273,18 @@ export function ArmAutoConstructor() {
   }, []);
 
   const ranked = useMemo(() => {
-    return rankArmSplits({ level, goal: goal as any, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization });
-  }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization]);
+    // R5: при выбранном именном цикле сплиты ранжируются по ЕГО дням/нед —
+    // иначе валидатор потом честно пожалуется на расхождение частоты.
+    // Ручной daysPerWeek при этом не затирается (только ранжирование).
+    let effDays = daysPerWeek;
+    try {
+      if (cycId) {
+        const c = ARM_CYCLE_LIBRARY.find((x) => x.id === cycId);
+        if (c && c.daysPerWeek > 0) effDays = c.daysPerWeek;
+      }
+    } catch { effDays = daysPerWeek; }
+    return rankArmSplits({ level, goal: goal as any, technique, discipline, daysPerWeek: effDays, gripFocus, weakPoints, specialization });
+  }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization, cycId]);
 
   const best = useMemo(() => ranked[0]?.pattern, [ranked]);
 

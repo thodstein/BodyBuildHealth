@@ -522,6 +522,10 @@ export interface ArmProSummary {
   video: { points: number; xLoop: number; trajectory: string } | null;
   autoreg: { volumeMult: number; rirShift: number; note: string } | null;
   cns: { heavyDays: number; volumeMult: number; note: string } | null;
+  cycle: { id: string; name: string; weeks: number; fit: string; taperPreset: string } | null;
+  medley: { id: string; name: string; best: number[]; total: number } | null;
+  coc: { working: string; challenge: string | null; note: string } | null;
+  regimen: { volumeMult: number; rirShift: number; lines: string[] } | null;
 }
 
 /** Чистая сводка: те же движки, что в applyArmPro, но структурой (не строками). */
@@ -536,6 +540,10 @@ export function buildArmProSummary(input: ArmBuilderInput): ArmProSummary {
     video: null,
     autoreg: null,
     cns: null,
+    cycle: null,
+    medley: null,
+    coc: null,
+    regimen: null,
   };
   try {
     if (input.bodyWeightKg != null || input.ageYears != null || input.arm) {
@@ -603,6 +611,47 @@ export function buildArmProSummary(input: ArmBuilderInput): ArmProSummary {
           out.attempts = { implement: 'rolling_thunder', attempts: att, wrPct: Math.round((Number(rt) / wr) * 1000) / 10 };
         }
       }
+    }
+  } catch { /* опционально */ }
+  // Интернет-циклы R5: те же движки, что в applyArmPro, но структурой.
+  try {
+    const cid = String((input as unknown as Record<string, unknown>)['cycleId'] || '');
+    const c = cid ? getArmCycle(cid) : undefined;
+    if (c) {
+      const fit = fitCycleToWeeks(c.id, Number((input as { weeks?: number }).weeks || 8));
+      out.cycle = { id: c.id, name: c.name, weeks: c.weeks, fit: fit.fit, taperPreset: c.taperPreset };
+    }
+  } catch { /* опционально */ }
+  try {
+    const mid = String((input as unknown as Record<string, unknown>)['medleyId'] || '');
+    const m = mid ? getMedley(mid) : undefined;
+    if (m) {
+      const att = (input as unknown as { medleyAttempts?: Array<{ eventIdx: number; weightKg: number; success: boolean }> }).medleyAttempts;
+      const sim = Array.isArray(att) && att.length ? simulateMedley(m.id, att) : { best: m.events.map(() => 0), total: 0 };
+      out.medley = { id: m.id, name: m.name, best: sim.best, total: sim.total };
+    }
+  } catch { /* опционально */ }
+  try {
+    const cw = String((input as unknown as Record<string, unknown>)['cocWorking'] || '');
+    if (cw) {
+      const t = planCocTriple(cw);
+      out.coc = { working: t.work, challenge: t.challenge, note: t.note };
+    }
+  } catch { /* опционально */ }
+  try {
+    const ex = input as unknown as Record<string, unknown>;
+    if (ex['bloodflow'] === true || ex['heavySingles'] === true || ex['pumpkinArm'] != null || ex['neverFail'] === true || ex['brzenkMode'] === true || ex['akimovHook'] === true) {
+      const r = planArmRegimen({
+        bloodflow: ex['bloodflow'] === true,
+        pumpkinArm: (ex['pumpkinArm'] === 'left' || ex['pumpkinArm'] === 'right' ? ex['pumpkinArm'] : null) as 'left' | 'right' | null,
+        neverFail: ex['neverFail'] === true,
+        heavySingles: ex['heavySingles'] === true,
+        brzenkMode: ex['brzenkMode'] === true,
+        akimovHook: ex['akimovHook'] === true,
+        compPeriod: ex['compPeriod'] === true,
+        level: String((input as { level?: string }).level ?? 'intermediate'),
+      });
+      out.regimen = { volumeMult: r.volumeMult, rirShift: r.rirShift, lines: r.lines };
     }
   } catch { /* опционально */ }
   return out;

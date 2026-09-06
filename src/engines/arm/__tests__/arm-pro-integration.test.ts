@@ -117,7 +117,7 @@ describe('arm-pro-integration (A–J сквозной)', () => {
   });
   it('сводка пустая без PRO-ввода; попытки для лифтинга', () => {
     const empty = buildArmProSummary({ ...BASE } as any);
-    expect(empty).toEqual({ waf: null, bilateral: null, cut: null, supermatch: null, sparring: null, attempts: null, video: null, autoreg: null, cns: null });
+    expect(empty).toEqual({ waf: null, bilateral: null, cut: null, supermatch: null, sparring: null, attempts: null, video: null, autoreg: null, cns: null, cycle: null, medley: null, coc: null, regimen: null });
     const lift = buildArmProSummary({ ...BASE, discipline: 'armlifting', workMax: { grip_support: 100 }, sex: 'male' } as any);
     expect(lift.attempts?.attempts).toEqual([90, 96, 102]);
     expect(lift.attempts?.wrPct).toBeCloseTo((100 / 130.5) * 100, 0);
