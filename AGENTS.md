@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Стронг: APK PRO-слой планировщика — карточки/кнопки/попапы (Sep 06 2026, 40b730de pathspec свои, НЕ запушено — очередь чужих)
+
+Полное визуальное улучшение стронг-планировщика для АПК по прецеденту арм-слоя: отдельный `styles-native-strongman.css` + лоадер за `isNativeApp()`, shared-файлы не тронуты, TG 1-в-1. Тесты **apk-strongman-pack 5/5** + engines strength-sport 691/691 + UI стронг 27/27, tsc 0.
+
+- **NEW `src/styles-native-strongman.css`**: 20 секций только `html.app-native` (hero-стекло с янтарной кромкой, липкая лента шагов, тост-msg, шиты попапов с пружиной `ssApkSheetUp`, пресет-пилюли контеста 44px, янтарный contest-бокс, сплит-карточки 20px, hero-CTA сборки 56px, аккордеон недель, gantt/heatmap/medley, range 28px, каскад + reduced-motion + 380px). Ноль hex (только var/rgb — акцент/темы бесплатно, янтарь через `--ss-amber-rgb`).
+- **NEW `strongman-apk-loader.ts`**: динамический import CSS только в native (в TG/web no-op), паритет с `arm-apk-loader`.
+- **Хуки (только свои TSX, аддитивно)**: корень `train-strong ss-apk` + `data-ss` (hero/steps/msg/presets/contest/split-list/build/attempts/week/exercise/set-row/exports/gantt/heatmap/medley/section); попапы `ss-apk-backdrop/sheet/handle/option/done`. Инлайн-стили не менялись — TG байт-в-байт.
+- **Процесс**: только edit/write (без powershell-правок, кодировка цела), коммит строго pathspec 5 файлов. НЕ ПУШИТЬ — в локальном main чужие `160a058a2/c3ade97fb` (арм APK) + `e76b08d9a` (APK волна 23), пуш утянул бы чужие.
+
 ## Стронг/ТА: интернет-циклы R2+R3+R4 — полное закрытие без остатков (Sep 06 2026, pathspec свои, НЕ запушено — очередь чужих)
 
 R2 закрыл аудит R1 (adapt-паритет-1, weak/contest-селектор, гибрид, год из циклов, печать, +2 шаблона); R3 поверх — паритет-2, год с прогрессией, пик-блоки; R4 — паритет-3, превью/персист, библиотека 15, Masters. Strength-sport **696/696 (48 файлов)** + UI циклов 5/5, tsc 0, соседи TrainingScreen_parts 659/660 (1 падение — чужой предсуществующий MesocycleProgressionCard, замыкание только lms, моих файлов ноль).
