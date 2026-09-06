@@ -5,9 +5,9 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { buildArmTaperCurve } from '../arm-taper.engine';
 
 describe('arm-cycle-library', () => {
-  it('12 шаблонов, уникальные id', () => {
-    expect(ARM_CYCLE_LIBRARY.length).toBe(12);
-    expect(new Set(ARM_CYCLE_LIBRARY.map((c) => c.id)).size).toBe(12);
+  it('19 шаблонов, уникальные id', () => {
+    expect(ARM_CYCLE_LIBRARY.length).toBe(19);
+    expect(new Set(ARM_CYCLE_LIBRARY.map((c) => c.id)).size).toBe(19);
   });
   it('все шаблоны валидны: недели/фазы/тейпер', () => {
     for (const c of ARM_CYCLE_LIBRARY) {
