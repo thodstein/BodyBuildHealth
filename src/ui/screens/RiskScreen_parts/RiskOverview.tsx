@@ -9,14 +9,15 @@ import { getRiskColor } from '../../../core/utils/risk-colors';
 import type { AggregatedRisk } from '../../../engines/risk.engine';
 import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 import { WeeklyRiskChart } from './WeeklyRiskChart';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 function mapRiskSystem(riskSystem: string): string { return RISK_SYSTEM_MAP[riskSystem] || riskSystem; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
 
-const SYSTEM_ICONS: Record<string, string> = {
-  cardio:'❤️', hepatic:'🫁', renal:'🫘', neuro:'🧠', endocrine:'⚖️', hematologic:'🩸',
-  reproductive:'🧬', musculoskeletal:'💪', metabolic:'⚡', ghigf:'📈', ins_axis:'🍬',
-  neuro_toxicity:'⚠️', blood:'🩸', vessels:'🫀', immunity:'🛡️', thyroid:'🦋', prostate:'🔴', skin:'🧴'
+const SYSTEM_ICONS: Record<string, NativeIconName> = {
+  cardio:'heart', hepatic:'lungs', renal:'kidney', neuro:'cpu', endocrine:'layers', hematologic:'droplet',
+  reproductive:'dot', musculoskeletal:'move', metabolic:'zap', ghigf:'flask', ins_axis:'syringe',
+  neuro_toxicity:'alertTriangle', blood:'droplet', vessels:'activity', immunity:'shield', thyroid:'butterfly', prostate:'search', skin:'star'
 };
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -77,12 +78,12 @@ export const RiskOverview: React.FC<{
     return RECOMMENDATIONS_DB.filter(r => Object.values(sysMap).includes(r.recId)).slice(0, 6);
   }, [riskResult.systemBreakdown]);
 
-  const Section: React.FC<{ id: string; icon: string; title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, icon, title, children }) => (
+  const Section: React.FC<{ id: string; icon: NativeIconName; title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, icon, title, children }) => (
     <div style={{ padding:0, overflow:'hidden', marginBottom:10, borderRadius:16, background:'rgba(20,22,30,0.42)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
       <button onClick={() => toggle(id)} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'11px 13px', cursor:'pointer', textAlign:'left', background: showSections[id]?'rgba(255,255,255,0.03)':'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, borderBottom: showSections[id]?'1px solid rgba(255,255,255,0.06)':'none' }}>
-        <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, transition:'transform 0.2s', transform: showSections[id]?'rotate(90deg)':'rotate(0deg)' }}>▶</span>
-        <span style={{ fontSize:15 }}>{icon}</span> {title}
-        <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: showSections[id]?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.06)', border:`1px solid ${showSections[id]?'rgba(0,230,138,0.18)':'rgba(255,255,255,0.08)'}`, color: showSections[id]?'#00e68a':'rgba(255,255,255,0.45)', fontWeight:700 }}>{showSections[id]?'−':'＋'}</span>
+        <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.7)', transition:'transform 0.2s', transform: showSections[id]?'rotate(90deg)':'rotate(0deg)' }}><NativeIcon name="chevronRight" size={10} /></span>
+        <span style={{ display:'inline-flex', color:'rgba(255,255,255,0.85)' }}><NativeIcon name={icon} size={15} /></span> {title}
+        <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: showSections[id]?'rgba(var(--labs-accent-rgb, 0,230,138),0.12)':'rgba(255,255,255,0.06)', border:`1px solid ${showSections[id]?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(255,255,255,0.08)'}`, color: showSections[id]?'var(--labs-accent, #00e68a)':'rgba(255,255,255,0.45)', fontWeight:700 }}>{showSections[id]?'−':'+'}</span>
       </button>
       {showSections[id] && <div style={{ padding:'12px 12px 12px' }}>{children}</div>}
     </div>
@@ -91,7 +92,7 @@ export const RiskOverview: React.FC<{
   return (
     <div className="risk-overview">
       {/* Overall Risk + Penalty */}
-      <Section id="overall" icon="📊" title="Общий риск">
+      <Section id="overall" icon="chart" title="Общий риск">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
           {[
             { label:'Raw', val:Math.round(riskResult.overallRaw), color:getRiskColor(riskResult.overallRaw) },
@@ -121,7 +122,7 @@ export const RiskOverview: React.FC<{
 
       {/* Dynamics */}
       {weeklyDynamics && (
-        <Section id="dynamics" icon="📈" title="Динамика по неделям">
+        <Section id="dynamics" icon="trendingDown" title="Динамика по неделям">
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
             <span style={{ fontSize:9, color:'var(--text-dim)', whiteSpace:'nowrap' }}>
               {chartWeek != null ? `Неделя ${chartWeek+1}` : 'Все недели'}
@@ -137,17 +138,17 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* System Risks */}
-      <Section id="systems" icon="🫀" title="Риски по системам">
+      <Section id="systems" icon="heart" title="Риски по системам">
         <div style={{ display:'grid', gap:5 }}>
           {ALL_RISK_SYSTEMS.map(sys => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd || bd.net < 1) return null;
             const netPct = Math.round(bd.net);
-            const icon = SYSTEM_ICONS[sys] || '⚠️';
+            const icon: NativeIconName = SYSTEM_ICONS[sys] || 'alertTriangle';
             const label = SYSTEM_LABELS[sys] || sys;
             return (
               <div key={sys} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--bg-secondary)', borderRadius:8, padding:'6px 10px' }}>
-                <span style={{ fontSize:14, minWidth:22, textAlign:'center' }}>{icon}</span>
+                <span style={{ display: 'inline-flex', color: netPct>25?getRiskColor(bd.net):'var(--text-dim)' }}><NativeIcon name={icon} size={14} /></span>
                 <span style={{ fontSize:11, minWidth:90, color:netPct>25?getRiskColor(bd.net):'var(--text-dim)', fontWeight:netPct>25?600:400 }}>{label}</span>
                 <div style={{ flex:1, background:'rgba(255,255,255,0.05)', borderRadius:4, height:8, overflow:'hidden' }}>
                   <div style={{ width:`${Math.min(100,bd.net)}%`, height:'100%', background:getRiskColor(bd.net), borderRadius:4, transition:'width 0.4s' }} />
@@ -161,7 +162,7 @@ export const RiskOverview: React.FC<{
 
       {/* Key Risks */}
       {relevantRisks.length > 0 && (
-        <Section id="key" icon="⚡" title="Ключевые риски">
+        <Section id="key" icon="zap" title="Ключевые риски">
           <div style={{ display:'grid', gap:5 }}>
             {relevantRisks.map((risk: any) => {
               const lc = risk.levels?.includes('HIGH') ? '#ef4444' : risk.levels?.includes('MEDIUM') ? '#eab308' : '#22c55e';
@@ -181,7 +182,7 @@ export const RiskOverview: React.FC<{
 
       {/* Sources */}
       {aggregatedRisk && (
-        <Section id="sources" icon="🔍" title="Источники рисков">
+        <Section id="sources" icon="search" title="Источники рисков">
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
             {[
               { label:'💊 Фарма', val:Math.round(aggregatedRisk.pharma.overallNet) },
@@ -199,7 +200,7 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Support Coverage — How support reduces risk per system */}
-      <Section id="support_coverage" icon="🛡️" title="Покрытие поддержкой">
+      <Section id="support_coverage" icon="shield" title="Покрытие поддержкой">
         <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Насколько препараты поддержки снижают риски по системам</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
           {(() => {
@@ -232,7 +233,7 @@ export const RiskOverview: React.FC<{
       {/* Recommendations */}
       {/* Recommendations */}
       {!hideRecs && (
-      <Section id="recs" icon="✅" title="Рекомендации">
+      <Section id="recs" icon="check" title="Рекомендации">
         {recommendations.length > 0 ? (
           <div style={{ display:'grid', gap:4 }}>
             {recommendations.map((rec: any, i: number) => (
@@ -247,7 +248,7 @@ export const RiskOverview: React.FC<{
 
       {/* History */}
       {riskHistory && riskHistory.length > 0 && (
-        <Section id="history" icon="📜" title="История рисков">
+        <Section id="history" icon="clock" title="История рисков">
           <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:60, padding:'0 4px' }}>
             {riskHistory.slice(-12).map((h, i) => (
               <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
@@ -261,7 +262,7 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Drug Thresholds */}
-      <Section id="thresholds" icon="💊" title="Пороги препаратов">
+      <Section id="thresholds" icon="pill" title="Пороги препаратов">
         <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>Максимальные дозировки — превышение кратно увеличивает риски</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
           {(() => {

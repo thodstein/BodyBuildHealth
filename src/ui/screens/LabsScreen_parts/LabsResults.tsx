@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
-import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle } from './LabsUI';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle, labsWithAlpha } from './LabsUI';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 const LAB_SYSTEM_MAP: Record<string, string> = {
   'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'ALP': 'hepatic',
@@ -20,7 +21,7 @@ const LAB_SYSTEM_MAP: Record<string, string> = {
 
 const sysLabels: Record<string, string> = LABS_SYS_LABEL;
 const sysColors: Record<string, string> = LABS_SYS_COLOR;
-const sysIcons: Record<string, string> = LABS_SYS_ICON;
+const sysIcons: Record<string, NativeIconName> = LABS_SYS_ICON;
 
 function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
@@ -59,7 +60,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         </button>
         {systems.map(sys=>(
           <button key={sys} onClick={()=>setFilterSystem(sys)} style={filterSystem===sys? sysPillStyle(true, sysColors[sys]||'#6b7280') : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            {sysIcons[sys]||''} {sysLabels[sys]||sys}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={10} /> {sysLabels[sys]||sys}</span>
           </button>
         ))}
         <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.38)', display:'flex', alignItems:'center', gap:6 }}>
@@ -68,7 +69,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
       </div>
 
       {labs.length===0 ? (
-        <LabsEmpty icon="🧪" title="Нет данных анализов" desc="Введите маркеры во вкладке «Текущие» — выберите фазу, заполните пакет или используйте импорт PDF/фото. Данные группируются по датам и системам." />
+        <LabsEmpty icon={<NativeIcon name="flask" size={26} />} title="Нет данных анализов" desc="Введите маркеры во вкладке «Текущие» — выберите фазу, заполните пакет или используйте импорт PDF/фото. Данные группируются по датам и системам." />
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {Object.entries(groupedByDate).map(([date, dateLabs])=>{
@@ -81,8 +82,8 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 12px', cursor:'pointer', textAlign:'left',
                   background: isOpen? 'rgba(255,255,255,0.02)' : 'transparent', border:'none', color:'#fff', borderBottom: isOpen? '1px solid rgba(255,255,255,0.06)' : 'none',
                 }}>
-                  <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: isOpen? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${isOpen?'rgba(0,230,138,0.18)':'rgba(255,255,255,0.08)'}`, fontSize:10, transition:'transform 0.2s', transform: isOpen? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-                  <span style={{ fontSize:13 }}>📅</span>
+                  <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: isOpen? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${isOpen?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(255,255,255,0.08)'}`, color: isOpen ? LABS_ACCENT : '#fff', transition:'transform 0.2s', transform: isOpen? 'rotate(90deg)' : 'rotate(0deg)' }}><NativeIcon name="chevronRight" size={10} /></span>
+                  <span style={{ display: 'inline-flex', color: 'rgba(255,255,255,0.55)' }}><NativeIcon name="clock" size={12} /></span>
                   <span style={{ fontSize:12, fontWeight:800, color: isOpen? LABS_ACCENT : '#fff' }}>{dateStr}</span>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,0.38)', marginLeft:6, display:'none' }}>{date}</span>
                   <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
@@ -103,20 +104,20 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                       return (
                         <div key={lab.code+lab.date} style={{
                           display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:12,
-                          background: isAbn? statusColor+'10' : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? statusColor+'1E' : 'rgba(255,255,255,0.06)'}`,
+                          background: isAbn? labsWithAlpha(statusColor, '10') : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? labsWithAlpha(statusColor, '1E') : 'rgba(255,255,255,0.06)'}`,
                           borderLeft:`3px solid ${statusColor}`,
                         }}>
                           <div style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: sysColor+'16', color: sysColor, fontWeight:800, fontSize:10, border:`1px solid ${sysColor}22` }}>{lab.code.slice(0,2).toUpperCase()}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontWeight:700, fontSize:11, color: isAbn?'#fff':'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
                             <div style={{ fontSize:9, color:'#fff', marginTop:1, display:'flex', gap:6, alignItems:'center' }}>
-                              <span>{sysIcons[sys]||''} {sysLabels[sys]||sys}</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={10} /> {sysLabels[sys]||sys}</span>
                               {info && <span style={{ padding:'1px 5px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)' }}>{info.lln}–{info.uln} {info.prefUnit||''}</span>}
                             </div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:86 }}>
                             <div style={{ fontWeight:800, fontSize:14, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'#fff', marginLeft:3, fontWeight:600 }}>{lab.unit||''}</span></div>
-                            <div style={{ marginTop:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: statusColor+'18', border:`1px solid ${statusColor}22`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
+                            <div style={{ marginTop:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: labsWithAlpha(statusColor, '18'), border:`1px solid ${labsWithAlpha(statusColor, '22')}`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
                           </div>
                         </div>
                       );
@@ -127,7 +128,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             );
           })}
           {Object.keys(groupedByDate).length===0 && (
-            <LabsEmpty icon="🔎" title="Нет маркеров для фильтра" desc="Смените систему фильтра или сбросьте на «Все системы»." />
+            <LabsEmpty icon={<NativeIcon name="search" size={26} />} title="Нет маркеров для фильтра" desc="Смените систему фильтра или сбросьте на «Все системы»." />
           )}
         </div>
       )}

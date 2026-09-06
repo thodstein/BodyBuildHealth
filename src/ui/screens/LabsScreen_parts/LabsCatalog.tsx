@@ -146,7 +146,7 @@ export const LabsCatalog: React.FC = () => {
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{entry.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({entry.code})</span>
                 </div>
-                <div style={{ fontSize: 11, background: 'rgba(0,230,138,0.1)', padding: '2px 8px', borderRadius: 4 }}>
+                <div style={{ fontSize: 11, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)', padding: '2px 8px', borderRadius: 4 }}>
                   {entry.min}–{entry.max} {entry.unit}
                 </div>
               </div>

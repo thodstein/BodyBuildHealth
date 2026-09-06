@@ -2,8 +2,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { useDataLink } from '../../../core/data-link';
+import { NativeIcon } from '../../native/NativeIcons';
 
-const ACCENT = '#00e68a';
+const ACCENT = 'var(--labs-accent, #00e68a)';
+const ACCENT_RGB = 'var(--labs-accent-rgb, 0,230,138)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10 };
 
 // ── Лабораторные маркеры из таблицы T4 ──
@@ -108,7 +110,7 @@ export const LabsTzRiskTab: React.FC = () => {
   return (
     <div className="labs-tzrisk" style={{ padding: '0 0 80px' }}>
       <div style={CARD}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧮 Риски по механизм-ориентированной модели (ТЗ)</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="cpu" size={15} /> Риски по механизм-ориентированной модели (ТЗ)</div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 8 }}>
           Введите лабораторные маркеры из таблицы T4 для оценки выраженности механизмов (m_i) по 6 системам организма.
         </div>
@@ -123,7 +125,7 @@ export const LabsTzRiskTab: React.FC = () => {
 
       {/* Параметры курса */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>💉 Параметры курса</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="syringe" size={13} /> Параметры курса</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <div>
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Класс</div>
@@ -156,15 +158,15 @@ export const LabsTzRiskTab: React.FC = () => {
 
       {/* Лабораторные маркеры */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🧪 Лабораторные маркеры (таблица T4)</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="flask" size={13} /> Лабораторные маркеры (таблица T4)</div>
         <div style={{ display: 'grid', gap: 4 }}>
           {LAB_MARKERS_CONFIG.map(m => {
             const isFilled = labValues[m.code] && labValues[m.code].trim() !== '';
             return (
               <div key={m.code} style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6,
-                background: isFilled ? 'rgba(0,230,138,0.04)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isFilled ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)'}`,
+                background: isFilled ? `rgba(${ACCENT_RGB},0.04)` : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isFilled ? `rgba(${ACCENT_RGB},0.12)` : 'rgba(255,255,255,0.04)'}`,
               }}>
                 <div style={{ minWidth: 90, fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
                   <span style={{ fontWeight: 600, color: '#fff' }}>{m.name}</span>
@@ -189,7 +191,7 @@ export const LabsTzRiskTab: React.FC = () => {
 
       {/* Поддержка из калькулятора */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>💊 Поддержка из калькулятора</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="pill" size={13} /> Поддержка из калькулятора</div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
           {supportIds.length > 0
             ? `✅ ${supportIds.length} веществ: ${supportIds.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ')}`
@@ -199,12 +201,12 @@ export const LabsTzRiskTab: React.FC = () => {
 
       <button onClick={handleCalc} style={{
         width: '100%', padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer', marginBottom: 10,
-        background: `linear-gradient(135deg,${ACCENT},#00c853)`, color: '#000', fontWeight: 800, fontSize: 14,
+        background: `linear-gradient(135deg,${ACCENT},var(--accent-2, #00c853))`, color: 'var(--accent-contrast, #000)', fontWeight: 800, fontSize: 14,
       }}>🧮 Рассчитать</button>
 
       {showResult && result && (
         <>
-          <div style={{ ...CARD, textAlign: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.06) 0%, rgba(0,230,138,0.02) 100%)', border: `1px solid rgba(0,230,138,0.15)` }}>
+          <div style={{ ...CARD, textAlign: 'center', background: `linear-gradient(135deg, rgba(${ACCENT_RGB},0.06) 0%, rgba(${ACCENT_RGB},0.02) 100%)`, border: `1px solid rgba(${ACCENT_RGB},0.15)` }}>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>📊 Общий интегральный риск</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
               <div>
@@ -236,7 +238,7 @@ export const LabsTzRiskTab: React.FC = () => {
           </div>
 
           <div style={CARD}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🫀 Риск по системам</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="heart" size={13} /> Риск по системам</div>
             {result.organs.map((organ: TzSpecOrganResult) => (
               <div key={organ.id} style={{ marginBottom: 4, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

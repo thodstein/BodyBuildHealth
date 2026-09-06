@@ -8,6 +8,7 @@ import {
   LabDiaryEntry, LabDiaryMarker,
 } from '../../../engines/lab-diary.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
+import { NativeIcon } from '../../native/NativeIcons';
 
 const GLASS: React.CSSProperties = {
   ...LABS_CARD,
@@ -112,7 +113,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
       {/* Header stats — premium */}
       <div style={{ ...GLASS, padding:14 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-          <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', fontSize:16 }}>📓</div>
+          <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', color: LABS_ACCENT }}><NativeIcon name="notebook" size={17} /></div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Дневник анализов</div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
@@ -139,7 +140,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             <button key={id} onClick={() => setMode(id as any)}
               style={{
                 padding:'7px 13px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:6,
-                background: active? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.68)', border:`1px solid ${active?LABS_ACCENT:'rgba(255,255,255,0.08)'}`, boxShadow: active?'0 6px 16px rgba(0,230,138,0.22)':'none',
+                background: active? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.68)', border:`1px solid ${active?LABS_ACCENT:'rgba(255,255,255,0.08)'}`, boxShadow: active?'0 6px 16px rgba(var(--labs-accent-rgb, 0,230,138),0.22)':'none',
               }}>{label} {id==='abnormal' && abnormalMarkers.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:999, background: active?'#000':'#ef4444', color:'#fff' }}>{abnormalMarkers.length}</span>}</button>
           );
         })}
@@ -205,7 +206,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           {labs.length > 0 && (
             <button onClick={handleImportNow} style={{
               width: '100%', padding: '10px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
-              border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: '#00e68a',
+              border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)', background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)', color: LABS_ACCENT,
               fontWeight: 700, fontSize: 11,
             }}>
               🔄 Импортировать результаты из лаборатории ({labs.length} записей)
@@ -227,9 +228,9 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                 <button key={m.code} onClick={() => setSelectedMarker(m.code)}
                   style={{
                     padding: '3px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit',
-                    border: selectedMarker === m.code ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                    background: selectedMarker === m.code ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                    color: selectedMarker === m.code ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                    border: selectedMarker === m.code ? '1px solid var(--labs-accent, #00e68a)' : '1px solid rgba(255,255,255,0.06)',
+                    background: selectedMarker === m.code ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)' : 'rgba(255,255,255,0.03)',
+                    color: selectedMarker === m.code ? LABS_ACCENT : 'rgba(255,255,255,0.5)',
                     fontWeight: selectedMarker === m.code ? 700 : 400,
                   }}>{m.name}</button>
               ))}
@@ -248,7 +249,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                 <button key={d} onClick={() => setChartDays(d as any)}
                   style={{
                     padding: '4px 12px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-                    background: chartDays === d ? '#00e68a' : 'rgba(255,255,255,0.04)',
+                      background: chartDays === d ? LABS_ACCENT : 'rgba(255,255,255,0.04)',
                     color: chartDays === d ? '#000' : 'rgba(255,255,255,0.5)',
                     fontWeight: 600,
                   }}>{d} дн.</button>

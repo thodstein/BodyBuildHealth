@@ -1,6 +1,7 @@
 import React from 'react';
 import { REQUIRED_LABS_PER_PHASE } from '../../../core/constants';
 import { LABS_ACCENT, LABS_CARD, LabsSectionHeader, LabsBadge } from './LabsUI';
+import { NativeIcon } from '../../native/NativeIcons';
 
 const PHASE_LABELS: Record<string, string> = {
   baseline: 'Базовый',
@@ -57,7 +58,7 @@ export const LabsSchedule: React.FC = () => {
   return (
     <div className="labs-schedule">
       <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)' }}>
-        <LabsSectionHeader icon="📅" title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
+        <LabsSectionHeader icon={<NativeIcon name="clock" size={15} />} title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
         <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:12, lineHeight:1.4, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
           Совет: сдавайте базовый скрининг до курса и каждые 4 недели на курсе. Маркеры с ℹ️ — наведите для подсказки.
         </div>

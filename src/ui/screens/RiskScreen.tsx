@@ -29,7 +29,8 @@ import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
-import { LABS_CARD } from './LabsScreen_parts/LabsUI';
+import { LABS_CARD, labsWithAlpha } from './LabsScreen_parts/LabsUI';
+import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { isNativeApp } from '../../core/app-platform';
 
 /** RiskHeroStats — нетто/брутто риск в hero, ТОЛЬКО APK (isNativeApp гейт). */
@@ -646,16 +647,16 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     // ── Main page: cards ──
     if (basicPage === 'main') {
       const cardDefs = [
-        { key:'dynamics', icon:'📈', title:'Динамика рисков', desc:'График изменения рисков по неделям', color:'#3b82f6' },
-        { key:'mechanisms', icon:'⚙️', title:'Системы и механизмы', desc:'Риски по всем системам организма с описанием механизмов', color:'#a855f7' },
-        { key:'key_risks', icon:'🔑', title:'Ключевые риски', desc:'Основные факторы риска по каждой системе', color:'#ef4444' },
-        { key:'history', icon:'📜', title:'История и пороги препаратов', desc:'Динамика рисков и пороговые дозы всей фармакологии', color:'#f97316' },
+        { key:'dynamics', icon:'chart' as NativeIconName, title:'Динамика рисков', desc:'График изменения рисков по неделям', color:'#3b82f6' },
+        { key:'mechanisms', icon:'sliders' as NativeIconName, title:'Системы и механизмы', desc:'Риски по всем системам организма с описанием механизмов', color:'#a855f7' },
+        { key:'key_risks', icon:'zap' as NativeIconName, title:'Ключевые риски', desc:'Основные факторы риска по каждой системе', color:'#ef4444' },
+        { key:'history', icon:'clock' as NativeIconName, title:'История и пороги препаратов', desc:'Динамика рисков и пороговые дозы всей фармакологии', color:'#f97316' },
       ];
       return (
         <div>
           {/* Общий Риск — premium */}
           <div style={{ ...LABS_CARD, marginBottom:12, padding:16, textAlign:'center', background:'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(20,22,30,0.52) 100%)', border:'1px solid rgba(0,230,138,0.18)', backdropFilter:'blur(12px)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8 }}><span style={{ width:26, height:26, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', fontSize:12 }}>📊</span><span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Общий риск</span><span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background: riskResult.overallNet>50?'rgba(239,68,68,0.14)':'rgba(0,230,138,0.14)', border:`1px solid ${riskResult.overallNet>50?'rgba(239,68,68,0.18)':'rgba(0,230,138,0.18)'}`, color: riskResult.overallNet>50?'#f87171':'#00e68a', fontWeight:800 }}>{riskResult.overallNet<25?'низкий':riskResult.overallNet<50?'умеренный':riskResult.overallNet<75?'высокий':'критический'}</span></div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8 }}><span style={{ width:26, height:26, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', color:'#4ade80' }}><NativeIcon name="chart" size={13} /></span><span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Общий риск</span><span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background: riskResult.overallNet>50?'rgba(239,68,68,0.14)':'rgba(0,230,138,0.14)', border:`1px solid ${riskResult.overallNet>50?'rgba(239,68,68,0.18)':'rgba(0,230,138,0.18)'}`, color: riskResult.overallNet>50?'#f87171':'#00e68a', fontWeight:800 }}>{riskResult.overallNet<25?'низкий':riskResult.overallNet<50?'умеренный':riskResult.overallNet<75?'высокий':'критический'}</span></div>
             <div style={{ display:'flex', justifyContent:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
               <div style={{ flex:1, minWidth:90, padding:'10px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>С поддержкой</div>
@@ -698,7 +699,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:18, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.48)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', backdropFilter:'blur(14px)', boxShadow:'0 12px 30px rgba(0,0,0,0.18)', transition:'transform 0.18s, border-color 0.18s',
               }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=c.color+'55'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; }}>
-                <div style={{ width:44, height:44, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:c.color+'18', border:`1px solid ${c.color}22`, fontSize:20 }}>{c.icon}</div>
+                <div style={{ width:44, height:44, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:c.color+'18', border:`1px solid ${c.color}22`, color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={20} /></div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:c.color }}>{c.title}</div>
                   <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}>{c.desc}</div>
@@ -732,7 +733,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       return (
         <div>
           <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>🔑 Ключевые риски по системам</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="zap" size={13} /></span> Ключевые риски по системам</div>
             {sorted.filter(s => s.net > 5).map(s => (
               <div key={s.sys} style={{ marginBottom:6, padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
@@ -773,7 +774,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         <div>
           {/* Risk History */}
           <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📜 История рисков</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="clock" size={13} /></span> История рисков</div>
             {riskHistory.length === 0 ? (
               <div style={{ fontSize:10, color:'#fff', textAlign:'center', padding:10 }}>Нет сохранённой истории</div>
             ) : (
@@ -791,7 +792,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* Drug Thresholds — only AAS/GH/Insulin, Russian names, no duplicates */}
           <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>💊 Препараты и пороги (ААС, ГР, инсулины)</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="pill" size={13} /></span> Препараты и пороги (ААС, ГР, инсулины)</div>
             <div style={{ display:'grid', gap:6 }}>
               {deduped.map(d => {
                 const anColor = d.androgenicity < 0.3 ? '#22c55e' : d.androgenicity < 0.7 ? '#eab308' : d.androgenicity < 1.2 ? '#f97316' : '#ef4444';
@@ -824,10 +825,10 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     // Main page: MC toggle + 4 nav cards
     if (mcPage === 'main') {
       const mcCards = [
-        { key:'organs', icon:'🧬', title:'Органы и Матрицы', desc:'Матрица рисков по органам и системам с временным срезом', color:'#8b5cf6' },
-        { key:'dynamics', icon:'📈', title:'Динамика', desc:'Временной ряд рисков по дням на 12 недель', color:'#3b82f6' },
-        { key:'sensitivity', icon:'📊', title:'Чувствительность', desc:'Анализ чувствительности к параметрам образа жизни', color:'#f97316' },
-        { key:'pk', icon:'💊', title:'Фармакокинетика', desc:'PK/PD симуляция концентрации препаратов', color:'#22c55e' },
+        { key:'organs', icon:'layers' as NativeIconName, title:'Органы и Матрицы', desc:'Матрица рисков по органам и системам с временным срезом', color:'#8b5cf6' },
+        { key:'dynamics', icon:'chart' as NativeIconName, title:'Динамика', desc:'Временной ряд рисков по дням на 12 недель', color:'#3b82f6' },
+        { key:'sensitivity', icon:'target' as NativeIconName, title:'Чувствительность', desc:'Анализ чувствительности к параметрам образа жизни', color:'#f97316' },
+        { key:'pk', icon:'pill' as NativeIconName, title:'Фармакокинетика', desc:'PK/PD симуляция концентрации препаратов', color:'#22c55e' },
       ];
       return (
         <div>
@@ -864,7 +865,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)',
               }}>
                 <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, background:c.color+'18', fontSize:20 }}>{c.icon}</div>
+                  flexShrink:0, background:c.color+'18', color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={20} /></div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
                   <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>{c.desc}</div>
@@ -913,12 +914,12 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </div>
             <div className="risk-hero-cards native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · полуколичественная шкала · верификация анализами.', color: '#8b5cf6' },
-                { id: 'calculations', icon: '🧮', title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника — все модели в одном месте.', color: '#22c55e' },
-                { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
+                { id: 'tz_spec', icon: 'layers' as NativeIconName, title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · полуколичественная шкала · верификация анализами.', color: '#8b5cf6' },
+                { id: 'calculations', icon: 'cpu' as NativeIconName, title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника — все модели в одном месте.', color: '#22c55e' },
+                { id: 'info', icon: 'message' as NativeIconName, title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
               ].map((card, ci) => (
                 <div key={card.id} role="button" tabIndex={0} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'tz_spec' ? 'overview' : 'overview'); }} onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); (e.currentTarget as HTMLDivElement).click(); }}} onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${card.color}30`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 16px rgba(0,0,0,0.22), 0 0 0 1px ${card.color}14 inset`; }} onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 10px rgba(0,0,0,0.16)'; }} className="risk-hero-card native-fade-up" data-id={card.id} style={{ animationDelay: `${ci * 55}ms`, display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 3px 10px rgba(0,0,0,0.16)', background:'rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}>
-                  <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${card.color}22, ${card.color}10)`, border:`1px solid ${card.color}28`, fontSize:18, boxShadow:`0 3px 10px ${card.color}20`, position:'relative' }}>{card.icon}</div>
+                  <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${card.color}22, ${card.color}10)`, border:`1px solid ${card.color}28`, color: card.color, boxShadow:`0 3px 10px ${card.color}20`, position:'relative' }}><NativeIcon name={card.icon} size={19} /></div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{card.title}</div>
                     <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3 }}>{card.desc}</div>
@@ -938,7 +939,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           <button onClick={() => setMainTab('hero')} style={{ padding:'7px 12px', cursor:'pointer', fontSize:11, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', borderRadius:999, display:'flex', alignItems:'center', gap:6 }}>← Обзор</button>
           <div style={{ width:1, height:18, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
           <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-            <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: mainTab==='tz_spec'?'rgba(139,92,246,0.14)':'rgba(34,197,94,0.14)', border:`1px solid ${mainTab==='tz_spec'?'rgba(139,92,246,0.18)':'rgba(34,197,94,0.18)'}`, fontSize:13 }}>{mainTab==='tz_spec'?'🧬': mainTab==='info'?'ℹ️':'🧮'}</span>
+            <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: mainTab==='tz_spec'?'rgba(139,92,246,0.14)':'rgba(34,197,94,0.14)', border:`1px solid ${mainTab==='tz_spec'?'rgba(139,92,246,0.18)':'rgba(34,197,94,0.18)'}`, color: mainTab==='tz_spec' ? '#a78bfa' : mainTab==='info' ? '#c4b5fd' : '#4ade80' }}>{mainTab==='tz_spec'? <NativeIcon name="layers" size={13} /> : mainTab==='info' ? <NativeIcon name="message" size={13} /> : <NativeIcon name="cpu" size={13} />}</span>
             <div style={{ minWidth:0 }}>
               <div style={{ fontSize:12, fontWeight:800, color:'#fff', lineHeight:1 }}>{mainTab==='tz_spec'?'Механизм-модель': mainTab==='info'?'Информация':'Риски'}</div>
               <div style={{ fontSize:9, color:'#fff', lineHeight:1, marginTop:2 }}>{subTab} • {riskResult? `${Math.round(riskResult.overallNet)}% net` : 'нет данных'}</div>
@@ -958,20 +959,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ position:'relative' }}>
               {/* Summary card */}
               <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
-                  📊 Средний риск курса
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="chart" size={13} /></span> Средний риск курса
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {[
-                    { label: 'Вероятностная', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
-                    { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
-                    { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
+                    { label: 'Вероятностная', icon: 'file' as NativeIconName, net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
+                    { label: 'Монте-Карло', icon: 'cpu' as NativeIconName, net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
+                    { label: 'MDSS', icon: 'heart' as NativeIconName, net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
                     <div key={i} style={{
                       flex: '1 1 30%', minWidth: 100, textAlign: 'center', padding: '10px 4px', borderRadius: 12,
                       background: item.color + '0d', border: `1px solid ${item.color}22`,
                     }}>
-                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600 }}>{item.icon} {item.label}</div>
+                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><NativeIcon name={item.icon} size={10} /> {item.label}</div>
                       <div style={{ fontSize: 'clamp(18px, 6vw, 26px)', fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : '#fff', display:'flex', alignItems:'center', gap:2 }}>
                         <span>{item.net != null ? `${item.net}` : '—'}</span>
                         <span style={{ fontSize:'clamp(12px,3vw,16px)', color:'#fff', fontWeight:400 }}>/</span>
@@ -985,10 +986,10 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {[
-                  { id: 'basic', icon: '📋', title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
-                  { id: 'montecarlo', icon: '🎲', title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
-                  { id: 'mdss', icon: '🏥', title: 'MDSS', desc: 'Medical Decision Support System — Hill+MC+Sigmoid модель прогнозирования.', color: '#f97316', subs: '' },
-                  { id: 'clinical', icon: '🩺', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6', subs: '3D • Комплаенс • Патологии • Анализы' },
+                  { id: 'basic', icon: 'file' as NativeIconName, title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
+                  { id: 'montecarlo', icon: 'cpu' as NativeIconName, title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
+                  { id: 'mdss', icon: 'heart' as NativeIconName, title: 'MDSS', desc: 'Medical Decision Support System — Hill+MC+Sigmoid модель прогнозирования.', color: '#f97316', subs: '' },
+                  { id: 'clinical', icon: 'cross' as NativeIconName, title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6', subs: '3D • Комплаенс • Патологии • Анализы' },
                 ].map(card => (
                   <button key={card.id} onClick={() => {
                     setCalcPage(card.id as any);
@@ -1001,8 +1002,8 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)', transition: 'all 0.2s',
                   }}>
                     <div style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: card.color + '18', fontSize: 22 }}>
-                      {card.icon}
+                      background: card.color + '18', color: card.color }}>
+                      <NativeIcon name={card.icon as NativeIconName} size={22} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
@@ -1379,7 +1380,7 @@ const ComplianceDisplay: React.FC = () => {
     <div>
       {/* Info card */}
       <div style={{ marginBottom:10, padding:14, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-        <div style={{ fontSize:14, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🕒 Комплаенс — Data Decay Engine</div>
+        <div style={{ fontSize:14, fontWeight:700, color:'var(--accent)', marginBottom:6, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="clock" size={14} /> Комплаенс — Data Decay Engine</div>
         <div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>
           Отслеживание дисциплины сдачи анализов. Штрафной коэффициент за устаревшие данные. Даты вычисляются автоматически из курса и анализов.
         </div>
@@ -1738,7 +1739,7 @@ const LabsRisksTab: React.FC = () => {
         </div>
       )}
       {[
-        {key:'pharma',icon:'🧬',title:'Лабораторно-фармацевтические риски',
+        {key:'pharma',icon:'pill' as NativeIconName,title:'Лабораторно-фармацевтические риски',
          body: labPharmaAlerts.length>0 ? <div style={{display:'grid',gap:3}}>{labPharmaAlerts.map((a,i)=>
           <div key={i} style={{padding:'6px 8px',borderRadius:6,background:a.severity==='critical'?'rgba(239,68,68,0.08)':a.severity==='high'?'rgba(249,115,22,0.08)':'rgba(234,179,8,0.08)',border:`1px solid ${a.severity==='critical'?'rgba(239,68,68,0.2)':a.severity==='high'?'rgba(249,115,22,0.2)':'rgba(234,179,8,0.2)'}`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1746,14 +1747,14 @@ const LabsRisksTab: React.FC = () => {
               <span style={{fontSize:7,fontWeight:700,padding:'1px 5px',borderRadius:3,background:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308',color:'#fff'}}>{a.severity==='critical'?'КРИТ':a.severity==='high'?'ВЫСОК':'МОНИТ'}</span>
             </div><div style={{color:'#fff',fontSize:8}}>{a.recommendation}</div></div>)}</div> :
           <div style={{fontSize:10,color:'#fff',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
-        {key:'indices',icon:'📊',title:'Композитные индексы здоровья',
+        {key:'indices',icon:'grid' as NativeIconName,title:'Композитные индексы здоровья',
          body:<div style={{display:'grid',gap:6}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
           <div key={item.label} style={{padding:8,borderRadius:8,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.06)`:'var(--bg-secondary)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.2)`:'1px solid var(--border)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div><div style={{fontSize:10,fontWeight:600}}>{item.label}</div><div style={{fontSize:8,color:'#fff',marginTop:2}}>{item.desc}</div></div>
               {item.val!==null ? <div style={{textAlign:'right'}}><div style={{fontSize:18,fontWeight:700,color:statusColor(item.val,item.inv)}}>{item.val}%</div><div style={{fontSize:8,color:statusColor(item.val,item.inv),fontWeight:600}}>{statusLabel(item.val,item.inv)}</div></div> : <div style={{fontSize:10,color:'#fff'}}>Нет данных</div>}
             </div></div>)}</div>},
-        {key:'systems',icon:'⚠️',title:'Риски по системам организма',
+        {key:'systems',icon:'alertTriangle' as NativeIconName,title:'Риски по системам организма',
          body: labRisks && Object.values(labRisks.systemBreakdown).some(v=>v.net>0) ? <div style={{display:'grid',gap:3}}>{Object.entries(labRisks.systemBreakdown).filter(([,v])=>v.net>0).sort(([,a],[,b])=>b.net-a.net).map(([sys,val])=>{
           const lvl=val.net<=25?'low':val.net<=50?'medium':val.net<=75?'high':'critical';
           const lc={low:{bg:'rgba(34,197,94,0.08)',text:'#22c55e',bar:'#22c55e'},medium:{bg:'rgba(234,179,8,0.08)',text:'#eab308',bar:'#eab308'},high:{bg:'rgba(249,115,22,0.08)',text:'#f97316',bar:'#f97316'},critical:{bg:'rgba(239,68,68,0.08)',text:'#ef4444',bar:'#ef4444'}}[lvl];
@@ -1762,7 +1763,7 @@ const LabsRisksTab: React.FC = () => {
             <div style={{flex:1,height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:3,transition:'width 0.4s ease'}}/></div>
             <span style={{fontSize:11,fontWeight:700,color:lc.text,minWidth:28,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
           <div style={{fontSize:10,color:'#fff',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все системы в норме':'Нет данных анализов — отображаются базовые значения'}</div>},
-        {key:'markers',icon:'🔬',title:'Маркеры с отклонениями',
+        {key:'markers',icon:'flask' as NativeIconName,title:'Маркеры с отклонениями',
          body: labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
           const isHigh=m.deviation>0; const absDev=Math.abs(m.deviation);
           const dl=absDev<=20?'low':absDev<=50?'medium':absDev<=100?'high':'critical';
@@ -1779,14 +1780,14 @@ const LabsRisksTab: React.FC = () => {
             display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
             background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
           }}>
-            <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections[b.key] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-            {b.icon} {b.title}
+            <span style={{ display: 'inline-flex', transition: 'transform 0.2s', transform: riskSections[b.key] ? 'rotate(90deg)' : 'rotate(0deg)', color: 'rgba(255,255,255,0.6)' }}><NativeIcon name="chevronRight" size={10} /></span>
+            <span style={{ display: 'inline-flex', color: 'rgba(255,255,255,0.75)' }}><NativeIcon name={b.icon} size={12} /></span> {b.title}
           </button>
           {riskSections[b.key] && <div style={{ padding: '0 12px 12px' }}>{b.body}</div>}
         </div>
       ))}
       {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 18 }}>
-        <div style={{ fontSize: 28, marginBottom: 6 }}>🧪</div>
+        <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.6)', display: 'flex', justifyContent: 'center' }}><NativeIcon name="flask" size={28} /></div>
         <div style={{ fontSize: 12, color: '#fff', marginBottom: 4 }}>Нет данных анализов</div>
         <div style={{ fontSize: 10, color: '#f59e0b' }}>Отображаются базовые риски без точных лабов. Для расчёта штрафа используйте кнопку "Без анализов" в общем обзоре.</div></div>}
     </div>

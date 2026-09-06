@@ -4405,6 +4405,14 @@ html.app-native .market-filter:active {
   transform: scale(0.94);
 }
 
+/* ─── 65. LABS ACCENT ─────────────────────────────────────────
+ * Только APK. Бренд-минт блока идёт за темой; системные цвета и
+ * статусы (в норме/выше/ниже) не трогаем. */
+html.app-native {
+  --labs-accent: var(--accent);
+  --labs-accent-rgb: var(--accent-rgb);
+}
+
 /* ─── 59. APK DYNAMIC COLOR — акцент поверх var-изированных токенов ──
  * Дефолт (без атрибута) — лайм. Весь слой уже сидит на var(--accent) /
  * var(--accent-2) / --accent-rgb, поэтому переключение мгновенное и полное.

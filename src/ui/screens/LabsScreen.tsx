@@ -12,6 +12,8 @@ import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab
 import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
 import { LABS_ACCENT, LABS_CARD } from './LabsScreen_parts/LabsUI';
+import { labsWithAlpha } from './LabsScreen_parts/LabsUI';
+import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 // import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab'; // удалено — T4 маркеры интегрированы в фазы
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
@@ -169,19 +171,19 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
   'BNP': 'Натрийуретический пептид. Маркёр сердечной недостаточности.',
 };
 
-const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
-  { id: 'lab', label: 'Анализы', icon: '🔬' },
-  { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
+const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: NativeIconName }[] = [
+  { id: 'lab', label: 'Анализы', icon: 'flask' },
+  { id: 'risks', label: 'Риски и индексы', icon: 'alertTriangle' },
 ];
 
 type MainLabTab = 'hero' | 'lab' | 'risks';
 
-const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
-  { id: 'overview', label: 'Обзор', icon: '📊' },
-  { id: 'current', label: 'Текущие', icon: '🔬' },
-  { id: 'catalog', label: 'Каталог', icon: '📖' },
-  { id: 'journal', label: 'Дневник и архив', icon: '📓' },
-  { id: 'trends', label: 'Тренды', icon: '📈' },
+const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: NativeIconName }[] = [
+  { id: 'overview', label: 'Обзор', icon: 'chart' },
+  { id: 'current', label: 'Текущие', icon: 'flask' },
+  { id: 'catalog', label: 'Каталог', icon: 'bookOpen' },
+  { id: 'journal', label: 'Дневник и архив', icon: 'notebook' },
+  { id: 'trends', label: 'Тренды', icon: 'trendingDown' },
 ];
 
 type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal' | 'trends';
@@ -628,14 +630,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             )}
 <div className="labs-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, каталог, динамика, дневник и графики. Единый ввод по фазе, импорт PDF/фото.', color: LABS_ACCENT },
-                { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'ASI/HMI/CR, риски по системам, механизм-модель ТЗ и верификация.', color: '#f97316' },
+                { id: 'lab', icon: 'flask', title: 'Анализы', desc: 'Ввод, каталог, динамика, дневник и графики. Единый ввод по фазе, импорт PDF/фото.', color: LABS_ACCENT },
+                { id: 'risks', icon: 'alertTriangle', title: 'Риски и индексы', desc: 'ASI/HMI/CR, риски по системам, механизм-модель ТЗ и верификация.', color: '#f97316' },
               ].map(card => (
                 <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} className="labs-hero-card" data-id={card.id} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                   background:'transparent', border:'1px solid rgba(255,255,255,0.14)', backdropFilter:'none', WebkitBackdropFilter:'none', boxShadow:'none', color:'#fff', transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
                 }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}>
-                  <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${card.color}18`, border:`1px solid ${card.color}22`, fontSize:18 }}>{card.icon}</div>
+                  <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: labsWithAlpha(card.color, '18'), border:`1px solid ${labsWithAlpha(card.color, '22')}`, color: card.color }}><NativeIcon name={card.icon as NativeIconName} size={19} /></div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6, textShadow:'0 1px 10px rgba(0,0,0,0.7)' }}>
                       {card.title}
@@ -654,9 +656,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    background: 'rgba(239,68,68,0.25)', fontSize: 18,
+                    background: 'rgba(239,68,68,0.25)', color: '#f87171',
                   }}>
-                    ⚠️
+                    <NativeIcon name="alertTriangle" size={18} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: '#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
@@ -695,10 +697,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
               <button key={t.id} onClick={() => setSubTab(t.id)} className="labs-subtab" data-active={subTab === t.id} style={{
                 padding: '5px 7px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t.id ? '2px solid #00e68a' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
+                cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t.id ? '2px solid var(--labs-accent, #00e68a)' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
                 color: subTab === t.id ? '#fff' : 'rgba(255,255,255,0.52)',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
               }}>
-                {t.icon} {t.label}
+                <NativeIcon name={t.icon} size={11} /> {t.label}
               </button>
             ))}
           </div>
@@ -786,13 +789,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         setChartSelectedCodes(prev => { const next = new Set(prev); if (next.has(m.code)) next.delete(m.code); else next.add(m.code); return next; });
                       }} style={{
                         display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                        background: isSelected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-                        border: `1px solid ${isSelected ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
+                        background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'var(--bg-secondary)',
+                        border: `1px solid ${isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.3)' : 'var(--border)'}`,
                         color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
                       }}>
                         <div style={{
                           width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          background: isSelected ? 'var(--accent)' : 'rgba(0,230,138,0.12)',
+                          background: isSelected ? 'var(--accent)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)',
                           color: isSelected ? '#000' : 'var(--accent)', fontSize: 9, fontWeight: 700,
                         }}>
                           {isSelected ? '✓' : m.code.slice(0, 2)}
@@ -927,8 +930,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
             <button onClick={() => setShowLabInput(true)} style={{
               padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-              background: 'linear-gradient(135deg, rgba(0,230,138,0.12) 0%, rgba(0,230,138,0.04) 100%)',
-              border: '1px solid rgba(0,230,138,0.25)', color: 'var(--accent)',
+              background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.12) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.04) 100%)',
+              border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)', color: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
               <span style={{ fontSize: 16 }}>➕</span> Добавить анализы
@@ -950,8 +953,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <button onClick={() => setShowImport(true)} style={{
-              width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)',
-              background: 'linear-gradient(135deg, rgba(0,230,138,0.12) 0%, rgba(0,230,138,0.04) 100%)',
+              width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)',
+              background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.12) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.04) 100%)',
               color: 'var(--accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
@@ -961,7 +964,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* Inline batch form — same layout as progress card chips */}
           {showNewLabsInline && (
-            <div className="card" style={{ marginBottom: 10, padding: 10, border: '1px solid rgba(0,230,138,0.25)' }}>
+            <div className="card" style={{ marginBottom: 10, padding: 10, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
@@ -982,8 +985,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       return (
                         <div key={code} style={{
                           display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6,
-                          background: filled ? 'rgba(0,230,138,0.10)' : 'var(--bg-secondary)',
-                          border: `1px solid ${filled ? 'rgba(0,230,138,0.25)' : 'var(--border)'}`,
+                          background: filled ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)' : 'var(--bg-secondary)',
+                          border: `1px solid ${filled ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.25)' : 'var(--border)'}`,
                           transition: 'all 0.15s',
                         }}>
                           <span style={{ fontSize: 10, fontWeight: filled ? 600 : 400, color: filled ? 'var(--accent)' : '#fff' }}>
@@ -1064,8 +1067,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     return (
                       <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
                         padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', transition: 'all 0.15s',
-                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.08)') : 'var(--bg-secondary)',
-                        border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(0,230,138,0.15)') : 'var(--border)'}`,
+                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(249,115,22,0.12)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)') : 'var(--bg-secondary)',
+                        border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.15)') : 'var(--border)'}`,
                         color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : '#fff',
                         fontWeight: isSubmitted ? 600 : 400,
                       }}>
@@ -1238,14 +1241,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div>
                   <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>📦 Архив ({labArchive.length})</div>
                   {labArchive.slice(0,20).map((r:any) => (
-                    <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(0,230,138,0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
+                    <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
                       <div style={{ display:'flex', justifyContent:'space-between' }}>
                         <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
                         <span style={{ color:'#fff' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
                       </div>
                       {selectedArchivedLabReport?.id === r.id && (
                         <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
-                          <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 Отчёт от {r.date}</div>
+                            <div style={{ fontSize:9, fontWeight:700, color:LABS_ACCENT, marginBottom:4, display:'flex', alignItems:'center', gap:4 }}><NativeIcon name="file" size={9} /> Отчёт от {r.date}</div>
                           {(r.labs||[]).map((l:any, i:number) => (
                             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'#fff' }}>
                               <span>{l.name || l.code}</span>
@@ -1414,7 +1417,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {insights.length > 0 && (
               <div style={{ marginBottom:12, display:'grid', gap:4 }}>
                 {insights.map((insight, i) => (
-                  <div key={i} style={{ padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)', fontSize:10, color:'var(--text)', lineHeight:1.4 }}>
+                  <div key={i} style={{ padding:'6px 10px', borderRadius:8, background:'rgba(var(--labs-accent-rgb, 0,230,138),0.06)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.12)', fontSize:10, color:'var(--text)', lineHeight:1.4 }}>
                     {insight}
                   </div>
                 ))}
@@ -1435,7 +1438,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📉 График изменений</div>
                 <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
                   {filtered.filter(t => t.points.length >= 2).map(t => {
-                    const palette = ['#00e68a','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+                    const palette = ['var(--labs-accent, #00e68a)','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
                     const color = palette[report.trends.indexOf(t) % palette.length];
                     const isVisible = visibleTrends.size === 0 || visibleTrends.has(t.code);
                     return (
@@ -1463,7 +1466,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       const w = Math.max(320, chartTrends.length * 90) - pad.left - pad.right;
                       const h = 180 - pad.top - pad.bottom;
                       const xStep = w / Math.max(1, dates.length - 1);
-                      const palette = ['#00e68a','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+                      const palette = ['var(--labs-accent, #00e68a)','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
                       return (
                         <g transform={`translate(${pad.left},${pad.top})`}>
                           {[0, 0.25, 0.5, 0.75, 1].map(f => {
@@ -1597,7 +1600,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   }}>{label}</button>
                 ))}
               </div>
-              <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(0,230,138,0.2)' }}>
+              <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
                   📋 План сдачи: {PHASE_LABELS[selectedPhase]}
                 </div>
@@ -1635,9 +1638,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                             return (
                               <span key={code} style={{
                                 fontSize:8, padding:'1px 5px', borderRadius:3,
-                                background: done ? 'rgba(0,230,138,0.12)' : 'rgba(239,68,68,0.08)',
+                                background: done ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(239,68,68,0.08)',
                                 color: done ? 'var(--accent)' : '#ef4444',
-                                border:`1px solid ${done?'rgba(0,230,138,0.2)':'rgba(239,68,68,0.15)'}`,
+                                border:`1px solid ${done?'rgba(var(--labs-accent-rgb, 0,230,138),0.2)':'rgba(239,68,68,0.15)'}`,
                               }}>
                                 {done ? '✓' : '○'} {info?.name||code}
                               </span>
@@ -1912,7 +1915,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                             {drugs.map((d, i) => (
-                              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 600, border: '1px solid rgba(0,230,138,0.15)' }}>
+                              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', color: LABS_ACCENT, fontWeight: 600, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.15)' }}>
                                 {d.drugId} ({(d.effect.strength * 100).toFixed(0)}%)
                               </span>
                             ))}
@@ -1938,8 +1941,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 {tzSpecResult ? (
                   <>
                     <div style={{ textAlign: 'center', padding: '8px 0', borderRadius: 10, marginBottom: 6,
-                      background: 'linear-gradient(135deg, rgba(0,230,138,0.06) 0%, rgba(0,230,138,0.02) 100%)',
-                      border: '1px solid rgba(0,230,138,0.15)' }}>
+                      background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.06) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.02) 100%)',
+                      border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.15)' }}>
                       <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Общий риск</div>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
                         <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallRaw < 25 ? '#22c55e' : tzSpecResult.overallRaw < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallRaw}%</span>
@@ -2081,7 +2084,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <button key={t.id} onClick={() => setSubTab(t.id)} style={{
               flex:'0 0 auto', padding:'6px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
               background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : '#fff', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-            }}>{t.icon} {t.label}</button>
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+            }}><NativeIcon name={t.icon} size={11} /> {t.label}</button>
           ))}
         </div>
       )}
@@ -2091,7 +2095,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={backdropClick}>
           <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
+              <span style={{ fontWeight: 700, fontSize: 16, display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="file" size={16} /> Импорт анализов</span>
                <button onClick={cancelOcr} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', maxHeight: '70vh' }}>
@@ -2130,7 +2134,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['' + (e?.message || String(e))] });
                         }
                         setOcrLoading(false);
-                      }} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', width: '100%' }}>
+                      }} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)', color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', width: '100%' }}>
                         📋 Разобрать вставленный текст
                       </button>
                     </div>
@@ -2167,7 +2171,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <React.Fragment key={lab.code}>
                         <button onClick={() => toggleLabSelection(lab.code)} style={{
                           display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                          background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
+                          background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)' : 'var(--bg-secondary)',
                           border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                         }}>
                           <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
@@ -2219,7 +2223,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>✕</button>
             </div>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
-              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8, padding: '6px 10px', background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)', borderRadius: 8 }}>
                 {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
               </div>
             ) : null; })()}

@@ -225,8 +225,8 @@ const LabsProblemPanelsTab: React.FC = () => {
         {/* Copy referral button */}
         <button onClick={() => handleCopyReferral(selectedPanel)} style={{
           width: '100%', padding: '12px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-          background: referralCopied ? 'rgba(0,230,138,0.15)' : 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))',
-          border: `1px solid ${referralCopied ? 'rgba(0,230,138,0.5)' : 'rgba(0,230,138,0.25)'}`,
+          background: referralCopied ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.15)' : 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.12), rgba(var(--labs-accent-rgb, 0,230,138),0.04))',
+          border: `1px solid ${referralCopied ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.5)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.25)'}`,
           color: 'var(--accent)', transition: 'all 0.2s',
         }}>
           {referralCopied ? '✓ Скопировано' : '📋 Сформировать направление (копировать в буфер)'}
@@ -274,7 +274,7 @@ const LabsProblemPanelsTab: React.FC = () => {
               {selectedSymptoms.map(s => (
                 <span key={s.id} onClick={() => removeSymptom(s.id)} style={{
                   padding: '4px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                  background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)',
+                  background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)', border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)',
                   color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   ✓ {s.symptom} <span style={{ fontSize: 9, opacity: 0.6 }}>✕</span>
@@ -307,7 +307,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                 {filteredSymptoms.map(s => (
                   <button key={s.id} onClick={() => addSymptom(s.id)} style={{
                     width: '100%', padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
-                    background: selectedSymptomIds.includes(s.id) ? 'rgba(0,230,138,0.06)' : 'transparent',
+                    background: selectedSymptomIds.includes(s.id) ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)' : 'transparent',
                     border: 'none', fontSize: 11, color: 'var(--text)',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
@@ -337,7 +337,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                   return p ? (
                     <button key={id} onClick={() => { setSelectedPanelId(id); setShowSymptomLink(false); }} style={{
                       padding: '4px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                      background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', color: 'var(--accent)',
+                      background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)', color: 'var(--accent)',
                       whiteSpace: 'nowrap',
                     }}>
                       {p.title}
@@ -414,7 +414,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                 </span>
                 <span style={{
                   padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600,
-                  background: 'rgba(0,230,138,0.08)', color: 'var(--accent)',
+                  background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', color: 'var(--accent)',
                 }}>
                   {panel.markers.length} маркеров
                 </span>

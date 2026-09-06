@@ -3,7 +3,8 @@ import { UCUM_MAP } from '../../../core/constants';
 import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
-import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge } from './LabsUI';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
+import { NativeIcon } from '../../native/NativeIcons';
 
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
@@ -319,7 +320,7 @@ export default function LabsCatalogTab({
     <div className="labs-labscatalog">
       {/* Header — premium */}
       <div style={{ ...LABS_CARD, padding:12, marginBottom:10, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', gap:10 }}>
-        <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background: catalogMode==='markers'? 'rgba(0,230,138,0.14)' : 'rgba(168,85,247,0.14)', border:`1px solid ${catalogMode==='markers'?'rgba(0,230,138,0.18)':'rgba(168,85,247,0.18)'}`, fontSize:16 }}>{catalogMode === 'markers' ? '📖' : '🩺'}</div>
+        <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background: catalogMode==='markers'? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(168,85,247,0.14)', border:`1px solid ${catalogMode==='markers'?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(168,85,247,0.18)'}`, color: catalogMode === 'markers' ? LABS_ACCENT : '#a855f7' }}><NativeIcon name={catalogMode === 'markers' ? 'bookOpen' : 'cross'} size={17} /></div>
         <div style={{ flex:1 }}>
           <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{catalogMode === 'markers' ? 'Каталог маркеров' : 'Обследования'}</div>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{catalogMode === 'markers' ? `${catalogEntries.length} маркеров • ${filledCount} заполнено для «${PHASE_LABELS[selectedPhase]}»` : `${INVESTIGATIONS.length} панелей • группировка по типу исследования`}</div>
@@ -331,12 +332,12 @@ export default function LabsCatalogTab({
       <div style={{ display:'flex', gap:4, padding:4, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10 }}>
         <button onClick={() => setCatalogMode('markers')} style={{
           flex:1, padding:'8px 0', fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-          background: catalogMode === 'markers' ? LABS_ACCENT : 'transparent', color: catalogMode === 'markers' ? '#000' : 'rgba(255,255,255,0.62)', border:'none', boxShadow: catalogMode==='markers'?'0 6px 16px rgba(0,230,138,0.22)':'none'
-        }}>📊 Маркеры</button>
+          background: catalogMode === 'markers' ? LABS_ACCENT : 'transparent', color: catalogMode === 'markers' ? '#000' : 'rgba(255,255,255,0.62)', border:'none', boxShadow: catalogMode==='markers'?'0 6px 16px rgba(var(--labs-accent-rgb, 0,230,138),0.22)':'none'
+        }}><NativeIcon name="chart" size={12} /> Маркеры</button>
         <button onClick={() => setCatalogMode('investigations')} style={{
           flex:1, padding:'8px 0', fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
           background: catalogMode === 'investigations' ? '#a855f7' : 'transparent', color: catalogMode === 'investigations' ? '#fff' : 'rgba(255,255,255,0.62)', border:'none', boxShadow: catalogMode==='investigations'?'0 6px 16px rgba(168,85,247,0.22)':'none'
-        }}>📋 Обследования</button>
+        }}><NativeIcon name="file" size={12} /> Обследования</button>
       </div>
 
       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
@@ -370,9 +371,9 @@ export default function LabsCatalogTab({
                       const expanded = invExpandedCards[inv.id] || false;
                       return (
                         <div key={inv.id} onClick={() => setInvExpandedCards(prev => ({ ...prev, [inv.id]: !prev[inv.id] }))} style={{
-                          background: expanded ? 'rgba(0,230,138,0.04)' : 'var(--bg-secondary)',
+                          background: expanded ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.04)' : 'var(--bg-secondary)',
                           borderRadius: 10, padding: '10px 12px', marginBottom: 6, cursor: 'pointer',
-                          border: expanded ? '1px solid rgba(0,230,138,0.2)' : '1px solid var(--border)',
+                          border: expanded ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)' : '1px solid var(--border)',
                           transition: 'all 0.15s',
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: expanded ? 8 : 0 }}>
@@ -380,7 +381,7 @@ export default function LabsCatalogTab({
                               <div style={{ fontWeight: 600, fontSize: 12, color: expanded ? 'var(--accent)' : 'var(--text)', marginBottom: 3 }}>{inv.name}</div>
                               <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35, marginBottom: 4 }}>{inv.description}</div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, background: 'rgba(0,230,138,0.08)', padding: '2px 6px', borderRadius: 4 }}>⏱ {inv.frequency}</span>
+                                <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', padding: '2px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="clock" size={9} /> {inv.frequency}</span>
                                 <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
                                   {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное' : 'Описательная оценка'}`}
                                 </span>
@@ -455,7 +456,7 @@ export default function LabsCatalogTab({
           return (
             <button key={key} onClick={() => onPhaseChange(key)} style={{
               padding:'7px 10px', borderRadius:10, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              background: active? LABS_ACCENT : 'transparent', color: active?'#000':'rgba(255,255,255,0.62)', border:'none', boxShadow: active?'0 4px 12px rgba(0,230,138,0.18)':'none'
+              background: active? LABS_ACCENT : 'transparent', color: active?'#000':'rgba(255,255,255,0.62)', border:'none', boxShadow: active?'0 4px 12px rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'none'
             }}>{label}</button>
           );
         })}
@@ -481,7 +482,7 @@ export default function LabsCatalogTab({
           padding:'9px 14px', borderRadius:12, border:'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
           background: saved ? '#22c55e' : filledCount > 0 ? LABS_ACCENT : 'rgba(255,255,255,0.06)',
           color: saved ? '#fff' : filledCount > 0 ? '#000' : 'rgba(255,255,255,0.45)',
-          fontWeight:800, fontSize:11, transition:'all 0.2s', whiteSpace:'nowrap', boxShadow: filledCount>0? '0 6px 16px rgba(0,230,138,0.18)' : 'none',
+          fontWeight:800, fontSize:11, transition:'all 0.2s', whiteSpace:'nowrap', boxShadow: filledCount>0? '0 6px 16px rgba(var(--labs-accent-rgb, 0,230,138),0.18)' : 'none',
         }}>
           {saving ? '⏳' : saved ? '✓ Сохранено' : `💾 ${filledCount}`}
         </button>
@@ -529,7 +530,7 @@ export default function LabsCatalogTab({
               <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: sysColors[sys]+'16', border:`1px solid ${sysColors[sys]}22`, fontSize:9, transition:'transform 0.2s', transform: isOpen?'rotate(90deg)':'rotate(0deg)', flexShrink:0 }}>▶</span>
               <span style={{ fontSize:15, flexShrink:0 }}>{sysIcons[sys] || '📋'}</span>
               <span style={{ flex:1 }}>{sysLabels[sys] || sys}</span>
-              <span style={{ fontSize:9, fontWeight:800, padding:'3px 8px', borderRadius:999, background: sysFilled===entries.length? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${sysFilled===entries.length? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.08)'}`, color: sysFilled===entries.length? LABS_ACCENT : 'rgba(255,255,255,0.55)' }}>
+              <span style={{ fontSize:9, fontWeight:800, padding:'3px 8px', borderRadius:999, background: sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.08)'}`, color: sysFilled===entries.length? LABS_ACCENT : 'rgba(255,255,255,0.55)' }}>
                 {sysFilled}/{entries.length}
               </span>
             </button>
@@ -546,8 +547,8 @@ export default function LabsCatalogTab({
                     return (
                       <div key={entry.code} style={{
                         display:'flex', alignItems:'center', gap:8, padding:'8px 9px', borderRadius:11,
-                        background: hasVal? 'rgba(0,230,138,0.08)' : existing? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
-                        border:`1px solid ${hasVal? 'rgba(0,230,138,0.16)' : existing? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.06)'}`,
+                        background: hasVal? 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)' : existing? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+                        border:`1px solid ${hasVal? 'rgba(var(--labs-accent-rgb, 0,230,138),0.16)' : existing? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.06)'}`,
                         borderLeft:`3px solid ${hasVal? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : sysColors[sys]+'AA'}`,
                         cursor:'pointer', transition:'transform 0.12s',
                       }} onClick={() => setDetailEntry(entry)}>
@@ -655,7 +656,7 @@ export default function LabsCatalogTab({
               </div>
 
               {/* Quick input in detail */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 10, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)', borderRadius: 10, marginBottom: 10 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0 }}>Значение:</span>
                 <input
                   value={val}

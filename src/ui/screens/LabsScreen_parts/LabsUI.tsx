@@ -1,14 +1,22 @@
 import React from 'react';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 // ═══════════════════════════════════════════════════════════════
 // LabsUI — единая дизайн-система блока «Анализы»
-// Glass + accent (#00e68a) + системные цвета · без потери информации
+// Glass + accent (за темой APK через --labs-accent, фолбэк минт) + системные цвета
 // ═══════════════════════════════════════════════════════════════
 
-export const LABS_ACCENT = '#00e68a';
-export const LABS_ACCENT_DIM = 'rgba(0,230,138,0.12)';
-export const LABS_ACCENT_BORDER = 'rgba(0,230,138,0.22)';
-export const LABS_ACCENT_SOFT = 'rgba(0,230,138,0.06)';
+export const LABS_ACCENT = 'var(--labs-accent, #00e68a)';
+const LABS_ACCENT_RGB = 'var(--labs-accent-rgb, 0,230,138)';
+/** Hex — как было; акцент — rgba() через триплет (конкатенация с var() невалидна). */
+export const labsWithAlpha = (c: string, hexAlpha: string): string => {
+  if (c !== LABS_ACCENT) return `${c}${hexAlpha}`;
+  const a = Math.round((parseInt(hexAlpha, 16) / 255) * 1000) / 1000;
+  return `rgba(${LABS_ACCENT_RGB}, ${a})`;
+};
+export const LABS_ACCENT_DIM = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.12)';
+export const LABS_ACCENT_BORDER = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.22)';
+export const LABS_ACCENT_SOFT = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.06)';
 
 export const LABS_SYS_COLOR: Record<string, string> = {
   hepatic: '#22c55e', renal: '#3b82f6', endocrine: '#a855f7',
@@ -28,11 +36,11 @@ export const LABS_SYS_LABEL: Record<string, string> = {
   other: 'Прочее',
 };
 
-export const LABS_SYS_ICON: Record<string, string> = {
-  hepatic: '🫁', renal: '🫘', endocrine: '🧬', hematologic: '🩸',
-  cardio: '❤️', metabolic: '⚡', reproductive: '🧫', neuro: '🧠', other: '📋',
-  blood: '🩸', vessels: '🫀', ghigf: '🧪', ins_axis: '🍬', thyroid: '🦋',
-  prostate: '🔬', skin: '✨', immunity: '🛡️', musculoskeletal: '🦴', neuro_toxicity: '🧠',
+export const LABS_SYS_ICON: Record<string, NativeIconName> = {
+  hepatic: 'lungs', renal: 'kidney', endocrine: 'layers', hematologic: 'droplet',
+  cardio: 'heart', metabolic: 'zap', reproductive: 'dot', neuro: 'cpu', other: 'file',
+  blood: 'droplet', vessels: 'activity', ghigf: 'flask', ins_axis: 'syringe', thyroid: 'butterfly',
+  prostate: 'search', skin: 'star', immunity: 'shield', musculoskeletal: 'move', neuro_toxicity: 'cpu',
 };
 
 // ── Карточки ──
@@ -52,7 +60,7 @@ export const LABS_CARD_FLAT: React.CSSProperties = {
 };
 
 export const LABS_GLASS_HERO: React.CSSProperties = {
-  background: 'linear-gradient(135deg, rgba(0,230,138,0.14) 0%, rgba(59,130,246,0.10) 50%, rgba(168,85,247,0.08) 100%)',
+  background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.14) 0%, rgba(59,130,246,0.10) 50%, rgba(168,85,247,0.08) 100%)',
   border: '1px solid rgba(255,255,255,0.07)',
   borderRadius: 20,
   backdropFilter: 'blur(12px)',
@@ -82,19 +90,19 @@ export const sysPillStyle = (active: boolean, color: string): React.CSSPropertie
   whiteSpace: 'nowrap',
   cursor: 'pointer',
   flexShrink: 0,
-  background: active ? color + '18' : 'var(--bg-secondary)',
+  background: active ? labsWithAlpha(color, '18') : 'var(--bg-secondary)',
   color: active ? color : 'var(--text-dim)',
-  border: `1px solid ${active ? color + '40' : 'var(--border)'}`,
+  border: `1px solid ${active ? labsWithAlpha(color, '40') : 'var(--border)'}`,
   transition: 'all 0.15s',
 });
 
 // ── Мини-компоненты ──
 
-export const LabsSectionHeader: React.FC<{ icon: string; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
+export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
   <div className="labs-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
     <div style={{
       width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: accent + '18', border: `1px solid ${accent}30`, fontSize: 15, flexShrink: 0,
+      background: labsWithAlpha(accent, '18'), border: `1px solid ${labsWithAlpha(accent, '30')}`, color: accent, flexShrink: 0,
     }}>{icon}</div>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{title}</div>
@@ -104,18 +112,18 @@ export const LabsSectionHeader: React.FC<{ icon: string; title: string; subtitle
   </div>
 );
 
-export const LabsKpiCard: React.FC<{ icon: string; label: string; value: string | number; sub?: string; color: string; accent?: string }> = ({ icon, label, value, sub, color }) => (
+export const LabsKpiCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string; accent?: string }> = ({ icon, label, value, sub, color }) => (
   <div className="labs-kpi" style={{
-    background: color + '0F',
-    border: `1px solid ${color}22`,
+    background: labsWithAlpha(color, '0F'),
+    border: `1px solid ${labsWithAlpha(color, '22')}`,
     borderRadius: 14,
     padding: '10px 10px 9px',
     textAlign: 'center',
     position: 'relative',
     overflow: 'hidden',
   }}>
-    <div style={{ position: 'absolute', top: -10, right: -10, width: 44, height: 44, borderRadius: '50%', background: color + '12' }} />
-    <div style={{ fontSize: 13, marginBottom: 2 }}>{icon}</div>
+    <div style={{ position: 'absolute', top: -10, right: -10, width: 44, height: 44, borderRadius: '50%', background: labsWithAlpha(color, '12') }} />
+    <div style={{ marginBottom: 2, color, display: 'flex', justifyContent: 'center' }}>{icon}</div>
     <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
     <div style={{ fontSize: 9, fontWeight: 700, color, marginTop: 2, letterSpacing: 0.3 }}>{label}</div>
     {sub && <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>{sub}</div>}
@@ -151,13 +159,13 @@ export const LabsRing: React.FC<{ value: number; size?: number; stroke?: number;
 export const LabsBadge: React.FC<{ color: string; bg?: string; children: React.ReactNode; small?: boolean }> = ({ color, bg, children, small }) => (
   <span style={{
     fontSize: small ? 8 : 9, fontWeight: 700, padding: small ? '1px 5px' : '2px 7px', borderRadius: 999,
-    background: bg || color + '18', color, border: `1px solid ${color}30`, whiteSpace: 'nowrap',
+    background: bg || labsWithAlpha(color, '18'), color, border: `1px solid ${labsWithAlpha(color, '30')}`, whiteSpace: 'nowrap',
   }}>{children}</span>
 );
 
-export const LabsEmpty: React.FC<{ icon: string; title: string; desc: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
+export const LabsEmpty: React.FC<{ icon: React.ReactNode; title: string; desc: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
   <div className="labs-empty" style={{ ...LABS_CARD_FLAT, textAlign: 'center', padding: 22 }}>
-    <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+    <div style={{ marginBottom: 8, color: 'var(--text-dim)', display: 'flex', justifyContent: 'center' }}>{icon}</div>
     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
     <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: action ? 10 : 0 }}>{desc}</div>
     {action}

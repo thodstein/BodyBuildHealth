@@ -15,7 +15,8 @@ export type NativeIconName =
   | 'star' | 'search' | 'chevronDown' | 'chevronRight' | 'check'
   | 'x' | 'plus'   | 'clock' | 'trash' | 'share' | 'moon'
   | 'layers' | 'inbox' | 'kettlebell' | 'syringe' | 'cross'
-  | 'ruler' | 'eye' | 'cpu' | 'dot' | 'pin' | 'phone' | 'sun' | 'send';
+  | 'ruler' | 'eye' | 'cpu' | 'dot' | 'pin' | 'phone' | 'sun' | 'send'
+  | 'lungs' | 'kidney' | 'butterfly' | 'arrowUp' | 'arrowDown';
 
 const PATHS: Record<NativeIconName, React.ReactNode> = {
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>),
@@ -71,6 +72,11 @@ const PATHS: Record<NativeIconName, React.ReactNode> = {
   phone: (<><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></>),
   sun: (<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>),
   send: (<><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></>),
+  lungs: (<><path d="M12 4v5" /><path d="M11 9C9 6.5 7 5.5 5 5.5c-2 0-3 2-3 5v5a2 2 0 0 0 2 2h4V9z" /><path d="M13 9c2-2.5 4-3.5 6-3.5 2 0 3 2 3 5v5a2 2 0 0 1-2 2h-4V9z" /></>),
+  kidney: (<path d="M12 3c-4 0-6 3.5-6 8s2 9 6 9c1.5 0 2-.5 2-2v-3a3 3 0 0 1 3-3h1c1.5 0 2-1.5 2-3.5S16.5 3 12 3z" />),
+  butterfly: (<><ellipse cx="8" cy="12" rx="4" ry="6" /><ellipse cx="16" cy="12" rx="4" ry="6" /><line x1="12" y1="8" x2="12" y2="16" /></>),
+  arrowUp: (<><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></>),
+  arrowDown: (<><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></>),
 };
 
 export interface NativeIconProps {

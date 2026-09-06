@@ -2,6 +2,7 @@ import React from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty } from './LabsUI';
+import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 const LAB_RANGES: Record<string, { min: number; max: number; name: string; unit: string }> = {};
 Object.entries(UCUM_MAP).forEach(([code, info]) => {
@@ -85,12 +86,12 @@ export const LabsOverview: React.FC<{
 
       {/* KPI — 4 карточки */}
       <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', padding:12 }}>
-        <LabsSectionHeader icon="📋" title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
+        <LabsSectionHeader icon={<NativeIcon name="file" size={15} />} title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-          <LabsKpiCard icon="🧪" label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
-          <LabsKpiCard icon="✓" label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
-          <LabsKpiCard icon="↑" label="Выше" value={highCount} color="#ef4444" sub="нормы" />
-          <LabsKpiCard icon="↓" label="Ниже" value={lowCount} color="#f97316" sub="нормы" />
+          <LabsKpiCard icon={<NativeIcon name="flask" size={13} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
+          <LabsKpiCard icon={<NativeIcon name="check" size={13} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
+          <LabsKpiCard icon={<NativeIcon name="arrowUp" size={13} />} label="Выше" value={highCount} color="#ef4444" sub="нормы" />
+          <LabsKpiCard icon={<NativeIcon name="arrowDown" size={13} />} label="Ниже" value={lowCount} color="#f97316" sub="нормы" />
         </div>
         {labs.length>0 && (
           <div style={{ marginTop:10, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999, overflow:'hidden', display:'flex' }}>
@@ -101,7 +102,7 @@ export const LabsOverview: React.FC<{
         )}
         {abnormalCount>0 && (
           <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.14)', display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontSize:12 }}>⚠️</span>
+            <span style={{ display: 'inline-flex', color: '#f97316' }}><NativeIcon name="alertTriangle" size={12} /></span>
             <span style={{ fontSize:10, color:'#fecaca', flex:1 }}><b>{abnormalCount}</b> из {labs.length} вне нормы — <b>{highCount} ↑</b> и <b>{lowCount} ↓</b>. Проверьте «Риски и индексы» и тренды.</span>
             <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.18)', color:'#fecaca', fontWeight:800 }}>{Math.round(abnormalCount/labs.length*100)}%</span>
           </div>
@@ -111,17 +112,17 @@ export const LabsOverview: React.FC<{
       {/* Системные группы */}
       {labs.length > 0 ? (
         <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.38)', backdropFilter:'blur(10px)' }}>
-          <LabsSectionHeader icon="🧬" title="Показатели по системам" subtitle="Сортировка — сначала отклонения, затем норма. Клик по строке — детали." />
+          <LabsSectionHeader icon={<NativeIcon name="layers" size={15} />} title="Показатели по системам" subtitle="Сортировка — сначала отклонения, затем норма. Клик по строке — детали." />
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {sortedSystems.map(([system, systemLabs]) => {
               const color = LABS_SYS_COLOR[system] || '#6b7280';
-              const icon = LABS_SYS_ICON[system] || '📋';
+              const icon: NativeIconName = LABS_SYS_ICON[system] || 'file';
               const label = LABS_SYS_LABEL[system] || system;
               const sysAbn = systemLabs.filter(l=> { const s=getLabStatus(l); return s==='high'||s==='low'; }).length;
               return (
                 <div key={system} style={{ borderRadius:14, overflow:'hidden', border:`1px solid ${color}18`, background:'rgba(255,255,255,0.02)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 11px', background: color+'10', borderBottom:`1px solid ${color}14` }}>
-                    <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: color+'18', border:`1px solid ${color}22`, fontSize:13 }}>{icon}</span>
+                    <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: color+'18', border:`1px solid ${color}22`, color }}><NativeIcon name={icon} size={14} /></span>
                     <span style={{ fontSize:12, fontWeight:800, color:'#fff', flex:1 }}>{label}</span>
                     <span style={{ fontSize:9, color:'#fff' }}>{systemLabs.length} маркеров</span>
                     {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
@@ -160,7 +161,7 @@ export const LabsOverview: React.FC<{
           </div>
         </div>
       ) : (
-        <LabsEmpty icon="🔬" title="Нет маркеров в этой фазе" desc="Введите анализы во вкладке «Текущие» или импортируйте PDF/фото. Данные группируются по системам автоматически." />
+          <LabsEmpty icon={<NativeIcon name="flask" size={26} />} title="Нет маркеров в этой фазе" desc="Введите анализы во вкладке «Текущие» или импортируйте PDF/фото. Данные группируются по системам автоматически." />
       )}
     </div>
   );

@@ -218,8 +218,8 @@ export default function ExtendedLabsTab({
                     return (
                       <div key={code} style={{
                         display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6,
-                        background: hasVal ? 'rgba(0,230,138,0.06)' : existing ? 'rgba(59,130,246,0.06)' : 'transparent',
-                        border: `1px solid ${hasVal ? 'rgba(0,230,138,0.12)' : existing ? 'rgba(59,130,246,0.12)' : 'transparent'}`,
+                        background: hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)' : existing ? 'rgba(59,130,246,0.06)' : 'transparent',
+                        border: `1px solid ${hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : existing ? 'rgba(59,130,246,0.12)' : 'transparent'}`,
                       }}>
                         <span style={{ fontSize: 9, fontWeight: 600, minWidth: 100, color: 'var(--text)' }}>
                           {info.name}
