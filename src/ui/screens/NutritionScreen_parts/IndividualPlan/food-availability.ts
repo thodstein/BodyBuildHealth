@@ -19,6 +19,8 @@ export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   // моллюски/деликатесы, которых нет в рознице
   'seafood_geoduck', 'seafood_conch', 'whelk', 'protein_whelk', 'seafood_abalone',
   'seafood_sea_urchin', 'seafood_lobster', 'seafood_oysters',
+  // P1a: улитки-эскарго — деликатес, не тарелка автоплана (лезли в предтрен).
+  'escargot', 'exotic_escargots', 'snails', 'seafood_snails',
   // фрукты
   'fruit_cherimoya', 'fruit_jackfruit', 'fruit_jackfruit_fresh', 'fruit_durian_fresh',
   'fruit_lychee', 'fruit_lychee_fresh', 'fruit_rambutan', 'fruit_rambutan_fresh',
@@ -305,6 +307,72 @@ export function isPeriLikeMeal(m: { type?: string } | null | undefined): boolean
   const t = String((m as any).type || '');
   if (t === 'preworkout' || t === 'postworkout' || t === 'intra' || t === 'presleep') return true;
   return (m as any)[INSULIN_WINDOW_MARK] === true;
+}
+
+// ─── Центральные баны гарниров (единая точка для ВСЕХ путей добора) ─────────
+// Иначе каждый путь (primary/посадка/dense/корректор/рецепт) ведёт свой список
+// и новый мусор (фунчоза, перловка, батат в завтраке) пролезает через забытый путь.
+// Источник: интернет-практика высокоуровневых дней — рис/крем/хлопья/хлеб/паста,
+// остальное (перловка/гречка/киноа/батат/крахмалы/мука) — объём/клетчатка/ЖКТ.
+/** HV-степлы вне сборки: объёмные/клетчаточные/ингредиенты (перловка/гречка/киноа/батат/крахмал/мука). */
+export const HV_STAPLE_BAN: ReadonlySet<string> = new Set([
+  'buckwheat', 'barley', 'grain_barley_pearl', 'quinoa', 'quinoa_flakes', 'grain_quinoa_flakes',
+  'oat_bran', 'grain_oat_bran', 'rice_bran', 'grain_rice_bran', 'wheat_bran', 'sweet_potato',
+  'grain_tapioca_starch', 'grain_arrowroot_starch', 'grain_coconut_flour',
+]);
+/** true если гарнир запрещён в HV-сборке (объём/клетчатка/ингредиент). */
+export function isHvStapleBanned(id: string): boolean {
+  if (!id) return false;
+  return HV_STAPLE_BAN.has(id);
+}
+/** В завтраке никогда: макароны/лапша/кус-кус + HV-объёмные (батат/перловка/киноа/крахмал).
+ * PRO-типология (все дни, не только HV): картошка/рис-гарнир/фунчоза в завтраке — мусорная
+ * корзина (кейсы MC3: potato_baked 150г в творог; P60: glass_noodles в обед + potato ведром).
+ * Завтрак = овсяная семья (oats/corn_flakes/cream_of_rice/rice_cream/muesli/хлеб), не гарнир. */
+const BREAKFAST_BAN_RE = /pasta|noodle|macaroni|spaghetti|couscous|quinoa|tapioca|arrowroot|potato|glass|funchose|ramen|udon|soba|lagman/;
+export function isBreakfastBannedCarb(id: string): boolean {
+  if (!id) return false;
+  const lid = id.toLowerCase();
+  if (BREAKFAST_BAN_RE.test(lid)) return true;
+  if (isHvStapleBanned(id)) return true;
+  if (lid === 'rice_white' || lid === 'rice_brown' || lid === 'rice_basmati' || lid === 'sweet_potato') return true;
+  if (lid === 'buckwheat' || lid === 'barley' || lid === 'grain_barley_pearl') return true;
+  // P1a: булгур — обеденный гарнир, не завтрашный (корректор тащил bulgur 181 г в завтрак).
+  if (lid.includes('bulgur')) return true;
+  return false;
+}
+/** В завтраке никогда как белок: мясо/птица/рыба (курица/говядина/тунец/лосось в кашу — мусор).
+ * Завтрак = яйца/творог/йогурт/сыворотка/казеин/тофу. */
+const BREAKFAST_MEAT_RE = /chicken|turkey|beef|pork|tuna|salmon|trout|mackerel|cod|hake|pollock|tilapia|minced|farsh|sausage|bacon|ham|duck|goose|lamb|veal|rabbit|sardine|herring|sprat/;
+export function isBreakfastBannedProtein(id: string): boolean {
+  if (!id) return false;
+  return BREAKFAST_MEAT_RE.test(id.toLowerCase());
+}
+/** В завтраке никогда как жир: наливаемые масла/животные жиры (соевое масло в творог — мусор).
+ * Завтрак-жир = орехи/авокадо/сливочное мало/молоко, не ложка масла. */
+const BREAKFAST_OIL_RE = /^oil_|_oil$|tallow|lard|goose_fat|duck_fat|mayonnaise|mayo_/;
+export function isBreakfastBannedFat(id: string): boolean {
+  if (!id) return false;
+  return BREAKFAST_OIL_RE.test(id.toLowerCase());
+}
+/** Тяжёлые животные жиры — никогда как отдельный пункт тарелки (tallow 26г к курице — мусор).
+ * Допустимы только внутри продукта, не ложкой. */
+export function isHeavyAnimalFat(id: string): boolean {
+  if (!id) return false;
+  const lid = id.toLowerCase();
+  return lid === 'tallow' || lid.includes('tallow') || lid.includes('lard') || lid.includes('goose_fat') || lid.includes('duck_fat');
+}
+/** Сладость как основа гарнира — никогда (печенье 40г + фунчоза 300г в обед — мусор).
+ * Сладости — только топ-ап ≤30г, не второй гарнир. */
+const SWEET_BASE_RE = /honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|cookie|chocolate|candy|halva|waffle/;
+export function isSweetBaseId(id: string): boolean {
+  if (!id) return false;
+  return SWEET_BASE_RE.test(id.toLowerCase());
+}
+/** Сколько углеводных пунктов (carb_slow/carb_fast) уже в приёме. */
+export function countCarbItems(m: { items?: Array<{ role?: string }> } | null | undefined): number {
+  if (!m || !Array.isArray((m as any).items)) return 0;
+  return (m as any).items.filter((it: any) => it.role === 'carb_slow' || it.role === 'carb_fast').length;
 }
 
 // ─── Portable-еда (работа: без разогрева, без запаха, без контейнера) ────

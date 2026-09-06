@@ -239,6 +239,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   refreshRecipeSuggestions: (dayIdx?: number) => void;
   /** ♻️ Пропуск приёма: удалить приём и пересобрать день (ребаланс ±3%), синк закупок/готовки. */
   removeMealRebalanced: (dayIdx: number, mealIdx: number) => void;
+  /** P4b: 🎯-цель приёма применить сразу к текущему дню (рескейл + ребаланс + синк). */
+  applyMealTargetNow: (label: string, dayIdx?: number) => void;
   updateMealTime: (mealIdx: number, time: string) => void;
   duplicateMeal: (mealIdx: number) => void;
   toggleAllergen: (id: string) => void;
@@ -1709,6 +1711,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (alm) additions.push(mk(alm, 15));
     }
     if (additions.length === 0) return;
+    // P1b: комбо — единый коктейль (порошок + хлопья[/орехи]), а не россыпь строк.
+    const _grp = 'protein:snack-combo';
+    for (const a of additions) (a as any)._cocktail = { kind: 'protein', name: '🥤 Протеиновый коктейль', group: _grp };
     saveUndo();
     const apply = (items: any[]) => [...items, ...additions];
     if (resolved.plan === 'day') {
@@ -1885,6 +1890,54 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       refreshRecipeCookingCardIfActive(resolved.plan === 'week' ? days[resolved.day] : dayPlan, resolved.plan === 'three' ? updated : threeDayPlan, resolved.plan === 'week' ? updated : weekPlan);
     }
     if (typeof (window as any).showToast === 'function') (window as any).showToast('♻️ День пересобран без пропущенного приёма', 'success');
+  };
+
+  /** P4b: 🎯-цель приёма применяется СРАЗУ к текущему дню (раньше — только localStorage
+   * до следующей генерации, текущий приём не менялся). Рескейл приёма к цели через
+   * applyMealTargetOverrides (кламп 0.7–1.4 + инвариант дня ±5%) + синк недели/закупок. */
+  const applyMealTargetNow = (label: string, dayIdx?: number) => {
+    let ov: { label: string; p?: number; f?: number; c?: number } | undefined;
+    try {
+      const cur: any[] = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
+      ov = cur.find((o: any) => o && o.label === label);
+    } catch { ov = undefined; }
+    if (!ov || (ov.p == null && ov.f == null && ov.c == null)) return;
+    const di = dayIdx ?? 0;
+    const dayTargets = {
+      kcal: effectiveKcal > 0 ? effectiveKcal : 0,
+      p: effectiveP > 0 ? effectiveP : 0,
+      f: effectiveF > 0 ? effectiveF : 0,
+      c: effectiveC > 0 ? effectiveC : 0,
+    };
+    saveUndo();
+    if (di === 0) {
+      if (!dayPlan?.meals?.length) return;
+      const applied = applyMealTargetOverrides(dayPlan.meals as any, [ov] as any, dayTargets as any);
+      const nextDay = { ...dayPlan, meals: applied.meals, totals: sumDayTotals(applied.meals as any) };
+      setDayPlan(nextDay as any);
+      if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+        const days = [...weekPlan.days];
+        days[weekEditDay] = { ...days[weekEditDay], meals: applied.meals, totals: sumDayTotals(applied.meals as any) };
+        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+        setShoppingList(buildShoppingFromPlans(days));
+      } else {
+        setShoppingList(buildShoppingFromPlans([nextDay]));
+      }
+    } else {
+      const resolved = _resolvePlanDay(di);
+      if (!resolved || (resolved as any).plan === 'day') return;
+      const srcPlan: any = (resolved as any).plan === 'three' ? threeDayPlan : weekPlan;
+      const rday: number = (resolved as any).day;
+      if (!srcPlan?.days?.[rday]) return;
+      const applied = applyMealTargetOverrides(srcPlan.days[rday].meals as any, [ov] as any, dayTargets as any);
+      const days = [...srcPlan.days];
+      days[rday] = { ...days[rday], meals: applied.meals, totals: sumDayTotals(applied.meals as any) };
+      const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
+      if ((resolved as any).plan === 'three') setThreeDayPlan(updated); else setWeekPlan(updated);
+      setDayPlan(days[rday] as any);
+      setShoppingList(buildShoppingFromPlans(days));
+    }
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(`🎯 Цель «${label}» применена к текущему дню`, 'success');
   };
 
   // Эпик E: единые операции правки дня, синхронные в weekPlan при weekEditDay
@@ -2332,10 +2385,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚖️ Первый ужа́т до ×${_newScale} — второй влезет полноценно`, 'info' as any);
       }
     }
-    if (_rawRoom <= 0 && !_shrinkNote) {
-      if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём уже закрыт первым рецептом — «${recipe.name}» влезет только мини-порцией, день может перебрать`, 'warning');
-      _roomKcal = 150;
-    } else if (_rawRoom < 0.25 * _targetKcal) {
+    // P4a: в закрытый приём второй молча мини-порцией НЕ льём (раньше: тихие 150 ккал +
+    // «день может перебрать» + ребаланс резал другие приёмы = каша). Честный выбор:
+    // замена второго идёт как раньше; новый второй в закрытый приём — только через ⚖️
+    // (shrinkFirst выше) либо замена первого. Пользователь решает явно.
+    if (_rawRoom <= 0 && !_shrinkNote && !_isReplace) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём закрыт первым рецептом — места нет. Нажмите ⚖️ рядом с блюдом (ужать первый ×0.65 и добавить полноценно) или замените первый рецепт`, 'warning');
+      setRecipePickerMeal(null);
+      return;
+    } else if (_rawRoom < 0.25 * _targetKcal && !_shrinkNote && !_isReplace) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast(`ℹ️ Места под второй рецепт мало (~${Math.round(_rawRoom)} ккал) — берём мини-порцию`, 'info' as any);
       _roomKcal = _rawRoom;
     }
@@ -3687,6 +3745,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     weightMode, setWeightMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,
+    applyMealTargetNow,
     updateMealTime, duplicateMeal,
     weekEditDay, openWeekDayForEdit, switchPlanDays,
     addFoodToMeal, addSnackComboToMeal, undoLast,
