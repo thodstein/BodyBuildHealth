@@ -124,6 +124,25 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(document.body.textContent).toMatch(/согласие/);
   });
 
+  it('ось humerus-2026: флаги дают строку и предупреждение', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByLabelText(/Ось humerus-2026/));
+    fireEvent.click(screen.getByLabelText(/Скрут корпуса в атаку/));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    // строка оси в rationale плана (предупреждение — в safetyWarnings шага качества)
+    expect(document.body.textContent).toMatch(/Ось: риск guarded/);
+  });
+
+  it('медли: ввод попыток даёт Медли-факт в плане', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.change(screen.getByLabelText(/Медли \(армлифтинг\)/), { target: { value: 'rt_saxon_hub' } });
+    expect(document.body.textContent).toContain('Попытки медли');
+    fireEvent.change(screen.getByLabelText('Попытка 1 кг'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Попытка 2 кг'), { target: { value: '80' } });
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(document.body.textContent).toMatch(/Медли-факт/);
+  });
+
   it('печать: PRO-сводка со циклом попадает в HTML', () => {
     const origOpen = window.open;
     const writes: string[] = [];

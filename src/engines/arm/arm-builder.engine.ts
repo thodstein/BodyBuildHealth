@@ -535,6 +535,12 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     else weekMult = w <= 3 ? 0.9 : 1;
     // tendon deload первые 4 недели для beginner — ещё ×0.85 сверху уже учтённого tendonMult, но тут дополнительно для объёма
     if (level === 'beginner' && w <= 4) weekMult *= 0.92;
+    // R8: внутрицикловой %прогрессии весов (СРЦ №4 — 0.5%/нед): работает только
+    // при ЯВНО заданном correctionPct (дефолт — ровно 1.0, старые планы целы).
+    // Кросс-мезо ставка из того же поля применяется отдельно (см. выше).
+    const cpRaw = Number((input as any).correctionPct);
+    const cpWeekly = Number.isFinite(cpRaw) && cpRaw > 0 && cpRaw <= 5 ? cpRaw : 0;
+    const weekLoadMult = cpWeekly > 0 ? Math.pow(1 + cpWeekly / 100, w - 1) : 1;
     const taper = isPeaking;
     // TOP wave-5/12: Grip-RPE фаза недели (явная или авто-волна по неделям плана)
     let gripPhaseMult = 1;
@@ -632,7 +638,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
               effectiveWorkMax = { ...effectiveWorkMax, [mus]: baseFromPrev };
             }
           }
-          const wgt = weightForMuscle(mus, effectiveWorkMax, pct);
+          const wgtBase = weightForMuscle(mus, effectiveWorkMax, pct);
+          const wgt = weekLoadMult === 1 ? wgtBase : Math.round(wgtBase * weekLoadMult * 2) / 2;
           workSets.push({
             reps: repVal,
             rir,
@@ -813,6 +820,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Сплит: ${pattern.name} (${pattern.sessionsPerRotation}x/${pattern.rotationDays}дн)`);
   rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
   if (cycleNote) rationale.push(cycleNote);
+  try {
+    const cp = Number((input as any).correctionPct);
+    if (Number.isFinite(cp) && cp > 0 && cp <= 5) rationale.push(`Прогрессия весов +${cp}%/нед внутри цикла (СРЦ) + кросс-мезо из того же поля.`);
+  } catch { /* опционально */ }
   if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
   const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');

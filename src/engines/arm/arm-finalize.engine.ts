@@ -84,26 +84,47 @@ function ensureSidePressureGuard(plan: ArmPlan): void {
   }
 }
 
+function tryTableSwap(plan: ArmPlan, wkIdx: number, why: string): boolean {
+  const wk = plan.weeks[wkIdx];
+  const supportIdx = wk.sessions.findIndex(s => !s.tableTime && s.sessionTag === 'Support');
+  if (supportIdx >= 0 && wk.sessions[supportIdx].exercises.length < 6) {
+    wk.sessions[supportIdx].tableTime = true;
+    wk.sessions[supportIdx].sessionTag = 'TableTech';
+    wk.sessions[supportIdx].exercises.unshift({
+      muscle: 'pronators' as any, name: 'Пронация на блоке (90)', role: 'primary', character: 'техника' as any,
+      sets: 2, repsRange: [8,12], rir: 3,
+      workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }, { reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
+      movementPattern: 'pronation' as any, substitutionGroup: 'pronation', isTable: true,
+    });
+    plan.rationale.push(`Н${wk.week}: ${why} — автозамена Support→TableTech (Кузнецов VIII ≥50%)`);
+    return true;
+  }
+  plan.rationale.push(`Н${wk.week}: ${why} — нет места под TableTech, добавьте стол вручную`);
+  return false;
+}
+
 function ensureTableTime(plan: ArmPlan, targetRatio: number): void {
+  // R8: минимум столовых сессий из именного цикла — только с cycleId и кроме
+  // чистого армлифтинга (там стол другой природы; маппинг мутный — см. R7).
+  // Без цикла — поведение байт-в-байт как раньше.
+  let cycleTableFloor = 0;
+  let cycleName = '';
+  try {
+    const cid = String((plan.inputSnapshot as any)?.cycleId || '');
+    const c = cid ? getArmCycle(cid) : undefined;
+    if (c && c.tablePerWeek > 0 && plan.discipline !== 'armlifting') {
+      cycleTableFloor = c.tablePerWeek;
+      cycleName = c.name;
+    }
+  } catch { cycleTableFloor = 0; }
   for (const wk of plan.weeks) {
     const tableSess = wk.sessions.filter(s => s.tableTime).length;
     const ratio = tableSess / Math.max(1, wk.sessions.length);
     if (ratio < 0.3 && targetRatio >= 0.5) {
       // PRO: не только warning, но и swap одной Support сессии на TableTech если есть место
-      const supportIdx = wk.sessions.findIndex(s => !s.tableTime && s.sessionTag === 'Support');
-      if (supportIdx >= 0 && wk.sessions[supportIdx].exercises.length < 6) {
-        wk.sessions[supportIdx].tableTime = true;
-        wk.sessions[supportIdx].sessionTag = 'TableTech';
-        wk.sessions[supportIdx].exercises.unshift({
-          muscle: 'pronators' as any, name: 'Пронация на блоке (90)', role: 'primary', character: 'техника' as any,
-          sets: 2, repsRange: [8,12], rir: 3,
-          workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }, { reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
-          movementPattern: 'pronation' as any, substitutionGroup: 'pronation', isTable: true,
-        });
-        plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% — автозамена Support→TableTech (Кузнецов VIII ≥50%)`);
-      } else {
-        plan.rationale.push(`Н${wk.week}: table time ${(ratio*100).toFixed(0)}% <30% при цели 50% — добавить стол`);
-      }
+      tryTableSwap(plan, plan.weeks.indexOf(wk), `table time ${(ratio*100).toFixed(0)}% <30% при цели 50%`);
+    } else if (tableSess < cycleTableFloor) {
+      tryTableSwap(plan, plan.weeks.indexOf(wk), `цикл ${cycleName} просит стол ${cycleTableFloor}×/нед, в плане ${tableSess}`);
     }
   }
 }

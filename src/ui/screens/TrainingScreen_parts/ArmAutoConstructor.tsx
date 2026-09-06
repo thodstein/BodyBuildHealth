@@ -25,7 +25,7 @@ import { buildArmCalendar, superSeriesYear } from '../../../engines/arm/arm-cale
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
-import { ARM_MEDLEYS } from '../../../engines/arm/arm-medley.engine';
+import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
@@ -141,6 +141,17 @@ export function ArmAutoConstructor() {
   const [cycMedley, setCycMedley] = useState<string>('');
   const [cycFor, setCycFor] = useState<boolean>(false);
   const [cycForSpec, setCycForSpec] = useState<string>('support');
+  // R8: ось humerus-2026 + попытки медли (опционально, пусто = как раньше)
+  const [cycAxisOn, setCycAxisOn] = useState<boolean>(false);
+  const [axTrunk, setAxTrunk] = useState<boolean>(false);
+  const [axMisalign, setAxMisalign] = useState<boolean>(false);
+  const [axBehind, setAxBehind] = useState<boolean>(false);
+  const [axDorsal, setAxDorsal] = useState<boolean>(false);
+  const [axCold, setAxCold] = useState<boolean>(false);
+  const [axDefense, setAxDefense] = useState<boolean>(false);
+  const [axSideMax, setAxSideMax] = useState<boolean>(false);
+  const [medAttKg, setMedAttKg] = useState<string[]>(['', '', '']);
+  const [medAttOk, setMedAttOk] = useState<boolean[]>([true, true, true]);
 
   // TOP wave-13: автоподстановка веса/возраста из профиля (только пустые поля)
   useEffect(() => {
@@ -381,6 +392,17 @@ export function ArmAutoConstructor() {
         medleyId: cycMedley || undefined,
         forMode: cycFor || undefined,
         forSpecialization: cycFor ? (cycForSpec as any) : undefined,
+        // R8: ось и попытки — только при явном вводе, иначе движок их не видит
+        axisCheck: cycAxisOn ? {
+          ...(axTrunk ? { trunkRotatedTowardAttack: true } : {}),
+          ...(axMisalign ? { wristElbowShoulderAligned: false } : {}),
+          ...(axBehind ? { wristBehindShoulder: true } : {}),
+          ...(axDorsal ? { wristExtendedDorsally: true } : {}),
+          ...(axCold ? { coldNoWarmup: true } : {}),
+          ...(axDefense ? { fightingFromDefense: true } : {}),
+          ...(axSideMax ? { sideMaxAttempt: true } : {}),
+        } : undefined,
+        medleyAttempts: cycMedley ? medAttKg.map((kg, i) => ({ eventIdx: i, weightKg: parseFloat(kg) || 0, success: medAttOk[i] !== false })).filter((a) => a.weightKg > 0) : undefined,
         tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
         tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
         calStartIso: proDate || undefined,
@@ -725,12 +747,41 @@ export function ArmAutoConstructor() {
                 <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAkimov} onChange={e=>setCycAkimov(e.target.checked)} /> Акимов-крюк</label>
                 {cycAkimov && <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycComp} onChange={e=>setCycComp(e.target.checked)} /> Соревн. период</label>}
                 <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycFor} onChange={e=>setCycFor(e.target.checked)} /> FOR-7 (adv+)</label>
+                <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={cycAxisOn} onChange={e=>setCycAxisOn(e.target.checked)} /> Ось humerus-2026</label>
                 {cycFor && <label style={{ ...SMALL }}>FOR-домен<br/>
                   <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)} style={{ background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px' }}>
                     <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
                   </select>
                 </label>}
               </div>
+              {cycAxisOn && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap', padding: 8, borderRadius: 8, border: '1px dashed #1f3a5f' }}>
+                  <span style={{ ...SMALL, color: '#fff' }}>Ось кисть–локоть–плечо (что было):</span>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axTrunk} onChange={e=>setAxTrunk(e.target.checked)} /> Скрут корпуса в атаку</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axMisalign} onChange={e=>setAxMisalign(e.target.checked)} /> Ось разорвана</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axBehind} onChange={e=>setAxBehind(e.target.checked)} /> Запястье позади плеча</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axDorsal} onChange={e=>setAxDorsal(e.target.checked)} /> Кисть разогнута назад</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axCold} onChange={e=>setAxCold(e.target.checked)} /> Холод без разминки</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axDefense} onChange={e=>setAxDefense(e.target.checked)} /> Борьба из защиты</label>
+                  <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={axSideMax} onChange={e=>setAxSideMax(e.target.checked)} /> Макс бокового</label>
+                </div>
+              )}
+              {cycMedley && (()=>{
+                let events: Array<{ implement: string }> = [];
+                try { events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>; } catch { events = []; }
+                if (!events.length) return null;
+                return (
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, border: '1px dashed #1f3a5f' }}>
+                    <div style={{ ...SMALL, color: '#fff', marginBottom: 6 }}>Попытки медли (факт → сводка):</div>
+                    {events.map((ev, i)=>(
+                      <label key={i} style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>{ev.implement}
+                        <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" style={{ width: 70, background:'#060d1d', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px' }} />
+                        <input aria-label={`Попытка ${i + 1} удачна`} type="checkbox" checked={medAttOk[i] !== false} onChange={e=>setMedAttOk(prev=>prev.map((v, j)=>j===i?e.target.checked:v))} />
+                      </label>
+                    ))}
+                  </div>
+                );
+              })()}
               {cycId && (()=>{
                 try {
                   const f = fitCycleToWeeks(cycId, weeks);
