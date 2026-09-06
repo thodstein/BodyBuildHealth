@@ -37,6 +37,8 @@ import { ArmHeatmap } from './ArmHeatmap';
 import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui';
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
+import { isNativeApp } from '../../../core/app-platform';
+import { ensureArmApkStyles } from './arm-apk-loader';
 
 type Step = 'params'|'grip'|'split'|'plan'|'quality'|'weights';
 
@@ -164,6 +166,11 @@ export function ArmAutoConstructor() {
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // APK-слой: подгрузка styles-native-arm.css только в native (в TG/web no-op).
+  useEffect(() => {
+    ensureArmApkStyles();
   }, []);
 
   const workMax = useMemo(() => {
@@ -453,11 +460,11 @@ export function ArmAutoConstructor() {
   const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
 
   return (
-    <div className="train-arm" style={{ maxWidth: 980, margin: '0 auto', padding: 12 }}>
+    <div className={isNativeApp() ? 'train-arm arm-apk' : 'train-arm'} style={{ maxWidth: 980, margin: '0 auto', padding: 12 }}>
       <h2 style={H}>🤝 Арм-конструктор PRO</h2>
       <p style={SMALL}>Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard.</p>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div data-arm="steps" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {(['params','grip','split','plan','quality','weights'] as Step[]).map(s => (
           <button key={s} onClick={()=>setStep(s)} style={{ ...STEP_PILL(step===s), background: step===s ? ACCENT : 'rgba(255,255,255,0.06)', color: step===s ? '#001' : '#fff' }}>
             {s === 'params' ? '🎛 Параметры' : s === 'grip' ? '✊ Хват' : s === 'split' ? '🗓 Сплит' : s === 'plan' ? '📋 План' : s === 'quality' ? '📊 Качество' : '🏋️ Веса'}
@@ -465,7 +472,7 @@ export function ArmAutoConstructor() {
         ))}
       </div>
 
-      {msg && <div style={{ ...CARD, background: 'rgba(0,230,138,0.12)', borderColor: ACCENT, color: '#fff' }}>{msg}</div>}
+      {msg && <div data-arm="msg" style={{ ...CARD, background: 'rgba(0,230,138,0.12)', borderColor: ACCENT, color: '#fff' }}>{msg}</div>}
 
       {step === 'params' && (
         <div style={CARD}>
@@ -840,7 +847,7 @@ export function ArmAutoConstructor() {
         <div style={CARD}>
           <h3 style={H}>🗓 Выбор сплита</h3>
           <p style={SMALL}>Ранжирование по уровню/цели/технике/хватe/дням ({daysPerWeek}/нед). Зелёный — лучший.</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div data-arm="split-list" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {ranked.slice(0,6).map((r,i)=> (
               <div key={r.pattern.id} onClick={()=>setPatternId(r.pattern.id)} style={{ padding:10, borderRadius:12, border: `1px solid ${patternId===r.pattern.id ? ACCENT : i===0 ? 'rgba(0,230,138,0.4)' : '#1f3a5f'}`, background: patternId===r.pattern.id ? 'rgba(0,230,138,0.12)' : i===0 ? 'rgba(0,230,138,0.06)' : '#0a1629', cursor:'pointer' }}>
                 <div style={{ color:'#fff', fontWeight:700 }}>{i===0 ? '★ ' : ''}{r.pattern.name} <span style={{ color:'#9ab', fontWeight:400 }}>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span> <span style={{ float:'right', color: ACCENT }}>{r.score}</span></div>
@@ -860,7 +867,7 @@ export function ArmAutoConstructor() {
             <>
               <h3 style={H}>📋 План — {builtPlan.pattern.name}</h3>
               <div style={SMALL}>{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+              <div data-arm="week-pills" style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
                 {builtPlan.weeks.map((w:any)=> (
                   <button key={w.week} onClick={()=>setWeekSel(w.week)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid', borderColor: weekSel===w.week ? ACCENT : '#1f3a5f', background: weekSel===w.week ? ACCENT : '#0a1629', color: weekSel===w.week ? '#001' : '#9ab', fontWeight: weekSel===w.week ? 700 : 400, cursor:'pointer' }}>
                     Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}
