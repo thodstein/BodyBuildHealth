@@ -3102,7 +3102,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (

@@ -861,3 +861,41 @@
   bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
   max-width: calc(100% - 24px);
 }
+
+/* ─── 19. ТЕЛЕФОН: длинные строки переносятся, тапы без подсветки ── */
+.support-screen.support-root.train-sup {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.support-screen.support-root [data-sup] {
+  overflow-wrap: break-word;
+}
+
+/* Любая пропущенная таблица внутри разделов — горизонтальный скролл, не рвёт страницу */
+.support-screen.support-root [data-sup] table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.support-screen.support-root * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Подписи таббара не переносятся на вторую строку на узких экранах */
+.support-screen.support-root .support-subbar button > span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ─── 19b. ТЕЛЕФОН ≤480px: режимные сетки в одну колонку ────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-calctools [style*='gridTemplateColumns'],
+  .support-screen.support-root .sup-pepcalc [style*='gridTemplateColumns'],
+  .support-screen.support-root .sup-research [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+}

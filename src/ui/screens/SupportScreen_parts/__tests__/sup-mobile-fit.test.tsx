@@ -11,7 +11,7 @@
  * табличные правила — строковыми ассертами по CSS-файлам.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
@@ -360,7 +360,11 @@ describe('SUP mobile fit (360px)', () => {
       '92dvh',
       'safe-area-inset-bottom',
       'grid-template-columns: 1fr',
-      "bottom:70",
+      'bottom:70',
+      'overflow-wrap: break-word',
+      '-webkit-tap-highlight-color: transparent',
+      'text-size-adjust: 100%',
+      'text-overflow: ellipsis',
     ]) {
       expect(css, hook).toContain(hook);
     }
@@ -368,5 +372,34 @@ describe('SUP mobile fit (360px)', () => {
     for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp']) {
       expect(native, hook).toContain(hook);
     }
+  });
+
+  it('топбары не перекрывают контент: отступ ≥ высоты шапки, горизонталь зажата', () => {
+    const { container } = render(<SupportScreen />);
+    const root = container.querySelector('.support-screen') as HTMLElement;
+    expect(root.style.overflowX, 'no page h-scroll').toBe('clip');
+    // Генератор: шапка BackNav+пилюли ≈120px → отступ 124px
+    const calc = container.querySelector('.support-hero-card[data-key="calc"]') as HTMLElement;
+    expect(calc, 'calc card').not.toBeNull();
+    fireEvent.click(calc as HTMLElement);
+    expect(container.querySelector("[data-sup='topbar']"), 'gen topbar').not.toBeNull();
+    expect(root.style.paddingTop, 'gen offset').toBe('124px');
+    cleanup();
+    // Протоколы: шапка BackNav ≈57px → отступ 60px
+    const second = render(<SupportScreen />);
+    const proto = second.container.querySelector('.support-hero-card[data-key="protocols"]') as HTMLElement;
+    fireEvent.click(proto);
+    const root2 = second.container.querySelector('.support-screen') as HTMLElement;
+    expect(root2.style.paddingTop, 'protocols offset').toBe('60px');
+    second.unmount();
+    // Инфо: шапка BackNav+пилюли ≈123px на 360px → отступ 132px
+    const third = render(<SupportScreen />);
+    const info = third.container.querySelector('.support-hero-card[data-key="info"]') as HTMLElement;
+    expect(info, 'info card').not.toBeNull();
+    fireEvent.click(info);
+    expect(third.container.querySelector("[data-sup='topbar']"), 'info topbar').not.toBeNull();
+    const root3 = third.container.querySelector('.support-screen') as HTMLElement;
+    expect(root3.style.paddingTop, 'info offset').toBe('132px');
+    third.unmount();
   });
 });
