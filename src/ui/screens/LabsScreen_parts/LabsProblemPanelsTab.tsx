@@ -356,73 +356,81 @@ const LabsProblemPanelsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Phase filter pills */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {['all', 'baseline', 'on_cycle', 'pct', 'fertility'].map(ph => (
-          <button key={ph} onClick={() => setFilterPhase(ph)} style={{
-            padding: '5px 12px', borderRadius: 14, fontSize: 10, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-            transition: 'all 0.2s',
-            background: filterPhase === ph ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: filterPhase === ph ? '#000' : '#fff',
-            border: `1px solid ${filterPhase === ph ? 'var(--accent)' : 'var(--border)'}`,
-          }}>
-            {ph === 'all' ? 'Все фазы' : PHASE_LABELS[ph] || ph}
-          </button>
-        ))}
+      {/* Phase filter pills — TOP APK 44px */}
+      <div className="labs-filter-row" style={{ display:'flex', gap:8, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', padding:'2px 2px 4px' }}>
+        {['all', 'baseline', 'on_cycle', 'pct', 'fertility'].map(ph => {
+          const active = filterPhase === ph;
+          return (
+            <button key={ph} onClick={() => setFilterPhase(ph)} aria-pressed={active} style={{
+              padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+              whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:44,
+              transition:'all 0.2s',
+              background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
+              color: active ? '#0a1a08' : '#fff',
+              border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+              boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+            }}>
+              {ph === 'all' ? 'Все фазы' : PHASE_LABELS[ph] || ph}
+            </button>
+          );
+        })}
       </div>
-      {/* Urgency filter pills */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {['all', 'routine', 'urgent', 'emergency'].map(ur => (
-          <button key={ur} onClick={() => setFilterUrgency(ur)} style={{
-            padding: '5px 12px', borderRadius: 14, fontSize: 10, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-            transition: 'all 0.2s',
-            background: filterUrgency === ur ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: filterUrgency === ur ? '#000' : '#fff',
-            border: `1px solid ${filterUrgency === ur ? 'var(--accent)' : 'var(--border)'}`,
-          }}>
-            {ur === 'all' ? 'Все срочности' : URGENCY_LABELS[ur] || ur}
-          </button>
-        ))}
+      {/* Urgency filter pills — TOP APK 44px */}
+      <div className="labs-filter-row" style={{ display:'flex', gap:8, marginBottom:10, overflowX:'auto', scrollbarWidth:'none', padding:'2px 2px 6px' }}>
+        {['all', 'routine', 'urgent', 'emergency'].map(ur => {
+          const active = filterUrgency === ur;
+          return (
+            <button key={ur} onClick={() => setFilterUrgency(ur)} aria-pressed={active} style={{
+              padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+              whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:44,
+              transition:'all 0.2s',
+              background: active ? 'var(--accent)' : 'rgba(21,38,66,0.60)',
+              color: active ? '#000' : '#fff',
+              border: active ? '1px solid var(--accent)' : '1px solid rgba(140,190,255,0.14)',
+            }}>
+              {ur === 'all' ? 'Все срочности' : URGENCY_LABELS[ur] || ur}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Panel cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Panel cards — TOP APK 64px+ */}
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
         {filteredPanels.map(panel => (
           <button key={panel.id} onClick={() => setSelectedPanelId(panel.id)} style={{
-            padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-            background: 'rgba(20,22,30,0.4)', border: `1px solid ${URGENCY_COLORS[panel.urgency]}20`,
-            borderLeft: `3px solid ${URGENCY_COLORS[panel.urgency]}`,
-            color: 'var(--text)', transition: 'all 0.2s',
-            display: 'flex', gap: 10,
+            padding:'14px 14px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%', minHeight:72,
+            background:'linear-gradient(180deg, rgba(21,38,66,0.72), rgba(12,23,40,0.72))', border:`1px solid ${URGENCY_COLORS[panel.urgency]}30`,
+            borderLeft:`3px solid ${URGENCY_COLORS[panel.urgency]}`,
+            boxShadow:'0 8px 22px rgba(0,0,0,0.35)',
+            color:'#fff', transition:'all 0.2s',
+            display:'flex', gap:10, alignItems:'center',
           }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
                 <span style={{
-                  padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600,
-                  background: `${URGENCY_COLORS[panel.urgency]}15`,
-                  color: URGENCY_COLORS[panel.urgency],
+                  padding:'3px 8px', borderRadius:999, fontSize:10, fontWeight:800,
+                  background:`${URGENCY_COLORS[panel.urgency]}1E`,
+                  color:URGENCY_COLORS[panel.urgency], border:`1px solid ${URGENCY_COLORS[panel.urgency]}30`,
                 }}>
                   {URGENCY_LABELS[panel.urgency]}
                 </span>
                 <span style={{
-                  padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600,
-                  background: 'var(--bg-secondary)', color: '#fff',
+                  padding:'3px 8px', borderRadius:999, fontSize:10, fontWeight:800,
+                  background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.10)',
                 }}>
                   {PHASE_LABELS[panel.phase]}
                 </span>
                 <span style={{
-                  padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600,
-                  background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', color: 'var(--accent)',
+                  padding:'3px 8px', borderRadius:999, fontSize:10, fontWeight:800,
+                  background:'rgba(var(--labs-accent-rgb, 0,230,138),0.10)', color:'var(--accent)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.20)',
                 }}>
                   {panel.markers.length} маркеров
                 </span>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{panel.title}</div>
-              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>{panel.problem}</div>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>{panel.title}</div>
+              <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>{panel.problem}</div>
             </div>
-            <span style={{ color: URGENCY_COLORS[panel.urgency], fontSize: 14, opacity: 0.5 }}>→</span>
+            <span style={{ color:URGENCY_COLORS[panel.urgency], fontSize:16, flexShrink:0 }}>→</span>
           </button>
         ))}
       </div>

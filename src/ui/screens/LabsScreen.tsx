@@ -1648,11 +1648,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   }}>{label}</button>
                 ))}
               </div>
-              <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)' }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
+              <div className="card" style={{ ...LABS_CARD, borderLeft:`3px solid ${LABS_ACCENT}` }}>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:6, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10 }}>
                   📋 План сдачи: {PHASE_LABELS[selectedPhase]}
                 </div>
-                <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.5 }}>
+                <div style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.6 }}>
                   {(() => {
                     const phases: Record<string,string> = {
                        baseline:`Перед началом курса — полный базовый скрининг (${requiredLabs.length} маркеров, включая ОАМ)`,
@@ -1664,31 +1664,31 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     return phases[selectedPhase] || 'Следуйте рекомендованному графику';
                   })()}
                 </div>
-                <div style={{ display:'grid', gap:6 }}>
+                <div style={{ display:'grid', gap:8 }}>
                   {Object.entries(labsBySystem).map(([system, codes]) => {
                     const submitted = codes.filter(c => submittedCodes.has(c.toUpperCase())).length;
                     const total = codes.length;
                     const pct = total > 0 ? Math.round(submitted/total*100) : 0;
                     return (
-                      <div key={system} style={{ padding:8, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-secondary)' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                          <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
-                          <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
-                          <span style={{ fontSize:9, color:'#fff', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
+                      <div key={system} style={{ padding:12, borderRadius:14, border:'1px solid rgba(140,190,255,0.12)', background:'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                          <div style={{ width:10, height:10, borderRadius:'50%', background: sysColors[system]||'#6b7280', flexShrink:0 }}/>
+                          <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{sysLabels[system]||system}</span>
+                          <span style={{ fontSize:11, color:'#fff', marginLeft:'auto', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{submitted}/{total} · {pct}%</span>
                         </div>
-                        <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
-                          <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
+                        <div style={{ height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden' }}>
+                          <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:999, transition:'width 0.4s' }}/>
                         </div>
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:8 }}>
                           {codes.map(code => {
                             const info = UCUM_MAP[code.toUpperCase()];
                             const done = submittedCodes.has(code.toUpperCase());
                             return (
                               <span key={code} style={{
-                                fontSize:8, padding:'1px 5px', borderRadius:3,
-                                background: done ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(239,68,68,0.08)',
+                                fontSize:11, fontWeight:700, padding:'6px 10px', borderRadius:999,
+                                background: done ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(239,68,68,0.10)',
                                 color: done ? 'var(--accent)' : '#ef4444',
-                                border:`1px solid ${done?'rgba(var(--labs-accent-rgb, 0,230,138),0.2)':'rgba(239,68,68,0.15)'}`,
+                                border:`1px solid ${done?'rgba(var(--labs-accent-rgb, 0,230,138),0.22)':'rgba(239,68,68,0.20)'}`,
                               }}>
                                 {done ? '✓' : '○'} {info?.name||code}
                               </span>
@@ -1700,9 +1700,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   })}
                 </div>
                 {missingLabs.length > 0 && (
-                  <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                    <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
-                    <div style={{ fontSize:9, color:'#fff', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
+                  <div style={{ marginTop:10, padding:'12px 12px', borderRadius:14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.20)' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
+                    <div style={{ fontSize:12, color:'#fff', lineHeight:1.6 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
                   </div>
                 )}
               </div>
@@ -1992,79 +1992,79 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.tz ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                 🧮 Риски (механизм-ориентированная модель ТЗ)
               </button>
-              {riskSections.tz && (<div style={{ padding: '0 12px 12px' }}>
+              {riskSections.tz && (<div style={{ padding:'0 12px 12px' }}>
                 {tzSpecResult ? (
                   <>
-                    <div style={{ textAlign: 'center', padding: '8px 0', borderRadius: 10, marginBottom: 6,
-                      background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.06) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.02) 100%)',
-                      border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.15)' }}>
-                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Общий риск</div>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
-                        <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallRaw < 25 ? '#22c55e' : tzSpecResult.overallRaw < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallRaw}%</span>
-                        <span style={{ fontSize: 14, color: '#fff' }}>→</span>
-                        <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallAfter}%</span>
+                    <div style={{ textAlign:'center', padding:'14px 12px', borderRadius:16, marginBottom:8,
+                      background:'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.10) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.04) 100%)',
+                      border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)' }}>
+                      <div style={{ fontSize:12, color:'#fff', marginBottom:6, fontWeight:700 }}>Общий риск</div>
+                      <div style={{ display:'flex', justifyContent:'center', gap:12, alignItems:'center' }}>
+                        <span style={{ fontSize:28, fontWeight:900, color: tzSpecResult.overallRaw < 25 ? '#22c55e' : tzSpecResult.overallRaw < 50 ? '#eab308' : '#f97316', fontVariantNumeric:'tabular-nums' }}>{tzSpecResult.overallRaw}%</span>
+                        <span style={{ fontSize:18, color:'#fff' }}>→</span>
+                        <span style={{ fontSize:28, fontWeight:900, color: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316', fontVariantNumeric:'tabular-nums' }}>{tzSpecResult.overallAfter}%</span>
                       </div>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginTop:4 }}>
                         {tzSpecResult.overallCategory} · K_protect {tzSpecResult.k_protect_overall}%
                       </div>
                       {tzSpecResult.overallVerification !== undefined && (
-                        <div style={{ fontSize: 8, marginTop: 2, color: tzSpecResult.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24' }}>
+                        <div style={{ fontSize:11, marginTop:4, color: tzSpecResult.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24', lineHeight:1.5 }}>
                           {tzSpecResult.overallVerification >= 0.5 ? '🔬' : '⚠'} Индекс риска · верифицировано анализами: {Math.round(tzSpecResult.overallVerification * 100)}% систем
                           {tzSpecResult.overallVerification < 0.5 && ' — оценка по фармакологии'}
                         </div>
                       )}
-                      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, margin: '4px 10px 0', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${Math.min(100, tzSpecResult.overallAfter)}%`, borderRadius: 2,
+                      <div style={{ height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, margin:'8px 4px 0', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${Math.min(100, tzSpecResult.overallAfter)}%`, borderRadius:999,
                           background: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }} />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gap: 2 }}>
+                    <div style={{ display:'grid', gap:8 }}>
                       {tzSpecResult.organs.map((organ: TzSpecOrganResult) => {
                         const cc = (v: number) => v < 25 ? '#22c55e' : v < 50 ? '#eab308' : v < 75 ? '#f97316' : '#ef4444';
                         return (
-                          <div key={organ.id} style={{ padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: 9, fontWeight: 600 }}>
+                          <div key={organ.id} style={{ padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${cc(organ.afterPercent)}`, minHeight:56 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                              <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>
                                 {organ.icon} {organ.name}
                                 {organ.verification !== undefined && organ.verification < 0.5 && (
-                                  <span style={{ color: '#fbbf24', marginLeft: 3 }}>⚠</span>
+                                  <span style={{ color:'#fbbf24', marginLeft:4 }}>⚠</span>
                                 )}
                               </span>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: cc(organ.afterPercent) }}>
+                              <span style={{ fontSize:13, fontWeight:900, color: cc(organ.afterPercent), fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
                                 {organ.rawPercent}% → {organ.afterPercent}%
                               </span>
                             </div>
                             {organ.floors && organ.floors.length > 0 && (
-                              <div style={{ marginTop: 1 }}>
+                              <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:2 }}>
                                 {organ.floors.map((f, i) => (
-                                  <div key={i} style={{ fontSize: 7, color: '#fca5a5', lineHeight: 1.4 }}>⚓ {f.label}</div>
+                                  <div key={i} style={{ fontSize:11, color:'#fca5a5', lineHeight:1.5 }}>⚓ {f.label}</div>
                                 ))}
                               </div>
                             )}
-                            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 1, marginTop: 1, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${Math.min(100, organ.afterPercent)}%`, background: cc(organ.afterPercent), borderRadius: 1 }} />
+                            <div style={{ height:6, background:'rgba(255,255,255,0.08)', borderRadius:999, marginTop:6, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${Math.min(100, organ.afterPercent)}%`, background: cc(organ.afterPercent), borderRadius:999 }} />
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ fontSize: 7, color: '#fff', textAlign: 'center', marginTop: 4 }}>
+                    <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>
                       Из фазы «{PHASE_LABELS[selectedPhase]}» · покрытие {Math.round(tzSpecResult.d_cov * 100)}%
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 9, color: '#fff', textAlign: 'center', padding: '10px 0' }}>
-                    {hasLabs ? 'Недостаточно данных' : 'Введите анализы в текущей фазе'}
+                  <div style={{ ...LABS_CARD, textAlign:'center', padding:20 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{hasLabs ? 'Недостаточно данных' : 'Введите анализы в текущей фазе'}</div>
                   </div>
                 )}
               </div>)}</div>
 
-            {/* Penalty */}
+            {/* Penalty — TOP APK */}
             {anyNoLabs && (
-              <div className="card" style={{ padding: 8, marginBottom: 8, background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 600 }}>⚠️ Штраф за отсутствие анализов</span>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</span>
+              <div className="card" style={{ padding:'12px 14px', marginBottom:8, borderRadius:14, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.30)', borderLeft:'3px solid #ef4444' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:13, color:'#fff', fontWeight:800 }}>⚠️ Штраф за отсутствие анализов</span>
+                  <span style={{ fontSize:14, fontWeight:900, color:'#ef4444', fontVariantNumeric:'tabular-nums' }}>×{penalty.totalMultiplier.toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -2116,10 +2116,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     'CRP (воспаление), GLU (метаболизм)',
                   ]},
                 ].map(group => (
-                  <div key={group.title} style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2 }}>{group.icon} {group.title}</div>
+                  <div key={group.title} style={{ marginBottom:8, padding:'12px 12px', borderRadius:14, background:'rgba(21,38,66,0.45)', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${LABS_ACCENT}` }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:6 }}>{group.icon} {group.title}</div>
                     {group.markers.map((m, i) => (
-                      <div key={i} style={{ fontSize: 8, color: '#fff', lineHeight: 1.5, paddingLeft: 6 }}>• {m}</div>
+                      <div key={i} style={{ fontSize:12, color:'#fff', lineHeight:1.6, paddingLeft:8 }}>• {m}</div>
                     ))}
                   </div>
                 ))}
@@ -2273,47 +2273,49 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* Lab Input Modal — full screen to bottom */}
       {showLabInput && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setShowLabInput(false)}>
-          <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🧪</span>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>Ввести результат</span>
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => setShowLabInput(false)}>
+          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', padding:'0 18px calc(18px + env(safe-area-inset-bottom,0px))', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'88vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px' }} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', fontSize:17 }}>🧪</span>
+                <span style={{ fontWeight:800, fontSize:15, color:'#fff' }}>Ввести результат</span>
               </div>
-              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setShowLabInput(false)} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
             </div>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
-              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8, padding: '6px 10px', background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)', borderRadius: 8 }}>
+              <div style={{ fontSize:12, color:'#fff', marginBottom:10, padding:'10px 12px', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', borderRadius:12, lineHeight:1.5 }}>
                 {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
               </div>
             ) : null; })()}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Код маркера</label>
-                <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Код маркера</label>
+                <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Значение</label>
-                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Значение</label>
+                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Единица</label>
-                <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Единица</label>
+                <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Дата</label>
-                <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Дата</label>
+                <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
               </div>
             </div>
-            {addError && <div style={{ fontSize: 10, color: '#ef4444', textAlign: 'center', marginTop: 8 }}>{addError}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+            {addError && <div style={{ fontSize:12, color:'#ef4444', textAlign:'center', marginTop:10, fontWeight:700 }}>{addError}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:14 }}>
               <button onClick={() => setShowLabInput(false)} style={{
-                padding: 10, borderRadius: 10, border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                padding:'14px', borderRadius:14, border:'1px solid rgba(140,190,255,0.14)', minHeight:52,
+                background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer',
               }}>✕ Отмена</button>
               <button onClick={() => { setAddError(''); addLab(); }} style={{
-                padding: 10, borderRadius: 10, border: 'none',
-                background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                padding:'14px', borderRadius:14, border:'none', minHeight:52,
+                background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', fontWeight:800, fontSize:14, cursor:'pointer',
+                boxShadow:'0 8px 24px rgba(var(--labs-accent-rgb, 0,230,138),0.35)',
               }}>✓ Сохранить</button>
             </div>
           </div>
