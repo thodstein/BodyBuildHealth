@@ -36,9 +36,9 @@ export interface SMDiagnosticSnapshot {
 export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
   const rows = snap.weakPoints.map(wp => `<tr><td>${esc(wp)}</td></tr>`).join('');
   const findings = snap.findings.map(f => `<li>${esc(f)}</li>`).join('');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Стронг-диагностика</title><style>body{font-family:system-ui;padding:24px;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:8px}h1{font-size:18px}</style></head><body>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Стронг-диагностика</title><style>body{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;padding:24px;max-width:900px;margin:0 auto;color:#111;line-height:1.5}h1{font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#fff;background:linear-gradient(135deg,#ef4444,#f59e0b);padding:18px 22px;border-radius:14px;margin:0 0 14px}div.score{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;margin:0 0 6px}h2{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#111;border-bottom:2px solid #f59e0b;padding-bottom:6px;margin:18px 0 8px}table{border-collapse:collapse;width:100%}th{background:#0A84FF;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.05em}td,th{border:1px solid #ddd;padding:8px 10px;font-size:12px}table tr:nth-child(even) td{background:#f8fafc}ul{margin:6px 0;padding-left:20px}li{margin:3px 0;font-size:13px}@media print{body{padding:0;max-width:none}h1{break-inside:avoid}h2{break-inside:avoid}table{break-inside:auto}tr{break-inside:avoid}}</style></head><body>
 <h1>Стронг-диагностика — отчёт ${esc(new Date().toISOString().slice(0,10))}</h1>
-<div>Score ${snap.score} (${esc(snap.level)}) · verification ${snap.verification}</div>
+<div class="score">Score ${snap.score} (${esc(snap.level)}) · verification ${snap.verification}</div>
 <h2>Слабые фазы</h2><table><tr><th>Фаза</th></tr>${rows || '<tr><td>баланс</td></tr>'}</table>
 <h2>Метрики</h2><ul>
 <li>Carry sway: ${snap.carrySwayCm != null ? `${snap.carrySwayCm}см` : esc(snap.sway || '—')}</li>

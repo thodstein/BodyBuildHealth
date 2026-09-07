@@ -159,6 +159,8 @@ export const StrengthSportConstructor: React.FC = () => {
   const [msg, setMsg] = useState('');
   // Сборка тяжёлая (до 16 нед) — флаг busy + yield, чтобы UI не фризил без отклика.
   const [building, setBuilding] = useState(false);
+  const [buildStage, setBuildStage] = useState('Собираем план…');
+  const tick = () => new Promise<void>(r => setTimeout(r, 0));
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
   const contestSim = useMemo(() => {
@@ -300,6 +302,7 @@ export const StrengthSportConstructor: React.FC = () => {
     // vbtMap НЕ очищаем: ключи week-day-ex-set стабильны между пересборками,
     // замеры — это история последних сессий, она должна переживать rebuild.
     const velocityHistory = collectSsVelocityHistory(vbtMap, vbtPerLift as any, hubVelocity);
+    setBuildStage('Строим недели и сеты…'); await tick();
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -340,8 +343,10 @@ export const StrengthSportConstructor: React.FC = () => {
         p = buildStrengthSportPlan(input);
       }
     }
+    setBuildStage('Финализируем объёмы…'); await tick();
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
     // Диагностика: инъекция коррекций с MRV-бюджетом (TA vs SM)
+    setBuildStage('Внедряем диагностику…'); await tick();
     if (weakPoints.length) {
       const isSM = weakPoints.some((wp: string) => /^(log_|yoke_|farmers_|stone_|grip_|core_|conditioning)/.test(String(wp)));
       if (isSM || mode === 'strongman') {
@@ -382,6 +387,7 @@ export const StrengthSportConstructor: React.FC = () => {
       if (wc) localStorage.setItem('he_strength_weightcut_payload', JSON.stringify(wc));
     } catch {}
     try {
+      setBuildStage('Собираем год…'); await tick();
       const hist = loadStrengthSportPlans().slice(0, 6);
       const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
@@ -614,7 +620,7 @@ export const StrengthSportConstructor: React.FC = () => {
                 );
               })}
             </div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS).</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS). Замеры из плана применятся при следующей сборке.</div>
             {Object.keys(hubVelocity).length > 0 && (
               <div style={{ fontSize:11, color:'#f5b04c', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', padding:'8px 10px', borderRadius:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <span>📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</span>
@@ -910,7 +916,7 @@ export const StrengthSportConstructor: React.FC = () => {
             />
           )}
           <button data-ss="build" onClick={build} disabled={building} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'18px 22px', fontSize:17, borderRadius:18, opacity: building?0.6:1 }}>✦ Собрать план {cycleId ? `· 📚 ${cycleId} (${cycleMode==='faithful'?'дословно':'adapt'})` : patternId ? `· ${patternId}` : ''}</button>
-          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ Собираем план — считаем объёмы, проценты и taper…</div>}
+          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ {buildStage}</div>}
         </div>
       )}
 
@@ -1250,7 +1256,7 @@ export const StrengthSportConstructor: React.FC = () => {
             <button onClick={() => setStep('split')} style={{ ...BTN, flex:1 }}>← К сплиту</button>
             <button data-ss="build" onClick={build} disabled={building} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.4, opacity: building?0.6:1 }}>✦ Собрать план</button>
           </div>
-          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ Собираем план — считаем объёмы, проценты и taper…</div>}
+          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ {buildStage}</div>}
         </SectionCard>
       )}
     </div>
