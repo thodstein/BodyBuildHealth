@@ -3,6 +3,7 @@
  * Покрывает именно новые пути (базовые инварианты — в остальных файлах):
  *  - P1b: коктейльные теги (_cocktail) на порошках и rationale-строка;
  *  - P1: структурные инварианты (кап гарниров, бан завтрака, якоря lunch/dinner);
+ *  - P1a-fix2: семейные капы гарниров (рис ≤3/день, крем ≤2, без внутриприёмных дублей);
  *  - P4a: secondRecipeRoomDecision — явное решение вместо тихой мини-порции;
  *  - P4b: 🎯-цель применяется сразу (UI: модал → рескейл без регенерации);
  *  - P1b/P2: бейдж коктейля в выдаче (UI: 🥣 комбо → 🥤).
@@ -11,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
+import { correctDayToTargets } from '../day-target-corrector';
 import { IndividualPlan } from '../index';
 import { secondRecipeRoomDecision } from '../IndividualPlanContext';
 import { useRenderMealList } from '../MealListRender';
@@ -103,8 +105,98 @@ describe('P1: структурные инварианты якорей/типо�
   });
 });
 
-describe('P4a: secondRecipeRoomDecision — явное решение', () => {
-  it('остатка нет (0/минус) → abort без комнаты', () => {
+describe('P1a-fix2: семейные капы гарниров (жалоба «везде рисовый крем»)', () => {
+  const riceMealsOf = (plan: any) =>
+    plan.meals.filter((m: any) => (m.items || []).some((it: any) =>
+      (it.role === 'carb_slow' || it.role === 'carb_fast') && /rice|cream_of_rice|rice_cream|rice_flakes/.test(it.id)));
+  const creamMealsOf = (plan: any) =>
+    plan.meals.filter((m: any) => (m.items || []).some((it: any) =>
+      (it.role === 'carb_slow' || it.role === 'carb_fast') && /cream_of_rice|rice_cream/.test(it.id)));
+
+  it('HV 900У: рис-семья ≤4 приёмов, крем ≤2 (было 5–6/3+ до фикса)', () => {
+    const plan = buildDayPlan(trainBase());
+    expect(riceMealsOf(plan).length).toBeLessThanOrEqual(4);
+    expect(creamMealsOf(plan).length).toBeLessThanOrEqual(2);
+  });
+
+  it('база 320У: рис-семья ≤3 приёмов', () => {
+    const plan = buildDayPlan(base());
+    expect(riceMealsOf(plan).length).toBeLessThanOrEqual(3);
+  });
+
+  it('внутри приёма нет двух ПОЛНОЦЕННЫХ гарниров одного семейства (рис + крем)', () => {
+    // Микро-топ-апы <30 г (корректор доводит У чистым носителем вместо роста риса
+    // с белком) — не «рисовый крем везде», их разрешаем осознанно.
+    for (const input of [base(), trainBase()]) {
+      const plan = buildDayPlan(input);
+      for (const m of plan.meals) {
+        const carbs = (m.items || [])
+          .filter((it: any) => it.role === 'carb_slow' || it.role === 'carb_fast');
+        const riceOnes = carbs.filter((it: any) => /rice|cream_of_rice|rice_cream|rice_flakes/.test(it.id));
+        const bigDups = riceOnes.filter((it: any) => (it.amount || 0) >= 30);
+        expect(bigDups.length, `${m.label}: ${riceOnes.map((x: any) => `${x.id}:${x.amount}`).join(',')}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+});
+
+describe('P1b-конструктор: большой дефицит закрывается коктейлем 2–3 носителей', () => {
+  const mkMeal = (label: string, type: string, items: any[]): any => {
+    const totals = items.reduce((s: any, it: any) => ({
+      kcal: s.kcal + it.kcal, p: s.p + it.p, f: s.f + it.f, c: s.c + it.c, fiber: (s.fiber || 0) + (it.fiber || 0),
+    }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+    return { label, type, items, totals, rationale: [] };
+  };
+  const protItem = (id: string, name: string, amount: number, p: number): any => ({
+    id, name, amount, p, f: 2, c: 1, kcal: Math.round(4 * p + 18 + 4), fiber: 0, role: 'protein',
+  });
+  const carbItem = (id: string, name: string, amount: number, c: number): any => ({
+    id, name, amount, p: 3, f: 1, c, kcal: Math.round(12 + 9 + 4 * c), fiber: 2, role: 'carb_slow',
+  });
+
+  it('белковый дефицит ≥30 г → 🥤 коктейль одной группой (мясо + жидкий белок и/или порошок)', () => {
+    // Угли/жиры почти в норме (иначе worst-ось не белковая), хост с комнатой 60 г.
+    const meals = [
+      mkMeal('Завтрак', 'breakfast', [protItem('egg_whole', 'Яйца', 150, 19), carbItem('oats_dry', 'Овсянка', 100, 60)]),
+      mkMeal('Обед', 'lunch', [protItem('chicken_breast', 'Курица', 150, 46), carbItem('potato_boiled', 'Картофель', 250, 42)]),
+      mkMeal('Ужин', 'dinner', [protItem('turkey_breast', 'Индейка', 150, 43), carbItem('pasta_durum', 'Паста', 150, 45)]),
+    ];
+    const res = correctDayToTargets(meals as any, { kcal: 2500, p: 220, f: 12, c: 160 }, { weightKg: 90 });
+    const tagged = res.meals.flatMap((m: any) => (m.items || []).filter((it: any) => (it as any)._cocktail?.kind === 'protein'));
+    expect(tagged.length).toBeGreaterThanOrEqual(2);
+    const groups = new Set(tagged.map((it: any) => (it as any)._cocktail.group));
+    expect(groups.size).toBe(1);
+    expect(res.meals.some((m: any) => ((m as any).rationale || []).some((r: string) => /Назначено коктейлем/.test(r)))).toBe(true);
+  });
+
+  it('углеводный дефицит ≥60 г → 🍯 добор одной группой (база + сладость, сахар в капе)', () => {
+    const meals = [
+      mkMeal('Завтрак', 'breakfast', [protItem('egg_whole', 'Яйца', 150, 19), carbItem('oats_dry', 'Овсянка', 80, 48)]),
+      mkMeal('Полдник', 'snack', [protItem('cottage_cheese_5', 'Творог', 150, 25)]),
+      mkMeal('Обед', 'lunch', [protItem('chicken_breast', 'Курица', 120, 37), carbItem('potato_boiled', 'Картофель', 200, 34)]),
+      mkMeal('Ужин', 'dinner', [protItem('turkey_breast', 'Индейка', 120, 35), carbItem('pasta_durum', 'Паста', 120, 36)]),
+    ];
+    const res = correctDayToTargets(meals as any, { kcal: 4200, p: 150, f: 15, c: 400 }, { weightKg: 100, highCarb: true });
+    const tagged = res.meals.flatMap((m: any) => (m.items || []).filter((it: any) => (it as any)._cocktail?.kind === 'carb'));
+    expect(tagged.length).toBeGreaterThanOrEqual(2);
+    const groups = new Set(tagged.map((it: any) => (it as any)._cocktail.group));
+    expect(groups.size).toBe(1);
+  });
+
+  it('малый дефицит — без коктейля (legacy single-путь, без тегов)', () => {
+    const meals = [
+      mkMeal('Завтрак', 'breakfast', [protItem('egg_whole', 'Яйца', 150, 19), carbItem('oats_dry', 'Овсянка', 100, 60)]),
+      mkMeal('Обед', 'lunch', [protItem('chicken_breast', 'Курица', 150, 46), carbItem('potato_boiled', 'Картофель', 250, 42)]),
+      mkMeal('Ужин', 'dinner', [protItem('turkey_breast', 'Индейка', 150, 43), carbItem('pasta_durum', 'Паста', 150, 45)]),
+    ];
+    const tot = meals.reduce((s: any, m: any) => ({ p: s.p + m.totals.p, c: s.c + m.totals.c }), { p: 0, c: 0 });
+    const res = correctDayToTargets(meals as any, { kcal: 2500, p: tot.p + 10, f: 70, c: tot.c + 20 }, { weightKg: 90 });
+    const tagged = res.meals.flatMap((m: any) => (m.items || []).filter((it: any) => (it as any)._cocktail));
+    expect(tagged.length).toBe(0);
+  });
+});
+
+describe('P4a: secondRecipeRoomDecision — явное решение', () => {  it('остатка нет (0/минус) → abort без комнаты', () => {
     expect(secondRecipeRoomDecision(800, 800)).toEqual({ action: 'abort', roomKcal: 0 });
     expect(secondRecipeRoomDecision(800, 950)).toEqual({ action: 'abort', roomKcal: 0 });
   });

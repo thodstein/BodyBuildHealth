@@ -3244,10 +3244,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _healthStatus: 'green' | 'yellow' | 'red' = _healthScore >= 75 ? 'green' : _healthScore >= 55 ? 'yellow' : 'red';
         // Эпик 9в: тренд качества — запись скора дня (0-10) в историю (все режимы).
         try { addDayScore(_prepDate, _healthScore / 10); } catch {}
-        // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
+        // Преобразуем DayPlanV2 → совместимый формат старого dayPlan.
+        // P1b: сохраняем role и _cocktail пунктов (иначе теги коктейлей-добивок,
+        // назначенные движком, не доходят до выдачи — бейджи не рисуются).
         const meals = v2.meals.map((m: any) => ({
           label: m?.label || 'Приём пищи', time: m?.time || '', items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({
             name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber, leucine_mg: it.leucine_mg,
+            role: it.role, ...((it as any)._cocktail ? { _cocktail: (it as any)._cocktail } : {}),
           })), totals: { kcal: m?.totals?.kcal || 0, p: m?.totals?.p || 0, f: m?.totals?.f || 0, c: m?.totals?.c || 0, fiber: m?.totals?.fiber || 0 },
           type: m?.type,
           conflictWarnings: undefined, synergyNotes: undefined,

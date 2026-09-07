@@ -119,7 +119,9 @@ export function stapleFamilyOf(id: string): string | null {
   if (!id) return null;
   // крупы/гарниры
   if (/oat|hercules|porridge/.test(id)) return 'oats';
-  if (/^rice|rice_/.test(id) && !/cake/.test(id)) return 'rice';
+  // P1a-fix: рисовые продукты — ОДНО семейство (рис/крем/рисовые хлопья/рисовый крем):
+  // иначе ротация по id даёт рис в 5 приёмах под разными именами («рисовый крем везде»).
+  if (/^rice|rice_|cream_of_rice|rice_cream|rice_flakes/.test(id) && !/cake/.test(id)) return 'rice';
   if (/buckwheat|grechka/.test(id)) return 'buckwheat';
   if (/pasta|noodle|spaghetti|macaroni/.test(id)) return 'pasta';
   if (/potato/.test(id)) return 'potato';
@@ -132,6 +134,45 @@ export function stapleFamilyOf(id: string): string | null {
   if (/oil|mct|mayonnaise|mayo_/.test(id)) return 'oils';
   // фрукты считаются на уровне роли, не семейства
   return null;
+}
+
+/**
+ * P1a-fix: кап приёмов в день на СЕМЕЙСТВО гарнира (анти-моно вкуса).
+ * Один рис под 4 именами (rice/cream/rice_cream/flakes) — всё равно рис:
+ * per-id капы его не ловят. Без семейства (null) — только per-id капы.
+ */
+export function familyMealCap(fam: string | null, opts?: { hv?: boolean }): number {
+  if (!fam) return Infinity;
+  if (fam === 'oats') return 2;
+  // P1a-fix2: HV-дням плотность важнее моно-строгости (900У/9пр тремя рисовыми
+  // приёмами не закрыть — движок уходил в фолбэки мимо капа: рис всё равно стоял
+  // в 5 приёмах + сходимость −9%). Рису на HV — 4, крему при этом свой субкап 2.
+  if (fam === 'rice') return opts?.hv ? 4 : 3;
+  return 3;
+}
+
+/** Рисовый крем — подкап внутри рисового семейства (жалоба «везде рисовый крем»). */
+export function isCreamId(id: string): boolean {
+  return /cream_of_rice|rice_cream/.test(id || '');
+}
+
+/** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства). */
+export function creamMealCap(_hv?: boolean): number {
+  return 2;
+}
+
+/** Сколько приёмов дня уже несут то же семейство гарнира (по id — если семейства нет). */
+export function familyMealUses(meals: Array<{ items?: Array<{ id?: string }> }>, id: string): number {
+  const fam = stapleFamilyOf(id);
+  let n = 0;
+  for (const m of meals || []) {
+    const items = (m as any)?.items || [];
+    const hit = fam
+      ? items.some((it: any) => stapleFamilyOf(it?.id || '') === fam)
+      : items.some((it: any) => (it?.id || '') === id);
+    if (hit) n++;
+  }
+  return n;
 }
 
 export const EXCLUDED_FAMILIES_FROM_PLATE: ReadonlySet<string> = new Set(['oils_mayonnaise']);

@@ -38,6 +38,7 @@ import {
   QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
+  familyMealCap, familyMealUses, isCreamId, creamMealCap,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
@@ -1056,6 +1057,12 @@ const _pickCtx: {
   // v3: счётчик использований гарниров за день (анти-моно primary-сборки на HV).
   // Сброс в начале buildDayPlan.
   dayCarbUses: Map<string, number>;
+  // P1a-fix: счётчик СЕМЕЙСТВ гарниров (рис под 4 именами — одно семейство).
+  // Ведётся параллельно dayCarbUses, те же точки сброса.
+  dayCarbFamilyUses: Map<string, number>;
+  // P1a-fix2: счётчик приёмов с рисовым кремом (субкап 2 внутри рисового семейства).
+  // Те же точки сброса/инкремента, что у dayCarbFamilyUses.
+  dayCreamMeals: number;
   // P1a: якоря дня 2+2 (Vertical/про-рационы: 2 белка + 2 гарнира покрывают 70–80% дня,
   // внутри дня coherence, между днями — ротация выбором по dayOffset). Сброс в начале buildDayPlan.
   dayCarbAnchors: string[];
@@ -1079,6 +1086,8 @@ const _pickCtx: {
   highVolumeDay: false,
   isTrainingDayCtx: true,
   dayCarbUses: new Map(),
+  dayCarbFamilyUses: new Map(),
+  dayCreamMeals: 0,
   dayCarbAnchors: [],
   dayProtAnchors: [],
   allergenTags: undefined,
@@ -1162,17 +1171,35 @@ function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: {
   // иначе bb_quality_score хоронит хлопья/крем (score низкий) при маленьких пулах.
   // Плюс абсолютный кап ≤2 использований/день (дневник ведёт buildDayPlan через dayCarbUses) —
   // иначе при пустом fresh пул целиком возвращается и крем стоит 4 раза.
+  // P1a-fix2: кап СЕМЕЙНЫЙ (рис под 4 именами — одно): per-id кап пропускал 4-й рис
+  // под новым именем («рисовый крем везде»). Без семейства — per-id как раньше.
   if (opts?.uniform) {
     const _uses = _pickCtx.dayCarbUses;
+    const _hvU = !!_pickCtx.highVolumeDay;
+    const _famUsesU = _pickCtx.dayCarbFamilyUses;
+    const _creamU: number = (_pickCtx as any).dayCreamMeals || 0;
+    const _capOkU = (f: any): boolean => {
+      if ((_uses.get(f.id) || 0) >= 2) return false;
+      const _fam = stapleFamilyOf(f.id);
+      if (_fam && ((_famUsesU.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvU }))) return false;
+      if (isCreamId(f.id) && _creamU >= creamMealCap(_hvU)) return false;
+      return true;
+    };
     if (_uses && _uses.size > 0) {
-      const _capped = pool.filter(f => (_uses.get(f.id) || 0) < 2);
+      const _capped = pool.filter(_capOkU);
       if (_capped.length >= 1) pool = _capped;
       else {
-        // Все варианты уже по 2 — берём наименее использованный, а не полный пул
-        // (иначе seeded-пик снова берёт лидера и выходит 3-й/4-й крем).
+        // Все варианты в капах — наименее использованные СЕМЕЙСТВА первыми
+        // (per-id least-used возвращал 4-й рис под новым именем).
         let _min = Infinity;
-        for (const f of pool) _min = Math.min(_min, _uses.get(f.id) || 0);
-        const _least = pool.filter(f => (_uses.get(f.id) || 0) <= _min);
+        for (const f of pool) {
+          const _fam = stapleFamilyOf(f.id);
+          _min = Math.min(_min, _fam ? (_famUsesU.get(_fam) || 0) : (_uses.get(f.id) || 0));
+        }
+        const _least = pool.filter(f => {
+          const _fam = stapleFamilyOf(f.id);
+          return (_fam ? (_famUsesU.get(_fam) || 0) : (_uses.get(f.id) || 0)) <= _min;
+        });
         if (_least.length > 0) pool = _least;
       }
     }
@@ -1906,10 +1933,34 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       // иначе фунчоза стоит в обеде и ужине («мусорная свалка»). Якоря дня — кап 3
       // (тест mono: моно-гарнир ≤3/день; 4-й повтор — уже моно-моно). Порог ≥2 держим,
       // чтобы при пустом пуле не остаться без гарнира.
+      // P1a-fix: плюс СЕМЕЙНЫЙ кап (рис под 4 именами — одно семейство; per-id капы
+      // его не ловят: «рисовый крем везде»). Без семейства — только per-id кап.
+      // P1a-fix2: крем — субкап 2 внутри рисового семейства; пустой кап — НЕ откат
+      // к сырому пулу (иначе рис тёк мимо капа), а least-family-used порядок.
       {
         const _anchC: string[] = (_pickCtx.dayCarbAnchors || []) as string[];
-        const capped = pool.filter((f: any) => (_pickCtx.dayCarbUses.get(f.id) || 0) < (_anchC.includes(f.id) ? 3 : 2));
-        if (capped.length >= 2) pool = capped;
+        const _hvF = !!_pickCtx.highVolumeDay;
+        const _creamF: number = (_pickCtx as any).dayCreamMeals || 0;
+        const _famUsesF = _pickCtx.dayCarbFamilyUses;
+        const _capOkF = (f: any): boolean => {
+          if ((_pickCtx.dayCarbUses.get(f.id) || 0) >= (_anchC.includes(f.id) ? 3 : 2)) return false;
+          const _fam = stapleFamilyOf(f.id);
+          if (_fam && ((_famUsesF.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvF }))) return false;
+          if (isCreamId(f.id) && _creamF >= creamMealCap(_hvF)) return false;
+          return true;
+        };
+        const capped = pool.filter(_capOkF);
+        if (capped.length > 0) pool = capped;
+        else {
+          pool = [...pool].sort((a: any, b: any) => {
+            const _fa = stapleFamilyOf(a.id);
+            const _fb = stapleFamilyOf(b.id);
+            const _ua = _fa ? (_famUsesF.get(_fa) || 0) : (_pickCtx.dayCarbUses.get(a.id) || 0);
+            const _ub = _fb ? (_famUsesF.get(_fb) || 0) : (_pickCtx.dayCarbUses.get(b.id) || 0);
+            if (_ua !== _ub) return _ua - _ub;
+            return String(a.id).localeCompare(String(b.id));
+          });
+        }
       }
       if (!_recentFamilies || _recentFamilies.size === 0) return pool;
       const fresh = pool.filter((f: any) => { const fam = stapleFamilyOf(f.id); return !fam || !_recentFamilies.has(fam); });
@@ -2047,9 +2098,12 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           if (_ci === 1 && (remC <= 100 || _solidW() > 550 || (!(_pickCtx.highVolumeDay || _bigMeal)))) break;
           const usedIds2 = new Set(items.map(i => i.id));
           const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
+          // P1a-fix2: второй гарнир — из ДРУГОГО семейства, чем primary (иначе «рис + крем»
+          // в одной тарелке: внутриприёмный дубль рисовой монотонности).
+          const usedFams2 = new Set(items.map(i => stapleFamilyOf(i.id)).filter(Boolean));
           const comfortPool = COMFORT_CARB_IDS
             .map(id => FOOD_DB.find(f => f.id === id))
-            .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f)
+            .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !usedFams2.has(stapleFamilyOf(f.id) as string) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f)
               && (!_needPortable || isPortableFood(f))
               // PRO-типология: сладость — не второй гарнир (печенье/шоколад/мёд как основа обеда — мусор).
               // Второй гарнир = крупа/хлеб/картофель. Сладости — только мелким топ-апом в корректоре.
@@ -2057,13 +2111,32 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           // P1a: из comfort-пула сначала дневные свежие (dayCarbUses 0) — иначе один и тот же
           // хлеб/булгур во всех приёмах дня. Повтор — только lean (Б<8): белковые крупы
           // повторным заходом несут скрытый белок (кейс HV900). Фолбэк — весь пул.
-          const _freshComfort = comfortPool.filter(f => (_pickCtx.dayCarbUses.get(f.id) || 0) === 0 || (f.protein || 0) < 8);
-          const _comfortPick = _freshComfort.length > 0 ? _freshComfort : comfortPool;
+          // P1a-fix: свежесть — по СЕМЕЙСТВУ (рис/крем/рисовый крем — одно): иначе
+          // «свежими» оказываются 4 рисовых id подряд.
+          // P1a-fix2: семейный кап + крем-субкап на всех уровнях фолбэка (иначе сырой
+          // comfortPool в конце возвращает рис мимо капа).
+          const _hvC = !!_pickCtx.highVolumeDay;
+          const _creamC: number = (_pickCtx as any).dayCreamMeals || 0;
+          const _capOkC = (f: any): boolean => {
+            const _fam = stapleFamilyOf(f.id);
+            if (_fam && ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvC }))) return false;
+            if (isCreamId(f.id) && _creamC >= creamMealCap(_hvC)) return false;
+            return true;
+          };
+          const _isFamFresh = (f: any): boolean => {
+            const _fam = stapleFamilyOf(f.id);
+            return _fam ? ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) === 0) : ((_pickCtx.dayCarbUses.get(f.id) || 0) === 0);
+          };
+          const _famFresh = comfortPool.filter(f => _isFamFresh(f) && _capOkC(f));
+          const _freshComfort = _famFresh.length > 0 ? _famFresh
+            : comfortPool.filter(f => _capOkC(f) && ((_pickCtx.dayCarbUses.get(f.id) || 0) === 0 || (f.protein || 0) < 8));
+          const _comfortPick = _freshComfort.length > 0 ? _freshComfort : comfortPool.filter(_capOkC);
           const src2 = _comfortPick.length > 0 ? pickPriority(_comfortPick, seed + 27 + _ci * 11, { lockedIds, recentIds, hardRecentIds })
             // Fallback-второй гарнир — самый ПЛОТНЫЙ (У/100), иначе батат 453 г раздувает
             // тарелку за 700 г съедобности при тех же углях, что 150 г сухой крупы.
             // PRO: фунчоза/стеклянная лапша — не основа (только сайд ≤100г в корректоре).
-            : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam && !/glass|funchose|rice_noodles/.test(f.id))
+            // P1a-fix2: плотный фолбэк тоже уважает семейный кап + крем-субкап.
+            : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam && !/glass|funchose|rice_noodles/.test(f.id) && _capOkC(f))
               .sort((a: FoodItem, b: FoodItem) => (b.carbs || 0) - (a.carbs || 0))[0];
           if (!src2) break;
           const portionCap = Math.round((COMFORT_PORTION_LIMITS[src2.id] ?? 100) * _comfortMult);
@@ -2092,7 +2165,24 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           for (const step of liveLadderSteps()) {
             if (remC <= 60) break;
             if (usedIds3.has(step.id)) continue;
-            if ((_pickCtx.dayCarbUses.get(step.id) || 0) >= 2) continue;
+            // P1a-fix2: лестница — из другого семейства, чем уже лежащие гарниры приёма
+            // (иначе «рис + крем» в одной тарелке).
+            {
+              const _sfL = stapleFamilyOf(step.id);
+              if (_sfL && items.some((i: any) => stapleFamilyOf(i.id) === _sfL)) continue;
+            }
+            // P1a-fix: пропуск по СЕМЕЙСТВУ (рис/крем/рисовый крем — одно): per-id кап
+            // пропускал 4-й рис под новым именем.
+            // P1a-fix2: HV-ослабление риса (4) + крем-субкап 2.
+            {
+              const _famL = stapleFamilyOf(step.id);
+              const _capL = _famL ? familyMealCap(_famL, { hv: _hvDay }) : 2;
+              const _usesL = _famL
+                ? (_pickCtx.dayCarbFamilyUses.get(_famL) || 0)
+                : (_pickCtx.dayCarbUses.get(step.id) || 0);
+              if (_usesL >= _capL) continue;
+              if (isCreamId(step.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvDay))) continue;
+            }
             if (!_hvDay && step.kind !== 'grain' && step.kind !== 'bake') continue;
             if (step.kind === 'drink') continue;
             if (step.id === 'dextrose' || step.id === 'orange_juice') continue;
@@ -2755,12 +2845,22 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
   _pickCtx.currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   _pickCtx.dayCarbUses = new Map();
+  _pickCtx.dayCarbFamilyUses = new Map();
+  (_pickCtx as any).dayCreamMeals = 0;
   // P1a: якоря дня 2+2 — ротация по дню (внутри дня coherence, между днями rotation через
   // recentFoodIds/hardRecentIds чейнинг контекста). Фильтр доступности/исключений здесь;
   // пересечение с пулом приёма — в точке пика (фолбэк — обычная селекция).
+  // P1a-fix2: на HV запрещённые стейплы (греча/перловка/киноа — isHvStapleBanned) якорями
+  // не становятся; два якоря — из разных семейств (иначе рис+крем оба якоря дня).
   {
+    // highVolumeDay ставится ниже (строка ~3221) — для якорей считаем HV из input
+    // напрямую (та же формула по доступным полям), иначе читаем stale прошлого дня.
+    const _anchHv = _isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80)
+      || (input.goalKcal || 0) >= 4200
+      || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 2.8;
     const _anchOk = (id: string): boolean => {
       if (input.excludedIds && input.excludedIds.has(id)) return false;
+      if (_anchHv && isHvStapleBanned(id)) return false;
       try {
         const f = FOOD_DB.find(x => x.id === id);
         if (!f || !foodAvailableForPlan(f)) return false;
@@ -2771,7 +2871,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const live = pool.filter(_anchOk);
       if (live.length === 0) return [];
       const start = (Math.abs(Math.round(input.dayOffset || 0)) * 2) % live.length;
-      return [live[start % live.length], live[(start + 1) % live.length]].filter((v, i, a) => a.indexOf(v) === i);
+      const pair = [live[start % live.length], live[(start + 1) % live.length]].filter((v, i, a) => a.indexOf(v) === i);
+      // Разные семейства: рис+крем парой не ходят (иначе оба primary-обеда рисовые).
+      if (pair.length === 2) {
+        const _f0 = stapleFamilyOf(pair[0]);
+        const _f1 = stapleFamilyOf(pair[1]);
+        if (_f0 && _f0 === _f1) {
+          const _alt = live.find(id => { const _f = stapleFamilyOf(id); return _f !== _f0; });
+          if (_alt) pair[1] = _alt;
+        }
+      }
+      return pair;
     };
     _pickCtx.dayCarbAnchors = _rot2(['rice_white', 'potato_boiled', 'buckwheat', 'pasta_durum', 'oats_dry', 'cream_of_rice', 'corn_flakes', 'bread_white']);
     _pickCtx.dayProtAnchors = _rot2(['chicken_breast', 'turkey_breast', 'pollock', 'cod', 'egg_whole', 'cottage_cheese_5', 'tuna_canned', 'beef_lean']);
@@ -3350,7 +3460,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     return hard.size > 0 ? hard : undefined;
   })();
-  const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') _pickCtx.dayCarbUses.set(it.id, ((_pickCtx.dayCarbUses.get(it.id) || 0) + 1)); }); };
+  const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') { _pickCtx.dayCarbUses.set(it.id, ((_pickCtx.dayCarbUses.get(it.id) || 0) + 1)); const _fam = stapleFamilyOf(it.id); if (_fam) _pickCtx.dayCarbFamilyUses.set(_fam, ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) + 1)); if (isCreamId(it.id)) (_pickCtx as any).dayCreamMeals = (((_pickCtx as any).dayCreamMeals || 0) + 1); } }); };
   // Адаптация по дневнику: пробросить заметку о компенсации в plan notes.
   if (input.diaryCompensation && input.diaryCompensation.note) {
     notes.push('📊 ' + input.diaryCompensation.note);
@@ -5157,6 +5267,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // ограничениях не закрыть).
             const _capN = (_pickCtx.highVolumeDay || (input as any).refeedDay) ? 3 : (meals.length >= 5 ? 2 : 999);
             if (effWorst === 'c' && countCarbItems(_tm) >= _capN && !_tm.items.some((x: any) => x.id === cand.id)) continue;
+            // P1a-fix2: посадка — не второе семейство в тот же приём (иначе «рис + крем»
+            // в одной тарелке). Рост существующего пункта — можно.
+            if (effWorst === 'c' && !_tm.items.some((x: any) => x.id === cand.id)) {
+              const _famCd = stapleFamilyOf(cand.id);
+              if (_famCd && (_tm.items || []).some((x: any) =>
+                (x.role === 'carb_slow' || x.role === 'carb_fast') && stapleFamilyOf(x.id) === _famCd)) continue;
+            }
             // Portable-режим без привязки к смене: все приёмы — только портативное
             // (зеркало _needPortable; иначе фунчоза в офис через посадку).
             if (input.portableMode && (input.isWorkDay === undefined && input.workStartMin === undefined && input.workEndMin === undefined) && !isPortableFood(cand as any)) continue;
@@ -5165,7 +5282,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             if (effWorst === 'c' && !_tm.items.some((x: any) => x.id === cand.id)
               && countCarbItems(_tm) >= 1 && ((_tm as any).target?.c || 0) < 100) continue;
             // v3: углеводный носитель, уже стоявший в 2 приёмах дня, посадкой не кладём.
-            if (effWorst === 'c' && _pickCtx.highVolumeDay && (_pickCtx.dayCarbUses.get(cand.id) || 0) >= 2) continue;
+            // P1a-fix: считаем по СЕМЕЙСТВУ (рис под 4 именами — один учёт).
+            // P1a-fix2: HV-ослабление риса (4) + крем-субкап 2.
+            if (effWorst === 'c' && _pickCtx.highVolumeDay) {
+              const _famP = stapleFamilyOf(cand.id);
+              const _capP = _famP ? familyMealCap(_famP, { hv: true }) : 2;
+              const _usesP = _famP
+                ? (_pickCtx.dayCarbFamilyUses.get(_famP) || 0)
+                : (_pickCtx.dayCarbUses.get(cand.id) || 0);
+              if (_usesP >= _capP) continue;
+              if (isCreamId(cand.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(true))) continue;
+            }
             const _exC = _tm.items.find((x:any) => x.id === cand.id);
             const _capC = carbPortionCap(cand, mealCapScaleOf(_tm));
             // Порошок сверх скупа — не доливаем в тот же приём (коктейль, не ведро).
@@ -5227,7 +5354,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         } else if (grams > 0) {
           targetMeal.items.push(it);
           // v3: посадка тоже пишет в дневной счётчик — следующие итерации видят новый гарнир.
-          if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') _pickCtx.dayCarbUses.set(it.id, ((_pickCtx.dayCarbUses.get(it.id) || 0) + 1));
+          if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') {
+            _pickCtx.dayCarbUses.set(it.id, ((_pickCtx.dayCarbUses.get(it.id) || 0) + 1));
+            const _famP = stapleFamilyOf(it.id);
+            if (_famP) _pickCtx.dayCarbFamilyUses.set(_famP, ((_pickCtx.dayCarbFamilyUses.get(_famP) || 0) + 1));
+            if (isCreamId(it.id)) (_pickCtx as any).dayCreamMeals = (((_pickCtx as any).dayCreamMeals || 0) + 1);
+          }
         }
         targetMeal.totals = targetMeal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
       }
@@ -5535,9 +5667,30 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // v3: общий дневной счётчик (primary + хвост): продукт, уже стоявший в 2 приёмах,
           // хвостом не добавляется — иначе 3-й крем поверх двух primary. Подсчёт живой
           // (meals мутирует по ходу цикла), prior-добавки видны следующим итерациям.
+          // P1a-fix2: плюс СЕМЕЙНЫЙ кап (хвост добавлял 3-й крем поверх риса+крема primary)
+          // и крем-субкап 2.
           const _denseUses = (id: string): number => {
             let n = 0;
             for (const mm of meals) for (const it of (mm.items || [])) if ((it as any).id === id) n++;
+            return n;
+          };
+          const _denseFamUses = (id: string): number => {
+            const _fam = stapleFamilyOf(id);
+            if (!_fam) return _denseUses(id);
+            let n = 0;
+            for (const mm of meals)
+              for (const it of (mm.items || [])) {
+                if (((it as any).role !== 'carb_slow' && (it as any).role !== 'carb_fast') || (it as any).role === 'liquid') continue;
+                if (stapleFamilyOf((it as any).id || '') === _fam) { n++; break; }
+              }
+            return n;
+          };
+          const _denseCreamUses = (): number => {
+            let n = 0;
+            for (const mm of meals)
+              for (const it of (mm.items || [])) {
+                if (isCreamId((it as any).id || '')) { n++; break; }
+              }
             return n;
           };
           for (const m of _flexMs) {
@@ -5545,10 +5698,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             if (_cDevNow <= 10) break;
             if (((m.items || []).length || 0) >= 8) continue;
             const _have = new Set((m.items || []).map((x: any) => x.id));
+            // P1a-fix2: хвост — не второе семейство в тот же приём («рис + крем»).
+            const _haveFams = new Set((m.items || [])
+              .filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast')
+              .map((x: any) => stapleFamilyOf(x.id)).filter(Boolean));
             const _df = _denseIds
               .map((did: string) => FOOD_DB.find((f: any) => f.id === did))
               .filter((f: any) => f && !_have.has(f.id)
+                && !_haveFams.has(stapleFamilyOf(f.id) as string)
                 && _denseUses(f.id) < 2
+                && _denseFamUses(f.id) < familyMealCap(stapleFamilyOf(f.id), { hv: true })
+                && (!isCreamId(f.id) || _denseCreamUses() < creamMealCap(true))
                 && !(input.excludedIds && input.excludedIds.has(f.id))
                 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))
                 // v3 portable: в рабочее окно — только портативное (хлопья/хлеб/мёд), не каша/суп.
@@ -5575,6 +5735,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // Счётчик дневного использования — иначе кап ≤2/день не видит хвостовые
             // доборы и крем стоит в 4 приёмах (моно-провал hv-adequacy).
             _pickCtx.dayCarbUses.set(_df.id, ((_pickCtx.dayCarbUses.get(_df.id) || 0) + 1));
+            {
+              const _famH = stapleFamilyOf(_df.id);
+              if (_famH) _pickCtx.dayCarbFamilyUses.set(_famH, ((_pickCtx.dayCarbFamilyUses.get(_famH) || 0) + 1));
+              if (isCreamId(_df.id)) (_pickCtx as any).dayCreamMeals = (((_pickCtx as any).dayCreamMeals || 0) + 1);
+            }
             m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
             notes.push(`🍚 Плотный добор: ${_df.name} ${_dg} г в «${m.label}» (угли без объёма тарелки)`);

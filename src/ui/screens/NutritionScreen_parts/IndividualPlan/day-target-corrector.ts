@@ -12,7 +12,7 @@
 
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -21,7 +21,7 @@ const POWDER_PORTION_CAP_G = 60;
 // (swap скипает prew, cut — нет) и их расширение ломает peri-поведение.
 
 export interface DayTargets { kcal: number; p: number; f: number; c: number; }
-export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; }
+export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; _cocktail?: { kind: string; name: string; group: string } }
 export interface CorrectorMeal { label?: string; type?: string; time?: string; items: CorrectorItem[]; totals?: { kcal: number; p: number; f: number; c: number; fiber?: number }; recipeApplied?: string; recipeAppliedData?: { ingredientIds?: string[] }; recipeApplied2?: string; recipeAppliedData2?: { ingredientIds?: string[] }; }
 
 function sumTotals(meals: CorrectorMeal[]): DayTargets & { fiber: number } {
@@ -302,14 +302,52 @@ export function correctDayToTargets(
         const underPool = poolFor(under, opts?.excludedIds, conv, hv).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
           // Углеводы в convenient-режиме: удобство первым (низкая клетчатка) — иначе swap тащит батат.
-          const bestU = [...underPool].sort((a, b) => {
+          const _sortU = [...underPool].sort((a, b) => {
             if (conv && under === 'c') {
               const ca = (a.carbs || 0) / (1 + (a.fiber || 0) * 2);
               const cb = (b.carbs || 0) / (1 + (b.fiber || 0) * 2);
               if (Math.abs(ca - cb) > 0.5) return cb - ca;
             }
             return needFor(b) / Math.max(1, b.kcal || 1) - needFor(a) / Math.max(1, a.kcal || 1);
-          })[0];
+          });
+          // P1a-fix2: своп уважает семейный кап + крем-субкап (иначе «овсянка → крем»,
+          // «ржанка → крем»: своп менял primary-гарниры на крем мимо всех капов —
+          // доказано дампом: Факт «Хлопья ржаные» → крем 70 г).
+          const _famUsesSw = (id: string): number => {
+            const _fam = stapleFamilyOf(id);
+            let n = 0;
+            for (const m of meals) {
+              const items = (m.items || []) as any[];
+              const hit = _fam
+                ? items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _fam)
+                : items.some(it => it.id === id && (it.role === 'carb_slow' || it.role === 'carb_fast'));
+              if (hit) n++;
+            }
+            return n;
+          };
+          const _creamUsesSw = (): number => {
+            let n = 0;
+            for (const m of meals) {
+              const items = (m.items || []) as any[];
+              if (items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && isCreamId(it.id))) n++;
+            }
+            return n;
+          };
+          const _capForSw = (id: string): number => {
+            if (anchorSet && anchorSet.has(id)) return 3;
+            const _fam = stapleFamilyOf(id);
+            if (!_fam) return 2;
+            return familyMealCap(_fam, { hv });
+          };
+          let _candU = under === 'c'
+            ? _sortU.filter(c => _famUsesSw(c.id) < _capForSw(c.id) && (!isCreamId(c.id) || _creamUsesSw() < creamMealCap(hv)))
+            : _sortU;
+          if (_candU.length === 0) {
+            // Всё в капах — наименее использованное семейство (сходимость важнее),
+            // а не первый сырого пула (им был бы крем).
+            _candU = [..._sortU].sort((a, b) => _famUsesSw(a.id) - _famUsesSw(b.id));
+          }
+          const bestU = _candU[0];
           const bestUFood = FOOD_DB.find(f => f.id === bestU.id);
           const bestUMacros = bestUFood ? { p: bestUFood.protein || 0, f: bestUFood.fat || 0, c: bestUFood.carbs || 0 } : { p: 0, f: 0, c: 0 };
           let victimMi = -1, victimIi = -1, victimBad = -1;
@@ -332,6 +370,15 @@ export function correctDayToTargets(
               // P1a: своп в самого себя — пропуск (иначе «посттрен крем 100 → крем 100» ×5
               // сжигает итерации вхолостую).
               if (it.id === bestU.id) return;
+              // P1a-fix2: churn внутри семейства — пропуск (рис → крем не даёт ни
+              // разнообразия, ни сходимости нового: та же рисовая монотонность).
+              // HV-исключение: на HV плотность важнее (там рис↔крем — рабочий инструмент
+              // сходимости; кап 4 + крем-субкап 2 держат разнообразие сверху).
+              if (!hv && under === 'c' && (it.role === 'carb_slow' || it.role === 'carb_fast')) {
+                const _vf = stapleFamilyOf(it.id);
+                const _bf = stapleFamilyOf(bestU.id);
+                if (_vf && _bf && _vf === _bf) return;
+              }
               // P1a: гарнир завтрака не свопаем (курируемая oatFamily-типология; паритет
               // с DENSITY-SWAP, который завтрак скипает целиком — иначе «овсянка → батат»).
               // P1a: якоря дня не свопаем (курированный primary lunch/dinner; их можно
@@ -445,7 +492,44 @@ export function correctDayToTargets(
             const _sNow = meals.flatMap(mm => mm.items || []).filter(x => _sIds.has(x.id)).reduce((s, x) => s + (x.c || 0), 0);
             const _sCap = safeTargets.c >= 1300 ? 0.25 : safeTargets.c >= 1000 ? 0.20 : 0.15;
             const _sugarFull = _sNow >= safeTargets.c * _sCap;
-            const _best = [..._alts.filter(f => !_sugarFull || !_sIds.has(f.id))]
+            // P1a-fix2: своп внутри семейства (рис → крем) запрещён + семейный кап /
+            // крем-субкап на замену (иначе density-swap льёт крем поверх риса).
+            const _vicFamD = stapleFamilyOf(_vic.id);
+            const _famUsesD = (id: string): number => {
+              const _fam = stapleFamilyOf(id);
+              let n = 0;
+              for (const m of meals) {
+                const items = (m.items || []) as any[];
+                const hit = _fam
+                  ? items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _fam)
+                  : items.some(it => it.id === id && (it.role === 'carb_slow' || it.role === 'carb_fast'));
+                if (hit) n++;
+              }
+              return n;
+            };
+            const _creamUsesD = (): number => {
+              let n = 0;
+              for (const m of meals) {
+                const items = (m.items || []) as any[];
+                if (items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && isCreamId(it.id))) n++;
+              }
+              return n;
+            };
+            const _capForD = (id: string): number => {
+              if (anchorSet && anchorSet.has(id)) return 3;
+              const _fam = stapleFamilyOf(id);
+              if (!_fam) return 2;
+              return familyMealCap(_fam, { hv });
+            };
+            const _altsF = _alts.filter(f => {
+              const _bf = stapleFamilyOf(f.id);
+              // HV-исключение: плотность важнее (churn-бан только обычных дней).
+              if (!hv && _vicFamD && _bf && _vicFamD === _bf) return false;
+              if (_famUsesD(f.id) >= _capForD(f.id)) return false;
+              if (isCreamId(f.id) && _creamUsesD() >= creamMealCap(hv)) return false;
+              return true;
+            });
+            const _best = [..._altsF.filter(f => !_sugarFull || !_sIds.has(f.id))]
               .sort((a, b) => (b.carbs || 0) / Math.max(1, b.kcal || 1) - (a.carbs || 0) / Math.max(1, a.kcal || 1))[0];
             if (_best) {
               const _g = Math.max(30, Math.min(250, Math.round((_vic.kcal || 0) / Math.max(1, _best.kcal || 1) * 100 / 10) * 10));
@@ -484,7 +568,7 @@ export function correctDayToTargets(
     let eff: 'p' | 'f' | 'c' = worst === 'k'
       ? (abs.p >= abs.c && abs.p >= abs.f ? 'p' : abs.c >= abs.f ? 'c' : 'f')
       : worst as 'p' | 'f' | 'c';
-    const need = (eff === 'p' ? safeTargets.p - totals.p : eff === 'f' ? safeTargets.f - totals.f : safeTargets.c - totals.c);
+    let need = (eff === 'p' ? safeTargets.p - totals.p : eff === 'f' ? safeTargets.f - totals.f : safeTargets.c - totals.c);
     if (Math.abs(need) < 0.3) break;
 
     if (need < 0) {
@@ -682,6 +766,10 @@ export function correctDayToTargets(
           if (addG < 10) continue;
         }
         const newAmount = cand.it.amount + addG;
+        // P1b: вёдра не растим — большой дефицит закрывает коктейль (ветка newItem
+        // ниже): «яйца 580 г», «курица 400 г». Диверт только вёдер при cocktail-дефиците
+        // (Б≥30/У≥60, порция уже >250/300 г); рост мелочи идёт как раньше.
+        if ((eff === 'p' && need >= 30 && newAmount > 250) || (eff === 'c' && need >= 60 && newAmount > 300)) continue;
         // Порошок растим только до скупа (60 г) — дальше новый приём/носитель.
         if (isProteinPowderId(cand.it.id) && newAmount > POWDER_PORTION_CAP_G) continue;
         // капы: белок ≤300, фрукт ≤150, клетчатка ≤10, общие ≤600, порошок ≤60
@@ -707,7 +795,17 @@ export function correctDayToTargets(
         if (isCore) coreScale.set(key, curScale);
         recalcMealTotals(meals);
       }
-      if (done) continue;
+      // P1b: при cocktail-дефиците (Б≥30/У≥60) после удачного роста НЕ уходим сразу
+      // на следующую итерацию, а даём шанс ветке newItem (конструктор коктейлей ниже):
+      // иначе рост по +80 г/итерацию в тот же пункт морит коктейль голодом («яйца 580 г»).
+      // need здесь stale (до роста) — перебор невозможен: newItem-путь клампится 1.03× цели.
+      if (done && !((eff === 'p' && need >= 30) || (eff === 'c' && need >= 60))) continue;
+      if (done) {
+        // Рост сработал — пересчитываем need под ветку newItem, иначе граммовки
+        // посчитаются от до-ростового дефицита.
+        need = (eff === 'p' ? safeTargets.p - sumTotals(meals).p : eff === 'f' ? safeTargets.f - sumTotals(meals).f : safeTargets.c - sumTotals(meals).c);
+        if (Math.abs(need) < 0.3) continue;
+      }
       // 2) не нашли куда нарастить — добавляем новый item из пула
       let pool = poolFor(eff, opts?.excludedIds, conv, hv);
       // Сахарный потолок дня — скользящий: 15% база, 20% при ≥1000У, 25% при ≥1300У.
@@ -744,7 +842,35 @@ export function correctDayToTargets(
       // пропускаем (иначе корректор кладёт 3-й крем поверх primary+хвоста). На ВСЕХ днях
       // (раньше только HV — фунчоза дублировалась в обед и ужин). Если все по 2 —
       // наименее использованный, а не первый пула.
-      const _dayUses = (id: string): number => meals.reduce((s, m) => s + (m.items || []).filter(it => it.id === id && ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast')).length, 0);
+      // P1a-fix: счёт СЕМЕЙНЫЙ (рис/крем/рисовый крем — одно): per-id счёт пропускал
+      // 4-й рис под новым именем. Без семейства — per-id как раньше.
+      const _famUses = (id: string): number => {
+        const _fam = stapleFamilyOf(id);
+        let n = 0;
+        for (const m of meals) {
+          const items = (m.items || []) as any[];
+          const hit = _fam
+            ? items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _fam)
+            : items.some(it => it.id === id && (it.role === 'carb_slow' || it.role === 'carb_fast'));
+          if (hit) n++;
+        }
+        return n;
+      };
+      const _useCapFor = (id: string): number => {
+        if (anchorSet && anchorSet.has(id)) return 3;
+        const _fam = stapleFamilyOf(id);
+        if (!_fam) return 2;
+        return familyMealCap(_fam, { hv });
+      };
+      const _creamUses = (): number => {
+        let n = 0;
+        for (const m of meals) {
+          const items = (m.items || []) as any[];
+          if (items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && isCreamId(it.id))) n++;
+        }
+        return n;
+      };
+      const _dayUses = (id: string): number => _famUses(id);
       const _leastUsedFirst = (arr: FoodItem[]): FoodItem[] => {
         let _min = Infinity;
         for (const f of arr) _min = Math.min(_min, _dayUses(f.id));
@@ -754,14 +880,27 @@ export function correctDayToTargets(
       const _freshSorted = _sortedPool.filter(c => {
         if (eff !== 'c') return true;
         const _u = _dayUses(c.id);
-        if (_u === 0) return true;
-        if (_u >= (anchorSet && anchorSet.has(c.id) ? 3 : 2)) return false;
+        if (_u === 0) {
+          // P1a-fix2: нулевое семейное использование — но крем-субкап всё равно держим
+          // (иначе первый крем дня проходит мимо субкапа при свежем семействе).
+          if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv)) return false;
+          return true;
+        }
+        if (_u >= _useCapFor(c.id)) return false;
+        // P1a-fix2: крем — субкап 2 внутри рисового семейства.
+        if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv)) return false;
         // P1a: повтор — только lean-носители (Б<8/100): иначе ротация ради новизны
         // тащит белковые крупы (овёс/булгур/ржанка/хлеб 9-13Б) вместо повторного риса,
         // и день перебирает белок скрытыми +15-30 г (кейс HV900 +13%).
         return (c.protein || 0) < 8;
       });
-      const _candIter = (_freshSorted.length > 0 ? _freshSorted : _leastUsedFirst(_sortedPool));
+      const _candIterRaw = (_freshSorted.length > 0 ? _freshSorted : _leastUsedFirst(_sortedPool));
+      // P1a-fix2: крем-субкап держим и в least-used фолбэке (иначе 3-й крем оттуда).
+      const _candIter = _creamUses() >= creamMealCap(hv)
+        ? (_candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id)).length > 0
+            ? _candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id))
+            : _candIterRaw)
+        : _candIterRaw;
       for (const cand of _candIter) {
         if (isProteinPowderId(cand.id)) {
           const _roomAny = meals.some(m => {
@@ -876,6 +1015,18 @@ export function correctDayToTargets(
           return true;
         });
         if (_pickFrom.length === 0) break;
+        // P1a-fix2: добивка — не второе семейство в тот же приём («рис + крем»).
+        // Рост существующего пункта — можно. Если все свободные уже несут семейство —
+        // фолбэк к ним (сходимость важнее).
+        if (eff === 'c') {
+          const _famB = stapleFamilyOf(_b.id);
+          if (_famB) {
+            const _noFam = _pickFrom.filter(m =>
+              (m.items || []).some(it => it.id === _b.id) ||
+              !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famB));
+            if (_noFam.length > 0) _pickFrom = _noFam;
+          }
+        }
       }
       let targetMeal: CorrectorMeal | undefined;
       if (_pickFrom.length > 0) {
@@ -913,6 +1064,20 @@ export function correctDayToTargets(
             if (_over > 0) grams = Math.max(0, grams - Math.ceil(_over / per100Best * 100 / 10) * 10);
           }
           if (grams < (conv ? 20 : 10)) break;
+        }
+      }
+      // P1b-конструктор: хост коктейля — targetMeal, иначе наименее гружённый
+      // свободный приём (иначе ветка роста same-id ниже перехватывает управление
+      // и коктейль не строится никогда: best уже везде — «яйца 580 г»).
+      // (Сам конструктор — перед newItem ниже; здесь только хост.)
+      if (!targetMeal && ((eff === 'p' && need >= 30) || (eff === 'c' && need >= 60))) {
+        const _ckEl = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !_postLocked(m) && !(m as any)._insulinWindow);
+        if (_ckEl.length > 0) {
+          targetMeal = _ckEl.reduce((a, b) => {
+            const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
+            const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
+            return aShare <= bShare ? a : b;
+          });
         }
       }
       if (!targetMeal) {
@@ -967,6 +1132,190 @@ export function correctDayToTargets(
         if (_maxByRoom < 10) break;
         grams = Math.min(grams, _maxByRoom);
       }
+      // P1b-конструктор коктейлей-добивок (спека ANCHOR-WAVE «Мини-спецификация»):
+      // большой дефицит закрываем набором 2–3 носителей с капами, а не одним продуктом
+      // («курица 400 г», «рис 300 г сухого поверх тарелки»). Теги _cocktail с группой
+      // рисует UI (бейдж 🥤/🍯). Всё или ничего: гейт improveGate, иначе legacy-путь ниже.
+      if (((eff === 'p' && need >= 30) || (eff === 'c' && need >= 60)) && targetMeal) {
+        const _ckItems: CorrectorItem[] = [];
+        const _ckKind = eff === 'p' ? 'protein' : 'carb';
+        const _ckName = eff === 'p' ? '🥤 Протеиновый коктейль' : '🍯 Углеводный добор';
+        const _ckGroup = `${_ckKind}:${String(targetMeal.label || targetMeal.type || '')}:${meals.indexOf(targetMeal)}`;
+        const _ckTag = { kind: _ckKind, name: _ckName, group: _ckGroup };
+        const _ckHas = (id: string) => (targetMeal.items || []).some(it => it.id === id);
+        const _ckFood = (id: string): FoodItem | undefined => {
+          const f = FOOD_DB.find(x => x.id === id);
+          if (!f || !foodAvailableForPlan(f)) return undefined;
+          if (opts?.excludedIds && opts.excludedIds.has(id)) return undefined;
+          return f;
+        };
+        const _ckFamUses = (id: string): number => {
+          const _fam = stapleFamilyOf(id);
+          let n = 0;
+          for (const m of meals) {
+            const items = (m.items || []) as any[];
+            const hit = _fam
+              ? items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _fam)
+              : items.some(it => it.id === id && (it.role === 'carb_slow' || it.role === 'carb_fast'));
+            if (hit) n++;
+          }
+          return n;
+        };
+        const _ckCreamUses = (): number => {
+          let n = 0;
+          for (const m of meals) {
+            const items = (m.items || []) as any[];
+            if (items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && isCreamId(it.id))) n++;
+          }
+          return n;
+        };
+        const _ckCapFor = (id: string): number => {
+          if (anchorSet && anchorSet.has(id)) return 3;
+          const _fam = stapleFamilyOf(id);
+          if (!_fam) return 2;
+          return familyMealCap(_fam, { hv });
+        };
+        const _ckPush = (f: FoodItem, g: number, r: string): void => {
+          const _rr = g / 100;
+          const _p = Math.round((f.protein || 0) * _rr * 10) / 10;
+          const _ff = Math.round((f.fat || 0) * _rr * 10) / 10;
+          const _c = Math.round((f.carbs || 0) * _rr * 10) / 10;
+          _ckItems.push({
+            id: f.id, name: f.name, amount: g,
+            kcal: Math.round(4 * _p + 9 * _ff + 4 * _c), p: _p, f: _ff, c: _c,
+            fiber: Math.round((f.fiber || 0) * _rr * 10) / 10, role: r,
+            _cocktail: { ..._ckTag },
+          } as any);
+        };
+        if (eff === 'p') {
+          // Белковый коктейль: мясо (150) + жидкий яичный белок (300) + порошок (30).
+          // Живёт внутри комнаты приёма 60 г белка (D-28 П6), ultraP — без комнаты.
+          const _roomCk = 60 - targetMeal.items
+            .filter(x => x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein')
+            .reduce((s, x) => s + (x.p || 0), 0);
+          const _ultraCk = safeTargets.p >= 350 || safeTargets.p / Math.max(40, weightKg) >= 3.5;
+          const _budgetCk = _ultraCk ? need : Math.min(need, Math.max(0, _roomCk));
+          if (_budgetCk >= 30) {
+            const _meats = ['chicken_breast', 'turkey_breast', 'tuna_canned'];
+            const _firstCk = (best && _meats.includes(best.id)) ? best.id : 'chicken_breast';
+            const _powCk = (best && isProteinPowderId(best.id)) ? best.id : 'whey_isolate';
+            const _pmCntCk = meals.filter(m => (m.items || []).some(it => isProteinPowderId(it.id))).length;
+            const _pmCapCk = _ultraCk ? 4 : 2;
+            let _remCk = _budgetCk;
+            // Спека: один продукт — не более ~60% дефицита (первый носитель), остаток —
+            // следующим (иначе мясо съедает весь бюджет и коктейль из 1 носителя не строится).
+            let _firstCkDone = false;
+            for (const _cc of [{ id: _firstCk, max: 150 }, { id: 'egg_white', max: 300 }, { id: _powCk, max: 30 }]) {
+              if (_remCk < 5) break;
+              if (_ckHas(_cc.id)) continue;
+              if (_cc.id === _powCk && _pmCntCk >= _pmCapCk) continue;
+              const f = _ckFood(_cc.id);
+              if (!f) continue;
+              const _per100 = f.protein || 0;
+              if (_per100 <= 0) continue;
+              const _shareCk = _firstCkDone ? _remCk : Math.min(_remCk, _budgetCk * 0.6);
+              let _g = Math.min(_cc.max, Math.floor(_shareCk / _per100 * 100 / 5) * 5);
+              if (COMFORT_CAP[f.id] !== undefined) _g = Math.min(_g, COMFORT_CAP[f.id]);
+              if (isProteinPowderId(f.id)) _g = Math.min(_g, POWDER_PORTION_CAP_G);
+              const _maxMacroCk = safeTargets.p * 1.03;
+              const _overCk = sumTotals(meals).p + _per100 * _g / 100 - _maxMacroCk;
+              if (_overCk > 0) _g = Math.max(0, _g - Math.ceil(_overCk / _per100 * 100 / 5) * 5);
+              if (_g < 10) continue;
+              _ckPush(f, _g, 'protein');
+              _remCk -= _g * _per100 / 100;
+              _firstCkDone = true;
+            }
+          }
+        } else {
+          // Углеводный коктейль: плотная база + сладость (капы спеки). Сладость —
+          // только в перекусы (в мейнах — мусор) и при сахарной комнате дня.
+          const _carbsInCk = targetMeal.items.filter(x => x.role === 'carb_slow' || x.role === 'carb_fast').length;
+          const _capCk = (hv || !!opts?.refeedDay) ? 3 : 2;
+          const _isMainCk = targetMeal.type === 'breakfast' || targetMeal.type === 'lunch' || targetMeal.type === 'dinner';
+          if (_carbsInCk + 2 <= _capCk) {
+            const _baseIds = ['cream_of_rice', 'corn_flakes', 'bread_white'];
+            let _baseCk: FoodItem | undefined;
+            const _bestBase = best && (best.carbs || 0) >= 45 && !isSweetBaseId(best.id) ? best : undefined;
+            const _mealFamsCk = new Set((targetMeal.items || [])
+              .filter(x => x.role === 'carb_slow' || x.role === 'carb_fast')
+              .map(x => stapleFamilyOf(x.id)).filter(Boolean));
+            for (const _bid of (_bestBase ? [_bestBase.id, ..._baseIds] : _baseIds)) {
+              if (_ckHas(_bid)) continue;
+              const f = _ckFood(_bid);
+              if (!f) continue;
+              if (targetMeal.type === 'breakfast' && isBreakfastBannedCarb(f.id)) continue;
+              const _bfam = stapleFamilyOf(f.id);
+              if (_bfam && _mealFamsCk.has(_bfam)) continue;
+              if (_ckFamUses(f.id) >= _ckCapFor(f.id)) continue;
+              if (isCreamId(f.id) && _ckCreamUses() >= creamMealCap(hv)) continue;
+              _baseCk = f;
+              break;
+            }
+            if (_baseCk) {
+              let _remCk = need;
+              const _perBase = _baseCk.carbs || 0;
+              if (_perBase > 0) {
+                // Спека: база — не более ~60% дефицита (остаток — сладости).
+                const _shareBase = Math.min(_remCk, _remCk * 0.6 + 30);
+                let _gb = Math.min(150, COMFORT_CAP[_baseCk.id] ?? 150, Math.floor(_shareBase / _perBase * 100 / 5) * 5);
+                const _maxMacroCk = safeTargets.c * 1.03;
+                const _overCk = sumTotals(meals).c + _perBase * _gb / 100 - _maxMacroCk;
+                if (_overCk > 0) _gb = Math.max(0, _gb - Math.ceil(_overCk / _perBase * 100 / 5) * 5);
+                if (_gb >= 30) {
+                  _ckPush(_baseCk, _gb, 'carb_slow');
+                  _remCk -= _gb * _perBase / 100;
+                }
+              }
+              if (!_isMainCk && _remCk >= 20) {
+                const _sIdsCk = new Set(['honey', 'jam', 'marmalade', 'zefir', 'pastila', 'pryaniki', 'sushki', 'sugar_cookies', 'dates', 'dates_dried', 'raisins', 'dried_apricots', 'dried_apple_rings', 'fruit_date_medjool', 'prunes', 'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips']);
+                const _sNowCk = meals.flatMap(mm => mm.items || []).filter(x => _sIdsCk.has(x.id)).reduce((s, x) => s + (x.c || 0), 0);
+                const _sCapCk = safeTargets.c >= 1300 ? 0.25 : safeTargets.c >= 1000 ? 0.20 : 0.15;
+                const _sweetSpec: Record<string, number> = { pryaniki: 60, jam: 55, dates: 60 };
+                for (const _sid of ['pryaniki', 'jam', 'dates']) {
+                  if (_remCk < 20) break;
+                  if (_ckHas(_sid)) continue;
+                  const f = _ckFood(_sid);
+                  if (!f) continue;
+                  const _per100 = f.carbs || 0;
+                  if (_per100 <= 0) continue;
+                  let _g = Math.min(_sweetSpec[_sid], COMFORT_CAP[f.id] ?? 100, Math.floor(_remCk / _per100 * 100 / 5) * 5);
+                  if (_sNowCk + _per100 * _g / 100 > safeTargets.c * _sCapCk) {
+                    const _roomS = safeTargets.c * _sCapCk - _sNowCk;
+                    _g = Math.min(_g, Math.floor(_roomS / _per100 * 100 / 5) * 5);
+                  }
+                  if (_g < 20) continue;
+                  _ckPush(f, _g, 'carb_fast');
+                  _remCk -= _g * _per100 / 100;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        // Коктейль — от 2 носителей (иначе это single под тегом: идём legacy-путём).
+        if (_ckItems.length >= 2) {
+          const _beforeCk = sumTotals(meals);
+          const _beforeDevCk = maxDevPct(_beforeCk as DayTargets, safeTargets);
+          for (const _ci of _ckItems) targetMeal.items.push(_ci);
+          recalcMealTotals(meals);
+          const _afterCk = sumTotals(meals);
+          const _afterDevCk = maxDevPct(_afterCk as DayTargets, safeTargets);
+          if (_afterDevCk < _beforeDevCk - improveGate(_beforeDevCk)) {
+            const _namesCk = _ckItems.map(x => `${x.name} ${Math.round(x.amount || 0)} г`).join(' + ');
+            const _macroCk = eff === 'p'
+              ? `+${Math.round(_ckItems.reduce((s, x) => s + (x.p || 0), 0))} г белка`
+              : `+${Math.round(_ckItems.reduce((s, x) => s + (x.c || 0), 0))} г углей`;
+            if (Array.isArray((targetMeal as any).rationale)) (targetMeal as any).rationale.push(`Назначено коктейлем: ${_ckName} (${_namesCk} ≈ ${_macroCk}) — сплит дефицита, жевать меньше`);
+            continue;
+          }
+          for (const _ci of _ckItems) {
+            const _ix = targetMeal.items.indexOf(_ci);
+            if (_ix >= 0) targetMeal.items.splice(_ix, 1);
+          }
+          recalcMealTotals(meals);
+          // Откат — дальше legacy single-путь (сходимость важнее).
+        }
+      }
       const newItem: CorrectorItem = {
         id: best.id, name: best.name, amount: grams,
         kcal: Math.round((best.kcal || 0) * grams / 100),
@@ -999,6 +1348,34 @@ export function correctDayToTargets(
         scaleItem(_dup, _prev);
         recalcMealTotals(meals);
         break;
+      }
+      // P1a-fix2: рост однодольца вместо нового пункта семейства («рис 250 + крем 20»
+      // в одном обеде): добивка растит существующий гарнир того же семейства.
+      // Не срослось (кап/гейт) — дальше обычный push (сходимость важнее).
+      if (eff === 'c') {
+        const _famN = stapleFamilyOf(newItem.id);
+        if (_famN) {
+          const _famEx = targetMeal.items.find(it => !(it as any)._fixedGrams &&
+            (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famN);
+          if (_famEx) {
+            const _per100 = (_famEx.c || 0) / Math.max(1, _famEx.amount || 1) * 100;
+            if (_per100 > 0) {
+              const _addG = Math.max(0, Math.round(newItem.c / _per100 * 100 / 10) * 10);
+              const _famCap = COMFORT_CAP[_famEx.id] !== undefined ? COMFORT_CAP[_famEx.id]
+                : (hv && _per100 >= 55) ? 150 : 600;
+              if (_addG >= 10 && _famEx.amount + _addG <= _famCap) {
+                const _prevF = _famEx.amount;
+                scaleItem(_famEx, _famEx.amount + _addG);
+                recalcMealTotals(meals);
+                const _afterF = sumTotals(meals);
+                const _afterDevF = maxDevPct(_afterF as DayTargets, safeTargets);
+                if (_afterDevF < beforeDev - improveGate(beforeDev)) continue;
+                scaleItem(_famEx, _prevF);
+                recalcMealTotals(meals);
+              }
+            }
+          }
+        }
       }
       targetMeal.items.push(newItem);
       recalcMealTotals(meals);
