@@ -77,8 +77,13 @@ export const RiskDetails: React.FC<{
     return map;
   }, [riskResult.systemBreakdown]);
 
+  const allOpen = CORE_SYSTEMS.every(s => expanded.has(s));
   return (
     <div className="risk-details">
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+        <button onClick={() => setExpanded(new Set(CORE_SYSTEMS))} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background: allOpen ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.06)', border: allOpen ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▼ Развернуть все</button>
+        <button onClick={() => setExpanded(new Set())} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▲ Свернуть{allOpen || expanded.size > 0 ? ` (${expanded.size})` : ''}</button>
+      </div>
       {/* Per-system detail cards */}
       {CORE_SYSTEMS.map(coreSys => {
         const info = SYSTEM_INFO[coreSys];
