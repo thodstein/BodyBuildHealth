@@ -284,6 +284,20 @@
   }
 }
 
+/* Диалог фильтра систем каталога: на низких телефонах не обрезается */
+.support-screen.support-root .sup-dialog {
+  max-height: 86vh !important;
+  max-height: 86dvh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Список каталога: dvh вместо vh — шторка браузера не съедает высоту */
+.support-screen.support-root [style*='max-height: 68vh'] {
+  max-height: 68vh !important;
+  max-height: 68dvh !important;
+}
+
 @keyframes supSheetUp {
   from { opacity: 0; transform: translateY(48px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }

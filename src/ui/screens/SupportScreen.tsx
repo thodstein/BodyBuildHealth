@@ -3276,7 +3276,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             {showOrganPopup && (
               <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
                 onClick={() => setShowOrganPopup(false)}>
-                <div onClick={e => e.stopPropagation()} style={{ width:'85%', maxWidth:320, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
+                <div onClick={e => e.stopPropagation()} className="sup-dialog" style={{ width:'85%', maxWidth:320, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
                   <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
                   <div style={{ padding:'14px 16px' }}>
                     <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🧬 Системы организма (ТЗ)</div>

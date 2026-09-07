@@ -2866,7 +2866,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 </div>
                 {mixQueue.map(entry => (
                   <div key={entry.recId} style={{ marginTop: 4, padding: '7px 9px', borderRadius: 8, background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
                         {entry.kind === 'preset' ? '🧪' : '💪'} {entry.title}
                         <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}> · {entry.ids.length} веществ</span>

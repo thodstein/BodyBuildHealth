@@ -365,6 +365,9 @@ describe('SUP mobile fit (360px)', () => {
       '-webkit-tap-highlight-color: transparent',
       'text-size-adjust: 100%',
       'text-overflow: ellipsis',
+      'sup-dialog',
+      '86dvh',
+      '68dvh',
     ]) {
       expect(css, hook).toContain(hook);
     }
