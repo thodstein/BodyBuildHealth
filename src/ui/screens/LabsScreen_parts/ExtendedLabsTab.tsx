@@ -158,19 +158,25 @@ export default function ExtendedLabsTab({
         Все маркеры из каталога UCUM, сгруппированные по панелям. Ввод с авто-заполнением из существующих анализов для выбранной фазы. Коррекция референсов под разные лаборатории.
       </div>
 
-      <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'2px 2px 4px' }}>
-        {Object.entries(PHASE_LABELS).map(([key, label]) => (
-          <button key={key} onClick={() => onPhaseChange(key)} aria-pressed={selectedPhase===key} style={{
-            padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
-            whiteSpace:'nowrap', cursor:'pointer', minHeight:44, flexShrink:0,
-            background: selectedPhase === key ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
-            color: selectedPhase === key ? '#0a1a08' : '#fff',
-            border: selectedPhase === key ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
-            boxShadow: selectedPhase===key ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
-          }}>
-            {label}
-          </button>
-        ))}
+      <div className="labs-phase-row" style={{ display:'flex', gap:10, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'2px 2px 6px', scrollSnapType:'x proximity' }}>
+        {Object.entries(PHASE_LABELS).map(([key, label]) => {
+          const active = selectedPhase===key;
+          return (
+            <button key={key} onClick={() => onPhaseChange(key)} aria-pressed={active} style={{
+              display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:14, minHeight:56, flexShrink:0, scrollSnapAlign:'start',
+              whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.18s ease',
+              background: active ? 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.18) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.06) 100%)' : 'rgba(21,38,66,0.60)',
+              border: active ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : '1px solid rgba(140,190,255,0.14)',
+              boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.28)' : 'none',
+              color:'#fff',
+            }}>
+              <span style={{ width:18, height:18, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', border: active ? '2px solid var(--labs-accent, #00e68a)' : '2px solid rgba(255,255,255,0.22)', background: active ? 'var(--labs-accent, #00e68a)' : 'transparent' }}>
+                {active && <span style={{ width:8, height:8, borderRadius:'50%', background:'#0a1a08' }} />}
+              </span>
+              <span style={{ fontSize:13, fontWeight:800, color: active ? 'var(--labs-accent, #00e68a)' : '#fff' }}>{label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -179,7 +185,7 @@ export default function ExtendedLabsTab({
         </span>
         <button onClick={handleSave} disabled={saving || filledCount === 0} style={{
           padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
-          background: saved ? '#22c55e' : filledCount > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
+          background: saved ? '#22c55e' : filledCount > 0 ? 'var(--accent)' : 'rgba(21,38,66,0.60)',
           color: saved ? '#fff' : filledCount > 0 ? '#000' : '#fff',
           fontWeight: 700, fontSize: 11, transition: 'all 0.2s',
         }}>

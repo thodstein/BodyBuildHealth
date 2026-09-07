@@ -57,8 +57,43 @@ html.app-native .labs-bottomtabs {
   }
 }
 
+/* КАПИТАЛ: янтарный focus, press, tabular, reduced-motion */
+html.app-native .labs-body button:focus-visible,
+html.app-native .labs-body input:focus-visible,
+html.app-native .labs-body textarea:focus-visible,
+html.app-native .labs-body select:focus-visible {
+  outline: 2px solid rgba(255, 184, 0, 0.85) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(255, 184, 0, 0.18) !important;
+}
+
+html.app-native .labs-body button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .labs-kpi,
+html.app-native .labs-phase-row button,
+html.app-native .labs-bottomtabs button {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .labs-kpi {
+  transition: transform 0.14s ease, box-shadow 0.14s ease !important;
+}
+
+html.app-native .labs-phase-row button:active {
+  transform: scale(0.96) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  html.app-native .labs-body button:active {
+  html.app-native .labs-body button:active,
+  html.app-native .labs-kpi:active,
+  html.app-native .labs-phase-row button:active {
     transform: none !important;
+  }
+  html.app-native .labs-body,
+  html.app-native .labs-kpi,
+  html.app-native .labs-phase-row {
+    animation: none !important;
   }
 }

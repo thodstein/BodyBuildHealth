@@ -914,20 +914,27 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
       {subTab === 'current' && (
         <div>
-          {/* Phase selector — TOP APK: 44px пилюли, скролл-лента, актив с glow */}
-          <div className="labs-phase-row" style={{ display:'flex', gap:8, overflowX:'auto', margin:'12px 0 10px', scrollbarWidth:'none', padding:'2px 2px 4px' }}>
+          {/* Phase selector — КАПИТАЛ: опшн-карточки 56px с радио и градиентом active */}
+          <div className="labs-phase-row" style={{ display:'flex', gap:10, overflowX:'auto', margin:'14px 0 12px', scrollbarWidth:'none', padding:'2px 2px 6px', scrollSnapType:'x proximity' }}>
             {Object.entries(PHASE_LABELS).map(([key, label]) => {
               const active = selectedPhase === key;
               return (
                 <button key={key} onClick={() => handlePhaseChange(key)} aria-pressed={active} style={{
-                  padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
-                  whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.2s', minHeight:44, flexShrink:0,
-                  background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
-                  color: active ? '#0a1a08' : '#fff',
-                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
-                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                  display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:14, minHeight:56, flexShrink:0, scrollSnapAlign:'start',
+                  whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.18s ease',
+                  background: active ? 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.18) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.06) 100%)' : 'rgba(21,38,66,0.60)',
+                  border: active ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : '1px solid rgba(140,190,255,0.14)',
+                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.28)' : 'none',
+                  color: '#fff',
                 }}>
-                  {label}
+                  <span style={{
+                    width:18, height:18, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+                    border: active ? '2px solid var(--labs-accent, #00e68a)' : '2px solid rgba(255,255,255,0.22)',
+                    background: active ? 'var(--labs-accent, #00e68a)' : 'transparent',
+                  }}>
+                    {active && <span style={{ width:8, height:8, borderRadius:'50%', background:'#0a1a08' }} />}
+                  </span>
+                  <span style={{ fontSize:13, fontWeight:800, color: active ? 'var(--labs-accent, #00e68a)' : '#fff' }}>{label}</span>
                 </button>
               );
             })}

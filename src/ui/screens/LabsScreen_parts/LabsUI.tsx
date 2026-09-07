@@ -129,26 +129,26 @@ export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string;
 
 export const LabsKpiCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string; accent?: string }> = ({ icon, label, value, sub, color }) => (
   <div className="labs-kpi" style={{
-    background: labsWithAlpha(color, '0F'),
-    border: `1px solid ${labsWithAlpha(color, '25')}`,
-    borderTop: `2px solid ${labsWithAlpha(color, '55')}`,
+    background: `linear-gradient(180deg, ${labsWithAlpha(color, '14')} 0%, ${labsWithAlpha(color, '06')} 100%)`,
+    border: `1px solid ${labsWithAlpha(color, '22')}`,
+    borderTop: `2px solid ${labsWithAlpha(color, '60')}`,
     borderRadius: 18,
-    padding: '12px 8px 10px',
+    padding: '14px 8px 12px',
     textAlign: 'center',
     position: 'relative',
     overflow: 'hidden',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.40)',
-    minHeight: 96,
+    boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
+    minHeight: 104,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
   }}>
-    <div style={{ position: 'absolute', top: -10, right: -10, width: 44, height: 44, borderRadius: '50%', background: labsWithAlpha(color, '12') }} />
-    <div style={{ marginBottom: 4, color, display: 'flex', justifyContent: 'center' }}>{icon}</div>
-    <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-    <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginTop: 3, letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</div>
-    {sub && <div style={{ fontSize:11, color:'#fff', marginTop:3 }}>{sub}</div>}
+    <div style={{ position:'absolute', top:-12, right:-12, width:52, height:52, borderRadius:'50%', background: labsWithAlpha(color, '10') }} />
+    <div style={{ marginBottom:6, color, display:'flex', justifyContent:'center', filter:'drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}>{icon}</div>
+    <div style={{ fontSize:26, fontWeight:900, color, lineHeight:1, fontVariantNumeric:'tabular-nums', letterSpacing:-0.5 }}>{value}</div>
+    <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginTop:4, letterSpacing:0.6, textTransform:'uppercase', opacity:0.95 }}>{label}</div>
+    {sub && <div style={{ fontSize:11, color:'#fff', marginTop:2, fontWeight:600 }}>{sub}</div>}
   </div>
 );
 
