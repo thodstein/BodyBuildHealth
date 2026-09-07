@@ -296,7 +296,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                           {v}
                         </span>
                       </div>
-                      <div style={{ fontSize:9, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:700 }}>
+                      <div style={{ fontSize:10, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:700 }}>
                         {chartData.labels[i].slice(-5)}
                       </div>
                     </div>

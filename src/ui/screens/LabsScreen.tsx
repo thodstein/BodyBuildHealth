@@ -2313,7 +2313,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
             </div>
             {addError && <div style={{ fontSize:12, color:'#ef4444', textAlign:'center', marginTop:10, fontWeight:700 }}>{addError}</div>}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginTop:14 }}>
               <button onClick={() => setShowLabInput(false)} style={{
                 padding:'14px', borderRadius:14, border:'1px solid rgba(140,190,255,0.14)', minHeight:52,
                 background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer',

@@ -126,7 +126,7 @@ export const LabsTzRiskTab: React.FC = () => {
       {/* Параметры курса */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="syringe" size={13} /> Параметры курса</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8 }}>
           <div>
             <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Класс</div>
             <div style={{ display: 'flex', gap: 3 }}>
