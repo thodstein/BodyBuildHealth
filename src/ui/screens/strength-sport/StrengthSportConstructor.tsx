@@ -37,6 +37,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureStrongmanApkStyles } from './strongman-apk-loader';
+import { parseSmBridgePayload } from './sm-bridge-intake';
 import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, EventCard, StrengthGantt, StrengthHeatmap, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
@@ -101,21 +102,19 @@ export const StrengthSportConstructor: React.FC = () => {
   ]);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagnosticLevel, setDiagnosticLevel] = useState<string>('');
+  // VBT-история и sway из хаба (bridge): hubVelocity идёт в velocityHistory билда напрямую,
+  // минуя vbtMap (у него другой формат ключей week-day-ex-set).
+  const [hubVelocity, setHubVelocity] = useState<Record<string, number[]>>({});
+  const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
   // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
+  // через чистый parseSmBridgePayload (см. sm-bridge-intake.ts + его тест).
   useEffect(() => {
     const apply = (payload: any) => {
-      if (!payload || payload.kind !== 'weakpoints') return;
-      const merged: string[] = [
-        ...((payload.data?.smWeakPoints as string[]) || []),
-        ...((payload.data?.groups as string[]) || []),
-        ...((payload.data?.wlWeakPoints as string[]) || []),
-        ...((payload.data?.weakPoints as string[]) || []),
-      ];
-      const groups: string[] | undefined = merged.length ? Array.from(new Set(merged.map((s: any) => String(s)))) as string[] : undefined;
+      if (!payload || payload.kind !== 'weakpoints' || !payload.data) return;
+      const p = parseSmBridgePayload(payload.data);
       // Contest packet from SM hub
-      const incomingContest: any = payload.data?.contest || payload.data?.smContest || null;
-      if (incomingContest && typeof incomingContest === 'object' && Array.isArray(incomingContest.events)) {
-        setContest(incomingContest as any);
+      if (p.contest) {
+        setContest(p.contest as any);
         setMode('strongman' as any);
       }
       // Turn/platform synthetic via hub fields
@@ -123,18 +122,20 @@ export const StrengthSportConstructor: React.FC = () => {
         // will be handled via contest merge on next build; ensure mode strongman
         setMode('strongman' as any);
       }
-      if (Array.isArray(groups) && groups.length > 0) {
-        setWeakPoints(groups.slice(0, 4).map((s: string) => String(s)));
-        if (payload.data?.level) setDiagnosticLevel(String(payload.data.level));
-        else if (payload.data?.diagnosticLevel) setDiagnosticLevel(String(payload.data.diagnosticLevel));
-        if (payload.data?.smWeakPoints) setMode('strongman' as any);
-        else if (payload.data?.wlWeakPoints) setMode('weightlifting' as any);
-        // VBT history / sway from SM hub
-        if (payload.data?.velocityHistory && typeof payload.data.velocityHistory === 'object') {
-          try { setVbtMap(prev => ({ ...prev, ...payload.data.velocityHistory } as any)); } catch {}
+      // Стратегия попыток из хаба (раньше молча терялась — всегда был 'balanced')
+      if (p.strategy) setContestStrategy(p.strategy);
+      if (Array.isArray(p.weakPoints) && p.weakPoints.length > 0) {
+        setWeakPoints(p.weakPoints);
+        if (p.diagnosticLevel) setDiagnosticLevel(p.diagnosticLevel);
+        if (p.mode) setMode(p.mode as any);
+        // VBT history from SM hub — в отдельный стейт (формат {liftId:[точки]},
+        // в vbtMap нельзя: там ключи week-day-ex-set, build() такое отбрасывает)
+        if (Object.keys(p.hubVelocity).length > 0) {
+          try { setHubVelocity(prev => ({ ...prev, ...p.hubVelocity })); } catch {}
         }
-        if (payload.data?.velocityLossPct != null) setVelocityLoss(Number(payload.data.velocityLossPct) || 0);
-        else if (payload.data?.vbtLossPct != null) setVelocityLoss(Number(payload.data.vbtLossPct) || 0);
+        if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
+        // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
+        if (p.swayCm != null) setSwayCmBridge(p.swayCm);
       }
     };
     try {
@@ -312,6 +313,17 @@ export const StrengthSportConstructor: React.FC = () => {
         }
       }
     } catch {}
+    // VBT из хаба: hubVelocity уже в формате {liftId:[точки]} — напрямую в историю
+    try {
+      for (const [lift, pts] of Object.entries(hubVelocity)) {
+        if (!lift || !Array.isArray(pts) || pts.length === 0) continue;
+        const clean = pts.filter((v) => Number.isFinite(v) && (v as number) > 0).slice(-3);
+        if (!clean.length) continue;
+        if (!velocityHistory) velocityHistory = {};
+        if (!velocityHistory[lift]) velocityHistory[lift] = [];
+        velocityHistory[lift] = [...velocityHistory[lift], ...clean].slice(-3);
+      }
+    } catch {}
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -377,6 +389,11 @@ export const StrengthSportConstructor: React.FC = () => {
     if (diagnosticLevel === 'critical') {
       p.weeksData.forEach(w => { if (!w.deload) w.sessions.forEach(s => s.exercises.forEach(e => { const orig = e.workSets.length; const keep = Math.max(2, Math.round(orig * 0.85)); if (keep < orig) { e.workSets = e.workSets.slice(0, keep); e.sets = keep; e.workSets.forEach(ws => ws.rir = Math.min(4, (ws.rir ?? 2) + 1)); } })); });
       p.rationale.push('CRITICAL gate: объём ×0.85 RIR+1 (score≤49)');
+    }
+    // Sway carry из хаба: у билдера нет sway-входа — честно фиксируем в rationale,
+    // чтобы замер не терялся молча (Kinovea SRD 3/5см).
+    if (swayCmBridge != null && swayCmBridge > 0) {
+      p.rationale.push(`Sway ${swayCmBridge}см из диагностики (Kinovea): коридор ±3см, при >5см — стоп carries и проверка техники`);
     }
     setPlan(p);
     saveStrengthSportPlan(p);
@@ -622,6 +639,12 @@ export const StrengthSportConstructor: React.FC = () => {
               })}
             </div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS).</div>
+            {Object.keys(hubVelocity).length > 0 && (
+              <div style={{ fontSize:11, color:'#f5b04c', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', padding:'8px 10px', borderRadius:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <span>📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</span>
+                <button onClick={() => setHubVelocity({})} style={{ padding:'6px 12px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>✕ Сбросить</button>
+              </div>
+            )}
            </SectionCard>
 
            <SectionCard icon="📈" title="LVP калибровка" subtitle="Индивидуальный профиль скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent>

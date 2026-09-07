@@ -629,6 +629,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tackyUsed: state.tackyUsed,
       turnNeeded: state.turnNeeded,
+      strategy: state.strategy,
       swayCm,
       sway: swayDiag?.text ?? null,
       vbt: vbtLoss ? `${vbtLoss.lossPct}%` : null,
