@@ -541,7 +541,7 @@ export function ArmAutoConstructor() {
             </AdSec>
           )}
 
-          <AdSec title="Слабые зоны (1–2, специализация ×1.3) — мышцы" collapsible summary={summWeak}>
+          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak}>
             <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
@@ -623,7 +623,7 @@ export function ArmAutoConstructor() {
             </AdGrid>
           </AdSec>
 
-          <AdSec title="🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro}>
+          <AdSec title="🏆 PRO: старт WAF" hint="Руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro}>
             <AdGrid cols="3">
               <AdField label="Вес, кг">
                 <input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
@@ -705,7 +705,7 @@ export function ArmAutoConstructor() {
             </div>
           </AdSec>
 
-          <AdSec title="🥇 TOP: матчап · скорость · лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop}>
+          <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop}>
             <AdGrid cols="3">
               <AdField label="Стиль оппонента">
                 <select value={topOpp} onChange={e=>setTopOpp(e.target.value)}>
@@ -761,7 +761,7 @@ export function ArmAutoConstructor() {
               <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
               <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
-            <AdSec title="📚 Именной цикл (интернет-библиотека) — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc}>
+            <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc}>
               <AdGrid cols="2">
                 <AdField label="Цикл">
                   <select value={cycId} onChange={e=>setCycId(e.target.value)}>

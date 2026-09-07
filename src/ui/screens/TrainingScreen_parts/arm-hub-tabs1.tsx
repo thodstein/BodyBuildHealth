@@ -170,7 +170,7 @@ export function HubWristTab({ H }: { H: any }) {
           )}
         </div>
       </AdSec>
-      <AdSec title={`🎯 12 мёртвых точек — выбери 1-3 (как WLDiagnosticsHub) · техника ${state.technique} · до 3`}>
+      <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`}>
         <div className="ad-row">
           {WEAK_GROUPS.map(g=> (
             <div key={g.title}>
