@@ -95,7 +95,7 @@ export function HubControls({ H }: { H: any }) {
         </div>
       </div>
       <AdBtn variant="amber" block onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
-      <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" />
+      <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
     </>
   );
 }

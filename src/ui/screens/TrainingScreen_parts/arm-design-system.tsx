@@ -76,18 +76,21 @@ export type AdStepDef = { id: string; label: string };
 
 /**
  * Липкая лента шагов. Нумерация — визуальная (aria-hidden), доступное имя
- * кнопки = label 1-в-1 (контракт getByRole exact).
+ * кнопки = label 1-в-1 (контракт getByRole exact). numbered=false — для
+ * лент категорий (табы хаба): там порядок не означает последовательность.
  */
 export function AdSteps({
   steps,
   active,
   onSelect,
   hook,
+  numbered = true,
 }: {
   steps: AdStepDef[];
   active: string;
   onSelect: (id: string) => void;
   hook: string;
+  numbered?: boolean;
 }) {
   return (
     <div className="ad-steps" data-arm={hook} aria-label="Шаги">
@@ -100,9 +103,11 @@ export function AdSteps({
           className="ad-step"
           onClick={() => { buzz(); onSelect(s.id); }}
         >
-          <span className="ad-step-n" aria-hidden>
-            {i + 1}
-          </span>
+          {numbered ? (
+            <span className="ad-step-n" aria-hidden>
+              {i + 1}
+            </span>
+          ) : null}
           {s.label}
         </button>
       ))}
