@@ -175,8 +175,8 @@ export function HubWristTab({ H }: { H: any }) {
           {WEAK_GROUPS.map(g=> (
             <div key={g.title}>
               <div className="ad-muted">{g.title} {g.title==='Кисть'?'🤚' : g.title==='Ротация'?'🔄':'💥'}</div>
-              <div className="ad-row">
-                {g.points.map(wp=>{
+                    <div className="ad-chips">
+                      {g.points.map(wp=>{
                   const sel = state.weakPoints.includes(wp);
                   const bio = ARM_BIOMECH[wp];
                   const isForTech = bio.technique.includes(state.technique) || bio.technique.includes('all') || state.technique==='balanced';
@@ -218,7 +218,7 @@ export function HubWristTab({ H }: { H: any }) {
           </div>
         )}
       </AdSec>
-      <div className="ad-row">
+      <div className="ad-chips">
         <span className="ad-muted">Legacy провалы (совместимость):</span>
         {[
           ['cup','Кисть открывается (cup)'],

@@ -533,7 +533,7 @@ export function ArmAutoConstructor() {
 
           {discipline !== 'armwrestling' && (
             <AdSec title="Хват-фокус" collapsible summary={summFocus}>
-              <div className="ad-row">
+              <div className="ad-chips">
                 {GRIP_FOCI.map(g=> (
                   <AdChip key={g.id} active={gripFocus===g.id} onClick={()=>setGripFocus(g.id)}>{g.label}</AdChip>
                 ))}
@@ -542,7 +542,7 @@ export function ArmAutoConstructor() {
           )}
 
           <AdSec title="Слабые зоны (1–2, специализация ×1.3) — мышцы" collapsible summary={summWeak}>
-            <div className="ad-row">
+            <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
               ))}
@@ -699,7 +699,7 @@ export function ArmAutoConstructor() {
             } catch { return null; } })()}
             <div>
               <div className="ad-muted">WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
-              <div className="ad-row">
+              <div className="ad-chips">
                 {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} className="ad-tag">{f.name}</span>)}
               </div>
             </div>

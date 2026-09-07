@@ -54,7 +54,7 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
             <option value="press">Пресс</option>
           </select>
         </div>
-        <div className="ad-row">
+        <div className="ad-chips">
           {[
             ['cup','Кисть открывается (cup)'],
             ['rising','Пальцы уходят (rising)'],

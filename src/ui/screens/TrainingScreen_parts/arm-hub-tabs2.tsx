@@ -32,7 +32,7 @@ export function HubPressureTab({ H }: { H: any }) {
         ))}
       </div>
       <AdSec title="Мёртвые точки давления (быстрый выбор)" hint="side/back — humerus guard">
-        <div className="ad-row">
+        <div className="ad-chips">
           {(['side_mid','side_pin','back_start','back_drag'] as string[]).map(wp=>{
             const sel = state.weakPoints.includes(wp);
             const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
@@ -199,7 +199,7 @@ export function HubStrengthTab({ H }: { H: any }) {
             {(dynamicReport as any).metrics.cup && (dynamicReport as any).metrics.cup.f500 < 25 ? 'cup низкая → cup_start/hold · ' : ''}
             {!((dynamicReport as any).metrics.finger_flex?.ftIndex<30 || (dynamicReport as any).metrics.hammer?.ftIndex<30 || (dynamicReport as any).metrics.hook?.fMax<30 || (dynamicReport as any).metrics.cup?.f500<25) ? 'Все F/t в допуске — баланс' : ''}
           </div>
-          <div className="ad-row">
+          <div className="ad-chips">
             {[
               { id:'contain_fingers', need: (dynamicReport as any).metrics.finger_flex?.ftIndex<30 },
               { id:'sup_drag', need: (dynamicReport as any).metrics.hammer?.ftIndex<30 },
@@ -257,7 +257,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         )}
       </AdBanner>
       <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible>
-        <div className="ad-row">
+        <div className="ad-chips">
           {[
             ['mobWristFlex', 'Сгиб кисти ≥80°'],
             ['mobWristExt', 'Разгиб ≥70°'],
