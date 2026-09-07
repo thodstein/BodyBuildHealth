@@ -9,6 +9,7 @@ import {
 } from '../../../engines/lab-diary.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
+import { UCUM_MAP } from '../../../core/constants';
 
 const GLASS: React.CSSProperties = {
   ...LABS_CARD,
@@ -35,14 +36,15 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   const refresh = useCallback(() => setDiary(getLabDiary()), []);
 
-  // auto-import on mount
+  // auto-import on mount — P0 fix: нормы из UCUM_MAP, иначе все inRange=true и аномалии 0
   useEffect(() => {
     if (labs && labs.length > 0) {
       const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
       for (const lab of labs) {
-        const key = lab.code.toUpperCase();
+        const key = (lab.code || '').toUpperCase();
         if (!markerNorms[key]) {
-          markerNorms[key] = {};
+          const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
+          markerNorms[key] = { lln: info?.lln, uln: info?.uln };
         }
       }
       const prevLen = diary.length;
@@ -76,6 +78,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   const handleImportNow = () => {
     const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
+    for (const lab of labs) {
+      const key = (lab.code || '').toUpperCase();
+      if (!markerNorms[key]) {
+        const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
+        markerNorms[key] = { lln: info?.lln, uln: info?.uln };
+      }
+    }
     importLabsToDiary(labs, markerNorms);
     refresh();
   };
