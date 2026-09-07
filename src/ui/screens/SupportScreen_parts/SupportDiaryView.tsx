@@ -71,6 +71,50 @@ const SIDE_EFFECTS = [
   'Изжога', 'Вздутие', 'Сыпь', 'Усталость',
 ];
 
+// ── Напоминания: честное планирование, пока приложение открыто ──
+// Раньше время ставилось, но ничего никогда не срабатывало (муляж).
+const SUP_REMINDER_KEY = 'he_sup_reminder_v1';
+interface SupReminderSettings { enabled: boolean; time: string; smartEnabled: boolean; smartTime: string; }
+const SUP_REMINDER_DEFAULT: SupReminderSettings = { enabled: false, time: '08:00', smartEnabled: false, smartTime: '08:00' };
+function loadSupReminder(): SupReminderSettings {
+  try {
+    const raw = localStorage.getItem(SUP_REMINDER_KEY);
+    if (!raw) return { ...SUP_REMINDER_DEFAULT };
+    const s = JSON.parse(raw);
+    const t = (v: unknown, fb: string) => (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v) ? v : fb);
+    return {
+      enabled: s?.enabled === true,
+      time: t(s?.time, '08:00'),
+      smartEnabled: s?.smartEnabled === true,
+      smartTime: t(s?.smartTime, '08:00'),
+    };
+  } catch { return { ...SUP_REMINDER_DEFAULT }; }
+}
+/** Ближайшая дата срабатывания для времени ЧЧ:ММ от момента now (сегодня, иначе завтра). */
+export function nextSupReminderDate(time: string, now: Date = new Date()): Date | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(time || '');
+  if (!m) return null;
+  const hh = Number(m[1]); const mm = Number(m[2]);
+  if (hh > 23 || mm > 59) return null;
+  const d = new Date(now);
+  d.setHours(hh, mm, 0, 0);
+  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+  return d;
+}
+/** Человеческий остаток до даты срабатывания. */
+export function supReminderCountdown(target: Date, now: Date = new Date()): string {
+  const mins = Math.max(0, Math.round((target.getTime() - now.getTime()) / 60000));
+  if (mins < 1) return 'меньше чем через минуту';
+  if (mins < 60) return `через ${mins} мин`;
+  const h = Math.floor(mins / 60); const mm = mins % 60;
+  const sameDay = target.getDate() === now.getDate()
+    && target.getMonth() === now.getMonth()
+    && target.getFullYear() === now.getFullYear();
+  const hh = String(target.getHours()).padStart(2, '0');
+  const mnt = String(target.getMinutes()).padStart(2, '0');
+  return `через ${h} ч${mm > 0 ? ` ${mm} мин` : ''} (${sameDay ? 'сегодня' : 'завтра'} в ${hh}:${mnt})`;
+}
+
 interface SubstanceIntake {
   taken: boolean;
   dose?: string;
@@ -662,14 +706,48 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     return Array.from(effects);
   }, [todayEntry]);
 
-  const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderTime, setReminderTime] = useState('08:00');
+  const [reminderEnabled, setReminderEnabled] = useState(() => loadSupReminder().enabled);
+  const [reminderTime, setReminderTime] = useState(() => loadSupReminder().time);
   const [reminderPermission, setReminderPermission] = useState<'granted' | 'denied' | 'default'>('default');
-  const [smartReminderEnabled, setSmartReminderEnabled] = useState(false);
-  const [smartReminderTime, setSmartReminderTime] = useState('08:00');
+  const [smartReminderEnabled, setSmartReminderEnabled] = useState(() => loadSupReminder().smartEnabled);
+  const [smartReminderTime, setSmartReminderTime] = useState(() => loadSupReminder().smartTime);
   const [filterSub, setFilterSub] = useState('');
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyLimit, setHistoryLimit] = useState(20);
+
+  // Персист настроек напоминаний (раньше слетали при каждом монтировании)
+  useEffect(() => {
+    try {
+      localStorage.setItem(SUP_REMINDER_KEY, JSON.stringify({
+        enabled: reminderEnabled, time: reminderTime,
+        smartEnabled: smartReminderEnabled, smartTime: smartReminderTime,
+      }));
+    } catch { /* quota/private — настройки просто не запомнятся */ }
+  }, [reminderEnabled, reminderTime, smartReminderEnabled, smartReminderTime]);
+
+  // Реальное планирование: таймер до ближайшего срабатывания + ежедневный повтор.
+  // Работает, пока приложение открыто (вкладка/свёрнутый АПК — да, убитое — нет).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (reminderPermission !== 'granted') return;
+    const jobs = [
+      { enabled: reminderEnabled, time: reminderTime, body: 'Пора принять БАДы!' },
+      { enabled: smartReminderEnabled, time: smartReminderTime, body: 'Умное напоминание: пора принять БАДы!' },
+    ].filter(j => j.enabled && nextSupReminderDate(j.time));
+    if (jobs.length === 0) return;
+    const timers: number[] = [];
+    const arm = (time: string, body: string) => {
+      const next = nextSupReminderDate(time);
+      if (!next) return;
+      const delay = Math.max(0, next.getTime() - Date.now());
+      timers.push(window.setTimeout(() => {
+        try { new Notification('BodyBuildHealth', { body }); } catch { /* заблокировано на уровне ОС */ }
+        arm(time, body);
+      }, delay));
+    };
+    jobs.forEach(j => arm(j.time, j.body));
+    return () => { timers.forEach(t => window.clearTimeout(t)); };
+  }, [reminderEnabled, reminderTime, smartReminderEnabled, smartReminderTime, reminderPermission]);
 
   const filteredEntries = useMemo(() => {
     let list = entries.filter(e => e.date !== today);
@@ -1050,26 +1128,26 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                     </div>
                   )}
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', minHeight: 44 }}>
                     <input
                       type="checkbox"
                       checked={reminderEnabled}
                       onChange={e => {
-                        if (e.target.checked && reminderPermission !== 'granted') {
-                          if ('Notification' in window) {
-                            Notification.requestPermission().then(perm => {
-                              setReminderPermission(perm);
-                              if (perm === 'granted') setReminderEnabled(true);
-                            });
-                          }
+                        // Без Notification API (тесты, часть WebView) — просто запоминаем
+                        // настройку, шедулер тихо no-op, статус всё честно объясняет.
+                        if (e.target.checked && reminderPermission !== 'granted' && 'Notification' in window) {
+                          Notification.requestPermission().then(perm => {
+                            setReminderPermission(perm);
+                            if (perm === 'granted') setReminderEnabled(true);
+                          });
                         } else {
                           setReminderEnabled(e.target.checked);
                         }
                       }}
-                      style={{ width: 18, height: 18 }}
+                      style={{ width: 20, height: 20, flexShrink: 0 }}
                     />
                     <span style={{ fontSize: 12, color: '#e2e8f0' }}>Включить напоминания о приёме</span>
-                  </div>
+                  </label>
                   
                   {reminderEnabled && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1086,12 +1164,12 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                       />
                       <button onClick={() => {
                         if (reminderPermission === 'granted') {
-                          new Notification('BodyBuildHealth', {
-                            body: 'Пора принять БАДы!',
-                            icon: '💊',
-                          });
+                          try {
+                            new Notification('BodyBuildHealth', {
+                              body: 'Пора принять БАДы!',
+                            });
+                          } catch { /* заблокировано на уровне ОС */ }
                         }
-                        alert('Напоминание установлено на ' + reminderTime);
                       }} style={{
                         padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)',
                         background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontWeight: 600, fontSize: 11,
@@ -1099,10 +1177,21 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                       }}>Тест</button>
                     </div>
                   )}
-                  
+
+                  {reminderEnabled && (() => {
+                    const next = reminderPermission === 'granted' ? nextSupReminderDate(reminderTime) : null;
+                    return (
+                      <div style={{ fontSize: 9, color: '#64748b', marginTop: 6 }}>
+                        {next
+                          ? `✅ Установлено на ${reminderTime} · ${supReminderCountdown(next)}`
+                          : '⏳ Разрешите уведомления — иначе напоминание не сработает'}
+                      </div>
+                    );
+                  })()}
+
                   {reminderEnabled && (
                     <div style={{ fontSize: 9, color: '#64748b', marginTop: 6 }}>
-                      💡 Совет: Браузер покажет уведомление, даже если вкладка закрыта
+                      💡 Работает, пока приложение открыто. Полностью закрытый браузер его не разбудит
                     </div>
                   )}
                 
@@ -1139,7 +1228,9 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                         />
                         <button onClick={() => {
                           if (reminderPermission === 'granted') {
-                            new Notification('BodyBuildHealth', { body: 'Умное напоминание: пора принять БАДы!', icon: '🧠' });
+                            try {
+                              new Notification('BodyBuildHealth', { body: 'Умное напоминание: пора принять БАДы!' });
+                            } catch { /* заблокировано на уровне ОС */ }
                           }
                         }} style={{
                           padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)',
