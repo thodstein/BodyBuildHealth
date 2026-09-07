@@ -4551,6 +4551,14 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
   if (level === 'beginner') return; // новички не используют intensity techniques
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
+    // P2 (качество): пик/тейпер — без отказных техник. Реализация силы идёт
+    // через RIR-дрифт и топ-сеты, а дропы/rest-pause в пик-неделю — мусорная
+    // усталость перед тестом. Prep-недели (contestPhase/prepProtocol/peakWeek)
+    // и taper-флаг — тоже без техник (протокол пика свят).
+    const w: any = week;
+    if (w.phase === 'peaking' || w.taper === true || w.deload === true) continue;
+    if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || w.peakWeek === true) continue;
+    if (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) continue;
     const weekPriority = schedule?.active
       ? specResForWeekSchedule(schedule, week.week).targets
       : (priorityMuscles || []);
