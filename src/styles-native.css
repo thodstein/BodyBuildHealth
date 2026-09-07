@@ -382,8 +382,10 @@ html.app-native .native-home-bg {
   position: fixed;
   inset: 0;
   /* Ниже шторки: fixed позиционируется от viewport, а не от слоя —
-   * без этого верх картинки прячется под статус-баром. */
-  top: env(safe-area-inset-top, 0px);
+   * без этого верх картинки прячется под статус-баром.
+   * max(): если WebView не отдаёт env (старый Android), всё равно даём
+   * минимум высоты статус-бара, иначе fallback 0px всё прячет обратно. */
+  top: max(env(safe-area-inset-top, 0px), 24px);
   pointer-events: none;
 }
 

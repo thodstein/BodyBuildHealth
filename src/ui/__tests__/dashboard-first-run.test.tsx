@@ -103,7 +103,8 @@ describe('DashboardNative landing', () => {
     expect(css).toContain('object-fit: contain');
     expect(css).toContain('object-position: center top');
     // Фон ниже шторки: fixed идёт от viewport, верх картинки не под статус-баром.
+    // max(): страховка на случай битого env в WebView (минимум высота шторки).
     const bgRule = css.slice(css.indexOf('.native-home-bg {'), css.indexOf('.native-home-bg {') + 400);
-    expect(bgRule).toContain('top: env(safe-area-inset-top');
+    expect(bgRule).toContain('top: max(env(safe-area-inset-top');
   });
 });
