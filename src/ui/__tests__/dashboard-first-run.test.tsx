@@ -102,5 +102,8 @@ describe('DashboardNative landing', () => {
     // Картинка — contain от верха: запечённые HUD-надписи не режутся.
     expect(css).toContain('object-fit: contain');
     expect(css).toContain('object-position: center top');
+    // Фон ниже шторки: fixed идёт от viewport, верх картинки не под статус-баром.
+    const bgRule = css.slice(css.indexOf('.native-home-bg {'), css.indexOf('.native-home-bg {') + 400);
+    expect(bgRule).toContain('top: env(safe-area-inset-top');
   });
 });
