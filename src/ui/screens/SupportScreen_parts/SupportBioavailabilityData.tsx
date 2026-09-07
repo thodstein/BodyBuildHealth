@@ -719,8 +719,17 @@ export const FORM_RECOMMENDER: Record<string, FormRecommendation[]> = {
 };
 
 // ─── Build enriched catalog (shared by SupportBioavailability + SupportEffectiveDose) ───
+// Три источника (каталог → фарма → пептиды) пересекаются по id (напр. cjc1295,
+// bpc157, tb500 есть и в каталоге, и в PEPTIDE_DB): без дедупа список рисует
+// дублирующиеся строки и React-ключи (дубли/пропажа строк). Первый источник побеждает.
 export function buildBioavailabilityCatalog(): EnrichedEntry[] {
   const entries: EnrichedEntry[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (e: EnrichedEntry): void => {
+    if (seen.has(e.id)) return;
+    seen.add(e.id);
+    entries.push(e);
+  };
   for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
     if (!entry?.nameRu) continue;
     const forms: FormWithBio[] = (entry.forms || []).map(f => {
@@ -729,7 +738,7 @@ export function buildBioavailabilityCatalog(): EnrichedEntry[] {
     });
     const bios = forms.map(f => f.bioavailability);
     const clinical = classifySubstance(entry.nameRu, entry.category || []);
-    entries.push({
+    pushUnique({
       id, source: 'catalog', nameRu: entry.nameRu, nameEn: entry.name || id,
       tier: entry.tier, category: entry.category || [], description: entry.description || '',
       forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0,
@@ -743,7 +752,7 @@ export function buildBioavailabilityCatalog(): EnrichedEntry[] {
     if (!ph || !ph.name) continue;
     const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
     const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+    pushUnique({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
   }
   for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
     if (!pp || !pp.name) continue;
@@ -752,7 +761,7 @@ export function buildBioavailabilityCatalog(): EnrichedEntry[] {
       return { id: `${pepId}_${rt}`, name: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, nameRu: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, dose: `${pp.amountMg} мг`, best: rt === 'sc', bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, notes: b ? `диапазон ${b.min}-${b.max}%` : '', effectiveDose: (d: number) => Math.round(d * bio) };
     });
     const bios = forms.map(f => f.bioavailability);
-    entries.push({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', pp.className || 'gh_peptide'].filter(Boolean), description: `${pp.effects?.join(', ') || ''}`, forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0, avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+    pushUnique({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', pp.className || 'gh_peptide'].filter(Boolean), description: `${pp.effects?.join(', ') || ''}`, forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0, avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
   }
   return entries;
 }
