@@ -101,10 +101,10 @@ export const LabsOverview: React.FC<{
           </div>
         )}
         {abnormalCount>0 && (
-          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.14)', display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ display: 'inline-flex', color: '#f97316' }}><NativeIcon name="alertTriangle" size={12} /></span>
-            <span style={{ fontSize:10, color:'#fecaca', flex:1 }}><b>{abnormalCount}</b> из {labs.length} вне нормы — <b>{highCount} ↑</b> и <b>{lowCount} ↓</b>. Проверьте «Риски и индексы» и тренды.</span>
-            <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.18)', color:'#fecaca', fontWeight:800 }}>{Math.round(abnormalCount/labs.length*100)}%</span>
+          <div style={{ marginTop:10, padding:'12px 12px', borderRadius:14, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.22)', borderLeft:'3px solid #ef4444', display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ display:'inline-flex', color:'#f97316', flexShrink:0 }}><NativeIcon name="alertTriangle" size={14} /></span>
+            <span style={{ fontSize:12, color:'#fff', flex:1, lineHeight:1.5 }}><b>{abnormalCount}</b> из {labs.length} вне нормы — <b>{highCount} ↑</b> и <b>{lowCount} ↓</b>. Проверьте «Риски и индексы» и тренды.</span>
+            <span style={{ fontSize:12, padding:'4px 10px', borderRadius:999, background:'rgba(239,68,68,0.16)', border:'1px solid rgba(239,68,68,0.25)', color:'#fecaca', fontWeight:800, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{Math.round(abnormalCount/labs.length*100)}%</span>
           </div>
         )}
       </div>

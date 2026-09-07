@@ -283,20 +283,20 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <div style={{
-                        width: '100%', borderRadius: '3px 3px 0 0',
+                        width: '100%', borderRadius: '4px 4px 0 0',
                         height: h,
                         background: inRange ? '#00e68a' : '#ef4444',
-                        opacity: 0.7,
+                        opacity: 0.85,
                         position: 'relative',
                       }}>
                         <span style={{
-                          position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                          fontSize: 7, color: inRange ? '#00e68a' : '#ef4444', fontWeight: 700, whiteSpace: 'nowrap',
+                          position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+                          fontSize: 9, color: inRange ? '#00e68a' : '#ef4444', fontWeight: 800, whiteSpace: 'nowrap',
                         }}>
                           {v}
                         </span>
                       </div>
-                      <div style={{ fontSize: 6, color: '#fff', writingMode: 'vertical-lr' as any }}>
+                      <div style={{ fontSize: 8, color: '#fff', writingMode: 'vertical-lr' as any, fontWeight: 600 }}>
                         {chartData.labels[i].slice(-5)}
                       </div>
                     </div>
@@ -305,7 +305,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
               </div>
               {/* ULN/LLN references */}
               {(chartData.uln || chartData.lln) && (
-                <div style={{ fontSize: 8, color: '#fff', marginTop: 4, display: 'flex', gap: 12 }}>
+                <div style={{ fontSize: 11, color: '#fff', marginTop: 6, display: 'flex', gap: 12, fontWeight: 600 }}>
                   {chartData.lln !== undefined && <span>▼ Низ: {chartData.lln}</span>}
                   {chartData.uln !== undefined && <span>▲ Верх: {chartData.uln}</span>}
                 </div>

@@ -836,13 +836,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
                 </>)}
                 {hasSelection ? (
-                  <div className="card" style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap', fontSize: 9 }}>
+                  <div className="card" style={{ ...LABS_CARD }}>
+                    <div style={{ display:'flex', gap:8, marginBottom:10, flexWrap:'wrap' }}>
                       {selCodes.map((code, i) => {
                         const info = UCUM_MAP[code];
                         return (
-                          <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff' }}>
-                            <span style={{ width: 10, height: 10, borderRadius: 3, background: chartPalette[i % chartPalette.length], flexShrink: 0 }} />
+                          <span key={code} style={{ display:'flex', alignItems:'center', gap:6, color:'#fff', fontSize:12, fontWeight:700, padding:'6px 10px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(140,190,255,0.10)' }}>
+                            <span style={{ width:10, height:10, borderRadius:3, background:chartPalette[i % chartPalette.length], flexShrink:0 }} />
                             {info?.name || code}
                           </span>
                         );
