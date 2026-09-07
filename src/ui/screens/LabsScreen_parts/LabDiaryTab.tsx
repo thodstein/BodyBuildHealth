@@ -36,23 +36,22 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   const refresh = useCallback(() => setDiary(getLabDiary()), []);
 
-  // auto-import on mount — P0 fix: нормы из UCUM_MAP, иначе все inRange=true и аномалии 0
+  // auto-import — P0 fix: [] deps не импортил при асинхронной загрузке labs (mount labs=[] → никогда)
   useEffect(() => {
-    if (labs && labs.length > 0) {
-      const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
-      for (const lab of labs) {
-        const key = (lab.code || '').toUpperCase();
-        if (!markerNorms[key]) {
-          const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
-          markerNorms[key] = { lln: info?.lln, uln: info?.uln };
-        }
+    if (!labs || labs.length === 0) return;
+    const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
+    for (const lab of labs) {
+      const key = (lab.code || '').toUpperCase();
+      if (!markerNorms[key]) {
+        const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
+        markerNorms[key] = { lln: info?.lln, uln: info?.uln };
       }
-      const prevLen = diary.length;
-      importLabsToDiary(labs, markerNorms);
-      const updated = getLabDiary();
-      if (updated.length > prevLen) setDiary(updated);
     }
-  }, []);
+    const prevLen = getLabDiary().length;
+    importLabsToDiary(labs, markerNorms);
+    const updated = getLabDiary();
+    if (updated.length !== prevLen) setDiary(updated);
+  }, [labs]);
 
   const stats = useMemo(() => getLabDiaryStats(diary), [diary]);
   const topMarkers = useMemo(() => getTopTestedMarkers(diary, 20), [diary]);

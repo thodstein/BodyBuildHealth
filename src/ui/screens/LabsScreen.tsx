@@ -202,6 +202,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
+  // P0 fix: фаза из профиля может подтянуться асинхронно (useDataLink) — синкаем без сброса ручного выбора, если фаза реально сменилась
+  useEffect(() => {
+    const cur = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
+    setSelectedPhase(prev => (prev === cur ? prev : cur));
+  }, [profilePhase]);
   const [showLabInput, setShowLabInput] = useState(false);
   const [showNewLabsInline, setShowNewLabsInline] = useState(false);
   const [batchValues, setBatchValues] = useState<Record<string, string>>({});
