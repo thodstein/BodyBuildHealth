@@ -217,9 +217,15 @@
   border-radius: 12px;
 }
 
-/* Мелкие механизм-бейджи 7-8px → читаемые 11px (кроме hero) */
-.support-screen.support-root :not(.support-hero):not(.support-hero *)span[style*='font-size: 7'],
-.support-screen.support-root :not(.support-hero):not(.support-hero *)span[style*='font-size: 8'] {
+/* Мелкие механизм-бейджи 7-8px → читаемые 11px (hero не входит ни в один из этих контейнеров) */
+.support-screen.support-root .sup-catalogview span[style*='font-size: 7'],
+.support-screen.support-root .sup-catalogview span[style*='font-size: 8'],
+.support-screen.support-root [data-sup='catalog'] span[style*='font-size: 7'],
+.support-screen.support-root [data-sup='catalog'] span[style*='font-size: 8'],
+.support-screen.support-root .sup-stacks span[style*='font-size: 7'],
+.support-screen.support-root .sup-stacks span[style*='font-size: 8'],
+.support-screen.support-root .sup-fav span[style*='font-size: 7'],
+.support-screen.support-root .sup-fav span[style*='font-size: 8'] {
   font-size: 11px !important;
   padding: 3px 8px !important;
   border-radius: 999px !important;
@@ -240,54 +246,42 @@
   gap: 8px !important;
 }
 
-/* ─── 12. ПОПАПЫ/МОДАЛКИ — пружинный шит ────────────────────────── */
-.support-screen.support-root .sup-apk-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 250;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+/* ─── 12. МОДАЛКИ — родные диалоги, на телефоне bottom-sheet ──── */
+.support-screen.support-root .sup-manualpick,
+.support-screen.support-root .sup-modals {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   animation: supFade 0.22s ease;
-  padding: 0;
 }
 
-.support-screen.support-root .sup-apk-sheet {
-  width: 100%;
-  max-width: 560px;
-  max-height: 88vh;
-  overflow-y: auto;
-  border-radius: 20px 20px 0 0;
-  background: rgba(20, 20, 24, 0.96);
-  border: 1px solid var(--sup-edge2);
-  border-bottom: none;
-  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
-  animation: supSheetUp 0.32s cubic-bezier(0.22, 0.9, 0.3, 1.2);
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+.support-screen.support-root .sup-manualpick > div,
+.support-screen.support-root .sup-modals > div {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  max-height: 90vh;
+  max-height: 90dvh;
 }
 
-.support-screen.support-root .sup-apk-handle {
-  width: 40px;
-  height: 4px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.22);
-  margin: 10px auto 4px;
-  flex-shrink: 0;
-}
-
-.support-screen.support-root .sup-apk-done {
-  min-height: 52px !important;
-  border-radius: 14px !important;
-  font-size: 14px !important;
-  font-weight: 900 !important;
-  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
-  color: var(--sup-acc-ink) !important;
-  border: none !important;
-  width: 100% !important;
-  box-shadow: 0 8px 24px rgba(0, 230, 138, 0.35) !important;
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-manualpick,
+  .support-screen.support-root .sup-modals {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .support-screen.support-root .sup-manualpick > div,
+  .support-screen.support-root .sup-modals > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    max-height: 92vh !important;
+    max-height: 92dvh !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    animation: supSheetUp 0.32s cubic-bezier(0.22, 0.9, 0.3, 1.2);
+  }
+  .support-screen.support-root .sup-manualpick button,
+  .support-screen.support-root .sup-modals button {
+    min-height: 48px !important;
+  }
 }
 
 @keyframes supSheetUp {
@@ -331,6 +325,33 @@
   .support-screen.support-root .sup-protocols [style*='gridTemplateColumns'] {
     grid-template-columns: 1fr !important;
   }
+  .support-screen.support-root .sup-calctools [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+  .support-screen.support-root .sup-pepcalc [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+  .support-screen.support-root [data-sup='hormones'] [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+  .support-screen.support-root .sup-diary > div:first-child {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* ─── 15b. Таблицы — никогда не рвут вёрстку на узком экране ────── */
+.support-screen.support-root .sup-geninfo table,
+.support-screen.support-root .sup-bio table,
+.support-screen.support-root .sup-effdose table,
+.support-screen.support-root .sup-timing table,
+.support-screen.support-root .sup-analog table,
+.support-screen.support-root .sup-synergy table,
+.support-screen.support-root .sup-fav table,
+.support-screen.support-root .sup-diary table,
+.support-screen.support-root .sup-weekplan table,
+.support-screen.support-root .sup-protocols [class*='sup-proto-'] table,
+.support-screen.support-root [data-sup='hormones'] .screen.fertility-pct table {
+  max-width: 100%;
 }
 
 /* ─── 16. REDUCED MOTION ────────────────────────────────────────── */

@@ -3480,9 +3480,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== MANUAL PICKER MODAL ===== */}
       {showManualPicker && (
-        <div className="sup-apk-backdrop" data-sup="modal">
-        <div className="sup-apk-sheet" style={{ padding:'0 12px' }}>
-        <div className="sup-apk-handle" aria-hidden />
         <SupportManualPicker
           onClose={() => setShowManualPicker(false)}
           enhancedSubs={enhancedSubs}
@@ -3498,15 +3495,10 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           setFavRefresh={setFavRefresh}
           showToast={showToast}
         />
-        </div>
-        </div>
       )}
 
       {/* ===== MODAL OVERLAY ===== */}
       {showModal && (
-        <div className="sup-apk-backdrop" data-sup="modal">
-        <div className="sup-apk-sheet" style={{ padding:'0 12px' }}>
-        <div className="sup-apk-handle" aria-hidden />
         <SupportModals
         showModal={showModal} setShowModal={setShowModal}
         modalLevel={modalLevel} setModalLevel={setModalLevel}
@@ -3540,8 +3532,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           }
         }}
       />
-        </div>
-        </div>
       )}
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}

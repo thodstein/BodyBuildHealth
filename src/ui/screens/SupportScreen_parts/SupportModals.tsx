@@ -76,7 +76,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
     setModalWantBoost(false);
   };
 
-  return (<div className="sup-modals" style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
+  return (<div className="sup-modals" data-sup="modal" style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
     <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:16 }}>
       {showModal === 'intel' && !modalLevel && (
         <>
@@ -125,7 +125,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
             </button>
           </div>
 
-          <button onClick={handleApply} style={{
+          <button onClick={handleApply} data-sup-cta="primary" style={{
             width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
             background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, marginBottom:6,
           }          }>✅ Применить уровень{modalWantJoint ? ' + суставы' : ''}{modalWantBoost ? ' + усиление' : ''}</button>

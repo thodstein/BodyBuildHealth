@@ -107,7 +107,7 @@ describe('APK support pack', () => {
     expect(hexHits).toEqual([]);
   });
 
-  it('хуки слоя на месте: корень, нав, топбар, контент, попапы', () => {
+  it('хуки слоя на месте: корень, нав, топбар, контент, модалки', () => {
     const css = readSupportCss();
     for (const hook of [
       '.train-sup.sup-apk',
@@ -121,9 +121,10 @@ describe('APK support pack', () => {
       "[data-sup='stacks']",
       "[data-sup='diary']",
       "[data-sup='research']",
-      '.sup-apk-backdrop',
-      '.sup-apk-sheet',
-      '.sup-apk-done',
+      "[data-sup='modal']",
+      "[data-sup='hormones']",
+      '.sup-manualpick',
+      '.sup-modals',
       'supApkSheetUp',
       'prefers-reduced-motion',
     ]) {
