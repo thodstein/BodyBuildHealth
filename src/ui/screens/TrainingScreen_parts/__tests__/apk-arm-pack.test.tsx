@@ -250,4 +250,28 @@ describe('APK arm pack', () => {
       expect(h.container.querySelector('.train-armdiag')?.classList.contains('arm-apk'), String(name)).toBe(true);
     }
   });
+
+  it('аккордеоны: PRO свернут с саммари, раскрывается по тапу', () => {
+    render(<ArmAutoConstructor />);
+    const head = screen.getByRole('button', { name: /PRO: старт WAF/ });
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    expect(head.textContent).toContain('без даты');
+    // поля доступны и в свёрнутом виде — скрытие только визуальное
+    expect(screen.getByLabelText('Дата старта')).toBeTruthy();
+    fireEvent.click(head);
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('хаб: Table-IQ свернут, журнал работает без раскрытия', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    const head = screen.getByRole('button', { name: /Table-IQ/ });
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.change(screen.getByLabelText('Фолы за схватку'), { target: { value: '2' } });
+    fireEvent.click(screen.getByText(/＋ Схватка/));
+    expect(document.body.textContent).toContain('Table-IQ 1 схваток');
+    expect(head.textContent).toContain('Схваток: 1');
+    fireEvent.click(head);
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+  });
 });

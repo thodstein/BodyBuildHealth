@@ -139,7 +139,7 @@ export function HubWristTab({ H }: { H: any }) {
           <AdChip active={showCam} tone="green" onClick={()=> setShowCam((v: boolean)=>!v)}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</AdChip>
           <label className="ad-chip">📁 JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
         </div>
-        <AdSec title="📊 Kinovea CSV трекинга кисти (t,x,y)">
+        <AdSec title="📊 Kinovea CSV трекинга кисти (t,x,y)" collapsible defaultOpen={false} summary={trackMetrics ? `xLoop ${trackMetrics.xLoop} · ${trackMetrics.points} точек` : 'CSV не загружен'}>
           <textarea value={trackCsv} onChange={(e) => setTrackCsv(e.target.value)} placeholder={'t,x,y\n0,0,0\n0.1,1.2,0.5'} rows={3} className="ad-mono" />
           <div className="ad-row">
             <AdBtn variant="dark" onClick={() => { try { if (trackMetrics) { setBaseXLoop(String(trackMetrics.xLoop)); localStorage.setItem('he_arm_track_base', String(trackMetrics.xLoop)); } } catch {} }}>📌 База SRD</AdBtn>

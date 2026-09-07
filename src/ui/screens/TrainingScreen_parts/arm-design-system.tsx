@@ -114,17 +114,46 @@ export function AdSec({
   hint,
   children,
   hook,
+  collapsible,
+  defaultOpen,
+  summary,
 }: {
   title: React.ReactNode;
   hint?: React.ReactNode;
   children: React.ReactNode;
   hook?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  summary?: React.ReactNode;
 }) {
+  const [open, setOpen] = React.useState(defaultOpen ?? true);
+  if (!collapsible) {
+    return (
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})}>
+        <div className="ad-sec-t">{title}</div>
+        {hint ? <div className="ad-sec-hint">{hint}</div> : null}
+        {children}
+      </div>
+    );
+  }
   return (
     <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})}>
-      <div className="ad-sec-t">{title}</div>
-      {hint ? <div className="ad-sec-hint">{hint}</div> : null}
-      {children}
+      <button
+        type="button"
+        className="ad-sec-head"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="ad-sec-chev" aria-hidden>
+          {open ? '▾' : '▸'}
+        </span>
+        <span className="ad-sec-t">{title}</span>
+        {!open && summary ? <span className="ad-sec-sum">{summary}</span> : null}
+      </button>
+      <div className="ad-sec-body" data-collapsed={!open}>
+        {hint ? <div className="ad-sec-hint">{hint}</div> : null}
+        {children}
+      </div>
     </div>
   );
 }

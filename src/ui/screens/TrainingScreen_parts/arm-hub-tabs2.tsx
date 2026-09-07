@@ -67,7 +67,7 @@ export function HubPressureTab({ H }: { H: any }) {
           })}
         </div>
       </AdSec>
-      <AdSec title="🥇 TOP: матчап + Table-IQ журнал">
+      <AdSec title="🥇 TOP: матчап + Table-IQ журнал" collapsible defaultOpen={false} summary={`Схваток: ${tiq.length}`}>
         <AdGrid cols="3">
           <AdField label="Оппонент">
             <select value={muState.opp} onChange={e=>{ const v={...muState, opp:e.target.value}; setMuState(v); saveMu(v); }}>
@@ -191,7 +191,7 @@ export function HubStrengthTab({ H }: { H: any }) {
         <AdBtn variant="dark" onClick={onResetDynamic}>🗑 Сброс динамик</AdBtn>
       </div>
       {dynamicReport && (dynamicReport as any).metrics && (
-        <AdSec title="F/t → мёртвые точки (авто-подсказка)">
+        <AdSec title="F/t → мёртвые точки (авто-подсказка)" collapsible defaultOpen={false} summary="Кандидаты">
           <div className="ad-muted">
             {(dynamicReport as any).metrics.finger_flex && (dynamicReport as any).metrics.finger_flex.ftIndex < 30 ? 'finger_flex низкая → contain_fingers (pinch) · ' : ''}
             {(dynamicReport as any).metrics.hammer && (dynamicReport as any).metrics.hammer.ftIndex < 30 ? 'hammer низкая → sup_drag/back_drag · ' : ''}
@@ -212,7 +212,7 @@ export function HubStrengthTab({ H }: { H: any }) {
         </AdSec>
       )}
       {forceHistory.stats.length>0 && (
-        <AdSec title="История 12 нед — avg/max/min + fatigue">
+        <AdSec title="История 12 нед — avg/max/min + fatigue" collapsible defaultOpen={false} summary="Графики и усталость">
           <div className="ad-row">
             {forceHistory.stats.map((w:any)=> (
               <div key={w.week} className="ad-stat">
@@ -256,7 +256,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
           <span> · Per-muscle: {perMuscleAcwrSumP0.danger.length > 0 && <b>🔴 {perMuscleAcwrSumP0.danger.join(', ')}</b>} {perMuscleAcwrSumP0.caution.length > 0 && <span>🟠 {perMuscleAcwrSumP0.caution.join(', ')}</span>}</span>
         )}
       </AdBanner>
-      <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`}>
+      <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible>
         <div className="ad-row">
           {[
             ['mobWristFlex', 'Сгиб кисти ≥80°'],
@@ -279,7 +279,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
           {mobMsg && <span className="ad-tip">{mobMsg}</span>}
         </div>
       </AdSec>
-      <AdSec title="🔄 Авторегуляция (sRPE 7д + VBT + боли)">
+      <AdSec title="🔄 Авторегуляция (sRPE 7д + VBT + боли)" collapsible>
         <div className="ad-row">
           <AdField label="Локоть 0-10">
             <input aria-label="Боль локоть 0-10" inputMode="decimal" value={H.painElbow} onChange={(e) => H.setPainElbow(e.target.value)} placeholder="0" />
@@ -299,7 +299,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         )}
         <div className="ad-muted"><b>Гварды плана:</b> {guardsP0.ucl.length + guardsP0.shoulder.length + guardsP0.tendon.length + guardsP0.humerus.length === 0 ? (armPlan ? '✓ UCL/плечо/tendon/humerus чисто' : 'нет плана — нечего проверять') : [...guardsP0.ucl, ...guardsP0.shoulder, ...guardsP0.tendon, ...guardsP0.humerus].slice(0, 5).join(' · ')}</div>
       </AdSec>
-      <AdSec title="🩹 Return-to-pull (после травмы)">
+      <AdSec title="🩹 Return-to-pull (после травмы)" collapsible defaultOpen={false} summary={rh.injury==='none' ? 'Скрининг' : rh.injury}>
         <div className="ad-row">
           <AdField label="Травма">
             <select aria-label="Травма для return-to-pull" value={rh.injury} onChange={(e) => setRh({ ...rh, injury: e.target.value })}>

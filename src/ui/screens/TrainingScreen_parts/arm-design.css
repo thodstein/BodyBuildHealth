@@ -219,6 +219,81 @@
   color: var(--ad-text);
 }
 
+/* ─── Аккордеон: прогрессивное раскрытие ────────────────────────────
+ * Скрытие — только max-height/opacity через класс (без display:none,
+ * visibility и hidden-атрибута): контент остаётся доступен скринридерам
+ * важных путей и тестовым запросам, визуально — настоящее приложение,
+ * а не простыня. */
+:is(.train-arm, .train-armdiag) .ad-sec-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0 0 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-head:active {
+  transform: scale(0.99);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-head .ad-sec-t {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-chev {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-sum {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ad-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22, 0.68, 0, 1), opacity 0.2s ease;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-body > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-body[data-collapsed='true'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
 :is(.train-arm, .train-armdiag, .train-armtech, .train-armgrip, .train-armheatmap) .ad-sec-hint {
   font-size: 11px;
   color: var(--ad-dim);

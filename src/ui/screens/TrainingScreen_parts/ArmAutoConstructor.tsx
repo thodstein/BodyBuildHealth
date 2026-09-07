@@ -463,6 +463,15 @@ export function ArmAutoConstructor() {
 
   const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
 
+  // Саммари аккордеонов — чистые производные для шапки (логики нет).
+  const summWeak = weakPoints.length ? weakPoints.map(m=>ARM_MUSCLE_RU[m] || m).join(' + ') : 'Не выбрано';
+  const summPed = !showPed ? 'Выкл' : (Object.keys(pedDoses).length ? `${Object.values(pedDoses).reduce((a,b)=>a+(Number(b)||0),0)} мг/нед` : 'Вкл');
+  const summWm = `${Object.values(workMaxEdit).filter(v=>v!=='').length}/7 задано`;
+  const summPro = `${proBw || '—'} кг · ${proArm==='both'?'обе':proArm==='left'?'левая':'правая'} · ${proDate || 'без даты'}`;
+  const summTop = [topOpp!=='unknown'&&'матчап', topRfd&&'RFD', topSim&&'sim', topContinuity&&'cross-meso', topGripAuto&&'авто-RPE', topLadder&&'лестница'].filter(Boolean).join(' · ') || 'Выкл';
+  const summCyc = cycId ? ((()=>{ try { return ARM_CYCLE_LIBRARY.find(c=>c.id===cycId)?.name || cycId; } catch { return cycId; } })()) : 'Обычный план';
+  const summFocus = (()=>{ try { return GRIP_FOCI.find(g=>g.id===gripFocus)?.label || gripFocus; } catch { return gripFocus; } })();
+
   return (
     <AdRoot rootClass="train-arm" maxWidth={980}>
       <AdHead
@@ -510,7 +519,7 @@ export function ArmAutoConstructor() {
           </AdSec>
 
           {discipline !== 'armwrestling' && (
-            <AdSec title="Хват-фокус">
+            <AdSec title="Хват-фокус" collapsible summary={summFocus}>
               <div className="ad-row">
                 {GRIP_FOCI.map(g=> (
                   <AdChip key={g.id} active={gripFocus===g.id} onClick={()=>setGripFocus(g.id)}>{g.label}</AdChip>
@@ -519,7 +528,7 @@ export function ArmAutoConstructor() {
             </AdSec>
           )}
 
-          <AdSec title="Слабые зоны (1–2, специализация ×1.3) — мышцы">
+          <AdSec title="Слабые зоны (1–2, специализация ×1.3) — мышцы" collapsible summary={summWeak}>
             <div className="ad-row">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
@@ -543,7 +552,7 @@ export function ArmAutoConstructor() {
             </AdBanner>
           )}
 
-          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете.">
+          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете." collapsible defaultOpen={false} summary={summPed}>
             <AdCheck checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
               <>
@@ -583,7 +592,7 @@ export function ArmAutoConstructor() {
             <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           </div>
 
-          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%).">
+          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm}>
             <AdGrid cols="3">
               {[
                 ['wrist_flexors','Кисть (кг)'],
@@ -601,7 +610,7 @@ export function ArmAutoConstructor() {
             </AdGrid>
           </AdSec>
 
-          <AdSec title="🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг">
+          <AdSec title="🏆 PRO: старт WAF · руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro}>
             <AdGrid cols="3">
               <AdField label="Вес, кг">
                 <input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
@@ -683,7 +692,7 @@ export function ArmAutoConstructor() {
             </div>
           </AdSec>
 
-          <AdSec title="🥇 TOP: матчап · скорость · лестница · sim · календарь">
+          <AdSec title="🥇 TOP: матчап · скорость · лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop}>
             <AdGrid cols="3">
               <AdField label="Стиль оппонента">
                 <select value={topOpp} onChange={e=>setTopOpp(e.target.value)}>
@@ -739,7 +748,7 @@ export function ArmAutoConstructor() {
               <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
               <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
-            <AdSec title="📚 Именной цикл (интернет-библиотека) — пусто = обычный план">
+            <AdSec title="📚 Именной цикл (интернет-библиотека) — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc}>
               <AdGrid cols="2">
                 <AdField label="Цикл">
                   <select value={cycId} onChange={e=>setCycId(e.target.value)}>
