@@ -296,7 +296,8 @@ export function resolveLabMarker(name: string): string {
 
 /** 0..1 position within reference range; null if unknown. */
 export function normalizedRatio(code: string, value: number, unit: string, age?: number, sex?: 'male' | 'female'): number | null {
-  const ucum = UCUM_MAP[code];
+  // P0 fix: UCUM ключи смешанного регистра (HbA1c), code приходит upper
+  const ucum = (UCUM_MAP as any)[code] || (UCUM_MAP as any)[code.toUpperCase()] || (UCUM_MAP as any)[code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === code.toLowerCase())?.[1] as any);
   if (!ucum) return null;
   const norm = value * ucum.coeff;
   let lln = ucum.lln;
