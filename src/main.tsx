@@ -133,6 +133,24 @@ async function bootstrap() {
     try { initPWA(); } catch (e) { console.warn('initPWA failed:', e); }
   }
 
+  // APK: чистим SW от старых сборок (авто-регистрация VitePWA вшивалась
+  // в dist и вешала зелёный баннер поверх hero; новые сборки её не содержат).
+  if (platform === 'native') {
+    try {
+      navigator.serviceWorker?.getRegistrations().then((rs) => {
+        rs.forEach((r) => {
+          try {
+            void r.unregister();
+          } catch {
+            /* ignore */
+          }
+        });
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
     await db.init();
   } catch (e) {

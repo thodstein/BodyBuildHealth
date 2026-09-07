@@ -67,6 +67,14 @@ export function createOfflineBanner() {
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // APK: обновления идут через AppUpdateBanner + OTA/live-update.
+    // Зелёный PWA-баннер поверх hero здесь запрещён (в т.ч. от старых SW).
+    try {
+      const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } };
+      if (w.Capacitor?.isNativePlatform?.() === true) return;
+    } catch {
+      /* ignore */
+    }
     const existing = document.getElementById('update-banner');
     if (existing) return;
     const banner = document.createElement('div');

@@ -76,3 +76,18 @@ describe('AppUpdateBanner (волна 20)', () => {
     expect(container.querySelector('[aria-label="app-update"]')).toBeNull();
   });
 });
+
+describe('волна 32: PWA-баннер не лезет поверх hero в APK', () => {
+  it('4. native-сборка без авто-регистрации SW + гейт + чистка', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const cfg = fs.readFileSync(path.join(process.cwd(), 'vite.config.ts'), 'utf-8');
+    expect(cfg).toContain('injectRegister');
+    expect(cfg).toContain("VITE_APP_PLATFORM === 'native' ? false : 'auto'");
+    const pwa = fs.readFileSync(path.join(process.cwd(), 'src', 'core', 'pwa-manager.ts'), 'utf-8');
+    expect(pwa).toContain('isNativePlatform');
+    const main = fs.readFileSync(path.join(process.cwd(), 'src', 'main.tsx'), 'utf-8');
+    expect(main).toContain('getRegistrations');
+    expect(main).toContain('unregister');
+  });
+});
