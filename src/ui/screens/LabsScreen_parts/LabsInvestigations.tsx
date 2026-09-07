@@ -207,8 +207,8 @@ export const LabsInvestigations: React.FC = () => {
                           <div style={{ fontWeight: 600, fontSize: 12, color: expanded ? 'var(--accent)' : 'var(--text)', marginBottom: 3 }}>{inv.name}</div>
                           <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.35, marginBottom: 4 }}>{inv.description}</div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, background: 'rgba(0,230,138,0.08)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>⏱ {inv.frequency}</span>
-                            <span style={{ fontSize: 9, color: '#fff' }}>
+                            <span style={{ fontSize:11, color:'var(--accent)', fontWeight:700, background:'rgba(0,230,138,0.10)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⏱ {inv.frequency}</span>
+                            <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>
                               {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное исследование' : 'Описательная оценка'}`}
                             </span>
                           </div>
@@ -252,7 +252,7 @@ export const LabsInvestigations: React.FC = () => {
                                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>{info?.name || code}</span>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <span style={{ color: '#fff' }}>{info?.lln || '—'}–{info?.uln || '—'}</span>
-                                        <span style={{ color: '#fff', fontSize: 9 }}>{info?.prefUnit || ''}</span>
+                                        <span style={{ color:'#fff', fontSize:11, fontWeight:600 }}>{info?.prefUnit || ''}</span>
                                       </div>
                                     </div>
                                   );

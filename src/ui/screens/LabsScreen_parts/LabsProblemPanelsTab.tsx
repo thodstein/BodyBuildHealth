@@ -179,8 +179,8 @@ const LabsProblemPanelsTab: React.FC = () => {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 100 }}>
                   <span style={{
-                    fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
-                    background: `${IMPORTANCE_COLORS[m.importance]}20`, color: IMPORTANCE_COLORS[m.importance],
+                    fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:999,
+                    background:`${IMPORTANCE_COLORS[m.importance]}22`, color:IMPORTANCE_COLORS[m.importance], border:`1px solid ${IMPORTANCE_COLORS[m.importance]}35`,
                   }}>{IMPORTANCE_LABELS[m.importance]}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{m.label}</span>
                 </div>
@@ -277,7 +277,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                   background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)', border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)',
                   color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4,
                 }}>
-                  ✓ {s.symptom} <span style={{ fontSize: 9, opacity: 0.6 }}>✕</span>
+                  ✓ {s.symptom} <span style={{ fontSize:11, opacity:0.7 }}>✕</span>
                 </span>
               ))}
             </div>
@@ -312,7 +312,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <span>{s.symptom}</span>
-                    <span style={{ fontSize: 9, color: '#fff' }}>{s.category}</span>
+                    <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>{s.category}</span>
                   </button>
                 ))}
               </div>

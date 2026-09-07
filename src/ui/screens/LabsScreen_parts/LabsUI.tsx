@@ -148,7 +148,7 @@ export const LabsKpiCard: React.FC<{ icon: React.ReactNode; label: string; value
     <div style={{ marginBottom: 4, color, display: 'flex', justifyContent: 'center' }}>{icon}</div>
     <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
     <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginTop: 3, letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</div>
-    {sub && <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>{sub}</div>}
+    {sub && <div style={{ fontSize:11, color:'#fff', marginTop:3 }}>{sub}</div>}
   </div>
 );
 

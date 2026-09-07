@@ -340,7 +340,7 @@ export default function LabsCatalogTab({
         }}><NativeIcon name="file" size={14} /> Обследования</button>
       </div>
 
-      <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>
+      <div style={{ fontSize:11, color:'#fff', marginBottom:10, lineHeight:1.5 }}>
         {catalogMode === 'markers'
           ? 'Справочник лабораторных маркеров с референсами, описаниями и вводом значений. Группировка по системам организма.'
           : `${INVESTIGATIONS.length} исследований и лабораторных панелей для мониторинга на курсе.`}
@@ -532,7 +532,7 @@ export default function LabsCatalogTab({
               <span style={{ width:28, height:28, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background: sysColors[sys]+'1E', border:`1px solid ${sysColors[sys]}30`, fontSize:11, transition:'transform 0.2s', transform: isOpen?'rotate(90deg)':'rotate(0deg)', flexShrink:0 }}>▶</span>
               <span style={{ fontSize:16, flexShrink:0 }}>{sysIcons[sys] || '📋'}</span>
               <span style={{ flex:1 }}>{sysLabels[sys] || sys}</span>
-              <span style={{ fontSize:9, fontWeight:800, padding:'3px 8px', borderRadius:999, background: sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.08)'}`, color: sysFilled===entries.length? LABS_ACCENT : '#fff' }}>
+              <span style={{ fontSize:11, fontWeight:800, padding:'4px 10px', borderRadius:999, background: sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${sysFilled===entries.length? 'rgba(var(--labs-accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.08)'}`, color: sysFilled===entries.length? LABS_ACCENT : '#fff' }}>
                 {sysFilled}/{entries.length}
               </span>
             </button>

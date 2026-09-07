@@ -90,7 +90,7 @@ export const LabsSchedule: React.FC = () => {
                         display:'inline-flex', alignItems:'center', gap:4,
                       }}>
                         {code}
-                        {LAB_DESCRIPTIONS[code] && <span style={{ fontSize:8, opacity:0.7 }} title={LAB_DESCRIPTIONS[code]}>ℹ️</span>}
+                        {LAB_DESCRIPTIONS[code] && <span style={{ fontSize:10, opacity:0.8 }} title={LAB_DESCRIPTIONS[code]}>ℹ️</span>}
                       </span>
                     ))}
                   </div>

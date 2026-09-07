@@ -192,7 +192,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                         height: h, background: d.pct > 30 ? '#ef4444' : d.pct > 10 ? '#f59e0b' : '#00e68a',
                         opacity: 0.85,
                       }} />
-                      <div style={{ fontSize:9, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:600 }}>
+                      <div style={{ fontSize:10, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:700 }}>
                         {d.date.slice(5)}
                       </div>
                     </div>
@@ -271,7 +271,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             <div style={GLASS}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
                 📈 {topMarkers.find(m => m.code === selectedMarker)?.name || selectedMarker}
-                <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>
+                <span style={{ fontSize:11, color:'#fff', marginLeft:6, fontWeight:700 }}>
                   {chartData.unit}
                 </span>
               </div>
@@ -290,13 +290,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                         position: 'relative',
                       }}>
                         <span style={{
-                          position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
-                          fontSize: 9, color: inRange ? '#00e68a' : '#ef4444', fontWeight: 800, whiteSpace: 'nowrap',
+                          position:'absolute', top:-16, left:'50%', transform:'translateX(-50%)',
+                          fontSize:10, color: inRange ? '#00e68a' : '#ef4444', fontWeight:800, whiteSpace:'nowrap',
                         }}>
                           {v}
                         </span>
                       </div>
-                      <div style={{ fontSize: 8, color: '#fff', writingMode: 'vertical-lr' as any, fontWeight: 600 }}>
+                      <div style={{ fontSize:9, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:700 }}>
                         {chartData.labels[i].slice(-5)}
                       </div>
                     </div>
@@ -446,7 +446,7 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
     }}>
       <div style={{ position:'absolute', top:-8, right:-8, width:28, height:28, borderRadius:'50%', background: color+'12' }} />
       <div style={{ fontSize:18, fontWeight:900, color, lineHeight:1 }}>{value}</div>
-      <div style={{ fontSize:9, color, fontWeight:700, letterSpacing:0.3, marginTop:2 }}>{label}</div>
+      <div style={{ fontSize:11, color:'#fff', fontWeight:800, letterSpacing:0.4, marginTop:3 }}>{label}</div>
     </div>
   );
 }

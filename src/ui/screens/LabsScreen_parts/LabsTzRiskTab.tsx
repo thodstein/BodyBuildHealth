@@ -115,10 +115,10 @@ export const LabsTzRiskTab: React.FC = () => {
           Введите лабораторные маркеры из таблицы T4 для оценки выраженности механизмов (m_i) по 6 системам организма.
         </div>
         <button onClick={fillFromLabs} style={{
-          padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 600,
-          background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa',
+          padding:'10px 16px', borderRadius:999, cursor:'pointer', fontSize:12, fontWeight:800, minHeight:44,
+          background:'rgba(59,130,246,0.14)', border:'1px solid rgba(59,130,246,0.25)', color:'#fff',
         }}>📥 Заполнить из профиля ({labs.length} маркеров)</button>
-        <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+        <div style={{ marginTop:8, fontSize:11, color:'#fff', fontWeight:600 }}>
           Покрытие анализами: {presentCount}/{LAB_MARKERS_CONFIG.length} ({Math.round(dCov * 100)}%) · Штраф: ×{(1 + 0.25 * (1 - dCov)).toFixed(2)}
         </div>
       </div>
@@ -128,7 +128,7 @@ export const LabsTzRiskTab: React.FC = () => {
         <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="syringe" size={13} /> Параметры курса</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Класс</div>
+            <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Класс</div>
             <div style={{ display: 'flex', gap: 3 }}>
               {(['aas', 'gh', 'insulin'] as const).map(dc => (
                 <button key={dc} onClick={() => setDrugClass(dc)} style={{
@@ -144,12 +144,12 @@ export const LabsTzRiskTab: React.FC = () => {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Доза</div>
+            <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Доза</div>
             <input type="number" value={dose} onChange={e => setDose(Number(e.target.value))}
               style={{ width: '100%', padding: '8px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, fontWeight: 600, boxSizing: 'border-box' }} />
           </div>
           <div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Нед.</div>
+            <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Нед.</div>
             <input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))}
               style={{ width: '100%', padding: '8px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, fontWeight: 600, boxSizing: 'border-box' }} />
           </div>
@@ -164,23 +164,23 @@ export const LabsTzRiskTab: React.FC = () => {
             const isFilled = labValues[m.code] && labValues[m.code].trim() !== '';
             return (
               <div key={m.code} style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6,
-                background: isFilled ? `rgba(${ACCENT_RGB},0.04)` : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isFilled ? `rgba(${ACCENT_RGB},0.12)` : 'rgba(255,255,255,0.04)'}`,
+                display:'flex', alignItems:'center', gap:8, padding:'10px 10px', borderRadius:12, minHeight:52,
+                background: isFilled ? `rgba(${ACCENT_RGB},0.08)` : 'rgba(255,255,255,0.02)',
+                border:`1px solid ${isFilled ? `rgba(${ACCENT_RGB},0.18)` : 'rgba(140,190,255,0.10)'}`,
               }}>
-                <div style={{ minWidth: 90, fontSize: 9, color: '#fff' }}>
-                  <span style={{ fontWeight: 600, color: '#fff' }}>{m.name}</span>
-                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>{m.unit}</span>
+                <div style={{ minWidth:80, fontSize:11, color:'#fff' }}>
+                  <span style={{ fontWeight:700, color:'#fff' }}>{m.name}</span>
+                  <span style={{ fontSize:10, color:'#fff', marginLeft:4 }}>{m.unit}</span>
                 </div>
                 <input type="text" inputMode="decimal"
                   value={labValues[m.code] || ''}
                   onChange={e => setLabValues(prev => ({ ...prev, [m.code]: e.target.value }))}
                   placeholder={m.normalRange}
                   style={{
-                    flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                    background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', textAlign: 'center',
+                    flex:1, padding:'10px 10px', borderRadius:10, fontSize:13, fontWeight:700, minHeight:44,
+                    background:'rgba(0,0,0,0.30)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', textAlign:'center', boxSizing:'border-box',
                   }} />
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', minWidth: 40, textAlign: 'right' }}>
+                <div style={{ fontSize:10, color:'#fff', minWidth:48, textAlign:'right', fontWeight:600 }}>
                   {m.systems.join(', ')}
                 </div>
               </div>
@@ -207,16 +207,16 @@ export const LabsTzRiskTab: React.FC = () => {
       {showResult && result && (
         <>
           <div style={{ ...CARD, textAlign: 'center', background: `linear-gradient(135deg, rgba(${ACCENT_RGB},0.06) 0%, rgba(${ACCENT_RGB},0.02) 100%)`, border: `1px solid rgba(${ACCENT_RGB},0.15)` }}>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>📊 Общий интегральный риск</div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
+            <div style={{ fontSize:12, color:'#fff', marginBottom:6, fontWeight:700 }}>📊 Общий интегральный риск</div>
+            <div style={{ display:'flex', justifyContent:'center', gap:16, alignItems:'center' }}>
               <div>
-                <div style={{ fontSize: 9, color: '#f87171' }}>Без поддержки</div>
-                <div style={{ fontSize: 30, fontWeight: 800, color: catColor(result.overallRaw) }}>{result.overallRaw}%</div>
+                <div style={{ fontSize:11, color:'#f87171', fontWeight:700 }}>Без поддержки</div>
+                <div style={{ fontSize:30, fontWeight:900, color: catColor(result.overallRaw), fontVariantNumeric:'tabular-nums' }}>{result.overallRaw}%</div>
               </div>
-              <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.3)' }}>→</div>
+              <div style={{ fontSize:20, color:'#fff' }}>→</div>
               <div>
-                <div style={{ fontSize: 9, color: '#4ade80' }}>С поддержкой</div>
-                <div style={{ fontSize: 30, fontWeight: 800, color: catColor(result.overallAfter) }}>{result.overallAfter}%</div>
+                <div style={{ fontSize:11, color:'#4ade80', fontWeight:700 }}>С поддержкой</div>
+                <div style={{ fontSize:30, fontWeight:900, color: catColor(result.overallAfter), fontVariantNumeric:'tabular-nums' }}>{result.overallAfter}%</div>
               </div>
             </div>
             <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: catColor(result.overallAfter) }}>
@@ -224,8 +224,8 @@ export const LabsTzRiskTab: React.FC = () => {
             </div>
             {result.overallVerification !== undefined && (
               <div style={{
-                marginTop: 4, fontSize: 9, padding: '3px 8px', borderRadius: 6, display: 'inline-block',
-                background: result.overallVerification >= 0.5 ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.1)',
+                marginTop:6, fontSize:11, padding:'6px 10px', borderRadius:999, display:'inline-block', fontWeight:700,
+                background: result.overallVerification >= 0.5 ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)',
                 color: result.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24',
               }}>
                 {result.overallVerification >= 0.5 ? '🔬' : '⚠'} Индекс риска · верифицировано анализами: {Math.round(result.overallVerification * 100)}% систем
@@ -255,7 +255,7 @@ export const LabsTzRiskTab: React.FC = () => {
                 {organ.floors && organ.floors.length > 0 && (
                   <div style={{ marginTop: 2 }}>
                     {organ.floors.map((f, i) => (
-                      <div key={i} style={{ fontSize: 8, color: '#fca5a5', lineHeight: 1.4 }}>⚓ {f.label}</div>
+                      <div key={i} style={{ fontSize:11, color:'#fca5a5', lineHeight:1.5 }}>⚓ {f.label}</div>
                     ))}
                   </div>
                 )}
