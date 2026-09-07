@@ -337,4 +337,19 @@ describe('level and modes modal entry', () => {
     expect(getByText('🦴 Суставы')).not.toBeNull();
     expect(container.querySelector('.sup-modals')).toBeNull();
   });
+
+  it('сквозной флоу: выбор недели курса из плана', () => {
+    const { getByText, queryByText } = render(<SupportScreen />);
+    fireEvent.click(getByText('Общая информация'));
+    fireEvent.click(getByText(/Избранное · Дневник/));
+    fireEvent.click(getByText('📋 План'));
+    // стартовая неделя видна на кнопке
+    expect(getByText('📅 Неделя 6')).not.toBeNull();
+    fireEvent.click(getByText('📅 Неделя 6'));
+    expect(getByText('📅 Выберите неделю курса')).not.toBeNull();
+    fireEvent.click(getByText('Неделя 3'));
+    // модалка закрылась, неделя в плане обновилась
+    expect(queryByText('📅 Выберите неделю курса')).toBeNull();
+    expect(getByText('📅 Неделя 3')).not.toBeNull();
+  });
 });
