@@ -7,7 +7,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
 import { finalizeArmPlan } from '../../../engines/arm/arm-finalize.engine';
-import { rankArmSplits, selectBestArmSplit } from '../../../engines/arm/arm-selector.engine';
+import { rankArmSplits } from '../../../engines/arm/arm-selector.engine';
 import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine';
 import { validateArmPlan } from '../../../engines/arm/arm-validator.engine';
 import { calcArmMetrics } from '../../../engines/arm/arm-metrics.engine';
@@ -910,11 +910,9 @@ export function ArmAutoConstructor() {
 
       {step === 'plan' && (
         <AdCard>
-          {!builtPlan ? <div className="ad-muted">План не собран — вернись в «Параметры».</div> : (
+          {!builtPlan ? <AdBanner tone="info">План не собран — вернись в «Параметры».</AdBanner> : (
             <>
-              <div className="ad-sec-h">
-                <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
-              </div>
+              <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
               {planDash && (
                 <div className="ad-stats">
                   <div className="ad-stat"><div className="ad-stat-v">{planDash.weeks}</div><div className="ad-stat-l">Недель</div></div>
@@ -989,7 +987,7 @@ export function ArmAutoConstructor() {
 
       {step === 'quality' && (
         <AdCard>
-          {!builtPlan ? <div className="ad-muted">Сначала собери план.</div> : (
+          {!builtPlan ? <AdBanner tone="info">Сначала собери план.</AdBanner> : (
             <>
               <AdSec title="📊 Качество">
                 <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
@@ -1029,7 +1027,7 @@ export function ArmAutoConstructor() {
       {step === 'weights' && (
         <AdCard>
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
-            {!builtPlan ? <div className="ad-muted">Сначала собери план в «Параметры».</div> : (
+            {!builtPlan ? <AdBanner tone="info">Сначала собери план в «Параметры».</AdBanner> : (
               <>
                 <div className="ad-stats">
                   {Object.entries(workMax).map(([k,v])=> (

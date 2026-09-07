@@ -10,6 +10,15 @@ import React from 'react';
 import './arm-design.css';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
+import { haptics } from '../../../core/native-bridge';
+
+function buzz(): void {
+  try {
+    void haptics('light');
+  } catch {
+    /* no-op: тихий режим вне устройства */
+  }
+}
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
@@ -89,7 +98,7 @@ export function AdSteps({
           aria-pressed={active === s.id}
           data-active={active === s.id}
           className="ad-step"
-          onClick={() => onSelect(s.id)}
+          onClick={() => { buzz(); onSelect(s.id); }}
         >
           <span className="ad-step-n" aria-hidden>
             {i + 1}
@@ -209,6 +218,7 @@ export function AdChip({
   tone,
   dim,
   children,
+  onClick,
   ...rest
 }: BtnProps & { active?: boolean; tone?: 'red' | 'green'; dim?: boolean }) {
   return (
@@ -218,6 +228,7 @@ export function AdChip({
       aria-pressed={!!active}
       {...(tone ? { 'data-tone': tone } : {})}
       {...(dim ? { 'data-dim': 'true' } : {})}
+      onClick={(e) => { buzz(); onClick?.(e); }}
       {...rest}
     >
       {children}

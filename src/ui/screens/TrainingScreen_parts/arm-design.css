@@ -518,6 +518,12 @@
   color: var(--ad-dim);
 }
 
+:is(.train-arm, .train-armdiag) .ad-btn[data-variant='danger'] {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
 :is(.train-arm, .train-armdiag) .ad-btn-block {
   width: 100%;
 }
