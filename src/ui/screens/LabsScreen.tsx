@@ -302,7 +302,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labs: LabPoint[] = linked.labs || [];
   const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase || l.phase === selectedPhase)), [labs, selectedPhase]);
-  const archiveLabs = useMemo(() => labs.filter(l => l.archived || (l.phase && l.phase !== selectedPhase)), [labs, selectedPhase]);
+  // P0 fix: архив — только archived, а не «все чужие фазы» (иначе архив всегда полон, а переключение фазы теряет данные)
+  const archiveLabs = useMemo(() => labs.filter(l => !!l.archived), [labs]);
   const hasLabs = currentLabs && currentLabs.length > 0;
 
   const handlePhaseChange = (phase: string) => {
