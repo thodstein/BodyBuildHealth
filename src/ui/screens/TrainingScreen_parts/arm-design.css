@@ -360,6 +360,15 @@
   margin-top: 0;
 }
 
+:is(.train-arm, .train-armdiag) .ad-fl {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ad-dim);
+  margin-bottom: 6px;
+}
+
 :is(.train-arm, .train-armdiag) input:not([type='checkbox']):not([type='radio']):not([type='file']),
 :is(.train-arm, .train-armdiag) select,
 :is(.train-arm, .train-armdiag) textarea {
@@ -379,6 +388,13 @@
 
 :is(.train-arm, .train-armdiag) select {
   font-size: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%239ab' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 38px !important;
+  cursor: pointer;
 }
 
 :is(.train-arm, .train-armdiag) textarea {

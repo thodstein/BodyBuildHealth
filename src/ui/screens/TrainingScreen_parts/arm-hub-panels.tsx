@@ -208,7 +208,7 @@ export function HubP0Panel({ H }: { H: any }) {
           <AdBtn variant="dark" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
           {criticalSideP0 && <span className="ad-tip">🔴 критично — side только ремень/изометрия</span>}
         </div>
-        {injectMsg && <div className="ad-muted">{injectMsg}</div>}
+        {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
       </AdSec>
     </AdCard>
   );

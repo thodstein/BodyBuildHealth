@@ -282,4 +282,13 @@ describe('APK arm pack', () => {
     fireEvent.click(head);
     expect(head.getAttribute('aria-expanded')).toBe('true');
   });
+
+  it('выбор chips: дисциплина/техника переключаются без селектов', () => {
+    render(<ArmAutoConstructor />);
+    expect(document.body.textContent).not.toContain('Хват-фокус');
+    fireEvent.click(screen.getByRole('button', { name: 'Армлифтинг' }));
+    expect(document.body.textContent).toContain('Хват-фокус');
+    fireEvent.click(screen.getByRole('button', { name: 'Хук' }));
+    expect(screen.getByRole('button', { name: 'Хук' }).getAttribute('aria-pressed')).toBe('true');
+  });
 });

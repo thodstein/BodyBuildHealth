@@ -501,34 +501,40 @@ export function ArmAutoConstructor() {
       {step === 'params' && (
         <AdCard>
           <AdSec title="🎛 Параметры">
-            <AdGrid cols="2">
-              <AdField label="Дисциплина">
-                <select value={discipline} onChange={e=>setDiscipline(e.target.value)}>
-                  {DISCIPLINES.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
-                </select>
-              </AdField>
-              <AdField label="Техника (стол)">
-                <select value={technique} onChange={e=>setTechnique(e.target.value)}>
-                  {TECHNIQUES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-              </AdField>
-              <AdField label="Уровень">
-                <select value={level} onChange={e=>setLevel(e.target.value)}>
-                  <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option><option value="enhanced">Enhanced</option>
-                </select>
-              </AdField>
-              <AdField label="Цель">
-                <select value={goal} onChange={e=>setGoal(e.target.value)}>
-                  {GOALS.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
-                </select>
-              </AdField>
-              <AdField label="Недель">
-                <input type="number" min={2} max={52} value={weeks} onChange={e=>setWeeks(Math.max(2,Math.min(52, parseInt(e.target.value)||8)))} />
-              </AdField>
-              <AdField label="Дней/нед">
-                <input type="number" min={2} max={6} value={daysPerWeek} onChange={e=>setDaysPerWeek(Math.max(2,Math.min(6, parseInt(e.target.value)||4)))} />
-              </AdField>
-            </AdGrid>
+            <div className="ad-list">
+              <div>
+                <div className="ad-fl">Дисциплина</div>
+                <div className="ad-chips">
+                  {DISCIPLINES.map(d=> <AdChip key={d.id} active={discipline===d.id} onClick={()=>setDiscipline(d.id)}>{d.label}</AdChip>)}
+                </div>
+              </div>
+              <div>
+                <div className="ad-fl">Техника (стол)</div>
+                <div className="ad-chips">
+                  {TECHNIQUES.map(t=> <AdChip key={t.id} active={technique===t.id} onClick={()=>setTechnique(t.id)}>{t.label}</AdChip>)}
+                </div>
+              </div>
+              <div>
+                <div className="ad-fl">Уровень</div>
+                <div className="ad-chips">
+                  {[{id:'beginner',label:'Новичок'},{id:'intermediate',label:'Средний'},{id:'advanced',label:'Продвинутый'},{id:'enhanced',label:'Enhanced'}].map(l=> <AdChip key={l.id} active={level===l.id} onClick={()=>setLevel(l.id)}>{l.label}</AdChip>)}
+                </div>
+              </div>
+              <div>
+                <div className="ad-fl">Цель</div>
+                <div className="ad-chips">
+                  {GOALS.map(g=> <AdChip key={g.id} active={goal===g.id} onClick={()=>setGoal(g.id)}>{g.label}</AdChip>)}
+                </div>
+              </div>
+              <AdGrid cols="2">
+                <AdField label="Недель">
+                  <input type="number" min={2} max={52} value={weeks} onChange={e=>setWeeks(Math.max(2,Math.min(52, parseInt(e.target.value)||8)))} />
+                </AdField>
+                <AdField label="Дней/нед">
+                  <input type="number" min={2} max={6} value={daysPerWeek} onChange={e=>setDaysPerWeek(Math.max(2,Math.min(6, parseInt(e.target.value)||4)))} />
+                </AdField>
+              </AdGrid>
+            </div>
           </AdSec>
 
           {discipline !== 'armwrestling' && (
