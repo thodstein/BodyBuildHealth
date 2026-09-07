@@ -111,7 +111,7 @@ export const LabsTzRiskTab: React.FC = () => {
     <div className="labs-tzrisk" style={{ padding: '0 0 80px' }}>
       <div style={CARD}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="cpu" size={15} /> Риски по механизм-ориентированной модели (ТЗ)</div>
-        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, marginBottom: 8 }}>
+        <div style={{ fontSize:11, color:'#fff', lineHeight:1.5, marginBottom:10 }}>
           Введите лабораторные маркеры из таблицы T4 для оценки выраженности механизмов (m_i) по 6 системам организма.
         </div>
         <button onClick={fillFromLabs} style={{
@@ -132,7 +132,7 @@ export const LabsTzRiskTab: React.FC = () => {
             <div style={{ display: 'flex', gap: 3 }}>
               {(['aas', 'gh', 'insulin'] as const).map(dc => (
                 <button key={dc} onClick={() => setDrugClass(dc)} style={{
-                  flex: 1, padding: '7px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                  flex:1, padding:'10px 4px', borderRadius:10, cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44,
                   transition: 'all 0.2s', textAlign: 'center',
                   background: drugClass === dc ? 'var(--accent)' : 'rgba(24,24,27,0.6)',
                   color: drugClass === dc ? '#000' : '#fff',
@@ -146,12 +146,12 @@ export const LabsTzRiskTab: React.FC = () => {
           <div>
             <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Доза</div>
             <input type="number" value={dose} onChange={e => setDose(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, fontWeight: 600, boxSizing: 'border-box' }} />
+              style={{ width:'100%', padding:'12px 10px', borderRadius:12, background:'rgba(24,24,27,0.6)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, fontWeight:700, boxSizing:'border-box', minHeight:44 }} />
           </div>
           <div>
             <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Нед.</div>
             <input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))}
-              style={{ width: '100%', padding: '8px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, fontWeight: 600, boxSizing: 'border-box' }} />
+              style={{ width:'100%', padding:'12px 10px', borderRadius:12, background:'rgba(24,24,27,0.6)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, fontWeight:700, boxSizing:'border-box', minHeight:44 }} />
           </div>
         </div>
       </div>
@@ -192,7 +192,7 @@ export const LabsTzRiskTab: React.FC = () => {
       {/* Поддержка из калькулятора */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="pill" size={13} /> Поддержка из калькулятора</div>
-        <div style={{ fontSize: 10, color: '#fff' }}>
+        <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>
           {supportIds.length > 0
             ? `✅ ${supportIds.length} веществ: ${supportIds.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ')}`
             : '🟡 Нет активной поддержки'}
