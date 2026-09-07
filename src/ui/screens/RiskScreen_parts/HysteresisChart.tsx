@@ -49,7 +49,7 @@ export const HysteresisChart: React.FC = () => {
   }, [drugs, selectedIdx]);
 
   if (!result || !result.points.length) {
-    return <div className="risk-hysteresis" style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>Добавьте препараты в курс для симуляции гистерезиса</div>;
+    return <div className="risk-hysteresis" style={{ padding: 20, textAlign: 'center', color: '#fff', fontSize: 12 }}>Добавьте препараты в курс для симуляции гистерезиса</div>;
   }
 
   // SVG chart
@@ -73,23 +73,23 @@ export const HysteresisChart: React.FC = () => {
     .join(' ');
 
   return (
-    <div className="risk-hysteresis" style={{ marginTop: 10, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, overflowX: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>🧪 Гистерезис — PK/PD</div>
-        <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>dMarker/dt = (E−Marker)/τ</div>
+    <div className="risk-hysteresis" style={{ marginTop: 12, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 18, padding: 16, overflowX: 'hidden', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>🧪 Гистерезис — PK/PD</div>
+        <div style={{ fontSize: 11, color: '#fff' }}>dMarker/dt = (E−Marker)/τ</div>
       </div>
 
       {/* Drug selector */}
       {drugs.length > 1 && (
-        <div style={{ display: 'flex', gap: 3, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {drugs.map((d, i) => {
             const ph = PHARMA_DB[d.substanceId] as any;
             return (
               <button key={i} onClick={() => setSelectedIdx(i)} style={{
-                padding: '3px 8px', borderRadius: 8, fontSize: 8, cursor: 'pointer',
-                background: i === selectedIdx ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
-                color: i === selectedIdx ? '#000' : 'rgba(255,255,255,0.6)',
-                border: '1px solid ' + (i === selectedIdx ? 'var(--accent)' : 'rgba(255,255,255,0.06)'),
+                minHeight:44, padding: '10px 16px', borderRadius: 999, fontSize: 13, fontWeight:800, cursor: 'pointer',
+                background: i === selectedIdx ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                color: i === selectedIdx ? '#000' : '#fff',
+                border: '1px solid ' + (i === selectedIdx ? 'var(--accent)' : 'rgba(255,255,255,0.10)'),
               }}>
                 {ph?.name || d.substanceId}
               </button>
@@ -109,19 +109,19 @@ export const HysteresisChart: React.FC = () => {
         {/* Marker — thick green */}
         <path d={markerPath} fill="none" stroke="#00e68a" strokeWidth={2.5} />
         {/* Time labels */}
-        <text x={MARGIN.left} y={CHART_H - 4} fontSize={8} fill="rgba(255,255,255,0.4)" textAnchor="middle">0</text>
-        <text x={scaleX(maxHours * 0.5)} y={CHART_H - 4} fontSize={8} fill="rgba(255,255,255,0.4)" textAnchor="middle">{Math.round(maxHours / 2)}ч</text>
-        <text x={scaleX(maxHours)} y={CHART_H - 4} fontSize={8} fill="rgba(255,255,255,0.4)" textAnchor="middle">{Math.round(maxHours)}ч</text>
+        <text x={MARGIN.left} y={CHART_H - 4} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle">0</text>
+        <text x={scaleX(maxHours * 0.5)} y={CHART_H - 4} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle">{Math.round(maxHours / 2)}ч</text>
+        <text x={scaleX(maxHours)} y={CHART_H - 4} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle">{Math.round(maxHours)}ч</text>
         {/* Y-axis label */}
-        <text x={2} y={MARGIN.top + INNER_H / 2} fontSize={7} fill="rgba(255,255,255,0.3)" textAnchor="middle" transform={`rotate(-90, 4, ${MARGIN.top + INNER_H / 2})`}>Эффект</text>
+        <text x={2} y={MARGIN.top + INNER_H / 2} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle" transform={`rotate(-90, 4, ${MARGIN.top + INNER_H / 2})`}>Эффект</text>
       </svg>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 10, fontSize: 7, marginTop: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
-        <span><span style={{ color: '#60a5fa', fontWeight: 700 }}>━</span> Концентрация</span>
-        <span><span style={{ color: '#00e68a', fontWeight: 700 }}>━</span> Биомаркер</span>
-        <span style={{ color: 'var(--text-dim)' }}>Пик: +{result.peakMarkerTime.toFixed(0)}ч</span>
-        <span style={{ color: 'var(--text-dim)' }}>Стаб: {result.timeToSteadyState.toFixed(0)}ч</span>
+      <div style={{ display: 'flex', gap: 10, fontSize: 12, fontWeight:700, color:'#fff', marginTop: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <span><span style={{ color: '#60a5fa', fontWeight: 800 }}>━</span> Концентрация</span>
+        <span><span style={{ color: '#00e68a', fontWeight: 800 }}>━</span> Биомаркер</span>
+        <span style={{ color: '#fff' }}>Пик: +{result.peakMarkerTime.toFixed(0)}ч</span>
+        <span style={{ color: '#fff' }}>Стаб: {result.timeToSteadyState.toFixed(0)}ч</span>
       </div>
     </div>
   );

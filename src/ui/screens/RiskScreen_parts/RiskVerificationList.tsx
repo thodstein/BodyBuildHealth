@@ -15,11 +15,11 @@ import {
 import { TZ_MECH_LABELS } from '../../../data/support-db';
 
 const ACCENT = '#00e68a';
-const CARD: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10 };
+const CARD: React.CSSProperties = { padding: 16, borderRadius: 18, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', marginBottom: 12 };
 
 const EXPORT_BTN: React.CSSProperties = {
-  padding: '7px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa',
+  minHeight: 44, padding: '10px 16px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 800,
+  background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.30)', color: '#fff',
   whiteSpace: 'nowrap',
 };
 
@@ -95,40 +95,45 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
 
   return (
     <div className="risk-verify" style={{ padding: '4px 0 80px' }}>
-      {/* HERO */}
-      <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.05) 0%, rgba(24,24,27,0.15) 100%)', border: '1px solid rgba(0,230,138,0.12)' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Верификация рисков анализами</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginBottom: 8 }}>
+      {/* HERO — APK PRO: белый текст, крупно */}
+      <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(20,22,30,0.60) 100%)', border: '1px solid rgba(0,230,138,0.22)' }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔬 Верификация рисков анализами</div>
+        <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 10 }}>
           Перечень анализов по 6 системам и 28 механизмам · пороги m_i = 1/2/3 (таблица T4) · якорные floors по лабораторным порогам
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 130 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Верифицировано систем</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: 26, fontWeight: 800, color: overallPct >= 50 ? '#4ade80' : '#fbbf24' }}>{overallPct}%</span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{verifiedSystems}/{report.systems.length}</span>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 140, flex:1, padding:'12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
+            <div style={{ fontSize: 12, color: '#fff', fontWeight:700, marginBottom: 4 }}>Верифицировано систем</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, justifyContent:'center' }}>
+              <span style={{ fontSize: 30, fontWeight: 900, color: overallPct >= 50 ? '#4ade80' : '#fbbf24' }}>{overallPct}%</span>
+              <span style={{ fontSize: 13, color: '#fff', fontWeight:700 }}>{verifiedSystems}/{report.systems.length}</span>
             </div>
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.55, flex:2, minWidth:200 }}>
             Маркеров в профиле: <b style={{ color: '#fff' }}>{report.presentMarkers}/{report.totalMarkers}</b>
-            <br />Якорных попаданий (floors): <b style={{ color: report.floorsCount > 0 ? '#fca5a5' : 'rgba(255,255,255,0.7)' }}>{report.floorsCount}</b>
+            <br />Якорных попаданий (floors): <b style={{ color: '#fff' }}>{report.floorsCount}</b>
             {report.floorsCount > 0 && ' — риск систем поднят независимо от препаратов'}
           </div>
         </div>
         {overallPct < 50 && (
-          <div style={{ marginTop: 8, fontSize: 9, color: '#fbbf24', lineHeight: 1.4 }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: '#fff', lineHeight: 1.5, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.24)', borderRadius:10, padding:'8px 10px' }}>
             ⚠ Менее половины систем верифицировано — оценка по фармакологии. Сдайте анализы: липидограмма, ОАК (гематокрит), печёночный и почечный блок, ТТГ, глюкоза, ЛГ/ФСГ/тестостерон.
           </div>
         )}
+        <div className="risk-verify-nav" style={{ display:'flex', gap:8, overflowX:'auto', marginTop:12, paddingBottom:2, scrollbarWidth:'none' }}>
+          {report.systems.map(s => (
+            <button key={s.id} onClick={() => { try { document.getElementById(`verify-${s.id}`)?.scrollIntoView({ behavior:'smooth', block:'start' }); } catch {} }} style={{ flexShrink:0, minHeight:44, padding:'8px 14px', borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{s.icon} {s.name}</button>
+          ))}
+        </div>
       </div>
 
-      {/* EXPORT */}
-      <div style={{ ...CARD, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>📤 Экспорт:</span>
+      {/* EXPORT — липкая удобная лента (ниже сабтабов 56+67: зазор 9px) */}
+      <div className="risk-verify-export" style={{ ...CARD, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', position:'sticky', top:132, zIndex:10 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>📤 Экспорт:</span>
         <button onClick={copyText} style={EXPORT_BTN}>{copied ? '✅ Скопировано' : '📋 Текст'}</button>
         <button onClick={downloadCsv} style={EXPORT_BTN}>📊 CSV</button>
         <button onClick={printPdf} style={EXPORT_BTN}>🖨 PDF</button>
-        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>весь перечень по всем системам</span>
+        <span style={{ fontSize: 11, color: '#fff' }}>весь перечень по всем системам</span>
       </div>
 
       {/* SYSTEMS */}
@@ -136,70 +141,70 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
         const organ = organById[sys.id];
         const verif = sysVerif(sys.id);
         return (
-          <div key={sys.id} style={CARD}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 700 }}>
+          <div key={sys.id} id={`verify-${sys.id}`} style={{ ...CARD, scrollMarginTop: 170 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap:10, marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color:'#fff' }}>
                 {sys.icon} {sys.name}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink:0 }}>
                 {organ && (
-                  <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: statusColor(organ.after >= 50 ? 3 : organ.after >= 25 ? 2 : 0) }}>
+                  <span style={{ fontSize: 12, fontWeight:800, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)', color: '#fff' }}>
                     риск {organ.raw}% → {organ.after}%
                   </span>
                 )}
-                <span style={{ fontSize: 10, fontWeight: 700, color: verif >= 0.5 ? '#4ade80' : '#fbbf24' }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
                   {Math.round(verif * 100)}% · {sys.presentCount}/{sys.total}
                 </span>
               </div>
             </div>
-            <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, marginBottom: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round(verif * 100)}%`, background: verif >= 0.5 ? '#4ade80' : '#fbbf24', borderRadius: 3 }} />
+            <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 999, marginBottom: 10, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round(verif * 100)}%`, background: verif >= 0.5 ? '#4ade80' : '#fbbf24', borderRadius: 999 }} />
             </div>
 
             {sys.floorHits.length > 0 && (
-              <div style={{ marginBottom: 6 }}>
+              <div style={{ marginBottom: 8 }}>
                 {sys.floorHits.map((f, i) => (
-                  <div key={i} style={{ fontSize: 9, color: '#fca5a5', lineHeight: 1.5, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: 6, padding: '3px 8px', marginBottom: 3 }}>
+                  <div key={i} style={{ fontSize: 12, fontWeight:700, color: '#fff', lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', borderRadius: 10, padding: '6px 10px', marginBottom: 4 }}>
                     ⚓ {f.label} — риск ≥ {f.risk}%
                   </div>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: 4 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
               {sys.mechanisms.map(mech => (
-                <div key={mech.id} style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 4, background: sys.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{TZ_MECH_LABELS[mech.id] || mech.id}</span>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>w={mech.weight}</span>
+                <div key={mech.id} style={{ padding: '10px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: sys.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{TZ_MECH_LABELS[mech.id] || mech.id}</span>
+                    <span style={{ fontSize: 11, color: '#fff' }}>w={mech.weight}</span>
                     {mech.present && mech.markers.length > 0 ? (
-                      <span style={{ fontSize: 8, color: '#4ade80', marginLeft: 'auto' }}>✅ есть маркер</span>
+                      <span style={{ fontSize: 11, fontWeight:800, color: '#fff', marginLeft: 'auto' }}>✅ есть маркер</span>
                     ) : mech.markers.length > 0 ? (
-                      <span style={{ fontSize: 8, color: '#fbbf24', marginLeft: 'auto' }}>⚠ нет данных</span>
+                      <span style={{ fontSize: 11, fontWeight:800, color: '#fff', marginLeft: 'auto' }}>⚠ нет данных</span>
                     ) : null}
                   </div>
                   {mech.note && (
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>— {mech.note}</div>
+                    <div style={{ fontSize: 12, color: '#fff', marginBottom: 4, lineHeight:1.45 }}>— {mech.note}</div>
                   )}
                   {mech.markers.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {mech.markers.map((mk, i) => (
                         <div key={i} title={`${mk.name}: пороги ${thresholdText(mk)} ${mk.unit}`} style={{
-                          display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px', borderRadius: 6, fontSize: 9,
-                          background: mk.present ? `${statusColor(mk.status)}14` : 'rgba(255,255,255,0.03)',
-                          border: `1px solid ${mk.present ? `${statusColor(mk.status)}30` : 'rgba(255,255,255,0.06)'}`,
-                          color: mk.present ? statusColor(mk.status) : 'rgba(255,255,255,0.35)',
+                          display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 10, fontSize: 12, fontWeight:600,
+                          background: mk.present ? `${statusColor(mk.status)}1e` : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${mk.present ? `${statusColor(mk.status)}40` : 'rgba(255,255,255,0.08)'}`,
+                          color: '#fff',
                         }}>
-                          <span style={{ fontWeight: 600, color: mk.present ? '#fff' : 'rgba(255,255,255,0.35)' }}>{mk.name}</span>
+                          <span style={{ fontWeight: 800, color: '#fff' }}>{mk.name}</span>
                           {mk.present ? (
                             <>
-                              <span>{mk.value}</span>
-                              <span style={{ opacity: 0.6 }}>{mk.unit}</span>
-                              <span style={{ opacity: 0.5 }}>· {statusLabel(mk.status)}</span>
+                              <span style={{ color:'#fff' }}>{mk.value}</span>
+                              <span style={{ color:'#fff' }}>{mk.unit}</span>
+                              <span style={{ color:'#fff' }}>· {statusLabel(mk.status)}</span>
                             </>
                           ) : (
-                            <span style={{ opacity: 0.6 }}>нет данных</span>
+                            <span style={{ color:'#fff' }}>нет данных</span>
                           )}
                         </div>
                       ))}
@@ -212,7 +217,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
         );
       })}
 
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5, padding: '0 4px' }}>
+      <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.55, padding: '0 4px' }}>
         Пороги m_i (таблица T4 механизм-ориентированной модели): 1 — пограничный, 2 — выраженный, 3 — критический.
         Якорные floors (⚓) поднимают риск системы независимо от препаратов и покрытия анализами.
       </div>

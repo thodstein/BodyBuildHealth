@@ -187,21 +187,21 @@ export const V7RiskDisplay: React.FC<{
   const getOrganRisk = (key: string): number => effectiveOrganRisk(key);
 
   const renderOrgans = () => (
-    <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
+    <div className="risk-v7-organs">
+      <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🔬 V7 Risk Engine — Полная модель</h3>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Временной срез:</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
-                {organWeek === 0 ? '' : `Неделя ${organWeek}`}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Временной срез:</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                {organWeek === 0 ? 'Среднее' : `Неделя ${organWeek}`}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>∅</span>
+              <span style={{ fontSize: 12, fontWeight:800, color: '#fff', whiteSpace: 'nowrap', minWidth: 26, textAlign: 'right' }}>∅</span>
               <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
-                style={{ flex: 1, accentColor: '#00e68a', height: 4, cursor: 'pointer' }} />
-              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22 }}>12</span>
+                style={{ flex: 1, accentColor: '#00e68a', height: 28, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, fontWeight:800, color: '#fff', whiteSpace: 'nowrap', minWidth: 26 }}>12</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, padding: '0 24px' }}>
               {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(w => (
@@ -213,38 +213,38 @@ export const V7RiskDisplay: React.FC<{
               ))}
             </div>
             {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4, textAlign: 'center' }}>
                 Общий риск (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
               </div>
             )}
           </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-          <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw Risk</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '12px 8px', borderRadius: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Raw Risk</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</div>
           </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Net Risk</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</div>
+          <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '12px 8px', borderRadius: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Net Risk</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</div>
           </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>P(событие)</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalPEvent * 100) }}>{(globalPEvent * 100).toFixed(1)}%</div>
+          <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '12px 8px', borderRadius: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>P(событие)</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: getRiskColor(globalPEvent * 100) }}>{(globalPEvent * 100).toFixed(1)}%</div>
           </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Качество данных</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: dataQuality > 0.7 ? '#22c55e' : dataQuality > 0.4 ? '#eab308' : '#ef4444' }}>{(dataQuality * 100).toFixed(0)}%</div>
+          <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '12px 8px', borderRadius: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Качество данных</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: dataQuality > 0.7 ? '#22c55e' : dataQuality > 0.4 ? '#eab308' : '#ef4444' }}>{(dataQuality * 100).toFixed(0)}%</div>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
           <button
             onClick={toggleMC}
             style={{
-              padding: '8px 20px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              background: mcEnabled ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'var(--bg-secondary)',
-              border: mcEnabled ? '1px solid #8b5cf6' : '1px solid var(--border)',
-              color: mcEnabled ? '#fff' : 'var(--text-dim)',
-              boxShadow: mcEnabled ? '0 0 16px rgba(139,92,246,0.35)' : 'none',
+              minHeight:48, padding: '12px 24px', borderRadius: 999, fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              background: mcEnabled ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(255,255,255,0.06)',
+              border: mcEnabled ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.12)',
+              color: '#fff',
+              boxShadow: mcEnabled ? '0 0 18px rgba(139,92,246,0.40)' : 'none',
               transition: 'all 0.3s',
             }}
           >
@@ -253,8 +253,8 @@ export const V7RiskDisplay: React.FC<{
         </div>
       </div>
 
-      <div className="card">
-        <h3 style={{ margin: '0 0 10px' }}>🫀 Органные системы</h3>
+      <div className="card" style={{ padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize:15, fontWeight:800, color:'#fff' }}>🫀 Органные системы</h3>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS_V7[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
@@ -263,16 +263,16 @@ export const V7RiskDisplay: React.FC<{
           const riskLevel = organPct < 20 ? 'low' : organPct < 40 ? 'medium' : 'high';
           return (
             <div key={sysKey} className={`risk-${riskLevel}`}
-              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden',
-                borderLeft: `3px solid ${getRiskColor(organPct)}` }}>
-              <div className="row" style={{ cursor: 'pointer', marginBottom: 0, padding: '8px 10px' }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, marginBottom: 10, overflow: 'hidden',
+                borderLeft: `4px solid ${getRiskColor(organPct)}` }}>
+              <div className="row" style={{ cursor: 'pointer', marginBottom: 0, padding: '12px', minHeight:56 }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
+                <span style={{ fontSize: 14, fontWeight: 800, color:'#fff' }}>{label}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ width: 50, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 3 }} />
+                  <div style={{ width: 60, background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 999 }} />
                   </div>
-                  <span style={{ padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 11, color: '#fff', background: getRiskColor(organPct), minWidth: 34, textAlign: 'center' }}>{organPct}%</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▾</span>
+                  <span style={{ padding: '5px 12px', borderRadius: 999, fontWeight: 800, fontSize: 13, color: '#fff', background: getRiskColor(organPct), minWidth: 44, textAlign: 'center' }}>{organPct}%</span>
+                  <span style={{ fontSize: 12, color: '#fff', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)', width:32, height:32, borderRadius:999, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}>▾</span>
                 </div>
               </div>
               {isExpanded && (
@@ -286,35 +286,35 @@ export const V7RiskDisplay: React.FC<{
                         const netVal = Math.round((mechData.P_net ?? mechData.p5 ?? 0) * 100);
                         const rawVal = Math.round((mechData.P_raw ?? mechData.raw ?? 0) * 100);
                         return (
-                          <div key={mechIdx} style={{ marginBottom: 4 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                              <span style={{ color: 'var(--text-dim)' }}>{mechName}</span>
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                <span style={{ color: getRiskColor(rawVal) }} title="">{rawVal}%</span>
-                                <span style={{ color: getRiskColor(netVal), fontWeight: 600 }} title="">{netVal}%</span>
-                                {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
+                          <div key={mechIdx} style={{ marginBottom: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:8, fontSize: 12 }}>
+                              <span style={{ color: '#fff', fontWeight:600 }}>{mechName}</span>
+                              <div style={{ display: 'flex', gap: 6, alignItems:'center' }}>
+                                <span style={{ color: getRiskColor(rawVal) }}>{rawVal}%</span>
+                                <span style={{ color: getRiskColor(netVal), fontWeight: 800 }}>{netVal}%</span>
+                                {mechData.geneticMult > 1.05 && <span style={{ fontSize: 11, color: '#fff' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
                               </div>
                             </div>
-                            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
-                              <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(netVal), borderRadius: 2, transition: 'width 0.3s' }} />
+                            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 6, overflow: 'hidden', marginTop:4 }}>
+                              <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(netVal), borderRadius: 999, transition: 'width 0.3s' }} />
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                    <div style={{ background: 'rgba(239,68,68,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Острый</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.acute ?? 0)}%</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
+                    <div style={{ background: 'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.20)', padding: '8px 6px', borderRadius: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Острый</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, marginTop:2 }}>{fmtPct01(sysData.acute ?? 0)}%</div>
                     </div>
-                    <div style={{ background: 'rgba(249,115,22,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Хронич.</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.chronic ?? 0)}%</div>
+                    <div style={{ background: 'rgba(249,115,22,0.10)', border:'1px solid rgba(249,115,22,0.20)', padding: '8px 6px', borderRadius: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Хронич.</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, marginTop:2 }}>{fmtPct01(sysData.chronic ?? 0)}%</div>
                     </div>
-                    <div style={{ background: 'rgba(168,85,247,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Фиброз</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.fibrosis ?? 0)}%</div>
+                    <div style={{ background: 'rgba(168,85,247,0.10)', border:'1px solid rgba(168,85,247,0.20)', padding: '8px 6px', borderRadius: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Фиброз</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, marginTop:2 }}>{fmtPct01(sysData.fibrosis ?? 0)}%</div>
                     </div>
                   </div>
                 </div>
@@ -327,18 +327,18 @@ export const V7RiskDisplay: React.FC<{
   );
 
   const renderMatrix = () => (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 10px 0' }}>🔲 Матрица рисков V7</h3>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>18 систем × 7-9 механизмов</p>
+    <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+      <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🔲 Матрица рисков V7</h3>
+      <p style={{ fontSize: 12, color: '#fff', margin: '0 0 12px 0' }}>18 систем × 7-9 механизмов</p>
       {Object.entries(matrix.systems).map(([sysKey, sysData]: [string, any]) => {
         const label = SYSTEM_NAMES_RU[sysKey] || sysKey;
         return (
-          <div key={sysKey} style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontWeight: 600, fontSize: 12 }}>{label}</span>
+          <div key={sysKey} style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding: '12px', borderRadius: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 13, color:'#fff' }}>{label}</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(sysData.raw) }}>{Math.round(sysData.raw)}%</b></span>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(sysData.net) }}>{Math.round(sysData.net)}%</b></span>
+                <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Raw: <b style={{ color: getRiskColor(sysData.raw) }}>{Math.round(sysData.raw)}%</b></span>
+                <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Net: <b style={{ color: getRiskColor(sysData.net) }}>{Math.round(sysData.net)}%</b></span>
               </div>
             </div>
             {Object.entries(sysData.mechanisms).map(([mechStr, mech]: [string, any]) => {
@@ -347,16 +347,16 @@ export const V7RiskDisplay: React.FC<{
               if (!mechName) return null;
               const netVal = Math.round(mech.P_net * 100);
               return (
-                <div key={mechStr} style={{ marginBottom: 2 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: 'var(--text-dim)' }}>{mechIdx}. {mechName}</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <span style={{ color: getRiskColor(mech.P_net * 100) }}>{netVal}%</span>
-                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mech.geneticMult.toFixed(2)}</span>}
+                <div key={mechStr} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:8, fontSize: 12 }}>
+                    <span style={{ color: '#fff', fontWeight:600 }}>{mechIdx}. {mechName}</span>
+                    <div style={{ display: 'flex', gap: 6, alignItems:'center' }}>
+                      <span style={{ color: getRiskColor(mech.P_net * 100), fontWeight:800 }}>{netVal}%</span>
+                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 11, color: '#fff' }}>🧬{mech.geneticMult.toFixed(2)}</span>}
                     </div>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
-                    <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(mech.P_net * 100), borderRadius: 2, transition: 'width 0.3s' }} />
+                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 6, overflow: 'hidden', marginTop:4 }}>
+                    <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(mech.P_net * 100), borderRadius: 999, transition: 'width 0.3s' }} />
                   </div>
                 </div>
               );
@@ -368,25 +368,25 @@ export const V7RiskDisplay: React.FC<{
   );
 
   const renderTimeSeries = () => {
-    if (!timeSeriesData) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK для временного ряда</div>;
+    if (!timeSeriesData) return <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>Нет данных PK для временного ряда</div>;
     const { days, organDaily } = timeSeriesData;
     const maxDay = days.length - 1;
 
     return (
-      <div>
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <h3 style={{ margin: '0 0 0 0' }}>📈 Эволюция рисков (84 дня)</h3>
-            <span style={{ fontSize: 13, fontWeight: 700, background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: 6 }}>
+      <div className="risk-v7-timeseries">
+        <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 8 }}>
+            <h3 style={{ margin: 0, fontSize:15, fontWeight:800, color:'#fff' }}>📈 Эволюция рисков (84 дня)</h3>
+            <span style={{ fontSize: 12, fontWeight: 800, color:'#fff', background: 'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', padding: '6px 12px', borderRadius: 999, whiteSpace:'nowrap' }}>
               День {selectedDay} / {maxDay}
             </span>
           </div>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Динамика рисков по органным системам</p>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} нед</span>
+          <p style={{ fontSize: 12, color: '#fff', margin: '0 0 10px 0' }}>Динамика рисков по органным системам</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight:700, color: '#fff', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} нед</span>
             <input type="range" min={0} max={maxDay} value={selectedDay} onChange={e => setSelectedDay(parseFloat(e.target.value) || 0)}
-              style={{ flex: 1, accentColor: 'var(--accent)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} нед</span>
+              style={{ flex: 1, accentColor: 'var(--accent)', height: 28, cursor:'pointer' }} />
+            <span style={{ fontSize: 12, fontWeight:700, color: '#fff', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} нед</span>
           </div>
         </div>
 
@@ -398,21 +398,21 @@ export const V7RiskDisplay: React.FC<{
           const valAtEnd = values[values.length - 1] || 0;
           const delta = valAtDay - valAtStart;
           const deltaStr = delta > 0 ? `+${(delta * 100).toFixed(1)}%` : `${(delta * 100).toFixed(1)}%`;
-          const deltaColor = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : 'var(--text-dim)';
+          const deltaColor = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : '#fff';
 
           return (
-            <div key={organKey} className="card" style={{ marginBottom: 6, padding: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+            <div key={organKey} className="card" style={{ marginBottom: 8, padding: '12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color:'#fff' }}>{label}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(valAtStart * 100).toFixed(1)}%</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: getRiskColor(valAtDay * 100) }}>{(valAtDay * 100).toFixed(1)}%</span>
-                  <span style={{ fontSize: 9, color: deltaColor, fontWeight: 600 }}>{deltaStr}</span>
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(valAtEnd * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 11, color: '#fff' }}>{(valAtStart * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: getRiskColor(valAtDay * 100) }}>{(valAtDay * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 11, color: deltaColor, fontWeight: 800 }}>{deltaStr}</span>
+                  <span style={{ fontSize: 11, color: '#fff' }}>{(valAtEnd * 100).toFixed(1)}%</span>
                 </div>
               </div>
               <div style={{ position: 'relative' }}>
-                <div style={{ display: 'flex', gap: 1, height: 32, borderRadius: 3, overflow: 'hidden', alignItems: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: 1, height: 36, borderRadius: 6, overflow: 'hidden', alignItems: 'flex-end' }}>
                   {values.map((v: number, i: number) => {
                     const isSelected = i === selectedDay;
                     return (
@@ -426,7 +426,7 @@ export const V7RiskDisplay: React.FC<{
                 </div>
                 <div style={{ position: 'absolute', left: `${(selectedDay / maxDay) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4 }}>
                 <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
               </div>
             </div>
@@ -437,16 +437,16 @@ export const V7RiskDisplay: React.FC<{
   };
 
   const renderSensitivity = () => {
-    if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
+    if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>Загрузка профиля...</div>;
     if (!linked.course || linked.course.length === 0) return (
-      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+      <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>📊</div>
         <div>Добавьте препараты в курс на вкладке 💊 Фарма</div>
-        <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-dim)' }}>для анализа чувствительности</div>
+        <div style={{ fontSize: 11, marginTop: 4, color: '#fff' }}>для анализа чувствительности</div>
       </div>
     );
     if (!sensitivityResults || sensitivityResults.length === 0) return (
-      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+      <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>
         <div>Недостаточно данных для анализа чувствительности</div>
         <div style={{ fontSize: 11, marginTop: 8 }}>Настройте параметры в Профиле {'>'} Параметры V7</div>
       </div>
@@ -456,10 +456,10 @@ export const V7RiskDisplay: React.FC<{
     const maxElasticity = Math.max(...top10.map(r => r.elasticity), 0.001);
 
     return (
-      <div>
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>🔬 Анализ чувствительности</h3>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
+      <div className="risk-v7-sensitivity">
+        <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🔬 Анализ чувствительности</h3>
+          <p style={{ fontSize: 12, color: '#fff', margin: 0, lineHeight:1.5 }}>
             Какие параметры сильнее всего влияют на общий риск? Эластичность показывает, на сколько % изменяется риск при 1% изменении параметра.
           </p>
         </div>
@@ -469,20 +469,20 @@ export const V7RiskDisplay: React.FC<{
           const elasticityLevel = result.elasticity < 0.1 ? '' : result.elasticity < 0.5 ? '' : result.elasticity < 1.0 ? '' : '';
           const elasticityColor = result.elasticity < 0.1 ? '#22c55e' : result.elasticity < 0.5 ? '#84cc16' : result.elasticity < 1.0 ? '#eab308' : '#ef4444';
           return (
-            <div key={result.parameter} className="card" style={{ marginBottom: 6, padding: '10px 12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>#{result.rank}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+            <div key={result.parameter} className="card" style={{ marginBottom: 8, padding: '12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>#{result.rank}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color:'#fff' }}>{label}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Базовое: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: elasticityColor }}>Оµ = {result.elasticity.toFixed(3)}</span>
-                  <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${elasticityColor}22`, color: elasticityColor, fontWeight: 600 }}>{elasticityLevel}</span>
+                  <span style={{ fontSize: 11, color: '#fff' }}>Базовое: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: elasticityColor }}>Оµ = {result.elasticity.toFixed(3)}</span>
+                  <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: `${elasticityColor}22`, border:`1px solid ${elasticityColor}44`, color: '#fff', fontWeight: 800 }}>{elasticityLevel}</span>
                 </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
-                <div style={{ width: `${barWidth}%`, height: '100%', background: elasticityColor, borderRadius: 3, transition: 'width 0.3s' }} />
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${barWidth}%`, height: '100%', background: elasticityColor, borderRadius: 999, transition: 'width 0.3s' }} />
               </div>
             </div>
           );
@@ -599,19 +599,19 @@ export const V7RiskDisplay: React.FC<{
     const riskOpacity = (pct: number) => Math.max(0.4, Math.min(0.95, 0.4 + pct / 100 * 0.55));
 
     return (
-      <div>
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>🧍 3D Модель рисков</h3>
-            <div style={{ minWidth: 180 }}>
+      <div className="risk-v7-3d">
+        <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:10, marginBottom: 8, flexWrap:'wrap' }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight:800, color:'#fff' }}>🧍 3D Модель рисков</h3>
+            <div style={{ minWidth: 180, flex:1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
+                <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
               </div>
               <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
-                style={{ width: '100%', accentColor: '#00e68a', height: 3, cursor: 'pointer' }} />
+                style={{ width: '100%', accentColor: '#00e68a', height: 28, cursor: 'pointer' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
-                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>∅</span>
-                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>12</span>
+                <span style={{ fontSize: 11, color: '#fff' }}>∅</span>
+                <span style={{ fontSize: 11, color: '#fff' }}>12</span>
               </div>
             </div>
           </div>
@@ -697,9 +697,9 @@ export const V7RiskDisplay: React.FC<{
             })}
 
             {/* Internal organ labels */}
-            <text x={cx} y={15} fill="var(--text-dim)" fontSize="7" fontWeight="600" textAnchor="middle">ГОЛОВА</text>
-            <text x={cx - 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Л</text>
-            <text x={cx + 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">П</text>
+            <text x={cx} y={15} fill="#fff" fontSize="7" fontWeight="600" textAnchor="middle">ГОЛОВА</text>
+            <text x={cx - 95} y={180} fill="#fff" fontSize="6" textAnchor="middle">Л</text>
+            <text x={cx + 95} y={180} fill="#fff" fontSize="6" textAnchor="middle">П</text>
 
             {/* Selected organ floating label */}
             {selectedOrgan3D && (
@@ -711,13 +711,13 @@ export const V7RiskDisplay: React.FC<{
             {/* Legend */}
             <g transform="translate(10, 479)">
               <rect x={0} y={0} width={8} height={8} rx={1.5} fill="#22c55e" opacity={0.8} />
-              <text x={10} y={7} fill="var(--text-dim)" fontSize="6">Низк</text>
+              <text x={10} y={7} fill="#fff" fontSize="6">Низк</text>
               <rect x={40} y={0} width={8} height={8} rx={1.5} fill="#eab308" opacity={0.8} />
-              <text x={50} y={7} fill="var(--text-dim)" fontSize="6">Сред</text>
+              <text x={50} y={7} fill="#fff" fontSize="6">Сред</text>
               <rect x={80} y={0} width={8} height={8} rx={1.5} fill="#f97316" opacity={0.8} />
-              <text x={90} y={7} fill="var(--text-dim)" fontSize="6">Выс</text>
+              <text x={90} y={7} fill="#fff" fontSize="6">Выс</text>
               <rect x={115} y={0} width={8} height={8} rx={1.5} fill="#ef4444" opacity={0.8} />
-              <text x={125} y={7} fill="var(--text-dim)" fontSize="6">Крит</text>
+              <text x={125} y={7} fill="#fff" fontSize="6">Крит</text>
             </g>
           </svg>
         </div>
@@ -734,42 +734,42 @@ export const V7RiskDisplay: React.FC<{
                 {fmtPct01(organSummary[selectedOrgan3D].meanS ?? 0)}%
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Острый</div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].acute ?? 0)) }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, marginBottom: 8 }}>
+              <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '8px', borderRadius: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Острый</div>
+                <div style={{ fontWeight: 800, fontSize: 15, marginTop:2, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].acute ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].acute ?? 0)}%
                 </div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Хронический</div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].chronic ?? 0)) }}>
+              <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '8px', borderRadius: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Хронический</div>
+                <div style={{ fontWeight: 800, fontSize: 15, marginTop:2, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].chronic ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].chronic ?? 0)}%
                 </div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Фиброз</div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].fibrosis ?? 0)) }}>
+              <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '8px', borderRadius: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Фиброз</div>
+                <div style={{ fontWeight: 800, fontSize: 15, marginTop:2, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].fibrosis ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].fibrosis ?? 0)}%
                 </div>
               </div>
             </div>
             {organSummary[selectedOrgan3D].mechanisms && Object.keys(organSummary[selectedOrgan3D].mechanisms).length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Механизмы:</div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color:'#fff', marginBottom: 6 }}>Механизмы:</div>
                 {Object.entries(organSummary[selectedOrgan3D].mechanisms).map(([idx, md]: [string, any]) => {
                   const mechIdx = Number(idx);
                   if (!hasValidMech(selectedOrgan3D, mechIdx)) return null;
                   const nm = getMechName(selectedOrgan3D, mechIdx);
                   const mpct = Math.round((md.P_net ?? md.p5 ?? 0) * 100);
                   return (
-                    <div key={mechIdx} style={{ marginBottom: 3, fontSize: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--text-dim)' }}>{nm}</span>
+                    <div key={mechIdx} style={{ marginBottom: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8 }}>
+                      <span style={{ color: '#fff', fontWeight:600 }}>{nm}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, marginLeft: 8 }}>
-                        <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4 }}>
-                          <div style={{ width: `${Math.min(100, mpct)}%`, height: '100%', background: getRiskColor(mpct), borderRadius: 2 }} />
+                        <div style={{ flex: 1, background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 6 }}>
+                          <div style={{ width: `${Math.min(100, mpct)}%`, height: '100%', background: getRiskColor(mpct), borderRadius: 999 }} />
                         </div>
-                        <span style={{ color: getRiskColor(mpct), fontWeight: 600, minWidth: 30, textAlign: 'right' }}>{mpct}%</span>
+                        <span style={{ color: getRiskColor(mpct), fontWeight: 800, minWidth: 36, textAlign: 'right' }}>{mpct}%</span>
                       </div>
                     </div>
                   );
@@ -780,22 +780,22 @@ export const V7RiskDisplay: React.FC<{
         )}
 
         {/* Overall risk bar */}
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск</span>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</b></span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</b></span>
+        <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color:'#fff' }}>Общий риск</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Raw: <b style={{ color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</b></span>
+              <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Net: <b style={{ color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</b></span>
             </div>
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 16, overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 16, overflow: 'hidden' }}>
             <div style={{
               width: `${Math.min(100, globalRiskNet)}%`, height: '100%',
               background: `linear-gradient(90deg, #22c55e, ${getRiskColor(globalRiskNet)})`,
-              borderRadius: 6, transition: 'width 0.5s',
+              borderRadius: 999, transition: 'width 0.5s',
             }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#fff' }}>
             <span>Низкий</span><span>Умеренный</span><span>Повышенный</span><span>Высокий</span><span>Критический</span>
           </div>
         </div>
@@ -810,13 +810,13 @@ export const V7RiskDisplay: React.FC<{
   ];
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 8px 0' }}>💊 Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Недельная динамика концентраций препаратов</p>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
-        <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(parseFloat(e.target.value) || 0)} style={{ flex: 1, accentColor: 'var(--accent)' }} />
-        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
+    <div className="card risk-v7-pk" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+      <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>💊 Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
+      <p style={{ fontSize: 12, color: '#fff', margin: '0 0 10px 0' }}>Недельная динамика концентраций препаратов</p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight:700, color: '#fff', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
+        <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(parseFloat(e.target.value) || 0)} style={{ flex: 1, accentColor: 'var(--accent)', height: 28, cursor:'pointer' }} />
+        <span style={{ fontSize: 12, fontWeight:700, color: '#fff', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
       </div>
       {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
         const vals = concs as number[];
@@ -824,17 +824,17 @@ export const V7RiskDisplay: React.FC<{
         const currentVal = vals[pkDay] || 0;
         const startVal = vals[0] || 0;
         return (
-          <div key={subId} style={{ marginBottom: 10, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{getSubstanceName(subId)}</span>
+          <div key={subId} style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding: '12px', borderRadius: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color:'#fff' }}>{getSubstanceName(subId)}</span>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Нач: {startVal.toFixed(2)}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor((currentVal / maxConc) * 100) }}>{currentVal.toFixed(2)}</span>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax: {maxConc.toFixed(2)}</span>
+                <span style={{ fontSize: 11, color: '#fff' }}>Нач: {startVal.toFixed(2)}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: getRiskColor((currentVal / maxConc) * 100) }}>{currentVal.toFixed(2)}</span>
+                <span style={{ fontSize: 11, color: '#fff' }}>Cmax: {maxConc.toFixed(2)}</span>
               </div>
             </div>
             <div style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', gap: 1, height: 36, borderRadius: 4, overflow: 'hidden', alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 1, height: 40, borderRadius: 6, overflow: 'hidden', alignItems: 'flex-end' }}>
                 {vals.filter((_, i) => i % 2 === 0).map((c: number, i: number) => {
                   const idx = i * 2;
                   const isSelected = idx === pkDay || Math.abs(idx - pkDay) <= 1;
@@ -848,14 +848,14 @@ export const V7RiskDisplay: React.FC<{
               </div>
               <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4 }}>
               <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
             </div>
           </div>
         );
       })}
     </div>
-  ) : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK. Добавьте препараты в курс.</div>;
+  ) : <div style={{ textAlign: 'center', padding: 40, color: '#fff', fontSize:13 }}>Нет данных PK. Добавьте препараты в курс.</div>;
 
   // Map user-facing page names to V7 internal tab names
   const tabMap: Record<string, string> = {
@@ -866,24 +866,25 @@ export const V7RiskDisplay: React.FC<{
   return (
     <div style={{ padding: '0 0 80px 0' }}>
       {/* MC toggle bar — always show */}
-      <div style={{ marginBottom:10, padding:12, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+      <div style={{ marginBottom:12, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
         <div style={{ flex:1, minWidth:200 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>🎲 Монте-Карло моделирование</div>
-          <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+          <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🎲 Монте-Карло моделирование</div>
+          <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.5 }}>
             {mcEnabled ? mcResult ? `MC: ${((mcResult as any).meanGlobalRisk*100||0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk*100||0).toFixed(1)}–P95: ${((mcResult as any).p95GlobalRisk*100||0).toFixed(1)}%]` : 'Загрузка...' : 'Детерминированный режим'}
           </div>
         </div>
-        <button onClick={toggleMC} style={{ padding:'8px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'var(--bg-secondary)', border:mcEnabled?'1px solid #8b5cf6':'1px solid var(--border)', color:mcEnabled?'#fff':'var(--text-dim)', boxShadow:mcEnabled?'0 0 16px rgba(139,92,246,0.35)':'none', transition:'all 0.3s' }}>🎲 МК: {mcEnabled?'ВКЛ':'ВЫКЛ'}</button>
+        <button onClick={toggleMC} style={{ minHeight:48, padding:'12px 22px', borderRadius:999, fontSize:14, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,0.06)', border:mcEnabled?'1px solid #8b5cf6':'1px solid rgba(255,255,255,0.12)', color:'#fff', boxShadow:mcEnabled?'0 0 18px rgba(139,92,246,0.40)':'none', transition:'all 0.3s' }}>🎲 МК: {mcEnabled?'ВКЛ':'ВЫКЛ'}</button>
       </div>
       {/* Tab bar — only when forcedTab is not provided */}
       {!forcedTab && (
-        <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', paddingBottom:2 }}>
+        <div className="risk-v7-tabs" style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:12, scrollbarWidth:'none', paddingBottom:2 }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              background: activeTab === t.id ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: activeTab === t.id ? '#000' : 'var(--text-dim)',
-              border: `1px solid ${activeTab === t.id ? 'var(--accent)' : 'var(--border)'}`,
+              minHeight:44, padding:'10px 18px', borderRadius:999, fontSize:13, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: activeTab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              color: activeTab === t.id ? '#000' : '#fff',
+              border: activeTab === t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.10)',
+              boxShadow: activeTab === t.id ? '0 0 14px rgba(0,230,138,0.30)' : 'none',
             }}>{t.label}</button>
           ))}
         </div>

@@ -15,7 +15,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
   const [hoverWeek, setHoverWeek] = useState<number | null>(null);
   const displayWeek = hoverWeek != null ? hoverWeek : selectedWeek;
 
-  if (data.length === 0) return <div style={{ color:'var(--text-dim)',textAlign:'center',padding:20 }}>Нет данных динамики</div>;
+  if (data.length === 0) return <div style={{ color:'#fff',textAlign:'center',padding:20 }}>Нет данных динамики</div>;
 
   const maxVal = Math.max(...data.map(d => Math.max(d.overallNet, d.overallRaw)), 5);
   const pad = { top: 14, right: 16, bottom: 30, left: 38 };
@@ -34,15 +34,15 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
   const activePoint = displayWeek != null && displayWeek >= 0 && displayWeek < data.length ? data[displayWeek] : null;
 
   return (
-    <div className="card" style={{ padding: 14 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-        <span style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>📈 Динамика рисков</span>
-        <div style={{ display:'flex', gap:2, background:'var(--bg-secondary)', borderRadius:8, padding:2 }}>
+    <div className="card risk-weekly-chart" style={{ padding: 16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+        <span style={{ fontSize:14, fontWeight:800, color:'#fff' }}>📈 Динамика рисков</span>
+        <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:999, padding:3 }}>
           {(['average','week'] as const).map(m => (
             <button key={m} onClick={() => onModeChange(m)} style={{
-              padding:'4px 12px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'none',
+              minHeight:44, padding:'10px 18px', borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', border:'none',
               background: mode === m ? 'var(--accent)' : 'transparent',
-              color: mode === m ? '#000' : 'var(--text-dim)', transition:'all 0.15s',
+              color: mode === m ? '#000' : '#fff', transition:'all 0.15s',
             }}>{m === 'average' ? 'Средний' : 'Понедельно'}</button>
           ))}
         </div>
@@ -50,10 +50,10 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
 
       {/* Hover/Selected values card */}
       {activePoint && (
-        <div style={{ display:'flex', gap:12, marginBottom:6, padding:'6px 10px', borderRadius:8, background:'var(--bg-secondary)' }}>
-          <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нед. {activePoint.week}</div>
-          <div style={{ fontSize:11, fontWeight:700, color:getRiskColor(activePoint.overallNet) }}>Net: {Math.round(activePoint.overallNet)}%</div>
-          <div style={{ fontSize:11, fontWeight:700, color:getRiskColor(activePoint.overallRaw) }}>Raw: {Math.round(activePoint.overallRaw)}%</div>
+        <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Нед. {activePoint.week}</div>
+          <div style={{ fontSize:13, fontWeight:800, color:getRiskColor(activePoint.overallNet) }}>Net: {Math.round(activePoint.overallNet)}%</div>
+          <div style={{ fontSize:13, fontWeight:800, color:getRiskColor(activePoint.overallRaw) }}>Raw: {Math.round(activePoint.overallRaw)}%</div>
         </div>
       )}
 
@@ -64,7 +64,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
           return (
             <g key={f}>
               <line x1={pad.left} y1={y} x2={chartW - pad.right} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
-              <text x={pad.left - 4} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{Math.round(maxVal * f)}%</text>
+              <text x={pad.left - 4} y={y + 3} fill="#fff" fontSize={10} fontWeight={700} textAnchor="end">{Math.round(maxVal * f)}%</text>
             </g>
           );
         })}
@@ -105,13 +105,13 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
 
         {/* X axis labels */}
         {data.map((d, i) => i % Math.max(1, Math.floor(data.length / 6)) === 0 ? (
-          <text key={`l${i}`} x={toX(i)} y={chartH - 8} fill="var(--text-dim)" fontSize={7} textAnchor="middle">Нед.{d.week}</text>
+          <text key={`l${i}`} x={toX(i)} y={chartH - 8} fill="#fff" fontSize={10} fontWeight={700} textAnchor="middle">Нед.{d.week}</text>
         ) : null)}
       </svg>
 
-      {/* Slider for week selection */}
-      <div style={{ marginTop: 6, display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:9, color:'var(--text-dim)', whiteSpace:'nowrap', minWidth:30, textAlign:'right' }}>
+      {/* Slider for week selection — APK: крупный тач */}
+      <div style={{ marginTop: 10, display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', minWidth:30, textAlign:'right' }}>
           {data.length > 0 ? `1` : ''}
         </span>
         <input type="range" min={0} max={Math.max(0, data.length - 1)} value={displayWeek ?? 0}
@@ -120,8 +120,8 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
             onWeekSelect(idx);
             setHoverWeek(null);
           }}
-          style={{ flex:1, accentColor:'var(--accent)', height:4, cursor:'pointer' }} />
-        <span style={{ fontSize:9, color:'var(--text-dim)', whiteSpace:'nowrap', minWidth:30 }}>
+          style={{ flex:1, accentColor:'var(--accent)', height:28, cursor:'pointer' }} />
+        <span style={{ fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', minWidth:30 }}>
           {data.length > 0 ? `${data.length}` : ''}
         </span>
       </div>
@@ -139,7 +139,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       </div>
 
       {/* Legend */}
-      <div style={{ display:'flex', gap:16, marginTop:8, fontSize:10, color:'var(--text-dim)', justifyContent:'center' }}>
+      <div style={{ display:'flex', gap:16, marginTop:10, fontSize:12, fontWeight:700, color:'#fff', justifyContent:'center' }}>
         <span style={{ display:'flex', alignItems:'center', gap:4 }}>
           <span style={{ width:16, height:3, background:'var(--accent)', borderRadius:2 }} /> Net риск
         </span>

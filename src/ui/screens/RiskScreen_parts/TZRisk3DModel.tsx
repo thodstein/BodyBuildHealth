@@ -460,14 +460,14 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         aria-label="3D модель рисков"
       >
         {failed && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, fontSize: 13, fontWeight:700, color: '#fff' }}>
             3D недоступно в этом окружении
           </div>
         )}
         {!loaded && !failed && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
             <div className="loading-spinner" style={{ marginRight: 8 }} />
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Загрузка 3D модели…</span>
+            <span style={{ fontSize: 13, fontWeight:700, color: '#fff' }}>Загрузка 3D модели…</span>
           </div>
         )}
         {hoverInfo && !selectedSystem && !failed && (() => {
@@ -487,7 +487,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               <span style={{ color: riskColor(pct), fontWeight: 700 }}>
                 {Math.round(pct)}%
               </span>
-              <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>
+              <span style={{ color: '#fff', marginLeft: 4 }}>
                 риск · {o ? o.mechanisms.length : 0} мех.
               </span>
             </div>
@@ -495,21 +495,21 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         })()}
       </div>
 
-      {/* Chip buttons */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+      {/* Chip buttons — APK PRO: 44px, белый */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {systemList.map(o => {
           const isSel = selectedSystem === o.system;
           return (
             <button key={o.system} onClick={() => handleChipClick(o.system)} style={{
-              display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 10,
-              fontSize: 10, fontWeight: isSel ? 700 : 500, cursor: 'pointer',
-              background: isSel ? o.color + '22' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${isSel ? o.color : 'rgba(255,255,255,0.06)'}`,
-              color: isSel ? o.color : 'rgba(255,255,255,0.7)',
+              display: 'flex', alignItems: 'center', gap: 6, minHeight:44, padding: '10px 16px', borderRadius: 999,
+              fontSize: 13, fontWeight: 800, cursor: 'pointer',
+              background: isSel ? o.color + '26' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${isSel ? o.color : 'rgba(255,255,255,0.10)'}`,
+              color: '#fff',
               transition: 'all 0.15s',
             }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: o.color, flexShrink: 0 }} />
-              {o.label} <span style={{ fontWeight: 700 }}>{o.riskPct}%</span>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: o.color, flexShrink: 0 }} />
+              {o.label} <span style={{ fontWeight: 800 }}>{o.riskPct}%</span>
             </button>
           );
         })}
@@ -526,9 +526,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             border: `1px solid ${info.color}44`,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.label}</span>
-              <button onClick={() => handleChipClick(selectedSystem)} style={{
-                background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14,
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{info.label}</span>
+              <button onClick={() => handleChipClick(selectedSystem)} aria-label="Закрыть" style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', cursor: 'pointer', fontSize: 14, minWidth:44, minHeight:44, borderRadius:999,
               }}>✕</button>
             </div>
             <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -544,12 +544,12 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.riskPct}%</span>
             </div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{info.description}</div>
+            <div style={{ fontSize: 12, color: '#fff', marginTop: 4, lineHeight:1.5 }}>{info.description}</div>
           </div>
         );
       })()}
 
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', marginTop: 10, lineHeight:1.5 }}>
         🖱 Клик по зоне на теле · Вращайте · Колёсико для зума · Клик по чипу для деталей
       </div>
     </div>

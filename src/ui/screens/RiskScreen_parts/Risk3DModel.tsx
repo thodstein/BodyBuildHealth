@@ -326,38 +326,38 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   }, [result]);
 
   return (
-    <div>
+    <div className="risk-3d">
       {/* Controls bar */}
-      <div className="card" style={{ marginBottom: 8, padding: '8px 12px', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      <div className="card" style={{ marginBottom: 10, padding: '12px 14px', borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {/* Risk mode */}
-        <div style={{ display: 'flex', gap: 2, background: 'var(--bg-secondary)', borderRadius: 8, padding: 2 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: 3 }}>
           {(['net', 'raw'] as const).map(m => (
             <button key={m} onClick={() => setRiskMode(m)} style={{
-              padding: '4px 12px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none',
+              minHeight:44, padding: '10px 18px', borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: 'pointer', border: 'none',
               background: riskMode === m ? 'var(--accent)' : 'transparent',
-              color: riskMode === m ? '#000' : 'var(--text-dim)', transition: 'all 0.15s',
+              color: riskMode === m ? '#000' : '#fff', transition: 'all 0.15s',
             }}>{m === 'net' ? 'Чистый риск' : 'Сырой риск'}</button>
           ))}
         </div>
 
         {/* Week slider */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 140 }}>
-          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Неделя</span>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 160 }}>
+          <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Неделя</span>
           <input type="range" min={0} max={weeks.length} value={organWeek}
             onChange={e => onWeekChange(parseFloat(e.target.value) || 0)}
-            style={{ flex: 1, height: 4, accentColor: 'var(--accent)' }} />
-          <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, minWidth: 18 }}>
+            style={{ flex: 1, height: 28, accentColor: 'var(--accent)', cursor:'pointer' }} />
+          <span style={{ fontSize: 13, color: '#fff', fontWeight: 800, minWidth: 22 }}>
             {organWeek === 0 ? '0' : organWeek}
           </span>
         </div>
 
         {/* MC Toggle */}
         <button onClick={onToggleMC} style={{
-          padding: '5px 14px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-          background: mcEnabled ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'var(--bg-secondary)',
-          border: mcEnabled ? '1px solid #8b5cf6' : '1px solid var(--border)',
-          color: mcEnabled ? '#fff' : 'var(--text-dim)',
-          boxShadow: mcEnabled ? '0 0 12px rgba(139,92,246,0.3)' : 'none',
+          minHeight:44, padding: '10px 20px', borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: 'pointer',
+          background: mcEnabled ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(255,255,255,0.06)',
+          border: mcEnabled ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.12)',
+          color: '#fff',
+          boxShadow: mcEnabled ? '0 0 16px rgba(139,92,246,0.35)' : 'none',
           transition: 'all 0.3s',
         }}>🎲 МК: {mcEnabled ? 'ВКЛ' : 'ВЫКЛ'}</button>
       </div>
@@ -367,31 +367,31 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
         ref={containerRef}
         style={{
           width: '100%', height: 'min(70vh, 550px)',
-          borderRadius: 16, overflow: 'hidden',
-          background: 'transparent',
-          border: '1px solid var(--border)',
+          borderRadius: 18, overflow: 'hidden',
+          background: 'rgba(20,22,30,0.55)',
+          border: '1px solid rgba(255,255,255,0.09)',
           position: 'relative',
         }}
       >
         {loading && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
             <div className="loading-spinner" style={{ marginRight: 8 }} />
-            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Загрузка 3D модели...</span>
+            <span style={{ fontSize: 13, fontWeight:700, color: '#fff' }}>Загрузка 3D модели...</span>
           </div>
         )}
       </div>
 
       {/* Organ legend */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {organList.map(o => {
           const isSel = selectedOrgan === o.system;
           return (
             <button key={o.system} onClick={() => setSelectedOrgan(isSel ? null : o.system)} style={{
-              display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 10,
-              fontSize: 10, fontWeight: isSel ? 700 : 500, cursor: 'pointer',
-              background: isSel ? o.color + '22' : 'var(--bg-secondary)',
-              border: `1px solid ${isSel ? o.color : 'var(--border)'}`,
-              color: isSel ? o.color : 'var(--text-dim)',
+              display: 'flex', alignItems: 'center', gap: 6, minHeight:44, padding: '10px 16px', borderRadius: 999,
+              fontSize: 13, fontWeight: 800, cursor: 'pointer',
+              background: isSel ? o.color + '26' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${isSel ? o.color : 'rgba(255,255,255,0.10)'}`,
+              color: '#fff',
               transition: 'all 0.15s',
             }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: o.color, flexShrink: 0 }} />
@@ -406,23 +406,23 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
         const info = organList.find(o => o.system === selectedOrgan);
         if (!info) return null;
         return (
-          <div className="card" style={{ marginTop: 8, padding: 10, borderColor: info.color + '44' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.label}</span>
-              <button onClick={() => setSelectedOrgan(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+          <div className="card" style={{ marginTop: 10, padding: '12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', borderLeft:`4px solid ${info.color}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{info.label}</span>
+              <button onClick={() => setSelectedOrgan(null)} aria-label="Закрыть" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', cursor: 'pointer', fontSize: 14, minWidth:44, minHeight:44, borderRadius:999 }}>✕</button>
             </div>
-            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, height: 6, background: 'var(--bg-secondary)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${info.riskPct}%`, height: '100%', background: info.color, borderRadius: 3, transition: 'width 0.4s' }} />
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${info.riskPct}%`, height: '100%', background: info.color, borderRadius: 999, transition: 'width 0.4s' }} />
               </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.riskPct}%</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: info.color }}>{info.riskPct}%</span>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>{info.description}</div>
+            <div style={{ fontSize: 12, color: '#fff', marginTop: 6, lineHeight:1.5 }}>{info.description}</div>
           </div>
         );
       })()}
 
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', marginTop: 10, lineHeight:1.5 }}>
         🖱 Вращайте модель • Колёсико для зума • Клик по органу для деталей
       </div>
     </div>

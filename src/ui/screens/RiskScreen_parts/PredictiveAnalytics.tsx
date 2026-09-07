@@ -6,7 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import { predict, type ForecastPoint } from '../../../engines/predictive-analytics.engine';
 
-const GLASS = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12 };
+const GLASS = { background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 18, padding: 16, boxShadow: '0 12px 30px rgba(0,0,0,0.20)' };
 
 export const PredictiveAnalytics: React.FC = () => {
   const linked = useDataLink();
@@ -35,27 +35,27 @@ export const PredictiveAnalytics: React.FC = () => {
   }, [linked.labs, marker]);
 
   return (
-    <div className="risk-predictive" style={{ ...GLASS, marginTop: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+    <div className="risk-predictive" style={{ ...GLASS, marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>📈 Предиктивная аналитика</div>
-          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>ARIMA(1,1,1) / Holt-Winters · прогноз + 95% ДИ</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>📈 Предиктивная аналитика</div>
+          <div style={{ fontSize: 12, color: '#fff', marginTop:2 }}>ARIMA(1,1,1) / Holt-Winters · прогноз + 95% ДИ</div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         {availableMarkers.map(m => (
           <button key={m} onClick={() => setMarker(m)} style={{
-            padding: '4px 8px', borderRadius: 8, fontSize: 8, fontWeight: marker === m ? 700 : 400, cursor: 'pointer',
-            background: marker === m ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.03)',
-            border: marker === m ? '1px solid #818cf8' : '1px solid rgba(255,255,255,0.06)',
-            color: marker === m ? '#818cf8' : 'rgba(255,255,255,0.5)',
+            minHeight:44, padding: '10px 16px', borderRadius: 999, fontSize: 13, fontWeight: marker === m ? 800 : 600, cursor: 'pointer',
+            background: marker === m ? 'rgba(129,140,248,0.18)' : 'rgba(255,255,255,0.06)',
+            border: marker === m ? '1px solid #818cf8' : '1px solid rgba(255,255,255,0.10)',
+            color: '#fff',
           }}>{m}</button>
         ))}
       </div>
 
       {allPoints.length < 2 ? (
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 16 }}>
+        <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', padding: 18, lineHeight:1.5 }}>
           Недостаточно данных для прогноза. Добавьте минимум 2 измерения.
         </div>
       ) : (
@@ -96,20 +96,20 @@ export const PredictiveAnalytics: React.FC = () => {
             })}
           </svg>
 
-          <div style={{ display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.4)', justifyContent: 'center', marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 10, fontSize: 12, fontWeight:700, color: '#fff', justifyContent: 'center', marginTop: 8 }}>
             <span>🟢 Факт</span>
-            <span style={{ color: '#818cf8' }}>━ Прогноз</span>
-            <span style={{ color: '#818cf8' }}>┊ 95% ДИ</span>
+            <span style={{ color: '#fff' }}>━ Прогноз</span>
+            <span style={{ color: '#fff' }}>┊ 95% ДИ</span>
           </div>
 
           {/* Forecast table */}
           {forecast.length > 0 && (
-            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2 }}>
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
               {forecast.slice(0, 6).map((f, i) => (
-                <div key={i} style={{ textAlign: 'center', padding: 6, borderRadius: 6, background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.08)' }}>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>Неделя +{i + 1}</div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#818cf8' }}>{f.value}</div>
-                  <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>±{Math.round((f.ci95_high - f.ci95_low) / 2 * 100) / 100}</div>
+                <div key={i} style={{ textAlign: 'center', padding: '10px 8px', borderRadius: 12, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.18)' }}>
+                  <div style={{ fontSize: 11, color: '#fff', fontWeight:700 }}>Неделя +{i + 1}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginTop:2 }}>{f.value}</div>
+                  <div style={{ fontSize: 11, color: '#fff', marginTop:2 }}>±{Math.round((f.ci95_high - f.ci95_low) / 2 * 100) / 100}</div>
                 </div>
               ))}
             </div>

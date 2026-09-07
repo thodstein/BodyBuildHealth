@@ -76,16 +76,16 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
   }, [allDrugs]);
 
   return (
-    <div className="sup-risktimeline" style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.04)' }}>
+    <div className="sup-risktimeline" style={{ marginTop: 10, padding: 14, borderRadius: 18, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>📈 Динамика риска по неделям</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>📈 Динамика риска по неделям</span>
         <button
           onClick={() => setShowAfter(!showAfter)}
           style={{
-            fontSize: 8, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+            minHeight:44, fontSize: 13, fontWeight: 800, padding: '10px 16px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer',
             background: showAfter ? 'rgba(0,230,138,0.15)' : 'rgba(239,68,68,0.12)',
-            color: showAfter ? '#00e68a' : '#ef4444',
+            color: '#fff',
           }}
         >
           {showAfter ? 'После поддержки' : 'До поддержки'}
@@ -98,7 +98,7 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
         {[0, 25, 50, 75, 100].map(p => (
           <g key={p}>
             <line x1={PAD_L} y1={yForPct(p)} x2={W - PAD_R} y2={yForPct(p)} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
-            <text x={2} y={yForPct(p) + 3} fontSize={7} fill="rgba(255,255,255,0.3)">{p}</text>
+            <text x={2} y={yForPct(p) + 3} fontSize={9} fontWeight={700} fill="#fff">{p}</text>
           </g>
         ))}
 
@@ -135,16 +135,16 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
 
         {/* Week labels (every few weeks) */}
         {timeline.filter((_, i) => i % Math.max(1, Math.ceil(maxWeek / 8)) === 0 || i === maxWeek - 1).map(t => (
-          <text key={t.week} x={xForWeek(t.week) - 4} y={H + 16} fontSize={6} fill="rgba(255,255,255,0.3)">{t.week}</text>
+          <text key={t.week} x={xForWeek(t.week) - 4} y={H + 16} fontSize={9} fontWeight={700} fill="#fff">{t.week}</text>
         ))}
       </svg>
 
       {/* Drug legend */}
       {allDrugs.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {allDrugs.map(d => (
-            <span key={d} style={{ fontSize: 7, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 2, background: drugColors[d], display: 'inline-block' }} />
+            <span key={d} style={{ fontSize: 11, fontWeight:600, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 3, background: drugColors[d], display: 'inline-block' }} />
               {d}
             </span>
           ))}
@@ -152,31 +152,31 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
       )}
 
       {/* System legend */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {systemIds.map(id => (
-          <span key={id} style={{ fontSize: 7, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-            <span style={{ width: 8, height: 2, background: SYS_COLORS[id], display: 'inline-block' }} />
+          <span key={id} style={{ fontSize: 11, fontWeight:600, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 3, borderRadius:2, background: SYS_COLORS[id], display: 'inline-block' }} />
             {SYS_LABELS[id] || id}
           </span>
         ))}
-        <span style={{ fontSize: 7, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-          <span style={{ width: 8, height: 2, background: 'rgba(255,255,255,0.5)', borderTop: '1px dashed', display: 'inline-block' }} />
+        <span style={{ fontSize: 11, fontWeight:600, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 3, borderRadius:2, background: '#fff', display: 'inline-block' }} />
           Общий
         </span>
       </div>
 
       {/* Week slider */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>
-          <span>Неделя: <b style={{ color: 'var(--text)' }}>{selectedWeek}</b> / {maxWeek}</span>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', fontSize: 12, fontWeight:700, color: '#fff', marginBottom: 4 }}>
+          <span>Неделя: <b style={{ color: '#fff' }}>{selectedWeek}</b> / {maxWeek}</span>
           {weekData && weekData.activeDrugs.length > 0 && (
-            <span style={{ fontSize: 7, color: 'var(--accent)' }}>{weekData.activeDrugs.length} активн.</span>
+            <span style={{ fontSize: 11, color: '#fff' }}>{weekData.activeDrugs.length} активн.</span>
           )}
         </div>
         <input
           type="range" min={1} max={maxWeek} value={selectedWeek}
           onChange={e => setSelectedWeek(parseInt(e.target.value))}
-          style={{ width: '100%', accentColor: '#00e68a', height: 16 }}
+          style={{ width: '100%', accentColor: '#00e68a', height: 28, cursor:'pointer' }}
         />
       </div>
 
@@ -184,36 +184,36 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
       {weekData && weekData.activeDrugs.length > 0 ? (
         <div>
           {/* Overall gauge */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>Риск до</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: weekData.overallRaw > 50 ? '#ef4444' : weekData.overallRaw > 25 ? '#fbbf24' : '#22c55e' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <div style={{ flex: 1, padding: '10px 8px', borderRadius: 14, background: 'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.18)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>Риск до</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginTop:2, color: weekData.overallRaw > 50 ? '#ef4444' : weekData.overallRaw > 25 ? '#fbbf24' : '#22c55e' }}>
                 {weekData.overallRaw}%
               </div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>После поддержки</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: weekData.overallAfter > 50 ? '#ef4444' : weekData.overallAfter > 25 ? '#fbbf24' : '#22c55e' }}>
+            <div style={{ flex: 1, padding: '10px 8px', borderRadius: 14, background: 'rgba(0,230,138,0.07)', border:'1px solid rgba(0,230,138,0.18)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight:700, color: '#fff' }}>После поддержки</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginTop:2, color: weekData.overallAfter > 50 ? '#ef4444' : weekData.overallAfter > 25 ? '#fbbf24' : '#22c55e' }}>
                 {weekData.overallAfter}%
               </div>
             </div>
           </div>
 
           {/* Active drugs with concentration */}
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 8, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Активные препараты:</div>
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Активные препараты:</div>
             {weekData.activeDrugs.map(d => {
               const conc = weekData.drugConcentrations[d] || 0;
               const phase = conc >= 0.95 ? 'стационар' : conc >= 0.5 ? 'накопление' : conc >= 0.1 ? 'распад' : 'следы';
               return (
-                <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 2, background: drugColors[d], display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 8, color: 'var(--text)', flex: 1 }}>{d}</span>
-                  <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${conc * 100}%`, background: drugColors[d], borderRadius: 2 }} />
+                <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 3, background: drugColors[d], display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight:600, color: '#fff', flex: 1 }}>{d}</span>
+                  <div style={{ width: 56, height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${conc * 100}%`, background: drugColors[d], borderRadius: 999 }} />
                   </div>
-                  <span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 32, textAlign: 'right' }}>{Math.round(conc * 100)}%</span>
-                  <span style={{ fontSize: 7, color: 'var(--accent)', minWidth: 40 }}>{phase}</span>
+                  <span style={{ fontSize: 11, fontWeight:700, color: '#fff', minWidth: 36, textAlign: 'right' }}>{Math.round(conc * 100)}%</span>
+                  <span style={{ fontSize: 11, color: '#fff', minWidth: 64 }}>{phase}</span>
                 </div>
               );
             })}
@@ -221,19 +221,19 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
 
           {/* Per-system bars */}
           <div>
-            <div style={{ fontSize: 8, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Риск по системам:</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Риск по системам:</div>
             {systemIds.map(id => {
               const raw = weekData.organPercents[id] || 0;
               const after = weekData.organAfterPercents[id] || 0;
               const c = raw >= 60 ? '#ef4444' : raw >= 30 ? '#fbbf24' : '#22c55e';
               return (
-                <div key={id} style={{ marginBottom: 2 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, marginBottom: 1 }}>
-                    <span style={{ color: 'var(--text)' }}>{SYS_LABELS[id] || id}</span>
-                    <span style={{ color: c, fontWeight: 600 }}>{raw}% → {after}%</span>
+                <div key={id} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', fontSize: 12, marginBottom: 3 }}>
+                    <span style={{ color: '#fff', fontWeight:700 }}>{SYS_LABELS[id] || id}</span>
+                    <span style={{ color: c, fontWeight: 800 }}>{raw}% → {after}%</span>
                   </div>
-                  <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(raw, 100)}%`, background: c, borderRadius: 1 }} />
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(raw, 100)}%`, background: c, borderRadius: 999 }} />
                   </div>
                 </div>
               );
@@ -241,7 +241,7 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
           </div>
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: 8, fontSize: 9, color: 'var(--text-dim)' }}>
+        <div style={{ textAlign: 'center', padding: 14, fontSize: 12, color: '#fff' }}>
           Нет активных препаратов на неделе {selectedWeek}
         </div>
       )}

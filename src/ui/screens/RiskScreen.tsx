@@ -78,11 +78,11 @@ const TAB_LABELS: Record<string, string> = {
   tz_3d: '🧊 3D модель',
 };
 
-/** ⚠️ Дисклеймер расчётов — ознакомительная информация, не медицинский инструмент. */
+/** ⚠️ Дисклеймер расчётов — APK PRO: белый текст 12px, тач-зона норм. */
 const RiskDisclaimer: React.FC = () => (
-  <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
-    <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', marginBottom: 4 }}>⚠️ Ознакомительная информация</div>
-    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+  <div className="risk-disclaimer" style={{ margin:'10px 0', padding: '12px 14px', borderRadius: 16, background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.30)', boxShadow:'0 8px 22px rgba(0,0,0,0.16)' }}>
+    <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 5 }}>⚠️ Ознакомительная информация</div>
+    <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.55 }}>
       Расчёты не являются медицинским инструментом и не заменяют врачебную оценку. Риски ориентировочные: они учитывают только текущее введённое состояние и построены на математических моделях и обобщённых данных — врачебного заключения они не дают. Для более точного расчёта добавьте результаты анализов (лабораторные показатели). Все действия и рекомендации выполняйте только под контролем врача.
     </div>
   </div>
@@ -513,29 +513,29 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     };
 
     return (
-      <div style={{ padding:'0 12px 80px' }}>
-        <h3 style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>📄 Отчёты по рискам</h3>
-        <p style={{ fontSize:10, color:'#fff', margin:'0 0 12px' }}>Полный отчёт по рискам: все системы, источники, динамика</p>
+      <div className="risk-reports" style={{ padding:'0 12px 80px' }}>
+        <h3 style={{ fontSize:17, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>📄 Отчёты по рискам</h3>
+        <p style={{ fontSize:12, color:'#fff', margin:'0 0 12px', lineHeight:1.5 }}>Полный отчёт по рискам: все системы, источники, динамика</p>
 
-        <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+        <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
           <button onClick={generateRiskReport} style={{
-            padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12,
-            background:'var(--accent)', color:'#000', border:'none', flex:1,
+            minHeight:48, padding:'12px 20px', borderRadius:999, cursor:'pointer', fontWeight:800, fontSize:14,
+            background:'var(--accent)', color:'#000', border:'none', flex:1, boxShadow:'0 8px 22px rgba(0,230,138,0.25)',
           }}>📄 Сгенерировать отчёт</button>
           <button onClick={() => { try { localStorage.removeItem('he_risk_reports'); localStorage.removeItem('he_risk_report_current'); setRiskArchive([]); setRiskReportGenerated(false); } catch {} }}
-            style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11,
-              background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>
+            style={{ minHeight:48, padding:'12px 18px', borderRadius:999, cursor:'pointer', fontWeight:800, fontSize:13,
+              background:'rgba(239,68,68,0.10)', color:'#fff', border:'1px solid rgba(239,68,68,0.26)' }}>
             🗑 Очистить архив
           </button>
         </div>
 
         {riskReportGenerated && (
-          <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <h4 style={{ margin:0, fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</h4>
-              <span style={{ fontSize:9, color:'#fff' }}>{new Date().toLocaleString()}</span>
+          <div style={{ borderRadius:18, padding:16, marginBottom:12, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:10 }}>
+              <h4 style={{ margin:0, fontSize:14, fontWeight:800, color:'#fff' }}>✅ Отчёт сгенерирован</h4>
+              <span style={{ fontSize:11, color:'#fff' }}>{new Date().toLocaleString()}</span>
             </div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+            <div style={{ fontSize:12, color:'#fff', lineHeight:1.6 }}>
               <b>Общий риск (raw):</b> {Math.round(riskResult?.overallRaw||0)}%<br/>
               <b>Общий риск (net):</b> {Math.round(riskResult?.overallNet||0)}%<br/>
               <b>Фарма риск:</b> {Math.round(pharmaRisk?.overallRaw||0)}% · <b>Тренировки:</b> {Math.round(trainingRisk.overallRaw)}% · <b>Питание:</b> {Math.round(nutritionRisk.overallRaw)}% · <b>Лабы:</b> {labRiskContributions ? `${Math.round(labRiskContributions.totalRisk||0)}%` : 'нет данных'}<br/>
@@ -543,14 +543,14 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </div>
 
             {riskResult?.systemBreakdown && (
-              <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:2 }}>
-                <div style={{ fontSize:9, fontWeight:700, color:'#fff', marginBottom:2 }}>Риск по системам:</div>
+              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:2 }}>Риск по системам:</div>
                 {Object.entries(riskResult.systemBreakdown).filter(([_,v]) => (v as any).net > 0).sort(([_,a],[__,b]) => (b as any).net - (a as any).net).map(([k,v]) => {
                   const sys = v as any;
                   return (
-                    <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'3px 8px', borderRadius:4, background:'rgba(255,255,255,0.03)', fontSize:9 }}>
-                      <span>{({cardio:'Сердечно-сосудистая',hepatic:'Печень',renal:'Почки',neuro:'Нервная',endocrine:'Эндокринная',hematologic:'Кровь',reproductive:'Репродуктивная',musculoskeletal:'Опорно-двиг.',metabolic:'Метаболизм'})[k] || k}</span>
-                      <span style={{ fontWeight:600, color: sys.net > 50 ? '#ef4444' : sys.net > 25 ? '#f59e0b' : '#22c55e' }}>
+                    <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8, padding:'8px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', fontSize:12 }}>
+                      <span style={{ color:'#fff', fontWeight:700, minWidth:0 }}>{({cardio:'Сердечно-сосудистая',hepatic:'Печень',renal:'Почки',neuro:'Нервная',endocrine:'Эндокринная',hematologic:'Кровь',reproductive:'Репродуктивная',musculoskeletal:'Опорно-двиг.',metabolic:'Метаболизм'})[k] || k}</span>
+                      <span style={{ fontWeight:800, color:'#fff', whiteSpace:'nowrap' }}>
                         raw: {Math.round(sys.raw)}% · net: {Math.round(sys.net)}%
                       </span>
                     </div>
@@ -558,7 +558,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 })}
               </div>
             )}
-            <div style={{ fontSize:9, color:'#fff', textAlign:'center', marginTop:8 }}>
+            <div style={{ fontSize:12, color:'#fff', textAlign:'center', marginTop:10 }}>
               Отчёт сохранён в архив. Доступен в Профиле → Отчёты.
             </div>
           </div>
@@ -566,17 +566,17 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
         {riskArchive.length > 0 && (
           <div>
-            <h4 style={{ fontSize:12, fontWeight:700, color:'#fff', margin:'0 0 8px' }}>📦 Архив отчётов ({riskArchive.length})</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <h4 style={{ fontSize:14, fontWeight:800, color:'#fff', margin:'0 0 10px' }}>📦 Архив отчётов ({riskArchive.length})</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {riskArchive.map((r: any) => (
-                <div key={r.id} style={{ borderRadius:10, padding:10, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>Отчёт от {r.date}</span>
-                    <span style={{ fontSize:9, color: r.overallNet > 50 ? '#ef4444' : r.overallNet > 25 ? '#f59e0b' : '#22c55e', fontWeight:700 }}>
+                <div key={r.id} style={{ borderRadius:14, padding:'12px 14px', background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Отчёт от {r.date}</span>
+                    <span style={{ fontSize:14, color:'#fff', fontWeight:800, padding:'4px 12px', borderRadius:999, background: r.overallNet > 50 ? 'rgba(239,68,68,0.14)' : r.overallNet > 25 ? 'rgba(245,158,11,0.14)' : 'rgba(34,197,94,0.12)', border:'1px solid rgba(255,255,255,0.10)' }}>
                       {Math.round(r.overallNet)}%
                     </span>
                   </div>
-                  <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>
+                  <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>
                     Систем: {r.systems?.length||0} · Фарма: {Math.round(r.pharmaRisk)}% · Тренировки: {Math.round(r.trainingRisk)}%
                   </div>
                 </div>
@@ -586,7 +586,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         )}
 
         {!riskReportGenerated && riskArchive.length === 0 && (
-          <div style={{ textAlign:'center', padding:40, fontSize:11, color:'#fff' }}>
+          <div style={{ textAlign:'center', padding:40, fontSize:13, color:'#fff', lineHeight:1.5 }}>
             Нажмите «Сгенерировать отчёт» для создания полного отчёта по рискам
           </div>
         )}
@@ -654,36 +654,36 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       ];
       return (
         <div>
-          {/* Общий Риск — premium */}
-          <div style={{ ...LABS_CARD, marginBottom:12, padding:16, textAlign:'center', background:'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(20,22,30,0.52) 100%)', border:'1px solid rgba(0,230,138,0.18)', backdropFilter:'blur(12px)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8 }}><span style={{ width:26, height:26, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', color:'#4ade80' }}><NativeIcon name="chart" size={13} /></span><span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Общий риск</span><span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background: riskResult.overallNet>50?'rgba(239,68,68,0.14)':'rgba(0,230,138,0.14)', border:`1px solid ${riskResult.overallNet>50?'rgba(239,68,68,0.18)':'rgba(0,230,138,0.18)'}`, color: riskResult.overallNet>50?'#f87171':'#00e68a', fontWeight:800 }}>{riskResult.overallNet<25?'низкий':riskResult.overallNet<50?'умеренный':riskResult.overallNet<75?'высокий':'критический'}</span></div>
-            <div style={{ display:'flex', justifyContent:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
-              <div style={{ flex:1, minWidth:90, padding:'10px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>С поддержкой</div>
-                <div style={{ fontSize:26, fontWeight:900, color:getRiskColor(riskResult.overallNet), lineHeight:1, marginTop:2 }}>{Math.round(riskResult.overallNet)}%</div>
+          {/* Общий Риск — APK PRO: крупный, белый, тач 44px */}
+          <div className="risk-overall" style={{ ...LABS_CARD, marginBottom:12, padding:18, textAlign:'center', background:'linear-gradient(135deg, rgba(0,230,138,0.12) 0%, rgba(20,22,30,0.60) 100%)', border:'1px solid rgba(0,230,138,0.22)', backdropFilter:'blur(14px)', borderRadius:18, boxShadow:'0 14px 34px rgba(0,0,0,0.22)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}><span style={{ width:34, height:34, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:'#4ade80' }}><NativeIcon name="chart" size={17} /></span><span style={{ fontSize:15, fontWeight:800, color:'#fff' }}>Общий риск</span><span style={{ fontSize:12, padding:'5px 10px', borderRadius:999, background: riskResult.overallNet>50?'rgba(239,68,68,0.14)':'rgba(0,230,138,0.14)', border:`1px solid ${riskResult.overallNet>50?'rgba(239,68,68,0.20)':'rgba(0,230,138,0.20)'}`, color: riskResult.overallNet>50?'#f87171':'#00e68a', fontWeight:800 }}>{riskResult.overallNet<25?'низкий':riskResult.overallNet<50?'умеренный':riskResult.overallNet<75?'высокий':'критический'}</span></div>
+            <div style={{ display:'flex', justifyContent:'center', gap:10, marginBottom:8, flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:120, padding:'12px 10px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, color:'#fff', fontWeight:700 }}>С поддержкой</div>
+                <div style={{ fontSize:30, fontWeight:900, color:getRiskColor(riskResult.overallNet), lineHeight:1, marginTop:4 }}>{Math.round(riskResult.overallNet)}%</div>
               </div>
-              <div style={{ flex:1, minWidth:90, padding:'10px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Без поддержки</div>
-                <div style={{ fontSize:26, fontWeight:900, color:getRiskColor(riskResult.overallRaw), lineHeight:1, marginTop:2 }}>{Math.round(riskResult.overallRaw)}%</div>
+              <div style={{ flex:1, minWidth:120, padding:'12px 10px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Без поддержки</div>
+                <div style={{ fontSize:30, fontWeight:900, color:getRiskColor(riskResult.overallRaw), lineHeight:1, marginTop:4 }}>{Math.round(riskResult.overallRaw)}%</div>
               </div>
             </div>
-            <div style={{ height:6, background:'rgba(255,255,255,0.07)', borderRadius:999, overflow:'hidden', marginBottom:8 }}>
+            <div style={{ height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden', marginBottom:8 }}>
               <div style={{ width:`${Math.min(100, riskResult.overallNet)}%`, height:'100%', background:getRiskColor(riskResult.overallNet), borderRadius:999, transition:'width 0.5s' }} />
             </div>
-            <div style={{ fontSize:9, color:'#fff' }}>
+            <div style={{ fontSize:12, color:'#fff', fontWeight:600 }}>
               {riskResult.overallNet < 25 ? 'Низкий риск' : riskResult.overallNet < 50 ? 'Умеренный риск' : riskResult.overallNet < 75 ? 'Высокий риск' : 'Критический риск'}
             </div>
             {/* ── Penalty toggle button ── */}
             <button onClick={toggleForceNoLabs} style={{
-              marginTop: 8, padding: '6px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              background: forceNoLabs ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.08)',
-              border: forceNoLabs ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(59,130,246,0.2)',
+              marginTop: 10, minHeight: 44, padding: '10px 18px', borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: 'pointer',
+              background: forceNoLabs ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.10)',
+              border: forceNoLabs ? '1px solid rgba(239,68,68,0.45)' : '1px solid rgba(59,130,246,0.28)',
               color: forceNoLabs ? '#f87171' : '#60a5fa', transition: 'all 0.2s'
             }}>
               {forceNoLabs ? '✅ Штраф без анализов' : '🚫 БЕЗ АНАЛИЗОВ (Штраф)'}
             </button>
             {forceNoLabs && (
-              <div style={{ fontSize: 8, color: '#f87171', marginTop: 4, background: 'rgba(239,68,68,0.06)', padding: '4px 8px', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, color: '#fff', marginTop: 8, background: 'rgba(239,68,68,0.08)', padding: '8px 10px', borderRadius: 8, border:'1px solid rgba(239,68,68,0.18)' }}>
                 ⚠ Применён штраф к расчёту рисков. Введите данные анализов для точной оценки.
               </div>
             )}
@@ -692,19 +692,19 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* Риск по системам и Эффективность поддержки — удалены, относятся к вероятностной модели */}
           {/* Синхронизация с калькулятором — удалена, не относится к методам расчёта риска */}
 
-          {/* 4 nav cards — premium glass */}
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {/* 4 nav cards — APK PRO: 56px+, белый текст */}
+          <div className="risk-navcards" style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {cardDefs.map(c => (
-              <button key={c.key} onClick={() => setBasicPage(c.key as any)} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:18, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.48)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', backdropFilter:'blur(14px)', boxShadow:'0 12px 30px rgba(0,0,0,0.18)', transition:'transform 0.18s, border-color 0.18s',
-              }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=c.color+'55'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; }}>
-                <div style={{ width:44, height:44, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:c.color+'18', border:`1px solid ${c.color}22`, color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={20} /></div>
+              <button key={c.key} onClick={() => setBasicPage(c.key as any)} aria-label={c.title} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:18, cursor:'pointer', textAlign:'left', width:'100%', minHeight:64,
+                background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', backdropFilter:'blur(14px)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)', transition:'transform 0.18s, border-color 0.18s',
+              }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor=c.color+'66'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.09)'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; }}>
+                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:c.color+'1c', border:`1px solid ${c.color}30`, color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={22} /></div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:c.color }}>{c.title}</div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}>{c.desc}</div>
+                  <div style={{ fontSize:14, fontWeight:800, marginBottom:3, color:'#fff', lineHeight:1.2 }}>{c.title}</div>
+                  <div style={{ fontSize:12, color:'#fff', lineHeight:1.4 }}>{c.desc}</div>
                 </div>
-                <span style={{ color:c.color, fontSize:11, fontWeight:800, padding:'6px 10px', borderRadius:999, background:c.color+'16', border:`1px solid ${c.color}22` }}>→</span>
+                <span style={{ color:'#fff', fontSize:14, fontWeight:800, minWidth:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:999, background:c.color+'20', border:`1px solid ${c.color}30` }}>→</span>
               </button>
             ))}
           </div>
@@ -731,19 +731,19 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         net: riskResult.systemBreakdown?.[sys]?.net ?? 0,
       })).sort((a, b) => b.net - a.net);
       return (
-        <div>
-          <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="zap" size={13} /></span> Ключевые риски по системам</div>
+        <div className="risk-keyrisks">
+          <div className="card" style={{ marginBottom:10, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.24)', color:'#f87171' }}><NativeIcon name="zap" size={15} /></span> Ключевые риски по системам</div>
             {sorted.filter(s => s.net > 5).map(s => (
-              <div key={s.sys} style={{ marginBottom:6, padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:getRiskColor(s.net) }}>{SYSTEM_ICONS_V2[s.sys] || ''} {s.label}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:getRiskColor(s.net) }}>{Math.round(s.net)}%</span>
+              <div key={s.sys} style={{ marginBottom:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{SYSTEM_ICONS_V2[s.sys] || ''} {s.label}</span>
+                  <span style={{ fontSize:14, fontWeight:800, color:getRiskColor(s.net) }}>{Math.round(s.net)}%</span>
                 </div>
-                <div style={{ height:4, background:'var(--bg)', borderRadius:2, overflow:'hidden' }}>
-                  <div style={{ width:`${s.net}%`, height:'100%', background:getRiskColor(s.net), borderRadius:2 }} />
+                <div style={{ height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden' }}>
+                  <div style={{ width:`${s.net}%`, height:'100%', background:getRiskColor(s.net), borderRadius:999 }} />
                 </div>
-                <div style={{ display:'flex', gap:8, marginTop:2, fontSize:9, color:'#fff' }}>
+                <div style={{ display:'flex', gap:8, marginTop:5, fontSize:12, color:'#fff' }}>
                   <span>Без поддержки: {Math.round(s.raw)}%</span>
                 </div>
               </div>
@@ -771,19 +771,19 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       const deduped = drugEntries.filter(d => { if (seen.has(d.name)) return false; seen.add(d.name); return true; })
         .sort((a, b) => b.androgenicity - a.androgenicity);
       return (
-        <div>
+        <div className="risk-history">
           {/* Risk History */}
-          <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="clock" size={13} /></span> История рисков</div>
+          <div className="card" style={{ marginBottom:10, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:'#4ade80' }}><NativeIcon name="clock" size={15} /></span> История рисков</div>
             {riskHistory.length === 0 ? (
-              <div style={{ fontSize:10, color:'#fff', textAlign:'center', padding:10 }}>Нет сохранённой истории</div>
+              <div style={{ fontSize:12, color:'#fff', textAlign:'center', padding:14 }}>Нет сохранённой истории</div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {riskHistory.map((h: any, i: number) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:'var(--bg-secondary)', fontSize:10 }}>
-                    <span style={{ color:'#fff' }}>{h.date}</span>
-                    <span style={{ color:getRiskColor(h.overallNet), fontWeight:600 }}>С поддержкой: {Math.round(h.overallNet)}%</span>
-                    <span style={{ color:getRiskColor(h.overallRaw), fontWeight:600 }}>Без поддержки: {Math.round(h.overallRaw)}%</span>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', fontSize:12 }}>
+                    <span style={{ color:'#fff', fontWeight:700 }}>{h.date}</span>
+                    <span style={{ color:getRiskColor(h.overallNet), fontWeight:800 }}>С поддержкой: {Math.round(h.overallNet)}%</span>
+                    <span style={{ color:getRiskColor(h.overallRaw), fontWeight:700 }}>Без: {Math.round(h.overallRaw)}%</span>
                   </div>
                 ))}
               </div>
@@ -791,20 +791,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           </div>
 
           {/* Drug Thresholds — only AAS/GH/Insulin, Russian names, no duplicates */}
-          <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="pill" size={13} /></span> Препараты и пороги (ААС, ГР, инсулины)</div>
-            <div style={{ display:'grid', gap:6 }}>
+          <div className="card" style={{ marginBottom:10, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.24)', color:'#a78bfa' }}><NativeIcon name="pill" size={15} /></span> Препараты и пороги (ААС, ГР, инсулины)</div>
+            <div style={{ display:'grid', gap:8 }}>
               {deduped.map(d => {
                 const anColor = d.androgenicity < 0.3 ? '#22c55e' : d.androgenicity < 0.7 ? '#eab308' : d.androgenicity < 1.2 ? '#f97316' : '#ef4444';
                 return (
-                  <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text)' }}>{d.name}</div>
-                      <div style={{ fontSize:9, color:'#fff' }}>{d.dosePerWeek}/нед</div>
+                  <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{d.name}</div>
+                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{d.dosePerWeek}/нед</div>
                     </div>
-                    <div style={{ textAlign:'right' }}>
-                      <div style={{ fontSize:9, color:'#fff' }}>Андрог.</div>
-                      <div style={{ fontSize:14, fontWeight:700, color:anColor }}>{d.androgenicity.toFixed(1)}</div>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ fontSize:11, color:'#fff' }}>Андрог.</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:anColor }}>{d.androgenicity.toFixed(1)}</div>
                     </div>
                   </div>
                 );
@@ -831,46 +831,46 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         { key:'pk', icon:'pill' as NativeIconName, title:'Фармакокинетика', desc:'PK/PD симуляция концентрации препаратов', color:'#22c55e' },
       ];
       return (
-        <div>
+        <div className="risk-mc">
           {/* MC Toggle card */}
-          <div className="card" style={{ marginBottom:10, padding:12, textAlign:'center',
-            background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>🎲 Монте Карло (V7)</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'#fff' }}>Без поддержки</div>
-                <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskRaw) }}>{Math.round(v7Result.globalRiskRaw)}%</div>
+          <div className="card risk-overall" style={{ marginBottom:10, padding:16, textAlign:'center', borderRadius:18,
+            background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.28)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10 }}>🎲 Монте Карло (V7)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:10 }}>
+              <div style={{ padding:'12px 8px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Без поддержки</div>
+                <div style={{ fontSize:28, fontWeight:900, color:getRiskColor(v7Result.globalRiskRaw), marginTop:4 }}>{Math.round(v7Result.globalRiskRaw)}%</div>
               </div>
-              <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'#fff' }}>С поддержкой</div>
-                <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskNet) }}>{Math.round(v7Result.globalRiskNet)}%</div>
+              <div style={{ padding:'12px 8px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, color:'#fff', fontWeight:700 }}>С поддержкой</div>
+                <div style={{ fontSize:28, fontWeight:900, color:getRiskColor(v7Result.globalRiskNet), marginTop:4 }}>{Math.round(v7Result.globalRiskNet)}%</div>
               </div>
             </div>
             <button onClick={toggleMC} style={{
-              padding:'8px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer',
-              background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'var(--bg-secondary)',
-              border:mcEnabled?'1px solid #8b5cf6':'1px solid var(--border)',
-              color:mcEnabled?'#fff':'#fff',
-              boxShadow:mcEnabled?'0 0 16px rgba(139,92,246,0.35)':'none',
+              minHeight:48, padding:'12px 24px', borderRadius:999, fontSize:14, fontWeight:800, cursor:'pointer',
+              background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,0.06)',
+              border:mcEnabled?'1px solid #8b5cf6':'1px solid rgba(255,255,255,0.12)',
+              color:'#fff',
+              boxShadow:mcEnabled?'0 0 18px rgba(139,92,246,0.40)':'none',
               transition:'all 0.3s',
             }}>{mcEnabled ? '✅ MC включён' : '▶ Включить Монте Карло'}</button>
           </div>
 
           {/* 4 nav cards */}
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div className="risk-navcards" style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {mcCards.map(c => (
-              <button key={c.key} onClick={() => setMcPage(c.key as any)} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14,
+              <button key={c.key} onClick={() => setMcPage(c.key as any)} aria-label={c.title} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:18, minHeight:64,
                 cursor:'pointer', textAlign:'left', width:'100%',
-                background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)',
+                background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', boxShadow:'0 10px 26px rgba(0,0,0,0.20)',
               }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, background:c.color+'18', color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={20} /></div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>{c.desc}</div>
+                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0, background:c.color+'1c', border:`1px solid ${c.color}30`, color: c.color }}><NativeIcon name={c.icon as NativeIconName} size={22} /></div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:800, marginBottom:3, color:'#fff' }}>{c.title}</div>
+                  <div style={{ fontSize:12, color:'#fff', lineHeight:1.4 }}>{c.desc}</div>
                 </div>
-                <span style={{ color:c.color, fontSize:16, opacity:0.6 }}>→</span>
+                <span style={{ color:'#fff', fontSize:14, fontWeight:800, minWidth:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:999, background:c.color+'20', border:`1px solid ${c.color}30` }}>→</span>
               </button>
             ))}
           </div>
@@ -933,17 +933,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── TOP NAV BAR — glass, sticky ─── */}
+      {/* ─── TOP NAV BAR — APK PRO: 56px, тач 44px, белый текст ─── */}
       {mainTab !== 'hero' && (
-        <div className="risk-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
-          <button onClick={() => setMainTab('hero')} style={{ padding:'7px 12px', cursor:'pointer', fontSize:11, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', borderRadius:999, display:'flex', alignItems:'center', gap:6 }}>← Обзор</button>
-          <div style={{ width:1, height:18, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
-          <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-            <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: mainTab==='tz_spec'?'rgba(139,92,246,0.14)':'rgba(34,197,94,0.14)', border:`1px solid ${mainTab==='tz_spec'?'rgba(139,92,246,0.18)':'rgba(34,197,94,0.18)'}`, color: mainTab==='tz_spec' ? '#a78bfa' : mainTab==='info' ? '#c4b5fd' : '#4ade80' }}>{mainTab==='tz_spec'? <NativeIcon name="layers" size={13} /> : mainTab==='info' ? <NativeIcon name="message" size={13} /> : <NativeIcon name="cpu" size={13} />}</span>
-            <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#fff', lineHeight:1 }}>{mainTab==='tz_spec'?'Механизм-модель': mainTab==='info'?'Информация':'Риски'}</div>
-              <div style={{ fontSize:9, color:'#fff', lineHeight:1, marginTop:2 }}>{subTab} • {riskResult? `${Math.round(riskResult.overallNet)}% net` : 'нет данных'}</div>
+        <div className="risk-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,12,18,0.86)', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10, padding:'8px 12px', flexShrink:0, minHeight:56 }}>
+          <button onClick={() => setMainTab('hero')} aria-label="Назад к обзору рисков" style={{ minHeight:44, padding:'10px 16px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)', borderRadius:999, display:'flex', alignItems:'center', gap:6 }}>← Обзор</button>
+          <div style={{ width:1, height:24, background:'rgba(255,255,255,0.10)', flexShrink:0 }} />
+          <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+            <span style={{ width:40, height:40, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: mainTab==='tz_spec'?'rgba(139,92,246,0.16)':'rgba(34,197,94,0.16)', border:`1px solid ${mainTab==='tz_spec'?'rgba(139,92,246,0.28)':'rgba(34,197,94,0.28)'}`, color: mainTab==='tz_spec' ? '#a78bfa' : mainTab==='info' ? '#c4b5fd' : '#4ade80' }}>{mainTab==='tz_spec'? <NativeIcon name="layers" size={18} /> : mainTab==='info' ? <NativeIcon name="message" size={18} /> : <NativeIcon name="cpu" size={18} />}</span>
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.15 }}>{mainTab==='tz_spec'?'Механизм-модель': mainTab==='info'?'Информация': mainTab==='calculations'?'Другие методы':'Риски'}</div>
+              <div style={{ fontSize:11, color:'#fff', lineHeight:1.2, marginTop:2 }}>{riskResult? `NET ${Math.round(riskResult.overallNet)}% · RAW ${Math.round(riskResult.overallRaw)}%` : 'нет данных'}</div>
             </div>
+            {riskResult && (
+              <span style={{ flexShrink:0, fontSize:13, fontWeight:900, padding:'8px 12px', borderRadius:999, background:`${getRiskColor(riskResult.overallNet)}1a`, border:`1px solid ${getRiskColor(riskResult.overallNet)}44`, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</span>
+            )}
           </div>
         </div>
       )}
@@ -955,36 +958,38 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
-            <div style={{ padding:12, borderRadius:16, border:'1px solid var(--border)' }}>
+            <div className="risk-calc-hero" style={{ padding:14, borderRadius:18, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(20,22,30,0.45)', backdropFilter:'blur(12px)' }}>
               <div style={{ position:'relative' }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:2, textAlign:'center' }}>Другие методы расчёта</div>
+              <div style={{ fontSize:12, color:'#fff', marginBottom:10, textAlign:'center', lineHeight:1.4 }}>Вероятностная · Монте-Карло · MDSS · Клиника — выбери модель</div>
               {/* Summary card */}
-              <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="chart" size={13} /></span> Средний риск курса
+              <div className="risk-overall" style={{ marginTop: 6, padding: 16, borderRadius: 18, background: 'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(20,22,30,0.60) 100%)', border: '1px solid rgba(0,230,138,0.20)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color: '#4ade80' }}><NativeIcon name="chart" size={15} /></span> Средний риск курса
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {[
                     { label: 'Вероятностная', icon: 'file' as NativeIconName, net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: 'cpu' as NativeIconName, net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
                     { label: 'MDSS', icon: 'heart' as NativeIconName, net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
                     <div key={i} style={{
-                      flex: '1 1 30%', minWidth: 100, textAlign: 'center', padding: '10px 4px', borderRadius: 12,
-                      background: item.color + '0d', border: `1px solid ${item.color}22`,
+                      flex: '1 1 30%', minWidth: 140, textAlign: 'center', padding: '12px 8px', borderRadius: 14,
+                      background: item.color + '12', border: `1px solid ${item.color}30`,
                     }}>
-                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><NativeIcon name={item.icon} size={10} /> {item.label}</div>
-                      <div style={{ fontSize: 'clamp(18px, 6vw, 26px)', fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : '#fff', display:'flex', alignItems:'center', gap:2 }}>
-                        <span>{item.net != null ? `${item.net}` : '—'}</span>
-                        <span style={{ fontSize:'clamp(12px,3vw,16px)', color:'#fff', fontWeight:400 }}>/</span>
-                        <span style={{ color: item.raw != null ? getRiskColor(item.raw) : '#fff' }}>{item.raw != null ? `${item.raw}` : '—'}</span>
+                      <div style={{ fontSize: 12, color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><NativeIcon name={item.icon} size={12} /> {item.label}</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: item.net != null ? getRiskColor(item.net) : '#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:4, marginTop:4 }}>
+                        <span>{item.net != null ? `${item.net}%` : '—'}</span>
+                        <span style={{ fontSize:14, color:'#fff', fontWeight:400 }}>/</span>
+                        <span style={{ fontSize:18, color: item.raw != null ? getRiskColor(item.raw) : '#fff' }}>{item.raw != null ? `${item.raw}%` : '—'}</span>
                       </div>
-                      <div style={{ fontSize: 'clamp(7px, 2vw, 8px)', color: '#fff', marginTop: 1 }}>с поддержкой / без поддержки</div>
+                      <div style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>с поддержкой / без</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              <div className="risk-navcards" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
                 {[
                   { id: 'basic', icon: 'file' as NativeIconName, title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
                   { id: 'montecarlo', icon: 'cpu' as NativeIconName, title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
@@ -997,20 +1002,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     else if (card.id === 'montecarlo') { setMcPage('main'); setSubTab('v7'); }
                     else if (card.id === 'clinical') { setSubTab('clinical'); }
                     else setSubTab('mdss');
-                  }} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-                    background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)', transition: 'all 0.2s',
+                  }} aria-label={card.title} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 18, cursor: 'pointer', textAlign: 'left', width: '100%', minHeight:64,
+                    background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', color: '#fff', transition: 'all 0.2s', boxShadow:'0 10px 26px rgba(0,0,0,0.20)',
                   }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: card.color + '18', color: card.color }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      background: card.color + '1c', border:`1px solid ${card.color}30`, color: card.color }}>
                       <NativeIcon name={card.icon as NativeIconName} size={22} />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
-                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>{card.desc}</div>
-                      {card.subs && <div style={{ fontSize: 9, color: card.color, marginTop: 3, opacity: 0.7 }}>{card.subs}</div>}
+                    <div style={{ flex: 1, minWidth:0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 3, color: '#fff' }}>{card.title}</div>
+                      <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.4 }}>{card.desc}</div>
+                      {card.subs && <div style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>{card.subs}</div>}
                     </div>
-                    <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
+                    <span style={{ color:'#fff', fontSize: 14, fontWeight:800, minWidth:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:999, background:card.color+'20', border:`1px solid ${card.color}30` }}>→</span>
                   </button>
                 ))}
               </div>
@@ -1021,17 +1026,17 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* ───── REGULAR SUB-TAB NAVIGATION ───── */}
           {(mainTab !== 'calculations' || calcPage !== 'hero') && (
             <>
-              {/* Sub-tab pills + back button for calculations */}
-              <div className="risk-subtabs" style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
+              {/* Sub-tab pills + back button for calculations — APK PRO: липкая лента, тач 44px */}
+              <div className="risk-subtabs" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', padding: '10px 12px', margin: '0 -12px', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.07)', flexWrap: 'nowrap' as const, position: 'sticky', top: 56, zIndex: 15, background: 'rgba(10,12,18,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
                 {mainTab === 'calculations' && (
                   <button onClick={() => {
                     if (basicPage !== 'main') { setBasicPage('main'); return; }
                     if (mcPage !== 'main') { setMcPage('main'); return; }
                     if (calcPage === 'clinical') { setCalcPage('hero'); setSubTab('overview'); return; }
                     setCalcPage('hero'); setSubTab('overview');
-                  }} style={{
-                    padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', flexShrink: 0,
-                    background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff', fontWeight: 600,
+                  }} aria-label="Назад" style={{
+                    minHeight: 44, padding: '10px 16px', borderRadius: 999, fontSize: 13, cursor: 'pointer', flexShrink: 0,
+                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: 800,
                   }}>← Назад</button>
                 )}
         {(mainTab === 'calculations'
@@ -1055,9 +1060,13 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               setSubTab(t as any);
             }
           }} className="risk-subtab" data-active={subTab === t || basicPage === t || mcPage === t} style={{
-            padding: '5px 7px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-            cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t || basicPage === t || mcPage === t ? '2px solid #8b5cf6' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
-            color: subTab === t || basicPage === t || mcPage === t ? '#fff' : 'rgba(255,255,255,0.52)',
+            minHeight: 44, padding: '10px 16px', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
+            cursor: 'pointer', flexShrink: 0, transition: 'all 0.16s ease',
+            background: (subTab === t || basicPage === t || mcPage === t) ? 'linear-gradient(135deg, rgba(139,92,246,0.30), rgba(139,92,246,0.12))' : 'rgba(255,255,255,0.06)',
+            border: (subTab === t || basicPage === t || mcPage === t) ? '1px solid rgba(139,92,246,0.55)' : '1px solid rgba(255,255,255,0.10)',
+            boxShadow: (subTab === t || basicPage === t || mcPage === t) ? '0 0 14px rgba(139,92,246,0.30)' : 'none',
+            borderRadius: 999, marginBottom: 0,
+            color: '#fff',
           }}>
             {SUBTAB_LABELS[t] || t}
           </button>
@@ -1157,63 +1166,63 @@ const MDSSRiskDisplay: React.FC = () => {
   const ZONE_COLORS: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
 
   return (
-    <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🧬 MDSS — Medical Decision Support System</h3>
-        <p style={{ fontSize: 11, color: '#fff', margin: '0 0 4px 0' }}>
+    <div className="risk-mdss">
+      <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+        <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🧬 MDSS — Medical Decision Support System</h3>
+        <p style={{ fontSize: 12, color: '#fff', margin: '0 0 4px 0', lineHeight:1.5 }}>
           Hill → Monte Carlo (10K) → Logistic Sigmoid. Прогноз необратимого отказа органов.
         </p>
-        <p style={{ fontSize: 10, color: 'var(--accent)', margin: 0 }}>
+        <p style={{ fontSize: 12, color: '#fff', margin: 0 }}>
           ⚡ Работает в браузере (TypeScript). Python-сервер не требуется.
         </p>
       </div>
 
       {!autoRun ? (
-        <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-          <p style={{ fontSize: 12, color: '#fff', marginBottom: 12 }}>
+        <div className="card" style={{ marginBottom: 12, padding:16, textAlign: 'center', borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <p style={{ fontSize: 13, color: '#fff', marginBottom: 12, lineHeight:1.5 }}>
             Нажмите кнопку для запуска анализа. Можно без ввода данных — использует консервативные значения.
           </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap:'wrap' }}>
             <button onClick={() => { setAutoRun(true); setTimeout(handleRun, 50); }} style={{
-              padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
+              minHeight:48, padding: '12px 24px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 800, fontSize: 14, boxShadow:'0 0 18px rgba(139,92,246,0.40)',
             }}>▶ Запустить анализ</button>
             <button onClick={() => { setAutoRun(false); handleRun(); }} style={{
-              padding: '10px 24px', borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
-              background: 'transparent', color: 'var(--accent)', fontWeight: 600, fontSize: 14,
+              minHeight:48, padding: '12px 24px', borderRadius: 999, border: '1px solid rgba(139,92,246,0.45)', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.10)', color: '#fff', fontWeight: 800, fontSize: 14,
             }}>Запустить один раз</button>
           </div>
         </div>
       ) : (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="card" style={{ marginBottom: 12, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 10, color: '#fff' }}>Недель экспозиции</label>
+              <label style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Недель экспозиции</label>
               <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(parseFloat(e.target.value) || 0); }}
-                style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
             </div>
             <div>
-              <label style={{ fontSize: 10, color: '#fff' }}>Генетика (через запятую)</label>
+              <label style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Генетика (через запятую)</label>
               <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
                 placeholder="APOL1_mutation, COMT_slow..."
-                style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button onClick={handleRun} style={{
-              flex: 1, padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 600, fontSize: 12,
+              flex: 1, minHeight:44, padding: '10px 16px', borderRadius: 999, border: '1px solid rgba(139,92,246,0.40)', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.14)', color: '#fff', fontWeight: 800, fontSize: 13,
             }}>🔄 Пересчитать</button>
             <button onClick={() => setAutoRun(false)} style={{
-              padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
-              background: 'transparent', color: '#fff', fontSize: 12,
+              minHeight:44, padding: '10px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 13, fontWeight:800,
             }}>Выкл авто</button>
           </div>
           {linked.labs?.length === 0 && (
-            <div style={{ fontSize: 9, color: '#ff9100', marginTop: 4 }}>⚠ Без анализов — консервативные оценки. Введите данные для точного прогноза.</div>
+            <div style={{ fontSize: 12, color: '#fff', marginTop: 8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.24)', borderRadius:10, padding:'8px 10px' }}>⚠ Без анализов — консервативные оценки. Введите данные для точного прогноза.</div>
           )}
           {linked.labs?.length > 0 && (
-            <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>✅ Использовано {linked.labs.length} анализов из вашего профиля</div>
+            <div style={{ fontSize: 12, color: '#fff', marginTop: 8 }}>✅ Использовано {linked.labs.length} анализов из вашего профиля</div>
           )}
         </div>
       )}
@@ -1223,10 +1232,10 @@ const MDSSRiskDisplay: React.FC = () => {
           {/* Compliance penalty banner */}
           {mdssResult.compliancePenalty > 1 && (
             <div className="card" style={{
-              marginBottom: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)',
-              borderLeft: '3px solid #ef4444',
+              marginBottom: 12, padding: '10px 14px', borderRadius:14, background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.20)', borderLeft: '4px solid #ef4444',
             }}>
-              <div style={{ fontSize: 10, color: '#f97316', fontWeight: 600 }}>
+              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, lineHeight:1.5 }}>
                 ⚠ Штраф за просрочку анализов: ×{mdssResult.compliancePenalty}
                 ({mdssResult.weeksSinceLastLab} нед без анализов)
               </div>
@@ -1234,37 +1243,37 @@ const MDSSRiskDisplay: React.FC = () => {
           )}
 
           {/* Overall risk */}
-          <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
+          <div className="card" style={{ marginBottom: 12, padding:16, textAlign: 'center', borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize: 13, fontWeight:700, color: '#fff', marginBottom: 6 }}>
               Максимальный риск по всем 14 системам
             </div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: ZONE_COLORS[mdssResult.overallAlertLevel] }}>
+            <div style={{ fontSize: 40, fontWeight: 900, lineHeight:1, color: ZONE_COLORS[mdssResult.overallAlertLevel] }}>
               {mdssResult.overallMaxRisk}%
             </div>
-            <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: '#fff', marginTop: 6 }}>
               {mdssResult.allMarkersUsed.length} биомаркеров · {Object.keys(mdssResult.organSystemsReport).length} систем
             </div>
           </div>
 
           {/* Sorted organs */}
           {mdssResult.sortedOrgans.map(r => (
-            <div key={r.organKey} className="card" style={{
-              marginBottom: 8, borderLeft: `4px solid ${ZONE_COLORS[r.alertLevel]}`,
+            <div key={r.organKey} className="card risk-mdss-organ" style={{
+              marginBottom: 10, padding:'12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', borderLeft: `4px solid ${ZONE_COLORS[r.alertLevel]}`,
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{r.organName}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: `${ZONE_COLORS[r.alertLevel]}22`, color: ZONE_COLORS[r.alertLevel], fontWeight: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:8, marginBottom: 6 }}>
+                <span style={{ fontWeight: 800, fontSize: 13, color:'#fff' }}>{r.organName}</span>
+                <span style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, background: `${ZONE_COLORS[r.alertLevel]}22`, border:`1px solid ${ZONE_COLORS[r.alertLevel]}44`, color: '#fff', fontWeight: 800, whiteSpace:'nowrap' }}>
                   {Math.round(r.riskPercentage)}% — {r.status.split('(')[0].trim()}
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10, color: '#fff', marginBottom: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, fontSize: 12, color: '#fff', marginBottom: 8 }}>
                 <div>Hill: {r.hillScore} · MC P95: {r.severity95}</div>
                 <div>Z: {r.zTotal} · Gen: ×{r.geneticFactor}</div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 4 }} />
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 999 }} />
               </div>
-              <div style={{ fontSize: 9, color: '#fff', marginTop: 3 }}>
+              <div style={{ fontSize: 12, color: '#fff', marginTop: 6, lineHeight:1.5 }}>
                 Маркеры ({r.markersUsed.length}): {r.markersUsed.join(', ')}
               </div>
             </div>
@@ -1273,14 +1282,14 @@ const MDSSRiskDisplay: React.FC = () => {
           {/* Missing markers */}
           {mdssResult.markersNotFound.length > 0 && (
             <div className="card" style={{
-              marginBottom: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.02)',
+              marginBottom: 12, padding: '12px 14px', borderRadius:16, background: 'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)',
             }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 8 }}>
                 🧪 Не сдано ({mdssResult.markersNotFound.length}): сдайте эти маркеры для точного прогноза
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {mdssResult.markersNotFound.map(m => (
-                  <span key={m} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 9 }}>
+                  <span key={m} style={{ padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)', color: '#fff', fontSize: 12, fontWeight:600 }}>
                     {m}
                   </span>
                 ))}
@@ -1377,54 +1386,54 @@ const ComplianceDisplay: React.FC = () => {
   const complianceColors: Record<string, string> = { compliant:'#00e68a', overdue:'#f97316', critical:'#ef4444' };
 
   return (
-    <div>
+    <div className="risk-compliance">
       {/* Info card */}
-      <div style={{ marginBottom:10, padding:14, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-        <div style={{ fontSize:14, fontWeight:700, color:'var(--accent)', marginBottom:6, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="clock" size={14} /> Комплаенс — Data Decay Engine</div>
-        <div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>
+      <div style={{ marginBottom:12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:32, height:32, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:'#4ade80' }}><NativeIcon name="clock" size={16} /></span> Комплаенс — Data Decay Engine</div>
+        <div style={{ fontSize:12, color:'#fff', lineHeight:1.55 }}>
           Отслеживание дисциплины сдачи анализов. Штрафной коэффициент за устаревшие данные. Даты вычисляются автоматически из курса и анализов.
         </div>
       </div>
 
       {/* Auto dates card */}
-      <div style={{ marginBottom:10, padding:14, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+      <div style={{ marginBottom:12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
           <div>
-            <div style={{ fontSize:9, color:'#fff', marginBottom:2 }}>Дата начала курса (авто)</div>
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--accent)', fontSize:12, fontWeight:600, opacity:0.8 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>Дата начала курса (авто)</div>
+            <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:13, fontWeight:700 }}>
               🔒 {courseStartDate}
             </div>
           </div>
           <div>
-            <div style={{ fontSize:9, color:'#fff', marginBottom:2 }}>Последние анализы (авто)</div>
-            <div style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--accent)', fontSize:12, fontWeight:600, opacity:0.8 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>Последние анализы (авто)</div>
+            <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:13, fontWeight:700 }}>
               🔒 {latestLabDate}
             </div>
           </div>
         </div>
 
         {/* Compliance status */}
-        <div style={{ display:'flex', gap:12, alignItems:'center', marginTop:4 }}>
+        <div style={{ display:'flex', gap:12, alignItems:'center', marginTop:6, padding:'12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:9, color:'#fff', marginBottom:2 }}>Статус комплаенса</div>
-            <div style={{ fontSize:14, fontWeight:700, color:complianceColors[compliance] }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>Статус комплаенса</div>
+            <div style={{ fontSize:15, fontWeight:800, color:complianceColors[compliance] }}>
               {compliance === 'compliant' ? '✅ В норме' : compliance === 'overdue' ? '⚠️ Просрочен' : '🔴 Критический'}
             </div>
           </div>
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:9, color:'#fff' }}>Недель с анализов</div>
-            <div style={{ fontSize:18, fontWeight:700, color:complianceColors[compliance] }}>{weeksSinceLab.toFixed(1)}</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Недель с анализов</div>
+            <div style={{ fontSize:22, fontWeight:800, color:complianceColors[compliance] }}>{weeksSinceLab.toFixed(1)}</div>
           </div>
         </div>
 
         {/* Missing markers warning */}
         {missingMarkers.length > 0 && (
-          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не хватает маркеров ({missingMarkers.length})</div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5 }}>
+          <div style={{ marginTop:10, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.24)' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:4 }}>⚠️ Не хватает маркеров ({missingMarkers.length})</div>
+            <div style={{ fontSize:12, color:'#fff', lineHeight:1.55 }}>
               {missingMarkers.slice(0, 10).join(', ')}{missingMarkers.length > 10 ? ` +${missingMarkers.length - 10}` : ''}
             </div>
-            <div style={{ fontSize:8, color:'#f97316', marginTop:4 }}>
+            <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>
               Штраф за неполные анализы будет применён к соответствующим системам
             </div>
           </div>
@@ -1434,45 +1443,45 @@ const ComplianceDisplay: React.FC = () => {
       {/* Results */}
       {report && (
         <>
-          <div style={{ marginBottom:10, padding:12, borderRadius:14, borderLeft:'3px solid ' + complianceColors[report.systemWarnings.complianceStatus],
-            background: report.systemWarnings.complianceStatus === 'compliant' ? 'rgba(0,230,138,0.06)' : report.systemWarnings.complianceStatus === 'critical' ? 'rgba(239,68,68,0.08)' : 'rgba(249,115,22,0.06)',
-            border:'1px solid var(--border)' }}>
-            <div style={{ fontSize:11, fontWeight:600, color:'var(--text)', marginBottom:4 }}>⚠️ Системные предупреждения</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, marginBottom:6 }}>{report.systemWarnings.disclaimer}</div>
-            <div style={{ fontSize:11, fontWeight:700, color:report.systemWarnings.complianceStatus==='compliant'?'#00e68a':'#f97316' }}>
+          <div style={{ marginBottom:12, padding:'12px 14px', borderRadius:16, borderLeft:'4px solid ' + complianceColors[report.systemWarnings.complianceStatus],
+            background: report.systemWarnings.complianceStatus === 'compliant' ? 'rgba(0,230,138,0.07)' : report.systemWarnings.complianceStatus === 'critical' ? 'rgba(239,68,68,0.09)' : 'rgba(249,115,22,0.07)',
+            borderTop:'1px solid rgba(255,255,255,0.09)', borderRight:'1px solid rgba(255,255,255,0.09)', borderBottom:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:6 }}>⚠️ Системные предупреждения</div>
+            <div style={{ fontSize:12, color:'#fff', lineHeight:1.55, marginBottom:8 }}>{report.systemWarnings.disclaimer}</div>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>
               {report.systemWarnings.penaltyStatus}
             </div>
-            <div style={{ display:'flex', gap:12, marginTop:4, fontSize:9, color:'#fff' }}>
+            <div style={{ display:'flex', gap:12, marginTop:6, fontSize:12, fontWeight:600, color:'#fff' }}>
               <span>{report.systemWarnings.weeksOnCycle} нед на курсе</span>
               <span>{report.systemWarnings.weeksSinceLastLab} нед с анализов</span>
             </div>
           </div>
 
-          <div style={{ padding:14, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>📊 Анализ с штрафом</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, textAlign:'center', marginBottom:8 }}>
-              <div style={{ padding:12, borderRadius:12, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'#fff' }}>Коэффициент штрафа</div>
-                <div style={{ fontSize:24, fontWeight:800, color:report.riskAnalysis.penaltyMultiplierApplied > 1 ? '#ef4444' : '#00e68a' }}>
+          <div style={{ padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10 }}>📊 Анализ с штрафом</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, textAlign:'center', marginBottom:10 }}>
+              <div style={{ padding:'14px 10px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Коэффициент штрафа</div>
+                <div style={{ fontSize:28, fontWeight:900, marginTop:4, color:report.riskAnalysis.penaltyMultiplierApplied > 1 ? '#ef4444' : '#00e68a' }}>
                   {report.riskAnalysis.penaltyMultiplierApplied.toFixed(1)}×
                 </div>
               </div>
-              <div style={{ padding:12, borderRadius:12, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'#fff' }}>Вероятность отказа</div>
-                <div style={{ fontSize:24, fontWeight:800, color:report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444' : report.riskAnalysis.probabilityPercent >= 50 ? '#f97316' : '#00e68a' }}>
+              <div style={{ padding:'14px 10px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Вероятность отказа</div>
+                <div style={{ fontSize:28, fontWeight:900, marginTop:4, color:report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444' : report.riskAnalysis.probabilityPercent >= 50 ? '#f97316' : '#00e68a' }}>
                   {Math.round(report.riskAnalysis.probabilityPercent)}%
                 </div>
               </div>
             </div>
-            <div style={{ height:8, background:'var(--bg-secondary)', borderRadius:4, overflow:'hidden' }}>
-              <div style={{ width:`${Math.min(100,report.riskAnalysis.probabilityPercent)}%`, height:'100%', background:report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444' : report.riskAnalysis.probabilityPercent >= 50 ? '#f97316' : '#00e68a', borderRadius:4, transition:'width 0.5s' }} />
+            <div style={{ height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden' }}>
+              <div style={{ width:`${Math.min(100,report.riskAnalysis.probabilityPercent)}%`, height:'100%', background:report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444' : report.riskAnalysis.probabilityPercent >= 50 ? '#f97316' : '#00e68a', borderRadius:999, transition:'width 0.5s' }} />
             </div>
           </div>
         </>
       )}
 
       {!report && (
-        <div style={{ textAlign:'center', padding:30, color:'#fff', fontSize:12 }}>
+        <div style={{ textAlign:'center', padding:30, color:'#fff', fontSize:13 }}>
           Загрузка анализа комплаенса...
         </div>
       )}
@@ -1577,62 +1586,62 @@ const ClinicalRiskDisplay: React.FC = () => {
   const zoneColors: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
 
   return (
-    <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🏥 Клинические патологии</h3>
-        <p style={{ fontSize: 11, color: '#fff', margin: 0 }}>
+    <div className="risk-clinical">
+      <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+        <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🏥 Клинические патологии</h3>
+        <p style={{ fontSize: 12, color: '#fff', margin: 0, lineHeight:1.5 }}>
           28 патологий в 8 системах. Hill → MC (10K) → Sigmoid.
         </p>
       </div>
 
       {labs.length === 0 && course.length === 0 && !result && (
-        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: 10, fontSize: 10, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4 }}>
+        <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.26)', marginBottom: 12, fontSize: 12, color: '#fff', textAlign: 'center', lineHeight: 1.5 }}>
           ⚠️ Для расчёта клинических рисков необходимы данные анализов и/или активный курс. Перейдите на вкладку <b>«Анализы»</b>, чтобы добавить лабораторные данные.
         </div>
       )}
 
       {!result && (
-        <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'var(--border)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+        <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', minHeight:52, padding: '12px 16px', borderRadius: 999, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 10, boxShadow:'0 8px 22px rgba(139,92,246,0.35)' }}>
           {loading ? '⏳ Анализ...' : course.length === 0 && labs.length === 0 ? '▶ Запустить (нет данных курса)' : '▶ Запустить клинический анализ'}
         </button>
       )}
-      {error && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 11, marginBottom: 8, textAlign: 'center' }}>{error}</div>}
+      {error && <div style={{ padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.24)', color: '#fff', fontSize: 12, marginBottom: 10, textAlign: 'center' }}>{error}</div>}
 
       {result && (
         <>
-          <div className="card" style={{ marginBottom: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#fff' }}>Максимальный риск</div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: result.overallMaxRisk >= 80 ? '#ef4444' : result.overallMaxRisk >= 50 ? '#f97316' : '#22c55e' }}>
+          <div className="card" style={{ marginBottom: 12, padding:16, textAlign: 'center', borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ fontSize: 13, fontWeight:700, color: '#fff', marginBottom:6 }}>Максимальный риск</div>
+            <div style={{ fontSize: 40, fontWeight: 900, lineHeight:1, color: result.overallMaxRisk >= 80 ? '#ef4444' : result.overallMaxRisk >= 50 ? '#f97316' : '#22c55e' }}>
               {result.overallMaxRisk}%
             </div>
-            <div style={{ fontSize: 9, color: '#fff' }}>{result.markersAnalyzed} маркеров · {result.results.length} патологий</div>
+            <div style={{ fontSize: 12, color: '#fff', marginTop:6 }}>{result.markersAnalyzed} маркеров · {result.results.length} патологий</div>
           </div>
-          <button onClick={handleAnalyze} style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10, marginBottom: 8 }}>
+          <button onClick={handleAnalyze} style={{ width: '100%', minHeight:44, padding: '10px 16px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight:800, marginBottom: 10 }}>
             🔄 Пересчитать
           </button>
 
           {result.systems.map((system: any) => (
-            <details key={system.systemKey} style={{ marginBottom: 8 }}>
-              <summary style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <details key={system.systemKey} className="risk-clinical-system" style={{ marginBottom: 10, borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', overflow:'hidden' }}>
+              <summary style={{ padding: '12px 14px', minHeight:56, borderRadius: 0, cursor: 'pointer', background: 'transparent', border: 'none', borderBottom:'1px solid rgba(255,255,255,0.07)', fontSize: 14, fontWeight: 800, color:'#fff', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {system.icon} {system.systemName}
-                <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, fontSize: 10, background: system.maxRisk >= 80 ? 'rgba(239,68,68,0.12)' : system.maxRisk >= 50 ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.08)', color: system.maxRisk >= 80 ? '#ef4444' : system.maxRisk >= 50 ? '#f97316' : '#00e68a', fontWeight: 600 }}>
+                <span style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 999, fontSize: 12, background: system.maxRisk >= 80 ? 'rgba(239,68,68,0.14)' : system.maxRisk >= 50 ? 'rgba(249,115,22,0.14)' : 'rgba(0,230,138,0.10)', border:`1px solid ${system.maxRisk >= 80 ? 'rgba(239,68,68,0.30)' : system.maxRisk >= 50 ? 'rgba(249,115,22,0.30)' : 'rgba(0,230,138,0.24)'}`, color: '#fff', fontWeight: 800 }}>
                   {Math.round(system.maxRisk)}%
                 </span>
               </summary>
-              <div style={{ padding: '4px 0 0 4px' }}>
+              <div style={{ padding: '10px 10px 12px' }}>
                 {system.pathologies.map((r: any) => (
-                  <div key={r.pathologyId} className="card" style={{ marginBottom: 4, borderLeft: `3px solid ${zoneColors[r.alertLevel]}`, padding: '6px 8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                      <span style={{ fontWeight: 600 }}>{r.pathologyName}</span>
-                      <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColors[r.alertLevel]}18`, color: zoneColors[r.alertLevel], fontWeight: 600, fontSize: 9 }}>{r.riskPercent}%</span>
+                  <div key={r.pathologyId} className="card" style={{ marginBottom: 8, borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderLeft: `4px solid ${zoneColors[r.alertLevel]}`, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap:'wrap', gap:8, fontSize: 13, marginBottom: 6 }}>
+                      <span style={{ fontWeight: 800, color:'#fff', minWidth:0 }}>{r.pathologyName}</span>
+                      <span style={{ padding: '4px 10px', borderRadius: 999, background: `${zoneColors[r.alertLevel]}22`, border:`1px solid ${zoneColors[r.alertLevel]}44`, color: '#fff', fontWeight: 800, fontSize: 12, whiteSpace:'nowrap' }}>{r.riskPercent}%</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, fontSize: 8, color: '#fff' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6, fontSize: 12, color: '#fff' }}>
                       <div>Hill: {r.hillScore}</div><div>MC95: {r.severity95}</div><div>Маркеры: {r.markersUsed.length}</div>
                     </div>
                     {r.contributingCompounds.length > 0 && (
-                      <div style={{ fontSize: 8, color: '#8b5cf6', marginTop: 2 }}>Препараты: {r.contributingCompounds.join(', ')}</div>
+                      <div style={{ fontSize: 12, color: '#fff', marginTop: 4 }}>Препараты: {r.contributingCompounds.join(', ')}</div>
                     )}
-                    {r.alertLevel >= 2 && <div style={{ fontSize: 8, color: '#f97316', marginTop: 2 }}>🔬 {r.instrumental}</div>}
+                    {r.alertLevel >= 2 && <div style={{ fontSize: 12, color: '#fff', marginTop: 4 }}>🔬 {r.instrumental}</div>}
                   </div>
                 ))}
               </div>
@@ -1732,64 +1741,64 @@ const LabsRisksTab: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="risk-labs">
       {!hasLabs && (
-        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: 10, fontSize: 10, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4 }}>
+        <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.26)', marginBottom: 12, fontSize: 12, color: '#fff', textAlign: 'center', lineHeight: 1.5 }}>
           ⚠️ Для расчёта рисков по анализам необходимо добавить лабораторные данные. Перейдите в раздел <b>«Анализы»</b> в главной навигации, чтобы внести результаты.
         </div>
       )}
       {[
         {key:'pharma',icon:'pill' as NativeIconName,title:'Лабораторно-фармацевтические риски',
-         body: labPharmaAlerts.length>0 ? <div style={{display:'grid',gap:3}}>{labPharmaAlerts.map((a,i)=>
-          <div key={i} style={{padding:'6px 8px',borderRadius:6,background:a.severity==='critical'?'rgba(239,68,68,0.08)':a.severity==='high'?'rgba(249,115,22,0.08)':'rgba(234,179,8,0.08)',border:`1px solid ${a.severity==='critical'?'rgba(239,68,68,0.2)':a.severity==='high'?'rgba(249,115,22,0.2)':'rgba(234,179,8,0.2)'}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:9,fontWeight:600,color:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308'}}>{a.marker} × {a.drugCause?.join(', ')}</span>
-              <span style={{fontSize:7,fontWeight:700,padding:'1px 5px',borderRadius:3,background:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308',color:'#fff'}}>{a.severity==='critical'?'КРИТ':a.severity==='high'?'ВЫСОК':'МОНИТ'}</span>
-            </div><div style={{color:'#fff',fontSize:8}}>{a.recommendation}</div></div>)}</div> :
-          <div style={{fontSize:10,color:'#fff',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
+         body: labPharmaAlerts.length>0 ? <div style={{display:'grid',gap:8}}>{labPharmaAlerts.map((a,i)=>
+          <div key={i} style={{padding:'10px 12px',borderRadius:12,background:a.severity==='critical'?'rgba(239,68,68,0.09)':a.severity==='high'?'rgba(249,115,22,0.09)':'rgba(234,179,8,0.09)',border:`1px solid ${a.severity==='critical'?'rgba(239,68,68,0.26)':a.severity==='high'?'rgba(249,115,22,0.26)':'rgba(234,179,8,0.26)'}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+              <span style={{fontSize:12,fontWeight:800,color:'#fff'}}>{a.marker} × {a.drugCause?.join(', ')}</span>
+              <span style={{fontSize:11,fontWeight:800,padding:'4px 10px',borderRadius:999,background:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308',color:'#fff',whiteSpace:'nowrap'}}>{a.severity==='critical'?'КРИТ':a.severity==='high'?'ВЫСОК':'МОНИТ'}</span>
+            </div><div style={{color:'#fff',fontSize:12,marginTop:4,lineHeight:1.5}}>{a.recommendation}</div></div>)}</div> :
+          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
         {key:'indices',icon:'grid' as NativeIconName,title:'Композитные индексы здоровья',
-         body:<div style={{display:'grid',gap:6}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
-          <div key={item.label} style={{padding:8,borderRadius:8,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.06)`:'var(--bg-secondary)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.2)`:'1px solid var(--border)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div><div style={{fontSize:10,fontWeight:600}}>{item.label}</div><div style={{fontSize:8,color:'#fff',marginTop:2}}>{item.desc}</div></div>
-              {item.val!==null ? <div style={{textAlign:'right'}}><div style={{fontSize:18,fontWeight:700,color:statusColor(item.val,item.inv)}}>{item.val}%</div><div style={{fontSize:8,color:statusColor(item.val,item.inv),fontWeight:600}}>{statusLabel(item.val,item.inv)}</div></div> : <div style={{fontSize:10,color:'#fff'}}>Нет данных</div>}
+         body:<div style={{display:'grid',gap:8}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
+          <div key={item.label} style={{padding:'12px',borderRadius:14,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.08)`:'rgba(255,255,255,0.04)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.24)`:'1px solid rgba(255,255,255,0.09)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+              <div><div style={{fontSize:13,fontWeight:800,color:'#fff'}}>{item.label}</div><div style={{fontSize:11,color:'#fff',marginTop:3}}>{item.desc}</div></div>
+              {item.val!==null ? <div style={{textAlign:'right',flexShrink:0}}><div style={{fontSize:22,fontWeight:900,color:statusColor(item.val,item.inv)}}>{item.val}%</div><div style={{fontSize:11,color:'#fff',fontWeight:700}}>{statusLabel(item.val,item.inv)}</div></div> : <div style={{fontSize:12,color:'#fff'}}>Нет данных</div>}
             </div></div>)}</div>},
         {key:'systems',icon:'alertTriangle' as NativeIconName,title:'Риски по системам организма',
-         body: labRisks && Object.values(labRisks.systemBreakdown).some(v=>v.net>0) ? <div style={{display:'grid',gap:3}}>{Object.entries(labRisks.systemBreakdown).filter(([,v])=>v.net>0).sort(([,a],[,b])=>b.net-a.net).map(([sys,val])=>{
+         body: labRisks && Object.values(labRisks.systemBreakdown).some(v=>v.net>0) ? <div style={{display:'grid',gap:8}}>{Object.entries(labRisks.systemBreakdown).filter(([,v])=>v.net>0).sort(([,a],[,b])=>b.net-a.net).map(([sys,val])=>{
           const lvl=val.net<=25?'low':val.net<=50?'medium':val.net<=75?'high':'critical';
           const lc={low:{bg:'rgba(34,197,94,0.08)',text:'#22c55e',bar:'#22c55e'},medium:{bg:'rgba(234,179,8,0.08)',text:'#eab308',bar:'#eab308'},high:{bg:'rgba(249,115,22,0.08)',text:'#f97316',bar:'#f97316'},critical:{bg:'rgba(239,68,68,0.08)',text:'#ef4444',bar:'#ef4444'}}[lvl];
-          return <div key={sys} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 8px',borderRadius:6,background:lc.bg,border:`1px solid ${lc.bg.replace('0.08','0.15')}`}}>
-            <span style={{fontSize:9,fontWeight:600,minWidth:60,color:lc.text}}>{sysLabels[sys]||sys}</span>
-            <div style={{flex:1,height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:3,transition:'width 0.4s ease'}}/></div>
-            <span style={{fontSize:11,fontWeight:700,color:lc.text,minWidth:28,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
-          <div style={{fontSize:10,color:'#fff',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все системы в норме':'Нет данных анализов — отображаются базовые значения'}</div>},
+          return <div key={sys} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',borderRadius:12,background:lc.bg,border:`1px solid ${lc.bg.replace('0.08','0.18')}`}}>
+            <span style={{fontSize:12,fontWeight:800,minWidth:64,color:'#fff'}}>{sysLabels[sys]||sys}</span>
+            <div style={{flex:1,height:8,background:'rgba(255,255,255,0.08)',borderRadius:999,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:999,transition:'width 0.4s ease'}}/></div>
+            <span style={{fontSize:13,fontWeight:800,color:lc.text,minWidth:40,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
+          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Все системы в норме':'Нет данных анализов — отображаются базовые значения'}</div>},
         {key:'markers',icon:'flask' as NativeIconName,title:'Маркеры с отклонениями',
          body: labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
           const isHigh=m.deviation>0; const absDev=Math.abs(m.deviation);
           const dl=absDev<=20?'low':absDev<=50?'medium':absDev<=100?'high':'critical';
           const dc={low:{bg:'rgba(34,197,94,0.06)',text:'#22c55e'},medium:{bg:'rgba(234,179,8,0.06)',text:'#eab308'},high:{bg:'rgba(249,115,22,0.06)',text:'#f97316'},critical:{bg:'rgba(239,68,68,0.06)',text:'#ef4444'}}[dl];
-          return <div key={m.code+m.value} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',borderRadius:6,background:dc.bg,border:`1px solid ${dc.bg.replace('0.06','0.12')}`}}>
-            <span style={{fontSize:8,color:'#fff',minWidth:46}}>{sysLabels[m.system]||m.system}</span>
-            <span style={{fontSize:10,fontWeight:600,flex:1,color:'var(--text)'}}>{m.name}</span>
-            <span style={{fontSize:8,color:'#fff'}}>{m.lln}–{m.uln}</span>
-            <span style={{fontSize:10,fontWeight:700,color:dc.text}}>{m.value} <span style={{fontSize:8,padding:'1px 4px',borderRadius:3,fontWeight:600,background:dc.text+'22',color:dc.text}}>{isHigh?'↑':'↓'}{absDev}%</span></span></div>})}</div> :
-          <div style={{fontSize:10,color:'#fff',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все маркеры в норме':'Нет данных анализов — добавьте анализы для просмотра отклонений'}</div>},
+          return <div key={m.code+m.value} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'10px',borderRadius:12,background:dc.bg,border:`1px solid ${dc.bg.replace('0.06','0.14')}`}}>
+            <span style={{fontSize:11,color:'#fff',fontWeight:700,minWidth:52}}>{sysLabels[m.system]||m.system}</span>
+            <span style={{fontSize:13,fontWeight:800,flex:1,minWidth:0,color:'#fff'}}>{m.name}</span>
+            <span style={{fontSize:11,color:'#fff'}}>{m.lln}–{m.uln}</span>
+            <span style={{fontSize:13,fontWeight:800,color:dc.text}}>{m.value} <span style={{fontSize:11,padding:'3px 8px',borderRadius:999,fontWeight:800,background:dc.text+'26',color:'#fff', border:`1px solid ${dc.text}44`}}>{isHigh?'↑':'↓'}{absDev}%</span></span></div>})}</div> :
+          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Все маркеры в норме':'Нет данных анализов — добавьте анализы для просмотра отклонений'}</div>},
       ].map(b => (
-        <div key={b.key} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+        <div key={b.key} className="card risk-labs-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 10, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
           <button onClick={() => setRiskSections(s => ({...s, [b.key]: !s[b.key]}))} style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
-            background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight:56, padding: '13px 14px', cursor: 'pointer', textAlign: 'left',
+            background: riskSections[b.key] ? 'rgba(255,255,255,0.04)' : 'transparent', border: 'none', borderBottom: riskSections[b.key] ? '1px solid rgba(255,255,255,0.07)' : 'none', color: '#fff', fontSize: 14, fontWeight: 800,
           }}>
-            <span style={{ display: 'inline-flex', transition: 'transform 0.2s', transform: riskSections[b.key] ? 'rotate(90deg)' : 'rotate(0deg)', color: 'rgba(255,255,255,0.6)' }}><NativeIcon name="chevronRight" size={10} /></span>
-            <span style={{ display: 'inline-flex', color: 'rgba(255,255,255,0.75)' }}><NativeIcon name={b.icon} size={12} /></span> {b.title}
+            <span style={{ display: 'inline-flex', transition: 'transform 0.2s', transform: riskSections[b.key] ? 'rotate(90deg)' : 'rotate(0deg)', color: '#fff', width:32, height:32, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}><NativeIcon name="chevronRight" size={13} /></span>
+            <span style={{ display: 'inline-flex', color: '#fff' }}><NativeIcon name={b.icon} size={15} /></span> {b.title}
           </button>
-          {riskSections[b.key] && <div style={{ padding: '0 12px 12px' }}>{b.body}</div>}
+          {riskSections[b.key] && <div style={{ padding: '12px 12px 14px' }}>{b.body}</div>}
         </div>
       ))}
-      {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 18 }}>
-        <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.6)', display: 'flex', justifyContent: 'center' }}><NativeIcon name="flask" size={28} /></div>
-        <div style={{ fontSize: 12, color: '#fff', marginBottom: 4 }}>Нет данных анализов</div>
-        <div style={{ fontSize: 10, color: '#f59e0b' }}>Отображаются базовые риски без точных лабов. Для расчёта штрафа используйте кнопку "Без анализов" в общем обзоре.</div></div>}
+      {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 20, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+        <div style={{ marginBottom: 8, color: '#fff', display: 'flex', justifyContent: 'center' }}><NativeIcon name="flask" size={30} /></div>
+        <div style={{ fontSize: 14, fontWeight:800, color: '#fff', marginBottom: 6 }}>Нет данных анализов</div>
+        <div style={{ fontSize: 12, color: '#fff', lineHeight:1.5 }}>Отображаются базовые риски без точных лабов. Для расчёта штрафа используйте кнопку «Без анализов» в общем обзоре.</div></div>}
     </div>
   );
 };

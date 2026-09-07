@@ -5155,6 +5155,7 @@ html.app-native .risk-topnav button:focus-visible {
 }
 
 html.app-native .risk-subtabs {
+  /* topnav 56px + 8px зазор + safe-area: лента липнет под шапкой без наезда */
   top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
   background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
   padding: 12px 12px 10px !important;
@@ -5206,7 +5207,22 @@ html.app-native .risk-navcards,
 html.app-native .risk-overall,
 html.app-native .risk-hysteresis,
 html.app-native .risk-predictive,
-html.app-native .risk-weekly-chart {
+html.app-native .risk-weekly-chart,
+html.app-native .risk-mdss,
+html.app-native .risk-mdss-organ,
+html.app-native .risk-compliance,
+html.app-native .risk-clinical,
+html.app-native .risk-clinical-system,
+html.app-native .risk-reports,
+html.app-native .risk-labs,
+html.app-native .risk-labs-card,
+html.app-native .risk-matrix,
+html.app-native .risk-v7-organs,
+html.app-native .risk-v7-timeseries,
+html.app-native .risk-v7-sensitivity,
+html.app-native .risk-v7-3d,
+html.app-native .risk-v7-pk,
+html.app-native .risk-v7-tabs {
   display: flex !important;
   flex-direction: column !important;
   gap: 12px !important;
@@ -5262,6 +5278,8 @@ html.app-native .risk-navcards button:focus-visible {
 }
 
 html.app-native .risk-verify-export {
+  /* сабтабы safe+64 высотой ~67: лента липнет ниже них с зазором */
+  top: calc(env(safe-area-inset-top, 0px) + 140px) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
@@ -5289,8 +5307,36 @@ html.app-native .risk-verify,
 html.app-native .risk-info,
 html.app-native .risk-calc-hero,
 html.app-native .risk-mc,
+html.app-native .risk-mdss,
+html.app-native .risk-compliance,
+html.app-native .risk-clinical,
+html.app-native .risk-reports,
+html.app-native .risk-labs,
+html.app-native .risk-matrix,
 html.app-native .risk-disclaimer {
   color: #fff !important;
+}
+
+html.app-native .risk-v7-tabs {
+  scrollbar-width: none !important;
+}
+
+html.app-native .risk-v7-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .risk-v7-tabs button,
+html.app-native .risk-clinical-system summary {
+  min-height: 44px !important;
+}
+
+html.app-native .risk-v7-tabs button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .risk-v7-tabs button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5299,7 +5345,13 @@ html.app-native .risk-disclaimer {
   html.app-native .risk-spec,
   html.app-native .risk-details,
   html.app-native .risk-verify,
-  html.app-native .risk-info {
+  html.app-native .risk-info,
+  html.app-native .risk-mdss,
+  html.app-native .risk-compliance,
+  html.app-native .risk-clinical,
+  html.app-native .risk-reports,
+  html.app-native .risk-labs,
+  html.app-native .risk-matrix {
     animation: none !important;
   }
 }

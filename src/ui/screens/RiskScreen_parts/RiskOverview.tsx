@@ -49,8 +49,10 @@ export const RiskOverview: React.FC<{
   });
   const toggle = (k: string) => setShowSections(s => ({ ...s, [k]: !s[k] }));
 
-  const overallStatus = riskResult.overallNet < 20 ? '✅ Низкий' : riskResult.overallNet < 40 ? '⚠️ Умеренный' : riskResult.overallNet < 60 ? '🔶 Повышенный' : riskResult.overallNet < 80 ? '🔴 Высокий' : '💀 Критический';
-  const overallColor = getRiskColor(riskResult.overallNet);
+  const overallRaw = riskResult.overallRaw ?? 0;
+  const overallNet = riskResult.overallNet ?? 0;
+  const overallStatus = overallNet < 20 ? '✅ Низкий' : overallNet < 40 ? '⚠️ Умеренный' : overallNet < 60 ? '🔶 Повышенный' : overallNet < 80 ? '🔴 Высокий' : '💀 Критический';
+  const overallColor = getRiskColor(overallNet);
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 
   const relevantRisks = React.useMemo(() => {
@@ -79,41 +81,41 @@ export const RiskOverview: React.FC<{
   }, [riskResult.systemBreakdown]);
 
   const Section: React.FC<{ id: string; icon: NativeIconName; title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, icon, title, children }) => (
-    <div style={{ padding:0, overflow:'hidden', marginBottom:10, borderRadius:16, background:'rgba(20,22,30,0.42)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
-      <button onClick={() => toggle(id)} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'11px 13px', cursor:'pointer', textAlign:'left', background: showSections[id]?'rgba(255,255,255,0.03)':'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, borderBottom: showSections[id]?'1px solid rgba(255,255,255,0.06)':'none' }}>
-        <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.7)', transition:'transform 0.2s', transform: showSections[id]?'rotate(90deg)':'rotate(0deg)' }}><NativeIcon name="chevronRight" size={10} /></span>
-        <span style={{ display:'inline-flex', color:'rgba(255,255,255,0.85)' }}><NativeIcon name={icon} size={15} /></span> {title}
-        <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: showSections[id]?'rgba(var(--labs-accent-rgb, 0,230,138),0.12)':'rgba(255,255,255,0.06)', border:`1px solid ${showSections[id]?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(255,255,255,0.08)'}`, color: showSections[id]?'var(--labs-accent, #00e68a)':'rgba(255,255,255,0.45)', fontWeight:700 }}>{showSections[id]?'−':'+'}</span>
+    <div style={{ padding:0, overflow:'hidden', marginBottom:12, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', backdropFilter:'blur(12px)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
+      <button onClick={() => toggle(id)} aria-expanded={!!showSections[id]} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', minHeight:56, padding:'13px 14px', cursor:'pointer', textAlign:'left', background: showSections[id]?'rgba(255,255,255,0.04)':'transparent', border:'none', color:'#fff', fontSize:14, fontWeight:800, borderBottom: showSections[id]?'1px solid rgba(255,255,255,0.07)':'none' }}>
+        <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', transition:'transform 0.2s', transform: showSections[id]?'rotate(90deg)':'rotate(0deg)', flexShrink:0 }}><NativeIcon name="chevronRight" size={13} /></span>
+        <span style={{ display:'inline-flex', color:'#fff' }}><NativeIcon name={icon} size={17} /></span> {title}
+        <span style={{ marginLeft:'auto', fontSize:13, minWidth:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 10px', borderRadius:999, background: showSections[id]?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontWeight:800 }}>{showSections[id]?'−':'+'}</span>
       </button>
-      {showSections[id] && <div style={{ padding:'12px 12px 12px' }}>{children}</div>}
+      {showSections[id] && <div style={{ padding:'14px 12px 14px' }}>{children}</div>}
     </div>
   );
 
   return (
     <div className="risk-overview">
-      {/* Overall Risk + Penalty */}
+      {/* Overall Risk + Penalty — APK PRO */}
       <Section id="overall" icon="chart" title="Общий риск">
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8 }}>
           {[
-            { label:'Raw', val:Math.round(riskResult.overallRaw), color:getRiskColor(riskResult.overallRaw) },
-            { label:'Net', val:Math.round(riskResult.overallNet), color:overallColor },
+            { label:'Raw', val:Math.round(overallRaw), color:getRiskColor(overallRaw) },
+            { label:'Net', val:Math.round(overallNet), color:overallColor },
             { label:'Статус', val:overallStatus, color:overallColor, small:true },
           ].map((t, i) => (
-            <div key={i} style={{ background:'var(--bg-secondary)', padding:'10px 8px', borderRadius:10, textAlign:'center' }}>
-              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>{t.label}</div>
-              <div style={{ fontSize:t.small?13:22, fontWeight:700, color:t.color }}>{t.val}</div>
+            <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'12px 8px', borderRadius:14, textAlign:'center' }}>
+              <div style={{ fontSize:12, color:'#fff', fontWeight:700, marginBottom:4 }}>{t.label}</div>
+              <div style={{ fontSize:t.small?14:26, fontWeight:800, color:t.color, lineHeight:1.1 }}>{t.val}</div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop:8, background:'var(--bg-secondary)', borderRadius:8, height:18, position:'relative', overflow:'hidden' }}>
-          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${Math.min(100,riskResult.overallRaw)}%`, background:getRiskColor(riskResult.overallRaw), opacity:0.3, borderRadius:8 }} />
-          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${Math.min(100,riskResult.overallNet)}%`, background:overallColor, borderRadius:8 }} />
-          <div style={{ position:'absolute', top:1, left:'50%', transform:'translateX(-50%)', fontSize:10, fontWeight:700, color:'#fff', textShadow:'0 0 4px rgba(0,0,0,0.5)' }}>{Math.round(riskResult.overallNet)}%</div>
+        <div style={{ marginTop:10, background:'rgba(255,255,255,0.06)', borderRadius:999, height:22, position:'relative', overflow:'hidden', border:'1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${Math.min(100,overallRaw)}%`, background:getRiskColor(overallRaw), opacity:0.3, borderRadius:999 }} />
+          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${Math.min(100,overallNet)}%`, background:overallColor, borderRadius:999 }} />
+          <div style={{ position:'absolute', top:2, left:'50%', transform:'translateX(-50%)', fontSize:12, fontWeight:800, color:'#fff', textShadow:'0 1px 4px rgba(0,0,0,0.6)' }}>{Math.round(overallNet)}%</div>
         </div>
         {anyNoLabs && (
-          <div style={{ marginTop:6, padding:8, borderRadius:8, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ fontWeight:700, fontSize:11, color:'#ef4444' }}>🚫 Штраф за отсутствие анализов</div>
-            <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+          <div style={{ marginTop:8, padding:10, borderRadius:12, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.24)' }}>
+            <div style={{ fontWeight:800, fontSize:13, color:'#fff' }}>🚫 Штраф за отсутствие анализов</div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.45 }}>
               {globalNoLabs ? 'Применён ко всем системам' : `Системы: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
             </div>
           </div>
@@ -123,14 +125,14 @@ export const RiskOverview: React.FC<{
       {/* Dynamics */}
       {weeklyDynamics && (
         <Section id="dynamics" icon="trendingDown" title="Динамика по неделям">
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-            <span style={{ fontSize:9, color:'var(--text-dim)', whiteSpace:'nowrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+            <span style={{ fontSize:12, fontWeight:700, color:'#fff', whiteSpace:'nowrap' }}>
               {chartWeek != null ? `Неделя ${chartWeek+1}` : 'Все недели'}
             </span>
             <input type="range" min={0} max={Math.max(0,(weeklyDynamics.weeks?.length||12)-1)} value={chartWeek??0}
-              onChange={e => setChartWeek(parseFloat(e.target.value) || 0)} style={{ flex:1, accentColor:'var(--accent)' }}/>
+              onChange={e => setChartWeek(parseFloat(e.target.value) || 0)} style={{ flex:1, accentColor:'var(--accent)', height:28 }}/>
             <button onClick={() => setChartWeek(null)} style={{
-              fontSize:9, color:'var(--accent)', background:'none', border:'1px solid var(--border)', borderRadius:4, padding:'2px 6px', cursor:'pointer', whiteSpace:'nowrap',
+              minHeight:44, fontSize:13, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:999, padding:'8px 16px', cursor:'pointer', whiteSpace:'nowrap',
             }}>Все</button>
           </div>
           <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={chartWeek} onWeekSelect={setChartWeek} mode={chartMode} onModeChange={setChartMode} />
@@ -139,7 +141,7 @@ export const RiskOverview: React.FC<{
 
       {/* System Risks */}
       <Section id="systems" icon="heart" title="Риски по системам">
-        <div style={{ display:'grid', gap:5 }}>
+        <div style={{ display:'grid', gap:8 }}>
           {ALL_RISK_SYSTEMS.map(sys => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd || bd.net < 1) return null;
@@ -147,13 +149,13 @@ export const RiskOverview: React.FC<{
             const icon: NativeIconName = SYSTEM_ICONS[sys] || 'alertTriangle';
             const label = SYSTEM_LABELS[sys] || sys;
             return (
-              <div key={sys} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--bg-secondary)', borderRadius:8, padding:'6px 10px' }}>
-                <span style={{ display: 'inline-flex', color: netPct>25?getRiskColor(bd.net):'var(--text-dim)' }}><NativeIcon name={icon} size={14} /></span>
-                <span style={{ fontSize:11, minWidth:90, color:netPct>25?getRiskColor(bd.net):'var(--text-dim)', fontWeight:netPct>25?600:400 }}>{label}</span>
-                <div style={{ flex:1, background:'rgba(255,255,255,0.05)', borderRadius:4, height:8, overflow:'hidden' }}>
-                  <div style={{ width:`${Math.min(100,bd.net)}%`, height:'100%', background:getRiskColor(bd.net), borderRadius:4, transition:'width 0.4s' }} />
+              <div key={sys} style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'10px 12px', minHeight:52 }}>
+                <span style={{ display: 'inline-flex', color: '#fff' }}><NativeIcon name={icon} size={17} /></span>
+                <span style={{ fontSize:13, minWidth:92, color:'#fff', fontWeight:700 }}>{label}</span>
+                <div style={{ flex:1, background:'rgba(255,255,255,0.08)', borderRadius:999, height:10, overflow:'hidden' }}>
+                  <div style={{ width:`${Math.min(100,bd.net)}%`, height:'100%', background:getRiskColor(bd.net), borderRadius:999, transition:'width 0.4s' }} />
                 </div>
-                <span style={{ fontSize:11, fontWeight:700, color:getRiskColor(bd.net), minWidth:32, textAlign:'right' }}>{netPct}%</span>
+                <span style={{ fontSize:14, fontWeight:800, color:getRiskColor(bd.net), minWidth:44, textAlign:'right' }}>{netPct}%</span>
               </div>
             );
           })}
@@ -163,16 +165,16 @@ export const RiskOverview: React.FC<{
       {/* Key Risks */}
       {relevantRisks.length > 0 && (
         <Section id="key" icon="zap" title="Ключевые риски">
-          <div style={{ display:'grid', gap:5 }}>
+          <div style={{ display:'grid', gap:8 }}>
             {relevantRisks.map((risk: any) => {
               const lc = risk.levels?.includes('HIGH') ? '#ef4444' : risk.levels?.includes('MEDIUM') ? '#eab308' : '#22c55e';
               return (
-                <div key={risk.id} style={{ background:'var(--bg-secondary)', padding:'8px 10px', borderRadius:8, borderLeft:`3px solid ${lc}` }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontWeight:600, fontSize:11 }}>{risk.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:lc, background:`${lc}22`, padding:'2px 6px', borderRadius:4 }}>{risk.levels?.[risk.levels.length-1]}</span>
+                <div key={risk.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'12px', borderRadius:14, borderLeft:`4px solid ${lc}` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <span style={{ fontWeight:800, fontSize:13, color:'#fff' }}>{risk.name}</span>
+                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:`${lc}30`, padding:'4px 10px', borderRadius:999, border:`1px solid ${lc}44` }}>{risk.levels?.[risk.levels.length-1]}</span>
                   </div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>{risk.description}</div>
+                  <div style={{ fontSize:12, color:'#fff', marginTop:6, lineHeight:1.5 }}>{risk.description}</div>
                 </div>
               );
             })}
@@ -183,16 +185,16 @@ export const RiskOverview: React.FC<{
       {/* Sources */}
       {aggregatedRisk && (
         <Section id="sources" icon="search" title="Источники рисков">
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
             {[
               { label:'💊 Фарма', val:Math.round(aggregatedRisk.pharma.overallNet) },
               { label:'🧪 Анализы', val:anyNoLabs ? `🚫 ${Math.round(aggregatedRisk.labs.overallNet)}` : Math.round(aggregatedRisk.labs.overallNet) },
               { label:'🏋️ Тренировки', val:Math.round(aggregatedRisk.training.overallNet) },
               { label:'🥗 Питание', val:Math.round(aggregatedRisk.nutrition.overallNet) },
             ].map((s, i) => (
-              <div key={i} style={{ background:'var(--bg-secondary)', padding:'10px', borderRadius:10, textAlign:'center' }}>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:4 }}>{s.label}</div>
-                <div style={{ fontSize:18, fontWeight:700, color:getRiskColor(typeof s.val==='number'?s.val:0) }}>{s.val}%</div>
+              <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'14px 10px', borderRadius:14, textAlign:'center' }}>
+                <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:6 }}>{s.label}</div>
+                <div style={{ fontSize:22, fontWeight:800, color:getRiskColor(typeof s.val==='number'?s.val:0) }}>{s.val}%</div>
               </div>
             ))}
           </div>
@@ -201,8 +203,8 @@ export const RiskOverview: React.FC<{
 
       {/* Support Coverage — How support reduces risk per system */}
       <Section id="support_coverage" icon="shield" title="Покрытие поддержкой">
-        <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Насколько препараты поддержки снижают риски по системам</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+        <div style={{ fontSize:12, color:'#fff', marginBottom:8, lineHeight:1.5 }}>Насколько препараты поддержки снижают риски по системам</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
           {(() => {
             const supportData = riskResult?.coverageMap || {};
             const systems = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
@@ -214,15 +216,15 @@ export const RiskOverview: React.FC<{
               const netRisk = Math.max(0, riskVal * (1 - coverage));
               const pct = Math.round(coverage * 100);
               return (
-                <div key={sys} style={{ background:'var(--bg-secondary)', padding:'6px 8px', borderRadius:8 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', marginBottom:2 }}>{sysLabels[sys] || sys}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                    <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-                      <div style={{ width: pct + '%', height:'100%', borderRadius:3, background: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444', transition:'width 0.3s' }} />
+                <div key={sys} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px', borderRadius:12 }}>
+                  <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:6 }}>{sysLabels[sys] || sys}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ flex:1, height:8, borderRadius:999, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                      <div style={{ width: pct + '%', height:'100%', borderRadius:999, background: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444', transition:'width 0.3s' }} />
                     </div>
-                    <span style={{ fontSize:9, fontWeight:700, color: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444' }}>{pct}%</span>
+                    <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{pct}%</span>
                   </div>
-                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>Риск: {Math.round(riskVal)}% → {Math.round(netRisk)}%</div>
+                  <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Риск: {Math.round(riskVal)}% → {Math.round(netRisk)}%</div>
                 </div>
               );
             });
@@ -231,30 +233,29 @@ export const RiskOverview: React.FC<{
       </Section>
 
       {/* Recommendations */}
-      {/* Recommendations */}
       {!hideRecs && (
       <Section id="recs" icon="check" title="Рекомендации">
         {recommendations.length > 0 ? (
-          <div style={{ display:'grid', gap:4 }}>
+          <div style={{ display:'grid', gap:8 }}>
             {recommendations.map((rec: any, i: number) => (
-              <div key={i} style={{ padding:8, borderRadius:8, background:rec.priority==='high'?'rgba(239,68,68,0.1)':rec.priority==='medium'?'rgba(234,179,8,0.1)':'rgba(34,197,94,0.1)', fontSize:11, color:rec.priority==='high'?'#ef4444':rec.priority==='medium'?'#eab308':'#22c55e' }}>
+              <div key={i} style={{ padding:'12px', borderRadius:12, background:rec.priority==='high'?'rgba(239,68,68,0.10)':rec.priority==='medium'?'rgba(234,179,8,0.10)':'rgba(34,197,94,0.10)', border:'1px solid rgba(255,255,255,0.07)', fontSize:12, fontWeight:600, color:'#fff', lineHeight:1.5 }}>
                 {rec.text}
               </div>
             ))}
           </div>
-        ) : <div style={{ color:'var(--text-dim)', textAlign:'center', padding:12, fontSize:12 }}>Нет специфических рекомендаций</div>}
+        ) : <div style={{ color:'#fff', textAlign:'center', padding:14, fontSize:13 }}>Нет специфических рекомендаций</div>}
       </Section>
       )}
 
       {/* History */}
       {riskHistory && riskHistory.length > 0 && (
         <Section id="history" icon="clock" title="История рисков">
-          <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:60, padding:'0 4px' }}>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:80, padding:'0 4px' }}>
             {riskHistory.slice(-12).map((h, i) => (
-              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                <span style={{ fontSize:8, color:getRiskColor(h.overallNet), fontWeight:700 }}>{Math.round(h.overallNet)}%</span>
-                <div style={{ width:'100%', background:getRiskColor(h.overallNet), borderRadius:'2px 2px 0 0', height:`${Math.max(4, h.overallNet/100*50)}px`, opacity:0.7 }} />
-                <span style={{ fontSize:6, color:'var(--text-dim)' }}>{h.date.slice(5)}</span>
+              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                <span style={{ fontSize:10, color:'#fff', fontWeight:800 }}>{Math.round(h.overallNet)}%</span>
+                <div style={{ width:'100%', background:getRiskColor(h.overallNet), borderRadius:'3px 3px 0 0', height:`${Math.max(6, h.overallNet/100*60)}px`, opacity:0.85 }} />
+                <span style={{ fontSize:9, color:'#fff' }}>{h.date.slice(5)}</span>
               </div>
             ))}
           </div>
@@ -263,8 +264,8 @@ export const RiskOverview: React.FC<{
 
       {/* Drug Thresholds */}
       <Section id="thresholds" icon="pill" title="Пороги препаратов">
-        <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>Максимальные дозировки — превышение кратно увеличивает риски</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
+        <div style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.5 }}>Максимальные дозировки — превышение кратно увеличивает риски</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, fontSize:12 }}>
           {(() => {
             const seen = new Set<string>();
             const allowed = /testosterone|trenbolone|nandrolone|boldenone|methenolone|oxandrolone|stanozolol|methandienone|oxymetholone|superdrol|halotestin|drostanolone|mesterolone|turinabol|insulin|gh_|igf|mgf|somatropin|cjc|ghrp|ipamorelin|mk677|sermorelin|hgh/i;
@@ -274,9 +275,9 @@ export const RiskOverview: React.FC<{
               .map(([id, thresh]) => {
                 const entry = PHARMA_DB[id];
                 return (
-                  <div key={id} style={{ background:'var(--bg-secondary)', padding:'6px 8px', borderRadius:6 }}>
-                    <div style={{ fontWeight:600, fontSize:10 }}>{entry!.name}</div>
-                    <div style={{ color:'var(--text-dim)', fontSize:9 }}>{thresh.dosePerWeek} мг/нед · Андр: {thresh.androgenicity.toFixed(1)}</div>
+                  <div key={id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px', borderRadius:12 }}>
+                    <div style={{ fontWeight:800, fontSize:12, color:'#fff' }}>{entry!.name}</div>
+                    <div style={{ color:'#fff', fontSize:11, marginTop:2 }}>{thresh.dosePerWeek} мг/нед · Андр: {thresh.androgenicity.toFixed(1)}</div>
                   </div>
                 );
               });

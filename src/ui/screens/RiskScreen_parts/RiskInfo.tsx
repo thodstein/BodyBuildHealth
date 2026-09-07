@@ -381,26 +381,37 @@ export const RiskInfo: React.FC = () => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
+  const openCount = SECTIONS.filter(s => expanded[s.id]).length;
   return (
-    <div className="risk-info">
-      {/* ─── REFERENCE INFO ─── */}
-      <div style={{ padding:'8px 0' }}>
-        <span style={{ fontSize:16, fontWeight:700 }}>ℹ️ Справочная информация</span>
+    <div className="risk-info" style={{ paddingBottom:80 }}>
+      {/* ─── REFERENCE INFO — APK PRO ─── */}
+      <div style={{ padding:'10px 0 6px' }}>
+        <div style={{ fontSize:17, fontWeight:800, color:'#fff' }}>ℹ️ Справочная информация</div>
+        <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.5 }}>
+          Полный справочник: формулы расчёта, механизмы риска по системам, пороги дозировок, генетические факторы, фармподдержка и описание моделей V7 Monte Carlo.
+        </div>
       </div>
-      <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:12, lineHeight:1.5 }}>
-        Полный справочник: формулы расчёта, механизмы риска по системам, пороги дозировок, генетические факторы, фармподдержка и описание моделей V7 Monte Carlo.
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+        <button onClick={() => setExpanded(Object.fromEntries(SECTIONS.map(s => [s.id, true])))} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▼ Развернуть все</button>
+        <button onClick={() => setExpanded({})} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▲ Свернуть{openCount > 0 ? ` (${openCount})` : ''}</button>
+      </div>
+      <div className="risk-info-nav" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 10px', scrollbarWidth:'none' }}>
+        {SECTIONS.map(s => (
+          <button key={s.id} onClick={() => { setExpanded(prev => ({ ...prev, [s.id]: true })); try { setTimeout(() => document.getElementById(`risk-info-${s.id}`)?.scrollIntoView({ behavior:'smooth', block:'start' }), 50); } catch {} }} style={{ flexShrink:0, minHeight:44, padding:'8px 14px', borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background: expanded[s.id] ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.06)', border: expanded[s.id] ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{s.icon} {s.title.split('—')[0].split('(')[0].trim().slice(0,18)}</button>
+        ))}
       </div>
       {SECTIONS.map(s => (
-        <div key={s.id} style={{ padding:0, overflow:'hidden', marginBottom:8, borderRadius:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-          <button onClick={() => toggle(s.id)} style={{
-            display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 14px', cursor:'pointer', textAlign:'left',
-            background:'transparent', border:'none', color:'var(--text)', fontSize:13, fontWeight:700,
+        <div key={s.id} id={`risk-info-${s.id}`} style={{ padding:0, overflow:'hidden', marginBottom:10, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 10px 26px rgba(0,0,0,0.18)', scrollMarginTop:170 }}>
+          <button onClick={() => toggle(s.id)} aria-expanded={!!expanded[s.id]} style={{
+            display:'flex', alignItems:'center', gap:10, width:'100%', minHeight:60, padding:'14px 14px', cursor:'pointer', textAlign:'left',
+            background: expanded[s.id] ? 'rgba(255,255,255,0.04)' : 'transparent', border:'none', borderBottom: expanded[s.id] ? '1px solid rgba(255,255,255,0.07)' : 'none', color:'#fff', fontSize:14, fontWeight:800, lineHeight:1.3,
           }}>
-            <span style={{ fontSize:12, transition:'transform 0.2s', transform: expanded[s.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-            <span style={{ fontSize:18 }}>{s.icon}</span> {s.title}
+            <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:12, transition:'transform 0.2s', transform: expanded[s.id] ? 'rotate(90deg)' : 'rotate(0deg)', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▶</span>
+            <span style={{ fontSize:20, flexShrink:0 }}>{s.icon}</span> <span style={{ flex:1 }}>{s.title}</span>
+            <span style={{ flexShrink:0, fontSize:12, fontWeight:800, padding:'5px 10px', borderRadius:999, background: expanded[s.id] ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{expanded[s.id] ? '−' : '+'}</span>
           </button>
           {expanded[s.id] && (
-            <div style={{ padding:'0 14px 14px', fontSize:11, color:'var(--text-dim)', lineHeight:1.8, whiteSpace:'pre-line' }}>
+            <div style={{ padding:'14px 14px 16px', fontSize:12, color:'#fff', lineHeight:1.7, whiteSpace:'pre-line' }}>
               {s.content}
             </div>
           )}

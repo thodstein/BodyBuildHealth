@@ -91,39 +91,39 @@ export const RiskDetails: React.FC<{
         const mechs = SYSTEM_MECHANISMS[coreSys] || [];
 
         return (
-          <div key={coreSys} style={{ marginBottom:8, borderRadius:14, overflow:'hidden', background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-            <button onClick={() => toggle(coreSys)} style={{
-              display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 14px', cursor:'pointer', textAlign:'left',
-              background: netPct > 40 ? `rgba(${netPct > 70 ? '239,68,68' : '249,115,22'},0.06)` : 'transparent',
-              border:'none', color:'var(--text)', fontWeight:700, fontSize:13,
+          <div key={coreSys} className="risk-system-card" style={{ marginBottom:10, borderRadius:18, overflow:'hidden', background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 10px 26px rgba(0,0,0,0.18)' }}>
+            <button onClick={() => toggle(coreSys)} aria-expanded={isOpen} style={{
+              display:'flex', alignItems:'center', gap:10, width:'100%', minHeight:60, padding:'13px 14px', cursor:'pointer', textAlign:'left',
+              background: netPct > 40 ? `rgba(${netPct > 70 ? '239,68,68' : '249,115,22'},0.08)` : 'transparent',
+              border:'none', borderBottom: isOpen ? '1px solid rgba(255,255,255,0.07)' : 'none', color:'#fff', fontWeight:800, fontSize:14,
             }}>
-              <span style={{ fontSize:12, transition:'transform 0.2s', transform:isOpen?'rotate(90deg)':'rotate(0deg)' }}>▶</span>
-              <span style={{ fontSize:18 }}>{icon}</span>
-              <span style={{ flex:1 }}>{label}</span>
-              <span style={{ fontSize:14, fontWeight:800, color:getRiskColor(netPct), background:'var(--bg-secondary)', padding:'2px 10px', borderRadius:6 }}>{netPct}%</span>
+              <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, transition:'transform 0.2s', transform:isOpen?'rotate(90deg)':'rotate(0deg)', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', flexShrink:0 }}>▶</span>
+              <span style={{ fontSize:22 }}>{icon}</span>
+              <span style={{ flex:1, color:'#fff' }}>{label}</span>
+              <span style={{ fontSize:15, fontWeight:800, color:getRiskColor(netPct), background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding:'5px 12px', borderRadius:999 }}>{netPct}%</span>
             </button>
 
             {isOpen && (
-              <div style={{ padding:'0 14px 14px' }}>
+              <div style={{ padding:'12px 14px 16px' }}>
                 {/* Description */}
-                {info?.description && <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>{info.description}</div>}
+                {info?.description && <div style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.55 }}>{info.description}</div>}
 
                 {/* Subsystems */}
                 {subs.length > 0 && (
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
                     {subs.map(sub => {
                       const sbd = riskResult.systemBreakdown[sub];
                       const sNet = sbd ? Math.round(sbd.net) : 0;
                       const labCont = labRiskContributions?.systemContributions?.[sub] || 0;
                       return (
                         <div key={sub} style={{
-                          padding:'4px 10px', borderRadius:8, fontSize:9, fontWeight:600,
-                          background: sNet > 30 ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)',
-                          border: `1px solid ${sNet > 30 ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
-                          color: sNet > 30 ? '#ef4444' : 'var(--text-dim)',
+                          padding:'7px 12px', borderRadius:999, fontSize:12, fontWeight:700,
+                          background: sNet > 30 ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${sNet > 30 ? 'rgba(239,68,68,0.26)' : 'rgba(255,255,255,0.09)'}`,
+                          color: '#fff',
                         }}>
                           {getSystemLabel(sub)}: {sNet}%
-                          {labCont > 0 && <span style={{ color:'#8b5cf6' }}> (лаб: {Math.round(labCont)}%)</span>}
+                          {labCont > 0 && <span style={{ color:'#fff' }}> (лаб: {Math.round(labCont)}%)</span>}
                         </div>
                       );
                     })}
@@ -132,26 +132,26 @@ export const RiskDetails: React.FC<{
 
                 {/* Mechanisms */}
                 {mechs.length > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>⚙️ Механизмы</div>
-                    <div style={{ display:'grid', gap:4 }}>
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:8 }}>⚙️ Механизмы</div>
+                    <div style={{ display:'grid', gap:8 }}>
                       {mechs.map((m, i) => {
                         const mechNet = bd ? Math.min(100, Math.max(0, (bd.net * 0.3))) : 0;
                         return (
-                          <div key={i} style={{ padding:'6px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                              <span style={{ fontSize:10, fontWeight:600 }}>{i+1}. {m.label}</span>
-                              <span style={{ fontSize:10, fontWeight:700, color:getRiskColor(mechNet) }}>{Math.round(mechNet)}%</span>
+                          <div key={i} style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:4 }}>
+                              <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{i+1}. {m.label}</span>
+                              <span style={{ fontSize:13, fontWeight:800, color:getRiskColor(mechNet) }}>{Math.round(mechNet)}%</span>
                             </div>
-                            {m.description && <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4, marginBottom:3 }}>{m.description}</div>}
+                            {m.description && <div style={{ fontSize:12, color:'#fff', lineHeight:1.5, marginBottom:5 }}>{m.description}</div>}
                             {m.drugs && m.drugs.length > 0 && (
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                                 {m.drugs.slice(0, 4).map((d, j) => (
-                                  <span key={j} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(239,68,68,0.1)', color:'#ef4444' }}>{d}</span>
+                                  <span key={j} style={{ fontSize:11, fontWeight:700, padding:'4px 9px', borderRadius:999, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.20)', color:'#fff' }}>{d}</span>
                                 ))}
                               </div>
                             )}
-                            {m.mitigation && <div style={{ fontSize:8, color:'#22c55e', marginTop:2 }}>🛡️ {m.mitigation}</div>}
+                            {m.mitigation && <div style={{ fontSize:12, color:'#fff', marginTop:5, fontWeight:600 }}>🛡️ {m.mitigation}</div>}
                           </div>
                         );
                       })}
@@ -161,17 +161,17 @@ export const RiskDetails: React.FC<{
 
                 {/* Lab contribution */}
                 {labRiskContributions && (
-                  <div style={{ fontSize:9, color:isSyntheticLab ? '#f97316' : 'var(--text-dim)', marginBottom:6 }}>
+                  <div style={{ fontSize:12, color:'#fff', fontWeight:600, marginBottom:8 }}>
                     Лаб. вклад: {Math.round(labRiskContributions.systemContributions?.[coreSys] || 0)}%
-                    {isSyntheticLab && <span style={{ marginLeft:4, color:'#ef4444', fontWeight:600 }}>⚠️ штраф</span>}
+                    {isSyntheticLab && <span style={{ marginLeft:6, color:'#fff', fontWeight:800 }}>⚠️ штраф</span>}
                   </div>
                 )}
 
                 {/* Contributing drugs */}
                 {contributorMap[coreSys] && contributorMap[coreSys].length > 0 && (
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
                     {(contributorMap[coreSys] || []).map(id => (
-                      <span key={id} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(249,115,22,0.1)', color:'#f97316' }}>
+                      <span key={id} style={{ fontSize:11, fontWeight:700, padding:'5px 10px', borderRadius:999, background:'rgba(249,115,22,0.10)', border:'1px solid rgba(249,115,22,0.22)', color:'#fff' }}>
                         {(PHARMA_DB as any)[id]?.name || id}
                       </span>
                     ))}
@@ -180,14 +180,14 @@ export const RiskDetails: React.FC<{
 
                 {/* Organs */}
                 {SYSTEM_ORGANS[coreSys] && (
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>
+                  <div style={{ fontSize:12, color:'#fff', marginBottom:6, lineHeight:1.5 }}>
                     <strong>Органы:</strong> {SYSTEM_ORGANS[coreSys].join(', ')}
                   </div>
                 )}
 
                 {/* Key markers */}
                 {info?.keyMarkers && info.keyMarkers.length > 0 && (
-                  <div style={{ fontSize:9, color:'var(--text-dim)' }}>
+                  <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>
                     <strong>Маркеры:</strong> {info.keyMarkers.slice(0, 5).join(', ')}
                   </div>
                 )}
@@ -197,37 +197,38 @@ export const RiskDetails: React.FC<{
         );
       })}
 
-      {/* Recommendations */}
-      <div style={{ marginTop:8, borderRadius:14, overflow:'hidden', background:'var(--glass-bg)', border:'1px solid var(--glass-border)' }}>
-        <div style={{ padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontSize:13, fontWeight:700 }}>✅ Рекомендации</span>
+      {/* Recommendations — APK PRO */}
+      <div style={{ marginTop:10, borderRadius:18, overflow:'hidden', background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 10px 26px rgba(0,0,0,0.18)' }}>
+        <div style={{ padding:'14px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:14, fontWeight:800, color:'#fff' }}>✅ Рекомендации</span>
           {recommendations.length > 5 && (
-            <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ fontSize:10, color:'var(--accent)', background:'none', border:'none', cursor:'pointer' }}>
+            <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ minHeight:44, fontSize:13, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:999, padding:'8px 16px', cursor:'pointer' }}>
               {showAllRecs ? '▲ Скрыть' : `▼ Все (${recommendations.length})`}
             </button>
           )}
         </div>
-        <div style={{ padding:'0 14px 14px' }}>
+        <div style={{ padding:'0 14px 16px' }}>
           {recommendations.length > 0 ? (
-            <div style={{ display:'grid', gap:5 }}>
+            <div style={{ display:'grid', gap:8 }}>
               {(showAllRecs ? recommendations : recommendations.slice(0, 5)).map((rec, i) => (
                 <div key={i} style={{
-                  padding:'8px 10px', borderRadius:8, fontSize:11,
-                  background: rec.priority === 'high' ? 'rgba(239,68,68,0.1)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.1)' : 'rgba(34,197,94,0.1)',
-                  borderLeft: `3px solid ${rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#22c55e'}`,
-                  color: rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#22c55e',
+                  padding:'12px', borderRadius:12, fontSize:12, fontWeight:600, lineHeight:1.5,
+                  background: rec.priority === 'high' ? 'rgba(239,68,68,0.10)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.10)' : 'rgba(34,197,94,0.10)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderLeft: `4px solid ${rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#22c55e'}`,
+                  color: '#fff',
                 }}>
                   {rec.text}
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ color:'var(--text-dim)', textAlign:'center', padding:12, fontSize:11 }}>Нет специфических рекомендаций</div>
+            <div style={{ color:'#fff', textAlign:'center', padding:14, fontSize:13 }}>Нет специфических рекомендаций</div>
           )}
         </div>
       </div>
 
-      <div style={{ fontSize:9, color:'var(--text-dim)', textAlign:'center', marginTop:8, fontStyle:'italic' }}>
+      <div style={{ fontSize:12, color:'#fff', textAlign:'center', marginTop:10, fontStyle:'italic', lineHeight:1.5 }}>
         Расчёты носят информационный характер и не заменяют консультацию врача. {CORE_SYSTEMS.length} систем × механика каждого.
       </div>
     </div>
