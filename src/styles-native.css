@@ -5355,3 +5355,111 @@ html.app-native .risk-v7-tabs button:focus-visible {
     animation: none !important;
   }
 }
+
+/* ─── 78. ARTICLES PRO-FULL — топ-подача блока «Статьи» (hero не тронут) ──
+ * Только APK. TSX уже несёт PRO-инлайны (44/48/56px, стекло, белый текст,
+ * чипы-лента, сетка auto-fill); здесь — safe-area, липкость, press/focus,
+ * каскад, табличные цифры и белый текст-гард. TG/web не тронуты. */
+html.app-native .screen.articles-list {
+  --text-dim: #fff !important;
+  --text-light: #fff !important;
+  --text-muted: #fff !important;
+}
+
+html.app-native .articles-toolbar {
+  top: env(safe-area-inset-top, 0px) !important;
+  min-height: 56px !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.app-native .articles-toolbar button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .articles-toolbar button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .articles-toolbar button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .articles-search {
+  min-height: 48px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .articles-chips {
+  scrollbar-width: none !important;
+  scroll-snap-type: x proximity !important;
+}
+
+html.app-native .articles-chips::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .article-chip {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+  color: #fff !important;
+}
+
+html.app-native .article-chip:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .article-chip:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .article-chip[data-active='true'] {
+  box-shadow: 0 0 14px rgba(0, 230, 138, 0.25) !important;
+}
+
+html.app-native .articles-grid {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .articles-reader-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+  min-height: 56px !important;
+}
+
+html.app-native .articles-reader-bar button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .articles-reader-bar button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .articles-reader-bar button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .articles-reader-body {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Белый текст-гард: вторичный текст блока — белый (категорийные цвета и акценты не тронуты) */
+html.app-native .screen.articles-list,
+html.app-native .articles-reader-body {
+  color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .articles-grid {
+    animation: none !important;
+  }
+}

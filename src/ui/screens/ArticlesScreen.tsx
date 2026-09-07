@@ -92,39 +92,39 @@ function renderMarkdown(md: string): string {
         inTable = true;
         const headerCells = line.split('|').filter(c => c.trim());
         const headerRow = '<tr>' + headerCells.map(c =>
-          `<th style="padding:8px 11px;text-align:left;font-size:10px;font-weight:800;color:${ART_ACC};text-transform:uppercase;letter-spacing:0.06em;background:${artA(0.09)};border-bottom:1px solid ${artA(0.16)}">${c.trim()}</th>`
+          `<th style="padding:9px 12px;text-align:left;font-size:12px;font-weight:800;color:${ART_ACC};text-transform:uppercase;letter-spacing:0.06em;background:${artA(0.09)};border-bottom:1px solid ${artA(0.16)};white-space:nowrap">${c.trim()}</th>`
         ).join('') + '</tr>';
-        return `<table style="width:100%;border-collapse:collapse;margin:14px 0;border-radius:12px;overflow:hidden;font-size:11px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
+        return `<div style="overflow-x:auto;margin:14px -4px 0;padding:0 4px;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:480px;border-collapse:collapse;border-radius:12px;overflow:hidden;font-size:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
       }
       return '<tr>' + cells.map((c, i) =>
-        `<td style="padding:7px 11px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;${i === 0 ? 'font-weight:700;color:#fff' : 'color:#fff'}">${c.trim()}</td>`
+        `<td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;line-height:1.5;${i === 0 ? 'font-weight:700;color:#fff' : 'color:#fff'}">${c.trim()}</td>`
       ).join('') + '</tr>';
     } else {
       if (inTable) {
         inTable = false;
-        return '</tbody></table>\n' + line;
+        return '</tbody></table></div>\n' + line;
       }
       return line;
     }
   }).join('\n');
-  if (inTable) html += '</tbody></table>';
+  if (inTable) html += '</tbody></table></div>';
 
   html = html
     .replace(/^- (.+)$/gm, (_, item) =>
-      `<li style="margin:5px 0;font-size:12px;line-height:1.55;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
-    .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:10px 0;padding:0;list-style:none">${m}</ul>`)
+      `<li style="margin:6px 0;font-size:13px;line-height:1.6;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
+    .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:12px 0;padding:0;list-style:none">${m}</ul>`)
     .replace(/^---$/gm, `<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,${artA(0.22)},transparent);margin:22px 0"/>`)
     .replace(/\n\n/g, '<div style="height:8px"></div>')
     .replace(/- \[ \] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:7px;margin:4px 0;font-size:11px;color:#fff"><span style="width:14px;height:14px;border-radius:4px;border:1.5px solid rgba(255,255,255,0.22);display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0"></span>${t}</span><br/>`)
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:#fff"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.25);display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0"></span>${t}</span><br/>`)
     .replace(/- \[x\] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:7px;margin:4px 0;font-size:11px;color:${ART_ACC}"><span style="width:14px;height:14px;border-radius:4px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`);
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:${ART_ACC}"><span style="width:16px;height:16px;border-radius:5px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`);
 
   html = html
     .replace(/^> (.+)$/gm, (_, q) =>
-      `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:8px;font-size:12px;color:#fff;line-height:1.55;backdrop-filter:blur(8px)">${q}</blockquote>`);
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:10px;font-size:13px;color:#fff;line-height:1.6;backdrop-filter:blur(8px)">${q}</blockquote>`);
 
-  return `<div style="line-height:1.75;font-size:13px;color:#fff">${html}</div>`;
+  return `<div style="line-height:1.8;font-size:14px;color:#fff">${html}</div>`;
 }
 
 export const ArticlesScreen: React.FC = () => {
@@ -222,22 +222,22 @@ export const ArticlesScreen: React.FC = () => {
 
   return (
     <div className="screen articles-list" style={{ fontFamily: FONT, paddingBottom: 'calc(20px + 72px + env(safe-area-inset-bottom,0px))', background:'transparent' }}>
-      {/* premium toolbar */}
-      <div className="articles-toolbar" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, position:'sticky', top:0, zIndex:2, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,10,15,0.62)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
-        <button onClick={() => setPage('hero')} style={{
-          padding:'8px 12px', cursor:'pointer', fontSize:12, fontWeight:700,
-          color:'#fff', border:'1px solid rgba(255,255,255,0.09)', background:'rgba(255,255,255,0.05)',
+      {/* premium toolbar — APK PRO: 56px, тач 44px */}
+      <div className="articles-toolbar" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, minHeight:56, position:'sticky', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,10,15,0.86)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
+        <button onClick={() => setPage('hero')} aria-label="Назад к категориям" style={{
+          minHeight:44, padding:'10px 16px', cursor:'pointer', fontSize:13, fontWeight:800,
+          color:'#fff', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)',
           borderRadius:999, display:'flex', alignItems:'center', gap:6,
           backdropFilter:'blur(10px)', transition:'all 0.18s',
         }}
         onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.14)'; }}
-        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.09)'; }}
+        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.12)'; }}
         >← Категории</button>
         <div style={{ flex:1 }} />
         {isNativeApp() && offline && (
-          <span className="articles-offline" style={{ fontSize:10, fontWeight:800, color:'#fbbf24', background:'rgba(251,191,36,0.10)', border:'1px solid rgba(251,191,36,0.24)', padding:'5px 10px', borderRadius:999 }}>Офлайн · читалка доступна</span>
+          <span className="articles-offline" style={{ fontSize:12, fontWeight:800, color:'#fff', background:'rgba(251,191,36,0.12)', border:'1px solid rgba(251,191,36,0.26)', padding:'7px 12px', borderRadius:999 }}>Офлайн · читалка доступна</span>
         )}
-        <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'5px 10px', borderRadius:999 }}>{articles.length} ст.</span>
+        <span style={{ fontSize:12, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', padding:'7px 12px', borderRadius:999 }}>{articles.length} ст.</span>
       </div>
 
       {/* Search bar — glass */}
@@ -247,9 +247,9 @@ export const ArticlesScreen: React.FC = () => {
         </svg>
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Поиск статей — заголовок, тег, категория..." className="articles-search" style={{
-            width:'100%', padding:'11px 36px 11px 36px', borderRadius:12,
+            width:'100%', minHeight:48, padding:'12px 44px 12px 38px', borderRadius:14,
             background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
-            color:'#fff', fontSize:13, outline:'none', fontFamily: FONT,
+            color:'#fff', fontSize:14, outline:'none', fontFamily: FONT,
             backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
             boxShadow:'0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
             transition:'border-color 0.2s, box-shadow 0.2s',
@@ -259,23 +259,24 @@ export const ArticlesScreen: React.FC = () => {
           onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)'; }}
         />
         {search && (
-          <button onClick={()=>setSearch('')} aria-label="Очистить" style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:999, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>✕</button>
+          <button onClick={()=>setSearch('')} aria-label="Очистить поиск" style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', minWidth:36, height:36, borderRadius:999, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800 }}>✕</button>
         )}
       </div>
 
-      {/* Category chips — glass pills */}
-      <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:12 }}>
+      {/* Category chips — APK PRO: тач 44px, скролл-лента */}
+      <div className="articles-chips" style={{ display:'flex', gap:8, flexWrap:'nowrap', overflowX:'auto', marginBottom:12, paddingBottom:4, scrollbarWidth:'none' }}>
         {isNativeApp() && (
           <button key="saved" onClick={() => setCategory('saved')} className="article-chip" data-active={category === 'saved'} aria-label="Сохранённые статьи" style={{
-            padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontFamily: FONT,
-            background: category === 'saved' ? 'linear-gradient(135deg, rgba(var(--accent-rgb, 0,230,138),0.16), rgba(var(--accent-rgb, 0,230,138),0.07))' : 'rgba(255,255,255,0.05)',
-            color: category === 'saved' ? 'var(--accent, #00e68a)' : '#fff',
-            border: `1px solid ${category === 'saved' ? 'rgba(var(--accent-rgb, 0,230,138),0.32)' : 'rgba(255,255,255,0.08)'}`,
-            fontWeight: category === 'saved' ? 800 : 600,
+            minHeight:44, padding:'10px 16px', borderRadius:999, fontSize:13, cursor:'pointer', fontFamily: FONT, flexShrink:0, whiteSpace:'nowrap',
+            background: category === 'saved' ? 'linear-gradient(135deg, rgba(var(--accent-rgb, 0,230,138),0.18), rgba(var(--accent-rgb, 0,230,138),0.08))' : 'rgba(255,255,255,0.06)',
+            color: '#fff',
+            border: `1px solid ${category === 'saved' ? 'rgba(var(--accent-rgb, 0,230,138),0.40)' : 'rgba(255,255,255,0.10)'}`,
+            boxShadow: category === 'saved' ? '0 0 14px rgba(0,230,138,0.25)' : 'none',
+            fontWeight: 800,
             transition:'all 0.18s', letterSpacing:'-0.01em',
             display:'flex', alignItems:'center', gap:6,
           }}>
-            <span style={{ display:'inline-flex', color:ART_ACC }}><NativeIcon name="bookmark" size={11} /></span>
+            <span style={{ display:'inline-flex', color:ART_ACC }}><NativeIcon name="bookmark" size={13} /></span>
             Сохранённые{saved.length > 0 ? ` · ${saved.length}` : ''}
           </button>
         )}
@@ -283,17 +284,17 @@ export const ArticlesScreen: React.FC = () => {
           const isActive = category === c.value;
           return (
             <button key={c.value} onClick={() => setCategory(c.value)} className="article-chip" data-active={isActive} style={{
-              padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontFamily: FONT,
-              background: isActive ? `linear-gradient(135deg, ${c.color}1f, ${c.color}12)` : 'rgba(255,255,255,0.05)',
-              color: isActive ? c.color : '#fff',
-              border: `1px solid ${isActive ? c.color+'44' : 'rgba(255,255,255,0.08)'}`,
-              fontWeight: isActive ? 800 : 600,
+              minHeight:44, padding:'10px 16px', borderRadius:999, fontSize:13, cursor:'pointer', fontFamily: FONT, flexShrink:0, whiteSpace:'nowrap',
+              background: isActive ? `linear-gradient(135deg, ${c.color}26, ${c.color}12)` : 'rgba(255,255,255,0.06)',
+              color: '#fff',
+              border: `1px solid ${isActive ? c.color+'55' : 'rgba(255,255,255,0.10)'}`,
+              fontWeight: 800,
               backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-              boxShadow: isActive ? `0 4px 16px ${c.color}22, inset 0 1px 0 rgba(255,255,255,0.08)` : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+              boxShadow: isActive ? `0 0 14px ${c.color}30, inset 0 1px 0 rgba(255,255,255,0.08)` : 'inset 0 1px 0 rgba(255,255,255,0.04)',
               transition:'all 0.18s', letterSpacing:'-0.01em',
               display:'flex', alignItems:'center', gap:6,
             }}>
-              {CAT_ICON[c.value] && <span style={{ display:'inline-flex' }}><NativeIcon name={CAT_ICON[c.value]} size={11} /></span>}
+              {CAT_ICON[c.value] && <span style={{ display:'inline-flex', color: isActive ? c.color : '#fff' }}><NativeIcon name={CAT_ICON[c.value]} size={13} /></span>}
               {c.label}
             </button>
           );
@@ -308,27 +309,27 @@ export const ArticlesScreen: React.FC = () => {
               <span style={{ width:26, height:26, borderRadius:8, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', display:'flex', alignItems:'center', justifyContent:'center', color:'#f87171' }}><NativeIcon name="file" size={13} /></span> PDF
             </span>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => openPDF(pdfViewer)} style={{ padding:'7px 16px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:11, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>Открыть</button>
-              <button onClick={() => setPdfViewer(null)} style={{ padding:'7px 12px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, cursor:'pointer' }}>✕</button>
+              <button onClick={() => openPDF(pdfViewer)} style={{ minHeight:44, padding:'10px 20px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>Открыть</button>
+              <button onClick={() => setPdfViewer(null)} aria-label="Закрыть" style={{ minWidth:44, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.07)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:14, fontWeight:800, cursor:'pointer' }}>✕</button>
             </div>
           </div>
           <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:24 }}>
             <div style={{ width:72, height:72, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(239,68,68,0.18), rgba(239,68,68,0.06) 55%, transparent 75%)', border:'1px solid rgba(239,68,68,0.18)', display:'flex', alignItems:'center', justifyContent:'center', color:'#f87171', boxShadow:'0 12px 32px rgba(239,68,68,0.18)' }}><NativeIcon name="file" size={32} /></div>
             <div style={{ fontSize:16, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>PDF-документ</div>
-            <div style={{ fontSize:12, color:'#fff', textAlign:'center', maxWidth:320, lineHeight:1.5 }}>Для просмотра откроется новая вкладка — браузер покажет файл в встроенном просмотрщике.</div>
-            <button onClick={()=>openPDF(pdfViewer)} style={{ marginTop:8, padding:'10px 18px', borderRadius:999, background:'#fff', color:'#000', border:'none', fontWeight:800, fontSize:12, cursor:'pointer' }}>Открыть в браузере →</button>
+            <div style={{ fontSize:13, color:'#fff', textAlign:'center', maxWidth:320, lineHeight:1.55 }}>Для просмотра откроется новая вкладка — браузер покажет файл в встроенном просмотрщике.</div>
+            <button onClick={()=>openPDF(pdfViewer)} style={{ marginTop:8, minHeight:48, padding:'12px 24px', borderRadius:999, background:'#fff', color:'#000', border:'none', fontWeight:800, fontSize:14, cursor:'pointer' }}>Открыть в браузере →</button>
           </div>
         </div>
       )}
 
-      {/* Full-screen article reader — premium */}
+      {/* Full-screen article reader — APK PRO */}
       {readingArticle && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, background:'#07070a', display:'flex', flexDirection:'column', fontFamily: FONT }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0, background:'rgba(255,255,255,0.02)', backdropFilter:'blur(14px)' }}>
-            <button onClick={() => setReadingArticle(null)} style={{
-              width:34, height:34, borderRadius:999, cursor:'pointer',
-              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
-              color:'#fff', fontSize:14, fontWeight:700,
+        <div className="articles-reader" style={{ position:'fixed', inset:0, zIndex:200, background:'#07070a', display:'flex', flexDirection:'column', fontFamily: FONT }}>
+          <div className="articles-reader-bar" style={{ display:'flex', alignItems:'center', gap:10, minHeight:56, padding:'8px 12px', borderBottom:'1px solid rgba(255,255,255,0.07)', flexShrink:0, background:'rgba(10,10,15,0.86)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)' }}>
+            <button onClick={() => setReadingArticle(null)} aria-label="Назад к списку статей" style={{
+              minWidth:44, height:44, borderRadius:999, cursor:'pointer',
+              background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
+              color:'#fff', fontSize:16, fontWeight:800,
               display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
             }}>←</button>
             <div style={{ flex:1, minWidth:0 }}>
@@ -352,17 +353,18 @@ export const ArticlesScreen: React.FC = () => {
                 className="article-bookmark"
                 data-active={saved.includes(readingArticle.id)}
                 style={{
-                  width:34, height:34, borderRadius:999, cursor:'pointer', flexShrink:0,
-                  background: saved.includes(readingArticle.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.16)' : 'rgba(255,255,255,0.06)',
-                  border: saved.includes(readingArticle.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.32)' : '1px solid rgba(255,255,255,0.08)',
+                  minWidth:44, height:44, borderRadius:999, cursor:'pointer', flexShrink:0,
+                  background: saved.includes(readingArticle.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.07)',
+                  border: saved.includes(readingArticle.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.40)' : '1px solid rgba(255,255,255,0.12)',
+                  boxShadow: saved.includes(readingArticle.id) ? '0 0 14px rgba(0,230,138,0.30)' : 'none',
                   color: saved.includes(readingArticle.id) ? 'var(--accent, #00e68a)' : '#fff',
                   fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
                 }}
-              >{saved.includes(readingArticle.id) ? <NativeIcon name="bookmark" size={15} filled /> : <NativeIcon name="bookmark" size={15} />}</button>
+              >{saved.includes(readingArticle.id) ? <NativeIcon name="bookmark" size={17} filled /> : <NativeIcon name="bookmark" size={17} />}</button>
             )}
           </div>
 
-          <div style={{ flex:1, overflow:'auto', padding:'18px 16px 40px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
+          <div className="articles-reader-body" style={{ flex:1, overflow:'auto', padding:'18px 16px 40px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:999, background:`${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}14`, border:`1px solid ${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}22`, color: CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280', fontSize:11, fontWeight:800, marginBottom:10 }}>
               <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {CATEGORIES.find(c=>c.value===readingArticle.category)?.label || readingArticle.category}
             </div>
@@ -380,22 +382,22 @@ export const ArticlesScreen: React.FC = () => {
             <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '') }} />
 
             {readingArticle.tags.length > 0 && (
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:26, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:26, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.07)' }}>
                 {readingArticle.tags.map(t => (
                   <span key={t} style={{
-                    padding:'5px 11px', borderRadius:999, fontSize:11, fontWeight:600,
-                    background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.06)',
+                    padding:'7px 13px', borderRadius:999, fontSize:12, fontWeight:700,
+                    background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.08)',
                     backdropFilter:'blur(8px)',
                   }}>#{t}</span>
                 ))}
               </div>
             )}
 
-            <div style={{ marginTop:22, padding:'12px 14px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ width:28, height:28, borderRadius:999, background:`${artA(0.14)}`, border:`1px solid ${artA(0.18)}`, display:'flex', alignItems:'center', justifyContent:'center', color:ART_ACC }}>✓</span>
-              <span style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>Материал подготовлен командой Health Engine. Не является медицинской рекомендацией — проконсультируйтесь с врачом.</span>
+            <div style={{ marginTop:22, padding:'12px 14px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ width:32, height:32, borderRadius:999, background:`${artA(0.14)}`, border:`1px solid ${artA(0.20)}`, display:'flex', alignItems:'center', justifyContent:'center', color:ART_ACC, flexShrink:0, fontWeight:800 }}>✓</span>
+              <span style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>Материал подготовлен командой Health Engine. Не является медицинской рекомендацией — проконсультируйтесь с врачом.</span>
             </div>
-            <div style={{ marginTop:18, textAlign:'center', fontSize:10, color:'#fff' }}>
+            <div style={{ marginTop:18, textAlign:'center', fontSize:11, color:'#fff' }}>
               Health Engine · {readingArticle.date}
             </div>
           </div>
@@ -404,16 +406,16 @@ export const ArticlesScreen: React.FC = () => {
 
       {/* Empty state — premium */}
       {articles.length === 0 && (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'44px 20px', gap:12, marginTop:10, borderRadius:16, background:'rgba(255,255,255,0.02)', border:'1px dashed rgba(255,255,255,0.08)' }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'44px 20px', gap:12, marginTop:10, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px dashed rgba(255,255,255,0.12)' }}>
           <div style={{ width:64, height:64, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(139,92,246,0.18), transparent 65%)', border:'1px solid rgba(139,92,246,0.18)', display:'flex', alignItems:'center', justifyContent:'center', color:'#a78bfa', boxShadow:'0 10px 28px rgba(139,92,246,0.14)' }}><NativeIcon name="inbox" size={26} /></div>
-          <div style={{ fontSize:14, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>Статьи не найдены</div>
-          <div style={{ fontSize:12, color:'#fff', textAlign:'center', maxWidth:300 }}>Попробуйте изменить запрос или сбросить фильтры — покажем всё снова.</div>
-          <button onClick={() => { setSearch(''); setCategory('all'); }} style={{ marginTop:6, padding:'8px 16px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', backdropFilter:'blur(10px)' }}>Сбросить фильтры</button>
+          <div style={{ fontSize:15, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>Статьи не найдены</div>
+          <div style={{ fontSize:13, color:'#fff', textAlign:'center', maxWidth:300, lineHeight:1.5 }}>Попробуйте изменить запрос или сбросить фильтры — покажем всё снова.</div>
+          <button onClick={() => { setSearch(''); setCategory('all'); }} style={{ marginTop:6, minHeight:44, padding:'10px 22px', borderRadius:999, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', backdropFilter:'blur(10px)' }}>Сбросить фильтры</button>
         </div>
       )}
 
-      {/* Article cards — premium magazine grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10, marginBottom:8 }}>
+      {/* Article cards — premium magazine grid (мобайл: 2 в ряд на 360, 1 на 320) */}
+      <div className="articles-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10, marginBottom:8 }}>
         {articles.map(article => {
           const catColor = CATEGORIES.find(c => c.value === article.category)?.color || '#6b7280';
           const catIcon: NativeIconName = CAT_ICON[article.category] || 'file';
@@ -436,37 +438,37 @@ export const ArticlesScreen: React.FC = () => {
             onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 14px 36px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = catColor+'2a'; }}
             onMouseLeave={e=>{ e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'; }}
             >
-              <div style={{ height:3, background: isPDF ? 'linear-gradient(90deg, #ef4444, #f97316)' : catColor, width:'100%', opacity:0.95 }} />
-              <div style={{ padding:'11px 11px 10px', position:'relative' }}>
+              <div style={{ height:4, background: isPDF ? 'linear-gradient(90deg, #ef4444, #f97316)' : catColor, width:'100%', opacity:0.95 }} />
+              <div style={{ padding:'12px 12px 11px', position:'relative' }}>
                 <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(520px 100px at 14% 0%, ${catColor}10, transparent 62%)`, pointerEvents:'none' }} />
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7, position:'relative' }}>
-                  <span style={{ fontSize:10, color:catColor, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:5, background:`${catColor}12`, border:`1px solid ${catColor}22`, padding:'3px 8px', borderRadius:999 }}>
-                    <NativeIcon name={catIcon} size={11} /> {CATEGORIES.find(c => c.value === article.category)?.label || article.category}
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginBottom:8, position:'relative' }}>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:5, background:`${catColor}14`, border:`1px solid ${catColor}26`, padding:'4px 9px', borderRadius:999, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    <NativeIcon name={catIcon} size={12} /> {CATEGORIES.find(c => c.value === article.category)?.label || article.category}
                   </span>
                   {isPDF ? (
-                    <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(239,68,68,0.12)', color:'#f87171', fontWeight:800, border:'1px solid rgba(239,68,68,0.18)' }}>PDF</span>
+                    <span style={{ fontSize:11, padding:'4px 9px', borderRadius:999, background:'rgba(239,68,68,0.14)', color:'#fff', fontWeight:800, border:'1px solid rgba(239,68,68,0.24)', flexShrink:0 }}>PDF</span>
                   ) : (
-                    <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:`${artA(0.10)}`, color:ART_ACC, fontWeight:800, border:`1px solid ${artA(0.16)}` }}>{readTime}′</span>
+                    <span style={{ fontSize:11, padding:'4px 9px', borderRadius:999, background:`${artA(0.12)}`, color:'#fff', fontWeight:800, border:`1px solid ${artA(0.20)}`, flexShrink:0 }}>{readTime}′</span>
                   )}
                 </div>
 
-                <div style={{ fontWeight:800, fontSize:12, color:'#fff', marginBottom:4, lineHeight:1.32, letterSpacing:'-0.015em', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 38, position:'relative' }}>
+                <div style={{ fontWeight:800, fontSize:13, color:'#fff', marginBottom:5, lineHeight:1.32, letterSpacing:'-0.015em', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 41, position:'relative' }}>
                   {article.title}
                 </div>
 
-                <div style={{ fontSize:11, color:'#fff', lineHeight:1.42, marginBottom:8, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 31, position:'relative' }}>
+                <div style={{ fontSize:12, color:'#fff', lineHeight:1.45, marginBottom:9, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 35, position:'relative' }}>
                   {article.description}
                 </div>
 
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', position:'relative' }}>
-                  <span style={{ fontSize:10, color:'#fff', fontWeight:600, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:999 }}>{article.date}</span>
-                  <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, position:'relative' }}>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', padding:'4px 9px', borderRadius:999 }}>{article.date}</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
                 </div>
               </div>
 
               {isPDF && (
-                <div style={{ padding:'0 11px 10px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
-                  <span style={{ fontSize:10, color:'rgba(239,68,68,0.72)', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}><NativeIcon name="file" size={11} /> Открыть PDF <span style={{ opacity:0.6 }}>→</span></span>
+                <div style={{ padding:'0 12px 11px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:800, display:'flex', alignItems:'center', gap:5 }}><NativeIcon name="file" size={12} /> Открыть PDF <span>→</span></span>
                 </div>
               )}
             </div>
@@ -476,12 +478,12 @@ export const ArticlesScreen: React.FC = () => {
 
       {/* Footer stats — pill */}
       <div style={{ marginTop:8, marginBottom:14, display:'flex', justifyContent:'center' }}>
-        <div style={{ display:'inline-flex', alignItems:'center', gap:10, padding:'7px 12px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)', fontSize:10, color:'#fff', fontWeight:700 }}>
-          <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="bookOpen" size={11} /> {ARTICLES_MANIFEST.length}</span>
-          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.18)' }} />
-          <span style={{ color:'#f87171', display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="file" size={11} /> {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF</span>
-          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.18)' }} />
-          <span style={{ color:ART_ACC, display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="notebook" size={11} /> {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length}</span>
+        <div style={{ display:'inline-flex', alignItems:'center', flexWrap:'wrap', justifyContent:'center', gap:10, padding:'9px 16px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', fontSize:12, color:'#fff', fontWeight:800 }}>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5 }}><NativeIcon name="bookOpen" size={13} /> {ARTICLES_MANIFEST.length}</span>
+          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+          <span style={{ color:'#fff', display:'inline-flex', alignItems:'center', gap:5 }}><NativeIcon name="file" size={13} /> {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF</span>
+          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+          <span style={{ color:'#fff', display:'inline-flex', alignItems:'center', gap:5 }}><NativeIcon name="notebook" size={13} /> {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length}</span>
         </div>
       </div>
     </div>
