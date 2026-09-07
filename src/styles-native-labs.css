@@ -1,0 +1,54 @@
+/* ─── LABS APK — телефонный слой вкладки «Анализы» ──────────
+ * Только APK (html.app-native). Грузится точечно через labs-apk-loader
+ * за гейтом isNativeApp() — в TG/web ни байта.
+ * Здесь — то, что инлайном не сделать: скроллбары Chromium, tap-подсветка,
+ * спиннеры number-инпутов, overscroll шитов, страховка нижних отступов. */
+
+html.app-native .labs-body {
+  padding-bottom: calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px)) !important;
+  overscroll-behavior-y: contain !important;
+}
+
+html.app-native .labs-subtabs,
+html.app-native .labs-filter-row,
+html.app-native .labs-phase-row,
+html.app-native .labs-bottomtabs {
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html.app-native .labs-subtabs::-webkit-scrollbar,
+html.app-native .labs-filter-row::-webkit-scrollbar,
+html.app-native .labs-phase-row::-webkit-scrollbar,
+html.app-native .labs-bottomtabs::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html.app-native .labs-body button,
+html.app-native .labs-body input,
+html.app-native .labs-body textarea {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html.app-native .labs-body input[type='number']::-webkit-outer-spin-button,
+html.app-native .labs-body input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+html.app-native .labs-body input[type='number'] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+html.app-native .labs-bottomtabs {
+  overscroll-behavior-x: contain !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .labs-body button:active {
+    transform: none !important;
+  }
+}

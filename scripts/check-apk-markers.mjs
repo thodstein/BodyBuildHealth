@@ -47,7 +47,7 @@ for (const w of [
 ]) mustExist(`public/${w}`, `webp ${w}`);
 
 // 3. CSS-изоляция: каждый селектор native-слоёв — только html.app-native.
-for (const name of ['src/styles-native.css', 'src/styles-native-pro.css']) {
+for (const name of ['src/styles-native.css', 'src/styles-native-pro.css', 'src/styles-native-labs.css']) {
   const p = join(root, name);
   if (!existsSync(p)) {
     fails.push(`MISS file ${name}`);

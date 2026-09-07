@@ -32,6 +32,9 @@ import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, export
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { isNativeApp } from '../../core/app-platform';
+import { ensureLabsApkStyles } from './LabsScreen_parts/labs-apk-loader';
+
+ensureLabsApkStyles();
 
 /** LabsHeroStats — сводка hero, ТОЛЬКО APK (isNativeApp гейт). Telegram не рендерит. */
 const LabsHeroStats: React.FC<{
@@ -696,9 +699,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── SCROLLABLE CONTENT — увеличен нижний отступ чтобы дашборд не перекрывал ─── */}
+      {/* ─── SCROLLABLE CONTENT — отступ над нижними табами: nav(76) + табы(64) + запас ─── */}
       {mainTab !== 'hero' && (
-      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
+      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom,0px))' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
@@ -1556,10 +1559,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                    </svg>
                     {hoveredTrendPoint && (
                      <div style={{
-                        position: 'fixed', left: hoveredTrendPoint.x + 8, top: hoveredTrendPoint.y - 28,
-                       background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '3px 8px', borderRadius: 4,
-                       fontSize: 10, fontWeight: 600, pointerEvents: 'none', zIndex: 1000,
-                       border: '1px solid rgba(255,255,255,0.15)',
+                        position:'fixed', left: Math.min(hoveredTrendPoint.x + 8, Math.max(8, (typeof window !== 'undefined' ? window.innerWidth : 360) - 132)), top: Math.max(8, hoveredTrendPoint.y - 32),
+                        maxWidth:'70vw', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                       background:'rgba(0,0,0,0.88)', color:'#fff', padding:'6px 10px', borderRadius:8,
+                       fontSize:12, fontWeight:700, pointerEvents:'none', zIndex:1000,
+                       border:'1px solid rgba(255,255,255,0.15)',
                      }}>
                         {hoveredTrendPoint.date.slice(5)}: {hoveredTrendPoint.value.toFixed(1)}
                      </div>
