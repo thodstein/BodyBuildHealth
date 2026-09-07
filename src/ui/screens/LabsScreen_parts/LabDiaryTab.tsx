@@ -218,25 +218,29 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
       {/* ═══ CHART ═══ */}
       {mode === 'chart' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Marker selector */}
-          <div style={GLASS}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+          {/* Marker selector — TOP APK чипы 40px */}
+          <div style={{ ...GLASS, padding:14 }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:8, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10 }}>
               Выберите маркер
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
-              {markerOptions.slice(0, 30).map(m => (
-                <button key={m.code} onClick={() => setSelectedMarker(m.code)}
-                  style={{
-                    padding: '3px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit',
-                    border: selectedMarker === m.code ? '1px solid var(--labs-accent, #00e68a)' : '1px solid rgba(255,255,255,0.06)',
-                    background: selectedMarker === m.code ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)' : 'rgba(255,255,255,0.03)',
-                    color: selectedMarker === m.code ? LABS_ACCENT : '#fff',
-                    fontWeight: selectedMarker === m.code ? 700 : 400,
-                  }}>{m.name}</button>
-              ))}
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:6 }}>
+              {markerOptions.slice(0, 30).map(m => {
+                const active = selectedMarker === m.code;
+                return (
+                  <button key={m.code} onClick={() => setSelectedMarker(m.code)} aria-pressed={active}
+                    style={{
+                      padding:'8px 14px', borderRadius:999, fontSize:12, cursor:'pointer', fontFamily:'inherit', minHeight:40,
+                      border: active ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : '1px solid rgba(140,190,255,0.14)',
+                      background: active ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(21,38,66,0.60)',
+                      color: active ? LABS_ACCENT : '#fff',
+                      fontWeight: active ? 800 : 600,
+                      boxShadow: active ? '0 4px 14px rgba(var(--labs-accent-rgb, 0,230,138),0.25)' : 'none',
+                    }}>{m.name}</button>
+                );
+              })}
             </div>
             {markerOptions.length > 30 && (
-              <div style={{ fontSize: 8, color: '#fff' }}>
+              <div style={{ fontSize:11, color:'#fff', fontWeight:600 }}>
                 + ещё {markerOptions.length - 30} маркеров
               </div>
             )}

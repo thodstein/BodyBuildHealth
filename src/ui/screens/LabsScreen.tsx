@@ -2229,22 +2229,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     })() : null;
                     return (
                       <React.Fragment key={lab.code}>
-                        <button onClick={() => toggleLabSelection(lab.code)} style={{
-                          display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                          background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)' : 'var(--bg-secondary)',
-                          border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                        <button onClick={() => toggleLabSelection(lab.code)} aria-pressed={isSelected} style={{
+                          display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, width:'100%', padding:'12px 12px', marginBottom:8, borderRadius:14, cursor:'pointer', minHeight:60,
+                          background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(21,38,66,0.60)',
+                          border: isSelected ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : '1px solid rgba(140,190,255,0.14)',
+                          borderLeft:`3px solid ${isSelected ? LABS_ACCENT : 'rgba(140,190,255,0.20)'}`,
                         }}>
-                          <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <span style={{ fontWeight:800, fontSize:13, color:'#fff', flex:1, textAlign:'left', minWidth:0 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
+                          <span style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', justifyContent:'flex-end', flexShrink:0 }}>
                             {compareLabel}
-                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 700, background: confidenceColor + '22', color: confidenceColor }}>
+                            <span style={{ fontSize:10, padding:'3px 8px', borderRadius:999, fontWeight:800, background:confidenceColor + '22', color:confidenceColor, border:`1px solid ${confidenceColor}30` }}>
                               {confidencePct}%
                             </span>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}{ratioLabel}</span>
+                            <span style={{ fontWeight:900, fontSize:14, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)', fontVariantNumeric:'tabular-nums' }}>{lab.value} {lab.unit}{ratioLabel}</span>
                           </span>
                         </button>
                         {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (
-                          <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: '#fff', lineHeight: 1.3 }}>
+                          <div style={{ margin:'-4px 4px 8px', fontSize:11, color:'#fff', lineHeight:1.5 }}>
                             {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–${lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
                           </div>
                         )}
@@ -2252,16 +2253,17 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     );
                   })}
                   <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{
-                    width: '100%', marginTop: 12, padding: 12,
-                    background: selectedLabs.size > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: selectedLabs.size > 0 ? '#000' : '#fff',
-                    border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
+                    width:'100%', marginTop:12, padding:'14px', minHeight:52,
+                    background: selectedLabs.size > 0 ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(255,255,255,0.06)',
+                    color: selectedLabs.size > 0 ? '#0a1a08' : '#fff',
+                    border:'none', borderRadius:14, fontWeight:800, fontSize:14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
+                    boxShadow: selectedLabs.size > 0 ? '0 8px 24px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
                   }}>✓ Сохранить {selectedLabs.size} показателей</button>
                   {ocrResult.labs.length === 0 && (
                     <button onClick={() => { setOcrResult(null); setSelectedLabs(new Set()); }} style={{
-                      width: '100%', marginTop: 6, padding: 10,
-                      background: 'var(--bg-secondary)', color: '#fff',
-                      border: '1px solid var(--border)', borderRadius: 10, fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                      width:'100%', marginTop:8, padding:'14px', minHeight:52,
+                      background:'rgba(21,38,66,0.60)', color:'#fff',
+                      border:'1px solid rgba(140,190,255,0.14)', borderRadius:14, fontWeight:800, fontSize:13, cursor:'pointer',
                     }}>🔄 Попробовать другой файл или вставить текст</button>
                   )}
                 </div>
