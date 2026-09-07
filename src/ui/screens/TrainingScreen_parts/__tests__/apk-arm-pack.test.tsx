@@ -293,4 +293,22 @@ describe('APK arm pack', () => {
     fireEvent.click(hookBtns[0]);
     expect(hookBtns[0].getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('выдача: полоса объёма — 8 недель с фазами, клик переключает', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📋 План' }));
+    const strip = container.querySelector("[data-arm='week-pills']");
+    expect(strip, 'vol strip').not.toBeNull();
+    const btns = Array.from(strip!.querySelectorAll('.ad-wpill'));
+    expect(btns.length).toBe(8);
+    for (const b of btns) {
+      expect(b.getAttribute('data-phase')).toBeTruthy();
+      const fill = b.querySelector('.ad-wpill-fill') as HTMLElement | null;
+      expect(fill, 'bar').not.toBeNull();
+      expect(Number.parseFloat(fill!.style.height)).toBeGreaterThan(0);
+    }
+    fireEvent.click(btns[2]);
+    expect(document.body.textContent).toContain('Неделя 3 —');
+  });
 });

@@ -939,6 +939,9 @@
   :is(.train-arm, .train-armdiag) .ad-toast {
     animation: none;
   }
+  :is(.train-arm) .ad-sess-list > .ad-sess {
+    animation: none;
+  }
 }
 
 /* ─── Выдача: фазные пилюли и теги ──────────────────────────────── */
@@ -986,6 +989,92 @@
 
 :is(.train-arm) .ad-ex-vl > b {
   color: var(--ad-text);
+}
+
+/* ─── Полоса объёма недель ───────────────────────────────────────── */
+:is(.train-arm) .ad-wpill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 52px;
+  padding: 8px 10px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--ad-edge2);
+  background: var(--ad-bg2);
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm) .ad-wpill:active {
+  transform: scale(0.94);
+}
+
+:is(.train-arm) .ad-wpill[data-active='true'] {
+  border-color: var(--ad-acc);
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.14), 0 8px 22px rgba(0, 230, 138, 0.25);
+}
+
+:is(.train-arm) .ad-wpill-bar {
+  display: flex;
+  align-items: flex-end;
+  height: 40px;
+  width: 100%;
+}
+
+:is(.train-arm) .ad-wpill-fill {
+  display: block;
+  width: 100%;
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--ad-acc), rgba(0, 200, 160, 0.45));
+}
+
+:is(.train-arm) .ad-wpill[data-phase='deload'] .ad-wpill-fill {
+  background: linear-gradient(180deg, #93c5fd, rgba(96, 165, 250, 0.45));
+}
+
+:is(.train-arm) .ad-wpill[data-phase='peaking'] .ad-wpill-fill {
+  background: linear-gradient(180deg, #fca5a5, rgba(239, 68, 68, 0.45));
+}
+
+:is(.train-arm) .ad-wpill[data-phase='intensification'] .ad-wpill-fill {
+  background: linear-gradient(180deg, #fcd34d, rgba(245, 158, 11, 0.45));
+}
+
+:is(.train-arm) .ad-wpill-t {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ad-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.train-arm) .ad-wpill[data-active='true'] .ad-wpill-t {
+  color: var(--ad-text);
+}
+
+/* ─── Каскад появления сессий ────────────────────────────────────── */
+:is(.train-arm) .ad-sess-list > .ad-sess {
+  animation: adIn 0.32s cubic-bezier(0.22, 0.68, 0, 1) backwards;
+}
+
+:is(.train-arm) .ad-sess-list > .ad-sess:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+:is(.train-arm) .ad-sess-list > .ad-sess:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+:is(.train-arm) .ad-sess-list > .ad-sess:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+:is(.train-arm) .ad-sess-list > .ad-sess:nth-child(n+5) {
+  animation-delay: 0.2s;
 }
 
 /* ─── Фокус с клавиатуры ─────────────────────────────────────────── */

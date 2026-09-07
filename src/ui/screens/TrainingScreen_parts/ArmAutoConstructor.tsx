@@ -472,7 +472,9 @@ export function ArmAutoConstructor() {
       const table = sess.filter((s: any) => s.tableTime).length;
       const light = weeks.filter((w: any) => w.deload || w.phase === 'deload' || w.taper || w.phase === 'peaking').length;
       const ex = sess.reduce((a: number, s: any) => a + s.exercises.length, 0);
-      return { weeks: weeks.length, sess: sess.length, tablePct: sess.length ? Math.round((table / sess.length) * 100) : 0, light, ex };
+      const vol = weeks.map((w: any) => w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.sets || 0), 0), 0));
+      const volMax = Math.max(1, ...vol);
+      return { weeks: weeks.length, sess: sess.length, tablePct: sess.length ? Math.round((table / sess.length) * 100) : 0, light, ex, vol, volMax };
     } catch { return null; }
   })();
 
@@ -936,16 +938,22 @@ export function ArmAutoConstructor() {
                 </div>
               )}
               <div className="ad-strip" data-arm="week-pills">
-                {builtPlan.weeks.map((w:any)=> (
-                  <button key={w.week} className="ad-pill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)}>
-                    Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}
+                {builtPlan.weeks.map((w:any)=> {
+                  const v = planDash && planDash.vol[w.week - 1] != null ? planDash.vol[w.week - 1] : 0;
+                  const h = planDash ? Math.max(8, Math.round((v / planDash.volMax) * 100)) : 8;
+                  return (
+                  <button key={w.week} className="ad-wpill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)} aria-label={`Неделя ${w.week}, сетов ${v}`}>
+                    <span className="ad-wpill-bar" aria-hidden><span className="ad-wpill-fill" style={{ height: `${h}%` }} /></span>
+                    <span className="ad-wpill-t">Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
               {curWeek && (
                 <div>
                   <h4 className="ad-sec-t">Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
+                  <div className="ad-sess-list">
                   {curWeek.sessions.map((sess:any, si:number)=> (
                     <div key={si} className="ad-sess">
                       <div className="ad-sess-h">{sess.sessionTag} <span className="ad-tag" data-ch={sess.character}>{sess.character}</span> {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}</div>
@@ -963,6 +971,7 @@ export function ArmAutoConstructor() {
                       ))}
                     </div>
                   ))}
+                  </div>
                 </div>
               )}
               <div className="ad-row">
