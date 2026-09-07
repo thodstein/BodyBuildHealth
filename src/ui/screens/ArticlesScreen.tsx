@@ -367,7 +367,7 @@ export const ArticlesScreen: React.FC = () => {
             }}>←</button>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:'-0.02em' }}>{readingArticle.title}</div>
-              <div style={{ fontSize:10, color:'#fff', display:'flex', alignItems:'center', flexWrap:'wrap', gap:6, marginTop:2, fontWeight:600 }}>
+              <div style={{ fontSize:12, color:'#fff', display:'flex', alignItems:'center', flexWrap:'wrap', gap:6, marginTop:2, fontWeight:600 }}>
                 <span style={{ color: CATEGORIES.find(c => c.value === readingArticle.category)?.color || '#6b7280', display:'inline-flex', verticalAlign:'-2px' }}>
                   <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={11} />
                 </span>
@@ -378,7 +378,7 @@ export const ArticlesScreen: React.FC = () => {
                 <span>{readingArticle.date}</span>
               </div>
             </div>
-            <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, fontWeight:700, color:'#fff' }}>{estimateReadTime(readingArticle.content||'')}′</span>
+            <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{estimateReadTime(readingArticle.content||'')}′</span>
             {isNativeApp() && (
               <button
                 onClick={() => setSaved(toggleSavedArticle(readingArticle.id))}

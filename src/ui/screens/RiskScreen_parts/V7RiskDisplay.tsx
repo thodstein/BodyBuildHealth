@@ -213,7 +213,7 @@ export const V7RiskDisplay: React.FC<{
               ))}
             </div>
             {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
-              <div style={{ fontSize: 10, color: '#fff', marginTop: 4, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#fff', marginTop: 4, textAlign: 'center' }}>
                 Общий риск (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
               </div>
             )}
@@ -426,7 +426,7 @@ export const V7RiskDisplay: React.FC<{
                 </div>
                 <div style={{ position: 'absolute', left: `${(selectedDay / maxDay) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#fff', marginTop: 4 }}>
                 <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
               </div>
             </div>
@@ -848,7 +848,7 @@ export const V7RiskDisplay: React.FC<{
               </div>
               <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#fff', marginTop: 4 }}>
               <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
             </div>
           </div>

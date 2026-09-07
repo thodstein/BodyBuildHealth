@@ -47,7 +47,7 @@ const GlassChip: React.CSSProperties = {
   padding: '4px 10px', borderRadius: 8,
   background: 'rgba(255,255,255,0.04)',
   border: '1px solid rgba(255,255,255,0.06)',
-  fontSize: 10, fontWeight: 600,
+  fontSize: 11, fontWeight: 600,
 };
 
 // ── Круговой gauge ──

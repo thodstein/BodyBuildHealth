@@ -251,13 +251,13 @@ export const RiskOverview: React.FC<{
       {riskHistory && riskHistory.length > 0 && (
         <Section id="history" icon="clock" title="История рисков">
           <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:80, padding:'0 4px' }}>
-            {riskHistory.slice(-12).map((h, i) => (
-              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+            {(() => { const arr = riskHistory.slice(-12); return arr.map((h, i) => (
+              <div key={i} style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                 <span style={{ fontSize:10, color:'#fff', fontWeight:800 }}>{Math.round(h.overallNet)}%</span>
                 <div style={{ width:'100%', background:getRiskColor(h.overallNet), borderRadius:'3px 3px 0 0', height:`${Math.max(6, h.overallNet/100*60)}px`, opacity:0.85 }} />
-                <span style={{ fontSize:10, color:'#fff' }}>{h.date.slice(5)}</span>
+                <span style={{ fontSize:10, color:'#fff' }}>{(i % 3 === 0 || i === arr.length - 1) ? h.date.slice(5) : ' '}</span>
               </div>
-            ))}
+            )); })()}
           </div>
         </Section>
       )}
