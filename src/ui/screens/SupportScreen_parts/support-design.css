@@ -1,0 +1,342 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * support-design.css — дизайн-кит вкладки «БАДы» (все платформы).
+ *
+ * База редизайна под топовое АПК: токены/навигация/карточки/пилюли/поля/
+ * кнопки/попапы + подача всего контента по порядку. Подключается статическим
+ * import из SupportScreen.tsx (как SupportVisualUpgrade.css) — shared-файлы
+ * и main.tsx не тронуты.
+ *
+ * Правила:
+ *  1. КАЖДЫЙ селектор начинается с `.support-screen` — за пределы вкладки
+ *     ничего не утекает.
+ *  2. ХЕРО НЕ ТРОГАЕМ: ни одного правила под `.support-hero*` здесь нет —
+ *     hero-страница остаётся байт-в-байт (контракт pharma-support-native).
+ *  3. Логика в TSX не меняется — только классы/хуки; строки/aria/роли
+ *     прежние (контракты rest-hooks + pharma-support-native).
+ *  4. Цвета — через глобальные var() с тёмными фолбэками: темы/акцент
+ *     приложения подхватываются бесплатно.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 0. ТОКЕНЫ ─────────────────────────────────────────────────── */
+.support-screen.support-root {
+  --sup-bg: var(--glass-bg, rgba(24, 24, 27, 0.55));
+  --sup-bg2: rgba(255, 255, 255, 0.04);
+  --sup-bg3: rgba(255, 255, 255, 0.07);
+  --sup-edge: var(--glass-border, rgba(255, 255, 255, 0.09));
+  --sup-edge2: rgba(255, 255, 255, 0.14);
+  --sup-text: var(--text, #fff);
+  --sup-dim: rgba(226, 236, 255, 0.72);
+  --sup-faint: rgba(226, 236, 255, 0.5);
+  --sup-acc: var(--accent, #00e68a);
+  --sup-acc-ink: var(--accent-contrast, #06281c);
+  --sup-blue: #60a5fa;
+  --sup-violet: #a78bfa;
+  --sup-amber: #f59e0b;
+  --sup-pink: #f472b6;
+  --sup-red: #ef4444;
+  --sup-green: #22c55e;
+  --sup-r: 18px;
+  --sup-r-sm: 12px;
+  --sup-shadow: var(--glass-shadow, 0 10px 30px rgba(0, 0, 0, 0.35));
+}
+
+/* ─── 1. КОРЕНЬ — центровка + кинематографичный вход ────────────── */
+.support-screen.support-root.train-sup {
+  max-width: 880px;
+  margin: 0 auto;
+  color: var(--sup-text);
+  animation: supIn 0.32s cubic-bezier(0.22, 0.68, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes supIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── 2. ТИПОГРАФИКА СЕКЦИЙ ─────────────────────────────────────── */
+.support-screen.support-root h2 {
+  font-size: 19px !important;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+.support-screen.support-root h3 { font-size: 15px !important; font-weight: 800; }
+.support-screen.support-root h4 { font-size: 13px !important; font-weight: 800; }
+
+/* ─── 3. НИЖНЯЯ НАВИГАЦИЯ — app-таббар ──────────────────────────── */
+.support-screen.support-root .support-subbar {
+  gap: 6px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+.support-screen.support-root .support-subbar button {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  padding: 6px 2px !important;
+}
+
+.support-screen.support-root .support-subbar button[data-active='true'] {
+  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
+  color: var(--sup-acc-ink) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 20px rgba(0, 230, 138, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  font-weight: 900 !important;
+}
+
+/* ─── 4. ВЕРХНИЕ ТОПБАРЫ — липкое стекло ────────────────────────── */
+.support-screen.support-root .support-topbar {
+  position: fixed;
+  border-bottom: 1px solid var(--sup-edge);
+}
+
+.support-screen.support-root .support-topbar .support-pills {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.support-screen.support-root .support-topbar .support-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.support-screen.support-root .support-pill {
+  min-height: 44px !important;
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.support-screen.support-root .support-pill[data-active='true'] {
+  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
+  color: var(--sup-acc-ink) !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 16px rgba(0, 230, 138, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
+/* ─── 5. НАЗАД/ДОМОЙ — удобные 44px ─────────────────────────────── */
+.support-screen.support-root .support-backnav {
+  gap: 8px !important;
+}
+
+.support-screen.support-root .support-backnav button {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+}
+
+/* ─── 6. КАРТОЧКИ КОНТЕНТА — единое стекло ──────────────────────── */
+.support-screen.support-root .sup-catalogview,
+.support-screen.support-root .sup-protocols,
+.support-screen.support-root .sup-stacks,
+.support-screen.support-root .sup-calctools,
+.support-screen.support-root .sup-research,
+.support-screen.support-root .sup-favorites,
+.support-screen.support-root .sup-diary,
+.support-screen.support-root .sup-timing,
+.support-screen.support-root .sup-synergy,
+.support-screen.support-root .sup-bio,
+.support-screen.support-root .sup-dose,
+.support-screen.support-root .sup-analog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Стеклянные панели внутри контента (каталог/стеки/синергии/дневник) */
+.support-screen.support-root .sup-catalogview > div,
+.support-screen.support-root .sup-stacks > div,
+.support-screen.support-root .sup-calctools > div {
+  border-radius: var(--sup-r);
+}
+
+/* Строки каталога: крупнее хит-зона, левая акцентная кромка у раскрытых */
+.support-screen.support-root .sup-catalogview [style*='border-radius: 10'],
+.support-screen.support-root .sup-catalogview [style*='border-radius:10'] {
+  border-radius: 14px !important;
+  border-color: var(--sup-edge) !important;
+  box-shadow: var(--sup-shadow);
+}
+
+/* ─── 7. ПОЛЯ ВВОДА — 48px, акцентный фокус ─────────────────────── */
+.support-screen.support-root input:not([type='checkbox']):not([type='radio']),
+.support-screen.support-root textarea,
+.support-screen.support-root select {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  background: rgba(6, 13, 29, 0.55) !important;
+  border: 1px solid var(--sup-edge) !important;
+  color: var(--sup-text) !important;
+  padding: 10px 12px !important;
+}
+
+.support-screen.support-root input:focus,
+.support-screen.support-root textarea:focus,
+.support-screen.support-root select:focus {
+  border-color: rgba(0, 230, 138, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.14) !important;
+  outline: none !important;
+}
+
+/* Поиск каталога — hero-поиск 52px */
+.support-screen.support-root .sup-catalogview input[placeholder*='Поиск'] {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  font-size: 13.5px !important;
+}
+
+/* ─── 8. КНОПКИ — 48px CTA, primary с градиентом ────────────────── */
+.support-screen.support-root button {
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.support-screen.support-root .sup-btn-primary,
+.support-screen.support-root button[data-sup-cta='primary'] {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
+  color: var(--sup-acc-ink) !important;
+  border: none !important;
+  box-shadow: 0 8px 24px rgba(0, 230, 138, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  padding: 12px 18px !important;
+}
+
+/* ─── 9. БЕЙДЖИ/ЧИПЫ — единый пилюльный язык ────────────────────── */
+.support-screen.support-root .sup-phaselabel,
+.support-screen.support-root .sup-itemrow {
+  border-radius: 12px;
+}
+
+/* Мелкие механизм-бейджи 7-8px → читаемые 11px (кроме hero) */
+.support-screen.support-root :not(.support-hero):not(.support-hero *)span[style*='font-size: 7'],
+.support-screen.support-root :not(.support-hero):not(.support-hero *)span[style*='font-size: 8'] {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  line-height: 1.4 !important;
+}
+
+/* ─── 10. ПРОТОКОЛЫ — сетка 2 колонки, акцентные иконки ─────────── */
+.support-screen.support-root .sup-protocols [style*='gridTemplateColumns'] {
+  gap: 10px !important;
+}
+
+.support-screen.support-root .sup-protocols button {
+  border-radius: 16px !important;
+}
+
+/* ─── 11. КАЛЬКУЛЯТОРЫ — хаб 5-в-1, режимные карточки ───────────── */
+.support-screen.support-root .sup-calctools [style*='gridTemplateColumns'] {
+  gap: 8px !important;
+}
+
+/* ─── 12. ПОПАПЫ/МОДАЛКИ — пружинный шит ────────────────────────── */
+.support-screen.support-root .sup-apk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: supFade 0.22s ease;
+  padding: 0;
+}
+
+.support-screen.support-root .sup-apk-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 20px 20px 0 0;
+  background: rgba(20, 20, 24, 0.96);
+  border: 1px solid var(--sup-edge2);
+  border-bottom: none;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+  animation: supSheetUp 0.32s cubic-bezier(0.22, 0.9, 0.3, 1.2);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.support-screen.support-root .sup-apk-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+
+.support-screen.support-root .sup-apk-done {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
+  color: var(--sup-acc-ink) !important;
+  border: none !important;
+  width: 100% !important;
+  box-shadow: 0 8px 24px rgba(0, 230, 138, 0.35) !important;
+}
+
+@keyframes supSheetUp {
+  from { opacity: 0; transform: translateY(48px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes supFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─── 13. ПЛАВАЮЩИЙ БЕЙДЖ СТЕКА — липкая CTA-панель ─────────────── */
+.support-screen.support-root [style*='position:sticky'][style*='bottom:0'] {
+  border-radius: 16px !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+}
+
+/* ─── 14. СКРОЛЛБАРЫ/СЕТИ ───────────────────────────────────────── */
+.support-screen.support-root ::-webkit-scrollbar { width: 4px; height: 4px; }
+.support-screen.support-root ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+.support-screen.support-root ::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── 15. АДАПТИВ 380px ─────────────────────────────────────────── */
+@media (max-width: 380px) {
+  .support-screen.support-root.train-sup {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  .support-screen.support-root .support-pill {
+    min-height: 48px !important;
+    font-size: 13px !important;
+  }
+  .support-screen.support-root .support-subbar button {
+    min-height: 56px !important;
+  }
+  .support-screen.support-root .sup-protocols [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── 16. REDUCED MOTION ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .support-screen.support-root.train-sup { animation: none !important; }
+  .support-screen.support-root .sup-apk-backdrop { animation: none !important; }
+  .support-screen.support-root .sup-apk-sheet { animation: none !important; }
+  .support-screen.support-root button { transition: none !important; }
+}

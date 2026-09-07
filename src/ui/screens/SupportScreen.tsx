@@ -4,6 +4,9 @@ import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
 import { SupportModals } from './SupportScreen_parts/SupportModals';
 import './SupportScreen_parts/SupportVisualUpgrade.css';
+import './SupportScreen_parts/support-design.css';
+import { isNativeApp } from '../../core/app-platform';
+import { ensureSupportApkStyles } from './SupportScreen_parts/support-apk-loader';
 import { ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
@@ -244,7 +247,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     if (section !== 'home') { setSection('home'); resetMain(); return; }
   };
   const backBtnStyle: React.CSSProperties = { padding:'8px 12px', borderRadius:12, fontSize:12, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.75)', fontWeight:700, whiteSpace:'nowrap' as const, minHeight:34, display:'inline-flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(10px)' };
-  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div className="support-backnav" style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap' as const }}>
+  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div className="support-backnav" data-sup="backnav" style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap' as const }}>
     <button onClick={goBack} style={backBtnStyle}>← Назад</button>
     <button onClick={goHome} style={backBtnStyle}>{homeLabel}</button>
   </div>;
@@ -2215,8 +2218,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         );
       })()}
 
-      {/* ===== BOTTOM TAB BAR — компактный, херо на весь экран за ним (не трогать — размер только для херо) ===== */}
-      <div className="support-subbar" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
+      {/* ===== BOTTOM TAB BAR — app-таббар 5 разделов, hero за ним (размеры hero не меняем) ===== */}
+      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
         {[
           { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
           { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
@@ -2226,7 +2229,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         ].map(item => {
           const active = section === item.id;
           return (
-          <button key={item.id} onClick={() => {
+          <button key={item.id} aria-label={item.label} aria-pressed={active} data-active={active} onClick={() => {
             setSection(item.id as any);
             setCalcView('main');
             if (item.id === 'home') { setTab('main'); setSupportView('main'); }
@@ -3096,16 +3099,18 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
   // ── Нижняя навигация: компактная 52 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался, херо фиксирован на весь экран
   const BOTTOM_NAV_H = 56;
+  React.useEffect(() => { ensureSupportApkStyles(); }, []);
+  const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div className="screen support-screen support-root" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
-        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div className="support-pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
+          <div className="support-pills" data-sup="pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
@@ -3128,7 +3133,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== PROTOCOLS HEADER (glass) ===== */}
       {section === 'protocols' && (
-        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
@@ -3137,11 +3142,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== INFO HEADER (glass, readable pills) ===== */}
       {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
-        <div className="support-topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div className="support-pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
+          <div className="support-pills" data-sup="pills" style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['calc_tools','🧮 Расчёты'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
@@ -3166,20 +3171,20 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {/* ===== SUB-NAVIGATION (REMOVED — content moved to existing tabs) ===== */}
 
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'info' && (
-        <div style={{ padding:'0 0 70px', display:'flex', flexDirection:'column' }}>
+        <div data-sup="content" style={{ padding:'0 0 70px', display:'flex', flexDirection:'column' }}>
           {/* Content */}
-          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+          <div data-sup="content" style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
       {renderView(infoView, 'catalog', () =>
-        <SupportCatalogView s={s} />
+        <div data-sup="catalog"><SupportCatalogView s={s} /></div>
       )}
       {renderView(infoView, 'stacks', () =>
-        <SupportStacksView s={s} />
+        <div data-sup="stacks"><SupportStacksView s={s} /></div>
       )}
       {renderView(infoView, 'favorites', () =>
-        <div>
+        <div data-sup="diary">
           <div style={{ display:'flex', gap:8, marginBottom:12, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
             {[['favorites','⭐ Избранное'],['diary','📓 Дневник']].map(([id,label]:any) => (
-              <button key={id} onClick={() => setCombinedFavDiaryTab(id as any)} style={{
+              <button key={id} className="support-pill" data-active={combinedFavDiaryTab === id} onClick={() => setCombinedFavDiaryTab(id as any)} style={{
                 padding:'9px 16px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:36,
                 background: combinedFavDiaryTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
                 color: combinedFavDiaryTab === id ? '#000' : 'rgba(255,255,255,0.7)',
@@ -3197,24 +3202,24 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
       {renderView(infoView, 'dose', () =>
-        <SupportEffectiveDose />
+        <div data-sup="calc"><SupportEffectiveDose /></div>
       )}
       {renderView(infoView, 'synergy_calc', () =>
-        <UnifiedSynergyCalculator s={s} />
+        <div data-sup="calc"><UnifiedSynergyCalculator s={s} /></div>
       )}
       {renderView(infoView, 'timing', () =>
-        <SupportTimingPlanner />
+        <div data-sup="calc"><SupportTimingPlanner /></div>
       )}
             {renderView(infoView, 'bioavailability', () =>
-              <div style={{ padding: '0 4px' }}>
+              <div data-sup="calc" style={{ padding: '0 4px' }}>
                 <SupportBioavailability s={s} />
               </div>
             )}
       {renderView(infoView, 'research', () =>
-        <SupportResearch s={s} />
+        <div data-sup="research"><SupportResearch s={s} /></div>
       )}
             {renderView(infoView, 'calc_tools', () =>
-              <SupportCalcToolsHub s={s} />
+              <div data-sup="calc"><SupportCalcToolsHub s={s} /></div>
             )}
 
           </div>
@@ -3229,16 +3234,20 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== PROTOCOLS ===== */}
       {section === 'protocols' && (
+        <div data-sup="protocols">
+        <div data-sup="content">
         <SupportProtocols s={s} />
+        </div>
+        </div>
       )}
 
       {/* ===== NON-MAIN CONTENT ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
-        <div style={{ paddingBottom: 16 }}>
+        <div data-sup="content" style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG ===== */}
       {(section === 'home' || section === 'info') && tab === 'catalog' && catalogSubTab !== 'stack' && (<InfoErrorBoundary label="Каталог">
-        <div>
+        <div data-sup="catalog">
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
           </div>
@@ -3416,6 +3425,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== AUTO CALCULATOR (единый калькулятор — ввод + TZ-mapper результат) ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
+        <div data-sup="calc">
+        <div data-sup="content">
         <InfoErrorBoundary label="Калькулятор поддержки">
         <AutoCalculator
           embedded
@@ -3436,6 +3447,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           planResult={planResult ?? undefined}
         />
         </InfoErrorBoundary>
+        </div>
+        </div>
       )}
 
       {/* ===== WEEK CHANGE TOAST (C22) ===== */}
@@ -3449,11 +3462,18 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
+        <div data-sup="calc">
+        <div data-sup="content">
         <SupportPeptideCalc s={s} />
+        </div>
+        </div>
       )}
 
       {/* ===== MANUAL PICKER MODAL ===== */}
       {showManualPicker && (
+        <div className="sup-apk-backdrop" data-sup="modal">
+        <div className="sup-apk-sheet" style={{ padding:'0 12px' }}>
+        <div className="sup-apk-handle" aria-hidden />
         <SupportManualPicker
           onClose={() => setShowManualPicker(false)}
           enhancedSubs={enhancedSubs}
@@ -3469,10 +3489,16 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           setFavRefresh={setFavRefresh}
           showToast={showToast}
         />
+        </div>
+        </div>
       )}
 
       {/* ===== MODAL OVERLAY ===== */}
-      {showModal && <SupportModals
+      {showModal && (
+        <div className="sup-apk-backdrop" data-sup="modal">
+        <div className="sup-apk-sheet" style={{ padding:'0 12px' }}>
+        <div className="sup-apk-handle" aria-hidden />
+        <SupportModals
         showModal={showModal} setShowModal={setShowModal}
         modalLevel={modalLevel} setModalLevel={setModalLevel}
         modalSearch={modalSearch} setModalSearch={setModalSearch}
@@ -3504,7 +3530,10 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             setTimeout(() => setWeekChangeMsg(''), 4000);
           }
         }}
-      />}
+      />
+        </div>
+        </div>
+      )}
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}
       {stackBuilder.length > 0 && (
