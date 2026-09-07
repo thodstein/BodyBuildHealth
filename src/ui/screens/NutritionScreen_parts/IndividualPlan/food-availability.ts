@@ -178,6 +178,26 @@ export function isSweetCarbId(id: string): boolean {
 export function sweetFleshClash(aId: string, bId: string): boolean {
   return (isSweetCarbId(aId) && isFleshProteinId(bId)) || (isFleshProteinId(aId) && isSweetCarbId(bId));
 }
+
+/**
+ * ЖЁСТКОЕ вето «тунец + крем» (жалоба дословно): КРЕМ + РЫБА в одной тарелке.
+ * Уже, чем sweet+flesh: десерты (пряник/джем/мёд) после мяса — разрешённая фича,
+ * а широкое вето душило сходимость (доказано биссекцией: −3.6 п.п. на max).
+ */
+const FISH_RE = /tuna|cod|pollock|hake|shrimp|salmon|trout|crab|squid|mussel|seafood|fish|octopus|roe/i;
+const LAND_MEAT_RE = /chicken|turkey|beef|pork|duck|lamb|veal/i;
+export function isFishId(id: string): boolean {
+  if (!id) return false;
+  if (LAND_MEAT_RE.test(id)) return false;
+  if (/egg|milk|kefir|yogurt|cheese|cottage|whey|casein|isolate|protein_powder/i.test(id)) return false;
+  return FISH_RE.test(id);
+}
+
+/** Крем + рыба в том же приёме (кроме самого проверяемого пункта). */
+export function creamFishClash(sweetId: string, meal: { items?: Array<{ id?: string }> }): boolean {
+  if (!isCreamId(sweetId)) return false;
+  return ((meal as any)?.items || []).some((x: any) => x.id !== sweetId && isFishId(x.id));
+}
 /** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства). */
 export function creamMealCap(_hv?: boolean): number {
   return 2;
@@ -207,9 +227,38 @@ export const EXCLUDED_FAMILIES_FROM_PLATE: ReadonlySet<string> = new Set(['oils_
 export function foodAvailableForPlan(f: { id: string }, preferredIds?: Set<string>): boolean {
   const id = f.id || '';
   if (EXOTIC_FOOD_IDS.has(id)) return false; // экзотика — никогда (даже в любимых не предлагаем в авто-план)
+  // P1 (HV-рацион): консервы — вообще не автоплан (пользователь: «не бич-пакет»).
+  // Вручную через поиск добавить можно; в БД id остаются.
+  if (isCannedFoodId(id)) return false;
   if (SPECIALTY_FOOD_IDS.has(id) && !(preferredIds && preferredIds.has(id))) return false;
   return true;
 }
+
+/** Консервы (tuna_canned, canned_*, *_canned_*) — вне автогенерации полностью. */
+export function isCannedFoodId(id: string): boolean {
+  return /canned/i.test(id || '');
+}
+
+/**
+ * Замена консервов свежими 1-в-1 С СОХРАНЕНИЕМ ПОЗИЦИИ в пуле (не удаление!).
+ * Простое выкидывание id сдвигает индексы seeded-пиков и ломает сходимость
+ * несвязанных сценариев (доказано: D-24 −33% от бана). Дубль свежего id в пуле —
+ * осознанно (вес ×2 на свежак вместо консервы, длина пула цела).
+ */
+export const CANNED_SUBSTITUTE: Record<string, string> = {
+  tuna_canned: 'tuna_steak',
+  cod_roe_canned: 'sardines',
+  crab_meat_canned: 'seafood_shrimp_tiger',
+  protein_squid_canned: 'pollock',
+  protein_mussels_canned: 'seafood_shrimp_tiger',
+  canned_green_peas: 'peas_green',
+  canned_corn_sweet: 'corn',
+  canned_tomatoes: 'tomato',
+  canned_olives_green: 'avocado',
+  milk_coconut_canned: 'coconut_urbec',
+  veg_bamboo_shoots_canned: 'celery',
+  seafood_tuna_canned_water: 'tuna_steak',
+};
 
 /** Дневные квоты реалистичной тарелки (эпик B). */
 export interface DailyQuotaState {

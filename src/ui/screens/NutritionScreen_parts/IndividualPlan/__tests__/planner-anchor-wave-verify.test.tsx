@@ -16,7 +16,8 @@ import { correctDayToTargets } from '../day-target-corrector';
 import { IndividualPlan } from '../index';
 import { secondRecipeRoomDecision, freeSnackRoomForSecond } from '../IndividualPlanContext';
 import { recommendMealCount } from '../IndividualPlanSettings';
-import { sweetFleshClash } from '../food-availability';
+import { sweetFleshClash, isCannedFoodId, isFishId } from '../food-availability';
+import { displayAmount, foodWeightState } from '../planner-weight-mode';
 import { useRenderMealList } from '../MealListRender';
 
 const base = (overrides: any = {}): MealPlanInput => ({
@@ -198,6 +199,52 @@ describe('P1b-конструктор: большой дефицит закрыв
   });
 });
 
+describe('P1 (HV-рацион): база — консервов нет, новые id в мере', () => {
+  it('в автопланах нет консервов (tuna_canned и прочие)', () => {
+    expect(isCannedFoodId('tuna_canned')).toBe(true);
+    expect(isCannedFoodId('canned_corn_sweet')).toBe(true);
+    expect(isCannedFoodId('chicken_breast')).toBe(false);
+    for (const input of [base(), trainBase()]) {
+      const plan = buildDayPlan(input);
+      const bad: string[] = [];
+      for (const m of plan.meals) for (const it of (m.items || []) as any[]) {
+        if (isCannedFoodId(it.id)) bad.push(`${m.label}:${it.id}`);
+      }
+      expect(bad, bad.join(', ')).toEqual([]);
+    }
+  });
+
+  it('weight-mode: манка сухая, хлебцы без конверсии ×2.8, мёд без меры', () => {
+    expect(foodWeightState('rice_semolina')).toBe('dry');
+    expect(displayAmount('rice_semolina', 150, 'raw')).toEqual({ grams: 150, suffix: 'сух.' });
+    expect(displayAmount('rice_semolina', 150, 'cooked').grams).toBeGreaterThan(300);
+    // Хлебцы едят сухими: было ×2.8 в режиме «гот.» — теперь как есть.
+    expect(displayAmount('rice_cakes', 30, 'cooked').grams).toBe(30);
+    expect(foodWeightState('honey')).toBe('other');
+  });
+});
+
+describe('P0 (HV-рацион): типология peri — пост-трен жидкие, ужин без хлопьев', () => {
+  it('пост-трен: амилопектин/декстроза + изолят (не голый шейк)', () => {
+    const plan = buildDayPlan(trainBase());
+    const post = plan.meals.find(m => m.type === 'postworkout')!;
+    expect(post).toBeTruthy();
+    const liq = (post.items || []).filter((it: any) => it.id === 'amylopectin' || it.id === 'dextrose');
+    expect(liq.length).toBeGreaterThanOrEqual(1);
+    expect(post.totals.c).toBeGreaterThanOrEqual(20);
+  });
+
+  it('ужин: без хлопьев (хлопья — завтрак/снек/peri)', () => {
+    for (const input of [base(), trainBase()]) {
+      const plan = buildDayPlan(input);
+      const dinner = plan.meals.find(m => m.type === 'dinner');
+      if (!dinner) continue;
+      const flakes = (dinner.items || []).filter((it: any) => /flake/i.test(it.id));
+      expect(flakes.map((x: any) => x.id), 'dinner').toEqual([]);
+    }
+  });
+});
+
 describe('P1b: один гарнир + вето «тунец + крем» (жалоба «углеводная свалка»)', () => {
   it('sweetFleshClash: крем/мёд/пряники + мясо/рыба — clash; молочка/яйца — нет', () => {
     expect(sweetFleshClash('cream_of_rice', 'tuna_canned')).toBe(true);
@@ -210,14 +257,14 @@ describe('P1b: один гарнир + вето «тунец + крем» (жа�
     expect(sweetFleshClash('potato_boiled', 'tuna_canned')).toBe(false);
   });
 
-  it('в плане нет сладко-мясных пар в одном приёме', () => {
+  it('в плане нет пары крем+рыба в одном приёме (тунец+крем); десерты после мяса — можно', () => {
     for (const input of [base(), trainBase()]) {
       const plan = buildDayPlan(input);
       for (const m of plan.meals) {
         const ids = (m.items || []).map((it: any) => it.id);
-        const sweets = ids.filter((id: string) => /cream_of_rice|rice_cream|honey|jam|pryaniki|dates|dried_/.test(id));
-        const flesh = ids.filter((id: string) => /chicken|turkey|tuna|cod|pollock|beef|shrimp|salmon/i.test(id) && !/egg|milk|whey|cheese|cottage/i.test(id));
-        expect(sweets.length > 0 && flesh.length > 0 ? `${m.label}: ${sweets.join(',')} + ${flesh.join(',')}` : '', `${m.label}`).toBe('');
+        const creams = ids.filter((id: string) => /cream_of_rice|rice_cream/.test(id));
+        const fish = ids.filter((id: string) => isFishId(id));
+        expect(creams.length > 0 && fish.length > 0 ? `${m.label}: ${creams.join(',')} + ${fish.join(',')}` : '', `${m.label}`).toBe('');
       }
     }
   });
