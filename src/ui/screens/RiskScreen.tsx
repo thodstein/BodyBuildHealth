@@ -1104,7 +1104,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 };
 
 // ── MDSS Risk Display Component ──
-const MDSSRiskDisplay: React.FC = () => {
+export const MDSSRiskDisplay: React.FC = () => {
   const linked = useDataLink();
   const [tWeeks, setTWeeks] = useState(Math.max(1, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4)));
   const [genetics, setGenetics] = useState<string[]>([]);
@@ -1118,21 +1118,25 @@ const MDSSRiskDisplay: React.FC = () => {
     if (genMap.length > 0) setGenetics(genMap);
   }, []);
 
-  // Compute weeksSinceLab from linked dates
-  const weeksSinceLab = (() => {
+  // Compute weeksSinceLab from linked dates — memo + округление до часа:
+  // сырой float от Date.now() менялся каждый рендер и вместе с setMdssResult
+  // в эффекте ниже давал бесконечный цикл при включённом авто-режиме.
+  const weeksSinceLab = useMemo(() => {
     const labs = linked.labs || [];
     if (!labs.length) return 52;
     const dates = labs.map(l => l.date).filter(Boolean).sort().reverse();
     if (!dates[0]) return 52;
     const ms = Date.now() - new Date(dates[0]).getTime();
-    return Math.max(0, ms / (7 * 24 * 3600 * 1000));
-  })();
+    return Math.round(Math.max(0, ms / (7 * 24 * 3600 * 1000)) * 24) / 24;
+  }, [linked.labs]);
 
-  // Auto-run on mount
+  // Auto-run: labs в зависимостях — иначе правка анализов при включённом
+  // авто-режиме молча оставляла старый расчёт (linked.labs из стора стабилен
+  // по ссылке, лишних пересчётов нет).
   useEffect(() => {
     if (!autoRun) return;
     handleRun();
-  }, [autoRun, tWeeks, genetics, weeksSinceLab]);
+  }, [autoRun, tWeeks, genetics, weeksSinceLab, linked.labs]);
 
   const handleRun = () => {
     const labs = linked.labs || [];
