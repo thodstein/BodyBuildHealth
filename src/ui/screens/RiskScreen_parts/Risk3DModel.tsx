@@ -341,7 +341,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
         </div>
 
         {/* Week slider */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 160 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
           <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Неделя</span>
           <input type="range" min={0} max={weeks.length} value={organWeek}
             onChange={e => onWeekChange(parseFloat(e.target.value) || 0)}

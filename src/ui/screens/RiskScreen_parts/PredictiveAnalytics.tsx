@@ -61,7 +61,7 @@ export const PredictiveAnalytics: React.FC = () => {
       ) : (
         <div>
           {/* Mini SVG chart */}
-          <svg width={360} height={150} style={{ display: 'block', maxWidth: '100%' }}>
+          <svg viewBox="0 0 360 150" style={{ display: 'block', width: '100%', height: 'auto' }}>
             {[0, 25, 50, 75, 100].map(p => (
               <line key={'g'+p} x1={30} y1={10+(100-p)*1.15} x2={350} y2={10+(100-p)*1.15} stroke="rgba(255,255,255,0.04)" strokeDasharray="2,2" />
             ))}

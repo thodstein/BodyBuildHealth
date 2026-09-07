@@ -5391,7 +5391,12 @@ html.app-native .articles-toolbar button:focus-visible {
 
 html.app-native .articles-search {
   min-height: 48px !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .screen.risk input[type='text'],
+html.app-native .screen.risk input[type='number'] {
+  font-size: 16px !important;
 }
 
 html.app-native .articles-chips {
@@ -5450,6 +5455,38 @@ html.app-native .articles-reader-bar button:focus-visible {
 
 html.app-native .articles-reader-body {
   font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .articles-fontbar button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+html.app-native .articles-fontbar button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .articles-fontbar button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+/* Телефон ≤380px: читалка дышит — чуть уже поля, крупнее межстрочный комфорт */
+@media (max-width: 380px) {
+  html.app-native .articles-reader-body {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}
+
+/* Телефон ≤380px: топбар Рисков — прячем дубль-бейдж % (инфо уже в подзаголовке NET/RAW) */
+@media (max-width: 380px) {
+  html.app-native .risk-topnav {
+    gap: 8px !important;
+  }
+  html.app-native .risk-topnav-badge {
+    display: none !important;
+  }
 }
 
 /* Белый текст-гард: вторичный текст блока — белый (категорийные цвета и акценты не тронуты) */

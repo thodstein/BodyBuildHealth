@@ -99,7 +99,7 @@ export const HysteresisChart: React.FC = () => {
       )}
 
       {/* SVG Chart */}
-      <svg width={CHART_W} height={CHART_H} style={{ display: 'block', maxWidth: '100%' }}>
+      <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} style={{ display: 'block', width: '100%', height: 'auto' }}>
         {/* Background grid */}
         {[0, 25, 50, 75, 100].map(v => (
           <line key={'h' + v} x1={MARGIN.left} y1={scaleY_marker(v / 100 * maxMarker)} x2={CHART_W - MARGIN.right} y2={scaleY_marker(v / 100 * maxMarker)} stroke="rgba(255,255,255,0.06)" strokeDasharray="2,2" />

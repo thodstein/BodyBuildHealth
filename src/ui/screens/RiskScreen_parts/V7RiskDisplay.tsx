@@ -218,7 +218,7 @@ export const V7RiskDisplay: React.FC<{
               </div>
             )}
           </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           <div style={{ background: 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', padding: '12px 8px', borderRadius: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Raw Risk</div>
             <div style={{ fontSize: 26, fontWeight: 800, color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</div>
@@ -265,9 +265,9 @@ export const V7RiskDisplay: React.FC<{
             <div key={sysKey} className={`risk-${riskLevel}`}
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, marginBottom: 10, overflow: 'hidden',
                 borderLeft: `4px solid ${getRiskColor(organPct)}` }}>
-              <div className="row" style={{ cursor: 'pointer', marginBottom: 0, padding: '12px', minHeight:56 }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
-                <span style={{ fontSize: 14, fontWeight: 800, color:'#fff' }}>{label}</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="row" style={{ cursor: 'pointer', marginBottom: 0, padding: '12px', minHeight:56, flexWrap:'wrap', gap:8 }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
+                <span style={{ fontSize: 14, fontWeight: 800, color:'#fff', minWidth:0 }}>{label}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink:0 }}>
                   <div style={{ width: 60, background: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
                     <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 999 }} />
                   </div>
@@ -470,12 +470,12 @@ export const V7RiskDisplay: React.FC<{
           const elasticityColor = result.elasticity < 0.1 ? '#22c55e' : result.elasticity < 0.5 ? '#84cc16' : result.elasticity < 1.0 ? '#eab308' : '#ef4444';
           return (
             <div key={result.parameter} className="card" style={{ marginBottom: 8, padding: '12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8, marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>#{result.rank}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color:'#fff' }}>{label}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap:'wrap', gap:8, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth:0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flexShrink:0 }}>#{result.rank}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color:'#fff', minWidth:0 }}>{label}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink:0 }}>
                   <span style={{ fontSize: 11, color: '#fff' }}>Базовое: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: elasticityColor }}>Оµ = {result.elasticity.toFixed(3)}</span>
                   <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: `${elasticityColor}22`, border:`1px solid ${elasticityColor}44`, color: '#fff', fontWeight: 800 }}>{elasticityLevel}</span>
@@ -603,7 +603,7 @@ export const V7RiskDisplay: React.FC<{
         <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:10, marginBottom: 8, flexWrap:'wrap' }}>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight:800, color:'#fff' }}>🧍 3D Модель рисков</h3>
-            <div style={{ minWidth: 180, flex:1 }}>
+            <div style={{ minWidth: 140, flex:1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <span style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
               </div>
@@ -867,7 +867,7 @@ export const V7RiskDisplay: React.FC<{
     <div style={{ padding: '0 0 80px 0' }}>
       {/* MC toggle bar — always show */}
       <div style={{ marginBottom:12, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-        <div style={{ flex:1, minWidth:200 }}>
+        <div style={{ flex:1, minWidth:150 }}>
           <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🎲 Монте-Карло моделирование</div>
           <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.5 }}>
             {mcEnabled ? mcResult ? `MC: ${((mcResult as any).meanGlobalRisk*100||0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk*100||0).toFixed(1)}–P95: ${((mcResult as any).p95GlobalRisk*100||0).toFixed(1)}%]` : 'Загрузка...' : 'Детерминированный режим'}

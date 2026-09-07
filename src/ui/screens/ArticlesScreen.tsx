@@ -71,7 +71,18 @@ function estimateReadTime(md: string): number {
   return Math.max(1, Math.ceil(words / 200));
 }
 
-function renderMarkdown(md: string): string {
+const READER_FONT_KEY = 'he_articles_font_v1';
+const READER_FONT_STEPS = [14, 16, 18];
+function loadReaderFont(): number {
+  try {
+    const v = parseInt(localStorage.getItem(READER_FONT_KEY) || '', 10);
+    return READER_FONT_STEPS.includes(v) ? v : 14;
+  } catch {
+    return 14;
+  }
+}
+
+function renderMarkdown(md: string, bodyPx = 14): string {
   let html = md
     .replace(/^### (.+)$/gm, (_, h) =>
       `<h4 style="font-size:13px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid ${ART_ACC};padding-left:10px">${h}</h4>`)
@@ -124,7 +135,7 @@ function renderMarkdown(md: string): string {
     .replace(/^> (.+)$/gm, (_, q) =>
       `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:10px;font-size:13px;color:#fff;line-height:1.6;backdrop-filter:blur(8px)">${q}</blockquote>`);
 
-  return `<div style="line-height:1.8;font-size:14px;color:#fff">${html}</div>`;
+  return `<div style="line-height:1.8;font-size:${bodyPx}px;color:#fff">${html}</div>`;
 }
 
 export const ArticlesScreen: React.FC = () => {
@@ -135,6 +146,23 @@ export const ArticlesScreen: React.FC = () => {
   const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
   const [saved, setSaved] = useState<string[]>(() => loadSavedArticles());
+  const [readerFont, setReaderFont] = useState<number>(() => loadReaderFont());
+  const [readProgress, setReadProgress] = useState(0);
+  const readerBodyRef = React.useRef<HTMLDivElement | null>(null);
+  const changeReaderFont = (delta: number) => {
+    setReaderFont(prev => {
+      const i = Math.max(0, Math.min(READER_FONT_STEPS.length - 1, READER_FONT_STEPS.indexOf(prev) + delta));
+      const next = READER_FONT_STEPS[i];
+      try { localStorage.setItem(READER_FONT_KEY, String(next)); } catch { /* quota — только сессия */ }
+      return next;
+    });
+  };
+  const onReaderScroll = () => {
+    const el = readerBodyRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    setReadProgress(max > 0 ? Math.min(100, Math.max(0, (el.scrollTop / max) * 100)) : 0);
+  };
   const [offline, setOffline] = useState(() => {
     try {
       return typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -142,6 +170,11 @@ export const ArticlesScreen: React.FC = () => {
       return false;
     }
   });
+
+  React.useEffect(() => {
+    setReadProgress(0);
+    readerBodyRef.current?.scrollTo?.(0, 0);
+  }, [readingArticle?.id]);
 
   React.useEffect(() => {
     if (!isNativeApp()) return;
@@ -249,7 +282,7 @@ export const ArticlesScreen: React.FC = () => {
           placeholder="Поиск статей — заголовок, тег, категория..." className="articles-search" style={{
             width:'100%', minHeight:48, padding:'12px 44px 12px 38px', borderRadius:14,
             background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
-            color:'#fff', fontSize:14, outline:'none', fontFamily: FONT,
+            color:'#fff', fontSize:16, outline:'none', fontFamily: FONT,
             backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
             boxShadow:'0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
             transition:'border-color 0.2s, box-shadow 0.2s',
@@ -334,7 +367,7 @@ export const ArticlesScreen: React.FC = () => {
             }}>←</button>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:'-0.02em' }}>{readingArticle.title}</div>
-              <div style={{ fontSize:10, color:'#fff', display:'flex', alignItems:'center', gap:6, marginTop:2, fontWeight:600 }}>
+              <div style={{ fontSize:10, color:'#fff', display:'flex', alignItems:'center', flexWrap:'wrap', gap:6, marginTop:2, fontWeight:600 }}>
                 <span style={{ color: CATEGORIES.find(c => c.value === readingArticle.category)?.color || '#6b7280', display:'inline-flex', verticalAlign:'-2px' }}>
                   <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={11} />
                 </span>
@@ -364,7 +397,11 @@ export const ArticlesScreen: React.FC = () => {
             )}
           </div>
 
-          <div className="articles-reader-body" style={{ flex:1, overflow:'auto', padding:'18px 16px 40px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
+          <div className="articles-progress" aria-hidden="true" style={{ height:3, background:'rgba(255,255,255,0.07)', flexShrink:0 }}>
+            <div style={{ width:`${readProgress}%`, height:'100%', background:ART_ACC, borderRadius:999, boxShadow:`0 0 8px ${artA(0.5)}`, transition:'width 0.12s linear' }} />
+          </div>
+
+          <div ref={readerBodyRef} onScroll={onReaderScroll} className="articles-reader-body" style={{ flex:1, overflow:'auto', padding:'18px 16px 110px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:999, background:`${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}14`, border:`1px solid ${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}22`, color: CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280', fontSize:11, fontWeight:800, marginBottom:10 }}>
               <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {CATEGORIES.find(c=>c.value===readingArticle.category)?.label || readingArticle.category}
             </div>
@@ -379,7 +416,7 @@ export const ArticlesScreen: React.FC = () => {
               <span style={{ padding:'3px 8px', borderRadius:999, background:`${artA(0.10)}`, border:`1px solid ${artA(0.18)}`, color:ART_ACC, fontWeight:700, fontSize:10 }}>{estimateReadTime(readingArticle.content||'')} мин чтения</span>
             </div>
 
-            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '') }} />
+            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '', readerFont) }} />
 
             {readingArticle.tags.length > 0 && (
               <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:26, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.07)' }}>
@@ -400,6 +437,13 @@ export const ArticlesScreen: React.FC = () => {
             <div style={{ marginTop:18, textAlign:'center', fontSize:11, color:'#fff' }}>
               Health Engine · {readingArticle.date}
             </div>
+          </div>
+
+          {/* Плавающая панель размера шрифта — читабельность на телефоне */}
+          <div className="articles-fontbar" style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', bottom:'calc(18px + env(safe-area-inset-bottom,0px))', zIndex:5, display:'flex', alignItems:'center', gap:4, padding:'5px', borderRadius:999, background:'rgba(14,14,18,0.82)', border:'1px solid rgba(255,255,255,0.10)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'0 10px 30px rgba(0,0,0,0.45)' }}>
+            <button onClick={() => changeReaderFont(-1)} disabled={readerFont <= READER_FONT_STEPS[0]} aria-label="Уменьшить шрифт" style={{ minWidth:44, height:44, borderRadius:999, border:'none', cursor:'pointer', background: readerFont <= READER_FONT_STEPS[0] ? 'transparent' : 'rgba(255,255,255,0.07)', color:'#fff', fontSize:15, fontWeight:800, opacity: readerFont <= READER_FONT_STEPS[0] ? 0.35 : 1 }}>A−</button>
+            <span style={{ fontSize:12, fontWeight:800, color:'#fff', minWidth:44, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>{readerFont}</span>
+            <button onClick={() => changeReaderFont(1)} disabled={readerFont >= READER_FONT_STEPS[READER_FONT_STEPS.length - 1]} aria-label="Увеличить шрифт" style={{ minWidth:44, height:44, borderRadius:999, border:'none', cursor:'pointer', background: readerFont >= READER_FONT_STEPS[READER_FONT_STEPS.length - 1] ? 'transparent' : 'rgba(255,255,255,0.07)', color:'#fff', fontSize:15, fontWeight:800, opacity: readerFont >= READER_FONT_STEPS[READER_FONT_STEPS.length - 1] ? 0.35 : 1 }}>A+</button>
           </div>
         </div>
       )}
@@ -461,8 +505,8 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
 
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, position:'relative' }}>
-                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', padding:'4px 9px', borderRadius:999 }}>{article.date}</span>
-                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, flexShrink:0, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', padding:'4px 9px', borderRadius:999 }}>{article.date}</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right' }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
                 </div>
               </div>
 

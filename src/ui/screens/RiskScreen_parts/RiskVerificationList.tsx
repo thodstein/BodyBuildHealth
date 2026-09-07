@@ -102,14 +102,14 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
           Перечень анализов по 6 системам и 28 механизмам · пороги m_i = 1/2/3 (таблица T4) · якорные floors по лабораторным порогам
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 140, flex:1, padding:'12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
+          <div style={{ minWidth: 120, flex:1, padding:'12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
             <div style={{ fontSize: 12, color: '#fff', fontWeight:700, marginBottom: 4 }}>Верифицировано систем</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, justifyContent:'center' }}>
               <span style={{ fontSize: 30, fontWeight: 900, color: overallPct >= 50 ? '#4ade80' : '#fbbf24' }}>{overallPct}%</span>
               <span style={{ fontSize: 13, color: '#fff', fontWeight:700 }}>{verifiedSystems}/{report.systems.length}</span>
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.55, flex:2, minWidth:200 }}>
+          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.55, flex:2, minWidth:160 }}>
             Маркеров в профиле: <b style={{ color: '#fff' }}>{report.presentMarkers}/{report.totalMarkers}</b>
             <br />Якорных попаданий (floors): <b style={{ color: '#fff' }}>{report.floorsCount}</b>
             {report.floorsCount > 0 && ' — риск систем поднят независимо от препаратов'}
@@ -142,8 +142,8 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
         const verif = sysVerif(sys.id);
         return (
           <div key={sys.id} id={`verify-${sys.id}`} style={{ ...CARD, scrollMarginTop: 170 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap:10, marginBottom: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color:'#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap:'wrap', gap:10, marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color:'#fff', flex:'1 1 140px', minWidth:0 }}>
                 {sys.icon} {sys.name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink:0 }}>

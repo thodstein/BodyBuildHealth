@@ -151,11 +151,11 @@ export const RiskOverview: React.FC<{
             return (
               <div key={sys} style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'10px 12px', minHeight:52 }}>
                 <span style={{ display: 'inline-flex', color: '#fff' }}><NativeIcon name={icon} size={17} /></span>
-                <span style={{ fontSize:13, minWidth:92, color:'#fff', fontWeight:700 }}>{label}</span>
-                <div style={{ flex:1, background:'rgba(255,255,255,0.08)', borderRadius:999, height:10, overflow:'hidden' }}>
+                <span style={{ fontSize:13, minWidth:92, flexShrink:0, color:'#fff', fontWeight:700 }}>{label}</span>
+                <div style={{ flex:1, minWidth:0, background:'rgba(255,255,255,0.08)', borderRadius:999, height:10, overflow:'hidden' }}>
                   <div style={{ width:`${Math.min(100,bd.net)}%`, height:'100%', background:getRiskColor(bd.net), borderRadius:999, transition:'width 0.4s' }} />
                 </div>
-                <span style={{ fontSize:14, fontWeight:800, color:getRiskColor(bd.net), minWidth:44, textAlign:'right' }}>{netPct}%</span>
+                <span style={{ fontSize:14, fontWeight:800, color:getRiskColor(bd.net), minWidth:44, flexShrink:0, textAlign:'right' }}>{netPct}%</span>
               </div>
             );
           })}
@@ -255,7 +255,7 @@ export const RiskOverview: React.FC<{
               <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                 <span style={{ fontSize:10, color:'#fff', fontWeight:800 }}>{Math.round(h.overallNet)}%</span>
                 <div style={{ width:'100%', background:getRiskColor(h.overallNet), borderRadius:'3px 3px 0 0', height:`${Math.max(6, h.overallNet/100*60)}px`, opacity:0.85 }} />
-                <span style={{ fontSize:9, color:'#fff' }}>{h.date.slice(5)}</span>
+                <span style={{ fontSize:10, color:'#fff' }}>{h.date.slice(5)}</span>
               </div>
             ))}
           </div>

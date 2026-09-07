@@ -945,7 +945,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ fontSize:11, color:'#fff', lineHeight:1.2, marginTop:2 }}>{riskResult? `NET ${Math.round(riskResult.overallNet)}% · RAW ${Math.round(riskResult.overallRaw)}%` : 'нет данных'}</div>
             </div>
             {riskResult && (
-              <span style={{ flexShrink:0, fontSize:13, fontWeight:900, padding:'8px 12px', borderRadius:999, background:`${getRiskColor(riskResult.overallNet)}1a`, border:`1px solid ${getRiskColor(riskResult.overallNet)}44`, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</span>
+              <span className="risk-topnav-badge" style={{ flexShrink:0, fontSize:13, fontWeight:900, padding:'8px 12px', borderRadius:999, background:`${getRiskColor(riskResult.overallNet)}1a`, border:`1px solid ${getRiskColor(riskResult.overallNet)}44`, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</span>
             )}
           </div>
         </div>
@@ -1199,13 +1199,13 @@ const MDSSRiskDisplay: React.FC = () => {
             <div>
               <label style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Недель экспозиции</label>
               <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(parseFloat(e.target.value) || 0); }}
-                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Генетика (через запятую)</label>
               <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
                 placeholder="APOL1_mutation, COMT_slow..."
-                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+                style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -1260,9 +1260,9 @@ const MDSSRiskDisplay: React.FC = () => {
             <div key={r.organKey} className="card risk-mdss-organ" style={{
               marginBottom: 10, padding:'12px 14px', borderRadius:16, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', borderLeft: `4px solid ${ZONE_COLORS[r.alertLevel]}`,
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:8, marginBottom: 6 }}>
-                <span style={{ fontWeight: 800, fontSize: 13, color:'#fff' }}>{r.organName}</span>
-                <span style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, background: `${ZONE_COLORS[r.alertLevel]}22`, border:`1px solid ${ZONE_COLORS[r.alertLevel]}44`, color: '#fff', fontWeight: 800, whiteSpace:'nowrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', flexWrap:'wrap', gap:8, marginBottom: 6 }}>
+                <span style={{ fontWeight: 800, fontSize: 13, color:'#fff', minWidth:0 }}>{r.organName}</span>
+                <span style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, background: `${ZONE_COLORS[r.alertLevel]}22`, border:`1px solid ${ZONE_COLORS[r.alertLevel]}44`, color: '#fff', fontWeight: 800, whiteSpace:'nowrap', flexShrink:0 }}>
                   {Math.round(r.riskPercentage)}% — {r.status.split('(')[0].trim()}
                 </span>
               </div>
@@ -1397,7 +1397,7 @@ const ComplianceDisplay: React.FC = () => {
 
       {/* Auto dates card */}
       <div style={{ marginBottom:12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:10 }}>
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>Дата начала курса (авто)</div>
             <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:13, fontWeight:700 }}>
@@ -1459,7 +1459,7 @@ const ComplianceDisplay: React.FC = () => {
 
           <div style={{ padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10 }}>📊 Анализ с штрафом</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, textAlign:'center', marginBottom:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, textAlign:'center', marginBottom:10 }}>
               <div style={{ padding:'14px 10px', borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Коэффициент штрафа</div>
                 <div style={{ fontSize:28, fontWeight:900, marginTop:4, color:report.riskAnalysis.penaltyMultiplierApplied > 1 ? '#ef4444' : '#00e68a' }}>
