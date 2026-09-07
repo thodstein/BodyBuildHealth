@@ -22,10 +22,11 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
     const dr = (detail?.dosageRange || sub.dosageRange);
     const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
     const unit = dr?.unit || 'mg/wk';
+    const freq = typeof dr?.frequency === 'string' ? dr.frequency : typeof dr?.frequency === 'number' ? `${dr.frequency}x/wk` : '2x/wk';
     db.put('course_log', {
       id: crypto.randomUUID(), substanceId: sub.id,
       doseValue: val, doseUnit: unit,
-      frequency: typeof dr?.frequency === 'number' ? dr.frequency : 2,
+      frequency: freq,
       startWeek: 1, endWeek: 12,
     }).catch(() => {});
   }, [sub.id, sub.dosageRange, detail?.dosageRange]);
@@ -506,10 +507,11 @@ export const CatalogTab: React.FC = () => {
     const dr = s.dosageRange;
     const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
     const unit = dr?.unit || 'mg/wk';
+    const freq = typeof dr?.frequency === 'string' ? dr.frequency : typeof dr?.frequency === 'number' ? `${dr.frequency}x/wk` : '2x/wk';
     db.put('course_log', {
       id: crypto.randomUUID(), substanceId: s.id,
       doseValue: val, doseUnit: unit,
-      frequency: dr?.frequency || '2x/wk',
+      frequency: freq,
       startWeek: 1, endWeek: 12,
     }).catch(() => {});
   }, []);
