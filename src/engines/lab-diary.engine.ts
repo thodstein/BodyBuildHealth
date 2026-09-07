@@ -179,11 +179,15 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
     const day = byDate.get(lab.date)!;
     const norm = markerNorms[lab.code] || {};
     const inRange = (norm.lln === undefined || lab.value >= norm.lln) && (norm.uln === undefined || lab.value <= norm.uln);
-    day.markers.push({
+    const marker: LabDiaryMarker = {
       code: lab.code, name: lab.name || lab.code,
       value: lab.value, unit: lab.unit || '',
       lln: norm.lln, uln: norm.uln, inRange,
-    });
+    };
+    // P0 fix: дедуп по коду на одну дату — последняя запись побеждает (иначе ×2 маркера и ×2 аномалии)
+    const existingIdx = day.markers.findIndex(m => m.code === lab.code);
+    if (existingIdx >= 0) day.markers[existingIdx] = marker;
+    else day.markers.push(marker);
   }
 
   // пересчёт и сохранение
