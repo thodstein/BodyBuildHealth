@@ -79,21 +79,27 @@ export function calculatePenaltyCoefficients(
   }
 
   const now = new Date();
+  // P0 fix: baseline — разовый чекап, не протухает за 8 нед; on_cycle — 4 нед актуальности
+  const isBaseline = phaseKey === 'baseline';
+  const windowMs = isBaseline ? Infinity : 8 * 7 * 24 * 60 * 60 * 1000;
   const recentLabs = submittedLabs.filter(l => {
     const d = new Date(l.date);
-    return (now.getTime() - d.getTime()) < 8 * 7 * 24 * 60 * 60 * 1000;
+    return isBaseline || (now.getTime() - d.getTime()) < windowMs;
   });
-  const labCodes = new Set(recentLabs.map(l => l.code));
-  const diagSet = new Set(submittedDiagnostics);
+  const labCodes = new Set(recentLabs.map(l => String(l.code).toUpperCase()));
+  const diagSet = new Set(submittedDiagnostics.map(d => String(d).toLowerCase()));
+  // P0 fix: требуемые коды — в верхнем регистре, сравнение кейс-инсенс
+  const requiredUpper = requiredLabs.map(c => String(c).toUpperCase());
+  const requiredDiagLower = requiredDiags.map(d => String(d).toLowerCase());
+  const missingLabs = requiredUpper.filter(code => !labCodes.has(code));
+  const missingDiags = requiredDiagLower.filter(d => !diagSet.has(d));
 
-  const missingLabs = requiredLabs.filter(code => !labCodes.has(code));
-  const missingDiags = requiredDiags.filter(d => !diagSet.has(d));
-
-  const labRatio = requiredLabs.length > 0 ? missingLabs.length / requiredLabs.length : 0;
-  const diagRatio = requiredDiags.length > 0 ? missingDiags.length / requiredDiags.length : 0;
+  const labRatio = requiredUpper.length > 0 ? missingLabs.length / requiredUpper.length : 0;
+  // P0 fix: диагностика не трекается в LabsScreen (всегда []), не штрафуем за неё
+  const diagRatio = submittedDiagnostics.length === 0 ? 0 : (requiredDiagLower.length > 0 ? missingDiags.length / requiredDiagLower.length : 0);
 
   const noLabs = forceNoLabsPenalty || labRatio >= 0.9;
-  const noDiags = diagRatio >= 0.9;
+  const noDiags = submittedDiagnostics.length > 0 && diagRatio >= 0.9;
 
   const labPenalty = noLabs ? 0.50 : labRatio * 0.40;
   const diagnosticPenalty = noDiags ? 0.35 : diagRatio * 0.25;
@@ -113,7 +119,7 @@ export function calculatePenaltyCoefficients(
 
 function resolvePhaseKey(phase: string): string {
   const p = phase.toLowerCase();
-  if (p.includes('course') && !p.includes('bridge')) return 'on_cycle';
+  if (p === 'on_cycle' || p.includes('on_cycle') || (p.includes('course') && !p.includes('bridge'))) return 'on_cycle';
   if (p.includes('bridge')) return 'bridge';
   if (p.includes('pct') && p.includes('post')) return 'post_pct';
   if (p.includes('pct')) return 'pct';
