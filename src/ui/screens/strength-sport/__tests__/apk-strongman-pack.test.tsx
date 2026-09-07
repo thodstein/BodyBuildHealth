@@ -10,7 +10,7 @@
  *    загрузчик CSS — no-op), в native — класс ss-apk + загрузка стилей.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
@@ -149,6 +149,14 @@ describe('APK strongman pack', () => {
     expect(container.querySelector("[data-ss='hero']"), 'hero hook').not.toBeNull();
     expect(container.querySelector("[data-ss='steps']"), 'steps hook').not.toBeNull();
     expect(container.querySelector("[data-ss='split-list']")).toBeNull();
+  });
+
+  it('пустая выдача: шаг План без плана показывает CTA, а не пустоту', async () => {
+    render(<StrengthSportConstructor />);
+    fireEvent.click(screen.getByText(/📋 План/));
+    expect(await screen.findByText('Плана пока нет')).toBeTruthy();
+    fireEvent.click(screen.getByText(/← К сплиту/));
+    expect(await screen.findByText('Интернет-цикл')).toBeTruthy();
   });
 
   it('native: корень ss-apk, загрузчик запускает импорт', () => {

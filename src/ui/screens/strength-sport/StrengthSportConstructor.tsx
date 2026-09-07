@@ -157,6 +157,8 @@ export const StrengthSportConstructor: React.FC = () => {
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(0);
   const [msg, setMsg] = useState('');
+  // Сборка тяжёлая (до 16 нед) — флаг busy + yield, чтобы UI не фризил без отклика.
+  const [building, setBuilding] = useState(false);
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
   const contestSim = useMemo(() => {
@@ -237,7 +239,13 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch {}
   };
 
-  const build = () => {
+  const build = async () => {
+    if (building) return;
+    setBuilding(true);
+    setMsg('⏳ Собираем план…');
+    try {
+      // Даём UI отрисовать busy-строку до тяжёлого синхронного расчёта.
+      await new Promise<void>(r => setTimeout(r, 30));
     let extra: any = {};
     try{
       const raw = localStorage.getItem('he_profile_v2');
@@ -386,6 +394,9 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch {}
     setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200);
     setStep('plan');
+    } finally {
+      setBuilding(false);
+    }
   };
 
   const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string; rir: number }>) => {
@@ -898,7 +909,8 @@ export const StrengthSportConstructor: React.FC = () => {
               preview
             />
           )}
-          <button data-ss="build" onClick={build} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'18px 22px', fontSize:17, borderRadius:18 }}>✦ Собрать план {cycleId ? `· 📚 ${cycleId} (${cycleMode==='faithful'?'дословно':'adapt'})` : patternId ? `· ${patternId}` : ''}</button>
+          <button data-ss="build" onClick={build} disabled={building} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'18px 22px', fontSize:17, borderRadius:18, opacity: building?0.6:1 }}>✦ Собрать план {cycleId ? `· 📚 ${cycleId} (${cycleMode==='faithful'?'дословно':'adapt'})` : patternId ? `· ${patternId}` : ''}</button>
+          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ Собираем план — считаем объёмы, проценты и taper…</div>}
         </div>
       )}
 
@@ -1229,6 +1241,17 @@ export const StrengthSportConstructor: React.FC = () => {
           </SectionCard></div>
           {msg && <InfoBanner tone="ok"><Highlight>{msg}</Highlight></InfoBanner>}
         </div>
+      )}
+      {step === 'plan' && !plan && (
+        <SectionCard icon="📋" title="Плана пока нет" subtitle="Здесь появятся сводка, гант, попытки и недели">
+          <div style={{ textAlign:'center', fontSize:44, lineHeight:1, padding:'8px 0 4px' }} aria-hidden="true">📋</div>
+          <div style={{ fontSize:14, color:TEXT_2, textAlign:'center', lineHeight:1.55 }}>Выбери сплит и нажми «Собрать план» — выдача строится под режим, цель и слабые зоны.</div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <button onClick={() => setStep('split')} style={{ ...BTN, flex:1 }}>← К сплиту</button>
+            <button data-ss="build" onClick={build} disabled={building} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.4, opacity: building?0.6:1 }}>✦ Собрать план</button>
+          </div>
+          {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ Собираем план — считаем объёмы, проценты и taper…</div>}
+        </SectionCard>
       )}
     </div>
   );
