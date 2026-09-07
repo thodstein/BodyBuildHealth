@@ -98,8 +98,9 @@ export function computeLabIndices(entries: LabPoint[]): LabIndices {
       homocysteine * 0.15 +
       alt * 0.15
     ),
+    // P0 fix: HOMA-IR = глюкоза(ммоль/л)×инсулин/22.5, а не /405/5 (=/2025 → ×90 занижение)
     homaIR: (ins > 0 && glucose > 0)
-      ? Math.min(1, (rawValue(entries, ['INSULIN', 'INS']) ?? 0) * (rawValue(entries, ['GLU', 'GLUCOSE']) ?? 0) / 405 / 5)
+      ? Math.min(1, (rawValue(entries, ['INSULIN', 'INS']) ?? 0) * (rawValue(entries, ['GLU', 'GLUCOSE']) ?? 0) / 22.5 / 5)
       : glucose * 0.7 + hba1c * 0.3,
     hepaticStress: Math.min(1,
       alt * 0.3 +
