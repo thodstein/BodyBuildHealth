@@ -30,7 +30,7 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { findPatternAlternative } from './bb-exercise-rotation.engine';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
-import { computeAASEquivDose } from './bb-ped-adaptation.engine';
+import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
@@ -2419,7 +2419,6 @@ function buildSession(
     }
     // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets до 5
     // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день)
-    
     for (const exData of pl.exDatas) {
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
       const vPct = (exData as any).substitutionVolumePct ?? 1.0;
@@ -2748,6 +2747,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   const pattern = foundPattern || SPLIT_PATTERNS[0];
   const level = normLevel(input.level) as TrainingLevel;
+  // PED-автоадаптация: если pedAdapt не передан явно (2-й аргумент), но в
+  // pedDoses есть положительные дозы — выводим из доз. Без этого половина
+  // PED-механик молча выключена (minSetsArms, budgetCap 0.70, pedArmBoost,
+  // doseAware-тейпер кривой), хотя UI/BB-тесты передают только pedDoses.
+  // Явный 2-й аргумент приоритетнее (UI и buildWithPED-пути без изменений).
+  if (!pedAdapt) {
+    const doses = input.pedDoses || {};
+    const doseVal = (v: unknown): number => {
+      if (typeof v === 'number') return v;
+      if (v == null) return 0;
+      return parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) || 0;
+    };
+    const active = (['AAS', 'insulin', 'MGF', 'IGF1', 'GH'] as const).filter(k => doseVal((doses as any)[k]) > 0);
+    if (active.length > 0) {
+      try {
+        const baseMrv: Record<string, number> = {};
+        for (const [m, lm] of Object.entries(getAllVolumeLandmarks(level))) baseMrv[m] = (lm as MuscleVolumeLandmarks).mrv;
+        pedAdapt = adaptForPEDs(active as any, baseMrv, doses as any, input.courseIntensity || 'moderate');
+      } catch { /* без PED-адаптации — натуральный путь */ }
+    }
+  }
   const inputWorkMax = input.workMax || {};
   // PRO: cross-mesocycle continuity — прогрессия весов и объёма из предыдущего плана.
   const mesoProgression = input.previousPlan
@@ -4267,6 +4287,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     maxWorkingSets: sessLimits.maxWorkingSets,
     maxExercises: sessLimits.maxExercises,
     trainingYears: input.trainingYears,
+    // onCourse для BIG per-exercise капов финализатора (иначе курс душится до 5)
+    onCourse,
     bodyweightCapability: input.bodyweightCapability,
     supersetMode: input.supersetMode,
     volumeScheme: effVolumeScheme,

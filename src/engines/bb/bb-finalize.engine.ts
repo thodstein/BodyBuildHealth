@@ -2127,6 +2127,9 @@ export interface BBFinalizeOptions {
   maxWorkingSets?: number;
   maxExercises?: number;
   trainingYears?: number;
+  /** На курсе: per-exercise капы BIG (8-10), иначе legacy 5/8.
+   *  Билдер прокидывает свой onCourse; прямые вызовы без флага — без изменений. */
+  onCourse?: boolean;
   patternId?: string;
   /** Способность к bodyweight-упражнениям — фильтр подтягиваний при allocation. */
   bodyweightCapability?: {
@@ -3027,6 +3030,16 @@ for (const week of next.weeks) {
           const scale = maxWorkingSets / totalGuard;
           for (const m of Object.keys(sesGuard)) sesGuard[m] = Math.max(2, Math.floor(sesGuard[m] * scale));
         }
+        // На курсе руки держат флор 4 даже после масштаба: иначе fit
+        // сбривает аксессуарные руки до 2 при защищённых праймари груди/спины
+        // (доказано BBDBG-трассировкой: remBudget 32/40, а итог 2/сессию).
+        // Сброс идёт через другие аксессуары/удаления; last-for-muscle защита
+        // фита страхует от полного удаления. Натуралов не касается.
+        if (options.onCourse) {
+          for (const m of ['biceps', 'triceps']) {
+            if (sesGuard[m] != null) sesGuard[m] = Math.max(sesGuard[m], 4);
+          }
+        }
         sessionGuard = sesGuard;
       }
       if (!options.preserveSource && options.reorder !== false) {
@@ -3048,6 +3061,11 @@ for (const week of next.weeks) {
         maxExercises: options.maxExercises ?? (isPPLPattern(options, next) ? 12 : 10),
         maxWorkingSets,
         minSetsByMuscle: sessionGuard,
+        // BIG-сессии курса не влезают в дефолтные 100 мин движка: тайм-трим
+        // сбривал бы руки/добивки под корень при защищённых праймари.
+        // Курс+стаж тренируются дольше — лимит времени масштабируется.
+        maxTimeSeconds: options.onCourse && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 150 * 60
+          : options.onCourse ? 120 * 60 : undefined,
       });
       if (fitted.removed.length > 0) {
         next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${fitted.removed.length} вторичных упражнений, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
@@ -3119,7 +3137,7 @@ for (const week of next.weeks) {
       for (const e of session.exercises) {
         if ((e as any).warmupActivator) continue;
         let exCap = 5;
-        try { exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears); } catch { exCap = 5; }
+        try { exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears, options.onCourse); } catch { exCap = 5; }
         if (e.sets > exCap) {
           e.sets = exCap;
           if (Array.isArray(e.workSets) && e.workSets.length > exCap) e.workSets = e.workSets.slice(0, exCap);
@@ -3841,7 +3859,7 @@ for (const week of next.weeks) {
           // Путь 1: plain +1 — влезает в cap×1.15 (порог инвариантов) и кап сессии.
           const target = [...items].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
           let exCap = 5;
-          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears); } catch { exCap = 5; }
+          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears, options.onCourse); } catch { exCap = 5; }
           const sessTotal = s.exercises
             .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional)
             .reduce((a: number, e: any) => a + (e.sets || 0), 0);
@@ -3927,7 +3945,7 @@ for (const week of next.weeks) {
         if ((e as any).warmupActivator) continue;
         let exCap = 5;
         try {
-          exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears);
+          exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears, options.onCourse);
         } catch { exCap = 5; }
         // FST-7 7-in-1 (явное разрешение fst7Seven): финишер держит ровно 7 —
         // не разбираем обратно на 5+2. Выше 7 — всё равно разбираем (защита
@@ -4117,7 +4135,7 @@ for (const week of next.weeks) {
           if (total >= need.min) break;
           const target = [...items].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
           let exCap = 5;
-          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears); } catch { exCap = 5; }
+          try { exCap = perExerciseCap(options.level, need.muscle, options.trainingYears, options.onCourse); } catch { exCap = 5; }
           if ((target.sets || 0) >= exCap) break;
           const sessTotal = s.exercises
             .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional)
@@ -4257,7 +4275,7 @@ for (const week of next.weeks) {
     const maxSets = options.maxWorkingSets ?? 30;
     const wmQ = (options as any).workMax?.['quads'] ?? 140;
     let hostCap = 5;
-    try { hostCap = perExerciseCap(options.level, 'quads', options.trainingYears); } catch { hostCap = 5; }
+    try { hostCap = perExerciseCap(options.level, 'quads', options.trainingYears, options.onCourse); } catch { hostCap = 5; }
     let widowWeeks = 0;
     for (const week of next.weeks) {
       if ((week as any).phase === 'deload' || (week as any).deload) continue;

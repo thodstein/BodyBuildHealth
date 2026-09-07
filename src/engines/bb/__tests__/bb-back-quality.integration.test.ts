@@ -22,7 +22,11 @@ describe('experienced enhanced back prescription', () => {
     expect(uppers).toHaveLength(2);
     for (const session of uppers) {
       const back = session.exercises.filter(e => e.muscle === 'back');
-      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
+      // Порог 17 (был 18): памп-сессия отдаёт 1 сет под гарантию рук на курсе
+      // (minSetsArms 4 при PED) в фиксированном бюджете сессии 60 сетов —
+      // zero-sum: руки weekly 4→7, спина weekly 48→41 (effective 49).
+      // Блок остаётся high-volume (6 упр, ≥3 паттерна), natural-план даёт <18.
+      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(17);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
       const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name)).filter((p): p is string => p !== null);
       expect(new Set(verticalProfiles).size).toBe(verticalProfiles.length);

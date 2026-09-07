@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
+import { perExerciseCap } from '../bb-volume.engine';
 
 const WM = { chest: 120, back: 130, shoulders: 70, biceps: 60, triceps: 65, quads: 150, hamstrings: 110, glutes: 150, calves: 90, abs: 70, traps: 90, forearms: 45 };
 
@@ -35,7 +36,9 @@ describe('BB корректность распределения в разных
       for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
         if ((e as any).warmupActivator) continue;
         expect(e.sets).toBeGreaterThanOrEqual(2);
-        expect(e.sets).toBeLessThanOrEqual(5);
+        // BIG-кап курса из единого источника (на курсе enhanced 8+ лет — до 10,
+        // не универсальные 5). Планы здесь строятся с AAS 500 → onCourse true.
+        expect(e.sets).toBeLessThanOrEqual(perExerciseCap('enhanced', (e as any).muscle, 8, true));
       }
     }
   });

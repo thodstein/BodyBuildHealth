@@ -197,7 +197,14 @@ export function sessionLimitsFor(
   const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
-  if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
+  if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) {
+    maxWorkingSets = 60;
+    // BIG-сессии опытных (спина 22 + грудь 18 + руки с гарантией 2 упр) несут
+    // ~20 движений: лимит 18 срезал бы аксессуарные тяги/махи целиком
+    // (enforce режет упражнениями, а не сетами). Сеты и время держат
+    // maxWorkingSets + maxTimeSeconds; счётчик — только разнообразие.
+    maxExercises = years >= 6 ? 20 : 18;
+  }
   else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
   else { maxWorkingSets = 24; maxExercises = 10; }
   // PPL: сессия качает 4–5 групп (Pull: спина/задняя/трапы/бицепс/предплечья) —
@@ -255,9 +262,9 @@ export function computeBBRecoveryMultiplier(input: {
 }
 
 /** Единый cap сетов на упражнение — про-правило, единственный источник (Фаза 2.5).
- *  Шкала BIG с учётом PED и стажа: натурал 5-6, advanced 6-8, enhanced 3+ 8-10
- *  на главные, 6-8 на руки/дельты, enhanced 6+ на курсе 10 на главные.
- *  Сигнатура обратно совместима (4-й/5-й парам опциональны). */
+ *  Без флага onCourse — legacy (5; enhanced 3+ на главных — 8).
+ *  BIG-ветка при явном onCourse===true: стаж 6+ — 10/8, 3+ — 8/6, 1+ — 6/5
+ *  (главные/остальные). Сигнатура обратно совместима. */
 export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number, onCourse?: boolean): number {
   const m = (muscle || '').toLowerCase();
   const years = Number.isFinite(trainingYears) ? (trainingYears as number) : 0;
