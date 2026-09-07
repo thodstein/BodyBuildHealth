@@ -1034,6 +1034,9 @@ export function ArmAutoConstructor() {
                     <div key={k} className="ad-stat"><div className="ad-stat-v">{String(v)} кг</div><div className="ad-stat-l">{k}</div></div>
                   ))}
                 </div>
+                {Object.keys(workMax).length === 0 && (
+                  <div className="ad-muted">Максимумы не заданы — введи их в «Параметры» или вес тела в профиле, иначе веса подберутся от базы.</div>
+                )}
                 <div className="ad-muted">Пример веса в плане (неделя 1, тяж): {(() => {
                   try {
                     const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];

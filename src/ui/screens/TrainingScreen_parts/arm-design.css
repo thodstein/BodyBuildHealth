@@ -971,3 +971,13 @@
 :is(.train-arm) .ad-ex-vl > b {
   color: var(--ad-text);
 }
+
+/* ─── Фокус с клавиатуры ─────────────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-btn:focus-visible,
+:is(.train-arm, .train-armdiag) .ad-chip:focus-visible,
+:is(.train-arm, .train-armdiag) .ad-step:focus-visible,
+:is(.train-arm, .train-armdiag) .ad-pill:focus-visible,
+:is(.train-arm, .train-armdiag) .ad-sec-head:focus-visible {
+  outline: 2px solid var(--ad-acc);
+  outline-offset: 2px;
+}
