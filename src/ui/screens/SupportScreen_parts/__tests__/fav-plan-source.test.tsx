@@ -10,6 +10,7 @@ import React from 'react';
 import { SupportFavoritesView } from '../SupportFavoritesView';
 import { SupportStacksView } from '../SupportStacksView';
 import { SupportManualPicker } from '../SupportManualPicker';
+import { SupportScreen } from '../../SupportScreen';
 
 const noop = () => {};
 
@@ -196,8 +197,7 @@ describe('stacks view save source', () => {
   });
 });
 
-describe('manual picker plan badge', () => {
-  beforeEach(() => {
+describe('manual picker plan badge', () => {  beforeEach(() => {
     try {
       localStorage.clear();
     } catch {}
@@ -249,5 +249,39 @@ describe('manual picker plan badge', () => {
     fireEvent.click(queryByText('⭐ Избранное')!);
     expect(container.textContent).toContain('В плане: 0');
     expect(queryByText('в плане')).toBeNull();
+  });
+});
+
+describe('saved plan load merges subs', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  afterEach(() => {
+    cleanup();
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+
+  it('загрузка сохранённого плана доводит вещества до действующего плана', () => {
+    localStorage.setItem(
+      'he_saved_support_plans',
+      JSON.stringify([
+        { id: 11, date: new Date().toISOString(), plan: { level: 'mid', subs: ['plan_sub_x'] } },
+      ]),
+    );
+    const { container, getByText } = render(<SupportScreen />);
+    // hero → инфо → избранное → план (действующий, со списком «Мои планы»)
+    fireEvent.click(getByText('Общая информация'));
+    fireEvent.click(getByText(/Избранное · Дневник/));
+    fireEvent.click(getByText('📋 План'));
+    // загрузка сохранённого плана
+    fireEvent.click(getByText('📂'));
+    // вещество из загруженного плана видно в действующем плане (даже без
+    // записи в каталоге — таблица показывает фолбэк, а не дропает строку)
+    expect(container.textContent).toContain('plan sub x');
+    expect(container.textContent).toContain('✅ План сохранён');
   });
 });

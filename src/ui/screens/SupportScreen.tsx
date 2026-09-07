@@ -642,6 +642,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     try {
+    // overrideSubs — применённый выбор (AutoCalculator / сохранённые планы).
+    // Раньше молча отбрасывались: пересчёт шёл без них и план не менялся.
+    // Вливаем в ручные добавления — они входят в живой план (effectiveLevel),
+    // стор, мост и дневник. Дедуп через Set — повторное применение идемпотентно.
+    if (overrideSubs && overrideSubs.length > 0) {
+      setEnhancedSubs((prev: string[]) => [...new Set([...(prev || []), ...overrideSubs])]);
+    }
     const s = linked.profile?.settings;
     const level = (overrideLevel || supportLevel) as PowerLevel;
     // Build TZ state from linked data
@@ -3455,9 +3462,12 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           onApply={(r) => {
             setAutoCalcResult(r);
             setCalcDone(true);
-            // C20: Применить результат AutoCalculator к основному плану поддержки
+            // C20: Применить результат AutoCalculator к основному плану поддержки.
+            // Уровень синхронизируем в стейт, иначе живой план (effectiveLevel)
+            // останется на старом уровне и разойдётся с применённым.
             const lvl = r.level === 'manual' ? 'max' : (r.level === 'base' ? 'basic' : r.level === 'medium' ? 'mid' : r.level === 'max' ? 'max' : 'boost') as 'basic' | 'mid' | 'max' | 'boost';
             if (r.subs && r.subs.length > 0) {
+              setSupportLevel(lvl);
               calcSupport(lvl, r.subs);
             }
           }}

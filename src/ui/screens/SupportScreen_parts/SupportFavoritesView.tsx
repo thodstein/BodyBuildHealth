@@ -318,14 +318,18 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       </tr></thead>
                       <tbody>
                         {subs.map((id: string) => {
+                          // Строка видна всегда: вещества из движка/ручных добавлений
+                          // может не быть в каталоге — тогда честные фолбэки, а не пропуск.
                           const sub = catalogSubstances.find((s:any) => s.id === id);
                           const d = dosages[id];
-                          if (!sub || !d) return null;
+                          const dispDose = d?.mg
+                            ? (d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`)
+                            : '—';
                           return (
                             <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                              <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing || '—'}</td>
-                              <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
-                              <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`}</td>
+                              <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
+                              <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
+                              <td style={{ padding:'3px 5px', color:'#00e68a' }}>{dispDose}</td>
                             </tr>
                           );
                         })}
