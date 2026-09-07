@@ -128,6 +128,9 @@ for (const sec of [
   '75. ANCHORED BOTTOMS',
 ]) mustContain('src/styles-native.css', sec, `css section ${sec}`);
 
+// 9. Главная: картинка целиком (contain), без своих надписей поверх верха.
+mustContain('src/styles-native.css', 'object-fit: contain', 'home hero contain');
+
 if (fails.length > 0) {
   console.error(`[check-apk-markers] FAIL (${fails.length}):`);
   for (const f of fails) console.error(`  - ${f}`);

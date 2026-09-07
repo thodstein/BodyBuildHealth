@@ -89,4 +89,18 @@ describe('DashboardNative landing', () => {
       setLocale('ru');
     }
   });
+
+  it('волна 28: своих надписей вверху нет — видна картинка целиком', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'styles-native.css'), 'utf-8');
+    setCapacitorNative();
+    resetAppPlatformCache();
+    const { container } = render(<DashboardNative />);
+    // Никакого своего текста поверх верха hero.
+    expect(container.querySelector('.native-home-top')).toBeNull();
+    // Картинка — contain от верха: запечённые HUD-надписи не режутся.
+    expect(css).toContain('object-fit: contain');
+    expect(css).toContain('object-position: center top');
+  });
 });
