@@ -183,7 +183,19 @@ export const PharmaCourseScreen: React.FC = () => {
       try {
         await db.init();
         const entries = await db.getAll<CourseEntry>('course_log');
+        // Отдельный импорт PEPTIDE_DB — healing-пептиды (bpc157/tb500 и т.д.) не в PHARMA_DB, не должны попадать в фарма-курс
+        let peptideIds: Set<string> = new Set();
+        try {
+          const { PEPTIDE_DB } = await import('../../engines/peptide-calculator.engine');
+          peptideIds = new Set(Object.keys(PEPTIDE_DB));
+        } catch {}
         const pharmaEntries = entries.filter(e => {
+          // healing-пептиды из PEPTIDE_DB, отсутствующие в PHARMA_DB — не фарма
+          if (peptideIds.has(e.substanceId)) {
+            const subById = PHARMA_DB[e.substanceId];
+            // GH-пептиды есть и в PHARMA_DB (peptide_ghrh/ghrp) — они фарма, оставляем
+            if (!subById) return false;
+          }
           const subById = PHARMA_DB[e.substanceId];
           if (subById) return subById.class !== 'support';
           const subByName = Object.values(PHARMA_DB).find(s => 
@@ -306,9 +318,11 @@ export const PharmaCourseScreen: React.FC = () => {
 
   const weekBar = (entry: CourseEntry) => {
     const w = totalWeeks || 16;
-    const s = ((entry.startWeek || 0) / w) * 100;
-    const e = (((entry.endWeek || w) - (entry.startWeek || 0)) / w) * 100;
-    return { left: `${s}%`, width: `${e}%` };
+    // inclusive: неделя end входит → длительность +1, горизонт +1 (0..w включительно = w+1 недель)
+    const s = ((entry.startWeek || 0) / (w + 1)) * 100;
+    const dur = ((entry.endWeek ?? w) - (entry.startWeek || 0) + 1);
+    const e = (dur / (w + 1)) * 100;
+    return { left: `${s}%`, width: `${Math.max(2, e)}%` };
   };
 
   const getDaysFromFreq = (freq: string): number[] => {

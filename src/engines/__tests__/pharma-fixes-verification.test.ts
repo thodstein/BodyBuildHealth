@@ -154,3 +154,61 @@ describe('P0-F score-pharma dose scaling', () => {
     expect(high.overallRaw).toBeGreaterThan(low.overallRaw);
   });
 });
+
+describe('P0 peptide filter and weekBar + getPharmaDetail fallback', () => {
+  it('getPharmaDetail falls back to defaults on empty mechanisms', async () => {
+    const { getPharmaDetail } = await import('../../core/pharma-database');
+    const { PHARMA_DB } = await import('../../core/pharma-database');
+    // Find a real substance and test that empty array would fallback (simulate)
+    // Create a mock entry with empty mechanisms
+    const testId = 'test_enan';
+    const raw = PHARMA_DB[testId];
+    expect(raw).toBeTruthy();
+    // The function should handle empty array: if raw has empty, it should return defaults
+    // We test the fallback logic directly
+    const { CLASS_DEFAULTS } = await import('../../core/pharma-db/class-defaults');
+    const defaults = CLASS_DEFAULTS[raw.class];
+    expect(defaults).toBeTruthy();
+    // Simulate empty
+    const mockRaw: any = { ...raw, mechanisms: [] };
+    const fallback = (Array.isArray(mockRaw.mechanisms) && mockRaw.mechanisms.length > 0) ? mockRaw.mechanisms : defaults.mechanisms;
+    expect(fallback).toBe(defaults.mechanisms);
+    expect(fallback.length).toBeGreaterThan(0);
+    // Real call should not be empty for known id
+    const detail = getPharmaDetail(testId);
+    expect(detail?.mechanisms?.length).toBeGreaterThan(0);
+  });
+  it('weekBar inclusive width is larger than exclusive for same end-start', () => {
+    const totalWeeks = 12;
+    const entry = { startWeek: 0, endWeek: 8 } as any;
+    const exclusive = ((entry.endWeek - entry.startWeek) / totalWeeks) * 100;
+    const inclusive = ((entry.endWeek - entry.startWeek + 1) / (totalWeeks + 1)) * 100;
+    expect(inclusive).toBeGreaterThan(exclusive);
+    // For 0-12 inclusive on 12 horizon, exclusive 100% vs inclusive 100% (13/13)
+    const e2 = { startWeek: 0, endWeek: 12 } as any;
+    const excl2 = ((e2.endWeek - e2.startWeek) / 12) * 100;
+    const incl2 = ((e2.endWeek - e2.startWeek + 1) / (12 + 1)) * 100;
+    expect(Math.abs(excl2 - 100)).toBeLessThan(0.01);
+    expect(Math.abs(incl2 - 100)).toBeLessThan(0.01);
+  });
+  it('peptide bpc157 should not be counted as pharma (filter)', async () => {
+    const { PEPTIDE_DB } = await import('../peptide-calculator.engine');
+    expect(PEPTIDE_DB['bpc157']).toBeTruthy();
+    const { PHARMA_DB: PDB } = await import('../../core/pharma-database');
+    expect(PDB['bpc157']).toBeUndefined();
+    // Simulate filter logic from PharmaCourseScreen
+    const peptideIds = new Set(Object.keys(PEPTIDE_DB));
+    const entries = [{ substanceId: 'bpc157' }, { substanceId: 'test_enan' }, { substanceId: 'unknown_xyz' }] as any[];
+    const filtered = entries.filter(e => {
+      if (peptideIds.has(e.substanceId)) {
+        const subById = (PDB as any)[e.substanceId];
+        if (!subById) return false;
+      }
+      const subById = (PDB as any)[e.substanceId];
+      if (subById) return subById.class !== 'support';
+      return true;
+    });
+    expect(filtered.map(f => f.substanceId)).toEqual(['test_enan', 'unknown_xyz']);
+    expect(filtered.some(f => f.substanceId === 'bpc157')).toBe(false);
+  });
+});

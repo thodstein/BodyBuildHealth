@@ -36,9 +36,9 @@ export function getPharmaDetail(id: string): PharmaSubstance | null {
   return {
     ...defaults,
     ...raw,
-    mechanisms: raw.mechanisms || defaults.mechanisms,
-    sideEffects: raw.sideEffects || defaults.sideEffects,
-    contraindications: raw.contraindications || defaults.contraindications,
+    mechanisms: (Array.isArray(raw.mechanisms) && raw.mechanisms.length > 0) ? raw.mechanisms : defaults.mechanisms,
+    sideEffects: (Array.isArray(raw.sideEffects) && raw.sideEffects.length > 0) ? raw.sideEffects : defaults.sideEffects,
+    contraindications: (Array.isArray(raw.contraindications) && raw.contraindications.length > 0) ? raw.contraindications : defaults.contraindications,
     description: raw.description || defaults.description,
     dosageRange: raw.dosageRange || defaults.dosageRange,
   };
