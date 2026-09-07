@@ -771,10 +771,12 @@ export const PharmaCourseScreen: React.FC = () => {
                   </div>
                   <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                     <span style={{ ...pillStyle, fontSize:10, color:'#fbbf24', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:20 }}>{cr.entries.length} пр.</span>
-                    <button onClick={() => {
+                    <button onClick={async () => {
                       if (!confirm(`Восстановить курс "${cr.name}"?`)) return;
+                      try {
+                        await Promise.all(cr.entries.map(e => db.put('course_log', e)));
+                      } catch {}
                       setCourse(cr.entries);
-                      cr.entries.forEach(async (e) => { try { await db.put('course_log', e); } catch {} });
                       const newHistory = historyCourses.filter((_, j) => j !== i);
                       setHistoryCourses(newHistory);
                       localStorage.setItem('he_course_history', JSON.stringify(newHistory));

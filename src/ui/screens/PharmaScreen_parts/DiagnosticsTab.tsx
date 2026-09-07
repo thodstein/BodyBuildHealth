@@ -2,6 +2,23 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../../engines/advanced-diagnostics.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult } from '../../../engines/advanced-diagnostics.engine';
 import { useDataLink } from '../../../core/data-link';
+import { weeklyDose, injectionsPerWeek } from '../../../engines/pharma-frequency';
+
+function detectEster(id: string): string {
+  const s = String(id || '').toLowerCase();
+  if (s.includes('phenylprop')) return 'phenylpropionate';
+  if (s.includes('isocapro')) return 'isocaproate';
+  if (s.includes('hex') || s.includes('hexahydrobenzyl')) return 'hexahydrobenzylcarbonate';
+  if (s.includes('enan')) return 'enanthate';
+  if (s.includes('prop')) return 'propionate';
+  if (s.includes('cyp')) return 'cypionate';
+  if (s.includes('undec')) return 'undecanoate';
+  if (s.includes('acet')) return 'acetate';
+  if (s.includes('deca')) return 'decanoate';
+  if (s.includes('sust') || s.includes('sustanon')) return 'sustanon';
+  if (s.includes('oral') || s.includes('oxan') || s.includes('stan') || s.includes('methand') || s.includes('anadrol') || s.includes('turinabol')) return 'oral';
+  return 'enanthate';
+}
 
 export const DiagnosticsTab: React.FC = () => {
   const linked = useDataLink();
@@ -35,19 +52,14 @@ export const DiagnosticsTab: React.FC = () => {
   useEffect(() => {
     if (useCourseDrugs && course.length > 0) {
       const mapped: DrugDoseInput[] = course.map((c: any) => {
-        const ester = c.substanceId.includes('enan') ? 'enanthate'
-          : c.substanceId.includes('prop') ? 'propionate'
-          : c.substanceId.includes('cyp') ? 'cypionate'
-          : c.substanceId.includes('undec') ? 'undecanoate'
-          : c.substanceId.includes('acet') ? 'acetate'
-          : c.substanceId.includes('deca') || c.substanceId === 'deca' ? 'decanoate'
-          : c.substanceId.includes('oral') ? 'oral'
-          : 'enanthate';
+        const ester = detectEster(c.substanceId);
+        const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
+        const perWeek = injectionsPerWeek(c.frequency as any);
         return {
           name: c.substanceId,
           ester,
-          mgPerWeek: c.doseUnit === 'mg/wk' ? c.doseValue : c.doseValue,
-          injectionsPerWeek: typeof c.frequency === 'number' ? c.frequency : 2,
+          mgPerWeek: wk,
+          injectionsPerWeek: perWeek,
         };
       });
       setDiagDrugs(mapped);
