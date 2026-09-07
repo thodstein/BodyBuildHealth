@@ -10,6 +10,8 @@ import {
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 import { UCUM_MAP } from '../../../core/constants';
+import { db } from '../../../core/db';
+import { notifyDataChange } from '../../../core/data-link';
 
 const GLASS: React.CSSProperties = {
   ...LABS_CARD,
@@ -88,10 +90,19 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
     refresh();
   };
 
-  const handleDeleteEntry = (date: string) => {
+  // P0 fix: удаление из дневника удаляло только localStorage, лабы в IndexedDB оставались → на след. mount импорт пересоздавал запись
+  const handleDeleteEntry = useCallback(async (date: string) => {
     removeLabDiaryDay(date);
     refresh();
-  };
+    try {
+      await db.init();
+      const labsForDate = await db.getByIndex<any>('labs_log', 'date', date);
+      for (const lab of labsForDate) {
+        try { await db.delete('labs_log', lab.id); } catch {}
+      }
+      notifyDataChange();
+    } catch {}
+  }, [refresh]);
 
   const markerOptions = useMemo(() => {
     const seen = new Set<string>();
