@@ -1106,17 +1106,22 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 // ── MDSS Risk Display Component ──
 export const MDSSRiskDisplay: React.FC = () => {
   const linked = useDataLink();
-  const [tWeeks, setTWeeks] = useState(Math.max(1, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4)));
+  const courseWeeks = Math.max(1, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4));
+  const [tWeeks, setTWeeks] = useState(courseWeeks);
+  // Курс/профиль подгружаются из IndexedDB позже маунта: подтягиваем значения
+  // только пока пользователь не трогал поля (иначе затёрли бы ручной ввод).
+  const [tWeeksTouched, setTWeeksTouched] = useState(false);
+  useEffect(() => { if (!tWeeksTouched) setTWeeks(courseWeeks); }, [courseWeeks]);
   const [genetics, setGenetics] = useState<string[]>([]);
   const [mdssResult, setMdssResult] = useState<MDSSOutput | null>(null);
   const [autoRun, setAutoRun] = useState(false);
 
-  // Auto-fill genetics from profile
+  // Auto-fill genetics from profile (dep, а не []: профиль тоже приезжает позже)
   useEffect(() => {
     const s = linked.profile?.settings;
     const genMap = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
     if (genMap.length > 0) setGenetics(genMap);
-  }, []);
+  }, [linked.profile]);
 
   // Compute weeksSinceLab from linked dates — memo + округление до часа:
   // сырой float от Date.now() менялся каждый рендер и вместе с setMdssResult
@@ -1207,7 +1212,7 @@ export const MDSSRiskDisplay: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight:700, color: '#fff' }}>Недель экспозиции</label>
-              <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(parseFloat(e.target.value) || 0); }}
+              <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeksTouched(true); setTWeeks(parseFloat(e.target.value) || 0); }}
                 style={{ width: '100%', minHeight:44, marginTop:4, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
             </div>
             <div>
