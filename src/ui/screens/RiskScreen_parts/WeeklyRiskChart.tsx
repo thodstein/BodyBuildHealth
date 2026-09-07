@@ -11,11 +11,26 @@ interface Props {
 }
 
 export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWeekSelect, mode, onModeChange }) => {
-  const data = dynamics.weeks || [];
+  const rawData = dynamics.weeks || [];
   const [hoverWeek, setHoverWeek] = useState<number | null>(null);
   const displayWeek = hoverWeek != null ? hoverWeek : selectedWeek;
 
-  if (data.length === 0) return <div style={{ color:'#fff',textAlign:'center',padding:20 }}>Нет данных динамики</div>;
+  if (rawData.length === 0) return <div style={{ color:'#fff',textAlign:'center',padding:20 }}>Нет данных динамики</div>;
+
+  // NOTE: тоггл «Средний/Понедельно» раньше ни на что не влиял (мёртвый
+  // контрол): обе ветки рисовали одни и те же точки. «Средний» теперь —
+  // нарастающее среднее с начала курса (сглаживает пики накопления/смыва).
+  const data = mode === 'average'
+    ? (() => {
+        let sumRaw = 0;
+        let sumNet = 0;
+        return rawData.map((d, i) => {
+          sumRaw += d.overallRaw;
+          sumNet += d.overallNet;
+          return { ...d, overallRaw: sumRaw / (i + 1), overallNet: sumNet / (i + 1) };
+        });
+      })()
+    : rawData;
 
   const maxVal = Math.max(...data.map(d => Math.max(d.overallNet, d.overallRaw)), 5);
   const pad = { top: 14, right: 16, bottom: 30, left: 38 };
@@ -51,7 +66,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       {/* Hover/Selected values card */}
       {activePoint && (
         <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Нед. {activePoint.week}</div>
+          <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Нед. {activePoint.week}{mode === 'average' ? ' · среднее' : ''}</div>
           <div style={{ fontSize:13, fontWeight:800, color:getRiskColor(activePoint.overallNet) }}>Net: {Math.round(activePoint.overallNet)}%</div>
           <div style={{ fontSize:13, fontWeight:800, color:getRiskColor(activePoint.overallRaw) }}>Raw: {Math.round(activePoint.overallRaw)}%</div>
         </div>
