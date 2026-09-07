@@ -27,6 +27,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
     setEnhancedSubs,
     setMyPlansRefresh,
     effectiveLevel, enhancedSubs, showToast,
+    jointMode, boostEnabled, setShowModal,
     reportGenerated, setReportGenerated,    mixGoals, setMixGoals,
     mixWorkoutType, setMixWorkoutType,
     mixTimeOfDay, setMixTimeOfDay,
@@ -263,6 +264,13 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               <>
                 <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>📋 Действующий план поддержки</div>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: {level?.label || supportLevel}</div>
+
+                {/* Режимы плана: раньше включались только из модалки, которую ничто не открывало */}
+                <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap', alignItems:'center' }}>
+                  {jointMode && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🦴 Суставы</span>}
+                  {boostEnabled && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#fca5a5' }}>🔥 Усиление</span>}
+                  <button onClick={() => setShowModal('intel')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>⚙️ Уровень и режимы</button>
+                </div>
 
                 {/* Action buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>

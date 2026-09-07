@@ -60,6 +60,9 @@ function planMocks(over: Record<string, unknown> = {}): Record<string, unknown> 
     setSupportView: noop,
     setCalcView: noop,
     linked: {},
+    jointMode: false,
+    boostEnabled: false,
+    setShowModal: noop,
     effectiveLevel: {
       subs: ['sub_a', 'sub_b'],
       dosages: { sub_a: { mg: 100, timing: 'утро' }, sub_b: { mg: 250, timing: 'вечер' } },
@@ -283,5 +286,55 @@ describe('saved plan load merges subs', () => {
     // записи в каталоге — таблица показывает фолбэк, а не дропает строку)
     expect(container.textContent).toContain('plan sub x');
     expect(container.textContent).toContain('✅ План сохранён');
+  });
+});
+
+describe('level and modes modal entry', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  afterEach(() => {
+    cleanup();
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+
+  it('кнопка открывает модалку уровней (раньше её ничто не открывало)', () => {
+    const setShowModal = vi.fn();
+    const { getByText } = render(
+      <SupportFavoritesView s={planMocks({ setShowModal })} />,
+    );
+    fireEvent.click(getByText('⚙️ Уровень и режимы'));
+    expect(setShowModal).toHaveBeenCalledWith('intel');
+  });
+
+  it('чипы режимов видны при включённых режимах', () => {
+    const { getByText } = render(
+      <SupportFavoritesView s={planMocks({ jointMode: true, boostEnabled: true })} />,
+    );
+    expect(getByText('🦴 Суставы')).not.toBeNull();
+    expect(getByText('🔥 Усиление')).not.toBeNull();
+  });
+
+  it('сквозной флоу: уровень + суставы применяются и модалка закрывается', () => {
+    const { container, getByText, queryByText } = render(<SupportScreen />);
+    fireEvent.click(getByText('Общая информация'));
+    fireEvent.click(getByText(/Избранное · Дневник/));
+    fireEvent.click(getByText('📋 План'));
+    fireEvent.click(getByText('⚙️ Уровень и режимы'));
+    // модалка открылась
+    expect(getByText('Выберите уровень поддержки')).not.toBeNull();
+    fireEvent.click(getByText('🟡 Средний'));
+    // экран результата с тумблерами режимов
+    fireEvent.click(getByText('🦴 ➕ Суставы'));
+    fireEvent.click(getByText('✅ Принять и добавить'));
+    fireEvent.click(getByText('✅ Применить уровень + суставы'));
+    // модалка закрылась, режим виден в плане
+    expect(queryByText('Выберите уровень поддержки')).toBeNull();
+    expect(getByText('🦴 Суставы')).not.toBeNull();
+    expect(container.querySelector('.sup-modals')).toBeNull();
   });
 });
