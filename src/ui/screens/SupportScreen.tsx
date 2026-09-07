@@ -101,7 +101,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   };
   useEffect(() => {
     if (initialSubTab === 'reports') {
-      setTab('main'); setSupportView('calc'); setCalcView('reports');
+      // Отчёты живут в Избранном (favTab='reports'), отдельной calcView-ветки нет —
+      // вести туда, а не в пустой экран.
+      setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites');
+      setCombinedFavDiaryTab('favorites'); setFavTab('reports');
     } else if (initialSubTab === 'diary') {
       setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites');
       setCombinedFavDiaryTab('diary');

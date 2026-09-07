@@ -241,4 +241,15 @@ describe('APK support pack', () => {
     expect(root, 'diary root').not.toBeNull();
     expect(root?.getAttribute('data-theme'), 'theme hook').toBe('dark');
   });
+
+  it('Диплинк reports открывает реальные отчёты, а не пустой экран', () => {
+    const { container, getByText } = render(<SupportScreen initialSubTab="reports" />);
+    expect(getByText('📊 Отчёты поддержки'), 'reports header').not.toBeNull();
+    expect(container.querySelector('.support-hero'), 'no hero').toBeNull();
+  });
+
+  it('Диплинк diary открывает дневник приёма', () => {
+    const { container } = render(<SupportScreen initialSubTab="diary" />);
+    expect(container.querySelector('.sup-diary'), 'diary root').not.toBeNull();
+  });
 });
