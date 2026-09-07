@@ -48,6 +48,11 @@ describe('BB-auto UI smoke', () => {
     expect(armHeadLabel('chest')).toBe('');
   });
 
+  it('renderParams содержит опцию A/B-ротации паттернов', () => {
+    const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
+    expect(html).toContain('A/B ротация паттернов');
+  });
+
   it('renderParams содержит выбор проф-методик: DUP, суперсеты, схема объёма, негативы', () => {
     const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
     expect(html).toContain('Волновая периодизация (DUP)');

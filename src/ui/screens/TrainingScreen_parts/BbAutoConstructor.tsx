@@ -3402,6 +3402,11 @@ export const BbAutoConstructor: React.FC = () => {
               desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя в план' : 'Доступно в цели «Сила + Масса»',
               on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass',
             },
+            {
+              icon: '🔀', title: 'A/B ротация паттернов',
+              desc: 'Одинаковые дни недели — разные движения (generic)',
+              on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true,
+            },
           ].map(t => {
             const active = t.enabled && t.on;
             return (
