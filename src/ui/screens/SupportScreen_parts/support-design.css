@@ -315,6 +315,12 @@
   -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
 }
 
+/* ─── 13b. ЛИПКАЯ ПАНЕЛЬ РЕЖИМОВ ХАБА — под fixed-шапкой, не под ней ─ */
+.support-screen.support-root .sup-calctools [style*='position:sticky'] {
+  top: 132px !important;
+  z-index: 40 !important;
+}
+
 /* ─── 14. СКРОЛЛБАРЫ/СЕТИ ───────────────────────────────────────── */
 .support-screen.support-root ::-webkit-scrollbar { width: 4px; height: 4px; }
 .support-screen.support-root ::-webkit-scrollbar-thumb {

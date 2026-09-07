@@ -368,6 +368,7 @@ describe('SUP mobile fit (360px)', () => {
       'sup-dialog',
       '86dvh',
       '68dvh',
+      'top: 132px',
     ]) {
       expect(css, hook).toContain(hook);
     }
