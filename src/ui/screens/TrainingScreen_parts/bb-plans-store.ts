@@ -50,6 +50,8 @@ export interface SavedBBPlan {
     programId?: string;
     planMode: string;
     cycleId?: string;
+    /** A/B-ротация паттернов (opt-in, generic-only). Дефолт выкл; legacy-варианты без поля = выкл. */
+    abPatternRotation?: boolean;
   };
   metrics: {
     totalSets: number;
@@ -123,6 +125,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
       planMode: rawParams.planMode === 'programs' || rawParams.planMode === 'bb_cycle' ? 'programs' : 'generic_split',
       cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,
+      abPatternRotation: rawParams.abPatternRotation === true ? true : undefined,
     },
     metrics: {
       totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,

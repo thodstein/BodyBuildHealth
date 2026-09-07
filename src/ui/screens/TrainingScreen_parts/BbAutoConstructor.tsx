@@ -2296,7 +2296,8 @@ export const BbAutoConstructor: React.FC = () => {
            programPath: bbProgramPath,
             programId: selectedProgramId || undefined,
             cycleId: planMode === 'programs' ? selectedCycleId : undefined,
-         };
+            abPatternRotation: abRotation === true ? true : undefined,
+          };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
            avgRir: exportMetrics.avgRir,
@@ -2417,6 +2418,7 @@ export const BbAutoConstructor: React.FC = () => {
       }
     }
     if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
+    setAbRotation(v.params.abPatternRotation === true);
     setBbWeekSel(1);
     setStep('plan');
   };

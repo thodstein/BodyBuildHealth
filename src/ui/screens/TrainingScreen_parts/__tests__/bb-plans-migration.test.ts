@@ -47,4 +47,17 @@ describe('Saved BB plan legacy migration', () => {
     expect((plans[0].params as any).athleteMode).toBeUndefined();
     expect((plans[1].params as any).athleteMode).toBeUndefined();
   });
+
+  it('persists abPatternRotation flag, legacy without flag = off', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([
+      { id: 'ab-on', plan: { weeks: [{ week: 1, sessions: [] }] }, params: { abPatternRotation: true } },
+      { id: 'ab-off', plan: { weeks: [{ week: 1, sessions: [] }] }, params: { abPatternRotation: false } },
+      { id: 'legacy-no-flag', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {} },
+    ]));
+    const plans = loadSavedBBPlans();
+    expect(plans.find(p => p.id === 'ab-on')?.params.abPatternRotation).toBe(true);
+    // false нормализуется в undefined (дефолт выкл — байт-в-байт legacy)
+    expect(plans.find(p => p.id === 'ab-off')?.params.abPatternRotation).toBeUndefined();
+    expect(plans.find(p => p.id === 'legacy-no-flag')?.params.abPatternRotation).toBeUndefined();
+  });
 });
