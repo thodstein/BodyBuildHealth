@@ -47,6 +47,16 @@ html.app-native .labs-bottomtabs {
   overscroll-behavior-x: contain !important;
 }
 
+/* iOS не зумит при фокусе: поля ввода ≥16px на телефоне
+ * (прецедент §17 support-design; R9 ужал шрифты до 12-13px — зум ломал раскладку). */
+@media (max-width: 480px) {
+  html.app-native .labs-body input:not([type='checkbox']):not([type='radio']),
+  html.app-native .labs-body textarea,
+  html.app-native .labs-body select {
+    font-size: 16px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.app-native .labs-body button:active {
     transform: none !important;

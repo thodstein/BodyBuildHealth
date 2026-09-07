@@ -52,8 +52,7 @@ describe('labs-apk-loader', () => {
     expect(ensureLabsApkStyles()).toBe(true);
   });
 
-  it('3. CSS-изоляция: каждый селектор — только html.app-native', async () => {
-    const fs = await import('fs');
+  it('3. CSS-изоляция: каждый селектор — только html.app-native', async () => {    const fs = await import('fs');
     const path = await import('path');
     const css = fs.readFileSync(
       path.join(process.cwd(), 'src', 'styles-native-labs.css'),
@@ -74,5 +73,16 @@ describe('labs-apk-loader', () => {
         expect(part.startsWith('html.app-native'), part).toBe(true);
       }
     }
+  });
+
+  it('4. anti-zoom: поля ввода ≥16px на телефоне (iOS не зумит)', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const css = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'styles-native-labs.css'),
+      'utf-8',
+    );
+    expect(css).toContain("@media (max-width: 480px)");
+    expect(css).toContain('font-size: 16px');
   });
 });
