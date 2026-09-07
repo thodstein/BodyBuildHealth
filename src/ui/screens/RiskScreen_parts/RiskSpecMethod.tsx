@@ -5,6 +5,7 @@ import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, 
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { DRUG_DB } from '../../../data/support-db';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
 import { TZRisk3DModel } from './TZRisk3DModel';
 import { RiskVerificationList } from './RiskVerificationList';
@@ -33,6 +34,23 @@ const riskLabel = (pct: number): string => {
   if (pct < 75) return 'Высокий';
   return 'Очень высокий';
 };
+
+/**
+ * Классификация препарата для ТЗ-входа — ТО ЖЕ правило, что канонический
+ * buildTzInput (engine-helpers): класс/форма из DRUG_DB по каноническому id.
+ * Раньше тут были сабстринг-эвристики, расходившиеся с калькулятором
+ * (mk677/mgf → 'aas' вместо 'gh'; trena → 'inject' вместо 'oral'),
+ * и цифры вкладки отличались от заявленно-идентичных при таких курсах.
+ * Экспортируется для тестов.
+ */
+export function classifyCourseDrug(substanceId: string): { drugClass: 'aas' | 'gh' | 'insulin'; form: 'inject' | 'oral'; canon: string } {
+  const id = (substanceId || '').toLowerCase();
+  const canon = resolvePedAlias(id) || id;
+  const entry = (DRUG_DB as any)?.[canon] || (DRUG_DB as any)?.[id];
+  const drugClass = entry?.class === 'gh' ? 'gh' : entry?.class === 'insulin' ? 'insulin' : 'aas';
+  const form = entry?.form === 'oral' ? 'oral' : 'inject';
+  return { drugClass: drugClass as 'aas' | 'gh' | 'insulin', form: form as 'inject' | 'oral', canon: canon || 'unknown' };
+}
 
 const CARD: React.CSSProperties = {
   padding: 16, borderRadius: 18,
@@ -119,21 +137,18 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     if (!course.length) return null;
     const totalDose = course.reduce((s, c) => s + (c.doseValue || 0), 0);
     const totalWeeks = course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0);
-    const ids = course.map(c => (c.substanceId || '').toLowerCase());
-    const hasAAS = ids.some(id => !id.includes('gh') && !id.includes('growth') && !id.includes('insulin') && !id.includes('igf') && !id.includes('ghrp') && !id.includes('cjc') && !id.includes('ipa'));
-    const hasGH = ids.some(id => id.includes('gh') || id.includes('growth') || id.includes('igf') || id.includes('ghrp') || id.includes('cjc') || id.includes('ipa') || id.includes('tese') || id.includes('soma'));
-    const hasInsulin = ids.some(id => id.includes('insulin') || id.includes('novor') || id.includes('aktrap') || id.includes('lantus'));
-    const drugClasses: string[] = [];
-    if (hasAAS) drugClasses.push('aas');
-    if (hasGH) drugClasses.push('gh');
-    if (hasInsulin) drugClasses.push('insulin');
+    const mapped = course.map(c => classifyCourseDrug(c.substanceId || ''));
+    const drugClasses: string[] = [...new Set(mapped.map(m => m.drugClass))];
+    const hasAAS = drugClasses.includes('aas');
+    const hasGH = drugClasses.includes('gh');
+    const hasInsulin = drugClasses.includes('insulin');
     let drugClass: 'aas' | 'gh' | 'insulin' = 'aas';
     if (drugClasses.length === 1) drugClass = drugClasses[0] as any;
     else if (hasAAS) drugClass = 'aas';
     else if (hasGH) drugClass = 'gh';
     else if (hasInsulin) drugClass = 'insulin';
     const avgDose = course.length > 0 ? Math.round(totalDose / course.length) : 500;
-    const form: 'inject' | 'oral' = ids.some(id => id.includes('oxand') || id.includes('stan') || id.includes('meth') || id.includes('oxym') || id.includes('turin') || id.includes('superdrol') || id.includes('sarm')) ? 'oral' : 'inject';
+    const form: 'inject' | 'oral' = mapped.some(m => m.form === 'oral') ? 'oral' : 'inject';
     return { drugClass, avgDose, totalWeeks: Math.max(1, totalWeeks), form, combos: drugClasses.length, count: course.length, classes: drugClasses };
   }, [course]);
 
@@ -174,13 +189,12 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     if (calcSnapshot) return calcSnapshot;
     if (!courseSummary) return null;
     const drugs = course.length > 0 ? course.map(c => {
-      const id = (c.substanceId || '').toLowerCase();
-      const isAAS = !id.includes('gh') && !id.includes('growth') && !id.includes('insulin') && !id.includes('igf');
+      const m = classifyCourseDrug(c.substanceId || '');
       return {
-        drugClass: isAAS ? 'aas' as const : id.includes('insulin') ? 'insulin' as const : 'gh' as const,
-        drugName: resolvePedAlias(id) || id || 'unknown',
+        drugClass: m.drugClass,
+        drugName: m.canon,
         dose: c.doseValue || 250,
-        form: (id.includes('oxand') || id.includes('stan') || id.includes('meth') ? 'oral' : 'inject') as 'inject' | 'oral',
+        form: m.form,
         startWeek: c.startWeek,
         endWeek: c.endWeek,
       };
@@ -237,12 +251,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
           const lastDose = (c.doseValue || 0) * (1 - Math.pow(0.5, Math.max(1, ew - sw + 1) / Math.max(hlWeeks, 0.1)));
           effDose = lastDose * Math.pow(0.5, weeksOff / Math.max(hlWeeks, 0.1));
         }
-        const id = (c.substanceId || '').toLowerCase();
-        const isAAS = !id.includes('gh') && !id.includes('growth') && !id.includes('insulin') && !id.includes('igf');
+        const m = classifyCourseDrug(c.substanceId || '');
         return {
-          drugClass: isAAS ? 'aas' as const : id.includes('insulin') ? 'insulin' as const : 'gh' as const,
-          drugName: id || 'unknown', dose: Math.max(0, Math.round(effDose)),
-          form: (id.includes('oxand') || id.includes('stan') || id.includes('meth') ? 'oral' : 'inject') as 'inject' | 'oral',
+          drugClass: m.drugClass,
+          drugName: m.canon, dose: Math.max(0, Math.round(effDose)),
+          form: m.form,
         };
       }).filter(d => d.dose > 0);
       const wi: TzSpecInput = {
