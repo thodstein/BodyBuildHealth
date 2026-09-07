@@ -46,6 +46,20 @@ for (const frag of [
 }
 if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у job’ов');
 
+// SDK coherence: workflow ставит платформу = compileSdk из variables.gradle,
+// иначе сборка падает на несоответствии SDK (зелёный ран гарантирован).
+{
+  const vars = readFileSync(join(__dirname, '..', 'android', 'variables.gradle'), 'utf-8');
+  const m = vars.match(/compileSdkVersion\s*=\s*(\d+)/);
+  if (!m) fails.push('variables.gradle без compileSdkVersion');
+  else if (!text.includes(`platforms;android-${m[1]}`)) {
+    fails.push(`workflow не ставит platforms;android-${m[1]} (compileSdk ${m[1]})`);
+  }
+  if (!text.includes('actions/setup-java@v4') || !text.includes('java-version: 21')) {
+    fails.push('workflow без JDK 21 (нужен для AGP 8.x)');
+  }
+}
+
 // Экшены установки SDK: официального actions/setup-android не существует
 // (Invalid: "Unable to resolve action actions/setup-android, repository not found") —
 // во всех job'ах обязан быть android-actions/setup-android.
