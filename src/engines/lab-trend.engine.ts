@@ -60,7 +60,9 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
     const current = sorted[sorted.length - 1];
     const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
 
-    const info = UCUM_MAP[code];
+    // P0 fix: UCUM_MAP ключи смешанного регистра (HbA1c), code — upper → кейс-инсенс поиск
+    const lower = code.toLowerCase();
+    const info = (UCUM_MAP as any)[code] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lower)?.[1] as any);
     const refLow = (current as any).refLow ?? info?.lln;
     const refHigh = (current as any).refHigh ?? info?.uln;
 
@@ -123,13 +125,27 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
     if (previous == null) {
       newMarkers.push(trend);
     } else if (significance === 'significant' || significance === 'critical') {
-      if (direction === 'down' && !['GLU', 'TG'].includes(code)) {
-        improved.push(trend);
-      } else if (direction === 'up' && !['LDL', 'TG', 'GLU', 'CRP', 'HCT'].includes(code)) {
-        worsened.push(trend);
+      // P0 fix: код-лист был инвертирован — LDL/HCT/CRP вверх не считались ухудшением, GLU/TG вниз не считались улучшением
+      // Теперь: для маркеров где ниже лучше (LDL/HCT/CRP/TG/GLU/HbA1c) — вверх ухудшение, вниз улучшение; для остальных — наоборот, но по умолчанию считаем движение к норме
+      const lowerIsBetter = ['LDL', 'HCT', 'CRP', 'TG', 'GLU', 'HBA1C', 'HB', 'ALT', 'AST', 'GGT', 'ALP', 'BIL', 'CREATININE', 'UA', 'HOMOCYSTEINE'].includes(code);
+      if (direction === 'down') {
+        if (lowerIsBetter) improved.push(trend);
+        else if (currentAbnormal === false && previousAbnormal === true) improved.push(trend);
+        else if (significance === 'critical' && !currentAbnormal) improved.push(trend);
+      } else if (direction === 'up') {
+        if (lowerIsBetter) worsened.push(trend);
+        else if (currentAbnormal && !previousAbnormal) worsened.push(trend);
+        else if (significance === 'critical' && currentAbnormal) worsened.push(trend);
       } else if (significance === 'critical') {
         if (currentAbnormal) worsened.push(trend);
         else improved.push(trend);
+      }
+      // фолбэк: если значимый тренд не попал ни в одну ветку, считаем по направлению к норме
+      if (!improved.includes(trend) && !worsened.includes(trend) && !newMarkers.includes(trend)) {
+        if (direction === 'up' && currentAbnormal) worsened.push(trend);
+        else if (direction === 'down' && currentAbnormal === false && previousAbnormal) improved.push(trend);
+        else if (direction === 'up') worsened.push(trend);
+        else if (direction === 'down') improved.push(trend);
       }
     }
   }
