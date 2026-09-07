@@ -676,12 +676,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── TOP NAV BAR — glass, sticky ─── */}
+      {/* ─── TOP NAV BAR — TOP APK: sticky glass + back 44px + титул секции ─── */}
       {mainTab !== 'hero' && (
-        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,12,18,0.72)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0 }}>
-          <button onClick={() => setMainTab('hero')} style={{
-            padding:'7px 12px', cursor:'pointer', fontSize:11, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', borderRadius:999, display:'flex', alignItems:'center', gap:6,
-          }}>← Назад</button>
+        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.85), rgba(12,23,40,0.85))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)' }}>
+          <button onClick={() => setMainTab('hero')} aria-label="Назад в Лабораторию" style={{
+            minHeight:44, minWidth:44, padding:'10px 14px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(140,190,255,0.16)', background:'rgba(21,38,66,0.70)', borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', gap:6, flexShrink:0,
+          }}>←</button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.1, letterSpacing:-0.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {mainTab === 'risks' ? 'Риски и индексы' : (LAB_SUB_TABS.find(t => t.id === subTab)?.label || 'Анализы')}
+            </div>
+            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {mainTab === 'risks' ? 'ASI · HMI · CR · механизм-модель ТЗ' : `${currentLabs.length} маркеров · ${PHASE_LABELS[selectedPhase] || selectedPhase}`}
+            </div>
+          </div>
+          <div style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', color:LABS_ACCENT, flexShrink:0 }}>
+            <NativeIcon name={mainTab === 'risks' ? 'alertTriangle' : 'flask'} size={17} />
+          </div>
         </div>
       )}
 
@@ -692,18 +703,25 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab segmented control */}
-          <div className="labs-subtabs" style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', padding: '8px 0 0', scrollbarWidth: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'nowrap' as const }}>
-            {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
-              <button key={t.id} onClick={() => setSubTab(t.id)} className="labs-subtab" data-active={subTab === t.id} style={{
-                padding: '5px 7px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                cursor: 'pointer', flexShrink: 0, transition: 'all 0.14s ease', background: 'transparent', border: 'none', borderBottom: subTab === t.id ? '2px solid var(--labs-accent, #00e68a)' : '2px solid transparent', borderRadius: 0, marginBottom: -1,
-                color: subTab === t.id ? '#fff' : 'rgba(255,255,255,0.52)',
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-                <NativeIcon name={t.icon} size={11} /> {t.label}
-              </button>
-            ))}
+          {/* Sub-tab pills — TOP APK: липкая лента, 44px, скролл-снап, актив с glow */}
+          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:64, zIndex:20, background:'transparent', scrollSnapType:'x proximity' }}>
+            {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
+              const active = subTab === t.id;
+              return (
+                <button key={t.id} onClick={() => setSubTab(t.id)} className="labs-subtab" data-active={active} aria-pressed={active} style={{
+                  padding:'10px 16px', fontSize:12, fontWeight:800, whiteSpace:'nowrap',
+                  cursor:'pointer', flexShrink:0, transition:'all 0.18s ease', scrollSnapAlign:'start',
+                  background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.70)',
+                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                  borderRadius:999, minHeight:44,
+                  color: active ? '#0a1a08' : '#fff',
+                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                  display:'inline-flex', alignItems:'center', gap:7,
+                }}>
+                  <NativeIcon name={t.icon} size={14} /> {t.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* ≡≡≡ OVERVIEW TAB ≡≡≡ */}
@@ -778,7 +796,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     );
                   })}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+                <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:10 }}>
                   {(chartFilterSys !== 'all'
                     ? uniqMarkers.filter(m => { const codes = LAB_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
                     : uniqMarkers
@@ -788,21 +806,22 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <button key={m.code} onClick={() => {
                         setChartSelectedCodes(prev => { const next = new Set(prev); if (next.has(m.code)) next.delete(m.code); else next.add(m.code); return next; });
                       }} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                        background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'var(--bg-secondary)',
-                        border: `1px solid ${isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.3)' : 'var(--border)'}`,
-                        color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
+                        display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', minHeight:60,
+                        background: isSelected ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(21,38,66,0.60)',
+                        border: isSelected ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : '1px solid rgba(140,190,255,0.14)',
+                        boxShadow: isSelected ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.25)' : 'none',
+                        color:'#fff', fontSize:12, transition:'all 0.15s',
                       }}>
                         <div style={{
-                          width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                           background: isSelected ? 'var(--accent)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)',
-                          color: isSelected ? '#000' : 'var(--accent)', fontSize: 9, fontWeight: 700,
+                          color: isSelected ? '#000' : 'var(--accent)', fontSize:11, fontWeight:800,
                         }}>
                           {isSelected ? '✓' : m.code.slice(0, 2)}
                         </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                          <div style={{ fontSize: 8, color: '#fff' }}>{m.code}</div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontWeight:800, fontSize:13, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</div>
+                          <div style={{ fontSize:11, color:'#fff', marginTop:1 }}>{m.code}</div>
                         </div>
                       </button>
                     );
@@ -890,20 +909,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
       {subTab === 'current' && (
         <div>
-          {/* Phase selector */}
-          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', margin: '10px 0', scrollbarWidth: 'none' }}>
-            {Object.entries(PHASE_LABELS).map(([key, label]) => (
-              <button key={key} onClick={() => handlePhaseChange(key)} style={{
-                padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
-                background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: selectedPhase === key ? '#000' : '#fff',
-                border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
-                flexShrink: 0,
-              }}>
-                {label}
-              </button>
-            ))}
+          {/* Phase selector — TOP APK: 44px пилюли, скролл-лента, актив с glow */}
+          <div className="labs-phase-row" style={{ display:'flex', gap:8, overflowX:'auto', margin:'12px 0 10px', scrollbarWidth:'none', padding:'2px 2px 4px' }}>
+            {Object.entries(PHASE_LABELS).map(([key, label]) => {
+              const active = selectedPhase === key;
+              return (
+                <button key={key} onClick={() => handlePhaseChange(key)} aria-pressed={active} style={{
+                  padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+                  whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.2s', minHeight:44, flexShrink:0,
+                  background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
+                  color: active ? '#0a1a08' : '#fff',
+                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                }}>
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Trend alerts */}
@@ -926,39 +948,42 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </div>
           )}
 
-          {/* Action buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+          {/* Action buttons — TOP APK: 52px CTA, стекло + левая кромка, auto-fit */}
+          <div className="labs-actions" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:10 }}>
             <button onClick={() => setShowLabInput(true)} style={{
-              padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-              background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.12) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.04) 100%)',
-              border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)', color: 'var(--accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding:'14px 12px', borderRadius:16, cursor:'pointer', fontWeight:800, fontSize:13, minHeight:52,
+              background:'linear-gradient(180deg, rgba(21,38,66,0.78), rgba(12,23,40,0.78))',
+              border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.30)', borderLeft:'3px solid var(--labs-accent, #00e68a)', color:'#fff',
+              boxShadow:'0 8px 22px rgba(0,0,0,0.40)',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
             }}>
-              <span style={{ fontSize: 16 }}>➕</span> Добавить анализы
+              <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', fontSize:15, flexShrink:0 }}>➕</span> Добавить анализы
             </button>
-              <button onClick={handleNewLabs} style={{
-              padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%)',
-              border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            <button onClick={handleNewLabs} style={{
+              padding:'14px 12px', borderRadius:16, cursor:'pointer', fontWeight:800, fontSize:13, minHeight:52,
+              background:'linear-gradient(180deg, rgba(21,38,66,0.78), rgba(12,23,40,0.78))',
+              border:'1px solid rgba(59,130,246,0.30)', borderLeft:'3px solid #3b82f6', color:'#fff',
+              boxShadow:'0 8px 22px rgba(0,0,0,0.40)',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
             }}>
-              <span style={{ fontSize: 16 }}>📋</span> Новые анализы (фаза)
+              <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.14)', border:'1px solid rgba(59,130,246,0.22)', fontSize:15, flexShrink:0 }}>📋</span> Новые анализы (фаза)
             </button>
           </div>
 
-          {/* Import button — opens modal with file/camera/paste options */}
-          <div style={{ marginBottom: 10 }}>
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif,.txt,.csv,text/plain,application/pdf,image/*" style={{ display: 'none' }}
+          {/* Import button — TOP APK primary CTA 52px */}
+          <div style={{ marginBottom:10 }}>
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif,.txt,.csv,text/plain,application/pdf,image/*" style={{ display:'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <button onClick={() => setShowImport(true)} style={{
-              width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)',
-              background: 'linear-gradient(135deg, rgba(var(--labs-accent-rgb, 0,230,138),0.12) 0%, rgba(var(--labs-accent-rgb, 0,230,138),0.04) 100%)',
-              color: 'var(--accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width:'100%', padding:'14px 14px', borderRadius:16, border:'1px solid transparent',
+              background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))',
+              color:'#0a1a08', fontWeight:800, fontSize:14, cursor:'pointer', minHeight:52,
+              boxShadow:'0 8px 24px rgba(var(--labs-accent-rgb, 0,230,138),0.35)',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
             }}>
-              <span style={{ fontSize: 16 }}>📄</span> Импорт анализов (PDF / фото / текст)
+              <span style={{ fontSize:17 }}>📄</span> Импорт анализов (PDF / фото / текст)
             </button>
           </div>
 
@@ -1168,23 +1193,27 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ≡≡≡ COMBINED JOURNAL TAB (diary + reports + archive) ≡≡≡ */}
       {subTab === 'journal' && (
         <div style={{ paddingBottom: 80 }}>
-          {/* Internal sub-tab segmented control */}
-          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+          {/* Internal sub-tab — TOP APK 44px */}
+          <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 8px', scrollbarWidth:'none' }}>
             {([
               { id: 'diary' as const, label: 'Дневник', icon: '📓' },
               { id: 'reports' as const, label: 'Отчёты', icon: '📄' },
               { id: 'archive' as const, label: 'Архив', icon: '📦' },
-            ]).map(v => (
-              <button key={v.id} onClick={() => setJournalSubView(v.id)} style={{
-                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                background: journalSubView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: journalSubView === v.id ? '#000' : '#fff',
-                border: `1px solid ${journalSubView === v.id ? 'var(--accent)' : 'var(--border)'}`,
-              }}>
-                {v.icon} {v.label}
-              </button>
-            ))}
+            ]).map(v => {
+              const active = journalSubView === v.id;
+              return (
+                <button key={v.id} onClick={() => setJournalSubView(v.id)} aria-pressed={active} style={{
+                  padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+                  whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.2s', flexShrink:0, minHeight:44,
+                  background: active ? `linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))` : 'rgba(21,38,66,0.60)',
+                  color: active ? '#0a1a08' : '#fff',
+                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                }}>
+                  {v.icon} {v.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* ≡≡≡ DIARY SUB-VIEW ≡≡≡ */}
@@ -1335,47 +1364,53 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           });
         };
         return (
-          <div style={{ padding: '10px 0' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:8 }}>
-              <div>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>📈 Динамика маркеров ({report.trends.length})</div>
-                <div style={{ fontSize:10, color:'#fff' }}>{report.summary}</div>
+          <div style={{ padding:'12px 0' }}>
+            <div style={{ ...LABS_CARD, marginBottom:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10, marginBottom:4 }}>
+                <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>📈 Динамика маркеров ({report.trends.length})</div>
               </div>
-              {report.trends.length > 0 && (
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                  {(['all','significant','critical','worsened','improved'] as const).map(f => (
-                    <button key={f} onClick={() => setTrendFilter(f)} style={{
-                      padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                       background: trendFilter === f ? 'var(--accent)' : 'var(--bg-secondary)',
-                       color: trendFilter === f ? '#000' : '#fff',
-                       border: `1px solid ${trendFilter === f ? 'var(--accent)' : 'var(--border)'}`,
-                    }}>
-                      {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
-                    </button>
-                   ))}
-                   <button onClick={() => { setTrendSystemFilter('all'); }} style={{
-                     padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                     background: trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                     color: trendSystemFilter === 'all' ? '#000' : '#fff',
-                     border: `1px solid ${trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-                   }}>Все системы</button>
-                   {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
-                     const info = SYSTEM_INFO_ALL[sys];
-                     return (
-                       <button key={sys} onClick={() => setTrendSystemFilter(trendSystemFilter === sys ? 'all' : sys)} style={{
-                         padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                         background: trendSystemFilter === sys ? (info?.icon || '') + ' var(--accent)' : 'var(--bg-secondary)',
-                         color: trendSystemFilter === sys ? '#000' : '#fff',
-                         border: `1px solid ${trendSystemFilter === sys ? 'var(--accent)' : 'var(--border)'}`,
-                       }}>
-                         {info?.icon || ''} {info?.label || sys}
-                       </button>
-                     );
-                   })}
-                   <button onClick={() => {
+              <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>{report.summary}</div>
+            </div>
+            {report.trends.length > 0 && (
+              <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 8px', scrollbarWidth:'none', marginBottom:4 }}>
+                  {(['all','significant','critical','worsened','improved'] as const).map(f => {
+                    const active = trendFilter === f;
+                    return (
+                      <button key={f} onClick={() => setTrendFilter(f)} aria-pressed={active} style={{
+                        padding:'10px 14px', borderRadius:999, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0,
+                        background: active ? `linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))` : 'rgba(21,38,66,0.60)',
+                        color: active ? '#0a1a08' : '#fff',
+                        border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                        boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                      }}>
+                        {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => { setTrendSystemFilter('all'); }} style={{
+                    padding:'10px 14px', borderRadius:999, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0,
+                    background: trendSystemFilter === 'all' ? 'var(--accent)' : 'rgba(21,38,66,0.60)',
+                    color: trendSystemFilter === 'all' ? '#000' : '#fff',
+                    border: trendSystemFilter === 'all' ? '1px solid var(--accent)' : '1px solid rgba(140,190,255,0.14)',
+                  }}>Все системы</button>
+                  {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
+                    const info = SYSTEM_INFO_ALL[sys];
+                    const active = trendSystemFilter === sys;
+                    return (
+                      <button key={sys} onClick={() => setTrendSystemFilter(active ? 'all' : sys)} aria-pressed={active} style={{
+                        padding:'10px 14px', borderRadius:999, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0,
+                        background: active ? 'var(--accent)' : 'rgba(21,38,66,0.60)',
+                        color: active ? '#000' : '#fff',
+                        border: active ? '1px solid var(--accent)' : '1px solid rgba(140,190,255,0.14)',
+                      }}>
+                        {info?.icon || ''} {info?.label || sys}
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => {
                     const csv = exportTrendsToCSV(report);
                     downloadCSV(csv, `lab-trends-${new Date().toISOString().slice(0,10)}.csv`);
-                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  }} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0 }}>
                     📥 CSV
                   </button>
                   <button onClick={() => {
@@ -1408,12 +1443,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       </body></html>`);
                     win.document.close();
                     win.print();
-                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  }} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0 }}>
                     🖨 Print
                   </button>
                 </div>
               )}
-            </div>
             {insights.length > 0 && (
               <div style={{ marginBottom:12, display:'grid', gap:4 }}>
                 {insights.map((insight, i) => (
@@ -1556,23 +1590,27 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ≡≡≡ CATALOG TAB — unified: catalog + schedule + problem panels ≡≡≡ */}
       {mainTab === 'lab' && subTab === 'catalog' && (
         <div>
-          {/* Catalog sub-view switcher */}
-          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+          {/* Catalog sub-view switcher — TOP APK 44px */}
+          <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 8px', scrollbarWidth:'none' }}>
             {([
               { id: 'catalog' as const, label: 'Каталог', icon: '📖' },
               { id: 'schedule' as const, label: 'График сдачи', icon: '📅' },
               { id: 'problems' as const, label: 'По проблеме', icon: '🔍' },
-            ]).map(v => (
-              <button key={v.id} onClick={() => setCatalogView(v.id)} style={{
-                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                background: catalogView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: catalogView === v.id ? '#000' : '#fff',
-                border: `1px solid ${catalogView === v.id ? 'var(--accent)' : 'var(--border)'}`,
-              }}>
-                {v.icon} {v.label}
-              </button>
-            ))}
+            ]).map(v => {
+              const active = catalogView === v.id;
+              return (
+                <button key={v.id} onClick={() => setCatalogView(v.id)} aria-pressed={active} style={{
+                  padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+                  whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.2s', flexShrink:0, minHeight:44,
+                  background: active ? `linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))` : 'rgba(21,38,66,0.60)',
+                  color: active ? '#0a1a08' : '#fff',
+                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                }}>
+                  {v.icon} {v.label}
+                </button>
+              );
+            })}
           </div>
 
           {catalogView === 'catalog' && (
@@ -1700,24 +1738,30 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         const verifLabMap: Record<string, number> = tzLabValues;
         return (
           <div>
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
-              {(['risks', 'verification'] as const).map(v => (
-                <button key={v} onClick={() => setRisksView(v)} style={{
-                  padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                  whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                  background: risksView === v ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: risksView === v ? '#000' : '#fff',
-                  border: `1px solid ${risksView === v ? 'var(--accent)' : 'var(--border)'}`,
-                }}>
-                  {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация рисков'}
-                </button>
-              ))}
+            <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 8px', scrollbarWidth:'none', alignItems:'center' }}>
+              {(['risks', 'verification'] as const).map(v => {
+                const active = risksView === v;
+                return (
+                  <button key={v} onClick={() => setRisksView(v)} aria-pressed={active} style={{
+                    padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+                    whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.2s', flexShrink:0, minHeight:44,
+                    background: active ? `linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))` : 'rgba(21,38,66,0.60)',
+                    color: active ? '#0a1a08' : '#fff',
+                    border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                    boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                  }}>
+                    {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация рисков'}
+                  </button>
+                );
+              })}
             </div>
             {risksView === 'verification' ? (
               <RiskVerificationList labMap={verifLabMap} result={tzSpecResult} />
             ) : (
             <div>
-            <div style={{ fontSize: 16, fontWeight: 700, padding: '10px 0' }}>⚠️ Риски и индексы здоровья</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10, margin:'12px 0 10px' }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>⚠️ Риски и индексы здоровья</div>
+            </div>
 
             {/* Labs Score Card (TZ Pipeline) */}
             <LabsScoreCard
@@ -2077,16 +2121,20 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       </div>
        )}
-      {/* ─── BOTTOM TABS — зеро, внизу, уменьшены ─── */}
+      {/* ─── BOTTOM TABS — TOP APK: липкая CTA-панель 52px, safe-area, nowrap ─── */}
       {mainTab === 'lab' && (
-        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:5, overflowX:'auto', padding:'6px 8px calc(6px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.88)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.07)', scrollbarWidth:'none' }}>
-          {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
-            <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-              flex:'0 0 auto', padding:'6px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
-              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : '#fff', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-            }}><NativeIcon name={t.icon} size={11} /> {t.label}</button>
-          ))}
+        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:8, overflowX:'auto', padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.85), rgba(12,23,40,0.88))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid rgba(140,190,255,0.14)', scrollbarWidth:'none', boxShadow:'0 -8px 24px rgba(0,0,0,0.35)' }}>
+          {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
+            const active = subTab===t.id;
+            return (
+              <button key={t.id} onClick={() => setSubTab(t.id)} aria-pressed={active} style={{
+                flex:'0 0 auto', padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', minHeight:44,
+                background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)', color: active ? '#0a1a08' : '#fff', border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                display:'inline-flex', alignItems:'center', gap:6,
+              }}><NativeIcon name={t.icon} size={13} /> {t.label}</button>
+            );
+          })}
         </div>
       )}
 
@@ -2285,16 +2333,16 @@ function TrendRow({ trend }: { trend: LabTrend }) {
     sparkPath = points;
   }
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', marginBottom:4, borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', fontSize:10 }}>
-      <span style={{ fontSize:14, minWidth:20, textAlign:'center', color }}>{icon}</span>
+    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 12px', marginBottom:8, borderRadius:14, background:'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${color}`, fontSize:11, minHeight:64, boxShadow:'0 6px 18px rgba(0,0,0,0.30)' }}>
+      <span style={{ fontSize:16, minWidth:24, textAlign:'center', color }}>{icon}</span>
       {pts.length >= 2 && (
         <svg width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} style={{ flexShrink:0, opacity:0.9 }}>
           <polyline fill="none" stroke={color} strokeWidth="2" points={sparkPath} vectorEffect="non-scaling-stroke" />
         </svg>
       )}
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontWeight:600, fontSize:11, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{trend.name}</div>
-        <div style={{ fontSize:8, color:'#fff' }}>
+        <div style={{ fontWeight:800, fontSize:13, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{trend.name}</div>
+        <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>
           {trend.previousDate && <span>{trend.previousDate.slice(5)}: {trend.previousValue}</span>}
           {trend.previousDate && <span> → </span>}
           <span>{trend.currentDate.slice(5)}: {trend.currentValue} {trend.unit}</span>

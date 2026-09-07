@@ -53,17 +53,17 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   return (
     <div className="labs-results">
-      {/* Filters — premium pills */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
-        <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? { ...sysPillStyle(true, LABS_ACCENT), padding:'6px 12px' } : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>
+      {/* Filters — TOP APK pills 44px, скролл-лента */}
+      <div className="labs-filter-row" style={{ display:'flex', gap:8, marginBottom:12, alignItems:'center', overflowX:'auto', padding:'2px 2px 6px', scrollbarWidth:'none' }}>
+        <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? sysPillStyle(true, LABS_ACCENT) : { padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontSize:11, fontWeight:800, cursor:'pointer', minHeight:44, whiteSpace:'nowrap', flexShrink:0 }}>
           Все системы
         </button>
         {systems.map(sys=>(
-          <button key={sys} onClick={()=>setFilterSystem(sys)} style={filterSystem===sys? sysPillStyle(true, sysColors[sys]||'#6b7280') : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={10} /> {sysLabels[sys]||sys}</span>
+          <button key={sys} onClick={()=>setFilterSystem(sys)} style={filterSystem===sys? sysPillStyle(true, sysColors[sys]||'#6b7280') : { padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontSize:11, fontWeight:800, cursor:'pointer', minHeight:44, whiteSpace:'nowrap', flexShrink:0 }}>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><NativeIcon name={sysIcons[sys] || 'file'} size={12} /> {sysLabels[sys]||sys}</span>
           </button>
         ))}
-        <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.38)', display:'flex', alignItems:'center', gap:6 }}>
+        <span style={{ marginLeft:'auto', fontSize:11, color:'#fff', display:'flex', alignItems:'center', gap:6, flexShrink:0, paddingLeft:8 }}>
           {filteredLabs.length} маркеров {abnormalCount>0 && <LabsBadge color="#ef4444" small>{abnormalCount} вне</LabsBadge>}
         </span>
       </div>
@@ -79,13 +79,13 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             return (
               <div key={date} style={{ ...LABS_CARD, padding:0, overflow:'hidden', background:'rgba(20,22,30,0.40)', backdropFilter:'blur(10px)' }}>
                 <button onClick={()=>toggleDate(date)} style={{
-                  display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 12px', cursor:'pointer', textAlign:'left',
+                  display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 12px', cursor:'pointer', textAlign:'left', minHeight:52,
                   background: isOpen? 'rgba(255,255,255,0.02)' : 'transparent', border:'none', color:'#fff', borderBottom: isOpen? '1px solid rgba(255,255,255,0.06)' : 'none',
                 }}>
-                  <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: isOpen? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${isOpen?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(255,255,255,0.08)'}`, color: isOpen ? LABS_ACCENT : '#fff', transition:'transform 0.2s', transform: isOpen? 'rotate(90deg)' : 'rotate(0deg)' }}><NativeIcon name="chevronRight" size={10} /></span>
-                  <span style={{ display: 'inline-flex', color: 'rgba(255,255,255,0.55)' }}><NativeIcon name="clock" size={12} /></span>
-                  <span style={{ fontSize:12, fontWeight:800, color: isOpen? LABS_ACCENT : '#fff' }}>{dateStr}</span>
-                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.38)', marginLeft:6, display:'none' }}>{date}</span>
+                  <span style={{ width:28, height:28, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background: isOpen? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${isOpen?'rgba(var(--labs-accent-rgb, 0,230,138),0.18)':'rgba(255,255,255,0.08)'}`, color: isOpen ? LABS_ACCENT : '#fff', transition:'transform 0.2s', transform: isOpen? 'rotate(90deg)' : 'rotate(0deg)', flexShrink:0 }}><NativeIcon name="chevronRight" size={12} /></span>
+                  <span style={{ display:'inline-flex', color:'#fff' }}><NativeIcon name="clock" size={13} /></span>
+                  <span style={{ fontSize:14, fontWeight:800, color: isOpen? LABS_ACCENT : '#fff' }}>{dateStr}</span>
+                  <span style={{ fontSize:10, color:'#fff', marginLeft:6, display:'none' }}>{date}</span>
                   <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
                     <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{dateLabs.length}</span>
                     {dateAbn>0 ? <LabsBadge color="#ef4444" small>⚠ {dateAbn}</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>✓</LabsBadge>}
@@ -103,21 +103,21 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                       const statusText=status==='high'? 'выше' : status==='low'? 'ниже' : status==='unknown'? '—' : 'норма';
                       return (
                         <div key={lab.code+lab.date} style={{
-                          display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:12,
-                          background: isAbn? labsWithAlpha(statusColor, '10') : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? labsWithAlpha(statusColor, '1E') : 'rgba(255,255,255,0.06)'}`,
-                          borderLeft:`3px solid ${statusColor}`,
+                          display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14,
+                          background: isAbn? labsWithAlpha(statusColor, '12') : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? labsWithAlpha(statusColor, '22') : 'rgba(140,190,255,0.12)'}`,
+                          borderLeft:`3px solid ${statusColor}`, minHeight:64,
                         }}>
-                          <div style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: sysColor+'16', color: sysColor, fontWeight:800, fontSize:10, border:`1px solid ${sysColor}22` }}>{lab.code.slice(0,2).toUpperCase()}</div>
+                          <div style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: sysColor+'1A', color: sysColor, fontWeight:800, fontSize:11, border:`1px solid ${sysColor}30` }}>{lab.code.slice(0,2).toUpperCase()}</div>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontWeight:700, fontSize:11, color: isAbn?'#fff':'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
-                            <div style={{ fontSize:9, color:'#fff', marginTop:1, display:'flex', gap:6, alignItems:'center' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={10} /> {sysLabels[sys]||sys}</span>
-                              {info && <span style={{ padding:'1px 5px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)' }}>{info.lln}–{info.uln} {info.prefUnit||''}</span>}
+                            <div style={{ fontWeight:800, fontSize:13, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
+                            <div style={{ fontSize:11, color:'#fff', marginTop:2, display:'flex', gap:6, alignItems:'center' }}>
+                              <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={11} /> {sysLabels[sys]||sys}</span>
+                              {info && <span style={{ padding:'2px 7px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{info.lln}–{info.uln} {info.prefUnit||''}</span>}
                             </div>
                           </div>
-                          <div style={{ textAlign:'right', flexShrink:0, minWidth:86 }}>
-                            <div style={{ fontWeight:800, fontSize:14, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'#fff', marginLeft:3, fontWeight:600 }}>{lab.unit||''}</span></div>
-                            <div style={{ marginTop:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: labsWithAlpha(statusColor, '18'), border:`1px solid ${labsWithAlpha(statusColor, '22')}`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
+                          <div style={{ textAlign:'right', flexShrink:0, minWidth:92 }}>
+                            <div style={{ fontWeight:900, fontSize:16, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{lab.value}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
+                            <div style={{ marginTop:4, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: labsWithAlpha(statusColor, '1E'), border:`1px solid ${labsWithAlpha(statusColor, '30')}`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
                           </div>
                         </div>
                       );

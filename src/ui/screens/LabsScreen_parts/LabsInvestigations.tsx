@@ -175,7 +175,7 @@ export const LabsInvestigations: React.FC = () => {
   return (
     <div className="labs-invest" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontSize: 13, fontWeight: 700, padding: '8px 0 4px', flexShrink: 0 }}>Обследования и панели</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8, flexShrink: 0 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, flexShrink: 0 }}>
         {totalCount} исследований и лабораторных панелей для мониторинга на курсе
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -187,9 +187,9 @@ export const LabsInvestigations: React.FC = () => {
             }}>
               <div>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{TYPE_CONFIG[g.type].label}</span>
-                <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-dim)' }}>{g.items.length}</span>
+                <span style={{ marginLeft: 6, fontSize: 10, color: '#fff' }}>{g.items.length}</span>
               </div>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: expandedTypes[g.type] ? 'rotate(180deg)' : 'none' }}>▼</span>
+              <span style={{ fontSize: 11, color: '#fff', transition: 'transform 0.2s', transform: expandedTypes[g.type] ? 'rotate(180deg)' : 'none' }}>▼</span>
             </div>
             {expandedTypes[g.type] && (
               <div style={{ padding: '6px 10px 10px' }}>
@@ -205,20 +205,20 @@ export const LabsInvestigations: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: expanded ? 8 : 0 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 12, color: expanded ? 'var(--accent)' : 'var(--text)', marginBottom: 3 }}>{inv.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35, marginBottom: 4 }}>{inv.description}</div>
+                          <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.35, marginBottom: 4 }}>{inv.description}</div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, background: 'rgba(0,230,138,0.08)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>⏱ {inv.frequency}</span>
-                            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                            <span style={{ fontSize: 9, color: '#fff' }}>
                               {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное исследование' : 'Описательная оценка'}`}
                             </span>
                           </div>
                         </div>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 8, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        <span style={{ fontSize: 11, color: '#fff', flexShrink: 0, marginLeft: 8, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                       </div>
                       {expanded && (
                         <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                           {inv.isInstrumental ? (
-                            <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                               {inv.markers.length > 0 ? (
                                 <>
                                   <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>Контролируемые параметры:</div>
@@ -227,13 +227,13 @@ export const LabsInvestigations: React.FC = () => {
                                     return (
                                       <div key={code} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                                         <span style={{ color: 'var(--text)' }}>{info?.name || code}</span>
-                                        {info && <span style={{ color: 'var(--text-dim)' }}>{info.lln}–{info.uln} {info.prefUnit}</span>}
+                                        {info && <span style={{ color: '#fff' }}>{info.lln}–{info.uln} {info.prefUnit}</span>}
                                       </div>
                                     );
                                   })}
                                 </>
                               ) : (
-                                <div style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: 10 }}>Описательное исследование — оценивается врачом по заключению</div>
+                                <div style={{ color: '#fff', fontStyle: 'italic', fontSize: 10 }}>Описательное исследование — оценивается врачом по заключению</div>
                               )}
                             </div>
                           ) : (
@@ -251,15 +251,15 @@ export const LabsInvestigations: React.FC = () => {
                                     }}>
                                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>{info?.name || code}</span>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <span style={{ color: 'var(--text-dim)' }}>{info?.lln || '—'}–{info?.uln || '—'}</span>
-                                        <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>{info?.prefUnit || ''}</span>
+                                        <span style={{ color: '#fff' }}>{info?.lln || '—'}–{info?.uln || '—'}</span>
+                                        <span style={{ color: '#fff', fontSize: 9 }}>{info?.prefUnit || ''}</span>
                                       </div>
                                     </div>
                                   );
                                 })}
                               </div>
                               {inv.markers.length === 0 && (
-                                <div style={{ fontSize: 10, color: 'var(--text-dim)', fontStyle: 'italic' }}>Маркеры определяются индивидуально</div>
+                                <div style={{ fontSize: 10, color: '#fff', fontStyle: 'italic' }}>Маркеры определяются индивидуально</div>
                               )}
                             </div>
                           )}

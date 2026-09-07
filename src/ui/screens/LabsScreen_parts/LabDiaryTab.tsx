@@ -116,19 +116,19 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', color: LABS_ACCENT }}><NativeIcon name="notebook" size={17} /></div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Дневник анализов</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
+            <div style={{ fontSize:10, color:'#fff', marginTop:1 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
           </div>
-          {stats.firstDate && <span style={{ fontSize:9, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)' }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
+          {stats.firstDate && <span style={{ fontSize:9, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+        <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
           <MiniStat label="Дней" value={`${stats.totalDays}`} color="#3b82f6" />
           <MiniStat label="Маркеров" value={`${stats.totalMarkers}`} color={LABS_ACCENT} />
-          <MiniStat label="Аномалий" value={`${abnormalMarkers.length}`} color={abnormalMarkers.length>0? '#ef4444':'#94a3b8'} />
+          <MiniStat label="Аномалий" value={`${abnormalMarkers.length}`} color={abnormalMarkers.length>0? '#ef4444': LABS_ACCENT} />
         </div>
       </div>
 
-      {/* Mode pills — premium */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+      {/* Mode pills — TOP APK: 44px, скролл-лента */}
+      <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 6px', scrollbarWidth:'none' }}>
         {[
           ['overview', '📊 Обзор'],
           ['chart', '📈 Графики'],
@@ -137,11 +137,11 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         ].map(([id, label]) => {
           const active = mode===id;
           return (
-            <button key={id} onClick={() => setMode(id as any)}
+            <button key={id} onClick={() => setMode(id as any)} aria-pressed={active}
               style={{
-                padding:'7px 13px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:6,
-                background: active? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.68)', border:`1px solid ${active?LABS_ACCENT:'rgba(255,255,255,0.08)'}`, boxShadow: active?'0 6px 16px rgba(var(--labs-accent-rgb, 0,230,138),0.22)':'none',
-              }}>{label} {id==='abnormal' && abnormalMarkers.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:999, background: active?'#000':'#ef4444', color:'#fff' }}>{abnormalMarkers.length}</span>}</button>
+                padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:6, minHeight:44,
+                background: active? `linear-gradient(135deg, ${LABS_ACCENT}, var(--accent-2, ${LABS_ACCENT}))` : 'rgba(21,38,66,0.60)', color: active?'#0a1a08':'#fff', border: active?'1px solid transparent':'1px solid rgba(140,190,255,0.14)', boxShadow: active?'0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)':'none',
+              }}>{label} {id==='abnormal' && abnormalMarkers.length>0 && <span style={{ fontSize:10, padding:'2px 7px', borderRadius:999, background: active?'#000':'#ef4444', color:'#fff', fontWeight:800 }}>{abnormalMarkers.length}</span>}</button>
           );
         })}
       </div>
@@ -151,11 +151,11 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Top tested markers */}
           <div style={GLASS}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 6 }}>
               🔬 Чаще всего измеряемые
             </div>
             {topMarkers.length === 0 ? (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: '#fff', padding: 8, textAlign: 'center' }}>
                 Нет данных. Импортируйте результаты анализов.
               </div>
             ) : (
@@ -166,10 +166,10 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                     background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
                     cursor: 'pointer',
                   }} onClick={() => { setSelectedMarker(m.code); setMode('chart'); }}>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', width: 18 }}>{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.7)' }}>{m.name}</span>
+                    <span style={{ fontSize: 9, color: '#fff', width: 18 }}>{i + 1}</span>
+                    <span style={{ flex: 1, fontSize: 10, fontWeight: 500, color: '#fff' }}>{m.name}</span>
                     <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 600 }}>{m.count}×</span>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>→</span>
+                    <span style={{ fontSize: 8, color: '#fff' }}>→</span>
                   </div>
                 ))}
               </div>
@@ -179,7 +179,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           {/* Abnormal pie-like summary */}
           {summary.length > 0 && (
             <div style={GLASS}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 6 }}>
                 📊 Аномалии по дням
               </div>
               <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', minHeight: 40, padding: '4px 0' }}>
@@ -192,7 +192,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                         height: h, background: d.pct > 30 ? '#ef4444' : d.pct > 10 ? '#f59e0b' : '#00e68a',
                         opacity: 0.7,
                       }} />
-                      <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', writingMode: 'vertical-lr' as any }}>
+                      <div style={{ fontSize: 6, color: '#fff', writingMode: 'vertical-lr' as any }}>
                         {d.date.slice(5)}
                       </div>
                     </div>
@@ -220,7 +220,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Marker selector */}
           <div style={GLASS}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
               Выберите маркер
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
@@ -230,13 +230,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                     padding: '3px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit',
                     border: selectedMarker === m.code ? '1px solid var(--labs-accent, #00e68a)' : '1px solid rgba(255,255,255,0.06)',
                     background: selectedMarker === m.code ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)' : 'rgba(255,255,255,0.03)',
-                    color: selectedMarker === m.code ? LABS_ACCENT : 'rgba(255,255,255,0.5)',
+                    color: selectedMarker === m.code ? LABS_ACCENT : '#fff',
                     fontWeight: selectedMarker === m.code ? 700 : 400,
                   }}>{m.name}</button>
               ))}
             </div>
             {markerOptions.length > 30 && (
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>
+              <div style={{ fontSize: 8, color: '#fff' }}>
                 + ещё {markerOptions.length - 30} маркеров
               </div>
             )}
@@ -250,7 +250,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   style={{
                     padding: '4px 12px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
                       background: chartDays === d ? LABS_ACCENT : 'rgba(255,255,255,0.04)',
-                    color: chartDays === d ? '#000' : 'rgba(255,255,255,0.5)',
+                    color: chartDays === d ? '#000' : '#fff',
                     fontWeight: 600,
                   }}>{d} дн.</button>
               ))}
@@ -262,7 +262,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             <div style={GLASS}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
                 📈 {topMarkers.find(m => m.code === selectedMarker)?.name || selectedMarker}
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>
+                <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>
                   {chartData.unit}
                 </span>
               </div>
@@ -287,7 +287,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                           {v}
                         </span>
                       </div>
-                      <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', writingMode: 'vertical-lr' as any }}>
+                      <div style={{ fontSize: 6, color: '#fff', writingMode: 'vertical-lr' as any }}>
                         {chartData.labels[i].slice(-5)}
                       </div>
                     </div>
@@ -296,7 +296,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
               </div>
               {/* ULN/LLN references */}
               {(chartData.uln || chartData.lln) && (
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 4, display: 'flex', gap: 12 }}>
+                <div style={{ fontSize: 8, color: '#fff', marginTop: 4, display: 'flex', gap: 12 }}>
                   {chartData.lln !== undefined && <span>▼ Низ: {chartData.lln}</span>}
                   {chartData.uln !== undefined && <span>▲ Верх: {chartData.uln}</span>}
                 </div>
@@ -304,13 +304,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             </div>
           ) : selectedMarker ? (
             <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: 10, color: '#fff' }}>
                 Нет данных для графика за выбранный период
               </div>
             </div>
           ) : (
             <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: 10, color: '#fff' }}>
                 Выберите маркер для просмотра динамики
               </div>
             </div>
@@ -325,7 +325,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
               <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
               <div style={{ fontSize: 11, color: '#00e68a', fontWeight: 600 }}>Нет аномальных маркеров</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Все показатели в пределах нормы</div>
+              <div style={{ fontSize: 9, color: '#fff' }}>Все показатели в пределах нормы</div>
             </div>
           ) : (
             abnormalMarkers.map((m, i) => {
@@ -339,7 +339,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{m.name}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+                      <div style={{ fontSize: 9, color: '#fff' }}>
                         {m.date} · {timeAgo(m.date)}
                       </div>
                     </div>
@@ -347,7 +347,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                       <div style={{ fontSize: 16, fontWeight: 800, color: normColor(m.value, m.lln, m.uln) }}>
                         {m.value} <span style={{ fontSize: 9, fontWeight: 400 }}>{m.unit}</span>
                       </div>
-                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
+                      <div style={{ fontSize: 8, color: '#fff' }}>
                         {m.lln !== undefined ? `норма: ${m.lln}` : ''}{m.lln !== undefined && m.uln !== undefined ? '-' : ''}{m.uln !== undefined ? `${m.uln}` : ''}
                       </div>
                     </div>
@@ -365,7 +365,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           {diary.length === 0 ? (
             <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
               <div style={{ fontSize: 24, marginBottom: 4 }}>📓</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: 10, color: '#fff' }}>
                 Дневник пуст. Импортируйте результаты анализов.
               </div>
             </div>
@@ -378,12 +378,12 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{day.date}</span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>
+                    <span style={{ fontSize: 9, color: '#fff', marginLeft: 6 }}>
                       {timeAgo(day.date)}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+                    <span style={{ fontSize: 9, color: '#fff' }}>
                       {day.totalMarkers} маркеров
                     </span>
                     {day.abnormalCount > 0 && (
@@ -408,7 +408,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                     </span>
                   ))}
                   {day.markers.length > 10 && (
-                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', padding: '2px 4px' }}>
+                    <span style={{ fontSize: 7, color: '#fff', padding: '2px 4px' }}>
                       +{day.markers.length - 10}
                     </span>
                   )}

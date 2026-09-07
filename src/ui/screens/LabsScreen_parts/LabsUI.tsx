@@ -41,19 +41,25 @@ export const LABS_SYS_ICON: Record<string, NativeIconName> = {
 };
 
 // ── Карточки ──
+// TOP APK: стекло navy + blur20 + тень, радиусы 18-20 (TG и APK едино)
 export const LABS_CARD: React.CSSProperties = {
-  background: 'rgba(20,22,30,0.45)',
-  border: '1px solid var(--glass-border, rgba(255,255,255,0.06))',
-  borderRadius: 16,
+  background: 'linear-gradient(180deg, rgba(21,38,66,0.72), rgba(12,23,40,0.72))',
+  border: '1px solid rgba(140,190,255,0.14)',
+  borderRadius: 18,
   padding: 14,
-  backdropFilter: 'blur(8px)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 10px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
 };
 
 export const LABS_CARD_FLAT: React.CSSProperties = {
-  background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
-  border: '1px solid var(--border, rgba(255,255,255,0.06))',
-  borderRadius: 14,
+  background: 'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))',
+  border: '1px solid rgba(140,190,255,0.12)',
+  borderRadius: 16,
   padding: 12,
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: '0 8px 22px rgba(0,0,0,0.40)',
 };
 
 export const LABS_GLASS_HERO: React.CSSProperties = {
@@ -64,46 +70,58 @@ export const LABS_GLASS_HERO: React.CSSProperties = {
 };
 
 // ── Пилюли / табы ──
+// TOP APK: 44px тач, актив — градиент + glow, неактив — белый текст (серого нет)
 export const pillStyle = (active: boolean, color = LABS_ACCENT): React.CSSProperties => ({
-  padding: '7px 14px',
-  borderRadius: 20,
-  fontSize: 11,
-  fontWeight: 700,
+  padding: '10px 16px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 800,
   whiteSpace: 'nowrap',
   cursor: 'pointer',
   transition: 'all 0.2s',
   flexShrink: 0,
-  background: active ? color : 'var(--bg-secondary)',
-  color: active ? '#000' : 'var(--text-dim)',
-  border: `1px solid ${active ? color : 'var(--border)'}`,
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: active ? `linear-gradient(135deg, ${color}, var(--accent-2, ${color}))` : 'rgba(21,38,66,0.60)',
+  color: active ? '#0a1a08' : '#fff',
+  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
   letterSpacing: active ? 0.2 : 0,
+  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
 });
 
 export const sysPillStyle = (active: boolean, color: string): React.CSSProperties => ({
-  padding: '6px 12px',
-  borderRadius: 20,
-  fontSize: 10,
-  fontWeight: 700,
+  padding: '10px 14px',
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 800,
   whiteSpace: 'nowrap',
   cursor: 'pointer',
   flexShrink: 0,
-  background: active ? labsWithAlpha(color, '18') : 'var(--bg-secondary)',
-  color: active ? color : 'var(--text-dim)',
-  border: `1px solid ${active ? labsWithAlpha(color, '40') : 'var(--border)'}`,
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: active ? labsWithAlpha(color, '22') : 'rgba(21,38,66,0.60)',
+  color: '#fff',
+  border: `1px solid ${active ? labsWithAlpha(color, '45') : 'rgba(140,190,255,0.14)'}`,
   transition: 'all 0.15s',
+  boxShadow: active ? `0 6px 18px ${labsWithAlpha(color, '30')}` : 'none',
 });
 
 // ── Мини-компоненты ──
 
 export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
-  <div className="labs-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+  <div className="labs-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, borderLeft: `3px solid ${accent}`, paddingLeft: 10 }}>
     <div style={{
-      width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: labsWithAlpha(accent, '18'), border: `1px solid ${labsWithAlpha(accent, '30')}`, color: accent, flexShrink: 0,
+      boxShadow: `0 4px 14px ${labsWithAlpha(accent, '25')}`,
     }}>{icon}</div>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.3 }}>{subtitle}</div>}
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.1, letterSpacing: -0.2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 11, color: '#fff', marginTop: 3, lineHeight: 1.4 }}>{subtitle}</div>}
     </div>
     {right}
   </div>
@@ -112,18 +130,25 @@ export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string;
 export const LabsKpiCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string; accent?: string }> = ({ icon, label, value, sub, color }) => (
   <div className="labs-kpi" style={{
     background: labsWithAlpha(color, '0F'),
-    border: `1px solid ${labsWithAlpha(color, '22')}`,
-    borderRadius: 14,
-    padding: '10px 10px 9px',
+    border: `1px solid ${labsWithAlpha(color, '25')}`,
+    borderTop: `2px solid ${labsWithAlpha(color, '55')}`,
+    borderRadius: 18,
+    padding: '12px 8px 10px',
     textAlign: 'center',
     position: 'relative',
     overflow: 'hidden',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.40)',
+    minHeight: 96,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
   }}>
     <div style={{ position: 'absolute', top: -10, right: -10, width: 44, height: 44, borderRadius: '50%', background: labsWithAlpha(color, '12') }} />
-    <div style={{ marginBottom: 2, color, display: 'flex', justifyContent: 'center' }}>{icon}</div>
-    <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-    <div style={{ fontSize: 9, fontWeight: 700, color, marginTop: 2, letterSpacing: 0.3 }}>{label}</div>
-    {sub && <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>{sub}</div>}
+    <div style={{ marginBottom: 4, color, display: 'flex', justifyContent: 'center' }}>{icon}</div>
+    <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginTop: 3, letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</div>
+    {sub && <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
@@ -161,10 +186,10 @@ export const LabsBadge: React.FC<{ color: string; bg?: string; children: React.R
 );
 
 export const LabsEmpty: React.FC<{ icon: React.ReactNode; title: string; desc: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
-  <div className="labs-empty" style={{ ...LABS_CARD_FLAT, textAlign: 'center', padding: 22 }}>
-    <div style={{ marginBottom: 8, color: 'var(--text-dim)', display: 'flex', justifyContent: 'center' }}>{icon}</div>
-    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
-    <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: action ? 10 : 0 }}>{desc}</div>
+  <div className="labs-empty" style={{ ...LABS_CARD_FLAT, textAlign: 'center', padding: 24, borderStyle: 'dashed' }}>
+    <div style={{ marginBottom: 10, color: '#fff', display: 'flex', justifyContent: 'center', opacity: 0.9 }}>{icon}</div>
+    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 6 }}>{title}</div>
+    <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: action ? 12 : 0 }}>{desc}</div>
     {action}
   </div>
 );

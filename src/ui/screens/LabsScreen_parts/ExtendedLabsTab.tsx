@@ -151,10 +151,10 @@ export default function ExtendedLabsTab({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <span style={{ fontSize: 18 }}>🔬</span>
         <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>Расширенная панель анализов</span>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Object.keys(UCUM_MAP).length} маркеров</span>
+        <span style={{ fontSize: 10, color: '#fff' }}>{Object.keys(UCUM_MAP).length} маркеров</span>
       </div>
 
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>
         Все маркеры из каталога UCUM, сгруппированные по панелям. Ввод с авто-заполнением из существующих анализов для выбранной фазы. Коррекция референсов под разные лаборатории.
       </div>
 
@@ -164,7 +164,7 @@ export default function ExtendedLabsTab({
             padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600,
             whiteSpace: 'nowrap', cursor: 'pointer',
             background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: selectedPhase === key ? '#000' : 'var(--text-dim)',
+            color: selectedPhase === key ? '#000' : '#fff',
             border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
             flexShrink: 0,
           }}>
@@ -174,13 +174,13 @@ export default function ExtendedLabsTab({
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+        <span style={{ fontSize: 10, color: '#fff' }}>
           {filledCount} / {Object.keys(UCUM_MAP).length} заполнено
         </span>
         <button onClick={handleSave} disabled={saving || filledCount === 0} style={{
           padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
           background: saved ? '#22c55e' : filledCount > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: saved ? '#fff' : filledCount > 0 ? '#000' : 'var(--text-dim)',
+          color: saved ? '#fff' : filledCount > 0 ? '#000' : '#fff',
           fontWeight: 700, fontSize: 11, transition: 'all 0.2s',
         }}>
           {saving ? '⏳' : saved ? '✓ Сохранено' : `💾 Сохранить (${filledCount})`}
@@ -201,7 +201,7 @@ export default function ExtendedLabsTab({
               <span style={{ fontSize: 10, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
               <span>{panel.icon}</span>
               <span style={{ flex: 1 }}>{panel.label}</span>
-              <span style={{ fontSize: 9, color: panelFilled === uniqueCodes.length ? 'var(--accent)' : 'var(--text-dim)' }}>
+              <span style={{ fontSize: 9, color: panelFilled === uniqueCodes.length ? 'var(--accent)' : '#fff' }}>
                 {panelFilled}/{uniqueCodes.length}
               </span>
             </button>
@@ -232,12 +232,12 @@ export default function ExtendedLabsTab({
                           step="any"
                           style={{
                             width: 60, padding: '2px 4px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
-                            borderRadius: 3, color: hasVal ? deviationColor(numVal, info) : 'var(--text-dim)',
+                            borderRadius: 3, color: hasVal ? deviationColor(numVal, info) : '#fff',
                             fontSize: 9, fontWeight: 600, textAlign: 'right',
                           }}
                         />
-                        <span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 28 }}>{info.prefUnit}</span>
-                        <span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 50 }}>
+                        <span style={{ fontSize: 7, color: '#fff', minWidth: 28 }}>{info.prefUnit}</span>
+                        <span style={{ fontSize: 7, color: '#fff', minWidth: 50 }}>
                           {info.lln}–{info.uln}
                         </span>
                         {existing && !hasVal && (

@@ -4915,3 +4915,374 @@ html.app-native .symptom-toast {
 html.app-native .nut-diary-fab {
   bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
 }
+
+/* ─── 76. LABS PRO-FULL — топ-подача вкладки «Анализы» (hero не тронут) ──
+ * Только APK. TSX уже несёт PRO-инлайны (44/48/52px, стекло, белый текст);
+ * здесь — липкость, press/focus, каскад, табличные цифры и белый текст-гард.
+ * TG/web — инлайны едины, этот слой их только усиливает. */
+html.app-native .labs-topnav {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.app-native .labs-topnav button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .labs-subtabs {
+  position: sticky !important;
+  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
+  z-index: 20 !important;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  margin: 0 -12px !important;
+  padding: 12px 12px 10px !important;
+  scroll-snap-type: x proximity !important;
+}
+
+html.app-native .labs-subtabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .labs-subtab {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .labs-subtab:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .labs-subtab:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .labs-subtab[data-active='true'] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .labs-bottomtabs {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.app-native .labs-bottomtabs button {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .labs-bottomtabs button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .labs-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .labs-overview,
+html.app-native .labs-results,
+html.app-native .labs-labdiary,
+html.app-native .labs-labscatalog,
+html.app-native .labs-schedule {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .labs-kpi-grid,
+html.app-native .labs-sys-grid {
+  gap: 8px !important;
+}
+
+html.app-native .labs-kpi {
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+html.app-native .labs-sec-head {
+  border-left: 3px solid var(--labs-accent, var(--accent)) !important;
+  padding-left: 10px !important;
+}
+
+html.app-native .labs-filter-row {
+  scrollbar-width: none !important;
+}
+
+html.app-native .labs-filter-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .labs-filter-row button {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .labs-filter-row button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .labs-filter-row button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .labs-phase-row {
+  scrollbar-width: none !important;
+}
+
+html.app-native .labs-phase-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .labs-phase-row button {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .labs-phase-row button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .labs-actions {
+  gap: 8px !important;
+}
+
+html.app-native .labs-actions button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+}
+
+html.app-native .labs-actions button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .labs-empty {
+  border-radius: 20px !important;
+  border-style: dashed !important;
+}
+
+html.app-native .labs-hero-card:active {
+  transform: scale(0.98) !important;
+}
+
+/* Белый текст-гард: вторичный текст вкладки — белый (семантика/акценты не тронуты) */
+html.app-native .labs-body,
+html.app-native .labs-overview,
+html.app-native .labs-results,
+html.app-native .labs-labdiary,
+html.app-native .labs-labscatalog,
+html.app-native .labs-schedule,
+html.app-native .labs-sec-head,
+html.app-native .labs-kpi,
+html.app-native .labs-empty {
+  color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .labs-body,
+  html.app-native .labs-overview,
+  html.app-native .labs-results,
+  html.app-native .labs-labdiary,
+  html.app-native .labs-labscatalog,
+  html.app-native .labs-schedule {
+    animation: none !important;
+  }
+}
+
+/* ─── 77. RISK PRO-FULL — топ-подача вкладки «Риски» (hero не тронут) ──
+ * Только APK. TSX уже несёт PRO-инлайны (44/48/56/64px, стекло 18px,
+ * белый текст, пилюли-навигация, быстрые якоря систем); здесь — липкость,
+ * press/focus, каскад, табличные цифры и белый текст-гард.
+ * TG/web — инлайны едины, этот слой их только усиливает. */
+html.app-native .screen.risk {
+  --text-dim: #fff !important;
+  --text-light: #fff !important;
+  --text-muted: #fff !important;
+}
+
+html.app-native .risk-topnav {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  min-height: 56px !important;
+}
+
+html.app-native .risk-topnav button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 999px !important;
+}
+
+html.app-native .risk-topnav button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .risk-topnav button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .risk-subtabs {
+  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
+  padding: 12px 12px 10px !important;
+  scroll-snap-type: x proximity !important;
+  gap: 8px !important;
+}
+
+html.app-native .risk-subtab {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+  color: #fff !important;
+}
+
+html.app-native .risk-subtab:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .risk-subtab:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .risk-subtab[data-active='true'] {
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35) !important;
+}
+
+html.app-native .risk-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .risk-overview,
+html.app-native .risk-spec,
+html.app-native .risk-details,
+html.app-native .risk-verify,
+html.app-native .risk-info,
+html.app-native .risk-calc-hero,
+html.app-native .risk-mc,
+html.app-native .risk-keyrisks,
+html.app-native .risk-history,
+html.app-native .risk-systems,
+html.app-native .risk-weekly,
+html.app-native .risk-inputs,
+html.app-native .risk-navcards,
+html.app-native .risk-overall,
+html.app-native .risk-hysteresis,
+html.app-native .risk-predictive,
+html.app-native .risk-weekly-chart {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .screen.risk .card {
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+html.app-native .risk-systems-nav,
+html.app-native .risk-verify-nav,
+html.app-native .risk-info-nav,
+html.app-native .risk-verify-export {
+  scrollbar-width: none !important;
+}
+
+html.app-native .risk-systems-nav::-webkit-scrollbar,
+html.app-native .risk-verify-nav::-webkit-scrollbar,
+html.app-native .risk-info-nav::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .risk-systems-nav button,
+html.app-native .risk-verify-nav button,
+html.app-native .risk-info-nav button,
+html.app-native .risk-verify-export button,
+html.app-native .risk-navcards button {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .risk-systems-nav button:active,
+html.app-native .risk-verify-nav button:active,
+html.app-native .risk-info-nav button:active,
+html.app-native .risk-verify-export button:active,
+html.app-native .risk-navcards button:active,
+html.app-native .risk-system-card:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .risk-systems-nav button:focus-visible,
+html.app-native .risk-verify-nav button:focus-visible,
+html.app-native .risk-info-nav button:focus-visible,
+html.app-native .risk-verify-export button:focus-visible,
+html.app-native .risk-navcards button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .risk-verify-export {
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.app-native .screen.risk input[type='range'] {
+  min-height: 28px !important;
+}
+
+html.app-native .screen.risk details summary {
+  min-height: 56px !important;
+}
+
+html.app-native .risk-system-card,
+html.app-native .risk-overall {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Белый текст-гард: весь вторичный текст вкладки — белый (риск-цвета % и семантика не тронуты) */
+html.app-native .risk-body,
+html.app-native .risk-overview,
+html.app-native .risk-spec,
+html.app-native .risk-details,
+html.app-native .risk-verify,
+html.app-native .risk-info,
+html.app-native .risk-calc-hero,
+html.app-native .risk-mc,
+html.app-native .risk-disclaimer {
+  color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .risk-body,
+  html.app-native .risk-overview,
+  html.app-native .risk-spec,
+  html.app-native .risk-details,
+  html.app-native .risk-verify,
+  html.app-native .risk-info {
+    animation: none !important;
+  }
+}

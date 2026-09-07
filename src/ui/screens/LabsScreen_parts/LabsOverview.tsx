@@ -84,10 +84,10 @@ export const LabsOverview: React.FC<{
         </div>
       )}
 
-      {/* KPI — 4 карточки */}
-      <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', padding:12 }}>
-        <LabsSectionHeader icon={<NativeIcon name="file" size={15} />} title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+      {/* KPI — 4 карточки: mobile-first auto-fit, на 360px 2 колонки */}
+      <div style={{ ...LABS_CARD, padding:14 }}>
+        <LabsSectionHeader icon={<NativeIcon name="file" size={16} />} title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
+        <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
           <LabsKpiCard icon={<NativeIcon name="flask" size={13} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
           <LabsKpiCard icon={<NativeIcon name="check" size={13} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
           <LabsKpiCard icon={<NativeIcon name="arrowUp" size={13} />} label="Выше" value={highCount} color="#ef4444" sub="нормы" />
@@ -109,10 +109,10 @@ export const LabsOverview: React.FC<{
         )}
       </div>
 
-      {/* Системные группы */}
+      {/* Системные группы — цветная левая кромка по системам */}
       {labs.length > 0 ? (
-        <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.38)', backdropFilter:'blur(10px)' }}>
-          <LabsSectionHeader icon={<NativeIcon name="layers" size={15} />} title="Показатели по системам" subtitle="Сортировка — сначала отклонения, затем норма. Клик по строке — детали." />
+        <div style={{ ...LABS_CARD }}>
+          <LabsSectionHeader icon={<NativeIcon name="layers" size={16} />} title="Показатели по системам" subtitle="Сортировка — сначала отклонения, затем норма. Клик по строке — детали." />
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {sortedSystems.map(([system, systemLabs]) => {
               const color = LABS_SYS_COLOR[system] || '#6b7280';
@@ -127,7 +127,7 @@ export const LabsOverview: React.FC<{
                     <span style={{ fontSize:9, color:'#fff' }}>{systemLabs.length} маркеров</span>
                     {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
                   </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, padding:8 }}>
+                  <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, padding:10 }}>
                     {systemLabs.sort((a,b)=> {
                       const pa: Record<string,number> = { high:0, low:1, unknown:2, normal:3 };
                       return (pa[getLabStatus(a)]??2) - (pa[getLabStatus(b)]??2);
@@ -139,17 +139,17 @@ export const LabsOverview: React.FC<{
                       const isAbn = status==='high'||status==='low';
                       return (
                         <div key={lab.code+'-'+lab.date} style={{
-                          display:'flex', alignItems:'center', gap:8, padding:'8px 9px', borderRadius:11,
-                          background: isAbn? statusColor+'10' : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? statusColor+'1E' : 'rgba(255,255,255,0.06)'}`,
-                          borderLeft:`3px solid ${statusColor}`, minWidth:0,
+                          display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14,
+                          background: isAbn? statusColor+'12' : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? statusColor+'22' : 'rgba(140,190,255,0.12)'}`,
+                          borderLeft:`3px solid ${statusColor}`, minWidth:0, minHeight:64,
                         }}>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:11, fontWeight:700, color: isAbn? '#fff':'rgba(255,255,255,0.9)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
-                            <div style={{ fontSize:9, color:'#fff', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.code} • {refInfo || '—'}</div>
+                            <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
+                            <div style={{ fontSize:11, color:'#fff', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.code} • {refInfo || '—'}</div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0 }}>
-                            <div style={{ fontSize:13, fontWeight:800, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'#fff', marginLeft:2, fontWeight:600 }}>{lab.unit||''}</span></div>
-                            <div style={{ marginTop:2, display:'inline-flex', alignItems:'center', gap:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: statusColor+'18', border:`1px solid ${statusColor}22`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?'—':'норма'}</div>
+                            <div style={{ fontSize:16, fontWeight:900, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{lab.value}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
+                            <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: statusColor+'1E', border:`1px solid ${statusColor}30`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?'—':'норма'}</div>
                           </div>
                         </div>
                       );

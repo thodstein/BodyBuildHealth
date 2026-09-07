@@ -102,7 +102,7 @@ export const LabsCatalog: React.FC = () => {
     <div className="labs-catalog">
       <div className="card">
         <h3>📖 Каталог анализов</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
+        <p style={{ fontSize: 12, color: '#fff', marginBottom: 12 }}>
           Справочник лабораторных маркеров с референсными значениями и описаниями. Всего: {catalogEntries.length} маркеров.
         </p>
 
@@ -144,7 +144,7 @@ export const LabsCatalog: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{entry.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({entry.code})</span>
+                  <span style={{ fontSize: 11, color: '#fff', marginLeft: 6 }}>({entry.code})</span>
                 </div>
                 <div style={{ fontSize: 11, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)', padding: '2px 8px', borderRadius: 4 }}>
                   {entry.min}–{entry.max} {entry.unit}
@@ -152,14 +152,14 @@ export const LabsCatalog: React.FC = () => {
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2 }}>{entry.system}</div>
               {entry.description && (
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{entry.description}</div>
+                <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{entry.description}</div>
               )}
             </div>
           ))}
         </div>
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
+          <div style={{ textAlign: 'center', padding: 20, color: '#fff' }}>
             Ничего не найдено по запросу «{search}»
           </div>
         )}

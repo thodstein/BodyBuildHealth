@@ -111,7 +111,7 @@ export const LabsTzRiskTab: React.FC = () => {
     <div className="labs-tzrisk" style={{ padding: '0 0 80px' }}>
       <div style={CARD}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="cpu" size={15} /> Риски по механизм-ориентированной модели (ТЗ)</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, marginBottom: 8 }}>
           Введите лабораторные маркеры из таблицы T4 для оценки выраженности механизмов (m_i) по 6 системам организма.
         </div>
         <button onClick={fillFromLabs} style={{
@@ -168,7 +168,7 @@ export const LabsTzRiskTab: React.FC = () => {
                 background: isFilled ? `rgba(${ACCENT_RGB},0.04)` : 'rgba(255,255,255,0.02)',
                 border: `1px solid ${isFilled ? `rgba(${ACCENT_RGB},0.12)` : 'rgba(255,255,255,0.04)'}`,
               }}>
-                <div style={{ minWidth: 90, fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                <div style={{ minWidth: 90, fontSize: 9, color: '#fff' }}>
                   <span style={{ fontWeight: 600, color: '#fff' }}>{m.name}</span>
                   <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>{m.unit}</span>
                 </div>
@@ -192,7 +192,7 @@ export const LabsTzRiskTab: React.FC = () => {
       {/* Поддержка из калькулятора */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="pill" size={13} /> Поддержка из калькулятора</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+        <div style={{ fontSize: 10, color: '#fff' }}>
           {supportIds.length > 0
             ? `✅ ${supportIds.length} веществ: ${supportIds.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ')}`
             : '🟡 Нет активной поддержки'}
@@ -207,7 +207,7 @@ export const LabsTzRiskTab: React.FC = () => {
       {showResult && result && (
         <>
           <div style={{ ...CARD, textAlign: 'center', background: `linear-gradient(135deg, rgba(${ACCENT_RGB},0.06) 0%, rgba(${ACCENT_RGB},0.02) 100%)`, border: `1px solid rgba(${ACCENT_RGB},0.15)` }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>📊 Общий интегральный риск</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>📊 Общий интегральный риск</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: 9, color: '#f87171' }}>Без поддержки</div>

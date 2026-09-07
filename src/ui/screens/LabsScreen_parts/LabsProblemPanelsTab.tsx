@@ -129,11 +129,11 @@ const LabsProblemPanelsTab: React.FC = () => {
   // Detail view for a specific panel
   if (selectedPanel) {
     return (
-      <div className="labs-problems" style={{ padding: '8px 0 60px' }}>
+      <div className="labs-problems" style={{ padding:'8px 0 60px', display:'flex', flexDirection:'column', gap:10 }}>
         <button onClick={() => setSelectedPanelId(null)} style={{
-          padding: '6px 12px', borderRadius: 12, cursor: 'pointer', fontWeight: 600, fontSize: 11,
-          background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
-          marginBottom: 10,
+          padding:'10px 16px', borderRadius:999, cursor:'pointer', fontWeight:800, fontSize:12, minHeight:44,
+          background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff',
+          marginBottom:2, alignSelf:'flex-start',
         }}>← Назад к списку</button>
 
         {/* Header */}
@@ -152,7 +152,7 @@ const LabsProblemPanelsTab: React.FC = () => {
             </span>
             <span style={{
               padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600,
-              background: 'var(--bg-secondary)', color: 'var(--text-dim)', border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)', color: '#fff', border: '1px solid var(--border)',
             }}>
               {PHASE_LABELS[selectedPanel.phase] || selectedPanel.phase}
             </span>
@@ -160,7 +160,7 @@ const LabsProblemPanelsTab: React.FC = () => {
           <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
             {selectedPanel.title}
           </h3>
-          <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+          <p style={{ margin: 0, fontSize: 11, color: '#fff', lineHeight: 1.4 }}>
             {selectedPanel.problem}
           </p>
         </div>
@@ -205,7 +205,7 @@ const LabsProblemPanelsTab: React.FC = () => {
           <h4 style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: '#f97316' }}>
             🩺 Клинический комментарий
           </h4>
-          <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
             {selectedPanel.clinicalNotes}
           </p>
         </div>
@@ -215,7 +215,7 @@ const LabsProblemPanelsTab: React.FC = () => {
           <h4 style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
             📋 Рекомендуемые действия
           </h4>
-          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
+          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: '#fff', lineHeight: 1.6 }}>
             {selectedPanel.recommendedActions.map((a, i) => (
               <li key={i}>{a}</li>
             ))}
@@ -240,7 +240,7 @@ const LabsProblemPanelsTab: React.FC = () => {
     <div className="labs-problems" style={{ padding: '8px 0 60px' }}>
       {/* Header + symptom link */}
       <div style={{ marginBottom: 12 }}>
-        <p style={{ margin: '0 0 8px', fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#fff', lineHeight: 1.4 }}>
           Выберите клинический сценарий для получения персонального перечня лабораторных маркеров,
           референсных значений и расшифровки отклонений.
         </p>
@@ -260,11 +260,11 @@ const LabsProblemPanelsTab: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: '#a855f7' }}>🔍 Симптом → анализы</span>
             <button onClick={() => { setShowSymptomLink(false); setSymptomLinkedPanels([]); setSymptomSearchQ(''); setSelectedSymptomIds([]); }} style={{
-              background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
+              background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff',
               borderRadius: 8, padding: '3px 10px', fontSize: 10, cursor: 'pointer',
             }}>✕</button>
           </div>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', margin: '0 0 8px' }}>
+          <p style={{ fontSize: 10, color: '#fff', margin: '0 0 8px' }}>
             Введите название симптома на русском — например «головная боль», «отёки», «тошнота»
           </p>
 
@@ -312,7 +312,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <span>{s.symptom}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{s.category}</span>
+                    <span style={{ fontSize: 9, color: '#fff' }}>{s.category}</span>
                   </button>
                 ))}
               </div>
@@ -323,7 +323,7 @@ const LabsProblemPanelsTab: React.FC = () => {
             width: '100%', padding: '9px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 11,
             background: selectedSymptomIds.length > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
             border: selectedSymptomIds.length > 0 ? 'none' : '1px solid var(--border)',
-            color: selectedSymptomIds.length > 0 ? '#000' : 'var(--text-dim)',
+            color: selectedSymptomIds.length > 0 ? '#000' : '#fff',
           }}>
             🔍 Найти анализы для {selectedSymptomIds.length > 0 ? `${selectedSymptomIds.length} симптомов` : 'симптомов'}
           </button>
@@ -349,7 +349,7 @@ const LabsProblemPanelsTab: React.FC = () => {
           )}
 
           {selectedSymptomIds.length > 0 && symptomLinkedPanels.length === 0 && (
-            <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+            <div style={{ marginTop: 6, fontSize: 10, color: '#fff', textAlign: 'center' }}>
               Нет панелей для выбранных симптомов
             </div>
           )}
@@ -364,7 +364,7 @@ const LabsProblemPanelsTab: React.FC = () => {
             whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
             transition: 'all 0.2s',
             background: filterPhase === ph ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: filterPhase === ph ? '#000' : 'var(--text-dim)',
+            color: filterPhase === ph ? '#000' : '#fff',
             border: `1px solid ${filterPhase === ph ? 'var(--accent)' : 'var(--border)'}`,
           }}>
             {ph === 'all' ? 'Все фазы' : PHASE_LABELS[ph] || ph}
@@ -379,7 +379,7 @@ const LabsProblemPanelsTab: React.FC = () => {
             whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
             transition: 'all 0.2s',
             background: filterUrgency === ur ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: filterUrgency === ur ? '#000' : 'var(--text-dim)',
+            color: filterUrgency === ur ? '#000' : '#fff',
             border: `1px solid ${filterUrgency === ur ? 'var(--accent)' : 'var(--border)'}`,
           }}>
             {ur === 'all' ? 'Все срочности' : URGENCY_LABELS[ur] || ur}
@@ -408,7 +408,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                 </span>
                 <span style={{
                   padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600,
-                  background: 'var(--bg-secondary)', color: 'var(--text-dim)',
+                  background: 'var(--bg-secondary)', color: '#fff',
                 }}>
                   {PHASE_LABELS[panel.phase]}
                 </span>
@@ -420,7 +420,7 @@ const LabsProblemPanelsTab: React.FC = () => {
                 </span>
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{panel.title}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{panel.problem}</div>
+              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>{panel.problem}</div>
             </div>
             <span style={{ color: URGENCY_COLORS[panel.urgency], fontSize: 14, opacity: 0.5 }}>→</span>
           </button>
@@ -428,7 +428,7 @@ const LabsProblemPanelsTab: React.FC = () => {
       </div>
 
       {filteredPanels.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 12 }}>
+        <div style={{ textAlign: 'center', padding: 20, color: '#fff', fontSize: 12 }}>
           Нет панелей для выбранных фильтров
         </div>
       )}

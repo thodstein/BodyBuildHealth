@@ -57,9 +57,9 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
 export const LabsSchedule: React.FC = () => {
   return (
     <div className="labs-schedule">
-      <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)' }}>
-        <LabsSectionHeader icon={<NativeIcon name="clock" size={15} />} title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:12, lineHeight:1.4, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ ...LABS_CARD }}>
+        <LabsSectionHeader icon={<NativeIcon name="clock" size={16} />} title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
+        <div style={{ fontSize:12, color:'#fff', marginBottom:12, lineHeight:1.5, padding:'10px 12px', borderRadius:12, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.16)' }}>
           Совет: сдавайте базовый скрининг до курса и каждые 4 недели на курсе. Маркеры с ℹ️ — наведите для подсказки.
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -69,11 +69,11 @@ export const LabsSchedule: React.FC = () => {
             const accent = PHASE_ACCENT[phase] || LABS_ACCENT;
             return (
               <div key={phase} style={{ borderRadius:14, overflow:'hidden', border:`1px solid ${accent}18`, background:'rgba(255,255,255,0.02)' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background: accent+'10', borderBottom:`1px solid ${accent}14` }}>
-                  <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: accent+'18', border:`1px solid ${accent}22`, fontSize:12, fontWeight:800, color:accent }}>{phaseLabel.slice(0,1)}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:800, fontSize:12, color:'#fff' }}>{phaseLabel}</div>
-                    {phaseDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{phaseDesc}</div>}
+                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 12px', background: accent+'12', borderBottom:`1px solid ${accent}1E` }}>
+                  <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background: accent+'1E', border:`1px solid ${accent}30`, fontSize:14, fontWeight:900, color:accent, flexShrink:0 }}>{phaseLabel.slice(0,1)}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:800, fontSize:14, color:'#fff' }}>{phaseLabel}</div>
+                    {phaseDesc && <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.4 }}>{phaseDesc}</div>}
                   </div>
                   <LabsBadge color={accent}>{labs.length} маркеров</LabsBadge>
                 </div>
@@ -81,12 +81,12 @@ export const LabsSchedule: React.FC = () => {
                   <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
                     {labs.map((code: string) => (
                       <span key={code} style={{
-                        background: accent+'10',
-                        border: `1px solid ${accent}22`,
-                        padding:'4px 8px',
+                        background: accent+'12',
+                        border: `1px solid ${accent}30`,
+                        padding:'8px 12px',
                         borderRadius:999,
-                        fontSize:10, fontWeight:700,
-                        color: 'rgba(255,255,255,0.82)',
+                        fontSize:11, fontWeight:800,
+                        color:'#fff',
                         display:'inline-flex', alignItems:'center', gap:4,
                       }}>
                         {code}
