@@ -217,7 +217,12 @@ intolerances: Intolerances; setIntolerances: (v: any) => void;
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
-  addSecondRecipeToMeal: (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean }) => void;
+  addSecondRecipeToMeal: (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean; forceFull?: boolean; acceptedMini?: boolean; mealsOverride?: any[]; snackFreedKcal?: number }) => void;
+  /** P4a-диалог: конфликт второго рецепта с закрытым приёмом (null — нет конфликта). */
+  secondRecipeConflict: { dayIdx: number; mealIdx: number; recipe: Recipe; targetKcal: number; firstKcal: number; roomKcal: number; miniKcal: number } | null;
+  setSecondRecipeConflict: (v: any) => void;
+  /** P4a-диалог: добавить второй ПОЛНОСТЬЮ, ужав перекусы (комната из снеков). */
+  addSecondRecipeWithSnackRoom: () => void;
   /** v2.1: ручной масштаб ВТОРОГО рецепта (кнопки ×0.5/×1/×1.5/×2). Первый — автомасштаб, не трогается. Остальные приёмы пересобираются ребалансом (якорь). */
   rescaleSecondRecipeInMeal: (mealIdx: number, dayIdx: number, scale: number) => void;
   /** v2.1: убрать второй рецепт из приёма (первый остаётся). Остальные приёмы пересобираются. */
@@ -340,6 +345,56 @@ export function secondRecipeRoomDecision(targetKcal: number, firstKcal: number):
   if (t <= 0 || rawRoom <= 0) return { action: 'abort', roomKcal: 0 };
   if (rawRoom < 0.25 * t) return { action: 'mini', roomKcal: rawRoom };
   return { action: 'full', roomKcal: rawRoom };
+}
+
+/**
+ * P4a-диалог: ужатие перекусов под второй рецепт (чистая функция, тестируется).
+ * Освобождает needKcal, пропорционально ужимая НЕзалоченные пункты перекусов
+ * (без _fixedGrams), но не ниже 50% порции и 10 г. Возвращает новый массив
+ * приёмов и фактически освобождённые ккал.
+ */
+export function freeSnackRoomForSecond(
+  mealsIn: any[], excludeMealIdx: number, needKcal: number, lockedIds?: Set<string>,
+): { meals: any[]; freedKcal: number } {
+  let need = Math.max(0, Math.round(needKcal || 0));
+  let freed = 0;
+  const meals = (mealsIn || []).map((m: any, mi: number) => {
+    if (mi === excludeMealIdx || need <= freed) return m;
+    const t = String(m?.type || '');
+    const lb = String(m?.label || '');
+    if (!(t.startsWith('snack') || /перекус|полдник/i.test(lb))) return m;
+    const items = ((m.items || []) as any[]).map((it: any) => ({ ...it }));
+    const order = items.map((_, ii) => ii).filter(ii => {
+      const it = items[ii];
+      if ((it as any)._fixedGrams) return false;
+      if (lockedIds && lockedIds.has(it.id)) return false;
+      return (it.kcal || 0) > 0 && (it.amount || 0) > 0;
+    }).sort((a, b) => items[b].kcal - items[a].kcal);
+    for (const ii of order) {
+      if (need <= freed) break;
+      const it = items[ii];
+      const minAmount = Math.max(10, (it.amount || 0) * 0.5);
+      if ((it.amount || 0) <= minAmount) continue;
+      const take = Math.min(it.kcal || 0, need - freed);
+      if (take <= 0) continue;
+      const oldKcal = it.kcal || 0;
+      const factor = Math.max(0, (oldKcal - take) / Math.max(1, oldKcal));
+      const newAmount = Math.max(minAmount, Math.round((it.amount || 0) * factor));
+      const r = newAmount / Math.max(1, it.amount || 1);
+      it.amount = newAmount;
+      it.p = Math.round((it.p || 0) * r * 10) / 10;
+      it.f = Math.round((it.f || 0) * r * 10) / 10;
+      it.c = Math.round((it.c || 0) * r * 10) / 10;
+      it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+      it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+      freed = Math.round(freed + Math.max(0, oldKcal - it.kcal));
+    }
+    // Пересчёт итога приёма из пунктов.
+    let tk = 0, tp = 0, tf = 0, tc = 0, tfi = 0;
+    for (const it of items) { tk += it.kcal || 0; tp += it.p || 0; tf += it.f || 0; tc += it.c || 0; tfi += it.fiber || 0; }
+    return { ...m, items, totals: { ...(m.totals || {}), kcal: Math.round(tk), p: Math.round(tp * 10) / 10, f: Math.round(tf * 10) / 10, c: Math.round(tc * 10) / 10, fiber: Math.round(tfi * 10) / 10 } };
+  });
+  return { meals, freedKcal: Math.max(0, Math.round(freed)) };
 }
 
 export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null; children: React.ReactNode }> = ({ profile: _profile, course: _course, labs = [], labAnalysis, children }) => {
@@ -1337,6 +1392,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [editAmount, setEditAmount] = useState<number>(0);
   const [replacingItem, setReplacingItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
   const [recipePickerMeal, setRecipePickerMeal] = useState<{ dayIdx: number; mealIdx: number; label: string } | null>(null);
+  // P4a-диалог: второй рецепт не влез в закрытый приём — явный выбор пользователя
+  // (shrink ×0.65 / комната из перекусов / мини / отмена) вместо тихого отказа.
+  const [secondRecipeConflict, setSecondRecipeConflict] = useState<{ dayIdx: number; mealIdx: number; recipe: Recipe; targetKcal: number; firstKcal: number; roomKcal: number; miniKcal: number } | null>(null);
   const [mealPrep, setMealPrep] = useState<any[] | null>(null);
   const [dayPlanNotes, setDayPlanNotes] = useState(() => { try { return localStorage.getItem('he_day_notes') || ''; } catch { return ''; } });
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -2331,7 +2389,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    * G3: количественный гейт (нет принудительных +150 при закрытом приёме), вычитание
    * старого второго при замене, запрет в peri/presleep, закупки из пропатченных дней.
    */
-  const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean }) => {
+  const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number, opts?: { shrinkFirst?: boolean; forceFull?: boolean; acceptedMini?: boolean; mealsOverride?: any[]; snackFreedKcal?: number }) => {
     const resolveMeals = (): { meals: any[]; plan: 'day' | 'three' | 'week'; day: number } | null => {
       if (dayIdx === 0) return { meals: dayPlan?.meals || [], plan: 'day', day: 0 };
       const r = _resolvePlanDay(dayIdx);
@@ -2342,7 +2400,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const resolved = resolveMeals();
     if (!resolved || mealIdx < 0 || mealIdx >= resolved.meals.length) { setRecipePickerMeal(null); return; }
-    const m = resolved.meals[mealIdx];
+    // P4a-диалог: пред-подготовленные приёмы (перекусы уже ужаты) идут вместо свежих из стейта.
+    const _srcMeals = opts?.mealsOverride ?? resolved.meals;
+    const m = _srcMeals[mealIdx];
     if (!m || !m.recipeApplied) { setRecipePickerMeal(null); return; }
     // G3: одно окно = одно блюдо — второй рецепт запрещён в peri/presleep.
     // Итерация C: инсулин-окна тоже (isPeriLikeMeal покрывает маркер; метка — на всякий случай).
@@ -2400,29 +2460,47 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
     }
     // P4a: в закрытый приём второй молча мини-порцией НЕ льём (раньше: тихие 150 ккал +
-    // «день может перебрать» + ребаланс резал другие приёмы = каша). Решение — явное
-    // (secondRecipeRoomDecision): замена второго идёт как раньше (слот уже есть);
-    // новый второй в закрытый приём — только через ⚖️ (shrinkFirst выше) либо замена
-    // первого. Пользователь решает явно.
+    // «день может перебрать» + ребаланс резал другие приёмы = каша). Решение — явное:
+    // диалог [⚖️ ужать первый ×0.65 / 🥜 забрать из перекусов / мини / отмена].
+    // Замена второго идёт как раньше (слот уже есть). forceFull (комната из перекусов
+    // уже освобождена) и acceptedMini (мини подтверждена в диалоге) гейты пропускают.
     const _dec = secondRecipeRoomDecision(_targetKcal, _targetKcal - _roomKcal);
-    if (_dec.action === 'abort' && !_shrinkNote && !_isReplace) {
-      if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ Приём закрыт первым рецептом — места нет. Нажмите ⚖️ рядом с блюдом (ужать первый ×0.65 и добавить полноценно) или замените первый рецепт`, 'warning');
-      setRecipePickerMeal(null);
-      return;
+    if (!_isReplace && !opts?.forceFull) {
+      if (_dec.action === 'abort' && !_shrinkNote) {
+        // Явная попытка ⚖️, но ужатие ничего не освободило (<50 ккал) — честный отказ
+        // без петли «диалог → shrink → диалог».
+        if (opts?.shrinkFirst) {
+          if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ Ужать первый не вышло — места всё равно нет. Замените первый рецепт', 'warning');
+          setRecipePickerMeal(null);
+          return;
+        }
+        setSecondRecipeConflict({ dayIdx, mealIdx, recipe, targetKcal: _targetKcal, firstKcal: _firstKcal, roomKcal: Math.max(0, Math.round(_roomKcal)), miniKcal: 0 });
+        setRecipePickerMeal(null);
+        return;
+      }
+      if (_dec.action === 'mini' && !_shrinkNote && !opts?.acceptedMini) {
+        setSecondRecipeConflict({ dayIdx, mealIdx, recipe, targetKcal: _targetKcal, firstKcal: _firstKcal, roomKcal: Math.max(0, Math.round(_roomKcal)), miniKcal: Math.max(0, Math.round(_dec.roomKcal)) });
+        setRecipePickerMeal(null);
+        return;
+      }
     }
     if (_isReplace && _roomKcal <= 0) _roomKcal = 150; // замена: слот уже есть (как раньше)
-    else if (_dec.action === 'mini' && !_shrinkNote && !_isReplace) {
+    else if (_dec.action === 'mini' && !_shrinkNote && !_isReplace && !opts?.forceFull) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast(`ℹ️ Места под второй рецепт мало (~${Math.round(_dec.roomKcal)} ккал) — берём мини-порцию`, 'info' as any);
       _roomKcal = _dec.roomKcal;
     }
-    const scaled2 = scaleRecipeToTarget(recipe, { kcal: _roomKcal, p: _mt.p || 30, f: _mt.f || 15, c: _mt.c || 40 }, weight);
+    // forceFull (комната из перекусов): второй — полными порциями, без скейла под комнату.
+    const scaled2 = opts?.forceFull ? null : scaleRecipeToTarget(recipe, { kcal: _roomKcal, p: _mt.p || 30, f: _mt.f || 15, c: _mt.c || 40 }, weight);
     const items2 = scaled2 ? scaled2.items : buildRecipeMealItems(recipe);
     if (!items2 || items2.length === 0) { setRecipePickerMeal(null); return; }
     const mergedItems = [..._baseItems, ...items2];
     const flat2 = flattenRecipeOption(recipe);
     if (scaled2) flat2.appliedScale = scaled2.scale;
-    const patched = resolved.meals.map((x: any, i: number) => i === mealIdx
-      ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2, rationale: _shrinkNote ? [...(x.rationale || []), _shrinkNote] : x.rationale }
+    const _notes2: string[] = [];
+    if (_shrinkNote) _notes2.push(_shrinkNote);
+    if (opts?.snackFreedKcal && opts.snackFreedKcal >= 50) _notes2.push(`🥜 Перекусы ужаты на ~${Math.round(opts.snackFreedKcal)} ккал — место под второй рецепт`);
+    const patched = _srcMeals.map((x: any, i: number) => i === mealIdx
+      ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2, rationale: _notes2.length > 0 ? [...(x.rationale || []), ..._notes2] : x.rationale }
       : x);
     const pre = sumDayTotals(patched as any);
     const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -2457,8 +2535,46 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // G3: закупки из ПРОПАТЧЕННЫХ дней (раньше three/week брались из старых days — список врал).
     setShoppingList(buildShoppingFromPlans(_visiblePlans));
     refreshRecipeCookingCardIfActive(resolved.plan === 'day' ? _resDay : dayPlan, resolved.plan === 'three' ? { days: _visiblePlans } : threeDayPlan, resolved.plan === 'week' ? { days: _visiblePlans } : weekPlan);
-    if (typeof (window as any).showToast === 'function') (window as any).showToast(_isReplace ? `🍳 Второй рецепт заменён на «${recipe.name}»` : `🍳 Второй рецепт «${recipe.name}» добавлен в приём${_shrinkNote ? ' (первый ужа́т)' : ''}`, 'success');
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(_isReplace ? `🍳 Второй рецепт заменён на «${recipe.name}»` : `🍳 Второй рецепт «${recipe.name}» добавлен в приём${_shrinkNote ? ' (первый ужа́т)' : opts?.snackFreedKcal && opts.snackFreedKcal >= 50 ? ' (перекусы ужаты)' : ''}`, 'success');
     setRecipePickerMeal(null);
+    setSecondRecipeConflict(null);
+  };
+
+  /**
+   * P4a-диалог: добавить второй ПОЛНОСТЬЮ, ужав перекусы (комната из снеков).
+   * Читает secondRecipeConflict, ужимает перекусы дня на ккал второго рецепта
+   * (полные порции) и делегирует в addSecondRecipeToMeal с forceFull — один сет
+   * стейта, stale-чтений нет (подготовленные приёмы идут через mealsOverride).
+   */
+  const addSecondRecipeWithSnackRoom = () => {
+    const c = secondRecipeConflict;
+    if (!c) return;
+    try {
+      const r = c.dayIdx === 0 ? { meals: dayPlan?.meals || [] } : (() => {
+        const rr = _resolvePlanDay(c.dayIdx);
+        if (!rr || rr.plan === 'day') return null;
+        const p: any = rr.plan === 'three' ? threeDayPlan : weekPlan;
+        if (!p?.days?.[rr.day]) return null;
+        return { meals: p.days[rr.day].meals };
+      })();
+      if (!r || c.mealIdx < 0 || c.mealIdx >= r.meals.length) {
+        if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ Приём уже изменился — откройте пикер заново', 'warning');
+        setSecondRecipeConflict(null);
+        return;
+      }
+      const fullItems = buildRecipeMealItems(c.recipe);
+      const fullKcal = (fullItems || []).reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+      if (!fullKcal || fullKcal <= 0) {
+        if (typeof (window as any).showToast === 'function') (window as any).showToast('⚠ Рецепт не разобрался на продукты', 'warning');
+        setSecondRecipeConflict(null);
+        return;
+      }
+      const needKcal = Math.max(0, fullKcal - Math.max(0, c.roomKcal || 0));
+      const { meals: freedMeals, freedKcal } = freeSnackRoomForSecond(r.meals, c.mealIdx, needKcal, lockedFoodIds);
+      addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { forceFull: true, mealsOverride: freedMeals, snackFreedKcal: freedKcal });
+    } catch {
+      setSecondRecipeConflict(null);
+    }
   };
 
   /**
@@ -3761,7 +3877,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     suppSearch, setSuppSearch, newRecipe, setNewRecipe,
     saveUndo, moveFoodItem, findSimilarFoods, replaceFoodItem,
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
-    updateItemAmount, removeFoodItem, replaceMealWithRecipe, addSecondRecipeToMeal, rescaleSecondRecipeInMeal, removeSecondRecipeFromMeal, generatePlan,
+    updateItemAmount, removeFoodItem, replaceMealWithRecipe, addSecondRecipeToMeal, secondRecipeConflict, setSecondRecipeConflict, addSecondRecipeWithSnackRoom, rescaleSecondRecipeInMeal, removeSecondRecipeFromMeal, generatePlan,
     generationMode, setGenerationMode,
     weightMode, setWeightMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,

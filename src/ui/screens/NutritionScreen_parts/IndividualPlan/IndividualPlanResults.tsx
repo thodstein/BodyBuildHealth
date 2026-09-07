@@ -56,7 +56,7 @@ export const IndividualPlanResults: React.FC = () => {
     userRecipes, setUserRecipes,
     shoppingList, setShoppingList, injections,
     recipePickerMeal, setRecipePickerMeal,
-    replaceMealWithRecipe, addSecondRecipeToMeal, undoStack, setUndoStack, undoLast,
+    replaceMealWithRecipe, addSecondRecipeToMeal, secondRecipeConflict, setSecondRecipeConflict, addSecondRecipeWithSnackRoom, undoStack, setUndoStack, undoLast,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
     loadSavedPlan, weight, budget, age, sex, bodyFatPct, trainType,
     generateCheatMeal, cheatMealPlan, setCheatMealPlan,
@@ -1123,6 +1123,41 @@ const doImportPlan = (raw: string): boolean => {
               ))}
             </div>
             <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:9, fontWeight:600 }}>✕ Отмена</button>
+          </div>
+        </div>
+      )}
+
+      {/* P4a-диалог: второй рецепт не влез в закрытый приём — явный выбор */}
+      {secondRecipeConflict && generated && dayPlan && (
+        <div style={{ position:'fixed', inset:0, zIndex:105, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.75)', padding:'12px' }}
+          onClick={() => setSecondRecipeConflict(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 22px', borderRadius:'20px', background:'#18181b', boxShadow:'0 18px 54px rgba(0,0,0,0.5)', border:'1px solid rgba(245,158,11,0.25)' }}>
+            <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
+            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>⚠️ Приём закрыт — куда деть «{secondRecipeConflict.recipe?.name}»?</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', marginBottom:12 }}>
+              Цель приёма ~{Math.round(secondRecipeConflict.targetKcal)} ккал, первый рецепт уже {Math.round(secondRecipeConflict.firstKcal)} ккал
+              {secondRecipeConflict.roomKcal > 0 ? ` (свободно ~${Math.round(secondRecipeConflict.roomKcal)} ккал)` : ' (места нет)'}. День не разъедется: ребаланс держит итоги.
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <button type="button" onClick={() => { const c = secondRecipeConflict; setSecondRecipeConflict(null); addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { shrinkFirst: true }); }}
+                style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.45)', color:'#c4b5fd', fontSize:10, fontWeight:700 }}>
+                ⚖️ Ужать первый ×0.65 — второй влезет полноценно
+              </button>
+              <button type="button" onClick={() => { setSecondRecipeConflict(null); addSecondRecipeWithSnackRoom(); }}
+                style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'rgba(34,197,94,0.10)', border:'1px solid rgba(34,197,94,0.4)', color:'#86efac', fontSize:10, fontWeight:700 }}>
+                🥜 Забрать из перекусов — ужа́ть снеки, второй полностью
+              </button>
+              {secondRecipeConflict.miniKcal > 0 && (
+                <button type="button" onClick={() => { const c = secondRecipeConflict; setSecondRecipeConflict(null); addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { acceptedMini: true }); }}
+                  style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24', fontSize:10, fontWeight:700 }}>
+                  ➕ Всё равно мини-порцию (~{Math.round(secondRecipeConflict.miniKcal)} ккал)
+                </button>
+              )}
+              <button type="button" onClick={() => setSecondRecipeConflict(null)}
+                style={{ padding:'8px 12px', borderRadius:12, cursor:'pointer', background:'transparent', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.7)', fontSize:10, fontWeight:600 }}>
+                ✕ Отмена
+              </button>
+            </div>
           </div>
         </div>
       )}

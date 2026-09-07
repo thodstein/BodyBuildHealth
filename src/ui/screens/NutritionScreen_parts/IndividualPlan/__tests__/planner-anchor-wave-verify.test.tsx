@@ -14,7 +14,7 @@ import React from 'react';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { correctDayToTargets } from '../day-target-corrector';
 import { IndividualPlan } from '../index';
-import { secondRecipeRoomDecision } from '../IndividualPlanContext';
+import { secondRecipeRoomDecision, freeSnackRoomForSecond } from '../IndividualPlanContext';
 import { useRenderMealList } from '../MealListRender';
 
 const base = (overrides: any = {}): MealPlanInput => ({
@@ -204,6 +204,39 @@ describe('P4a: secondRecipeRoomDecision — явное решение', () => { 
   it('мало места (<25% цели) → mini с честной комнатой', () => {
     expect(secondRecipeRoomDecision(800, 700)).toEqual({ action: 'mini', roomKcal: 100 });
     expect(secondRecipeRoomDecision(800, 650)).toEqual({ action: 'mini', roomKcal: 150 });
+  });
+
+  it('freeSnackRoomForSecond: ужимает перекусы на need, целевой приём и залоченное не трогает', () => {
+    const snackItem = (id: string, amount: number, kcal: number): any => ({ id, name: id, amount, kcal, p: 5, f: 5, c: 20, fiber: 1, role: 'carb_slow' });
+    const meals = [
+      { label: 'Обед', type: 'lunch', items: [snackItem('rice_white', 250, 325)], totals: { kcal: 325, p: 5, f: 5, c: 70, fiber: 1 } },
+      { label: 'Полдник', type: 'snack', items: [snackItem('corn_flakes', 100, 360), snackItem('jam', 50, 139)], totals: { kcal: 499, p: 10, f: 10, c: 100, fiber: 2 } },
+      { label: 'Перекус', type: 'snack2', items: [snackItem('bread_white', 100, 265)], totals: { kcal: 265, p: 5, f: 5, c: 50, fiber: 1 } },
+    ];
+    const res = freeSnackRoomForSecond(meals as any, 0, 300);
+    // Освободили ≥300, обед (idx 0) цел, математика пунктов сошлась с итогами.
+    expect(res.freedKcal).toBeGreaterThanOrEqual(300);
+    expect(res.meals[0].items[0].amount).toBe(250);
+    for (const m of res.meals) {
+      const sum = (m.items || []).reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+      expect(Math.abs(sum - m.totals.kcal)).toBeLessThanOrEqual(2);
+      for (const it of (m.items || []) as any[]) {
+        const orig = (meals as any[])[res.meals.indexOf(m)].items.find((x: any) => x.id === it.id);
+        if (orig) expect(it.amount).toBeGreaterThanOrEqual(Math.max(10, orig.amount * 0.5) - 1);
+      }
+    }
+  });
+
+  it('freeSnackRoomForSecond: залоченные пункты и _fixedGrams не ужимаются', () => {
+    const meals = [
+      { label: 'Обед', type: 'lunch', items: [{ id: 'a', name: 'a', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow' }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },
+      { label: 'Полдник', type: 'snack', items: [{ id: 'b', name: 'b', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow', _fixedGrams: true }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },
+      { label: 'Перекус', type: 'snack2', items: [{ id: 'c', name: 'c', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow' }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },
+    ];
+    const res = freeSnackRoomForSecond(meals as any, 0, 200, new Set(['c']));
+    expect(res.meals[1].items[0].amount).toBe(100);
+    expect(res.meals[2].items[0].amount).toBe(100);
+    expect(res.freedKcal).toBe(0);
   });
 
   it('места хватает (≥25%) → full', () => {
