@@ -353,17 +353,17 @@ export default function LabsCatalogTab({
         return (
           <div>
             {grouped.map(g => (
-              <div key={g.type} style={{ marginBottom:8, borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
+              <div key={g.type} style={{ marginBottom:10, borderRadius:16, overflow:'hidden', border:'1px solid rgba(140,190,255,0.12)', background:'rgba(21,38,66,0.45)', borderLeft:'3px solid #a855f7' }}>
                 <button onClick={() => setInvExpandedTypes(prev => ({ ...prev, [g.type]: !prev[g.type] }))} style={{
-                  display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', padding:'10px 12px',
-                  cursor:'pointer', background: invExpandedTypes[g.type]? 'rgba(255,255,255,0.04)' : 'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, textAlign:'left',
-                  borderBottom: invExpandedTypes[g.type] ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', padding:'12px 12px', minHeight:56,
+                  cursor:'pointer', background: invExpandedTypes[g.type]? 'rgba(168,85,247,0.08)' : 'transparent', border:'none', color:'#fff', fontSize:14, fontWeight:800, textAlign:'left',
+                  borderBottom: invExpandedTypes[g.type] ? '1px solid rgba(168,85,247,0.18)' : 'none',
                 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span style={{ width:26, height:26, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10 }}>{g.items.length}</span>
-                    <span>{INVEST_TYPE_CONFIG[g.type].label}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+                    <span style={{ width:32, height:32, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.16)', border:'1px solid rgba(168,85,247,0.25)', fontSize:12, fontWeight:800, flexShrink:0 }}>{g.items.length}</span>
+                    <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{INVEST_TYPE_CONFIG[g.type].label}</span>
                   </div>
-                  <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, transition:'transform 0.2s', transform: invExpandedTypes[g.type] ? 'rotate(180deg)' : 'none' }}>▾</span>
+                  <span style={{ width:28, height:28, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:12, transition:'transform 0.2s', transform: invExpandedTypes[g.type] ? 'rotate(180deg)' : 'none', flexShrink:0 }}>▾</span>
                 </button>
                 {invExpandedTypes[g.type] && (
                   <div style={{ padding: '6px 10px 10px' }}>
@@ -371,23 +371,23 @@ export default function LabsCatalogTab({
                       const expanded = invExpandedCards[inv.id] || false;
                       return (
                         <div key={inv.id} onClick={() => setInvExpandedCards(prev => ({ ...prev, [inv.id]: !prev[inv.id] }))} style={{
-                          background: expanded ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.04)' : 'var(--bg-secondary)',
-                          borderRadius: 10, padding: '10px 12px', marginBottom: 6, cursor: 'pointer',
-                          border: expanded ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.2)' : '1px solid var(--border)',
-                          transition: 'all 0.15s',
+                          background: expanded ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)' : 'rgba(21,38,66,0.45)',
+                          borderRadius:14, padding:'12px 12px', marginBottom:8, cursor:'pointer', minHeight:64,
+                          border: expanded ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)' : '1px solid rgba(140,190,255,0.12)',
+                          transition:'all 0.15s',
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: expanded ? 8 : 0 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 12, color: expanded ? 'var(--accent)' : 'var(--text)', marginBottom: 3 }}>{inv.name}</div>
-                              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.35, marginBottom: 4 }}>{inv.description}</div>
-                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', padding: '2px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="clock" size={9} /> {inv.frequency}</span>
-                                <span style={{ fontSize: 9, color: '#fff' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom: expanded ? 8 : 0 }}>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontWeight:800, fontSize:13, color: expanded ? 'var(--accent)' : '#fff', marginBottom:4, lineHeight:1.4 }}>{inv.name}</div>
+                              <div style={{ fontSize:12, color:'#fff', lineHeight:1.5, marginBottom:6 }}>{inv.description}</div>
+                              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                                <span style={{ fontSize:11, color:'var(--accent)', fontWeight:800, background:'rgba(var(--labs-accent-rgb, 0,230,138),0.10)', padding:'4px 8px', borderRadius:999, display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="clock" size={10} /> {inv.frequency}</span>
+                                <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>
                                   {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное' : 'Описательная оценка'}`}
                                 </span>
                               </div>
                             </div>
-                            <span style={{ fontSize: 11, color: '#fff', flexShrink: 0, marginLeft: 8, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+                            <span style={{ fontSize:13, color:'#fff', flexShrink:0, marginLeft:8, transition:'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                           </div>
                           {expanded && (
                             <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
@@ -570,8 +570,8 @@ export default function LabsCatalogTab({
                             {entry.lln}–{entry.uln} {entry.unit}
                           </div>
                         </div>
-                        {/* Value input */}
-                        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, minWidth:140 }}>
+                        {/* Value input — 320px-safe: группа ужата, инпут 44px */}
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, minWidth:120, flexWrap:'nowrap' as const }}>
                           <input
                             value={val}
                             onChange={e => { e.stopPropagation(); handleValueChange(upper, e.target.value); }}
@@ -579,8 +579,9 @@ export default function LabsCatalogTab({
                             placeholder={existing ? String(existing.value) : '—'}
                             type="number"
                             step="any"
+                            aria-label={entry.name}
                             style={{
-                              width:64, padding:'8px 8px', background:'rgba(0,0,0,0.30)', minHeight:40,
+                              width:60, padding:'10px 8px', background:'rgba(0,0,0,0.30)', minHeight:44,
                               border:`1px solid ${hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : 'rgba(140,190,255,0.16)'}`,
                               borderRadius:10, color: hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : '#fff',
                               fontSize:13, fontWeight:800, textAlign:'right',
@@ -633,10 +634,10 @@ export default function LabsCatalogTab({
                     <div style={{ fontSize: 10, color: '#fff' }}>{detailEntry.code}</div>
                   </div>
                 </div>
-                <button onClick={() => setDetailEntry(null)} style={{ background: 'var(--bg-secondary)', border: 'none', color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                <button onClick={() => setDetailEntry(null)} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, fontWeight:800, cursor:'pointer', flexShrink:0 }}>✕</button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:10 }}>
                 <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
                   <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Система</div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{sysLabels[detailEntry.system] || detailEntry.system}</div>

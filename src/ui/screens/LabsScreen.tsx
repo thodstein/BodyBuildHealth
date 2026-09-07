@@ -865,7 +865,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         const perBarW = selCodes.length > 1 ? groupW / selCodes.length : groupW;
                         return (
                           <g key={date}>
-                            <text x={x + barW / 2} y={chartH + 12} fill="#fff" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
+                            <text x={x + barW / 2} y={chartH + 12} fill="#fff" fontSize={8} textAnchor="middle">{date.slice(5)}</text>
                             {selCodes.map((code, ci) => {
                               const pts = seriesByCode[code] || [];
                               const pt = pts.find(p => p.date === date);
@@ -887,10 +887,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       })}
                       <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
                     </svg>
-                    <div style={{ marginTop: 8, textAlign: 'center' }}>
+                    <div style={{ marginTop:10, textAlign:'center' }}>
                       <button onClick={() => setChartSelectedCodes(new Set())} style={{
-                        fontSize: 9, color: '#fff', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                        borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
+                        fontSize:12, fontWeight:800, color:'#fff', background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)',
+                        borderRadius:999, padding:'10px 18px', cursor:'pointer', minHeight:44,
                       }}>✕ Сбросить выбор</button>
                     </div>
                   </div>
@@ -932,18 +932,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* Trend alerts */}
           {trendAlertList.length > 0 && (
-            <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', fontSize:10 }}>
-              <div style={{ fontWeight:700, color:'#ef4444', marginBottom:4 }}>⚠️ Критические изменения трендов ({trendAlertList.length})</div>
+            <div style={{ marginBottom:10, padding:'12px 12px', borderRadius:14, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.25)', borderLeft:'3px solid #ef4444' }}>
+              <div style={{ fontWeight:800, fontSize:13, color:'#ef4444', marginBottom:6 }}>⚠️ Критические изменения трендов ({trendAlertList.length})</div>
               {trendAlertList.slice(0,5).map(a => (
-                <div key={a.code} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', color:'var(--text)' }}>
-                  <span>{a.name}</span>
-                  <span style={{ color: a.direction === 'up' ? '#ef4444' : '#22c55e', fontWeight:600 }}>
+                <div key={a.code} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 0', color:'#fff', fontSize:12 }}>
+                  <span style={{ fontWeight:600 }}>{a.name}</span>
+                  <span style={{ color: a.direction === 'up' ? '#ef4444' : '#22c55e', fontWeight:800, whiteSpace:'nowrap' }}>
                     {a.direction === 'up' ? '↑' : '↓'} {a.significance}
                   </span>
                 </div>
               ))}
               {trendAlertList.length > 5 && (
-                <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                <div style={{ fontSize:11, color:'#fff', marginTop:6 }}>
                   +{trendAlertList.length - 5} дополнительных — перейдите во вкладку «Тренды»
                 </div>
               )}
@@ -992,11 +992,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* Inline batch form — same layout as progress card chips */}
           {showNewLabsInline && (
             <div className="card" style={{ marginBottom: 10, padding: 10, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.25)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
-                <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
-                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff',
-                  borderRadius: 8, padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:10 }}>
+                <span style={{ fontWeight:800, fontSize:14, color:'#fff' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
+                <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} aria-label="Закрыть ввод" style={{
+                  background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff',
+                  borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:13, fontWeight:800, cursor:'pointer', flexShrink:0,
                 }}>✕</button>
               </div>
               {Object.entries(labsBySystem).map(([system, codes]) => (
@@ -1149,7 +1149,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <PopupNumber label="Цинк (ммоль/эяк)" value={parseFloat(fertSperm.zinc||'')||0} min={0} max={20} step={0.1} suffix="ммоль" onChange={v => updateFert('zinc', String(v))} />
                   <PopupNumber label="DFI (фрагм. ДНК) %" value={parseFloat(fertSperm.dfi||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('dfi', String(v))} />
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
                   <PopupBool label={fertSperm.visc==='1'?'Вязкость: повышена':'Вязкость: норма'} value={fertSperm.visc==='1'} onChange={v => updateFertBool('visc', v)} />
                   <PopupBool label={fertSperm.aggl==='1'?'Агглютинация: есть':'Агглютинация: нет'} value={fertSperm.aggl==='1'} onChange={v => updateFertBool('aggl', v)} />
                   <PopupSelect label="Варикоцеле" value={fertSperm.var||'none'} options={[
@@ -1486,12 +1486,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     const color = palette[report.trends.indexOf(t) % palette.length];
                     const isVisible = visibleTrends.size === 0 || visibleTrends.has(t.code);
                     return (
-                      <button key={t.code} onClick={() => toggleTrend(t.code)} style={{
-                        padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                        background: isVisible ? color + '22' : 'transparent',
+                      <button key={t.code} onClick={() => toggleTrend(t.code)} aria-pressed={isVisible} style={{
+                        padding:'8px 12px', borderRadius:999, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', minHeight:40, flexShrink:0,
+                        background: isVisible ? color + '26' : 'rgba(21,38,66,0.60)',
                         color: isVisible ? color : '#fff',
-                        border: `1px solid ${isVisible ? color + '44' : 'var(--border)'}`,
-                        opacity: isVisible ? 1 : 0.5,
+                        border: isVisible ? `1px solid ${color + '55'}` : '1px solid rgba(140,190,255,0.14)',
+                        opacity: isVisible ? 1 : 0.6,
                       }}>
                         {t.name}
                       </button>
@@ -1968,9 +1968,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: isHigh ? '#ef4444' : '#3b82f6' }}>
                             {m.name} {isHigh ? '↑' : '↓'} {Math.abs(m.deviation)}% → нормализация
                           </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
                             {drugs.map((d, i) => (
-                              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', color: LABS_ACCENT, fontWeight: 600, border: '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.15)' }}>
+                              <span key={i} style={{ fontSize:11, padding:'6px 10px', borderRadius:999, background:'rgba(var(--labs-accent-rgb, 0,230,138),0.10)', color:LABS_ACCENT, fontWeight:800, border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)' }}>
                                 {d.drugId} ({(d.effect.strength * 100).toFixed(0)}%)
                               </span>
                             ))}
@@ -2225,7 +2225,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
                       const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
                       const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : '#fff';
-                      return <span style={{ fontSize:8, color, fontWeight:600, marginLeft:4 }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
+                      return <span style={{ fontSize:11, color, fontWeight:700, marginLeft:6, whiteSpace:'nowrap' }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
                     })() : null;
                     return (
                       <React.Fragment key={lab.code}>
@@ -2361,20 +2361,20 @@ function TrendRow({ trend }: { trend: LabTrend }) {
           {trend.previousDate && <span> → </span>}
           <span>{trend.currentDate.slice(5)}: {trend.currentValue} {trend.unit}</span>
           {trend.absoluteChange !== null && (
-            <span style={{ marginLeft:4, color, fontWeight:700 }}>
+            <span style={{ marginLeft:6, color, fontWeight:800 }}>
               {trend.absoluteChange > 0 ? '+' : ''}{trend.absoluteChange.toFixed(1)}
-              {trend.percentChange !== null && <span style={{ fontSize:8 }}> ({trend.percentChange > 0 ? '+' : ''}{trend.percentChange.toFixed(0)}%)</span>}
+              {trend.percentChange !== null && <span style={{ fontSize:10 }}> ({trend.percentChange > 0 ? '+' : ''}{trend.percentChange.toFixed(0)}%)</span>}
             </span>
           )}
           {trend.predictedValue !== undefined && (
-            <span style={{ marginLeft:4, color:'#a855f7', fontWeight:600, fontSize:8 }}>
+            <span style={{ marginLeft:6, color:'#a855f7', fontWeight:700, fontSize:10 }}>
               → {trend.predictedValue} {trend.unit} ({Math.round((trend.predictionConfidence || 0) * 100)}%)
             </span>
           )}
         </div>
       </div>
       {trend.refLow !== undefined && trend.refHigh !== undefined && (
-        <span style={{ fontSize:8, color:'#fff', whiteSpace:'nowrap' }}>Норма: {trend.refLow}–{trend.refHigh}</span>
+        <span style={{ fontSize:10, color:'#fff', whiteSpace:'nowrap', fontWeight:600 }}>Норма: {trend.refLow}–{trend.refHigh}</span>
       )}
     </div>
   );

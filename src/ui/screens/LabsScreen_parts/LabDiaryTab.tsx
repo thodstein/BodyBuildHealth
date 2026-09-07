@@ -400,7 +400,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                       </span>
                     )}
                     <button onClick={() => handleDeleteEntry(day.date)} aria-label={`Удалить ${day.date}`}
-                      style={{ padding:'8px 10px', borderRadius:10, fontSize:11, cursor:'pointer', fontFamily:'inherit', border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.10)', color:'#ef4444', minHeight:40, fontWeight:800 }}>✕</button>
+                      style={{ padding:'10px 12px', borderRadius:10, fontSize:12, cursor:'pointer', fontFamily:'inherit', border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.10)', color:'#ef4444', minHeight:44, minWidth:44, fontWeight:800 }}>✕</button>
                   </div>
                 </div>
                 {/* Markers chips */}
