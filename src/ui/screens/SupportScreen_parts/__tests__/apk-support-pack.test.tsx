@@ -196,6 +196,40 @@ describe('APK support pack', () => {
     ).not.toBeNull();
   });
 
+  it('Навигация запоминается: уход и возврат открывают тот же раздел', () => {
+    const first = render(<SupportScreen />);
+    const proto = first.container.querySelector(
+      '.support-hero-card[data-key="protocols"]',
+    ) as HTMLElement;
+    fireEvent.click(proto);
+    expect(first.container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    const stored = JSON.parse(localStorage.getItem('he_sup_nav_v1') || '{}');
+    expect(stored.section, 'persisted section').toBe('protocols');
+    first.unmount();
+    // новый монт (возврат во вкладку) — сразу протоколы, без кликов
+    const second = render(<SupportScreen />);
+    expect(second.container.querySelector("[data-sup='protocols']"), 'restored').not.toBeNull();
+    expect(second.container.querySelector('.support-hero'), 'no hero').toBeNull();
+    second.unmount();
+  });
+
+  it('Смена раздела сбрасывает скролл наверх', () => {
+    const { container } = render(<SupportScreen />);
+    // таббар виден сразу на home — в единственном экземпляре
+    expect(container.querySelectorAll("[data-sup='nav']").length, 'single nav').toBe(1);
+    const root = container.querySelector('.support-screen') as HTMLElement;
+    root.scrollTop = 999;
+    const navBtn = container.querySelector(
+      "[data-sup='nav'] button[aria-label='Протоколы']",
+    ) as HTMLElement;
+    expect(navBtn, 'nav button').not.toBeNull();
+    fireEvent.click(navBtn);
+    expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    expect(root.scrollTop, 'scroll reset').toBe(0);
+    // и после перехода таббар всё ещё один
+    expect(container.querySelectorAll("[data-sup='nav']").length, 'still single').toBe(1);
+  });
+
   it('Дневник: data-theme на корне + carve-out светлой темы из-под белого', () => {
     const css = fs.readFileSync(
       path.join(process.cwd(), 'src', 'ui', 'screens', 'SupportScreen_parts', 'SupportVisualUpgrade.css'),

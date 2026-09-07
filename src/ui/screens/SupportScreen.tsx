@@ -118,6 +118,43 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   const [protocolTab, setProtocolTab] = useState<string>('');
   const [protocolView, setProtocolView] = useState<'menu'|'detail'>('menu');
   const [infoTab, setInfoTab] = useState<string>('catalog');
+  // ── Навигация вкладки: персист позиции + скролл наверх при смене раздела ──
+  // На телефоне возврат в БАДы открывает тот же раздел, а не hero; смена
+  // раздела всегда начинает чтение сверху (скролл-контейнер — корень).
+  const SUP_NAV_KEY = 'he_sup_nav_v1';
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (initialTab || initialSubTab) return;
+    try {
+      const raw = localStorage.getItem(SUP_NAV_KEY);
+      if (!raw) return;
+      const nav = JSON.parse(raw);
+      if (!nav || typeof nav !== 'object') return;
+      if (typeof nav.section === 'string') setSection(nav.section);
+      if (typeof nav.tab === 'string') setTab(nav.tab);
+      if (typeof nav.supportView === 'string') setSupportView(nav.supportView);
+      if (typeof nav.calcView === 'string') setCalcView(nav.calcView);
+      if (typeof nav.infoView === 'string') setInfoView(nav.infoView);
+      if (typeof nav.genTab === 'string') setGenTab(nav.genTab);
+      if (typeof nav.protocolTab === 'string') setProtocolTab(nav.protocolTab);
+      if (nav.protocolView === 'menu' || nav.protocolView === 'detail') setProtocolView(nav.protocolView);
+      if (typeof nav.infoTab === 'string') setInfoTab(nav.infoTab);
+    } catch { /* битый стор — стартуем с hero */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SUP_NAV_KEY, JSON.stringify({
+        section, tab, supportView, calcView, infoView, genTab, protocolTab, protocolView, infoTab,
+      }));
+    } catch { /* quota/private — навигация просто не запомнится */ }
+  }, [section, tab, supportView, calcView, infoView, genTab, protocolTab, protocolView, infoTab]);
+  useEffect(() => {
+    try {
+      const el = rootRef.current;
+      if (el) el.scrollTop = 0;
+    } catch { /* non-DOM — нечего скроллить */ }
+  }, [section, tab, supportView, calcView, infoView, genTab, protocolTab, protocolView, infoTab]);
   const [searchQuery, setSearchQuery] = useState('');
   const [catalogOrgans, setCatalogOrgans] = useState<string[]>([]);
   const [showOrganPopup, setShowOrganPopup] = useState(false);
@@ -2218,39 +2255,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         );
       })()}
 
-      {/* ===== BOTTOM TAB BAR — app-таббар 5 разделов, hero за ним (размеры hero не меняем) ===== */}
-      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
-        {[
-          { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
-          { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
-          { id:'info', label:'Инфо', icon:'📚', accent:'#a78bfa' },
-          { id:'hormonal', label:'Гормоны', icon:'⚕️', accent:'#f472b6' },
-          { id:'protocols', label:'Протоколы', icon:'📋', accent:'#f59e0b' },
-        ].map(item => {
-          const active = section === item.id;
-          return (
-          <button key={item.id} aria-label={item.label} aria-pressed={active} data-active={active} onClick={() => {
-            setSection(item.id as any);
-            setCalcView('main');
-            if (item.id === 'home') { setTab('main'); setSupportView('main'); }
-            if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
-            if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
-            if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
-            if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
-          }} style={{
-            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-            padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',
-            color: active ? item.accent : '#fff',
-            fontSize:9, fontWeight: active ? 800 : 500,
-            borderRadius:10, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:40,
-          }}>
-            <span style={{ fontSize:18, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.05)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
-            <span style={{ letterSpacing: active ? '0.2px' : '0px', lineHeight:1 }}>{item.label}</span>
-            {active && <span style={{ width:18, height:2, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}70` }} />}
-          </button>
-        );})}
-      </div>
-
     </div>
   );
 };
@@ -3102,7 +3106,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
@@ -3533,6 +3537,39 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         }}
       />
       )}
+
+      {/* ===== BOTTOM TAB BAR — всегда видимый app-таббар 5 разделов (hero под ним, размеры hero не меняем) ===== */}
+      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
+        {[
+          { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
+          { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
+          { id:'info', label:'Инфо', icon:'📚', accent:'#a78bfa' },
+          { id:'hormonal', label:'Гормоны', icon:'⚕️', accent:'#f472b6' },
+          { id:'protocols', label:'Протоколы', icon:'📋', accent:'#f59e0b' },
+        ].map(item => {
+          const active = section === item.id;
+          return (
+          <button key={item.id} aria-label={item.label} aria-pressed={active} data-active={active} onClick={() => {
+            setSection(item.id as any);
+            setCalcView('main');
+            if (item.id === 'home') { setTab('main'); setSupportView('main'); }
+            if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
+            if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
+            if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
+            if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
+          }} style={{
+            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+            padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',
+            color: active ? item.accent : '#fff',
+            fontSize:9, fontWeight: active ? 800 : 500,
+            borderRadius:10, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:40,
+          }}>
+            <span style={{ fontSize:18, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.05)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
+            <span style={{ letterSpacing: active ? '0.2px' : '0px', lineHeight:1 }}>{item.label}</span>
+            {active && <span style={{ width:18, height:2, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}70` }} />}
+          </button>
+        );})}
+      </div>
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}
       {stackBuilder.length > 0 && (

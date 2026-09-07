@@ -379,6 +379,8 @@ describe('SUP mobile fit (360px)', () => {
   });
 
   it('топбары не перекрывают контент: отступ ≥ высоты шапки, горизонталь зажата', () => {
+    // персист навигации (he_sup_nav_v1) сбрасываем — каждый кейс стартует с hero
+    localStorage.removeItem('he_sup_nav_v1');
     const { container } = render(<SupportScreen />);
     const root = container.querySelector('.support-screen') as HTMLElement;
     expect(root.style.overflowX, 'no page h-scroll').toBe('clip');
@@ -390,6 +392,7 @@ describe('SUP mobile fit (360px)', () => {
     expect(root.style.paddingTop, 'gen offset').toBe('124px');
     cleanup();
     // Протоколы: шапка BackNav ≈57px → отступ 60px
+    localStorage.removeItem('he_sup_nav_v1');
     const second = render(<SupportScreen />);
     const proto = second.container.querySelector('.support-hero-card[data-key="protocols"]') as HTMLElement;
     fireEvent.click(proto);
@@ -397,6 +400,7 @@ describe('SUP mobile fit (360px)', () => {
     expect(root2.style.paddingTop, 'protocols offset').toBe('60px');
     second.unmount();
     // Инфо: шапка BackNav+пилюли ≈123px на 360px → отступ 132px
+    localStorage.removeItem('he_sup_nav_v1');
     const third = render(<SupportScreen />);
     const info = third.container.querySelector('.support-hero-card[data-key="info"]') as HTMLElement;
     expect(info, 'info card').not.toBeNull();
