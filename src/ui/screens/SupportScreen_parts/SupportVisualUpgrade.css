@@ -147,6 +147,19 @@
   opacity: 1 !important;
 }
 
+/* Светлая тема дневника — исключение: вернуть исходные цвета.
+   Иначе белые правила выше делают серый текст невидимым на светлом фоне.
+   Точные исходники восстанавливаются повторным утверждением литерала/вара. */
+.support-screen .sup-diary[data-theme='light'] [style*="#94a3b8"] { color: #94a3b8 !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="#64748b"] { color: #64748b !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="#666"] { color: #666 !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="#888"] { color: #888 !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="#e2e8f0"] { color: #e2e8f0 !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="var(--text-dim"] { color: var(--text-dim) !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="var(--text-light"] { color: var(--text-light) !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="var(--text-muted"] { color: var(--text-muted) !important; }
+.support-screen .sup-diary[data-theme='light'] [style*="var(--text-secondary"] { color: var(--text-secondary) !important; }
+
 /* Бейджи механизмов — крупнее */
 .support-screen span[style*="font-size: 7"],
 .support-screen span[style*="font-size: 8"] {

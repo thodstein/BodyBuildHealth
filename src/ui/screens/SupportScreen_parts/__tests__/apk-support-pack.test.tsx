@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
 import { SupportScreen } from '../../SupportScreen';
+import { SupportDiaryView } from '../SupportDiaryView';
 import { ensureSupportApkStyles, resetSupportApkStylesForTest } from '../support-apk-loader';
 import { resetAppPlatformCache } from '../../../../core/app-platform';
 
@@ -193,5 +194,17 @@ describe('APK support pack', () => {
       container.querySelector("[data-sup='hormones'] .screen.fertility-pct"),
       'fertility screen',
     ).not.toBeNull();
+  });
+
+  it('Дневник: data-theme на корне + carve-out светлой темы из-под белого', () => {
+    const css = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'SupportScreen_parts', 'SupportVisualUpgrade.css'),
+      'utf-8',
+    );
+    expect(css, 'light carve-out').toContain(".sup-diary[data-theme='light']");
+    const { container } = render(<SupportDiaryView s={{}} />);
+    const root = container.querySelector('.sup-diary');
+    expect(root, 'diary root').not.toBeNull();
+    expect(root?.getAttribute('data-theme'), 'theme hook').toBe('dark');
   });
 });
