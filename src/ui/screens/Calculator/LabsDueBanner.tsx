@@ -79,9 +79,9 @@ export const LabsDueBanner: React.FC<LabsDueBannerProps> = ({ systems, onOpenLab
           marginTop: 6,
         }}
       >
-        {systems.map(s => (
+        {systems.map((s, idx) => (
           <span
-            key={s.system}
+            key={s.system ?? `sys-${idx}`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -167,8 +167,8 @@ export const LabsDueBanner: React.FC<LabsDueBannerProps> = ({ systems, onOpenLab
           paddingTop: 7,
           borderTop: '1px solid rgba(245,158,11,0.2)',
         }}>
-          {systems.map(s => (
-            <div key={s.system} style={{ marginBottom: 5 }}>
+          {systems.map((s, idx) => (
+            <div key={s.system ?? `sys-${idx}`} style={{ marginBottom: 5 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
