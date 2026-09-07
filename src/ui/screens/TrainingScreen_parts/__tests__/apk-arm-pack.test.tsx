@@ -262,6 +262,14 @@ describe('APK arm pack', () => {
     expect(head.getAttribute('aria-expanded')).toBe('true');
   });
 
+  it('выдача: дашборд плана и обоснование после сборки', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    for (const marker of ['Недель', 'Сессий', 'Стол', 'Делод/пик', '📖 Обоснование']) {
+      expect(document.body.textContent, marker).toContain(marker);
+    }
+  });
+
   it('хаб: Table-IQ свернут, журнал работает без раскрытия', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Давление/ }));

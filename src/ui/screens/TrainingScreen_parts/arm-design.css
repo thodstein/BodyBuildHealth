@@ -876,3 +876,50 @@
     animation: none;
   }
 }
+
+/* ─── Выдача: фазные пилюли и теги ──────────────────────────────── */
+:is(.train-arm) .ad-pill[data-phase='deload']:not([data-active='true']) {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #93c5fd;
+}
+
+:is(.train-arm) .ad-pill[data-phase='peaking']:not([data-active='true']) {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+:is(.train-arm) .ad-pill[data-phase='intensification']:not([data-active='true']) {
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fcd34d;
+}
+
+:is(.train-arm, .train-armdiag) .ad-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+  white-space: nowrap;
+}
+
+:is(.train-arm) .ad-tag[data-ch='table'] {
+  border-color: rgba(0, 230, 138, 0.45);
+  color: var(--ad-acc);
+}
+
+:is(.train-arm) .ad-ex-vl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+:is(.train-arm) .ad-ex-vl > b {
+  color: var(--ad-text);
+}

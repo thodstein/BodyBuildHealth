@@ -30,13 +30,23 @@ export function HubHead({ H }: { H: any }) {
           <div>{hasWeak ? ((state.weakPoints.length? state.weakPoints.join(', ') : report.weakMuscles.join(', '))) : 'баланс'}</div>
           <div className="ad-muted">{hasWeak ? `${(report as any).weakPoints?.length||0} мёртвых точек · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
         </div>
-        {showScoring && scoring && (
+        {showScoring && scoring && (()=>{
+          const pct = Math.max(0, Math.min(100, Number(scoring.score) || 0));
+          const col = scoring.level==='ok' ? '#22c55e' : scoring.level==='warn' ? '#f59e0b' : '#ef4444';
+          const circ = 2 * Math.PI * 15;
+          return (
           <div className="ad-head-side">
-            <div>{scoring.score}</div>
+            <svg width="52" height="52" viewBox="0 0 40 40" role="img" aria-label={`Скор ${scoring.score}`}>
+              <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="5" />
+              <circle cx="20" cy="20" r="15" fill="none" stroke={col} strokeWidth="5" strokeLinecap="round"
+                strokeDasharray={`${(circ * pct / 100).toFixed(1)} ${circ.toFixed(1)}`} transform="rotate(-90 20 20)" />
+              <text x="20" y="24" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">{scoring.score}</text>
+            </svg>
             <div className="ad-muted">{scoreLabel(scoring.score)} · v{Math.round(scoring.verification*100)}%</div>
             {scoring.floors.length>0 && <div>{scoring.floors[0]}</div>}
           </div>
-        )}
+          );
+        })()}
       </div>
       <div className="ad-row">
         <span className="ad-tag">Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>

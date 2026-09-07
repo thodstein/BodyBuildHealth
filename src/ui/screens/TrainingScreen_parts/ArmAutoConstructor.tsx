@@ -463,6 +463,19 @@ export function ArmAutoConstructor() {
 
   const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
 
+  // Дашборд выдачи — чистые производные плана (логики нет).
+  const planDash = (() => {
+    try {
+      if (!builtPlan) return null;
+      const weeks = builtPlan.weeks;
+      const sess = weeks.flatMap((w: any) => w.sessions);
+      const table = sess.filter((s: any) => s.tableTime).length;
+      const light = weeks.filter((w: any) => w.deload || w.phase === 'deload' || w.taper || w.phase === 'peaking').length;
+      const ex = sess.reduce((a: number, s: any) => a + s.exercises.length, 0);
+      return { weeks: weeks.length, sess: sess.length, tablePct: sess.length ? Math.round((table / sess.length) * 100) : 0, light, ex };
+    } catch { return null; }
+  })();
+
   // Саммари аккордеонов — чистые производные для шапки (логики нет).
   const summWeak = weakPoints.length ? weakPoints.map(m=>ARM_MUSCLE_RU[m] || m).join(' + ') : 'Не выбрано';
   const summPed = !showPed ? 'Выкл' : (Object.keys(pedDoses).length ? `${Object.values(pedDoses).reduce((a,b)=>a+(Number(b)||0),0)} мг/нед` : 'Вкл');
@@ -899,12 +912,20 @@ export function ArmAutoConstructor() {
         <AdCard>
           {!builtPlan ? <div className="ad-muted">План не собран — вернись в «Параметры».</div> : (
             <>
-              <AdSec title={`📋 План — ${builtPlan.pattern.name}`}>
-                <div className="ad-muted">{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
-              </AdSec>
+              <div className="ad-sec-h">
+                <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
+              </div>
+              {planDash && (
+                <div className="ad-stats">
+                  <div className="ad-stat"><div className="ad-stat-v">{planDash.weeks}</div><div className="ad-stat-l">Недель</div></div>
+                  <div className="ad-stat"><div className="ad-stat-v">{planDash.sess}</div><div className="ad-stat-l">Сессий</div><div className="ad-stat-s">{planDash.ex} упр.</div></div>
+                  <div className="ad-stat"><div className="ad-stat-v">{planDash.tablePct}%</div><div className="ad-stat-l">Стол</div></div>
+                  <div className="ad-stat"><div className="ad-stat-v">{planDash.light}</div><div className="ad-stat-l">Делод/пик</div></div>
+                </div>
+              )}
               <div className="ad-strip" data-arm="week-pills">
                 {builtPlan.weeks.map((w:any)=> (
-                  <button key={w.week} className="ad-pill" data-active={weekSel===w.week} onClick={()=>setWeekSel(w.week)}>
+                  <button key={w.week} className="ad-pill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)}>
                     Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}
                   </button>
                 ))}
@@ -915,13 +936,13 @@ export function ArmAutoConstructor() {
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   {curWeek.sessions.map((sess:any, si:number)=> (
                     <div key={si} className="ad-sess">
-                      <div className="ad-sess-h">{sess.sessionTag} · {sess.character} {sess.tableTime ? '🖐️ стол' : ''}</div>
+                      <div className="ad-sess-h">{sess.sessionTag} <span className="ad-tag" data-ch={sess.character}>{sess.character}</span> {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}</div>
                       {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
                       {sess.exercises.map((ex:any, ei:number)=> (
                         <div key={ei} className="ad-ex">
                           <div className="ad-ex-top">
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl">{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]} RIR{ex.rir}{ex.holdSeconds ? ` hold ${ex.holdSeconds}с`:''}</span>
+                            <span className="ad-ex-vl"><b>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag">RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-tag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
                           </div>
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
@@ -958,6 +979,9 @@ export function ArmAutoConstructor() {
                   const a = document.createElement('a'); a.href=url; a.download='arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
                 }}>📅 .ics</AdBtn>
               </div>
+              <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
+                <div className="ad-muted">{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
+              </AdSec>
             </>
           )}
         </AdCard>
@@ -980,10 +1004,10 @@ export function ArmAutoConstructor() {
                   </div>
                 </div>
                 {builtPlan.validation && (
-                  <div>
-                    {builtPlan.validation.errors.length>0 && <div className="ad-tip">❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</div>}
-                    {builtPlan.validation.warnings.length>0 && <div className="ad-tip">⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</div>}
-                    {builtPlan.validation.valid && <div className="ad-tip">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</div>}
+                  <div className="ad-list">
+                    {builtPlan.validation.errors.length>0 && <AdBanner tone="bad">❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</AdBanner>}
+                    {builtPlan.validation.warnings.length>0 && <AdBanner tone="warn">⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</AdBanner>}
+                    {builtPlan.validation.valid && <AdBanner tone="ok">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</AdBanner>}
                   </div>
                 )}
                 <div className="ad-muted">
@@ -1007,11 +1031,11 @@ export function ArmAutoConstructor() {
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
             {!builtPlan ? <div className="ad-muted">Сначала собери план в «Параметры».</div> : (
               <>
-                <AdGrid cols="2">
+                <div className="ad-stats">
                   {Object.entries(workMax).map(([k,v])=> (
-                    <div key={k} className="ad-kv"><span>{k}:</span><span>{String(v)} кг</span></div>
+                    <div key={k} className="ad-stat"><div className="ad-stat-v">{String(v)} кг</div><div className="ad-stat-l">{k}</div></div>
                   ))}
-                </AdGrid>
+                </div>
                 <div className="ad-muted">Пример веса в плане (неделя 1, тяж): {(() => {
                   try {
                     const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];
@@ -1037,7 +1061,9 @@ export function ArmAutoConstructor() {
                       const att = planAttempts(t);
                       const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
                       const pct = Math.round((t / wr) * 1000) / 10;
-                      return `Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`;
+                      return (<><div className="ad-stats">{att.map((a: number, i: number) => (
+                        <div key={i} className="ad-stat"><div className="ad-stat-v">{a} кг</div><div className="ad-stat-l">Попытка {i + 1}</div></div>
+                      ))}</div>{`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`}</>);
                     })()}</div>
                   </AdSec>
                 )}
