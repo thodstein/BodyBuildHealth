@@ -67,7 +67,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
         Σ (доза × AR_affinity / 100) — сложи вклады каждого препарата. Выбери эфир — доза подтянется.
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:6, maxHeight:170, overflowY:'auto', marginBottom:12, paddingRight:2 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, maxHeight:170, overflowY:'auto', marginBottom:12, paddingRight:2 }}>
         {aiGrouped.map(g => (
           <div key={g.cls} onClick={() => setAiEsterPopup({ baseClass: g.cls, label: g.label, entryIdx: entries.length - 1 })} style={{
             padding:'10px 9px', borderRadius:12, cursor:'pointer', textAlign:'center',
@@ -260,7 +260,7 @@ export const DosageCalculatorTab: React.FC = () => {
             padding:'7px 13px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0, transition:'all 0.18s ease',
             background: dosageSub === t ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.06)',
-            color: dosageSub === t ? '#fff' : 'rgba(255,255,255,0.62)',
+            color: dosageSub === t ? '#fff' : '#fff',
             border:`1px solid ${dosageSub === t ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
             boxShadow: dosageSub===t ? '0 4px 14px rgba(139,92,246,0.22)' : 'none',
           }}>{t === 'dosage' ? '💉 Дозировка' : '🧬 Андрогенный индекс'}</button>
@@ -278,7 +278,7 @@ export const DosageCalculatorTab: React.FC = () => {
             {drug && <span style={{ marginLeft:'auto', fontSize:11, color:'#a78bfa', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'3px 8px', borderRadius:20, fontWeight:700 }}>{PHARMA_DB[drug]?.name}</span>}
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:6, maxHeight:210, overflowY:'auto', marginBottom:12, paddingRight:2 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, maxHeight:210, overflowY:'auto', marginBottom:12, paddingRight:2 }}>
             {grouped.map(g => (
               <div key={g.cls} onClick={() => setEsterPopup({ baseClass: g.cls, label: g.label })} style={{
                 padding:'10px 10px', borderRadius:12, cursor:'pointer', textAlign:'center',
@@ -316,19 +316,19 @@ export const DosageCalculatorTab: React.FC = () => {
               flex:1, padding:'8px 0', borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer',
               background: doseMode === 'per_kg' ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'transparent',
               border:'none',
-              color: doseMode === 'per_kg' ? '#fff' : 'rgba(255,255,255,0.55)',
+              color: doseMode === 'per_kg' ? '#fff' : '#fff',
               boxShadow: doseMode==='per_kg' ? '0 4px 12px rgba(139,92,246,0.22)' : 'none',
             }}>мг/кг/нед</button>
             <button onClick={() => setDoseMode('weekly')} style={{
               flex:1, padding:'8px 0', borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer',
               background: doseMode === 'weekly' ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'transparent',
               border:'none',
-              color: doseMode === 'weekly' ? '#fff' : 'rgba(255,255,255,0.55)',
+              color: doseMode === 'weekly' ? '#fff' : '#fff',
               boxShadow: doseMode==='weekly' ? '0 4px 12px rgba(139,92,246,0.22)' : 'none',
             }}>мг/нед</button>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
             {doseMode === 'per_kg' ? (
               <>
                 <div>
@@ -384,14 +384,14 @@ export const DosageCalculatorTab: React.FC = () => {
               <span style={{ marginLeft:'auto', fontSize:10, color:'#00e68a', background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.16)', padding:'3px 8px', borderRadius:20, fontWeight:700 }}>готово</span>
             </div>
               <div style={{ display:'grid', gap:9 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
                 <div style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
+                  <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#a78bfa' }}>{weeklyTotal.toFixed(0)}</div>
                   <div style={{ fontSize:10, color:'#fff' }}>мг/нед</div>
                 </div>
                 <div style={{ background:'linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.04))', border:'1px solid rgba(59,130,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
+                  <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#60a5fa' }}>{perInjectionMg.toFixed(1)}</div>
                   <div style={{ fontSize:10, color:'#fff' }}>мг × {injectionsPerWeek}/нед</div>
                 </div>
@@ -401,13 +401,13 @@ export const DosageCalculatorTab: React.FC = () => {
                 <div style={{ fontSize:34, fontWeight:900, color:'#00e68a', letterSpacing:-0.8 }}>{doseResult.volumeMl}</div>
                 <div style={{ fontSize:11, color:'#fff' }}>мл</div>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
                 <div style={{ background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Деления шприца</div>
+                  <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Деления шприца</div>
                   <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{doseResult.divisions}</div>
                 </div>
                 <div style={{ background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Доз / флакон</div>
+                  <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Доз / флакон</div>
                   <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{doseResult.dosesPerVial || '—'}</div>
                 </div>
               </div>

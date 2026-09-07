@@ -92,14 +92,14 @@ export const DiagnosticsTab: React.FC = () => {
           <button onClick={() => setUseCourseDrugs(true)} style={{
             flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
             border:`1px solid ${useCourseDrugs ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
-            background: useCourseDrugs ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: useCourseDrugs ? '#fff' : 'rgba(255,255,255,0.62)',
+            background: useCourseDrugs ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: useCourseDrugs ? '#fff' : '#fff',
           }}>
             💊 Из курса ({course.length})
           </button>
           <button onClick={() => setUseCourseDrugs(false)} style={{
             flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
             border:`1px solid ${!useCourseDrugs ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
-            background: !useCourseDrugs ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: !useCourseDrugs ? '#fff' : 'rgba(255,255,255,0.62)',
+            background: !useCourseDrugs ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: !useCourseDrugs ? '#fff' : '#fff',
           }}>
             ✏️ Вручную ({diagDrugs.length})
           </button>
@@ -136,7 +136,7 @@ export const DiagnosticsTab: React.FC = () => {
         <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>
           <span style={{ width:20, height:20, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.12)', fontSize:11 }}>❤️</span> Витальные показатели
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:10 }}>
           <div>
             <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>HRV (мс)</label>
             <input type="number" value={hrv} onChange={e => setHrv(parseFloat(e.target.value) || 0)}
@@ -206,13 +206,13 @@ export const DiagnosticsTab: React.FC = () => {
                 </div>
                 <div style={{ display:'flex', gap:6, marginTop:8 }}>
                   <div style={{ flex:1, textAlign:'center', padding:'6px 4px', background:'rgba(0,230,138,0.08)', borderRadius:9, border:'1px solid rgba(0,230,138,0.12)' }}>
-                    <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Пик</div><div style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>{r.peakConcMg}</div>
+                    <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Пик</div><div style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>{r.peakConcMg}</div>
                   </div>
                   <div style={{ flex:1, textAlign:'center', padding:'6px 4px', background:'rgba(59,130,246,0.08)', borderRadius:9, border:'1px solid rgba(59,130,246,0.12)' }}>
-                    <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Спад</div><div style={{ fontSize:13, fontWeight:800, color:'#60a5fa' }}>{r.troughConcMg}</div>
+                    <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Спад</div><div style={{ fontSize:13, fontWeight:800, color:'#60a5fa' }}>{r.troughConcMg}</div>
                   </div>
                   <div style={{ flex:1, textAlign:'center', padding:'6px 4px', background: r.hormonalSwingFlag ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)', borderRadius:9, border:`1px solid ${r.hormonalSwingFlag ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)'}` }}>
-                    <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Δ</div><div style={{ fontSize:13, fontWeight:800, color: r.hormonalSwingFlag ? '#f87171' : 'rgba(255,255,255,0.72)' }}>{r.peakTroughDeltaPct}%</div>
+                    <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Δ</div><div style={{ fontSize:13, fontWeight:800, color: r.hormonalSwingFlag ? '#f87171' : '#fff' }}>{r.peakTroughDeltaPct}%</div>
                   </div>
                 </div>
                 {r.hormonalSwingFlag && (
@@ -246,15 +246,15 @@ export const DiagnosticsTab: React.FC = () => {
 
           <div style={card}>
             <div style={{ fontSize:12, fontWeight:800, color:'#fbbf24', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>3. Витальные показатели</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7, fontSize:11 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:7, fontSize:11 }}>
               <div style={{ textAlign:'center', padding:'8px 4px', background:'rgba(0,0,0,0.18)', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>HRV</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.hrv < 35 ? '#f87171' : '#a78bfa' }}>{result.vitals.hrv} мс</div>
+                <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>HRV</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.hrv < 35 ? '#f87171' : '#a78bfa' }}>{result.vitals.hrv} мс</div>
               </div>
               <div style={{ textAlign:'center', padding:'8px 4px', background:'rgba(0,0,0,0.18)', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>RHR</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.rhr > 75 ? '#f87171' : '#a78bfa' }}>{result.vitals.rhr}</div>
+                <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>RHR</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.rhr > 75 ? '#f87171' : '#a78bfa' }}>{result.vitals.rhr}</div>
               </div>
               <div style={{ textAlign:'center', padding:'8px 4px', background:'rgba(0,0,0,0.18)', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>АД</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.bpSys > 140 || result.vitals.bpDia > 90 ? '#f87171' : '#a78bfa' }}>{result.vitals.bpSys}/{result.vitals.bpDia}</div>
+                <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>АД</div><div style={{ fontWeight:800, fontSize:13, color: result.vitals.bpSys > 140 || result.vitals.bpDia > 90 ? '#f87171' : '#a78bfa' }}>{result.vitals.bpSys}/{result.vitals.bpDia}</div>
               </div>
             </div>
             {result.vitals.alerts.length > 0 ? (
@@ -270,7 +270,7 @@ export const DiagnosticsTab: React.FC = () => {
 
           <div style={card}>
             <div style={{ fontSize:12, fontWeight:800, color:'#c4b5fd', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>4. BioAge — биологическое старение</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, textAlign:'center' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, textAlign:'center' }}>
               <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px', border:'1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Хронологический</div>
                 <div style={{ fontSize:24, fontWeight:900, color:'#fff', marginTop:2 }}>{result.bioage.chronologicalAge}</div>
@@ -282,7 +282,7 @@ export const DiagnosticsTab: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:10, color:'#fff' }}>
+            <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:6, fontSize:10, color:'#fff' }}>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'6px 6px', borderRadius:8, textAlign:'center', border:'1px solid rgba(255,255,255,0.04)' }}>АД-штраф <b style={{ color:'#fff' }}>+{result.bioage.bpPenalty}</b></div>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'6px 6px', borderRadius:8, textAlign:'center', border:'1px solid rgba(255,255,255,0.04)' }}>HRV-штраф <b style={{ color:'#fff' }}>+{result.bioage.hrvPenalty}</b></div>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'6px 6px', borderRadius:8, textAlign:'center', border:'1px solid rgba(255,255,255,0.04)' }}>Токс. <b style={{ color:'#fff' }}>+{result.bioage.toxicLoadPenalty}</b></div>
@@ -294,7 +294,7 @@ export const DiagnosticsTab: React.FC = () => {
 
           <div style={card}>
             <div style={{ fontSize:12, fontWeight:800, color:'#f472b6', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>5. ПКТ-таймер и HPTA рестарт</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
               <div style={{ textAlign:'center', background:'rgba(236,72,153,0.08)', borderRadius:12, padding:'10px', border:'1px solid rgba(236,72,153,0.14)' }}>
                 <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Начало ПКТ</div>
                 <div style={{ fontSize:22, fontWeight:900, color:'#f472b6' }}>День {result.pctReboot.pctStartDay}</div>

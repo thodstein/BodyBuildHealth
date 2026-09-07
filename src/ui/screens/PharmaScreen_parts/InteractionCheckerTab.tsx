@@ -180,7 +180,7 @@ export const InteractionCheckerTab: React.FC = () => {
                 <button key={s} onClick={() => { if (s==='CRITICAL') { setUnifiedOnlyCritical(true); } else { setUnifiedOnlyCritical(false); setUnifiedSeverity(s); } }} style={{
                   padding:'5px 8px', borderRadius: s==='CRITICAL'?'20px 0 0 20px': s==='ALL'?'0 20px 20px 0':'0', fontSize:10, fontWeight:800, cursor:'pointer',
                   background: (s==='CRITICAL'&&unifiedOnlyCritical)||(s==='HIGH'&&!unifiedOnlyCritical&&unifiedSeverity==='HIGH')||(s==='ALL'&&!unifiedOnlyCritical&&unifiedSeverity==='ALL') ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.06)',
-                  color: (s==='CRITICAL'&&unifiedOnlyCritical)||(s==='HIGH'&&!unifiedOnlyCritical&&unifiedSeverity==='HIGH')||(s==='ALL'&&!unifiedOnlyCritical&&unifiedSeverity==='ALL') ? '#fff' : 'rgba(255,255,255,0.52)',
+                  color: (s==='CRITICAL'&&unifiedOnlyCritical)||(s==='HIGH'&&!unifiedOnlyCritical&&unifiedSeverity==='HIGH')||(s==='ALL'&&!unifiedOnlyCritical&&unifiedSeverity==='ALL') ? '#fff' : '#fff',
                   border:'1px solid rgba(255,255,255,0.07)',
                 }}>{s==='CRITICAL'?'🔴 Крит':s==='HIGH'?'⚠ Высокие':'Все'}</button>
               ))}
@@ -250,7 +250,7 @@ export const InteractionCheckerTab: React.FC = () => {
             padding:'7px 13px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0, transition:'all 0.18s ease',
             background: interactSub === t.id ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(255,255,255,0.06)',
-            color: interactSub === t.id ? '#fff' : 'rgba(255,255,255,0.62)',
+            color: interactSub === t.id ? '#fff' : '#fff',
             border:`1px solid ${interactSub === t.id ? 'rgba(239,68,68,0.32)' : 'rgba(255,255,255,0.07)'}`,
             boxShadow: interactSub===t.id ? '0 4px 12px rgba(239,68,68,0.18)' : 'none',
           }}>{t.label}</button>
@@ -404,7 +404,7 @@ export const InteractionCheckerTab: React.FC = () => {
                 <button key={t} onClick={() => setInteractDetail(t)} style={{
                   padding:'6px 12px', borderRadius:20, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap',
                   background: interactDetail === t ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
-                  color: interactDetail === t ? '#f87171' : 'rgba(255,255,255,0.52)',
+                  color: interactDetail === t ? '#f87171' : '#fff',
                   border:`1px solid ${interactDetail === t ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)'}`,
                 }}>{t === 'conflicts' ? '🔴 Конфликты' : '📋 Указания'}</button>
               ))}
@@ -423,13 +423,13 @@ export const InteractionCheckerTab: React.FC = () => {
                       {conflicts.length > 0 && (
                         <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:6 }}>
                           {conflicts.slice(0,3).map((c, i) => {
-                            const sevColor = c.severity === 'HIGH' ? '#f87171' : c.severity === 'MEDIUM' ? '#fbbf24' : '#9ca3af';
+                            const sevColor = c.severity === 'HIGH' ? '#f87171' : c.severity === 'MEDIUM' ? '#fbbf24' : '#fff';
                             const bg = c.severity==='HIGH' ? 'rgba(239,68,68,0.08)' : c.severity==='MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)';
                             return (
                               <div key={i} style={{ padding:'7px 8px', borderRadius:9, background:bg, border:`1px solid ${sevColor}22` }}>
                                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
                                   <span style={{ fontSize:10, fontWeight:800, color: sevColor }}>{c.with}</span>
-                                  <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:`${sevColor}16`, color: sevColor, fontWeight:800, border:`1px solid ${sevColor}22` }}>{c.severity}</span>
+                                  <span style={{ fontSize:11, padding:'1px 6px', borderRadius:20, background:`${sevColor}16`, color: sevColor, fontWeight:800, border:`1px solid ${sevColor}22` }}>{c.severity}</span>
                                 </div>
                                 <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}>{c.effect}</div>
                               </div>

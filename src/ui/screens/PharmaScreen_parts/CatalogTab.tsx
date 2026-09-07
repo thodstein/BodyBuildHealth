@@ -95,21 +95,21 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
         {[
           { k:'Класс', v: CLASS_LABELS[sub.class] || sub.class },
           { k:'T½', v: sub.pk ? formatHalfLife(sub.pk.halfLifeHours) : '—' },
           { k:'Биодоступность', v: sub.pk ? (sub.pk.bioavailability * 100).toFixed(0)+'%' : '—' },
           { k:'Vd', v: sub.pk ? sub.pk.Vd + ' л' : '—' },
         ].map(i=>(
-          <div key={i.k} style={{ padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>{i.k}</div>
-            <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginTop:2 }}>{i.v}</div>
+          <div key={i.k} style={{ padding:'10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>{i.k}</div>
+            <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginTop:2 }}>{i.v}</div>
           </div>
         ))}
-        <div style={{ gridColumn:'1 / -1', padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Эстеры</div>
-          <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginTop:2 }}>{sub.esters?.join(', ') || '—'}</div>
+        <div style={{ gridColumn:'1 / -1', padding:'10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Эстеры</div>
+          <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginTop:2 }}>{sub.esters?.join(', ') || '—'}</div>
         </div>
       </div>
 
@@ -130,7 +130,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {Object.entries(sub.cvProfile).map(([key, val]) => {
               const lbl = CV_VALUE_LABELS[key]?.[val] || val;
-              const clr = CV_VALUE_COLORS[key]?.[val] || '#9e9e9e';
+              const clr = CV_VALUE_COLORS[key]?.[val] || '#fff';
               return (
                 <span key={key} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:`${clr}14`, color:clr, fontWeight:700, border:`1px solid ${clr}22` }}>{CV_LABELS[key] || key}: {lbl}</span>
               );
@@ -176,7 +176,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                 <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:bg, border:`1px solid ${border}` }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
                     <span style={{ fontSize:11, fontWeight:800, color:clr }}>{isSynergy ? '⊕' : '⊖'} {linked?.name || ls.id}</span>
-                    <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:`${clr}18`, color:clr, fontWeight:800 }}>
+                    <span style={{ fontSize:11, padding:'2px 6px', borderRadius:20, background:`${clr}18`, color:clr, fontWeight:800 }}>
                       {isSynergy ? 'СИНЕРГИЯ' : 'АНТАГОНИЗМ'} {Math.round(ls.strength * 100)}%
                     </span>
                   </div>
@@ -195,15 +195,15 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
             {sub.conflicts.map((c, i) => {
               const sevBg = c.severity === 'HIGH' ? 'rgba(239,68,68,0.10)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)';
               const sevBorder = c.severity === 'HIGH' ? 'rgba(239,68,68,0.22)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.22)' : 'rgba(255,255,255,0.07)';
-              const sevColor = c.severity === 'HIGH' ? '#f87171' : c.severity === 'MEDIUM' ? '#fbbf24' : '#9ca3af';
+              const sevColor = c.severity === 'HIGH' ? '#f87171' : c.severity === 'MEDIUM' ? '#fbbf24' : '#fff';
               return (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:sevBg, border:`1px solid ${sevBorder}` }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                     <span style={{ fontSize:10, fontWeight:800, color:sevColor }}>{c.with}</span>
-                    <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:`${sevColor}16`, color:sevColor, fontWeight:800 }}>{c.severity}</span>
+                    <span style={{ fontSize:11, padding:'2px 6px', borderRadius:20, background:`${sevColor}16`, color:sevColor, fontWeight:800 }}>{c.severity}</span>
                   </div>
                   <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>{c.effect}</div>
-                  {c.mechanism && <div style={{ fontSize:9, color:'#fff', marginTop:4, fontStyle:'italic' }}>{c.mechanism}</div>}
+                  {c.mechanism && <div style={{ fontSize:11, color:'#fff', marginTop:4, fontStyle:'italic' }}>{c.mechanism}</div>}
                 </div>
               );
             })}
@@ -239,14 +239,14 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {(sub.sideEffects || detail?.sideEffects || []).map((se: any, i: number) => {
               if (typeof se === 'string') return <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.08)', color:'#fcd34d', border:'1px solid rgba(245,158,11,0.12)' }}>{se}</span>;
-              return <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: se.frequency === 'common' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.04)', color: se.frequency === 'common' ? '#fcd34d' : 'rgba(255,255,255,0.58)', border:`1px solid ${se.frequency==='common'?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.06)'}` }}>{se.effect} <span style={{ opacity:0.6, fontSize:9 }}>• {se.frequency==='common'?'часто':se.frequency==='rare'?'редко':'очень редко'}</span></span>;
+              return <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: se.frequency === 'common' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.04)', color: se.frequency === 'common' ? '#fcd34d' : '#fff', border:`1px solid ${se.frequency==='common'?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.06)'}` }}>{se.effect} <span style={{ opacity:0.6, fontSize:11 }}>• {se.frequency==='common'?'часто':se.frequency==='rare'?'редко':'очень редко'}</span></span>;
             })}
           </div>
         </div>
       )}
 
       <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Фармакодинамика <span style={{ marginLeft:'auto', fontSize:9, color:'#fff' }}>тапни для описания</span></div>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Фармакодинамика <span style={{ marginLeft:'auto', fontSize:11, color:'#fff' }}>тапни для описания</span></div>
             {pdEntries.map(([key, val]) => {
               const absVal = Math.abs(val);
               const maxScale = key === 'AR_affinity' ? 2 : key === 'hct_impact' ? 6 : key === 'hepatotoxicity' ? 4 : 1.2;
@@ -256,7 +256,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               return (
                 <div key={key} style={{ marginBottom:8, padding:'7px 8px', borderRadius:9, background: isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent', border:`1px solid ${isExpanded ? 'rgba(255,255,255,0.06)' : 'transparent'}` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', cursor:'pointer', alignItems:'center' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{PD_LABELS[key] || key} <span style={{ fontSize:9, color:'#fff' }}>{isExpanded ? '▾' : '▸'}</span></span>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{PD_LABELS[key] || key} <span style={{ fontSize:11, color:'#fff' }}>{isExpanded ? '▾' : '▸'}</span></span>
                     <span style={{ color: pdBarColor(key, val), fontWeight:800, fontSize:11, background:`${pdBarColor(key,val)}14`, padding:'2px 7px', borderRadius:20 }}>{val.toFixed(2)}</span>
                   </div>
                   <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, height:6, marginTop:6, overflow:'hidden' }}>
@@ -319,7 +319,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>
                       {getMarkerName(eff.marker)}
-                      <span style={{ marginLeft:6, fontSize:9, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:20 }}>
+                      <span style={{ marginLeft:6, fontSize:11, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:20 }}>
                         {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} {(eff.strength * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -356,9 +356,9 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>💉 Диапазон дозировок</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {(() => { const dr = detail?.dosageRange || sub.dosageRange; if (!dr) return null; return <>
-              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Минимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{dr.min} <span style={{ fontSize:10, color:'#fff' }}>{dr.unit}</span></div></div>
-              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)' }}><div style={{ fontSize:9, color:'#fbbf24', fontWeight:700 }}>Максимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fbbf24' }}>{dr.max} <span style={{ fontSize:10, color:'#fbbf24' }}>{dr.unit}</span></div></div>
-              <div style={{ gridColumn:'1 / -1', padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Частота</div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{String(dr.frequency)}</div></div>
+              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Минимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{dr.min} <span style={{ fontSize:10, color:'#fff' }}>{dr.unit}</span></div></div>
+              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)' }}><div style={{ fontSize:11, color:'#fbbf24', fontWeight:700 }}>Максимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fbbf24' }}>{dr.max} <span style={{ fontSize:10, color:'#fbbf24' }}>{dr.unit}</span></div></div>
+              <div style={{ gridColumn:'1 / -1', padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Частота</div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{String(dr.frequency)}</div></div>
             </>; })()}
           </div>
         </div>
@@ -377,7 +377,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               return (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:bg, border:`1px solid ${clr}22` }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                    <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, background:`${clr}18`, color:clr, border:`1px solid ${clr}30` }}>{lbl}</span>
+                    <span style={{ fontSize:11, fontWeight:800, padding:'3px 7px', borderRadius:20, background:`${clr}18`, color:clr, border:`1px solid ${clr}30` }}>{lbl}</span>
                     <span style={{ fontSize:11, fontWeight:800, color:clr }}>{linkedName}</span>
                   </div>
                   <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>{s.desc || ''}</div>
@@ -441,8 +441,8 @@ const CatalogRow = React.memo<{
           {s.class.includes('test') ? '💉' : s.class.includes('oral') ? '💊' : s.class.includes('pept') ? '🧪' : s.class.includes('sarm') ? '🧬' : '🔬'}
         </div>
         <div style={{ minWidth:0, flex:1 }}>
-          <div style={{ fontWeight:800, fontSize:12, color: isSelected ? '#fff' : 'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:-0.2 }}>{s.name}</div>
-          <div style={{ fontSize:10, color: isSelected ? '#a78bfa' : 'rgba(255,255,255,0.48)', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{CLASS_LABELS[s.class] || s.class}{s.pk ? ` · T½ ${formatHalfLife(s.pk.halfLifeHours)}` : ''}</div>
+          <div style={{ fontWeight:800, fontSize:12, color: '#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:-0.2 }}>{s.name}</div>
+          <div style={{ fontSize:10, color: '#fff', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{CLASS_LABELS[s.class] || s.class}{s.pk ? ` · T½ ${formatHalfLife(s.pk.halfLifeHours)}` : ''}</div>
         </div>
       </div>
       <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e => e.stopPropagation()}>

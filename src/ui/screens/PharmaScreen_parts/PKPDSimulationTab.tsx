@@ -180,13 +180,13 @@ export const PKPDSimulationTab: React.FC = () => {
       const y = H - PAD - frac * (H - 2 * PAD);
       const label = (maxCp * frac).toFixed(1);
       return `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="0.7"/>
-        <text x="${PAD - 8}" y="${y + 3}" fill="rgba(255,255,255,0.42)" font-size="8" text-anchor="end">${label}</text>`;
+        <text x="${PAD - 8}" y="${y + 3}" fill="#fff" font-size="8" text-anchor="end">${label}</text>`;
     });
     const weekMarkers: string[] = [];
     const step = maxWeek <= 12 ? 1 : maxWeek <= 24 ? 2 : 4;
     for (let w = 0; w <= maxWeek; w += step) {
       const x = toX(w);
-      weekMarkers.push(`<text x="${x}" y="${H - 4}" fill="rgba(255,255,255,0.42)" font-size="9" text-anchor="middle">${w}</text>`);
+      weekMarkers.push(`<text x="${x}" y="${H - 4}" fill="#fff" font-size="9" text-anchor="middle">${w}</text>`);
     }
     return (
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: 'rgba(0,0,0,0.22)', borderRadius: 12, border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -199,7 +199,7 @@ export const PKPDSimulationTab: React.FC = () => {
         <path d={totalPathD} fill="none" stroke="#8b5cf6" strokeWidth="2.8" opacity={0.95} style={{ filter:'drop-shadow(0 0 6px rgba(139,92,246,0.35))' } as any} />
         <path d={effectPathD} fill="none" stroke="#00e68a" strokeWidth="1.8" strokeDasharray="6 3" opacity={0.82} />
         {weekMarkers.map((m, i) => <g key={`w${i}`} dangerouslySetInnerHTML={{ __html: m }} />)}
-        <text x={W / 2} y={H - 1} fill="rgba(255,255,255,0.42)" fontSize="10" textAnchor="middle">Недели</text>
+        <text x={W / 2} y={H - 1} fill="#fff" fontSize="10" textAnchor="middle">Недели</text>
       </svg>
     );
   }, [simResult, showAllDrugs, visibleDrugs]);
@@ -244,7 +244,7 @@ export const PKPDSimulationTab: React.FC = () => {
                   }}>✕</button>
                 )}
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
                 <div>
                   <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Доза на инъекцию (мг)</label>
                   <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', parseFloat(e.target.value) || 0)}
@@ -268,7 +268,7 @@ export const PKPDSimulationTab: React.FC = () => {
                         updateDrug(idx, 'frequencyDays', next);
                       }} style={{
                         flex:1, minWidth:36, height:30, borderRadius:9, fontSize:10, fontWeight:800, cursor:'pointer',
-                        background: active ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.04)', color: active ? '#fff' : 'rgba(255,255,255,0.62)',
+                        background: active ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.04)', color: active ? '#fff' : '#fff',
                         border:`1px solid ${active ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
                         boxShadow: active ? '0 4px 12px rgba(139,92,246,0.22)' : 'none',
                       }}>{['','Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]}</button>
@@ -306,7 +306,7 @@ export const PKPDSimulationTab: React.FC = () => {
           }
           return (<>
             {(showAllDrugs || pkClass || pkSearch) && (pkGrouped.length + pkSingles.length > 0) && (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:6, maxHeight:210, overflowY:'auto', paddingRight:2 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, maxHeight:210, overflowY:'auto', paddingRight:2 }}>
                 {pkGrouped.map(g => (
                   <div key={g.cls} onClick={() => setPkEsterPopup({ baseClass: g.cls, label: g.label })} style={{
                     padding:'10px 10px', borderRadius:12, cursor:'pointer',
@@ -386,9 +386,9 @@ export const PKPDSimulationTab: React.FC = () => {
                 { label:'Стационар', v:`≈${simResult.ssDays}`, unit:'дн', color:'#00e68a' },
               ].map(c=>(
                 <div key={c.label} style={{ textAlign:'center', padding:'10px 6px', background:'rgba(0,0,0,0.22)', borderRadius:12, border:'1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.label}</div>
+                  <div style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.label}</div>
                   <div style={{ fontSize:18, fontWeight:900, color:c.color, marginTop:2 }}>{c.v}</div>
-                  <div style={{ fontSize:9, color:'#fff' }}>{c.unit}</div>
+                  <div style={{ fontSize:11, color:'#fff' }}>{c.unit}</div>
                 </div>
               ))}
             </div>

@@ -212,7 +212,7 @@ export const PharmaReportsTab: React.FC = () => {
                   {generated.generatedAt ? new Date(generated.generatedAt).toLocaleString() : generated.date}
                 </span>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, fontSize:11 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:7, fontSize:11 }}>
                 <div style={{ background:'rgba(0,0,0,0.18)', padding:'8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
                   <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Препаратов</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.totalSubstances}</div>
                 </div>

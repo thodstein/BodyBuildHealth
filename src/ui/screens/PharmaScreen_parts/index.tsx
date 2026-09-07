@@ -127,58 +127,58 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   const pageIcon: Record<PharmaPage, NativeIconName> = { main:'pill', course:'syringe', calculators:'cpu', info:'bookOpen', reports:'chart' };
 
   return (
-    <div className="screen pharma pharma-inner" style={{ padding:'12px 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
-      {/* header bar */}
-      <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexShrink:0 }}>
-        <button onClick={() => setPage('main')} style={{
-          display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
-          background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', backdropFilter:'blur(8px)',
+    <div className="screen pharma pharma-inner" style={{ padding:'0 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
+      {/* topbar — 56px, sticky, safe-area, стекло */}
+      <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0, minHeight:56, padding:'10px 12px', margin:'0 -12px 0', background:'linear-gradient(180deg, rgba(9,18,34,0.92), rgba(9,18,34,0.78))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(140,190,255,0.12)', position:'sticky', top:0, zIndex:20 }}>
+        <button onClick={() => setPage('main')} aria-label="Назад" style={{
+          display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, minWidth:44, minHeight:44, padding:'0 14px', borderRadius:14, fontSize:13, cursor:'pointer', fontWeight:800,
+          background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', flexShrink:0,
         }}>← Назад</button>
-        <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
-          <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.22)', color:'#c4b5fd' }}><NativeIcon name={pageIcon[page]} size={14} /></span>
-          <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{pageTitle[page]}</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1 }}>
-              {page==='course' ? `${linked.course.length} преп. • ${Math.max(1, linked.course.reduce((m,c)=>Math.max(m,(c.endWeek||12)-(c.startWeek||0)),4))} нед` : page==='calculators' ? 'PK/PD · Дозировки · Пептиды' : page==='info' ? `${pharmaSubstances.length} веществ • взаимодействия` : page==='reports' ? 'Состав · валидация · риск' : ''}
+        <div style={{ flex:1, display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+          <span style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, rgba(139,92,246,0.18), rgba(124,58,237,0.14))', border:'1px solid rgba(139,92,246,0.22)', color:'#c4b5fd', flexShrink:0 }}><NativeIcon name={pageIcon[page]} size={16} /></span>
+          <div style={{ minWidth:0, flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:900, color:'#fff', lineHeight:1, letterSpacing:-0.2 }}>{pageTitle[page]}</div>
+            <div style={{ fontSize:11, color:'#fff', lineHeight:1.2, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {page==='course' ? `${linked.course.length} преп. • ${Math.max(1, linked.course.reduce((m,c)=>Math.max(m,(c.endWeek||12)-(c.startWeek||0)),4))} нед` : page==='calculators' ? 'PK/PD · Дозировки · Пептиды · Маппер · Диагностика' : page==='info' ? `${pharmaSubstances.length} веществ • каталог` : page==='reports' ? 'Состав · валидация · взаимодействия · риск' : ''}
             </div>
           </div>
         </div>
         {(page==='course' || page==='reports' || page==='info') && (
-          <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            <span style={{ fontSize:10, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name="syringe" size={11} /> {linked.course.length}</span>
-            <span style={{ fontSize:10, fontWeight:700, color: (linked.risk?.overallNet ?? 0) >=60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >=30 ? '#f59e0b' : '#00e68a' }}>{linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}</span>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+            <span style={{ fontSize:11, color:'#fff', display: 'inline-flex', alignItems: 'center', gap: 5, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', padding:'5px 9px', borderRadius:20, fontWeight:700 }}><NativeIcon name="syringe" size={12} /> {linked.course.length}</span>
+            <span style={{ fontSize:12, fontWeight:900, color: (linked.risk?.overallNet ?? 0) >=60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >=30 ? '#f59e0b' : '#00e68a', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)', padding:'5px 9px', borderRadius:20, minWidth:36, textAlign:'center' }}>{linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}</span>
           </div>
         )}
       </div>
 
       {page === 'info' && (
-        <div style={{ marginBottom:10, padding:'12px 14px', borderRadius:14,
-          background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))', border:'1px solid rgba(139,92,246,0.16)', flexShrink:0,
-          backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+        <div className="pharma-info-summary" style={{ marginBottom:10, padding:'14px', borderRadius:18,
+          background:'linear-gradient(180deg, rgba(21,38,66,0.78), rgba(12,23,40,0.78))', border:'1px solid rgba(140,190,255,0.14)', flexShrink:0,
+          backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', boxShadow:'0 10px 28px rgba(0,0,0,0.38)',
         }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}><NativeIcon name="chart" size={12} /> Сводка расчётов <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>{pharmaSubstances.length} веществ</span></div>
-          <div style={{ display:'flex', gap:8 }}>
-            <div style={{ flex:1, padding:'10px 8px', borderRadius:12, textAlign:'center',
-              background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)',
+          <div style={{ fontSize:12, fontWeight:900, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}><span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', color:'#a78bfa' }}><NativeIcon name="chart" size={14} /></span> Сводка расчётов <span style={{ marginLeft:'auto', fontSize:11, color:'#fff', fontWeight:800, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20 }}>{pharmaSubstances.length} веществ</span></div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
+            <div style={{ padding:'12px 10px', borderRadius:14, textAlign:'center',
+              background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)',
             }}>
-              <div style={{ fontSize:8, color:'#fff', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Препаратов в курсе</div>
-              <div style={{ fontSize:20, fontWeight:900, color:'#fff', marginTop:2 }}>{linked.course.length}</div>
+              <div style={{ fontSize:11, color:'#fff', letterSpacing:0.4, fontWeight:800, textTransform:'uppercase' as const }}>Препаратов в курсе</div>
+              <div style={{ fontSize:22, fontWeight:900, color:'#fff', marginTop:4 }}>{linked.course.length}</div>
             </div>
-            <div style={{ flex:1, padding:'10px 8px', borderRadius:12, textAlign:'center',
-              background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)',
+            <div style={{ padding:'12px 10px', borderRadius:14, textAlign:'center',
+              background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)',
             }}>
-              <div style={{ fontSize:8, color:'#fff', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Общий риск</div>
-              <div style={{ fontSize:20, fontWeight:900, color: (linked.risk?.overallNet ?? 0) >= 60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >= 30 ? '#f59e0b' : '#00e68a', marginTop:2 }}>
+              <div style={{ fontSize:11, color:'#fff', letterSpacing:0.4, fontWeight:800, textTransform:'uppercase' as const }}>Общий риск</div>
+              <div style={{ fontSize:22, fontWeight:900, color: (linked.risk?.overallNet ?? 0) >= 60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >= 30 ? '#f59e0b' : '#00e68a', marginTop:4 }}>
                 {linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}
               </div>
             </div>
           </div>
           {Object.keys(linked.activeDrugs).length > 0 && (
-            <div style={{ marginTop:8, fontSize:10, color:'#fff', lineHeight:1.4, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ color:'#fff', fontWeight:700 }}>Активные:</span> {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(' • ')}
+            <div style={{ marginTop:10, fontSize:11, color:'#fff', lineHeight:1.5, background:'rgba(0,0,0,0.18)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color:'#fff', fontWeight:800 }}>Активные:</span> {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(' • ')}
             </div>
           )}
-          <div style={{ marginTop:8 }}>
+          <div style={{ marginTop:10 }}>
             <PharmaScoreCard
               course={scoreCourse}
               weight={linked.profile?.settings?.weight || 80}
@@ -189,37 +189,43 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         </div>
       )}
 
-      {/* tabs — компактные, без пилюль */}
-      <div className="pharma-subtabs" style={{ display:'flex', gap:2, overflowX:'auto', overflowY:'hidden', marginBottom:8, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
+      {/* subtabs — липкие пилюли 44px, скролл-лента, glow активной */}
+      <div className="pharma-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, padding:'10px 12px 10px', margin:'0 -12px 8px', background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.04)', position:'sticky', top:56, zIndex:15, scrollSnapType:'x proximity' as any }}>
       {page === 'course' && (
         <span style={{
-          display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
-          color:'#a78bfa', borderBottom:'2px solid #8b5cf6', marginBottom:-1,
-        }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:5 }}><NativeIcon name="syringe" size={10} /></span>Курс <span style={{ color:'#fff', fontWeight:700 }}>{linked.course.length}</span></span>
+          display:'inline-flex', alignItems:'center', gap:7, padding:'9px 14px', fontSize:12, fontWeight:900, whiteSpace:'nowrap', flexShrink:0,
+          color:'#fff', background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:999, boxShadow:'0 6px 18px rgba(139,92,246,0.28)', minHeight:44, scrollSnapAlign:'start' as any,
+        }}><span style={{ display:'inline-flex' }}><NativeIcon name="syringe" size={12} /></span>Курс <span style={{ background:'rgba(255,255,255,0.16)', padding:'2px 7px', borderRadius:20, fontSize:11 }}>{linked.course.length}</span></span>
       )}
       {page === 'reports' && (
         <span style={{
-          display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
-          color:'#fbbf24', borderBottom:'2px solid #f59e0b', marginBottom:-1,
-        }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:5 }}><NativeIcon name="chart" size={10} /></span>Фарма-отчёт</span>
+          display:'inline-flex', alignItems:'center', gap:7, padding:'9px 14px', fontSize:12, fontWeight:900, whiteSpace:'nowrap', flexShrink:0,
+          color:'#fff', background:'linear-gradient(135deg, #f59e0b, #e07b00)', border:'1px solid rgba(245,158,11,0.35)', borderRadius:999, boxShadow:'0 6px 18px rgba(245,158,11,0.22)', minHeight:44, scrollSnapAlign:'start' as any,
+        }}><span style={{ display:'inline-flex' }}><NativeIcon name="chart" size={12} /></span>Фарма-отчёт</span>
       )}
       {page === 'calculators' && (['pkpd','dosage','peptides','mapper','diagnostics'] as const).map(t => (
         <button key={t} onClick={() => setSubTab(t)} style={{
-          padding:'5px 7px 6px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
-          cursor:'pointer', flexShrink:0, transition:'all 0.14s ease', background:'transparent', border:'none', borderBottom: subTab===t ? '2px solid #3b82f6' : '2px solid transparent', borderRadius:0, marginBottom:-1,
-          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.52)',
+          padding:'9px 14px', fontSize:12, fontWeight:800, whiteSpace:'nowrap', minHeight:44,
+          cursor:'pointer', flexShrink:0, transition:'all 0.18s ease', borderRadius:999, scrollSnapAlign:'start' as any,
+          background: subTab===t ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.06)',
+          color: '#fff',
+          border:`1px solid ${subTab===t ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          boxShadow: subTab===t ? '0 6px 18px rgba(59,130,246,0.22)' : 'none',
         }}>{t === 'pkpd' ? 'PK/PD' : t === 'dosage' ? 'Дозировки' : t === 'peptides' ? 'Пептиды' : t === 'mapper' ? 'Маппер' : 'Диагностика'}</button>
       ))}
       {page === 'info' && (['catalog','interactions'] as const).map(t => (
         <button key={t} onClick={() => setSubTab(t)} style={{
-          padding:'5px 7px 6px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
-          cursor:'pointer', flexShrink:0, transition:'all 0.14s ease', background:'transparent', border:'none', borderBottom: subTab===t ? '2px solid #22c55e' : '2px solid transparent', borderRadius:0, marginBottom:-1,
-          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.52)',
+          padding:'9px 14px', fontSize:12, fontWeight:800, whiteSpace:'nowrap', minHeight:44,
+          cursor:'pointer', flexShrink:0, transition:'all 0.18s ease', borderRadius:999, scrollSnapAlign:'start' as any,
+          background: subTab===t ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.06)',
+          color: '#fff',
+          border:`1px solid ${subTab===t ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          boxShadow: subTab===t ? '0 6px 18px rgba(34,197,94,0.18)' : 'none',
         }}>{t === 'catalog' ? 'Каталог' : 'Взаимодействия'}</button>
       ))}
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch' as any, paddingBottom:'calc(var(--nav-height,68px) + 28px + env(safe-area-inset-bottom))', minHeight:0 }}>
+      <div className="pharma-body" style={{ flex:1, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch' as any, paddingBottom:'calc(var(--nav-height,68px) + 28px + env(safe-area-inset-bottom))', minHeight:0, display:'flex', flexDirection:'column', gap:10 }}>
       {page === 'course' && <PharmaCourseScreen />}
       {page === 'reports' && <PharmaReportsTab />}
       {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}

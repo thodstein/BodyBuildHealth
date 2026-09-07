@@ -83,7 +83,7 @@ export const PharmaPeptideCalc: React.FC = () => {
             <button key={p.id} onClick={() => { setPeptideId(p.id); setGrowthId(null); setPepAmount(p.amountMg || 2); setPepRoute(p.routes?.[0] || 'sc'); setPepProtocol(null); }} style={{
               padding:'6px 11px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
               background: peptideId === p.id && !growthId ? 'linear-gradient(135deg, #a78bfa, #8b5cf6)' : 'rgba(255,255,255,0.05)',
-              color: peptideId === p.id && !growthId ? '#fff' : 'rgba(255,255,255,0.62)',
+              color: peptideId === p.id && !growthId ? '#fff' : '#fff',
               border:`1px solid ${peptideId === p.id && !growthId ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.07)'}`,
               boxShadow: peptideId===p.id && !growthId ? '0 4px 12px rgba(139,92,246,0.18)' : 'none',
             }}>{p.name}</button>
@@ -96,7 +96,7 @@ export const PharmaPeptideCalc: React.FC = () => {
               <button key={s.id} onClick={() => { setGrowthId(s.id); setPeptideId(''); setPepProtocol(null); }} style={{
                 padding:'5px 9px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                 background: selG ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.04)',
-                color: selG ? '#fff' : 'rgba(255,255,255,0.52)',
+                color: selG ? '#fff' : '#fff',
                 border:`1px solid ${selG ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.06)'}`,
               }}>{s.name}</button>
             );
@@ -125,7 +125,7 @@ export const PharmaPeptideCalc: React.FC = () => {
         {growthId && growthSel && (
           <div style={{ marginTop:10, padding:'11px', borderRadius:12, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.14)' }}>
             <div style={{ fontSize:12, fontWeight:800, color:'#c4b5fd', marginBottom:6 }}>{growthSel.name}</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11, color:'#fff', lineHeight:1.4 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, fontSize:11, color:'#fff', lineHeight:1.4 }}>
               <span><b style={{ color:'#a78bfa' }}>Класс</b> {CLASS_LABELS[growthSel.class] || growthSel.class}</span>
               <span><b style={{ color:'#a78bfa' }}>T½</b> {growthSel.pk?.halfLifeHours ? `${(growthSel.pk.halfLifeHours).toFixed(0)} ч` : '—'}</span>
               <span><b style={{ color:'#a78bfa' }}>Биодост.</b> {growthSel.pk?.bioavailability ? `${(growthSel.pk.bioavailability * 100).toFixed(0)}%` : '—'}</span>
@@ -140,7 +140,7 @@ export const PharmaPeptideCalc: React.FC = () => {
           <span style={{ width:24, height:24, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11 }}>💧</span>
           <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Калькулятор разведения</span>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
           <PopupNumber label="💊 Кол-во пептида" value={pepAmount} min={0.1} max={100} step={0.1} suffix="мг" onChange={v => setPepAmount(Math.max(0.1, v))} />
           <PopupNumber label="💧 Объём бака" value={pepDilution} min={0.1} max={50} step={0.1} suffix="мл" onChange={v => setPepDilution(Math.max(0.1, v))} />
           <PopupNumber label="💉 Дозировка" value={pepDose} min={1} max={10000} step={10} suffix="мкг" onChange={v => setPepDose(Math.max(1, v))} />
@@ -152,7 +152,7 @@ export const PharmaPeptideCalc: React.FC = () => {
         {dilution && (
           <div style={{ marginTop:10, padding:'11px', borderRadius:12, background:'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.03))', border:'1px solid rgba(59,130,246,0.14)' }}>
             <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Результат разведения</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, fontSize:11 }}>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Конц. <b style={{ color:'#60a5fa' }}>{dilution.concentrationMcgPerMl.toFixed(1)} мкг/мл</b></div>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Объём <b style={{ color:'#60a5fa' }}>{dilution.doseVolumeMl.toFixed(3)} мл</b></div>
               <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Единиц <b style={{ color:'#60a5fa' }}>{dilution.syringeUnitsDisplay}</b></div>
@@ -169,7 +169,7 @@ export const PharmaPeptideCalc: React.FC = () => {
             <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Фармакокинетика (PK)</span>
             <span style={{ marginLeft:'auto', fontSize:10, color:'#a78bfa', background:'rgba(167,139,250,0.10)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(167,139,250,0.14)' }}>T½ {sel ? sel.tHalfHours.toFixed(1) : '—'} ч</span>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:7 }}>
             {[
               { l:'Cmax', v: pk.maxConcentration.toFixed(1) },
               { l:'Средняя', v: pk.avgConcentration.toFixed(1) },
@@ -177,7 +177,7 @@ export const PharmaPeptideCalc: React.FC = () => {
               { l:'T½ (введёно)', v: sel ? `${sel.tHalfHours.toFixed(1)} ч` : '—' },
             ].map(c=>(
               <div key={c.l} style={{ padding:'10px', borderRadius:11, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.10)', textAlign:'center' }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.l}</div>
+                <div style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.l}</div>
                 <div style={{ fontSize:16, fontWeight:900, color:'#c4b5fd', marginTop:2 }}>{c.v}</div>
               </div>
             ))}
@@ -220,7 +220,7 @@ export const PharmaPeptideCalc: React.FC = () => {
               { l:'Макс', v: bio.effectiveMaxMcg.toFixed(0), bg:'rgba(34,197,94,0.06)', border:'rgba(34,197,94,0.10)', c:'#86efac', fs:13 },
             ].map(b=>(
               <div key={b.l} style={{ padding:'10px', borderRadius:11, textAlign:'center', background:b.bg, border:`1px solid ${b.border}` }}>
-                <div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>{b.l}</div>
+                <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>{b.l}</div>
                 <div style={{ fontSize:b.fs, fontWeight:900, color:b.c, marginTop:2 }}>{b.v} <span style={{ fontSize:10 }}>мкг</span></div>
               </div>
             ))}
@@ -240,7 +240,7 @@ export const PharmaPeptideCalc: React.FC = () => {
               <button key={day} onClick={() => setPepSchedule(active ? pepSchedule.filter(d => d !== day) : [...pepSchedule, day])} style={{
                 padding:'7px 11px', borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer',
                 background: active ? 'linear-gradient(135deg, #f59e0b, #e07b00)' : 'rgba(255,255,255,0.04)',
-                color: active ? '#fff' : 'rgba(255,255,255,0.62)',
+                color: active ? '#fff' : '#fff',
                 border:`1px solid ${active ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.07)'}`,
                 boxShadow: active ? '0 4px 12px rgba(245,158,11,0.18)' : 'none',
               }}>{day}</button>
@@ -252,7 +252,7 @@ export const PharmaPeptideCalc: React.FC = () => {
         </div>
         <div style={{ padding:'10px 11px', borderRadius:12, background:'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', border:'1px solid rgba(245,158,11,0.14)' }}>
           <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Итого</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:11 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, fontSize:11 }}>
             <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Доз/нед: <b style={{ color:'#fbbf24' }}>{pepSchedule.length}</b></div>
             <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Всего доз: <b style={{ color:'#fbbf24' }}>{Math.round(pepTotalDays / 7 * pepSchedule.length)}</b></div>
             <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Нед. расход: <b style={{ color:'#fbbf24' }}>{(pepSchedule.length * pepDose / 1000).toFixed(1)} мг</b></div>

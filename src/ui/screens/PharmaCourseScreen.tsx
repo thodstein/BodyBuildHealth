@@ -127,7 +127,7 @@ export const RemindCard: React.FC = () => {
                   minWidth: 32, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 800,
                   background: on ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
                   border: on ? '1px solid rgba(139,92,246,0.45)' : '1px solid rgba(255,255,255,0.08)',
-                  color: on ? '#fff' : 'rgba(255,255,255,0.55)',
+                  color: on ? '#fff' : '#fff',
                 }}
               >
                 {d}
@@ -475,7 +475,7 @@ export const PharmaCourseScreen: React.FC = () => {
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:3 }}>
                           <span style={{ fontWeight:800, fontSize:13, color:'#fff', letterSpacing:-0.2 }}>{subName(entry.substanceId)}</span>
                           <span style={{ ...pillStyle, background:`${color}18`, color, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 8px' }}>{CLASS_LABELS[cls] || cls}</span>
-                          {isActive && <span style={{ ...pillStyle, fontSize:9, color:'var(--pharma-accent, #00e68a)', background:'rgba(var(--pharma-accent-rgb, 0,230,138),0.12)', border:'1px solid rgba(var(--pharma-accent-rgb, 0,230,138),0.18)', borderRadius:20 }}>● Активен</span>}
+                          {isActive && <span style={{ ...pillStyle, fontSize:11, color:'var(--pharma-accent, #00e68a)', background:'rgba(var(--pharma-accent-rgb, 0,230,138),0.12)', border:'1px solid rgba(var(--pharma-accent-rgb, 0,230,138),0.18)', borderRadius:20 }}>● Активен</span>}
                         </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:11, color:'#fff' }}>
                           {editId === entry.id && editDraft ? (
@@ -562,7 +562,7 @@ export const PharmaCourseScreen: React.FC = () => {
                       background: isCrit ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.05)',
                     }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                        <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, letterSpacing:0.4, background: isCrit ? 'rgba(239,68,68,0.16)' : 'rgba(245,158,11,0.16)', color: isCrit ? '#f87171' : '#fbbf24', border:`1px solid ${isCrit ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'}` }}>
+                        <span style={{ fontSize:11, fontWeight:800, padding:'3px 7px', borderRadius:20, letterSpacing:0.4, background: isCrit ? 'rgba(239,68,68,0.16)' : 'rgba(245,158,11,0.16)', color: isCrit ? '#f87171' : '#fbbf24', border:`1px solid ${isCrit ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'}` }}>
                           {isCrit ? 'КРИТИЧНО' : 'ВНИМАНИЕ'}
                         </span>
                         <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{alert.drugs?.join(' + ')}</span>
@@ -602,7 +602,7 @@ export const PharmaCourseScreen: React.FC = () => {
             <>
               <div className="pc-glass" style={{ padding:'12px' }}>
                 <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📅 Недельное расписание <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>по дням частоты</span></div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:6 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(42px, 1fr))', gap:6 }}>
                   {scheduleData.map(day => (
                     <div key={day.day} style={{
                       background: day.entries.length>0 ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.03)', borderRadius:12, padding:'7px 5px', textAlign:'center',
@@ -611,7 +611,7 @@ export const PharmaCourseScreen: React.FC = () => {
                     }}>
                       <div style={{ fontSize:10, fontWeight:800, color: day.entries.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.32)', marginBottom:6, letterSpacing:0.3 }}>{day.day}</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        {day.entries.length===0 && <span style={{ fontSize:9, color:'#fff' }}>—</span>}
+                        {day.entries.length===0 && <span style={{ fontSize:11, color:'#fff' }}>—</span>}
                         {day.entries.map((item, i) => (
                           <div key={i} style={{
                             fontSize:8, color:'#fff', background:`${item.color}18`,
@@ -659,7 +659,7 @@ export const PharmaCourseScreen: React.FC = () => {
                           {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((d,i)=>{
                             const active = selected.includes(i);
                             return (
-                              <button key={i} onClick={()=>{ const cur=getDaysFromFreq(String(entry.frequency||'')); const next=cur.includes(i)?cur.filter(x=>x!==i):[...cur,i].sort((a,b)=>a-b); const nf=freqFromDays(next.length?next:[i]); updateEntry(entry.id,{frequency:nf}); }} style={{ flex:1, minWidth:30, height:26, borderRadius:7, fontSize:9, fontWeight:700, cursor:'pointer', border:`1px solid ${active?'#8b5cf6':'rgba(255,255,255,0.08)'}`, background: active?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.04)', color:'#fff' }}>{d}</button>
+                              <button key={i} onClick={()=>{ const cur=getDaysFromFreq(String(entry.frequency||'')); const next=cur.includes(i)?cur.filter(x=>x!==i):[...cur,i].sort((a,b)=>a-b); const nf=freqFromDays(next.length?next:[i]); updateEntry(entry.id,{frequency:nf}); }} style={{ flex:1, minWidth:30, height:26, borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', border:`1px solid ${active?'#8b5cf6':'rgba(255,255,255,0.08)'}`, background: active?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.04)', color:'#fff' }}>{d}</button>
                             );
                           })}
                         </div>
@@ -677,7 +677,7 @@ export const PharmaCourseScreen: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {course.length === 0 || !graphData ? (
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
-              <div style={{ fontSize:28, marginBottom:8, opacity:0.6, display: 'flex', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}><NativeIcon name="chart" size={28} /></div>
+              <div style={{ fontSize:28, marginBottom:8, opacity:0.6, display: 'flex', justifyContent: 'center', color:'#fff' }}><NativeIcon name="chart" size={28} /></div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет данных для графика</div>
               <div style={{ fontSize:11, color:'#fff' }}>Добавь хотя бы один препарат</div>
             </div>
@@ -702,7 +702,7 @@ export const PharmaCourseScreen: React.FC = () => {
                   const ew = entry.endWeek || totalWeeks;
                   return (
                     <div key={entry.id} style={{ display:'flex', alignItems:'center', marginBottom:6, gap:6 }}>
-                      <div style={{ width:78, fontSize:9, color:'#fff', textAlign:'right', paddingRight:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:700 }}>
+                      <div style={{ width:78, fontSize:11, color:'#fff', textAlign:'right', paddingRight:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:700 }}>
                         {subName(entry.substanceId)}
                       </div>
                       <div style={{ flex:1, display:'flex', position:'relative', height:18, background:'rgba(255,255,255,0.04)', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -805,7 +805,7 @@ export const PharmaCourseScreen: React.FC = () => {
                         <span style={{ fontSize:11, fontWeight:700, color:'#fff', flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</span>
                         <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800 }}>{entry.doseValue}{entry.doseUnit}</span>
                         <span style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)}</span>
-                        <span style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap' }}>{entry.startWeek || 0}–{entry.endWeek} нед</span>
+                        <span style={{ fontSize:11, color:'#fff', whiteSpace:'nowrap' }}>{entry.startWeek || 0}–{entry.endWeek} нед</span>
                       </div>
                     );
                   })}
@@ -869,13 +869,13 @@ export const PharmaCourseScreen: React.FC = () => {
                   <button key={cls} onClick={() => setPickerClass(cls)} className="pc-btn2" style={{
                     background: isActive ? `${color}22` : 'rgba(255,255,255,0.04)',
                     border:`1px solid ${isActive ? color+'55' : 'rgba(255,255,255,0.07)'}`,
-                    color: isActive ? '#fff' : 'rgba(255,255,255,0.62)',
+                    color: isActive ? '#fff' : '#fff',
                     borderRadius:20, padding:'6px 11px', fontSize:11,
                     fontWeight: isActive ? 800 : 600,
                     whiteSpace:'nowrap', boxShadow: isActive ? `0 4px 12px ${color}22` : 'none',
                   }}>
                     {label}
-                    <span style={{ marginLeft:5, fontSize:9, opacity:0.6, background:isActive? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:10 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
+                    <span style={{ marginLeft:5, fontSize:11, opacity:0.6, background:isActive? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:10 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
                   </button>
                 );
               })}
@@ -901,13 +901,13 @@ export const PharmaCourseScreen: React.FC = () => {
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background: color, opacity: customDose ? 1 : 0.85 }} />
                       <div style={{ fontWeight:800, fontSize:11, color:'#fff', marginBottom:3, lineHeight:1.3 }}>{sub.name}</div>
-                      <div style={{ fontSize:9, color:'#fff', marginBottom:6, lineHeight:1.3 }}>
+                      <div style={{ fontSize:11, color:'#fff', marginBottom:6, lineHeight:1.3 }}>
                         {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
                         {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
                       </div>
                       <div style={{
                         display:'inline-flex', alignItems:'center', gap:3,
-                        background: customDose ? `${color}2a` : 'rgba(255,255,255,0.06)', color: customDose ? '#fff' : 'rgba(255,255,255,0.72)', border:`1px solid ${customDose ? color+'40' : 'rgba(255,255,255,0.06)'}`, borderRadius:20,
+                        background: customDose ? `${color}2a` : 'rgba(255,255,255,0.06)', color: customDose ? '#fff' : '#fff', border:`1px solid ${customDose ? color+'40' : 'rgba(255,255,255,0.06)'}`, borderRadius:20,
                         padding:'4px 10px', fontSize:10, fontWeight:800,
                       }}>
                         + {customDose ?? defDose} {unit}
@@ -942,15 +942,15 @@ export const PharmaCourseScreen: React.FC = () => {
                     </select>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:9, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
+                    <span style={{ fontSize:11, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
                     {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
                       <button key={idx} onClick={() => {
                         setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
                       }} style={{
-                        width:28, height:28, borderRadius:9, fontSize:9, fontWeight:800,
+                        width:28, height:28, borderRadius:9, fontSize:11, fontWeight:800,
                         cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#8b5cf6' : 'rgba(255,255,255,0.08)'}`,
                         background: selectedDays.includes(idx) ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
-                        color: selectedDays.includes(idx) ? '#fff' : 'rgba(255,255,255,0.52)',
+                        color: selectedDays.includes(idx) ? '#fff' : '#fff',
                         display:'flex', alignItems:'center', justifyContent:'center',
                       }}>{day}</button>
                     ))}

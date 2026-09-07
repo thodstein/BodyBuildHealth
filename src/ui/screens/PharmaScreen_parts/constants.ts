@@ -108,9 +108,9 @@ export const CV_VALUE_LABELS: Record<string, Record<string, string>> = {
   cnsLoad: { low: 'низкая', medium: 'средняя', high: 'высокая' },
 };
 export const CV_VALUE_COLORS: Record<string, Record<string, string>> = {
-  bloodPressure: { up: '#f44336', down: '#2196f3', neutral: '#9e9e9e' },
-  heartRate: { up: '#f44336', down: '#2196f3', neutral: '#9e9e9e' },
-  vascularTone: { constrict: '#f44336', dilate: '#2196f3', neutral: '#9e9e9e' },
+  bloodPressure: { up: '#f44336', down: '#2196f3', neutral: '#fff' },
+  heartRate: { up: '#f44336', down: '#2196f3', neutral: '#fff' },
+  vascularTone: { constrict: '#f44336', dilate: '#2196f3', neutral: '#fff' },
   thrombosisRisk: { low: '#4caf50', medium: '#ff9800', high: '#f44336' },
   cnsLoad: { low: '#4caf50', medium: '#ff9800', high: '#f44336' },
 };

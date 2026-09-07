@@ -5500,3 +5500,247 @@ html.app-native .articles-reader-body {
     animation: none !important;
   }
 }
+
+/* ─── 79. PHARMA PRO-FULL — топ-подача вкладки «Фарма» (hero не тронут) ──
+ * Только APK. TSX уже несёт PRO-инлайны (56px топбар, стекло 18px,
+ * белый текст, пилюли-навигация 44px, быстрые якоря); здесь — липкость,
+ * press/focus, каскад, табличные цифры, мобайл 360 и белый текст-гард.
+ * TG/web — инлайны едины, этот слой их только усиливает. */
+html.app-native .screen.pharma {
+  --text-dim: #fff !important;
+  --text-light: #fff !important;
+  --text-muted: #fff !important;
+}
+
+html.app-native .pharma-head {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  min-height: 56px !important;
+}
+
+html.app-native .pharma-head button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .pharma-head button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .pharma-head button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .pharma-subtabs {
+  position: sticky !important;
+  top: calc(env(safe-area-inset-top, 0px) + 56px) !important;
+  z-index: 15 !important;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  margin: 0 -12px 8px !important;
+  padding: 10px 12px !important;
+  gap: 8px !important;
+  scroll-snap-type: x proximity !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+html.app-native .pharma-subtabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .pharma-subtabs button,
+html.app-native .pharma-subtabs span {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+  color: #fff !important;
+}
+
+html.app-native .pharma-subtabs button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .pharma-subtabs button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .pharma-subtabs button[data-active='true'] {
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35) !important;
+}
+
+html.app-native .pharma-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .pharma-catalog,
+html.app-native .pharma-interact,
+html.app-native .pharma-pkpd,
+html.app-native .pharma-dose,
+html.app-native .pharma-pep,
+html.app-native .pharma-mapper,
+html.app-native .pharma-diag,
+html.app-native .pharma-reports,
+html.app-native .pharma-course,
+html.app-native .pharma-info-summary {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .screen.pharma .card,
+html.app-native .pharma-course .pc-glass,
+html.app-native .pharma-course .pc-card2 {
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+html.app-native .pharma-course .pc-glass,
+html.app-native .pharma-course .pc-card2 {
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.78), rgba(12, 23, 40, 0.78)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+}
+
+html.app-native .pharma-catalog input[type='text'],
+html.app-native .pharma-pkpd input,
+html.app-native .pharma-dose input,
+html.app-native .pharma-pep input,
+html.app-native .pharma-mapper input,
+html.app-native .pharma-diag input,
+html.app-native .pharma-interact input,
+html.app-native .pharma-interact select,
+html.app-native .pharma-course input,
+html.app-native .pharma-course select {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .pharma-catalog button,
+html.app-native .pharma-interact button,
+html.app-native .pharma-pkpd button,
+html.app-native .pharma-dose button,
+html.app-native .pharma-pep button,
+html.app-native .pharma-mapper button,
+html.app-native .pharma-diag button,
+html.app-native .pharma-reports button,
+html.app-native .pharma-course button {
+  min-height: 44px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .pharma-catalog button:active,
+html.app-native .pharma-interact button:active,
+html.app-native .pharma-pkpd button:active,
+html.app-native .pharma-dose button:active,
+html.app-native .pharma-pep button:active,
+html.app-native .pharma-mapper button:active,
+html.app-native .pharma-diag button:active,
+html.app-native .pharma-reports button:active,
+html.app-native .pharma-course button:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .pharma-catalog button:focus-visible,
+html.app-native .pharma-interact button:focus-visible,
+html.app-native .pharma-pkpd button:focus-visible,
+html.app-native .pharma-dose button:focus-visible,
+html.app-native .pharma-pep button:focus-visible,
+html.app-native .pharma-mapper button:focus-visible,
+html.app-native .pharma-diag button:focus-visible,
+html.app-native .pharma-reports button:focus-visible,
+html.app-native .pharma-course button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .pharma-catalog details summary,
+html.app-native .pharma-mapper details summary,
+html.app-native .pharma-diag details summary {
+  min-height: 52px !important;
+}
+
+html.app-native .pharma-catalog details summary:active {
+  transform: scale(0.98) !important;
+}
+
+/* Сетки — на 360 сжимаются в auto-fit, на 320 — в колонку */
+html.app-native .pharma-pep [style*='gridTemplateColumns: 1fr 1fr'],
+html.app-native .pharma-diag [style*='gridTemplateColumns: 1fr 1fr'],
+html.app-native .pharma-dose [style*='gridTemplateColumns: 1fr 1fr'],
+html.app-native .pharma-mapper [style*='gridTemplateColumns: 1fr 1fr 1fr'],
+html.app-native .pharma-reports [style*='gridTemplateColumns: 1fr 1fr'] {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+
+html.app-native .pharma-pkpd [style*='gridTemplateColumns: repeat(auto-fill, minmax(132px'],
+html.app-native .pharma-dose [style*='gridTemplateColumns: repeat(auto-fill, minmax(132px'],
+html.app-native .pharma-pep [style*='gridTemplateColumns: repeat(auto-fill'] {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+
+/* Мобайл 360: каталог-фильтры, PKPD-дни графа, курс-расписание */
+@media (max-width: 380px) {
+  html.app-native .pharma-subtabs {
+    gap: 6px !important;
+    padding: 8px 10px !important;
+  }
+  html.app-native .pharma-head {
+    padding: 8px 10px !important;
+  }
+  html.app-native .pharma-catalog [style*='gridTemplateColumns'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* SVG графики — 100% ширины, не рвут 320 */
+html.app-native .pharma-pkpd svg {
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Белый текст-гард: весь вторичный текст вкладки — белый (семантика/акценты не тронуты) */
+html.app-native .pharma-body,
+html.app-native .pharma-catalog,
+html.app-native .pharma-interact,
+html.app-native .pharma-pkpd,
+html.app-native .pharma-dose,
+html.app-native .pharma-pep,
+html.app-native .pharma-mapper,
+html.app-native .pharma-diag,
+html.app-native .pharma-reports,
+html.app-native .pharma-course,
+html.app-native .pharma-info-summary {
+  color: #fff !important;
+}
+
+html.app-native .pharma-course .pc-card2,
+html.app-native .pharma-course .pc-glass {
+  color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pharma-body,
+  html.app-native .pharma-catalog,
+  html.app-native .pharma-interact,
+  html.app-native .pharma-pkpd,
+  html.app-native .pharma-dose,
+  html.app-native .pharma-pep,
+  html.app-native .pharma-mapper,
+  html.app-native .pharma-diag,
+  html.app-native .pharma-reports,
+  html.app-native .pharma-course {
+    animation: none !important;
+  }
+}

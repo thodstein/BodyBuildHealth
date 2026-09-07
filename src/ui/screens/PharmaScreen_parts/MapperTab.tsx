@@ -88,14 +88,14 @@ export const MapperTab: React.FC = () => {
           <button onClick={() => setUseCourse(true)} style={{
             flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
             border:`1px solid ${useCourse ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
-            background: useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: useCourse ? '#fff' : 'rgba(255,255,255,0.62)',
+            background: useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: useCourse ? '#fff' : '#fff',
           }}>
             💊 Из курса ({course.length})
           </button>
           <button onClick={() => setUseCourse(false)} style={{
             flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
             border:`1px solid ${!useCourse ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
-            background: !useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: !useCourse ? '#fff' : 'rgba(255,255,255,0.62)',
+            background: !useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: !useCourse ? '#fff' : '#fff',
           }}>
             ✏️ Вручную ({manualDrugs.length})
           </button>
@@ -137,7 +137,7 @@ export const MapperTab: React.FC = () => {
 
       {mapperResult && (
         <>
-          <div style={{ ...card, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center', padding:12 }}>
+          <div style={{ ...card, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8, textAlign:'center', padding:12 }}>
             <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize:20, fontWeight:900, color:'#a78bfa' }}>{mapperResult.activePathologies?.length ?? 0}</div>
               <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Патологии</div>
@@ -147,7 +147,7 @@ export const MapperTab: React.FC = () => {
               <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Биомаркеры</div>
             </div>
             <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize:20, fontWeight:900, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>
+              <div style={{ fontSize:20, fontWeight:900, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f59e0b' : '#fff' }}>
                 {mapperResult.knownDrugs}/{mapperResult.totalDrugs}
               </div>
               <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Распознано</div>
@@ -195,7 +195,7 @@ export const MapperTab: React.FC = () => {
                   <span key={m} style={{
                     padding:'5px 9px', borderRadius:20, fontSize:10, fontWeight:700,
                     background: has ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: has ? '#00e68a' : 'rgba(255,255,255,0.52)',
+                    color: has ? '#00e68a' : '#fff',
                     border:`1px solid ${has ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.06)'}`,
                   }}>{has ? '✓ ' : '○ '}{m}</span>
                 );
