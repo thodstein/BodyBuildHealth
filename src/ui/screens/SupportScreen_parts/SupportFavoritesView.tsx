@@ -43,7 +43,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
     <div className="sup-fav">
       <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
         {[['favorites','⭐ Избранное'],['mySubstances','💊 Мои препараты'],['myStacks','📦 Мои стеки'],['calculator','🧮 Расчёты'],['mixes','🎯 Миксы'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]:any) => (
-          <button key={id} onClick={() => setFavTab(id)} style={{
+          <button key={id} className="support-pill" data-active={favTab === id} aria-pressed={favTab === id} onClick={() => setFavTab(id)} style={{
             padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
             background: favTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
             color: favTab === id ? '#000' : 'var(--text-dim)',
@@ -241,9 +241,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
       {favTab === 'plan' && (
         <div style={{ padding:'0 0 80px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-            <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
-            <button onClick={() => setPlanSubTab('myplans')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'myplans' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'myplans' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'myplans' ? 'var(--accent)' : 'var(--border)'}` }}>📋 Мои планы</button>
-            <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
+            <button onClick={() => setPlanSubTab('active')} className="support-pill" data-active={planSubTab === 'active'} aria-pressed={planSubTab === 'active'} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
+            <button onClick={() => setPlanSubTab('myplans')} className="support-pill" data-active={planSubTab === 'myplans'} aria-pressed={planSubTab === 'myplans'} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'myplans' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'myplans' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'myplans' ? 'var(--accent)' : 'var(--border)'}` }}>📋 Мои планы</button>
+            <button onClick={() => setPlanSubTab('archive')} className="support-pill" data-active={planSubTab === 'archive'} aria-pressed={planSubTab === 'archive'} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
           </div>
 
           {planSubTab === 'active' && (() => {

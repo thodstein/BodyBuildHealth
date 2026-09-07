@@ -51,7 +51,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
         {MODE_DEFS.slice(0,3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} onClick={()=> setMode(d.m)} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:84, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:84, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
               <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
               <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
               <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>
@@ -63,7 +63,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
         {MODE_DEFS.slice(3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} onClick={()=> setMode(d.m)} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:82, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:82, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
               <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
               <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
               <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>
@@ -76,7 +76,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
         {MODE_DEFS.map(({ m, label, icon, desc, accent }) => {
           const isActive = mode===m;
           return (
-            <button key={m} onClick={() => setMode(m)} title={desc} style={{
+            <button key={m} className="support-pill" data-active={isActive} aria-pressed={isActive} onClick={() => setMode(m)} title={desc} style={{
               flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
               border: isActive ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
               background: isActive ? `${accent}18` : 'rgba(255,255,255,0.04)',

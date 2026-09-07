@@ -758,7 +758,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           ['complaints', '🩺 Жалобы'],
           ['compliance', '📋 Комплаенс'],
         ].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id as any)} style={sx.pill(tab === id)}>{label}</button>
+          <button key={id} className="support-pill" data-active={tab === id} aria-pressed={tab === id} onClick={() => setTab(id as any)} style={sx.pill(tab === id)}>{label}</button>
         ))}
       </div>
 

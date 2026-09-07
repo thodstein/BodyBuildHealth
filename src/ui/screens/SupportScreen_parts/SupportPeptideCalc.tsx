@@ -37,7 +37,7 @@ export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) 
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🧪 Выберите пептид</h4>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
                 {PEPTIDE_LIST.map((p: any) => (
-                  <button key={p.id} onClick={() => { setPeptideId(p.id); setPepAmount(2); setPepDose(100); }} style={{
+                  <button key={p.id} className="support-pill" data-active={peptideId === p.id} aria-pressed={peptideId === p.id} onClick={() => { setPeptideId(p.id); setPepAmount(2); setPepDose(100); }} style={{
                     padding:'6px 10px', borderRadius:16, fontSize:9, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
                     background: peptideId === p.id ? 'var(--accent)' : 'var(--bg-secondary)',
                     color: peptideId === p.id ? '#000' : 'var(--text-dim)',

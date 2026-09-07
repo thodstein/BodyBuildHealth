@@ -3241,6 +3241,15 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
 
+      {/* ===== HORMONAL (Гормоны: ПКТ/фертильность/ГЗТ) ===== */}
+      {tab === 'fertility-pct' && (
+        <div data-sup="hormones">
+        <div data-sup="content">
+        <FertilityPCTScreen />
+        </div>
+        </div>
+      )}
+
       {/* ===== NON-MAIN CONTENT ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
         <div data-sup="content" style={{ paddingBottom: 16 }}>

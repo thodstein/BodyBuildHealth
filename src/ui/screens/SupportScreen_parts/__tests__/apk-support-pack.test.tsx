@@ -184,4 +184,13 @@ describe('APK support pack', () => {
     const root = container.querySelector('.support-screen');
     expect(root?.classList.contains('sup-apk'), 'apk class in native').toBe(true);
   });
+
+  it('Гормоны: таб fertility-pct рендерит раздел, а не пустой экран', () => {
+    const { container } = render(<SupportScreen initialTab="fertility-pct" />);
+    expect(container.querySelector("[data-sup='hormones']"), 'hormones hook').not.toBeNull();
+    expect(
+      container.querySelector("[data-sup='hormones'] .screen.fertility-pct"),
+      'fertility screen',
+    ).not.toBeNull();
+  });
 });

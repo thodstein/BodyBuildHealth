@@ -136,3 +136,36 @@ html.app-native .train-sup.sup-apk .sup-apk-sheet {
     min-height: 56px !important;
   }
 }
+
+/* ─── 11. ПОСЕКЦИОННЫЕ УСИЛЕНИЯ (R1–R11) ─────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-autocalc {
+  gap: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-geninfo > div > div {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='hormones'] {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-protocols [class*='sup-proto-'] > div {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary {
+  gap: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-calctools [role='button'][data-active='true'] {
+  box-shadow: 0 0 0 3px var(--sup-ring), 0 8px 22px var(--sup-glow) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-manualpick {
+  backdrop-filter: blur(14px) saturate(160%) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-modals {
+  backdrop-filter: blur(14px) saturate(160%) !important;
+}

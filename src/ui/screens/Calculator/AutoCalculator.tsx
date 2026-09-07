@@ -291,7 +291,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   };
 
   return (
-    <div style={embedded ? {} : { padding: '0 12px 130px', maxWidth: 600, margin: '0 auto' }}>
+    <div className="sup-autocalc" style={embedded ? {} : { padding: '0 12px 130px', maxWidth: 600, margin: '0 auto' }}>
       {!embedded && <div style={{ marginBottom: 10, textAlign: 'center' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>🧮 Калькулятор поддержки</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight:1.4 }}>Механизм-ориентированная модель ТЗ-28: лабы → 28 механизмов → отбор веществ по k×breadth → фаза → guardrails → бустеры</div>

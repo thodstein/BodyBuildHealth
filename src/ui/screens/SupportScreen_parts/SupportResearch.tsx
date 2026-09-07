@@ -69,7 +69,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                       {key:'pharma',label:'📋 Каталог',color:'#00e68a'},
                       {key:'researchDb',label:'📖 База исследований',color:'#a855f7'},
                     ] as const).map((s: any) => (
-                      <button key={s.key} onClick={() => {setResearchSource(s.key);if(s.key==='pubchem')handlePubchemSearch();if(s.key==='fda')handleFDASearch();}} style={{
+                      <button key={s.key} className="support-pill" data-active={researchSource===s.key} aria-pressed={researchSource===s.key} onClick={() => {setResearchSource(s.key);if(s.key==='pubchem')handlePubchemSearch();if(s.key==='fda')handleFDASearch();}} style={{
                         padding:'7px 14px',borderRadius:20,fontSize:10,fontWeight:700,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,
                         background: researchSource===s.key ? s.color : 'var(--bg-secondary)',
                         color: researchSource===s.key ? '#fff' : 'var(--text-dim)',
