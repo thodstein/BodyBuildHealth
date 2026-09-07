@@ -843,19 +843,22 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 8 }}>
-          <span style={{ padding: '12px 16px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
-          <span style={{ padding: '12px 16px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
-          {swayDiag && <span style={{ padding: '12px 16px', borderRadius: 20, background: swayDiag.severity==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: swayDiag.severity==='ok'?'#22c55e':'#ef4444' }}>sway {swayDiag.swayCm}см</span>}
-          {vbtLoss && <span style={{ padding: '12px 16px', borderRadius: 20, background: vbtLoss.exceeded?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT {vbtLoss.lossPct}%</span>}
-          <span style={{ padding: '12px 16px', borderRadius: 20, background: ohs.level==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>OHS {ohs.totalScore}/6</span>
-          <span style={{ padding: '12px 16px', borderRadius: 20, background: gripFails>0?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
-          {scoring.floors.length>0 && <span style={{ padding: '12px 16px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
+          <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
+          {swayDiag && <span style={{ padding: '6px 12px', borderRadius: 20, background: swayDiag.severity==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: swayDiag.severity==='ok'?'#22c55e':'#ef4444' }}>sway {swayDiag.swayCm}см</span>}
+          {vbtLoss && <span style={{ padding: '6px 12px', borderRadius: 20, background: vbtLoss.exceeded?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT {vbtLoss.lossPct}%</span>}
+          <span style={{ padding: '6px 12px', borderRadius: 20, background: ohs.level==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>OHS {ohs.totalScore}/6</span>
+          <span style={{ padding: '6px 12px', borderRadius: 20, background: gripFails>0?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
+          {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
         {diaryWeaks.length>0 && <div style={{ fontSize: 12, color: '#5ee', marginBottom: 4 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</div>}
         {diaryPhases.length>0 && <div style={{ fontSize: 12, color: '#a78bfa', marginBottom: 6 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</div>}
         <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '12px 14px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика McGill/Harris) + sway (3/5см) + VBT 15% + grip tri-modal → RSS-скор. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Стронг-конструктор»</b> отправит с smBiomech + контест (mode:strongman).
         </div>
+        <details style={{ marginTop: 10, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <summary style={{ padding: '13px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
+          <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column' }}>
         {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 12, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
         {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#60a5fa' }}>Enode xLoop {swayCm}см → {enodeCorrected}см (Chavda 2024 bias) · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin}</div>}
@@ -872,6 +875,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {anthroDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: DIM }}>📏 Антро: {anthroDiag.loadAdvice} {anthroDiag.pickupAdvice}</div>}
         {logDipDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: logDipDiag.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>📐 Лог-дип: {logDipDiag.text}{logDipDiag.drivePowerW != null ? ` · drive ~${logDipDiag.drivePowerW}Вт` : ''}</div>}
         {gripAsymDiag && gripAsymDiag.isAsym && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#f59e0b' }}>⚖️ Grip-асимметрия: {gripAsymDiag.text}</div>}
+          </div>
+        </details>
         {toast && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 13 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button onClick={handleExport} style={{ padding: '12px 16px', borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, cursor: 'pointer' }}>🖨 HTML</button>
@@ -880,7 +885,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, padding: 14 }}>
+      <div style={{ ...CARD, padding: 14, position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
           {TAB_DEFS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : DIM, cursor:'pointer', fontSize:13, fontWeight:700, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
@@ -893,7 +898,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {tab==='press' && (
           <div>
             <div style={{ fontSize:13, fontWeight:700, color:ACCENT, marginBottom:6 }}>Жим — лог/аксель (4 фазы, дип 8-12см)</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
               {PRESS_OPTS.map(o=>(
                 <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={state.pressWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.pressWeak.includes(o.id) ? '#ef4444' : 'rgba(140,190,255,0.16)', background: state.pressWeak.includes(o.id) ? 'rgba(239,68,68,0.14)' : 'rgba(22,30,52,0.88)', color: state.pressWeak.includes(o.id) ? '#ef4444' : DIM, fontSize:13 }}>{o.label}</button>
               ))}
@@ -919,8 +924,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <label style={{ fontSize:13, color:DIM }}>VBT лог last м/с<br/><input value={state.vbtLogLast} onChange={e=>setState(s=>({...s, vbtLogLast:e.target.value}))} placeholder="0.65" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
             </div>
             <div style={{ fontSize:12, color:DIM, marginTop:6 }}>Ивенты: {Object.keys(EVENT_META).slice(0,4).join(', ')} — {VBT_SS_THRESHOLDS.log_press ? `VBT log ${VBT_SS_THRESHOLDS.log_press.optimalMin}/${VBT_SS_THRESHOLDS.log_press.stopMin} м/с` : ''}</div>
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Контест пакет</div>
+            <details open style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🏆 Контест пакет</summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <select value={state.contestId} onChange={e=>setState(s=>({...s, contestId:e.target.value}))} style={{ width:'100%', marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}>
                 <option value="">— без контеста (база)</option>
                 {Object.entries(CONTEST_PRESETS as any).map(([id,c]:any)=> <option key={id} value={id}>{c.name}</option>)}
@@ -947,14 +953,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
               <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:DIM, marginTop:6 }}><input type="checkbox" checked={state.armsBent} onChange={e=>setState(s=>({...s, armsBent:e.target.checked}))}/> Руки согнуты на камне/шине (риск бицепса)</label>
               {attemptsBridge && attemptsBridge.rationale.length > 0 && <div style={{ fontSize:12, color:'#22c55e', marginTop:4 }}>{attemptsBridge.rationale.slice(0, 4).join(' · ')}</div>}
-            </div>
+              </div>
+            </details>
           </div>
         )}
 
         {tab==='carry' && (
           <div>
             <div style={{ fontSize:13, fontWeight:700, color:ACCENT, marginBottom:6 }}>Переноски — йок/фермер/рама (5 фаз, sway 3/5см)</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
               {CARRY_OPTS.map(o=>(
                 <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={state.carryWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.carryWeak.includes(o.id) ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: state.carryWeak.includes(o.id) ? 'rgba(245,158,11,0.14)' : 'rgba(22,30,52,0.88)', color: state.carryWeak.includes(o.id) ? '#f59e0b' : DIM, fontSize:13 }}>{o.label}</button>
               ))}
@@ -992,7 +999,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {tab==='load' && (
           <div>
             <div style={{ fontSize:13, fontWeight:700, color:ACCENT, marginBottom:6 }}>Загрузки — камни/мешок/кега (anterior load, high-hips)</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
               {LOAD_OPTS.map(o=>(
                 <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={state.loadWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.loadWeak.includes(o.id) ? '#22c55e' : 'rgba(140,190,255,0.16)', background: state.loadWeak.includes(o.id) ? 'rgba(34,197,94,0.14)' : 'rgba(22,30,52,0.88)', color: state.loadWeak.includes(o.id) ? '#22c55e' : DIM, fontSize:13 }}>{o.label}</button>
               ))}
@@ -1024,7 +1031,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {tab==='grip' && (
           <div>
             <div style={{ fontSize:13, fontWeight:700, color:ACCENT, marginBottom:6 }}>Хват / Кор / Кондиция (tri-modal + axial)</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
               {GRIP_OPTS.map(o=>(
                 <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={state.gripWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.gripWeak.includes(o.id) ? '#a855f7' : 'rgba(140,190,255,0.16)', background: state.gripWeak.includes(o.id) ? 'rgba(168,85,247,0.14)' : 'rgba(22,30,52,0.88)', color: state.gripWeak.includes(o.id) ? '#a855f7' : DIM, fontSize:13 }}>{o.label}</button>
               ))}
@@ -1150,8 +1157,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:12, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:13, fontWeight:700, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:DIM, marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Углы суставов с видео (Hindle-нормы)</div>
+            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (Hindle-нормы)</summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ fontSize:12, color:DIM, marginTop:2 }}>Трекер поз → экспорт CSV (t,hip,knee,ankle,shoulder) → вставь ниже. Йок: hip ROM [30,46] / knee [43,65]; лог: shoulder ≥150°.</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 2fr', gap:6, marginTop:6 }}>
                 <label style={{ fontSize:13, color:DIM }}>Лифт<br/><select value={state.poseLift} onChange={e=>setState(s=>({...s, poseLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="log_press">log</option></select></label>
@@ -1166,9 +1174,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 {state.poseLive === 'ok' && <span style={{ fontSize: 12, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
                 {state.poseLive === 'fail' && <span style={{ fontSize: 12, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
               </div>
-            </div>
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>LVP-калибровка SM (Wood PLOS 2026: population ±0.15 — нужен ramp)</div>
+              </div>
+            </details>
+            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📈 LVP-калибровка SM (ramp → r²≥0.85)</summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginTop:6 }}>
                 <label style={{ fontSize:13, color:DIM }}>Лифт<br/><select value={state.lvpLift} onChange={e=>setState(s=>({...s, lvpLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="stone_load">stone</option><option value="log_press">log</option></select></label>
                 <label style={{ fontSize:13, color:DIM }}>50% м/с<br/><input value={state.lvp50} onChange={e=>setState(s=>({...s, lvp50:e.target.value}))} placeholder="1.90" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
@@ -1180,9 +1190,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <button onClick={handleLvpFit} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(59,130,246,0.14)', border:'1px solid rgba(140,190,255,0.16)', color:'#60a5fa', fontSize:13, cursor:'pointer' }}>📈 Fit LVP</button>
                 <span style={{ fontSize:12, color:DIM }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'ramp 50/65/75/90 → r²≥0.85')}</span>
               </div>
-            </div>
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Прогресс стронга (йок 20м / фермер 40м / лог / лестница)</div>
+              </div>
+            </details>
+            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📊 Прогресс стронга (йок / фермер / лог / лестница)</summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginTop:6 }}>
                 <label style={{ fontSize:13, color:DIM }}>Йок 20м с<br/><input value={state.progYoke20m} onChange={e=>setState(s=>({...s, progYoke20m:e.target.value}))} placeholder="12.0" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
                 <label style={{ fontSize:13, color:DIM }}>Фермер 40м с<br/><input value={state.progFarmers40m} onChange={e=>setState(s=>({...s, progFarmers40m:e.target.value}))} placeholder="28.0" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
@@ -1194,7 +1206,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <button onClick={handleSaveProgress} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(34,197,94,0.14)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:13, cursor:'pointer' }}>💾 Снапшот прогресса</button>
                 <span style={{ fontSize:12, color:DIM }}>{smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · best ${smTrend.bestScore} (${smTrend.bestDate})` : `история ${smProgressHist.length}/60`}</span>
               </div>
-            </div>
+              </div>
+            </details>
             <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
               <div style={{ fontSize:13, color:DIM }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>
               <div style={{ marginTop:6, width:'100%', height:60, background:'rgba(255,255,255,0.03)', borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', color:DIM, fontSize:13, border:'1px solid rgba(255,255,255,0.04)' }}>preview — sway 3см норма, &gt;5см критично (McGill lateral bend)</div>
@@ -1203,12 +1216,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         )}
       </div>
 
-      <div style={{ ...CARD, padding: 12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
-        <div style={{ fontSize:12, color:DIM, marginBottom:6 }}>Findings: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
-        {scoring.floors.length>0 && <div style={{ fontSize:12, color:'#ef4444', marginBottom:6 }}>Floors: {scoring.floors.join(' · ')}</div>}
-        <div style={{ fontSize:13, color:DIM, marginBottom:6 }}>Выбрано: {weakPoints.length? weakPoints.join(' · ') : '— баланс'} {smWeakPoints.length? `→ ${smWeakPoints.join(' · ')}` : ''}</div>
-        {smRankTop.length > 0 && <div style={{ fontSize:12, color:'#5ee', marginBottom:6 }}>Ранжир: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}% (score ${c.score})`).join(' · ')}</div>}
-        {smSpec && <div style={{ fontSize:12, color:DIM, marginBottom:6 }}>Спец-блок {smSpec.totalWeeks}нед: {smSpec.weeks.slice(0, 3).map((w) => `нед${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}… · {smSpec.rationale[0]}</div>}
+      <div style={{ ...CARD, padding: 14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:8 }}>📋 Итог и применение</div>
+        <details style={{ marginBottom:10, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
+          <summary style={{ padding:'13px 14px', fontSize:13, fontWeight:800, color:DIM, cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — findings, ранжир, спец-блок</summary>
+          <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>
+        <div style={{ fontSize:12, color:DIM }}>Findings: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
+        {scoring.floors.length>0 && <div style={{ fontSize:12, color:'#ef4444' }}>Floors: {scoring.floors.join(' · ')}</div>}
+        <div style={{ fontSize:13, color:DIM }}>Выбрано: {weakPoints.length? weakPoints.join(' · ') : '— баланс'} {smWeakPoints.length? `→ ${smWeakPoints.join(' · ')}` : ''}</div>
+        {smRankTop.length > 0 && <div style={{ fontSize:12, color:'#5ee' }}>Ранжир: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}% (score ${c.score})`).join(' · ')}</div>}
+        {smSpec && <div style={{ fontSize:12, color:DIM }}>Спец-блок {smSpec.totalWeeks}нед: {smSpec.weeks.slice(0, 3).map((w) => `нед${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}… · {smSpec.rationale[0]}</div>}
+          </div>
+        </details>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
           <label style={{ fontSize:13, color:DIM }}>Спец-блок нед (4-8)<br/><input value={state.specWeeks} onChange={e=>setState(s=>({...s, specWeeks:e.target.value}))} placeholder="6" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
           <label style={{ fontSize:13, color:DIM }}>Год: старт-неделя<br/><input value={state.annualStartWeek} onChange={e=>setState(s=>({...s, annualStartWeek:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
@@ -1221,7 +1240,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <button onClick={handleSaveAnnual} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:DIM, fontSize:13, fontWeight:700, cursor:'pointer' }}>🗓 Год</button>
           <button onClick={handleSMBackup} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:DIM, fontSize:13, fontWeight:700, cursor:'pointer' }}>📦 Бэкап</button>
         </div>
-        <div style={{ fontSize:12, color:DIM, marginTop:6 }}>SM-storage: {(smStoreBytes.total / 1024).toFixed(1)}КБ · quota-safe (истории урезаются при переполнении, чужие ключи не трогаем)</div>
+        <div style={{ fontSize:12, color:DIM, marginTop:8 }}>SM-storage: {(smStoreBytes.total / 1024).toFixed(1)}КБ · quota-safe (истории урезаются при переполнении, чужие ключи не трогаем)</div>
+      </div>
+
+      <div style={{ position:'sticky', bottom:0, zIndex:20, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'0 -12px -22px', background:'rgba(9,18,34,0.88)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
+        <span style={{ width:40, height:40, borderRadius:20, background:`conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.08) 0)`, display:'flex', alignItems:'center', justifyContent:'center', border:`2px solid ${sColor}`, fontWeight:900, color:'#fff', fontSize:13, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{score}</span>
+        <span style={{ fontSize:13, fontWeight:700, color: weakPoints.length ? '#fff' : DIM, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{weakPoints.length ? `${weakPoints.length} слабые: ${weakPoints.join(', ')}` : 'Выбери слабые фазы'}</span>
+        <button onClick={applyToConstructor} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:14, cursor:'pointer', flexShrink:0, boxShadow:'0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг</button>
       </div>
     </div>
   );
