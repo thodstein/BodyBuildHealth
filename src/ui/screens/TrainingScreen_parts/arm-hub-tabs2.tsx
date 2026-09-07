@@ -269,11 +269,12 @@ export function HubRecoveryTab({ H }: { H: any }) {
           ))}
         </div>
         <div className="ad-row">
-          <AdField label="Reverse-retest">
-            <select value={mobRetest} onChange={(e) => setMobRetest(e.target.value)}>
-              <option value="">—</option><option value="better">Лучше</option><option value="same">Так же</option>
-            </select>
-          </AdField>
+        <div>
+          <div className="ad-fl">Reverse-retest</div>
+          <div className="ad-chips">
+            {[{id:'',label:'—'},{id:'better',label:'Лучше'},{id:'same',label:'Так же'}].map(o=> <AdChip key={o.id || 'none'} active={mobRetest===o.id} onClick={()=>setMobRetest(o.id)}>{o.label}</AdChip>)}
+          </div>
+        </div>
           <AdBtn variant="dark" onClick={onMobToProfile}>→ В профиль</AdBtn>
           {armMobility.retestHint && <span className="ad-muted">{armMobility.retestHint}</span>}
           {mobMsg && <span className="ad-tip">{mobMsg}</span>}

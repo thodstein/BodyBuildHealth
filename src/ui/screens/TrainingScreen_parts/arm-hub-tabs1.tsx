@@ -116,11 +116,12 @@ export function HubWristTab({ H }: { H: any }) {
         <AdField label="Кисть°">
           <input inputMode="decimal" value={state.wristDeg} onChange={e=>setState((s: any)=>({...s, wristDeg:e.target.value}))} placeholder="10" />
         </AdField>
-        <AdField label="Направление">
-          <select value={state.direction} onChange={e=>setState((s: any)=>({...s, direction:e.target.value}))}>
-            <option value="to_little">К мизинцу</option><option value="to_middle">К среднему</option><option value="to_thumb">К большому</option>
-          </select>
-        </AdField>
+        <div>
+          <div className="ad-fl">Направление</div>
+          <div className="ad-chips">
+            {[{id:'to_little',label:'К мизинцу'},{id:'to_middle',label:'К среднему'},{id:'to_thumb',label:'К большому'}].map(o=> <AdChip key={o.id} active={state.direction===o.id} onClick={()=>setState((s: any)=>({...s, direction:o.id}))}>{o.label}</AdChip>)}
+          </div>
+        </div>
       </AdGrid>
       <AdBanner tone={angleValid.valid ? 'ok' : 'bad'}>
         <b>РУ: {angles.elbowDeg}° · {angles.direction} · pron {angles.pronDeg}° sup {angles.supDeg}° · {anglesVerified?'✓ верифицировано':'○ ручной ввод'}</b>

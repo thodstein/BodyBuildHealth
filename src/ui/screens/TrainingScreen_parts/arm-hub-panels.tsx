@@ -11,7 +11,7 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { angleJointForWeakPoint, isValidAngleForArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
-import { AdCard, AdSec, AdGrid, AdField, AdBtn, AdBanner, AdSteps } from './arm-design-system';
+import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdSteps } from './arm-design-system';
 import { LEVEL_OPTS, TAB_DEFS } from './arm-hub-shared';
 
 export function HubHead({ H }: { H: any }) {
@@ -68,29 +68,32 @@ export function HubControls({ H }: { H: any }) {
   const { state, setState, weightClassAuto, applyToConstructor, tab, setTab } = H;
   return (
     <>
-      <AdGrid cols="auto-sm">
-        <AdField label="Уровень">
-          <select value={state.level} onChange={e=>setState((s: any)=>({...s, level:e.target.value}))}>
-            {LEVEL_OPTS.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </AdField>
-        <AdField label="Техника">
-          <select value={state.technique} onChange={e=>setState((s: any)=>({...s, technique:e.target.value}))}>
-            <option value="balanced">Сбалансировано</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option>
-          </select>
-        </AdField>
+      <div>
+        <div className="ad-fl">Уровень</div>
+        <div className="ad-chips">
+          {LEVEL_OPTS.map(o=> <AdChip key={o.id} active={state.level===o.id} onClick={()=>setState((s: any)=>({...s, level:o.id}))}>{o.label}</AdChip>)}
+        </div>
+      </div>
+      <div>
+        <div className="ad-fl">Техника</div>
+        <div className="ad-chips">
+          {[{id:'balanced',label:'Сбалансировано'},{id:'hook',label:'Хук'},{id:'toproll',label:'Топролл'},{id:'press',label:'Пресс'}].map(o=> <AdChip key={o.id} active={state.technique===o.id} onClick={()=>setState((s: any)=>({...s, technique:o.id}))}>{o.label}</AdChip>)}
+        </div>
+      </div>
+      <AdGrid cols="2">
         <AdField label="Вес кг">
           <input inputMode="decimal" value={state.bwKg} onChange={e=>setState((s: any)=>({...s, bwKg:e.target.value}))} placeholder="80" />
-        </AdField>
-        <AdField label="Пол">
-          <select value={state.sex} onChange={e=>setState((s: any)=>({...s, sex:e.target.value}))}>
-            <option value="male">М</option><option value="female">Ж</option>
-          </select>
         </AdField>
         <AdField label="Класс WAF">
           <input value={weightClassAuto} readOnly />
         </AdField>
       </AdGrid>
+      <div>
+        <div className="ad-fl">Пол</div>
+        <div className="ad-chips">
+          {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
+        </div>
+      </div>
       <AdBtn variant="amber" block onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
       <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" />
     </>

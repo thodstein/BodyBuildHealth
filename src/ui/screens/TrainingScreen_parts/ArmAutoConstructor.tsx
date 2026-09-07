@@ -575,11 +575,12 @@ export function ArmAutoConstructor() {
             <AdCheck checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
               <>
-                <AdField label="Интенсивность курса">
-                  <select value={courseIntensity} onChange={e=>setCourseIntensity(e.target.value as any)}>
-                    <option value="mild">Мягкий</option><option value="moderate">Средний</option><option value="heavy">Тяжёлый</option>
-                  </select>
-                </AdField>
+              <div>
+                <div className="ad-fl">Интенсивность курса</div>
+                <div className="ad-chips">
+                  {[{id:'mild',label:'Мягкий'},{id:'moderate',label:'Средний'},{id:'heavy',label:'Тяжёлый'}].map(o=> <AdChip key={o.id} active={courseIntensity===o.id} onClick={()=>setCourseIntensity(o.id as any)}>{o.label}</AdChip>)}
+                </div>
+              </div>
                 <AdGrid cols="2">
                   {[
                     ['test_e','Тест энантат мг/нед'],
@@ -637,22 +638,24 @@ export function ArmAutoConstructor() {
               <AdField label="Возраст">
                 <input value={proAge} onChange={e=>setProAge(e.target.value)} placeholder="30" inputMode="numeric" />
               </AdField>
-              <AdField label="Рука">
-                <select value={proArm} onChange={e=>setProArm(e.target.value)}>
-                  <option value="both">Обе (2 зачёта)</option><option value="left">Левая</option><option value="right">Правая</option>
-                </select>
-              </AdField>
+              <div>
+                <div className="ad-fl">Рука</div>
+                <div className="ad-chips">
+                  {[{id:'both',label:'Обе (2 зачёта)'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id} active={proArm===o.id} onClick={()=>setProArm(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
               <AdField label="Дата старта">
                 <input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} />
               </AdField>
               <AdField label="Целевой вес, кг">
                 <input value={proTargetW} onChange={e=>setProTargetW(e.target.value)} placeholder="85" inputMode="decimal" />
               </AdField>
-              <AdField label="Спарринг">
-                <select value={proSpar} onChange={e=>setProSpar(e.target.value)}>
-                  <option value="off">Выкл</option><option value="70">70% техника</option><option value="90">90% контроль</option><option value="100">100% (heavy-нед)</option>
-                </select>
-              </AdField>
+              <div>
+                <div className="ad-fl">Спарринг</div>
+                <div className="ad-chips">
+                  {[{id:'off',label:'Выкл'},{id:'70',label:'70% техника'},{id:'90',label:'90% контроль'},{id:'100',label:'100% (heavy-нед)'}].map(o=> <AdChip key={o.id} active={proSpar===o.id} onClick={()=>setProSpar(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
               <AdField label="Сила левой, кг">
                 <input value={proLeft} onChange={e=>setProLeft(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
@@ -713,16 +716,18 @@ export function ArmAutoConstructor() {
 
           <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop}>
             <AdGrid cols="3">
-              <AdField label="Стиль оппонента">
-                <select value={topOpp} onChange={e=>setTopOpp(e.target.value)}>
-                  <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
-                </select>
-              </AdField>
-              <AdField label="Рука оппонента">
-                <select value={topOppHand} onChange={e=>setTopOppHand(e.target.value)}>
-                  <option value="unknown">Неизвестно</option><option value="high">High-hand</option><option value="low">Low-hand</option><option value="neutral">Нейтраль</option>
-                </select>
-              </AdField>
+              <div>
+                <div className="ad-fl">Стиль оппонента</div>
+                <div className="ad-chips">
+                  {[{id:'unknown',label:'Неизвестен'},{id:'hook',label:'Хук'},{id:'toproll',label:'Топролл'},{id:'press',label:'Пресс'},{id:'balanced',label:'Универсал'}].map(o=> <AdChip key={o.id} active={topOpp===o.id} onClick={()=>setTopOpp(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
+              <div>
+                <div className="ad-fl">Рука оппонента</div>
+                <div className="ad-chips">
+                  {[{id:'unknown',label:'Неизвестно'},{id:'high',label:'High-hand'},{id:'low',label:'Low-hand'},{id:'neutral',label:'Нейтраль'}].map(o=> <AdChip key={o.id} active={topOppHand===o.id} onClick={()=>setTopOppHand(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
               <AdField label="Оппонент Δ, кг (+ тяжелее)">
                 <input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" inputMode="decimal" />
               </AdField>
@@ -734,16 +739,18 @@ export function ArmAutoConstructor() {
               <AdField label="Результат (кг/с)">
                 <input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
-              <AdField label="Приоритет старта">
-                <select value={topCalPrio} onChange={e=>setTopCalPrio(e.target.value)}>
-                  <option value="A">A (тейпер 3н)</option><option value="B">B (тейпер 2н)</option><option value="C">C (без тейпера)</option>
-                </select>
-              </AdField>
-              <AdField label="Серия">
-                <select value={topCalSeries} onChange={e=>setTopCalSeries(e.target.value)}>
-                  <option value="local">Локальный</option><option value="waf_worlds">WAF Worlds</option><option value="east_vs_west">East-vs-West</option><option value="super_series">Super Series</option>
-                </select>
-              </AdField>
+              <div>
+                <div className="ad-fl">Приоритет старта</div>
+                <div className="ad-chips">
+                  {[{id:'A',label:'A (тейпер 3н)'},{id:'B',label:'B (тейпер 2н)'},{id:'C',label:'C (без тейпера)'}].map(o=> <AdChip key={o.id} active={topCalPrio===o.id} onClick={()=>setTopCalPrio(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
+              <div>
+                <div className="ad-fl">Серия</div>
+                <div className="ad-chips">
+                  {[{id:'local',label:'Локальный'},{id:'waf_worlds',label:'WAF Worlds'},{id:'east_vs_west',label:'East-vs-West'},{id:'super_series',label:'Super Series'}].map(o=> <AdChip key={o.id} active={topCalSeries===o.id} onClick={()=>setTopCalSeries(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
               <AdField label="Grip-RPE неделя">
                 <select aria-label="Grip-RPE неделя" value={topGripWeek} onChange={e=>setTopGripWeek(e.target.value)}>
                   <option value="">Авто</option><option value="1">1 (объём)</option><option value="2">2 (объём)</option><option value="3">3 (интенс.)</option><option value="4">4 (делоад)</option>
@@ -789,11 +796,12 @@ export function ArmAutoConstructor() {
                     <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
                   </select>
                 </AdField>
-                <AdField label="Pumpkin-рука (Larratt)">
-                  <select value={cycPumpkin} onChange={e=>setCycPumpkin(e.target.value)}>
-                    <option value="">—</option><option value="left">Левая</option><option value="right">Правая</option>
-                  </select>
-                </AdField>
+                <div>
+                  <div className="ad-fl">Pumpkin-рука (Larratt)</div>
+                  <div className="ad-chips">
+                    {[{id:'',label:'—'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id || 'none'} active={cycPumpkin===o.id} onClick={()=>setCycPumpkin(o.id)}>{o.label}</AdChip>)}
+                  </div>
+                </div>
               </AdGrid>
               <div className="ad-row">
                 <AdCheck checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />

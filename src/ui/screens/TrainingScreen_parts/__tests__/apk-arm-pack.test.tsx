@@ -288,7 +288,9 @@ describe('APK arm pack', () => {
     expect(document.body.textContent).not.toContain('Хват-фокус');
     fireEvent.click(screen.getByRole('button', { name: 'Армлифтинг' }));
     expect(document.body.textContent).toContain('Хват-фокус');
-    fireEvent.click(screen.getByRole('button', { name: 'Хук' }));
-    expect(screen.getByRole('button', { name: 'Хук' }).getAttribute('aria-pressed')).toBe('true');
+    // 'Хук' есть и в технике, и в оппоненте — техника идёт первой в DOM
+    const hookBtns = screen.getAllByRole('button', { name: 'Хук' });
+    fireEvent.click(hookBtns[0]);
+    expect(hookBtns[0].getAttribute('aria-pressed')).toBe('true');
   });
 });
