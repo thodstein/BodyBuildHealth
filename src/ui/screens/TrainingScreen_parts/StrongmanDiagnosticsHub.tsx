@@ -912,7 +912,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   return (
     <div className="train-strongdiag" style={{ padding: '14px 12px 22px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
       <div style={{ ...CARD, padding: '18px 18px 16px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -24, right: -24, width: 150, height: 150, borderRadius: 150, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -929,19 +929,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:8, marginBottom:8 }}>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${ohs.level==='ok'?'#22c55e':'#ef4444'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>OHS · МОБИЛЬНОСТЬ</span>
-            <span style={{ fontSize:20, fontWeight:800, color: ohs.level==='ok'?'#22c55e':'#ef4444', fontVariantNumeric:'tabular-nums' }}>{ohs.totalScore}/6</span>
+            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>{ohs.totalScore}/6</span>
           </div>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${gripFails>0?'#f59e0b':'#22c55e'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>GRIP · ПРОВАЛЫ</span>
-            <span style={{ fontSize:20, fontWeight:800, color: gripFails>0?'#f59e0b':'#22c55e', fontVariantNumeric:'tabular-nums' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
+            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
           </div>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>SWAY · CARRY</span>
-            <span style={{ fontSize:20, fontWeight:800, color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff', fontVariantNumeric:'tabular-nums' }}>{swayDiag ? `sway ${swayDiag.swayCm}см` : '—'}</span>
+            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff' }}>{swayDiag ? `sway ${swayDiag.swayCm}см` : '—'}</span>
           </div>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>VBT · ПОТЕРЯ</span>
-            <span style={{ fontSize:20, fontWeight:800, color: vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : '#fff', fontVariantNumeric:'tabular-nums' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : '—'}</span>
+            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : '—'}</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 8 }}>
@@ -949,13 +949,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
           {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
-        {diaryWeaks.length>0 && <div style={{ fontSize: 12, color: '#5ee', marginBottom: 4 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</div>}
-        {diaryPhases.length>0 && <div style={{ fontSize: 12, color: '#a78bfa', marginBottom: 6 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</div>}
+        {(diaryWeaks.length>0 || diaryPhases.length>0) && (
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
+            {diaryWeaks.length>0 && <span style={{ padding:'6px 12px', borderRadius:20, background:'rgba(94,234,212,0.10)', border:'1px solid rgba(94,234,212,0.22)', color:'#5ee', fontSize:12, fontWeight:700 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</span>}
+            {diaryPhases.length>0 && <span style={{ padding:'6px 12px', borderRadius:20, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', color:'#a78bfa', fontSize:12, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
+          </div>
+        )}
         <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '12px 14px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика McGill/Harris) + sway (3/5см) + VBT 15% + grip tri-modal → RSS-скор. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Стронг-конструктор»</b> отправит с smBiomech + контест (mode:strongman).
         </div>
         <details style={{ marginTop: 10, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <summary style={{ padding: '13px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
+          <summary style={{ padding: '13px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 52, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
           <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column' }}>
         {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 12, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
@@ -977,9 +981,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </details>
         {toast && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 13 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          <button onClick={handleExport} style={{ padding: '12px 16px', borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, cursor: 'pointer' }}>🖨 HTML</button>
-          <button onClick={handleExportCsv} style={{ padding: '12px 16px', borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, cursor: 'pointer' }}>📥 CSV</button>
-          <button onClick={applyMobilityToProfile} style={{ padding: '12px 16px', borderRadius: 14, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 13, cursor: 'pointer' }}>→ Мобильность в профиль</button>
+          <button onClick={handleExport} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>🖨 HTML</button>
+          <button onClick={handleExportCsv} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>📥 CSV</button>
+          <button onClick={applyMobilityToProfile} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>→ Мобильность в профиль</button>
         </div>
       </div>
 
@@ -1322,7 +1326,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
         <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:8 }}>📋 Итог и применение</div>
         <details style={{ marginBottom:10, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
-          <summary style={{ padding:'13px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — findings, ранжир, спец-блок</summary>
+          <summary style={{ padding:'13px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>Сводка расчёта — findings, ранжир, спец-блок</summary>
           <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>
         <div style={{ fontSize:12, color:'#fff' }}>Findings: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
         {scoring.floors.length>0 && <div style={{ fontSize:12, color:'#ef4444' }}>Floors: {scoring.floors.join(' · ')}</div>}
