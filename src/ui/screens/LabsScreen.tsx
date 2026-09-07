@@ -1644,11 +1644,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
               <div style={{ display:'flex', gap:3, overflowX:'auto', marginBottom:10, scrollbarWidth:'none' }}>
                 {Object.entries(PHASE_LABELS).map(([key,label]) => (
-                  <button key={key} onClick={() => handlePhaseChange(key)} style={{
-                    padding:'6px 12px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
-                    background: selectedPhase===key?'var(--accent)':'var(--bg-secondary)',
-                    color: selectedPhase===key?'#000':'#fff',
-                    border:`1px solid ${selectedPhase===key?'var(--accent)':'var(--border)'}`,
+                  <button key={key} onClick={() => handlePhaseChange(key)} aria-pressed={selectedPhase===key} style={{
+                    padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', minHeight:44,
+                    background: selectedPhase===key ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
+                    color: selectedPhase===key ? '#0a1a08' : '#fff',
+                    border: selectedPhase===key ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                    boxShadow: selectedPhase===key ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
                   }}>{label}</button>
                 ))}
               </div>

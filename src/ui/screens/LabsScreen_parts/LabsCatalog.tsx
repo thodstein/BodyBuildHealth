@@ -112,14 +112,14 @@ export const LabsCatalog: React.FC = () => {
           placeholder=""
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ width: '100%', padding: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', marginBottom: 8, fontSize: 13 }}
+          style={{ width:'100%', padding:'12px 12px', background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', borderRadius:12, color:'#fff', marginBottom:8, fontSize:14, minHeight:48, boxSizing:'border-box' }}
         />
 
         {/* System filter */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
           <button
             onClick={() => setFilterSystem('all')}
-            style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: filterSystem === 'all' ? 'var(--accent)' : 'transparent', color: filterSystem === 'all' ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
+            style={{ padding:'10px 14px', borderRadius:999, border: filterSystem === 'all' ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)', background: filterSystem === 'all' ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)', color: filterSystem === 'all' ? '#0a1a08' : '#fff', fontSize:12, fontWeight:800, cursor:'pointer', minHeight:44 }}
           >
             Все ({catalogEntries.length})
           </button>
@@ -129,7 +129,7 @@ export const LabsCatalog: React.FC = () => {
               <button
                 key={sys}
                 onClick={() => setFilterSystem(sys)}
-                style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: filterSystem === sys ? 'var(--accent)' : 'transparent', color: filterSystem === sys ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
+                style={{ padding:'10px 14px', borderRadius:999, border: filterSystem === sys ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)', background: filterSystem === sys ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)', color: filterSystem === sys ? '#0a1a08' : '#fff', fontSize:12, fontWeight:800, cursor:'pointer', minHeight:44 }}
               >
                 {sys} ({count})
               </button>
@@ -140,7 +140,7 @@ export const LabsCatalog: React.FC = () => {
         {/* Entries */}
         <div style={{ display: 'grid', gap: 6 }}>
           {filtered.map(entry => (
-            <div key={entry.code} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 6 }}>
+            <div key={entry.code} style={{ background:'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))', padding:'14px 12px', borderRadius:16, border:'1px solid rgba(140,190,255,0.12)', borderLeft:'3px solid var(--labs-accent, #00e68a)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{entry.name}</span>
