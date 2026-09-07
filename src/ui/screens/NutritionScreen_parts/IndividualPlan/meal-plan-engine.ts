@@ -252,7 +252,7 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // упирается в кап «нормального» приёма. Фрукт/овощ НЕ масштабируются (объёмные добавки).
 function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
 function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
-function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80)); const base = ((budget === 'max' || budget === 'enhanced') ? 115 : 95); return Math.round(Math.min(170, base * ws * Math.min(scale, 1.15))); }
+function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80)); const base = ((budget === 'max' || budget === 'enhanced') ? 150 : 120); return Math.round(Math.min(170, base * ws * Math.min(scale, 1.15))); }
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
 function mealCapScale(pG: number, cG: number, fG: number): number {
   const kcal = (pG || 0) * 4 + (cG || 0) * 4 + (fG || 0) * 9;
@@ -1660,7 +1660,11 @@ function buildWholeMeal(
   // P2 (HV-рацион, жалоба «печень и хлопья в одном приёме»): субпродукты — еда ОСНОВНЫХ
   // приёмов, не перекусов. В снеке ротация без печенки/паштета/языка (свежее мясо/
   // творог/порошок); пусто — берём как есть.
-  const _snackRotPool = rotPoolFinal;
+  const _snackRotPool = snack
+    ? rotPoolFinal.filter(f => !/liver|kidney|pate|tongue|heart_tripe|brain|sweetbread/i.test(f.id || '')).length > 0
+      ? rotPoolFinal.filter(f => !/liver|kidney|pate|tongue|heart_tripe|brain|sweetbread/i.test(f.id || ''))
+      : rotPoolFinal
+    : rotPoolFinal;
   // FIX preferred-foods: любимые белки выбираются из ПОЛНОГО пула (без гейта ротации —
   // раньше говядина в «рыбный» день не выбиралась никогда); ротация остаётся fallback.
   // D-28 fix (жалоба «любимые продукты работают не полностью / разбег КБЖУ»):
@@ -2008,7 +2012,7 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     // P2 (типология, жалоба «хлопья и мясо — кто-то ест вообще вместе?»): хлопья/мюсли —
     // снековая еда с молоком/протеином, в приём с мясным белком не идём. Fallback —
     // не-хлопьевые носители из того же пула (крем/крупа/картофель).
-    if (false && carbSource && isFlakeId(carbSource.id) && (snack || (type || '').startsWith('snack')) && proteinSource && isMeatProteinId((proteinSource as any).id)) {
+    if (carbSource && isFlakeId(carbSource.id) && (snack || (type || '').startsWith('snack')) && proteinSource && isMeatProteinId((proteinSource as any).id)) {
       const _alt = _carbPickFinal.filter((f: any) => !isFlakeId(f.id));
       if (_alt.length > 0) carbSource = pickPriority(_alt, seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds, uniform: _pickCtx.highVolumeDay });
     }
@@ -5408,6 +5412,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // P2 (типология): хлопья — снековая еда, к мясу в одном приёме не идём.
             if (effWorst === 'c' && isFlakeId(cand.id) && mealHasMeatProtein(_tm)
               && !_tm.items.some((x: any) => x.id === cand.id)) continue;
+            // P2 (типология, жалоба «булгур и картошку в один прием»): ОДИН стейпл-гарнир
+            // в приёме, в нормальной порции (рост существующего — без лимита). Второй
+            // пункт — только десерт в обед (рис + пряник/джем ≤60, правило №3).
+            // Окна инсулина/legacy MC3 (≤4 приёмов, не-HV, приём ≥100У) — вне капа.
+            if (effWorst === 'c' && !_winTm && !_legacyFew && !_dsrtOkP
+              && countCarbItems(_tm) >= 1 && !_tm.items.some((x: any) => x.id === cand.id)) continue;
             // P1a: лимит гарниров/приём — HV и рефид: 3, дни ≥5 приёмов: 2 (было только HV-2).
             // Дни ≤4 приёмов — legacy (3 приёма × 157У двумя гарнирами при пуловых
             // ограничениях не закрыть).
