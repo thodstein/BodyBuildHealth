@@ -841,8 +841,23 @@
 /* ─── 16. REDUCED MOTION ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .support-screen.support-root.train-sup { animation: none !important; }
-  .support-screen.support-root .sup-apk-backdrop { animation: none !important; }
-  .support-screen.support-root .sup-apk-sheet { animation: none !important; }
+  .support-screen.support-root .sup-manualpick > div,
+  .support-screen.support-root .sup-modals > div { animation: none !important; }
   .support-screen.support-root button { transition: none !important; }
   .support-screen.support-root .sup-calctools [role='button'][data-active='true'] { transform: none !important; }
+}
+
+/* ─── 17. ТЕЛЕФОН: 16px в полях (без iOS-зума при фокусе) ───────── */
+@media (max-width: 480px) {
+  .support-screen.support-root input:not([type='checkbox']):not([type='radio']),
+  .support-screen.support-root textarea,
+  .support-screen.support-root select {
+    font-size: 16px !important;
+  }
+}
+
+/* ─── 18. ТЕЛЕФОН: всплывающие тосты над жестовой панелью ───────── */
+.support-screen.support-root [style*='bottom:70'] {
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  max-width: calc(100% - 24px);
 }
