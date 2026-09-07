@@ -9,6 +9,7 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
 import { SupportFavoritesView } from '../SupportFavoritesView';
 import { SupportStacksView } from '../SupportStacksView';
+import { SupportManualPicker } from '../SupportManualPicker';
 
 const noop = () => {};
 
@@ -192,5 +193,61 @@ describe('stacks view save source', () => {
     fireEvent.click(getByText('Сохранить'));
     expect(setSavedStacks).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith('Нет препаратов в калькуляторе');
+  });
+});
+
+describe('manual picker plan badge', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  afterEach(() => {
+    cleanup();
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+
+  function pickerMocks(over: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      onClose: noop,
+      enhancedSubs: [],
+      setEnhancedSubs: noop,
+      catalogSubstances: [
+        { id: 'fav_a', name: 'Фав-А' },
+        { id: 'fav_b', name: 'Фав-Б' },
+      ],
+      allSupport: [],
+      ALL_STACKS: [],
+      catalogSupport: [],
+      SUPPORT_LEVELS: {},
+      supportLevel: 'mid',
+      MECH_TRANSLATIONS_RU: {},
+      MECH_LABELS: {},
+      setFavRefresh: noop,
+      showToast: noop,
+      planSubs: ['fav_a'],
+      ...over,
+    };
+  }
+
+  it('вещество из живого плана помечено «в плане», счётчик честный', () => {
+    localStorage.setItem('he_support_favorites', JSON.stringify(['fav_a', 'fav_b']));
+    const { container, getByText } = render(<SupportManualPicker {...(pickerMocks() as never)} />);
+    fireEvent.click(getByText('⭐ Избранное'));
+    // бейдж «в плане» ровно один — у fav_a из движка, а не из пустого SUPPORT_LEVELS
+    expect(container.textContent).toContain('В плане: 1');
+    expect(getByText('в плане')).not.toBeNull();
+  });
+
+  it('без planSubs бейджа нет — ничего не выдумываем', () => {
+    localStorage.setItem('he_support_favorites', JSON.stringify(['fav_a', 'fav_b']));
+    const { container, queryByText } = render(
+      <SupportManualPicker {...(pickerMocks({ planSubs: [] }) as never)} />,
+    );
+    fireEvent.click(queryByText('⭐ Избранное')!);
+    expect(container.textContent).toContain('В плане: 0');
+    expect(queryByText('в плане')).toBeNull();
   });
 });

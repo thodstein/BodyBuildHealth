@@ -3494,6 +3494,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           onClose={() => setShowManualPicker(false)}
           enhancedSubs={enhancedSubs}
           setEnhancedSubs={setEnhancedSubs}
+          planSubs={effectiveLevel?.subs || []}
           catalogSubstances={catalogSubstances}
           allSupport={allSupport}
           ALL_STACKS={ALL_STACKS}

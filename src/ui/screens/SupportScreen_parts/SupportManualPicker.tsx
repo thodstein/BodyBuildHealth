@@ -6,6 +6,8 @@ interface ManualPickerProps {
   onClose: () => void;
   enhancedSubs: string[];
   setEnhancedSubs: (v: string[] | ((prev: string[]) => string[])) => void;
+  /** Живой состав плана из движка — для честного бейджа «в плане» (SUPPORT_LEVELS пуст). */
+  planSubs?: string[];
   catalogSubstances: any[];
   allSupport: any[];
   ALL_STACKS: any[];
@@ -32,6 +34,7 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
   MECH_LABELS,
   setFavRefresh,
   showToast,
+  planSubs = [],
 }) => {
   const [tab, setTab] = React.useState<'catalog' | 'stacks' | 'favorites' | 'saved'>('catalog');
   const [search, setSearch] = React.useState('');
@@ -137,7 +140,7 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                 ) : (
                   catSubs.map((s: any) => {
                     const isSel = selected.includes(s.id);
-                    const alreadyIn = enhancedSubs.includes(s.id) || SUPPORT_LEVELS[supportLevel]?.subs?.includes(s.id);
+                    const alreadyIn = enhancedSubs.includes(s.id) || planSubs.includes(s.id);
                     return (
                       <div key={s.id} onClick={() => { if (!alreadyIn) toggleSelected(s.id); }}
                         style={{
@@ -186,13 +189,13 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                 const favSubstances = favIds.map((id: string) => catalogSubstances.find((s: any) => s.id === id)).filter(Boolean);
                 const filtered = favSearch ? favSubstances.filter((s: any) => (s.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
                 if (filtered.length === 0) return <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Нет избранных препаратов. Добавьте из каталога ⭐.</div>;
-                const notInPlan = filtered.filter((s: any) => !enhancedSubs.includes(s.id) && !SUPPORT_LEVELS[supportLevel]?.subs?.includes(s.id));
+                const notInPlan = filtered.filter((s: any) => !enhancedSubs.includes(s.id) && !planSubs.includes(s.id));
                 return (
                   <div>
                     <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>{favSearch ? `Найдено: ${filtered.length}` : `В избранном: ${filtered.length} · В плане: ${filtered.length - notInPlan.length}`}</div>
                     <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
                       {filtered.map((sub: any) => {
-                        const inPlan = enhancedSubs.includes(sub.id) || SUPPORT_LEVELS[supportLevel]?.subs?.includes(sub.id);
+                        const inPlan = enhancedSubs.includes(sub.id) || planSubs.includes(sub.id);
                         const isSel = selected.includes(sub.id);
                         return (
                           <div key={sub.id} onClick={() => { if (!inPlan) toggleSelected(sub.id); }}
@@ -218,10 +221,10 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                         );
                       })}
                     </div>
-                    <button onClick={() => {
-                      const toAdd = selected.filter(id => !enhancedSubs.includes(id) && !SUPPORT_LEVELS[supportLevel]?.subs?.includes(id));
-                      if (toAdd.length > 0) addToPlan(toAdd);
-                    }}
+                      <button onClick={() => {
+                        const toAdd = selected.filter(id => !enhancedSubs.includes(id) && !planSubs.includes(id));
+                        if (toAdd.length > 0) addToPlan(toAdd);
+                      }}
                       style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
                         background: selected.length > 0 ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
                         color: selected.length > 0 ? '#000' : 'var(--text-dim)', fontWeight:700, fontSize:11 }}>
