@@ -52,7 +52,7 @@ export const PKPDSimulationTab: React.FC = () => {
   const [pkEsterPopup, setPkEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
 
   const allSubstances = useMemo(() => {
-    const PKPD_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','insulin']);
+    const PKPD_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','dht_inject','insulin','gh','glp1','clenbuterol','thyroid','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf']);
     return Object.values(PHARMA_DB).filter(s => !!s?.name && PKPD_CLASSES.has(s.class));
   }, []);
 

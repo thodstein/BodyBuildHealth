@@ -12,6 +12,7 @@ import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.
 import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 import { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from './course-sync';
+import { injectionsPerWeek, weeklyDose } from '../engines/pharma-frequency';
 
 let globalTick = 0;
 const listeners = new Set<() => void>();
@@ -93,9 +94,9 @@ function computeWeeklyAverages(): { kcal: number; protein: number; fat: number; 
 function computeActiveDrugs(course: CourseEntry[]): Record<string, { dosePerWeek: number }> {
   const map: Record<string, { dosePerWeek: number }> = {};
   course.forEach(c => {
-    const freq = typeof c.frequency === 'number' ? c.frequency : 1;
+    const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
     if (!map[c.substanceId]) map[c.substanceId] = { dosePerWeek: 0 };
-    map[c.substanceId].dosePerWeek += c.doseValue * freq;
+    map[c.substanceId].dosePerWeek += wk;
   });
   return map;
 }
@@ -150,15 +151,22 @@ export function useDataLink(): LinkedData {
          setLabs(userLabs);
 
          const allCourse = await db.getAll<CourseEntry>('course_log');
-         const validCourse = (Array.isArray(allCourse) ? allCourse : []).filter(c =>
-           c && typeof c.substanceId === 'string' && c.substanceId.length > 0
-         ).map(c => ({
-           ...c,
-           doseValue: Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0,
-           frequency: typeof c.frequency === 'number' ? c.frequency : (Number.isFinite(Number(c.frequency)) ? Number(c.frequency) : 1),
-           startWeek: Number.isFinite(Number(c.startWeek)) ? Number(c.startWeek) : 1,
-           endWeek: Number.isFinite(Number(c.endWeek)) ? Number(c.endWeek) : 12,
-         }));
+          const validCourse = (Array.isArray(allCourse) ? allCourse : []).filter(c =>
+            c && typeof c.substanceId === 'string' && c.substanceId.length > 0
+          ).map(c => {
+            const rawFreq = c.frequency as unknown;
+            let freq: number | string = 1;
+            if (typeof rawFreq === 'number' && Number.isFinite(rawFreq)) freq = rawFreq as number;
+            else if (typeof rawFreq === 'string' && String(rawFreq).trim().length > 0) freq = String(rawFreq).trim();
+            else freq = 1;
+            return {
+              ...c,
+              doseValue: Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0,
+              frequency: freq,
+              startWeek: Number.isFinite(Number(c.startWeek)) ? Number(c.startWeek) : 1,
+              endWeek: Number.isFinite(Number(c.endWeek)) ? Number(c.endWeek) : 12,
+            };
+          });
          setCourse(validCourse);
          // Автосинхронизация course_log → profile.currentSubstances + PED-флаги/дозы
          syncCourseToProfile(validCourse);

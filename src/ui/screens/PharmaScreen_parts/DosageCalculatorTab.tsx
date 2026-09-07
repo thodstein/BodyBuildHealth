@@ -216,7 +216,7 @@ export const DosageCalculatorTab: React.FC = () => {
   const weeklyTotal = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
 
-  const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','pct_gonadotropin']);
+  const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','dht_inject','dht_derivative','gh','glp1','clenbuterol','thyroid','pct_gonadotropin']);
   const { pharmaFiltered, grouped, singles } = useMemo(() => {
     const filtered = allPharma.filter(p => KEEP_CLASSES.has(p.class));
     const grouped: { type: 'class'; cls: string; label: string }[] = [];

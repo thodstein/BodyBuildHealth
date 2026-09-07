@@ -17,7 +17,7 @@ import { SYNERGY_PAIRS } from '../../../engines/support.engine';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
 import { useDataLink } from '../../../core/data-link';
 
-const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
+const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','dht_inject','gh','glp1','clenbuterol','thyroid','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
 
 export const InteractionCheckerTab: React.FC = () => {
   const linked = useDataLink();

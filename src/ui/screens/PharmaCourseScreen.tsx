@@ -218,6 +218,7 @@ export const PharmaCourseScreen: React.FC = () => {
       doseValue: d,
       doseUnit: unit,
       frequency: selectedDays.length >= 7 ? 'daily' : selectedDays.length <= 1 ? '1x/wk' : `${selectedDays.length}x/wk`,
+      injectionDays: [...selectedDays].sort((a,b)=>a-b),
       startWeek,
       endWeek
     };
@@ -337,8 +338,9 @@ export const PharmaCourseScreen: React.FC = () => {
     for (const entry of course) {
       const cls = subClass(entry.substanceId);
       const color = classColor(cls);
-      const freq = typeof entry.frequency === 'string' ? entry.frequency : `${entry.frequency}x/wk`;
-      const dayIndices = getDaysFromFreq(freq);
+      const dayIndices = Array.isArray((entry as any).injectionDays) && (entry as any).injectionDays.length
+        ? (entry as any).injectionDays as number[]
+        : getDaysFromFreq(typeof entry.frequency === 'string' ? entry.frequency : `${entry.frequency}x/wk`);
       for (const idx of dayIndices) { if(grid[idx]) grid[idx].entries.push({ entry, color }); }
     }
     return grid;
@@ -634,7 +636,7 @@ export const PharmaCourseScreen: React.FC = () => {
                     const cls = subClass(entry.substanceId);
                     const color = classColor(cls);
                     const isAct = (entry.startWeek || 0) <= currentWeek && currentWeek < entry.endWeek;
-                    const selected = getDaysFromFreq(String(entry.frequency||''));
+                    const selected = Array.isArray((entry as any).injectionDays) && (entry as any).injectionDays.length ? (entry as any).injectionDays as number[] : getDaysFromFreq(String(entry.frequency||''));
                     return (
                       <div key={entry.id} style={{
                         display:'flex', flexDirection:'column', gap:6, padding:'8px 9px',
@@ -657,9 +659,10 @@ export const PharmaCourseScreen: React.FC = () => {
                         </div>
                         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                           {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((d,i)=>{
-                            const active = selected.includes(i);
+                            const days = Array.isArray((entry as any).injectionDays) && (entry as any).injectionDays.length ? (entry as any).injectionDays as number[] : getDaysFromFreq(String(entry.frequency||''));
+                            const active = days.includes(i);
                             return (
-                              <button key={i} onClick={()=>{ const cur=getDaysFromFreq(String(entry.frequency||'')); const next=cur.includes(i)?cur.filter(x=>x!==i):[...cur,i].sort((a,b)=>a-b); const nf=freqFromDays(next.length?next:[i]); updateEntry(entry.id,{frequency:nf}); }} style={{ flex:1, minWidth:30, height:26, borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', border:`1px solid ${active?'#8b5cf6':'rgba(255,255,255,0.08)'}`, background: active?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.04)', color:'#fff' }}>{d}</button>
+                              <button key={i} onClick={()=>{ const cur = Array.isArray((entry as any).injectionDays) && (entry as any).injectionDays.length ? (entry as any).injectionDays as number[] : getDaysFromFreq(String(entry.frequency||'')); const next=cur.includes(i)?cur.filter(x=>x!==i):[...cur,i].sort((a,b)=>a-b); const nf=freqFromDays(next.length?next:[i]); updateEntry(entry.id,{frequency:nf, injectionDays: next.length?next:[i]} as any); }} style={{ flex:1, minWidth:30, height:26, borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', border:`1px solid ${active?'#8b5cf6':'rgba(255,255,255,0.08)'}`, background: active?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.04)', color:'#fff' }}>{d}</button>
                             );
                           })}
                         </div>

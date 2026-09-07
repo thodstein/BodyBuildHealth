@@ -5,7 +5,7 @@ export const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO_ALL).map(([k, v]) => [k, (v as { label: string }).label.split(' ').slice(0, 2).join(' ')])
 );
 
-export const INJECTABLE_WITH_ESTERS = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone']);
+export const INJECTABLE_WITH_ESTERS = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','dht_inject']);
 
 export const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон',
@@ -147,15 +147,15 @@ export const formatHalfLife = (hours: number): string => {
 export const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
   'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin',
-  'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other', 'dht_derivative'
+  'drostanolone', 'dht_inject', 'dht_derivative', 'gh', 'glp1', 'clenbuterol', 'thyroid',
+  'peptide_gnrh', 'peptide_fat_loss', 'peptide_other'
 ] as const;
 
 export const PHARMA_CORE_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
   'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin',
-  'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other', 'dht_derivative'
+  'drostanolone', 'dht_inject', 'dht_derivative', 'gh', 'glp1', 'clenbuterol', 'thyroid',
+  'peptide_gnrh', 'peptide_fat_loss', 'peptide_other'
 ] as const;
 
 export type PharmaClass = typeof PHARMA_CLASSES[number];

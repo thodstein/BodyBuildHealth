@@ -1,5 +1,6 @@
 import { CourseEntry, BayesianState, ConcentrationPoint } from '../core/types';
 import { PHARMA_DB, PKPD_DEFAULTS } from '../core/constants';
+import { injectionsPerWeek } from './pharma-frequency';
 
 interface SubstanceState {
   A1: number; A2: number; A3: number;
@@ -22,46 +23,54 @@ export function calculateMultiSubstancePKPD(
   const FALLBACK_PK = { bioavailability: 0.8, ka: 0.02, k10: 0.03, k12: 0.01, k21: 0.005, Vd: 50 };
 
   // Группировка и инициализация веществ + расписание болюсов
+  // Ключ — уникальный по записи (не по substanceId), чтобы не суммировать дозы разных периодов
   const substances = new Map<string, SubstanceState>();
-  course.forEach(c => {
+  course.forEach((c, idx) => {
     if (!c) return;
     const sub = PHARMA_DB[c.substanceId];
     if (!sub || !sub.pk) return;
     const pk = sub.pk;
-    const freqStr = String(c.frequency ?? '');
-    const freqMatch = freqStr.match(/(\d+)x\/week/);
-    const injectionsPerWeek = freqMatch ? parseInt(freqMatch[1]) : 2;
-    const dosePerInjection = c.doseValue / injectionsPerWeek;
-    const intervalSteps = Math.round(stepsPerWeek / injectionsPerWeek);
-    const totalInjections = injectionsPerWeek * Math.max(0, c.endWeek ?? weeks);
+    const perWeek = injectionsPerWeek(c.frequency as any);
+    const weeklyDose = c.doseValue ?? 0;
+    const dosePerInjection = perWeek > 0 ? weeklyDose / perWeek : weeklyDose;
+    const startW = Number.isFinite(c.startWeek as number) ? (c.startWeek as number) : 0;
+    const endW = Number.isFinite(c.endWeek as number) ? (c.endWeek as number) : weeks;
+    const durationWeeks = Math.max(0, endW - startW);
+    const totalInjections = Math.round(perWeek * durationWeeks);
+    const intervalSteps = perWeek > 0 ? stepsPerWeek / perWeek : stepsPerWeek;
     const schedule = new Set<number>();
-    for (let i = 0; i < totalInjections; i++) schedule.add(i * intervalSteps + 1);
-    if (!substances.has(c.substanceId)) {
-      substances.set(c.substanceId, {
-        A1: 0, A2: 0, A3: 0,
-        dosePerDay: dosePerInjection * injectionsPerWeek / 7, bio: pk.bioavailability ?? FALLBACK_PK.bioavailability, ka: pk.ka ?? FALLBACK_PK.ka,
-        k10: pk.k10 ?? FALLBACK_PK.k10, k12: pk.k12 ?? FALLBACK_PK.k12, k21: pk.k21 ?? FALLBACK_PK.k21, Vd: (pk.Vd && pk.Vd > 0) ? pk.Vd : FALLBACK_PK.Vd,
-        injSchedule: schedule, injDose: dosePerInjection * (pk.bioavailability ?? FALLBACK_PK.bioavailability)
-      });
-    } else {
-      const ex = substances.get(c.substanceId)!;
-      if (!ex) return;
-      schedule.forEach(s => ex.injSchedule.add(s));
-      ex.injDose += dosePerInjection * (pk.bioavailability ?? FALLBACK_PK.bioavailability);
+    const baseStep = Math.round(startW * stepsPerWeek);
+    for (let i = 0; i < totalInjections; i++) {
+      const step = Math.round(baseStep + i * intervalSteps) + 1;
+      if (step >= 1 && step <= weeks * stepsPerWeek + stepsPerWeek) schedule.add(step);
     }
+    const key = `${c.substanceId}__${(c as any).id ?? idx}`;
+    substances.set(key, {
+      A1: 0, A2: 0, A3: 0,
+      dosePerDay: dosePerInjection * perWeek / 7,
+      bio: pk.bioavailability ?? FALLBACK_PK.bioavailability,
+      ka: pk.ka ?? FALLBACK_PK.ka,
+      k10: pk.k10 ?? FALLBACK_PK.k10,
+      k12: pk.k12 ?? FALLBACK_PK.k12,
+      k21: pk.k21 ?? FALLBACK_PK.k21,
+      Vd: (pk.Vd && pk.Vd > 0) ? pk.Vd : FALLBACK_PK.Vd,
+      injSchedule: schedule,
+      injDose: dosePerInjection * (pk.bioavailability ?? FALLBACK_PK.bioavailability),
+    });
   });
 
   const states = Array.from(substances.values());
   const kTol = PKPD_DEFAULTS.kTol;
+  let cumulativeTol = 0;
 
   for (let w = 0; w <= weeks; w++) {
-    let weekTotalCp = 0;
+    let weekCpSum = 0;
     let weekIntegralCp = 0;
 
     const baseStep = w * stepsPerWeek;
     for (let s = 0; s < stepsPerWeek; s++) {
       const step = baseStep + s;
-
+      let stepTotalCp = 0;
       states.forEach(state => {
         // Bolus injection at scheduled steps
         if (state.injSchedule.has(step)) state.A1 += state.injDose;
@@ -86,14 +95,15 @@ export function calculateMultiSubstancePKPD(
 
         const vd = (state.Vd > 0) ? state.Vd : FALLBACK_PK.Vd;
         const cp = (state.A2 / vd) * (b.clearanceK ?? 1);
-        weekTotalCp += cp;
+        stepTotalCp += cp;
+        weekCpSum += cp;
         weekIntegralCp += cp * dt;
       });
-
-      totalTol[w] = Math.min(PKPD_DEFAULTS.maxTol, totalTol[w] + kTol * weekTotalCp * dt);
+      cumulativeTol = Math.min(PKPD_DEFAULTS.maxTol, cumulativeTol + kTol * stepTotalCp * dt);
+      totalTol[w] = cumulativeTol;
     }
 
-    const avgCp = weekTotalCp / Math.max(stepsPerWeek, 1);
+    const avgCp = weekCpSum / Math.max(stepsPerWeek, 1);
     const combinedEC50 = 400 * (b.ec50Shift ?? 1) * (1 + 0.01 * (weekIntegralCp || 0));
     const effect = Math.max(0, Math.min(100, (isFinite(avgCp) ? avgCp : 0) ** 2.5 / ((isFinite(combinedEC50) ? combinedEC50 : 400) ** 2.5 + (isFinite(avgCp) ? avgCp : 0) ** 2.5))) * (1 - (totalTol[w] || 0)) * 100;
 

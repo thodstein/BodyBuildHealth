@@ -25,10 +25,11 @@ export function calculateConcentration(course: CourseEntry[], weeks: number = 52
   for(let w=0; w<=weeks; w++) {
     let weekDose = 0;
     course.forEach(c => {
-      if(w >= c.startWeek && w <= c.endWeek) {
+      if(w >= (c.startWeek ?? 0) && w <= (c.endWeek ?? 0)) {
         const sub = PHARMA_DB[c.substanceId];
-        const bio = sub ? sub.pk.bioavailability : PKPD_DEFAULTS.bioavailability;
-        weekDose += c.doseValue * bio * (c.doseUnit.includes('/wk') ? 1/7 : 1);
+        const bio = sub?.pk?.bioavailability ?? PKPD_DEFAULTS.bioavailability;
+        const isWeekly = typeof c.doseUnit === 'string' && c.doseUnit.includes('/wk');
+        weekDose += (c.doseValue ?? 0) * bio * (isWeekly ? 1/7 : 1);
       }
     });
     if(weekDose > 0) A1 += weekDose;
@@ -72,7 +73,7 @@ export function bayesianUpdate(state: BayesianState, labPredicted: number, labAc
 // ТЗ §4.6: Валидация введённого курса
 export function validateCourse(course: CourseEntry[]): { valid: boolean; warnings: string[] } {
   const warnings: string[] = [];
-  const oralCount = course.filter(c => PHARMA_DB[c.substanceId]?.pd.hepatotoxicity >= 2);
+  const oralCount = course.filter(c => (PHARMA_DB[c.substanceId]?.pd?.hepatotoxicity ?? 0) >= 2);
   
   course.forEach(c => {
     if(!PHARMA_DB[c.substanceId]) warnings.push(`Неизвестный препарат: ${c.substanceId}`);

@@ -4,6 +4,7 @@
  */
 import type { CourseEntry, PharmaSubstanceEntry } from './types';
 import { PHARMA_DB } from './pharma-database';
+import { weeklyDose } from '../engines/pharma-frequency';
 
 /** Маппинг CourseEntry[] (course_log) → PharmaSubstanceEntry[] (profile.currentSubstances). */
 export function mapCourseToSubstances(course: CourseEntry[]): PharmaSubstanceEntry[] {
@@ -50,10 +51,12 @@ export function derivePedFlagsFromCourse(course: CourseEntry[]): Partial<{
   if (ids.has('tamoxifen') || ids.has('clomiphene') || ids.has('enclomiphene')) result.hasSERM = true;
   if (ids.has('ostarine') || ids.has('lgd') || ids.has('rad140') || ids.has('s23') || ids.has('andarine')) result.hasSARMs = true;
   if (ids.has('mgf')) result.hasMGF = true;
+  if (ids.has('semaglutide') || ids.has('tirzepatide') || ids.has('glp1') || ids.has('liraglutide')) result.hasGLP1 = true;
 
   let ghIU = 0, insulinIU = 0, igfMcg = 0, clenMcg = 0, t3Mcg = 0;
   for (const c of course) {
-    const dose = Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0;
+    const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
+    const dose = Number.isFinite(wk) ? wk : 0;
     if (c.substanceId === 'somatropin' || c.substanceId === 'hgh' || c.substanceId === 'gh') ghIU += dose;
     if (['ins_short','ins_long','ins_aspart','ins_detemir'].includes(c.substanceId)) insulinIU += dose;
     if (['igf1_lr3','igf1_des'].includes(c.substanceId)) igfMcg += dose;
@@ -71,7 +74,7 @@ export function derivePedFlagsFromCourse(course: CourseEntry[]): Partial<{
 /** Вывод PED-флагов и доз из profile.currentSubstances (зеркало course_log). */
 export function derivePedFlagsFromSubstances(substances: PharmaSubstanceEntry[]): Partial<{
   hasAI: boolean; hasCaber: boolean; hasGH: boolean; hasIGF: boolean; hasInsulin: boolean;
-  hasSERM: boolean; hasSARMs: boolean; hasMGF: boolean;
+  hasSERM: boolean; hasSARMs: boolean; hasMGF: boolean; hasGLP1: boolean;
   ghIU: number; insulinIU: number; igfMcg: number; clenMcg: number; t3Mcg: number;
 }> {
   const ids = new Set(substances.map(s => s.id));
@@ -84,6 +87,7 @@ export function derivePedFlagsFromSubstances(substances: PharmaSubstanceEntry[])
   if (['tamoxifen','clomiphene','enclomiphene'].some(id => ids.has(id))) result.hasSERM = true;
   if (['ostarine','lgd','rad140','s23','andarine'].some(id => ids.has(id))) result.hasSARMs = true;
   if (ids.has('mgf')) result.hasMGF = true;
+  if (ids.has('semaglutide') || ids.has('tirzepatide') || ids.has('glp1') || ids.has('liraglutide')) result.hasGLP1 = true;
 
   let ghIU = 0, insulinIU = 0, igfMcg = 0, clenMcg = 0, t3Mcg = 0;
   for (const s of substances) {
