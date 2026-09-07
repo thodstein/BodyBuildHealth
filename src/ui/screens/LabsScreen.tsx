@@ -1785,13 +1785,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>⚠️ Риски и индексы здоровья</div>
             </div>
 
-            {/* Labs Score Card (TZ Pipeline) */}
+            {/* Labs Score Card (TZ Pipeline) — P0 fix: все маркеры фазы (lowercase id), а не поля 1 точки */}
             <LabsScoreCard
-              markers={(() => {
-                const latest = currentLabs?.[currentLabs.length - 1];
-                if (!latest) return [];
-                return Object.entries(latest).filter(([k, v]) => typeof v === 'number').map(([id, value]) => ({ id, value: value as number }));
-              })()}
+              markers={currentLabs.map(l => ({ id: (l.code || '').toLowerCase(), value: Number(l.value) })).filter(m => m.id && isFinite(m.value))}
               weight={(linked.profile?.settings as any)?.personal?.weight || 80}
               age={(linked.profile?.settings as any)?.personal?.age || 30}
               sex={(linked.profile?.settings as any)?.personal?.sex || 'male'}
