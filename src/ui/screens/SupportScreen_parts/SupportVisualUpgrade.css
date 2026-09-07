@@ -114,6 +114,39 @@
   color: #fff !important;
 }
 
+/* АБСОЛЮТНО ВЕСЬ СЕРЫЙ ТЕКСТ → БЕЛЫЙ (только color, фоны/рамки не трогаем).
+   Hex slate/gray: #94a3b8/#64748b/#6b7280/#9ca3af/#666/#888/#999/#e2e8f0.
+   Печатные HTML-строки (window.print) — это JS-строки, не DOM: не затрагиваются. */
+.support-screen [style*="#94a3b8"],
+.support-screen [style*="#64748b"],
+.support-screen [style*="#6b7280"],
+.support-screen [style*="#9ca3af"],
+.support-screen [style*="#666"],
+.support-screen [style*="#888"],
+.support-screen [style*="#999"],
+.support-screen [style*="#e2e8f0"],
+.support-screen [style*="color: gray"],
+.support-screen [style*="color:gray"],
+.support-screen [style*="color: grey"],
+.support-screen [style*="color:grey"] {
+  color: #fff !important;
+}
+
+/* var()-серые с fallback-формами var(--text-dim, ...) — префиксное покрытие */
+.support-screen [style*="var(--text-dim"],
+.support-screen [style*="var(--text-light"],
+.support-screen [style*="var(--text-muted"],
+.support-screen [style*="var(--text-secondary"] {
+  color: #fff !important;
+}
+
+/* Плейсхолдеры — читаемый белый */
+.support-screen input::placeholder,
+.support-screen textarea::placeholder {
+  color: rgba(255, 255, 255, 0.55) !important;
+  opacity: 1 !important;
+}
+
 /* Бейджи механизмов — крупнее */
 .support-screen span[style*="font-size: 7"],
 .support-screen span[style*="font-size: 8"] {
