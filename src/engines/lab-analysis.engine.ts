@@ -156,10 +156,10 @@ export function interpretLabs(labs: LabPoint[]): LabCompositeResult {
     if (value === null) continue;
 
     let status: LabInterpretation['status'] = 'normal';
-    const normalizedHigh = Math.max(ref.high, ref.criticalHigh - 1);
+    // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой)
     if (value < ref.low) status = 'low';
     else if (value > ref.criticalHigh) status = 'critical_high';
-    else if (value > normalizedHigh) status = 'high';
+    else if (value > ref.high) status = 'high';
 
     if (status !== 'normal') {
       const mapped = LAB_MECHANISM_MAP[code];
