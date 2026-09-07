@@ -97,6 +97,14 @@ if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у jo
   }
 }
 
+// 10. Артефакты локальной сборки не должны попасть в git (регенерит CI).
+{
+  const gi = readFileSync(join(__dirname, '..', '.gitignore'), 'utf-8');
+  for (const pat of ['dist-native/', 'web-bundle', 'android/assets/']) {
+    if (!gi.includes(pat)) fails.push(`.gitignore без ${pat}`);
+  }
+}
+
 if (fails.length > 0) {
   console.error('[check-apk-workflow] FAIL:');
   for (const f of fails) console.error(`  - ${f}`);

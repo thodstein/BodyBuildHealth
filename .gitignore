@@ -101,3 +101,7 @@ android/app/*.keystore
 android/app/*.jks
 *.apk
 *.aab
+# Локальная сборка натива и её побочка (регенерит CI: build:native / cap sync)
+dist-native/
+web-bundle*.zip
+android/assets/
