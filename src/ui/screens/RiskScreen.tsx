@@ -404,8 +404,11 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         systemBreakdown: { ...result.systemBreakdown, ...bridgeBreakdown },
       };
     }
+    // Покрытие поддержкой из data-link: без этого riskResult.coverageMap всегда
+    // пуст и секция «Покрытие поддержкой» показывала нули при любой поддержке.
+    result = { ...result, coverageMap: (linked.supportCoverage || {}) as Record<string, number> };
     return result;
-  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk]);
+  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk, linked.supportCoverage]);
 
   // Build synthetic lab risk contribution from penalty when no labs exist
   const syntheticLabContrib = useMemo(() => {
@@ -475,7 +478,9 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     } catch { return null; }
   }, [linked.labs, linked.course, linked.profile, linked.activeDrugs, linked.supportCoverage]);
 
-  const riskHistory = useMemo(() => loadRiskHistory(), []);
+  // tick в зависимостях: записи сохраняются по ходу сессии, без него
+  // страница истории не видела новые точки до перемонтирования.
+  const riskHistory = useMemo(() => loadRiskHistory(), [tick]);
 
   const renderRiskReports = () => {
     const saveArchive = (report: any) => {
@@ -610,7 +615,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;
       case 'labs_risks': return <LabsRisksTab />;
-      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
 
