@@ -3063,8 +3063,10 @@ for (const week of next.weeks) {
         minSetsByMuscle: sessionGuard,
         // BIG-сессии курса не влезают в дефолтные 100 мин движка: тайм-трим
         // сбривал бы руки/добивки под корень при защищённых праймари.
-        // Курс+стаж тренируются дольше — лимит времени масштабируется.
-        maxTimeSeconds: options.onCourse && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 150 * 60
+        // Лимит времени — пара к сет-бюджету (65 сетов × ~150 с ≈ 165 мин),
+        // условия те же, что у сет-капа: стаж 6+ на enhanced/курсе — 165 мин,
+        // остальной курс — 120, натуралы — дефолт движка.
+        maxTimeSeconds: (options.trainingYears ?? 0) >= 6 && (options.level === 'enhanced' || options.onCourse) ? 165 * 60
           : options.onCourse ? 120 * 60 : undefined,
       });
       if (fitted.removed.length > 0) {

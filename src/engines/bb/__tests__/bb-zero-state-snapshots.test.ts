@@ -25,13 +25,12 @@ const directVolume = (plan: any): Record<string, number> => {
 describe('BB zero-state snapshots (baseline Этапа 10)', () => {
   it('Generic enhanced 6+ (upper_lower_4, mass, AAS 500) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, ...PED });
-    // Re-baseline (осознанно, BIG-капы PED+стаж + честный фит):
-    // прайм-муверы вверх (грудь 30→36, квадры 18→21, бицепс бедра 23);
-    // руки 7/7 (было душёное 4/4 — флор рук 4 на курсе);
-    // спина 41 (памп-сессия 17: 1 сет уходит гарантии рук в бюджете 60);
-    // ягодицы direct 10 + indirect ≈ MAV. Валидатор зелёный, инварианты целы.
+    // Re-baseline (осознанно, бюджетная политика tier 6+: 65 сетов/165 мин):
+    // грудь 30→36, спина 46→45 (effective 49), руки 6/4→8/7, квадры 18→21,
+    // предплечья 6→8, пресс 14→16 — бюджет вмещает предписание целиком,
+    // zero-sum закрыт. Валидатор зелёный, инварианты целы.
     expect(directVolume(plan)).toEqual({
-      abs: 14, back: 41, biceps: 7, calves: 10, chest: 36, delt_mid: 6, delt_rear: 5, forearms: 6, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
+      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
     });
   });
 
