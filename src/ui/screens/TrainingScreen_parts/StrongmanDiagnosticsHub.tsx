@@ -828,8 +828,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   return (
     <div className="train-strongdiag" style={{ padding: '14px 12px 22px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }`}</style>
-      <div style={{ ...CARD, padding: '18px 18px 16px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', position: 'relative', overflow: 'hidden' }}>
+      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }`}</style>
+      <div style={{ ...CARD, padding: '18px 18px 16px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -24, right: -24, width: 150, height: 150, borderRadius: 150, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
           <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 22, flexShrink: 0, boxShadow: '0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🏋️‍♂️</div>
@@ -842,13 +842,27 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 11, color: sColor, fontWeight: 800, marginTop: 4 }}>{level==='ok'?'ОК':level==='warn'?'WARN':'CRITICAL'} · v{scoring.verification}</div>
           </div>
         </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:8, marginBottom:8 }}>
+          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${ohs.level==='ok'?'#22c55e':'#ef4444'}`, display:'flex', flexDirection:'column', gap:2 }}>
+            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>OHS · МОБИЛЬНОСТЬ</span>
+            <span style={{ fontSize:20, fontWeight:800, color: ohs.level==='ok'?'#22c55e':'#ef4444', fontVariantNumeric:'tabular-nums' }}>{ohs.totalScore}/6</span>
+          </div>
+          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${gripFails>0?'#f59e0b':'#22c55e'}`, display:'flex', flexDirection:'column', gap:2 }}>
+            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>GRIP · ПРОВАЛЫ</span>
+            <span style={{ fontSize:20, fontWeight:800, color: gripFails>0?'#f59e0b':'#22c55e', fontVariantNumeric:'tabular-nums' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
+          </div>
+          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
+            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>SWAY · CARRY</span>
+            <span style={{ fontSize:20, fontWeight:800, color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff', fontVariantNumeric:'tabular-nums' }}>{swayDiag ? `sway ${swayDiag.swayCm}см` : '—'}</span>
+          </div>
+          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
+            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>VBT · ПОТЕРЯ</span>
+            <span style={{ fontSize:20, fontWeight:800, color: vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : '#fff', fontVariantNumeric:'tabular-nums' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : '—'}</span>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 8 }}>
           <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
           <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
-          {swayDiag && <span style={{ padding: '6px 12px', borderRadius: 20, background: swayDiag.severity==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: swayDiag.severity==='ok'?'#22c55e':'#ef4444' }}>sway {swayDiag.swayCm}см</span>}
-          {vbtLoss && <span style={{ padding: '6px 12px', borderRadius: 20, background: vbtLoss.exceeded?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT {vbtLoss.lossPct}%</span>}
-          <span style={{ padding: '6px 12px', borderRadius: 20, background: ohs.level==='ok'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>OHS {ohs.totalScore}/6</span>
-          <span style={{ padding: '6px 12px', borderRadius: 20, background: gripFails>0?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
           {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
         {diaryWeaks.length>0 && <div style={{ fontSize: 12, color: '#5ee', marginBottom: 4 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</div>}
@@ -899,9 +913,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Жим — лог/аксель (4 фазы, дип 8-12см)</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
-              {PRESS_OPTS.map(o=>(
-                <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={state.pressWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.pressWeak.includes(o.id) ? '#ef4444' : 'rgba(140,190,255,0.16)', background: state.pressWeak.includes(o.id) ? 'rgba(239,68,68,0.14)' : 'rgba(22,30,52,0.88)', color: state.pressWeak.includes(o.id) ? '#ff6b6b' : '#fff', fontSize:13, fontWeight: state.pressWeak.includes(o.id) ? 800 : 600, boxShadow: state.pressWeak.includes(o.id) ? '0 0 16px rgba(239,68,68,0.40)' : 'none' }}>{o.label}</button>
-              ))}
+              {PRESS_OPTS.map(o=>{ const on = state.pressWeak.includes(o.id); return (
+                <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#ef4444' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(239,68,68,0.20), rgba(245,158,11,0.10))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(239,68,68,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ff6b6b' : 'rgba(255,255,255,0.30)', background: on ? '#ef4444' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                  <span>{o.label}</span>
+                </button> );})}
             </div>
             {state.pressWeak.map(id=>{
               const bio = smBiomechForWeak(id);
@@ -962,9 +978,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Переноски — йок/фермер/рама (5 фаз, sway 3/5см)</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
-              {CARRY_OPTS.map(o=>(
-                <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={state.carryWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.carryWeak.includes(o.id) ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: state.carryWeak.includes(o.id) ? 'rgba(245,158,11,0.14)' : 'rgba(22,30,52,0.88)', color: state.carryWeak.includes(o.id) ? '#ffb84d' : '#fff', fontSize:13, fontWeight: state.carryWeak.includes(o.id) ? 800 : 600, boxShadow: state.carryWeak.includes(o.id) ? '0 0 16px rgba(245,158,11,0.40)' : 'none' }}>{o.label}</button>
-              ))}
+              {CARRY_OPTS.map(o=>{ const on = state.carryWeak.includes(o.id); return (
+                <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(239,68,68,0.08))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(245,158,11,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ffb84d' : 'rgba(255,255,255,0.30)', background: on ? '#f59e0b' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                  <span>{o.label}</span>
+                </button> );})}
             </div>
             {state.carryWeak.map(id=>{
               const bio = smBiomechForWeak(id);
@@ -1000,9 +1018,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Загрузки — камни/мешок/кега (anterior load, high-hips)</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
-              {LOAD_OPTS.map(o=>(
-                <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={state.loadWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.loadWeak.includes(o.id) ? '#22c55e' : 'rgba(140,190,255,0.16)', background: state.loadWeak.includes(o.id) ? 'rgba(34,197,94,0.14)' : 'rgba(22,30,52,0.88)', color: state.loadWeak.includes(o.id) ? '#4ade80' : '#fff', fontSize:13, fontWeight: state.loadWeak.includes(o.id) ? 800 : 600, boxShadow: state.loadWeak.includes(o.id) ? '0 0 16px rgba(34,197,94,0.40)' : 'none' }}>{o.label}</button>
-              ))}
+              {LOAD_OPTS.map(o=>{ const on = state.loadWeak.includes(o.id); return (
+                <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#22c55e' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(34,197,94,0.20), rgba(34,197,94,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(34,197,94,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#4ade80' : 'rgba(255,255,255,0.30)', background: on ? '#22c55e' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                  <span>{o.label}</span>
+                </button> );})}
             </div>
             {state.loadWeak.map(id=>{
               const bio = smBiomechForWeak(id);
@@ -1032,9 +1052,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Хват / Кор / Кондиция (tri-modal + axial)</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
-              {GRIP_OPTS.map(o=>(
-                <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={state.gripWeak.includes(o.id)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid', borderColor: state.gripWeak.includes(o.id) ? '#a855f7' : 'rgba(140,190,255,0.16)', background: state.gripWeak.includes(o.id) ? 'rgba(168,85,247,0.14)' : 'rgba(22,30,52,0.88)', color: state.gripWeak.includes(o.id) ? '#c084fc' : '#fff', fontSize:13, fontWeight: state.gripWeak.includes(o.id) ? 800 : 600, boxShadow: state.gripWeak.includes(o.id) ? '0 0 16px rgba(168,85,247,0.40)' : 'none' }}>{o.label}</button>
-              ))}
+              {GRIP_OPTS.map(o=>{ const on = state.gripWeak.includes(o.id); return (
+                <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#a855f7' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(168,85,247,0.20), rgba(168,85,247,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#c084fc' : 'rgba(255,255,255,0.30)', background: on ? '#a855f7' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                  <span>{o.label}</span>
+                </button> );})}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
               <label style={{ fontSize:13, color:'#fff' }}>Support (фермер) сек<br/><input value={state.gripHoldSec} onChange={e=>setState(s=>({...s, gripHoldSec:e.target.value}))} placeholder="60" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
