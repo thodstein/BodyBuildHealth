@@ -998,23 +998,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 }}>✕</button>
               </div>
               {Object.entries(labsBySystem).map(([system, codes]) => (
-                <div key={system} style={{ marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: sysColors[system] || '#6b7280', flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>{sysLabels[system] || system}</span>
+                <div key={system} style={{ marginBottom:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                    <div style={{ width:10, height:10, borderRadius:'50%', background: sysColors[system] || '#6b7280', flexShrink:0 }} />
+                    <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{sysLabels[system] || system}</span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                     {codes.map(code => {
                       const info = UCUM_MAP[code.toUpperCase()];
                       const filled = batchValues[code] && batchValues[code].trim() !== '';
                       return (
                         <div key={code} style={{
-                          display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6,
-                          background: filled ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)' : 'var(--bg-secondary)',
-                          border: `1px solid ${filled ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.25)' : 'var(--border)'}`,
-                          transition: 'all 0.15s',
+                          display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:12, minHeight:48,
+                          background: filled ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : 'rgba(21,38,66,0.60)',
+                          border: filled ? '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.30)' : '1px solid rgba(140,190,255,0.14)',
+                          transition:'all 0.15s',
                         }}>
-                          <span style={{ fontSize: 10, fontWeight: filled ? 600 : 400, color: filled ? 'var(--accent)' : '#fff' }}>
+                          <span style={{ fontSize:12, fontWeight: filled ? 800 : 600, color: filled ? 'var(--accent)' : '#fff' }}>
                             {filled ? '✓' : '○'} {info?.name || code}
                           </span>
                           <input
@@ -1022,67 +1022,70 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                             onChange={e => setBatchValues(prev => ({ ...prev, [code]: e.target.value }))}
                             placeholder="0"
                             type="number"
+                            aria-label={info?.name || code}
                             style={{
-                              width: 48, padding: '2px 4px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
-                              borderRadius: 3, color: 'var(--accent)', fontSize: 10, fontWeight: 600, textAlign: 'right',
+                              width:64, padding:'8px 8px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', minHeight:40,
+                              borderRadius:10, color:'var(--accent)', fontSize:13, fontWeight:800, textAlign:'right',
                             }}
                           />
-                          <span style={{ fontSize: 7, color: '#fff', minWidth: 16 }}>{info?.prefUnit || ''}</span>
+                          <span style={{ fontSize:10, color:'#fff', minWidth:20, fontWeight:700 }}>{info?.prefUnit || ''}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
               ))}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display:'flex', gap:8, marginTop:10 }}>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
-                  flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)',
-                  background: 'var(--bg-secondary)', color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                  flex:1, padding:'12px 14px', borderRadius:14, border:'1px solid rgba(140,190,255,0.14)', minHeight:48,
+                  background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer',
                 }}>✕ Отмена</button>
                 <button onClick={handleBatchSave} style={{
-                  flex: 1, padding: '8px 12px', borderRadius: 10, border: 'none',
-                  background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                  flex:1, padding:'12px 14px', borderRadius:14, border:'none', minHeight:48,
+                  background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', fontWeight:800, fontSize:13, cursor:'pointer',
+                  boxShadow:'0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)',
                 }}>✓ Сохранить все</button>
               </div>
             </div>
           )}
 
-          {/* Penalty card */}
-          <div className="card" style={{ marginBottom: 10, padding: 10, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 600 }}>⚠️ Штраф за отсутствие анализов</span>
-              <button onClick={toggleGlobalNoLabs} style={{
-                padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 10,
-                background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff', border: 'none',
+          {/* Penalty card — TOP APK 44px */}
+          <div className="card" style={{ marginBottom:10, padding:14, borderRadius:16, background: anyNoLabs ? 'rgba(239,68,68,0.10)' : 'linear-gradient(180deg, rgba(21,38,66,0.72), rgba(12,23,40,0.72))', border: anyNoLabs ? '1px solid rgba(239,68,68,0.30)' : '1px solid rgba(140,190,255,0.14)', borderLeft:`3px solid ${anyNoLabs ? '#ef4444' : LABS_ACCENT}` }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:6 }}>
+              <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>⚠️ Штраф за отсутствие анализов</span>
+              <button onClick={toggleGlobalNoLabs} aria-pressed={globalNoLabs} style={{
+                padding:'10px 16px', borderRadius:999, cursor:'pointer', fontWeight:800, fontSize:12, minHeight:44, flexShrink:0,
+                background: globalNoLabs ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : '#ef4444', color: globalNoLabs ? '#0a1a08' : '#fff', border:'none',
+                boxShadow: globalNoLabs ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
               }}>
                 {globalNoLabs ? '✅ Применён' : '🚫 Без анализов'}
               </button>
             </div>
             {anyNoLabs ? (
-              <div style={{ fontSize: 10, color: '#ef4444' }}>Штраф ×{penalty.totalMultiplier.toFixed(2)} — коэффициент на все риски</div>
+              <div style={{ fontSize:12, color:'#fff', fontWeight:600 }}>Штраф ×{penalty.totalMultiplier.toFixed(2)} — коэффициент на все риски</div>
             ) : (
-              <div style={{ fontSize: 10, color: '#fff' }}>Нажмите чтобы применить штраф или введите анализы</div>
+              <div style={{ fontSize:12, color:'#fff' }}>Нажмите чтобы применить штраф или введите анализы</div>
             )}
           </div>
 
-          {/* Required labs progress */}
-          <div className="card" style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{PHASE_LABELS[selectedPhase]}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444' }}>
+          {/* Required labs progress — TOP APK чипы 44px */}
+          <div className="card" style={{ marginBottom:10, padding:14, borderRadius:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
+              <span style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{PHASE_LABELS[selectedPhase]}</span>
+              <span style={{ fontSize:12, fontWeight:800, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444', fontVariantNumeric:'tabular-nums' }}>
                 Готово {submittedCount}/{requiredLabs.length}
               </span>
             </div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ width: `${completionPct}%`, height: '100%', background: completionPct === 100 ? 'var(--accent)' : '#eab308', borderRadius: 4, transition: 'width 0.4s ease' }} />
+            <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:999, height:8, overflow:'hidden', marginBottom:10 }}>
+              <div style={{ width:`${completionPct}%`, height:'100%', background: completionPct === 100 ? 'var(--accent)' : '#eab308', borderRadius:999, transition:'width 0.4s ease' }} />
             </div>
             {Object.entries(labsBySystem).map(([system, codes]) => (
-              <div key={system} style={{ marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: sysColors[system] || '#6b7280', flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>{sysLabels[system] || system}</span>
+              <div key={system} style={{ marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <div style={{ width:10, height:10, borderRadius:'50%', background: sysColors[system] || '#6b7280', flexShrink:0 }} />
+                  <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{sysLabels[system] || system}</span>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                   {codes.map(code => {
                     const info = UCUM_MAP[code.toUpperCase()];
                     const isSubmitted = submittedCodes.has(code.toUpperCase());
@@ -1091,14 +1094,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     const isLow = latest && info ? (latest.value * (info.coeff || 1)) < info.lln : false;
                     return (
                       <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
-                        padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', transition: 'all 0.15s',
-                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(249,115,22,0.12)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)') : 'var(--bg-secondary)',
-                        border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.15)') : 'var(--border)'}`,
+                        padding:'8px 12px', borderRadius:12, fontSize:12, cursor:'pointer', transition:'all 0.15s', minHeight:40,
+                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.14)' : isLow ? 'rgba(249,115,22,0.14)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)') : 'rgba(21,38,66,0.60)',
+                        border: isSubmitted ? (isHigh ? '1px solid rgba(239,68,68,0.35)' : isLow ? '1px solid rgba(249,115,22,0.35)' : '1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)') : '1px solid rgba(140,190,255,0.14)',
                         color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : '#fff',
-                        fontWeight: isSubmitted ? 600 : 400,
+                        fontWeight: isSubmitted ? 800 : 600,
                       }}>
                         {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
-                        {latest && <span style={{ marginLeft: 3, fontWeight: 700 }}>{latest.value}</span>}
+                        {latest && <span style={{ marginLeft:4, fontWeight:800 }}>{latest.value}</span>}
                       </button>
                     );
                   })}
@@ -1106,7 +1109,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
             ))}
             {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
-              <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, fontSize: 9, color: '#fff' }}>
+              <div style={{ marginTop:6, padding:'10px 12px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)', borderRadius:12, fontSize:12, color:'#fff', lineHeight:1.5 }}>
                 Не сдано: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
               </div>
             )}
@@ -1246,56 +1249,56 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   setLabArchive(u);
                   try { localStorage.setItem('he_lab_reports', JSON.stringify(u)); localStorage.setItem('he_labs_report_current', JSON.stringify(r)); } catch { }
                   setLabReportGenerated(true);
-                }} style={{ padding: '8px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 12, background: 'var(--accent)', color: '#000', border: 'none', flex: 1 }}>📄 Сгенерировать отчёт</button>
-                <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); localStorage.removeItem('he_labs_report_current'); setLabArchive([]); setLabReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить</button>
+                }} style={{ padding:'14px 16px', borderRadius:16, cursor:'pointer', fontWeight:800, fontSize:14, minHeight:52, background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', border:'none', flex:1, boxShadow:'0 8px 24px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' }}>📄 Сгенерировать отчёт</button>
+                <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); localStorage.removeItem('he_labs_report_current'); setLabArchive([]); setLabReportGenerated(false); } catch {} }} style={{ padding:'14px 14px', borderRadius:16, cursor:'pointer', fontWeight:800, fontSize:13, minHeight:52, background:'rgba(239,68,68,0.10)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.25)' }}>🗑</button>
               </div>
               {labReportGenerated && (
-                <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</span>
-                    <span style={{ fontSize:9, color:'#fff' }}>{new Date().toLocaleString()}</span>
+                <div style={{ ...LABS_CARD, marginBottom:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:LABS_ACCENT }}>✅ Отчёт сгенерирован</span>
+                    <span style={{ fontSize:11, color:'#fff' }}>{new Date().toLocaleString()}</span>
                   </div>
-                  <div style={{ fontSize:10, color:'#fff' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
-                  <div style={{ maxHeight:160, overflowY:'auto', marginTop:4 }}>
+                  <div style={{ fontSize:12, color:'#fff' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
+                  <div style={{ maxHeight:200, overflowY:'auto', marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                     {labs.map((l:any,i:number) => (
-                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
-                        <span>{l.name||l.code}</span><span style={{ fontWeight:700 }}>{l.value} {l.unit}</span>
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', fontSize:12, color:'#fff', minHeight:44 }}>
+                        <span style={{ fontWeight:600 }}>{l.name||l.code}</span><span style={{ fontWeight:800, fontVariantNumeric:'tabular-nums' }}>{l.value} {l.unit}</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ fontSize:8, color:'#fff', textAlign:'center', marginTop:6 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
+                  <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
                 </div>
               )}
               {labArchive.length > 0 && (
                 <div>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>📦 Архив ({labArchive.length})</div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:8, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10 }}>📦 Архив ({labArchive.length})</div>
                   {labArchive.slice(0,20).map((r:any) => (
-                    <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between' }}>
-                        <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
-                        <span style={{ color:'#fff' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
+                    <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:14, padding:'12px 12px', marginBottom:8, background: selectedArchivedLabReport?.id === r.id ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)' : 'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${LABS_ACCENT}`, fontSize:12, cursor:'pointer', minHeight:52 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                        <span style={{ color:LABS_ACCENT, fontWeight:800, fontSize:13 }}>{r.date}</span>
+                        <span style={{ color:'#fff', fontSize:12 }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
                       </div>
                       {selectedArchivedLabReport?.id === r.id && (
-                        <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
-                            <div style={{ fontSize:9, fontWeight:700, color:LABS_ACCENT, marginBottom:4, display:'flex', alignItems:'center', gap:4 }}><NativeIcon name="file" size={9} /> Отчёт от {r.date}</div>
+                        <div style={{ marginTop:8, padding:10, background:'rgba(0,0,0,0.20)', borderRadius:10 }}>
+                            <div style={{ fontSize:12, fontWeight:800, color:LABS_ACCENT, marginBottom:6, display:'flex', alignItems:'center', gap:6 }}><NativeIcon name="file" size={12} /> Отчёт от {r.date}</div>
                           {(r.labs||[]).map((l:any, i:number) => (
-                            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'#fff' }}>
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:12, padding:'4px 0', color:'#fff' }}>
                               <span>{l.name || l.code}</span>
-                              <span>{l.value} {l.unit}</span>
+                              <span style={{ fontWeight:700 }}>{l.value} {l.unit}</span>
                             </div>
                           ))}
                           {r.trends && (
-                            <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                              <div style={{ fontSize:8, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>📈 Тренды</div>
-                              <div style={{ fontSize:8, color:'#fff', marginBottom:3 }}>{r.trends.summary}</div>
+                            <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                              <div style={{ fontSize:12, fontWeight:800, color:'var(--accent)', marginBottom:4 }}>📈 Тренды</div>
+                              <div style={{ fontSize:12, color:'#fff', marginBottom:4, lineHeight:1.5 }}>{r.trends.summary}</div>
                               {r.trends.insights?.map((insight: string, i: number) => (
-                                <div key={i} style={{ fontSize:8, color:'var(--text)', padding:'1px 0' }}>{insight}</div>
+                                <div key={i} style={{ fontSize:12, color:'#fff', padding:'2px 0', lineHeight:1.5 }}>{insight}</div>
                               ))}
                               {r.trends.worsened?.length > 0 && (
-                                <div style={{ fontSize:8, color:'#ef4444', marginTop:2 }}>⚠️ Ухудшения: {r.trends.worsened.map((w: any) => `${w.name} ${w.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
+                                <div style={{ fontSize:12, color:'#ef4444', marginTop:4 }}>⚠️ Ухудшения: {r.trends.worsened.map((w: any) => `${w.name} ${w.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
                               )}
                               {r.trends.improved?.length > 0 && (
-                                <div style={{ fontSize:8, color:'#22c55e', marginTop:2 }}>✅ Улучшения: {r.trends.improved.map((im: any) => `${im.name} ${im.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
+                                <div style={{ fontSize:12, color:'#22c55e', marginTop:4 }}>✅ Улучшения: {r.trends.improved.map((im: any) => `${im.name} ${im.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
                               )}
                             </div>
                           )}
@@ -1306,7 +1309,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
               )}
               {!labReportGenerated && labArchive.length === 0 && (
-                <div style={{ textAlign:'center', padding:30, fontSize:10, color:'#fff' }}>Нажмите «Сгенерировать отчёт»</div>
+                <div style={{ ...LABS_CARD, textAlign:'center', padding:24 }}>
+                  <div style={{ fontSize:28, marginBottom:8 }}>📄</div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>Нет отчётов</div>
+                  <div style={{ fontSize:12, color:'#fff' }}>Нажмите «Сгенерировать отчёт»</div>
+                </div>
               )}
             </div>
           )}
@@ -1778,7 +1785,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {/* Lab-Pharma Risks */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, pharma: !s.pharma }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.pharma ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -1813,7 +1820,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>)}</div>
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, indices: !s.indices }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.indices ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -1862,7 +1869,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {/* System Risks */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, systems: !s.systems }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.systems ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -1901,7 +1908,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {/* Abnormal Markers */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, markers: !s.markers }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.markers ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -1940,7 +1947,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {deviationCount > 0 && labRisks && (
               <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
                 <button onClick={() => setRiskSections(s => ({ ...s, normalizeDrugs: !s.normalizeDrugs }))} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                   background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
                 }}>
                   <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.normalizeDrugs ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -1975,7 +1982,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {/* ── Механизм-ориентированная модель (ТЗ) ── */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, tz: !s.tz }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.tz ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -2061,7 +2068,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {/* Required Lab Markers for MDSS + Support Calculator */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
               <button onClick={() => setRiskSections(s => ({ ...s, requiredLabs: !s.requiredLabs }))} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
               }}>
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.requiredLabs ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -2138,36 +2145,37 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-        {/* OCR Import Modal — centered */}
+        {/* OCR Import — TOP APK bottom-sheet */}
       {showImport && (
-         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={backdropClick}>
-          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 16, display: 'inline-flex', alignItems: 'center', gap: 8 }}><NativeIcon name="file" size={16} /> Импорт анализов</span>
-               <button onClick={cancelOcr} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
+         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={backdropClick}>
+          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', maxHeight:'88vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 2px', flexShrink:0 }} />
+            <div style={{ padding:'12px 16px', borderBottom:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexShrink:0 }}>
+              <span style={{ fontWeight:800, fontSize:15, color:'#fff', display:'inline-flex', alignItems:'center', gap:8 }}><NativeIcon name="file" size={16} /> Импорт анализов</span>
+               <button onClick={cancelOcr} aria-label="Закрыть импорт" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', maxHeight: '70vh' }}>
+            <div style={{ flex:1, overflowY:'auto', padding:'14px 16px calc(16px + env(safe-area-inset-bottom,0px))', maxHeight:'72vh' }}>
               {ocrLoading && (
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                  <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
-                  <div style={{ fontSize: 13, color: '#fff' }}>Распознаю документ...</div>
+                <div style={{ textAlign:'center', padding:40 }}>
+                  <div className="loading-spinner" style={{ margin:'0 auto 16px' }} />
+                  <div style={{ fontSize:13, color:'#fff' }}>Распознаю документ...</div>
                 </div>
               )}
               {!ocrLoading && !ocrResult && (
                 <div>
-                  <p style={{ fontSize: 12, color: '#fff', marginBottom: 12 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                  <p style={{ fontSize:13, color:'#fff', marginBottom:12, lineHeight:1.5 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
+                  <div style={{ display:'grid', gap:8 }}>
+                    <button onClick={() => fileInputRef.current?.click()} style={{ padding:16, borderRadius:16, border:'1px dashed rgba(140,190,255,0.25)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', minHeight:56 }}>
                       📄 Выбрать PDF или фото
                     </button>
-                    <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                    <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding:16, borderRadius:16, border:'1px dashed rgba(140,190,255,0.25)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', minHeight:56 }}>
                       📸 Сфотографировать
                     </button>
-                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                    <div style={{ borderTop:'1px solid rgba(140,190,255,0.12)', paddingTop:10 }}>
                       <textarea
                         placeholder="Вставьте текст анализов..."
                         rows={5}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', resize: 'vertical', marginBottom: 6 }}
+                        style={{ width:'100%', padding:'12px 14px', borderRadius:14, background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', color:'#fff', fontSize:13, boxSizing:'border-box', resize:'vertical', marginBottom:8, minHeight:96 }}
                         id="lab-text-paste"
                       />
                       <button onClick={async () => {

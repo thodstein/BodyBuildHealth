@@ -242,18 +242,23 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
             )}
           </div>
 
-          {/* Period selector */}
+          {/* Period selector — TOP APK 44px */}
           {selectedMarker && chartData && (
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[7, 30, 90].map(d => (
-                <button key={d} onClick={() => setChartDays(d as any)}
-                  style={{
-                    padding: '4px 12px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-                      background: chartDays === d ? LABS_ACCENT : 'rgba(255,255,255,0.04)',
-                    color: chartDays === d ? '#000' : '#fff',
-                    fontWeight: 600,
-                  }}>{d} дн.</button>
-              ))}
+            <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 4px', scrollbarWidth:'none' }}>
+              {[7, 30, 90].map(d => {
+                const active = chartDays === d;
+                return (
+                  <button key={d} onClick={() => setChartDays(d as any)} aria-pressed={active}
+                    style={{
+                      padding:'10px 16px', borderRadius:999, fontSize:12, cursor:'pointer', fontFamily:'inherit', minHeight:44, flexShrink:0,
+                      border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                      background: active ? `linear-gradient(135deg, ${LABS_ACCENT}, var(--accent-2, ${LABS_ACCENT}))` : 'rgba(21,38,66,0.60)',
+                      color: active ? '#0a1a08' : '#fff',
+                      fontWeight:800,
+                      boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
+                    }}>{d} дн.</button>
+                );
+              })}
             </div>
           )}
 

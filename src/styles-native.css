@@ -5080,6 +5080,22 @@ html.app-native .labs-hero-card:active {
   transform: scale(0.98) !important;
 }
 
+/* Риски-аккордеоны вкладки: 52px хит-зона, крупный заголовок */
+html.app-native .labs-body .card > button {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .labs-body .card > button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Дневник: чипы маркеров 40px+ */
+html.app-native .labs-labdiary button {
+  min-height: 40px !important;
+}
+
 /* Белый текст-гард: вторичный текст вкладки — белый (семантика/акценты не тронуты) */
 html.app-native .labs-body,
 html.app-native .labs-overview,
@@ -5089,7 +5105,8 @@ html.app-native .labs-labscatalog,
 html.app-native .labs-schedule,
 html.app-native .labs-sec-head,
 html.app-native .labs-kpi,
-html.app-native .labs-empty {
+html.app-native .labs-empty,
+html.app-native .labs-problems {
   color: #fff !important;
 }
 
