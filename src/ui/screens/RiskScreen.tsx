@@ -1308,7 +1308,7 @@ const MDSSRiskDisplay: React.FC = () => {
 };
 
 // ── Compliance Display Component ──
-const ComplianceDisplay: React.FC = () => {
+export const ComplianceDisplay: React.FC = () => {
   const linked = useDataLink();
   const s = linked.profile?.settings;
   const labs = linked.labs || [];
@@ -1383,7 +1383,9 @@ const ComplianceDisplay: React.FC = () => {
       zCritOverride: zCrit,
     });
     setReport(result);
-  }, [cycleStart, latestLabDate, markers.length]);
+    // NOTE: зависимость — весь markers, а не markers.length: правка значения
+    // анализа при том же количестве иначе не пересчитывала отчёт.
+  }, [cycleStart, latestLabDate, markers, genetics]);
 
   const msPerWeek = 7 * 24 * 3600 * 1000;
   const weeksSinceLab = Math.max(0, (new Date(today).getTime() - new Date(latestLabDate).getTime()) / msPerWeek);
