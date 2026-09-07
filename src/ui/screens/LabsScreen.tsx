@@ -665,15 +665,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: '#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
-                    <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>
+                    <div style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>
                       {trendAlertList.slice(0, 2).map(a => `${a.name} ${a.direction === 'up' ? '↑' : '↓'}`).join(', ')}
                       {trendAlertList.length > 2 && ` +${trendAlertList.length - 2}`}
                     </div>
                   </div>
-                  <span style={{ color: '#ef4444', fontSize: 14, opacity: 0.8 }}>→</span>
+                  <span style={{ color:'#ef4444', fontSize:14, opacity:0.8, flexShrink:0 }}>→</span>
                 </button>
               )}
-              <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>Нажми на раздел — откроются инструменты и данные</div>
+              <div style={{ marginTop:10, textAlign:'center', fontSize:11, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>Нажми на раздел — откроются инструменты и данные</div>
             </div>
           </div>
         </div>
@@ -1474,7 +1474,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ marginBottom:12 }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'#f97316', marginBottom:6 }}>💊 Рекомендации по коррекции</div>
                   {recommendations.map(({ trend, corrections }) => (
-                    <div key={trend.code} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.12)', fontSize:9, color:'var(--text)', marginBottom:3, lineHeight:1.4 }}>
+                    <div key={trend.code} style={{ padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.16)', fontSize:11, color:'#fff', marginBottom:6, lineHeight:1.5 }}>
                       <b>{trend.name}</b> {trend.direction === 'up' ? '↑' : '↓'} {trend.absoluteChange?.toFixed(1)} — поддержать: {corrections.join(', ')}
                     </div>
                   ))}
@@ -2083,7 +2083,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 📋 Требуемые анализы (MDSS + Калькулятор поддержки)
               </button>
               {riskSections.requiredLabs && (<div style={{ padding: '0 12px 12px' }}>
-                <div style={{ fontSize: 9, color: '#fff', marginBottom: 6 }}>
+                <div style={{ fontSize:11, color:'#fff', marginBottom:8, lineHeight:1.5 }}>
                   Сводка маркеров, необходимых для полного расчёта рисков MDSS, подбора поддержки и лабораторных индексов.
                 </div>
                 {[

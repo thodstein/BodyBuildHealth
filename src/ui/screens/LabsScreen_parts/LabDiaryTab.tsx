@@ -116,9 +116,9 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', color: LABS_ACCENT }}><NativeIcon name="notebook" size={17} /></div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Дневник анализов</div>
-            <div style={{ fontSize:10, color:'#fff', marginTop:1 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
+            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.4 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
           </div>
-          {stats.firstDate && <span style={{ fontSize:9, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
+          {stats.firstDate && <span style={{ fontSize:11, padding:'6px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:700, flexShrink:0 }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
         </div>
         <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
           <MiniStat label="Дней" value={`${stats.totalDays}`} color="#3b82f6" />
@@ -192,7 +192,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                         height: h, background: d.pct > 30 ? '#ef4444' : d.pct > 10 ? '#f59e0b' : '#00e68a',
                         opacity: 0.85,
                       }} />
-                      <div style={{ fontSize:7, color:'#fff', writingMode:'vertical-lr' as any }}>
+                      <div style={{ fontSize:9, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:600 }}>
                         {d.date.slice(5)}
                       </div>
                     </div>

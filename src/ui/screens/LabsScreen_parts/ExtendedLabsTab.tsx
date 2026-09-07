@@ -154,19 +154,19 @@ export default function ExtendedLabsTab({
         <span style={{ fontSize: 10, color: '#fff' }}>{Object.keys(UCUM_MAP).length} маркеров</span>
       </div>
 
-      <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>
+      <div style={{ fontSize:11, color:'#fff', marginBottom:10, lineHeight:1.5 }}>
         Все маркеры из каталога UCUM, сгруппированные по панелям. Ввод с авто-заполнением из существующих анализов для выбранной фазы. Коррекция референсов под разные лаборатории.
       </div>
 
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none' }}>
+      <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'2px 2px 4px' }}>
         {Object.entries(PHASE_LABELS).map(([key, label]) => (
-          <button key={key} onClick={() => onPhaseChange(key)} style={{
-            padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer',
-            background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: selectedPhase === key ? '#000' : '#fff',
-            border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
-            flexShrink: 0,
+          <button key={key} onClick={() => onPhaseChange(key)} aria-pressed={selectedPhase===key} style={{
+            padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800,
+            whiteSpace:'nowrap', cursor:'pointer', minHeight:44, flexShrink:0,
+            background: selectedPhase === key ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)',
+            color: selectedPhase === key ? '#0a1a08' : '#fff',
+            border: selectedPhase === key ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+            boxShadow: selectedPhase===key ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
           }}>
             {label}
           </button>
@@ -193,21 +193,21 @@ export default function ExtendedLabsTab({
         const isOpen = openPanels[panel.id];
         const panelFilled = uniqueCodes.filter(c => values[c] && values[c].trim() !== '').length;
         return (
-          <div key={panel.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div key={panel.id} style={{ marginBottom:8, borderRadius:14, overflow:'hidden', border:'1px solid rgba(140,190,255,0.12)', background:'rgba(21,38,66,0.45)', borderLeft:'3px solid var(--labs-accent, #00e68a)' }}>
             <button onClick={() => setOpenPanels(prev => ({ ...prev, [panel.id]: !prev[panel.id] }))} style={{
-              display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 10px', cursor: 'pointer',
-              background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 11, fontWeight: 700, textAlign: 'left',
+              display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 12px', cursor:'pointer', minHeight:52,
+              background:'transparent', border:'none', color:'#fff', fontSize:13, fontWeight:800, textAlign:'left',
             }}>
-              <span style={{ fontSize: 10, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-              <span>{panel.icon}</span>
-              <span style={{ flex: 1 }}>{panel.label}</span>
-              <span style={{ fontSize: 9, color: panelFilled === uniqueCodes.length ? 'var(--accent)' : '#fff' }}>
+              <span style={{ fontSize:12, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink:0 }}>▶</span>
+              <span style={{ flexShrink:0 }}>{panel.icon}</span>
+              <span style={{ flex:1, minWidth:0 }}>{panel.label}</span>
+              <span style={{ fontSize:11, color: panelFilled === uniqueCodes.length ? 'var(--accent)' : '#fff', fontWeight:800, flexShrink:0 }}>
                 {panelFilled}/{uniqueCodes.length}
               </span>
             </button>
             {isOpen && (
-              <div style={{ padding: '0 10px 10px' }}>
-                <div style={{ display: 'grid', gap: 3 }}>
+              <div style={{ padding:'0 10px 10px' }}>
+                <div style={{ display:'grid', gap:6 }}>
                   {uniqueCodes.map(code => {
                     const info = UCUM_MAP[code];
                     if (!info) return null;
@@ -217,11 +217,11 @@ export default function ExtendedLabsTab({
                     const hasVal = val.trim() !== '' && !isNaN(numVal);
                     return (
                       <div key={code} style={{
-                        display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6,
-                        background: hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.06)' : existing ? 'rgba(59,130,246,0.06)' : 'transparent',
-                        border: `1px solid ${hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)' : existing ? 'rgba(59,130,246,0.12)' : 'transparent'}`,
+                        display:'flex', alignItems:'center', gap:6, padding:'10px 10px', borderRadius:12, minHeight:48,
+                        background: hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.08)' : existing ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.02)',
+                        border:`1px solid ${hasVal ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.18)' : existing ? 'rgba(59,130,246,0.16)' : 'rgba(140,190,255,0.10)'}`,
                       }}>
-                        <span style={{ fontSize: 9, fontWeight: 600, minWidth: 100, color: 'var(--text)' }}>
+                        <span style={{ fontSize:11, fontWeight:700, minWidth:80, color:'#fff', flexShrink:0 }}>
                           {info.name}
                         </span>
                         <input
@@ -229,24 +229,24 @@ export default function ExtendedLabsTab({
                           onChange={e => handleValueChange(code, e.target.value)}
                           placeholder={existing ? String(existing.value) : '—'}
                           type="number"
-                          step="any"
+                          step="any" aria-label={info.name}
                           style={{
-                            width: 60, padding: '2px 4px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
-                            borderRadius: 3, color: hasVal ? deviationColor(numVal, info) : '#fff',
-                            fontSize: 9, fontWeight: 600, textAlign: 'right',
+                            width:64, padding:'8px 8px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', minHeight:40,
+                            borderRadius:10, color: hasVal ? deviationColor(numVal, info) : '#fff',
+                            fontSize:12, fontWeight:700, textAlign:'right',
                           }}
                         />
-                        <span style={{ fontSize: 7, color: '#fff', minWidth: 28 }}>{info.prefUnit}</span>
-                        <span style={{ fontSize: 7, color: '#fff', minWidth: 50 }}>
+                        <span style={{ fontSize:10, color:'#fff', minWidth:32, fontWeight:600 }}>{info.prefUnit}</span>
+                        <span style={{ fontSize:10, color:'#fff', minWidth:56, fontWeight:600 }}>
                           {info.lln}–{info.uln}
                         </span>
                         {existing && !hasVal && (
-                          <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>
+                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontWeight:700 }}>
                             {existing.value} {info.prefUnit}
                           </span>
                         )}
                         {hasVal && (
-                          <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3,
+                          <span style={{ fontSize:10, padding:'3px 7px', borderRadius:999, fontWeight:800,
                             background: numVal > info.uln ? 'rgba(239,68,68,0.15)' : numVal < info.lln ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.15)',
                             color: numVal > info.uln ? '#ef4444' : numVal < info.lln ? '#f97316' : 'var(--accent)',
                           }}>

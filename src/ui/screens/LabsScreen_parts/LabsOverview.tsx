@@ -67,7 +67,7 @@ export const LabsOverview: React.FC<{
           <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(234,179,8,0.14)', border:'1px solid rgba(234,179,8,0.18)', fontSize:14 }}>💡</span>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fde68a' }}>Нет данных анализов</div>
-            <div style={{ fontSize:10, color:'#fff', marginTop:1, lineHeight:1.35 }}>Добавьте маркеры во вкладке «Текущие» или импортируйте PDF/фото — тогда появятся статистика, риски и графики.</div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.5 }}>Добавьте маркеры во вкладке «Текущие» или импортируйте PDF/фото — тогда появятся статистика, риски и графики.</div>
           </div>
           <LabsBadge color="#eab308">старт</LabsBadge>
         </div>
@@ -78,9 +78,9 @@ export const LabsOverview: React.FC<{
           <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.18)', fontSize:14 }}>🚫</span>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fecaca' }}>Применён штраф за отсутствие анализов</div>
-            <div style={{ fontSize:9, color:'#fff', marginTop:1 }}>Риски рассчитываются с повышающим коэффициентом. Снимите штраф после ввода данных.</div>
+            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.5 }}>Риски рассчитываются с повышающим коэффициентом. Снимите штраф после ввода данных.</div>
           </div>
-          <button onClick={()=>setForceNoLabs(false)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>Снять</button>
+          <button onClick={()=>setForceNoLabs(false)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer', minHeight:44 }}>Снять</button>
         </div>
       )}
 
@@ -124,7 +124,7 @@ export const LabsOverview: React.FC<{
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 11px', background: color+'10', borderBottom:`1px solid ${color}14` }}>
                     <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: color+'18', border:`1px solid ${color}22`, color }}><NativeIcon name={icon} size={14} /></span>
                     <span style={{ fontSize:12, fontWeight:800, color:'#fff', flex:1 }}>{label}</span>
-                    <span style={{ fontSize:9, color:'#fff' }}>{systemLabs.length} маркеров</span>
+                    <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>{systemLabs.length} маркеров</span>
                     {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
                   </div>
                   <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, padding:10 }}>
