@@ -190,8 +190,15 @@ describe('APK TOP pack', () => {
     }
   });
 
-  it('волна 24: низы не под пилюлей — safe-area снизу', () => {
-    const css = readCss('styles-native.css');
+  it('волна 30: голого top-env нет — везде max(env, 24px)', () => {
+    for (const name of ['styles-native.css', 'styles-native-pro.css']) {
+      const css = readCss(name);
+      const bad = css.split('\n').filter((l) => /(?:^|\s)top:\s*env\(safe-area-inset-top/.test(l));
+      expect(bad, `${name}: bare top-env`).toEqual([]);
+    }
+  });
+
+  it('волна 24: низы не под пилюлей — safe-area снизу', () => {    const css = readCss('styles-native.css');
     const i = css.indexOf('74. BOTTOM FIT');
     expect(i).toBeGreaterThan(-1);
     const block = css.slice(i, i + 3000);

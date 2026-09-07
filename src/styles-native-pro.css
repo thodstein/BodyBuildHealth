@@ -18,7 +18,9 @@ html.app-native body {
 
 html.app-native #app {
   min-height: var(--app-height, 100dvh);
-  padding-top: env(safe-area-inset-top, 0px);
+  /* max(): если WebView не отдаёт env (старый Android), всё равно даём
+   * минимум высоты статус-бара — иначе верхи прячутся под шторкой. */
+  padding-top: max(env(safe-area-inset-top, 0px), 24px);
 }
 
 /* Нижний отступ под плавающий навбар уже есть в shell; здесь — страховка
