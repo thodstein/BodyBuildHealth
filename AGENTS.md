@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Стронг-хаб: финальная полировка — focus, чипы дневника, summary 52 (Sep 07 2026, 02b94590, пуш за пользователем)
+
+Доделка оформления (пуш делает пользователь сам). Только подача. Тесты **hub 9/9 + rest-hooks 68/68**, tsc 0.
+
+- **CSS**: янтарный `focus-visible` (кнопки/summary/поля), `prefers-reduced-motion` гасит press-scale; цифры tiles — tabular.
+- **Шапка**: строки дневника → чипы; ghost-кнопки экспорта 48px/700; оба summary 52px.
+- **Поймано**: свой replaceAll задвоил `fontVariantNumeric` в tiles (tsc TS1117) — починено точечно ×4.
+- **Процесс**: только edit, коммит pathspec 1 свой. НЕ ПУШИТЬ — пуш за пользователем.
+
 ## Статьи: guard-тест читалки — A-/A+, прогресс, персист (Sep 07 2026, 3bc98d1f, НЕ запушено — очередь чужих)
 
 NEW `articles-reader-controls.test.tsx` (3/3): открытие читалки с панелью шрифта и прогрессом, A+ 14→16→18 с упором в макс + персист `he_articles_font_v1`, восстановление кегля после переоткрытия. Широкая проверка **137/137** (rest-hooks 68 + native/shop/apk-top-pack/hubs-deep/labs-risk), tsc по своим 0. Коммит pathspec 1 свой. НЕ ПУШИТЬ — в worktree чужие WIP.
