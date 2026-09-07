@@ -18,6 +18,7 @@
  */
 import type { Exercise } from '../../core/types';
 import type { BBTrainingFocus } from './bb-goal-types';
+import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { sfrSelectionBonus } from './bb-sfr-db';
 
@@ -295,7 +296,7 @@ export function ensureStrictGroupCoverage(
   exerciseCount: number,
   sessionSelectedIds: string[],
   sessionSelectedNames: string[],
-  opts?: { isPrimary?: boolean; rotationMode?: string },
+  opts?: { isPrimary?: boolean; rotationMode?: string; avoidPatterns?: string[] },
 ): void {
   if (opts?.isPrimary === false) return;
   // rotationMode 'forbid' = запрет ротации: primary-упражнения строго одни и те
@@ -303,8 +304,20 @@ export function ensureStrictGroupCoverage(
   if (opts?.rotationMode === 'forbid') return;
   const groups = STRICT_EXERCISE_GROUPS[muscle];
   if (!groups || groups.length === 0 || exDatas.length < 2) return;
+  // Паттерн группы — по первому члену пула (члены пула — записи каталога,
+  // derivePattern на них детерминирован и совпадает с отбором).
+  const groupPattern = (g: any): string => {
+    try {
+      const m = pool.find(ex => strictGroupMatches(ex, g)) || exDatas.find(ex => strictGroupMatches(ex, g));
+      if (!m) return 'unknown';
+      return derivePattern(m);
+    } catch { return 'unknown'; }
+  };
   for (const g of groups) {
     if (exDatas.some(ex => strictGroupMatches(ex, g))) continue;
+    // A/B-ротация: паттерн из avoid-списка не форсируем (придёт в sibling-сессии),
+    // но мышцу без движений не оставляем (exDatas непуст — проверено выше).
+    if (opts?.avoidPatterns && opts.avoidPatterns.length > 0 && opts.avoidPatterns.includes(groupPattern(g))) continue;
     const poolMembers = pool.filter(ex => strictGroupMatches(ex, g));
     if (poolMembers.length === 0) continue; // группа недоступна (нет в каталоге/оборудовании)
     // Ищем заменяемый элемент: последний, НЕ являющийся единственным

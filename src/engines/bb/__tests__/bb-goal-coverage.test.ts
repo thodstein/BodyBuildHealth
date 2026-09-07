@@ -230,4 +230,15 @@ describe('E: Selector — goal-specific splitHints', () => {
     expect(result).toBeDefined();
     expect(result.pattern.id).toBeTruthy();
   });
+
+  it('D: high-объём (курс) тянет в Push/Pull вместо Upper', () => {
+    const PPL = new Set(['push_pull_2', 'push_pull_legs_4', 'ppl_6', 'ppl_rest_ppl', 'ppl_3', 'tpt_o_ttp', 'rolling_3_1_3_1', 'rolling_4_1']);
+    const onCourse = selectBestBBSplit(makeSelInput('mass', { daysPerWeek: 4, level: 'enhanced', peds: ['AAS'], pedDoses: { AAS: 500 } }));
+    expect(onCourse).toBeDefined();
+    expect(PPL.has(onCourse!.pattern.id)).toBe(true);
+    expect(onCourse!.rationale.some(r => r.includes('≤4 групп'))).toBe(true);
+    // Натуралу без курса бонус не положен (маркер отсутствует)
+    const nat = selectBestBBSplit(makeSelInput('mass', { daysPerWeek: 4, level: 'intermediate' }));
+    expect(nat!.rationale.some(r => r.includes('≤4 групп'))).toBe(false);
+  });
 });

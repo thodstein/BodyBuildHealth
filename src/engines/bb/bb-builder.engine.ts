@@ -127,6 +127,11 @@ export interface BBBuilderInput {
    *  - strict (строгий): смена раз в 4 недели;
    *  - variety (разнообразие): смена упражнения между сессиями, сохраняя нагрузку и паттерн. */
   rotationMode?: 'forbid' | 'strict' | 'variety';
+  /** A/B-ротация паттернов (opt-in, только generic-путь): sibling-сессии
+   *  одного тега в неделе получают РАЗНЫЕ паттерны (горизонталь vs
+   *  вертикаль), а не копии. Недельный объём цел (меняются только имена).
+   *  Дефолт выкл — legacy 1-в-1. */
+  abPatternRotation?: boolean;
   /** Интенсивность тренинга — управляет отдыхом/плотностью/восстановлением:
    *  - light: отдых +20% (низкая плотность, больше восстановление);
    *  - moderate: ×1.0 (стандарт);
@@ -835,6 +840,21 @@ function collapseKey(muscle: string): string {
   if (canonical && canonical !== muscle) return canonical;
   return muscle;
 }
+/** A/B-ротация: доминантный паттерн списка (чаще всего; ties — первый).
+ *  Sibling-сессия избегает только доминанту, а не все паттерны: иначе при
+ *  2-3 паттернах на мышцу второй сессии оставались бы объедки и срабатывал
+ *  фолбэк на полный пул (ротации фактически не было). Возвращает [] — пула
+ *  хватает всегда (один паттерн из пула не выводит). */
+function abDominantPattern(patterns: string[] | undefined): string[] {
+  if (!patterns || patterns.length === 0) return [];
+  const counts = new Map<string, number>();
+  for (const p of patterns) counts.set(p, (counts.get(p) || 0) + 1);
+  let best = '', bestN = 0;
+  for (const [p, n] of counts) {
+    if (n > bestN) { best = p; bestN = n; }
+  }
+  return best ? [best] : [];
+}
 /** fix Z: дедуплицирует PRO-ключи тега по collapseKey.
  *  Возвращает {group, repKey}: group = collapseKey (ключ для volumeRotation/output),
  *  repKey = первый PRO-ключ группы (для workMax/FORCE_HEAVY.pool). */
@@ -1307,13 +1327,29 @@ export interface SelectExercisesForMuscleOpts {
   excludeIds: string[];
   avoidAxialLoad?: boolean;
   preferEquipment: string[];
+  /** A/B-ротация: паттерны, занятые sibling-сессией того же тега (пул
+   *  фильтруется, с фолбэком на полный пул при нехватке кандидатов). */
+  avoidPatterns?: string[];
 }
 
 /** 3.1 — вынесенный слой selection: выбор упражнений через selectExercisesSmart +
  *  фиксация выбранных id/имён в сессионные списки (те же мутации, что были inline). */
 export function selectExercisesForMuscle(pool: any[], muscle: string, count: number, opts: SelectExercisesForMuscleOpts): any[] {
+  // A/B-ротация: убираем занятые sibling-паттерны, но только если кандидатов
+  // хватает (иначе — полный пул: лучше повтор паттерна, чем пустая сессия).
+  let candidates = pool;
+  if (opts.avoidPatterns && opts.avoidPatterns.length > 0) {
+    try {
+      const fresh = pool.filter((c: any) => {
+        let pat = 'unknown';
+        try { pat = derivePattern(c); } catch { pat = 'unknown'; }
+        return pat === 'unknown' || !opts.avoidPatterns!.includes(pat);
+      });
+      if (fresh.length >= count) candidates = fresh;
+    } catch { /* фолбэк — полный пул */ }
+  }
   const selected = selectExercisesSmart({
-    candidates: pool, muscleGroup: muscle, count,
+    candidates, muscleGroup: muscle, count,
     selectedIds: opts.sessionSelectedIds, selectedNames: opts.sessionSelectedNames,
     equipment: opts.equipment, weakZones: opts.weakZones, level: opts.level,
     injuryProfile: opts.injuryProfile, type: opts.type,
@@ -1567,6 +1603,10 @@ export interface BuildSessionParams {
   rotationMode?: 'forbid' | 'strict' | 'variety';
   intensityLevel?: 'light' | 'moderate' | 'high';
   legDayIndex?: number;
+  /** A/B-ротация: паттерны, занятые sibling-сессией того же тега на неделе. */
+  abAvoidPatterns?: string[];
+  /** A/B-ротация: порядковый номер среди sibling-сессий того же тега (0,1,…) — суффикс primary-слота. */
+  abSibIndex?: number;
 }
 
 function buildSession(
@@ -1618,6 +1658,8 @@ function buildSession(
   intensityLevel?: 'light' | 'moderate' | 'high',
   legDayIndex: number = 0,
   skipStrictCoverage?: boolean,
+  abAvoidPatterns?: string[],
+  abSibIndex: number = 0,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -1968,11 +2010,15 @@ function buildSession(
       type: effectiveSelType, targetRir: rir,
       favoriteIds, excludeIds, avoidAxialLoad,
       preferEquipment: PHASE_EQUIPMENT_PREF[phase],
+      avoidPatterns: abAvoidPatterns,
     });
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5, _score: 0 }];
     // Keep the first compound stable for the same session slot across weeks;
     // accessory movements remain eligible for phase rotation.
-    const primarySlot = `${phase}|${sched.sessionTag || dayInRotation}|${muscle}`;
+    // A/B-ротация: sibling-сессии одного тега НЕ делят primary-слот, иначе
+    // вторая сессия насильно получает лид первой (ротации нет). Суффикс
+    // применяется только при abSibIndex > 0 (дефолт 0 — legacy 1-в-1).
+    const primarySlot = `${phase}|${sched.sessionTag || dayInRotation}|${muscle}${abSibIndex > 0 ? `|ab${abSibIndex}` : ''}`;
     const stablePrimary = primaryBySlot.get(primarySlot);
     if (stablePrimary && (muscle === sessionLeadMuscle || (exDatas[0] as any)?.type === 'compound')) {
       const stable = pool.find(ex => ex.name === stablePrimary);
@@ -2261,7 +2307,7 @@ function buildSession(
       ? (isWeak(muscle, weakPoints) || (focusGroup ? collapseKey(focusGroup) === muscle : false))
       : true;
     if (isSpecTarget && !skipStrictCoverage) {
-      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary', rotationMode });
+      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary', rotationMode, avoidPatterns: abAvoidPatterns });
     }
 
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
@@ -2666,7 +2712,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.weekLocalUsed, p.primaryBySlot, p.trainingFocus, p.eccentricMult,
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
-    p.skipStrictCoverage,
+    p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
   );
 }
 
@@ -3154,6 +3200,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
     const weekLocalUsed = new Map<string, Set<string>>(); // F0 fix: shared per-week dedup for buildSession
+    // A/B-ротация паттернов (opt-in): tag → паттерны sibling-сессий недели
+    // (списком, с повторами — доминанта считается частотой). Сбрасывается
+    // каждую неделю (как weekLocalUsed).
+    const abWeekPatterns = new Map<string, string[]>();
     const weekSessions: BBSession[] = [];
     const phase = phaseByWeek.get(w) || 'accumulation';
     phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
@@ -3215,8 +3265,25 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
         const legDaysInWeek = sessions.filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active });
+        // A/B-ротация: индекс среди sibling-сессий того же тега (только при флаге).
+        const abSibIndex = input.abPatternRotation ? sessions.slice(0, i).filter(ss => (ss as any).sessionTag === s.sessionTag).length : 0;
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined, abSibIndex });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
+      // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
+      // Только при явном флаге (иначе legacy 1-в-1 байт-в-байт).
+      if (input.abPatternRotation) {
+        const tag = s.sessionTag || '';
+        if (!abWeekPatterns.has(tag)) abWeekPatterns.set(tag, []);
+        const list = abWeekPatterns.get(tag)!;
+        for (const ex of sess.exercises) {
+          if ((ex as any).warmupActivator) continue;
+          try {
+            const cat = (EXERCISE_CATALOG as any[]).find(c => c.name === (ex as any).name || c.id === (ex as any).exerciseName);
+            const pat = derivePattern({ name: (ex as any).name, group: cat?.group, type: cat?.type, targetMuscle: (ex as any).muscle, muscle: (ex as any).muscle });
+            if (pat && pat !== 'unknown') list.push(pat);
+          } catch { /* одно упражнение не ломает неделю */ }
+        }
+      }
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
         if (ex.exerciseName) { fbUsedIds.push(ex.exerciseName); fbUsedNames.push(ex.exerciseName); }

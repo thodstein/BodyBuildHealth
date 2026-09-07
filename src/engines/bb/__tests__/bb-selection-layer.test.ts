@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildExercisePool, selectExercisesForMuscle, computeMuscleSets, buildBBPlan, type SelectExercisesForMuscleOpts } from '../bb-builder.engine';
 import { computeLoading } from '../bb-loading-layer.engine';
-import { musclesForRole } from '../../movement-pattern';
+import { musclesForRole, derivePattern } from '../../movement-pattern';
+import { validateBBPlan } from '../bb-validator.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -168,6 +169,25 @@ describe('selectExercisesForMuscle — вынесенный слой выбор�
     const selected = selectExercisesForMuscle(pool, 'chest', Math.min(2, pool.length), opts);
     expect(selected.some((s: any) => s.id === favoriteId)).toBe(true);
   });
+
+  it('A/B-ротация: avoid-паттерны вылетают из отбора (механизм)', () => {
+    const pool = buildExercisePool('back', 'primary', poolOpts({
+      muscle: 'back', roleMuscles: musclesForRole('back'), sessionTag: 'Pull', isPurePull: true,
+    }));
+    expect(pool.length).toBeGreaterThan(4);
+    // Без avoid — как раньше (фильтр не вмешивается)
+    const plain = selectExercisesForMuscle(pool, 'back', 2, mkOpts());
+    expect(plain).toHaveLength(2);
+    // С avoid horizontal_pull — горизонталей нет в выборе
+    const patOf = (c: any): string => { try { return derivePattern(c); } catch { return 'unknown'; } };
+    const avoided = selectExercisesForMuscle(pool, 'back', 2, mkOpts({ avoidPatterns: ['horizontal_pull'] } as any));
+    expect(avoided).toHaveLength(2);
+    expect(avoided.every(c => patOf(c) !== 'horizontal_pull')).toBe(true);
+    // Пустой результат фильтра (избегаем всё) — фолбэк на полный пул, не пустота
+    const allPats = [...new Set(pool.map(patOf).filter(p => p !== 'unknown'))];
+    const fb = selectExercisesForMuscle(pool, 'back', 2, mkOpts({ avoidPatterns: allPats } as any));
+    expect(fb).toHaveLength(2);
+  });
 });
 
 describe('computeMuscleSets — вынесенный слой объёма (3.1)', () => {
@@ -237,6 +257,33 @@ describe('computeLoading — вынесенный слой loading, parity с bu
     expect(result.rir).toBe(exercise.rir);
     expect(result.tempoSpec).toBe(exercise.tempoSpec);
     expect(result.restSeconds).toBe(exercise.restSeconds);
+  });
+
+  it('A/B-ротация e2e: sibling Pull-сессии различаются, план валиден', () => {
+    const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
+    const base: any = { patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 1, workMax: WM };
+    const on = buildBBPlan({ ...base, abPatternRotation: true });
+    // План валиден: объёмы в капах (без overflow) — ротация не ломает модель.
+    // Точное равенство объёмов с флагом выкл НЕ требуется: разные движения
+    // имеют разную стоимость fatigue → fit/enforce тримят по-разному (честно
+    // задокументировано; инварианты вместо снапшотов).
+    const v = validateBBPlan(on, { level: 'intermediate' });
+    expect(v.issues.filter(i => i.code === 'effective_mrv_overflow')).toHaveLength(0);
+    // Все мышцы PPL присутствуют (ротация не вычищает группы)
+    const muscles = new Set<string>();
+    for (const w of on.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+      if (!e.warmupActivator) muscles.add(e.muscle);
+    }
+    for (const m of ['chest', 'back', 'quads', 'hamstrings', 'biceps', 'triceps']) {
+      expect(muscles.has(m), `мышца ${m} в плане`).toBe(true);
+    }
+    // Pull-сессии не идентичны по составу (ротация сработала)
+    const pulls = on.weeks[0].sessions.filter((s: any) => s.sessionTag === 'Pull');
+    expect(pulls.length).toBeGreaterThanOrEqual(2);
+    const names = (s: any) => new Set((s.exercises as any[]).map(e => e.name));
+    const [na, nb] = [names(pulls[0]), names(pulls[1])];
+    const diff = [...na].filter(n => !nb.has(n)).length + [...nb].filter(n => !na.has(n)).length;
+    expect(diff).toBeGreaterThanOrEqual(1);
   });
 
   it('warmup только для primary', () => {

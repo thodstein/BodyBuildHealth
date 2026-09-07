@@ -188,6 +188,25 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     if (hasGH && hasIns && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 3; rationale.push('GH+insulin: частый памп-сплит предпочтителен'); }
     if (!hasAAS && (p.id === 'bro_5')) { score -= 2; warnings.push('Натурал: bro 1×/нед — неоптимально, лучше 2×/нед'); }
 
+    // D (качество сессий): при high-объёме (курс/PED/enhanced) плотные дни
+    // на 5+ групп (Upper/FullBody/Torso: 18-20 движений) проигрывают по
+    // качеству разделённым Push/Pull (те же объёмы вдвое короче). Мягкий
+    // бонус сплитам, где в каждом дне ≤4 групп — рекомендация, не запрет:
+    // явный выбор пользователя в UI приоритетнее (selectedSplitId).
+    const highVolumeDemand = lvl === 'enhanced' || hasAAS || hasGH || hasIns;
+    if (highVolumeDemand) {
+      let maxTagSize = 0;
+      for (const d of p.schedule) {
+        if (d.kind !== 'тренировка' || !d.sessionTag) continue;
+        const muscles = TAG_MUSCLES[d.sessionTag] || [d.sessionTag];
+        if (muscles.length > maxTagSize) maxTagSize = muscles.length;
+      }
+      if (maxTagSize > 0 && maxTagSize <= 4) {
+        score += 6;
+        rationale.push('high-объём: короткие дни (≤4 групп) — Push/Pull короче Upper при том же объёме');
+      }
+    }
+
     // Пресет-подсказка (мягко)
     if (input.preset === 'dc' && (p.id === 'upper_lower_4' || p.id === 'ppl_6')) { score += 4; rationale.push('DC пресет: Upper/Lower/PPL подходит'); }
     if (input.preset === 'fortitude' && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 4; rationale.push('Fortitude: частый сплит'); }

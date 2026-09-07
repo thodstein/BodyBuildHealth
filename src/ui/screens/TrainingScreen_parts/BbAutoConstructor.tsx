@@ -597,6 +597,9 @@ export const BbAutoConstructor: React.FC = () => {
   // Кнопки/опции пользователя (передаются в engine).
   const [fewerCompound, setFewerCompound] = useState<boolean>(false);
   const [allowStrengthLifts, setAllowStrengthLifts] = useState<boolean>(false);
+  // A/B-ротация паттернов: sibling-сессии одного тега в неделе — разные
+  // паттерны (горизонталь vs вертикаль). Только generic-путь, дефолт выкл.
+  const [abRotation, setAbRotation] = useState<boolean>(false);
   const [rotationMode, setRotationMode] = useState<'forbid' | 'strict' | 'variety'>('variety');
   const [avoidAxialLoadUi, setAvoidAxialLoadUi] = useState<boolean>(false);
   const [intensityLevel, setIntensityLevel] = useState<'light' | 'moderate' | 'high'>('moderate');
@@ -1925,11 +1928,12 @@ export const BbAutoConstructor: React.FC = () => {
          favoriteExercises: bbFavEx,
          excludedExercises: bbExclEx,
          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
-         fewerCompound,
-         allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
-         rotationMode,
-         intensityLevel,
-         intensityTechnique: intensityTech,
+          fewerCompound,
+          allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
+          rotationMode,
+          abPatternRotation: abRotation,
+          intensityLevel,
+          intensityTechnique: intensityTech,
          autoDeload,
          deloadType,
          loadStrategy,
@@ -3098,6 +3102,7 @@ export const BbAutoConstructor: React.FC = () => {
                       { icon: '🚫', title: 'Исключить осевую нагрузку', desc: 'Убрать приседы, тяги со штангой', on: avoidAxialLoadUi, set: setAvoidAxialLoadUi, accent: '#ef4444', enabled: true },
                       { icon: '🏗️', title: 'Меньше многосуставных', desc: 'Больше тренажёров и изоляций', on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true },
                       { icon: '🏋️', title: 'Становая / жим стоя', desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя' : 'Доступно в «Сила + Масса»', on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass' },
+                      { icon: '🔀', title: 'A/B ротация паттернов', desc: 'Одинаковые дни недели — разные движения (generic)', on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true },
                     ].map(t => {
                       const active = t.enabled && t.on;
                       return (
@@ -4626,6 +4631,7 @@ export const BbAutoConstructor: React.FC = () => {
                     <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
                     {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
                     {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
+                    {abRotation ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>A/B ротация</span> : null}
                   </div>
                 </CollapsibleCard>
                 <CollapsibleCard title="7 · Выбранные методики — детально" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge={`${[bbMethodology, loadStrategy, intensityTech, volumeScheme, supersetMode, dupMode, deloadType].filter(v=>v!=='none'&&v!=='standard'&&v!=='compound_first').length} активных`}>
