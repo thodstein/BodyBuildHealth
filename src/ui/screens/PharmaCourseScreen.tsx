@@ -350,7 +350,7 @@ export const PharmaCourseScreen: React.FC = () => {
     if (course.length === 0 || totalWeeks === 0) return null;
     const weeks: { week: number; entries: { entry: CourseEntry; color: string }[] }[] = [];
     for (let w = 0; w <= totalWeeks; w++) {
-      const active = course.filter(e => w >= (e.startWeek || 0) && w < (e.endWeek || totalWeeks));
+      const active = course.filter(e => w >= (e.startWeek || 0) && w <= (e.endWeek ?? totalWeeks));
       weeks.push({ week: w, entries: active.map(e => ({ entry: e, color: classColor(subClass(e.substanceId)) })) });
     }
     return weeks;

@@ -43,10 +43,28 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     );
   }, []);
 
-  const scoreCourse = useMemo(() =>
-    (linked.course || []).map((c: any) => ({ substanceId: c.substanceId || '', dose: c.doseValue || 0, unit: c.doseUnit || 'мг', weeks: (c.endWeek || 12) - (c.startWeek || 0) })),
-    [linked.course]
-  );
+  const scoreCourse = useMemo(() => {
+    // Use weekly dose (frequency-aware) for risk scoring
+    const toWeekly = (c: any) => {
+      const v = c.doseValue || 0;
+      const u = c.doseUnit || 'мг';
+      const f = c.frequency;
+      // Simple weekly conversion: if unit already /wk keep, otherwise * perWeek
+      const s = String(f ?? '').toLowerCase();
+      let perWeek = 2;
+      if (typeof f === 'number' && Number.isFinite(f)) perWeek = f as number;
+      else if (s === 'daily') perWeek = 7;
+      else if (s === 'eod') perWeek = 3.5;
+      else {
+        const m = s.match(/(\d+(?:\.\d+)?)\s*x\s*\/\s*w/);
+        if (m) perWeek = parseFloat(m[1]);
+        else if (s.includes(',')) perWeek = s.split(',').filter(Boolean).length || 2;
+      }
+      const isWeekly = String(u).includes('/wk') || String(u).includes('/week');
+      return isWeekly ? v : v * perWeek;
+    };
+    return (linked.course || []).map((c: any) => ({ substanceId: c.substanceId || '', dose: toWeekly(c), unit: c.doseUnit || 'мг', weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+  }, [linked.course]);
 
   if (page === 'main') {
     const cards: { key: 'course' | 'reports' | 'calculators' | 'info'; icon: NativeIconName; title: string; desc: string; color: string; accent: string; border: string }[] = [

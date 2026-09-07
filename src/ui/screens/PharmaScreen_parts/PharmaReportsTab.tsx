@@ -97,16 +97,31 @@ export const PharmaReportsTab: React.FC = () => {
     setGenerated(null);
   };
 
-  const scoreCourse = useMemo(
-    () =>
-      course.map((c: any) => ({
-        substanceId: c.substanceId || '',
-        dose: c.doseValue || 0,
-        unit: c.doseUnit || 'мг',
-        weeks: (c.endWeek || 12) - (c.startWeek || 0),
-      })),
-    [course],
-  );
+  const scoreCourse = useMemo(() => {
+    const toWeekly = (c: any) => {
+      const v = c.doseValue || 0;
+      const u = c.doseUnit || 'мг';
+      const f = c.frequency;
+      const s = String(f ?? '').toLowerCase();
+      let perWeek = 2;
+      if (typeof f === 'number' && Number.isFinite(f)) perWeek = f as number;
+      else if (s === 'daily') perWeek = 7;
+      else if (s === 'eod') perWeek = 3.5;
+      else {
+        const m = s.match(/(\d+(?:\.\d+)?)\s*x\s*\/\s*w/);
+        if (m) perWeek = parseFloat(m[1]);
+        else if (s.includes(',')) perWeek = s.split(',').filter(Boolean).length || 2;
+      }
+      const isWeekly = String(u).includes('/wk') || String(u).includes('/week');
+      return isWeekly ? v : v * perWeek;
+    };
+    return course.map((c: any) => ({
+      substanceId: c.substanceId || '',
+      dose: toWeekly(c),
+      unit: c.doseUnit || 'мг',
+      weeks: (c.endWeek || 12) - (c.startWeek || 0),
+    }));
+  }, [course]);
 
   const card: React.CSSProperties = { background:'rgba(22,22,26,0.62)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, padding:14, boxShadow:'0 6px 18px rgba(0,0,0,0.18)' };
 

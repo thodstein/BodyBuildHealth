@@ -29,6 +29,8 @@ export const ESTER_HALF_LIFE_DAYS: Record<string, number> = {
   oral: 0.3,
   phenylpropionate: 1.5,
   hexahydrobenzylcarbonate: 6.0,
+  isocaproate: 4.5,
+  sustanon: 4.5,
 };
 
 /** 19-nor substances */
@@ -70,13 +72,22 @@ export function computePKPD(drugs: DrugDoseInput[]): PKPDOutput[] {
     const k = Math.log(2) / Math.max(tHalf, 0.01);
     const dosePerInjection = (drug.mgPerWeek || 0) / Math.max(drug.injectionsPerWeek || 0, 1);
     const intervalDays = 7.0 / injPerWeek;
+    // Точное расписание без округления интервала — иначе 2×/нед даёт ошибку 16%
+    const injectionDays = new Set<number>();
+    const totalInj = Math.max(1, Math.round(30 / intervalDays));
+    for (let i = 0; i < totalInj; i++) {
+      const d = Math.min(29, Math.round(i * intervalDays));
+      injectionDays.add(d);
+    }
+    // Ensure day 0 always has injection if schedule non-empty
+    if (injectionDays.size === 0) injectionDays.add(0);
 
     const dailyProfile: number[] = new Array(30).fill(0);
     let currentConc = 0;
 
     for (let day = 0; day < 30; day++) {
       currentConc *= Math.exp(-k * 1.0);
-      if (day % Math.max(1, Math.round(intervalDays)) === 0) {
+      if (injectionDays.has(day)) {
         currentConc += dosePerInjection;
       }
       dailyProfile[day] = Math.round(currentConc * 100) / 100;
