@@ -43,7 +43,9 @@ export const HysteresisChart: React.FC = () => {
 
   const drugs = useMemo(() => {
     return (linked.course || []).filter(c => {
-      const ph = PHARMA_DB[c.substanceId] as any;
+      // NOTE: lowercasing как в RiskSpecMethod — иначе не-канонический id
+      // (напр. 'TEST_ENAN' из legacy-импорта) тихо выпадал из симуляции.
+      const ph = PHARMA_DB[String(c.substanceId || '').toLowerCase()] as any;
       return ph?.pk && ph?.pd;
     });
   }, [linked.course]);
@@ -51,7 +53,7 @@ export const HysteresisChart: React.FC = () => {
   const result = useMemo<HysteresisResult | null>(() => {
     if (!drugs.length) return null;
     const drug = drugs[Math.min(selectedIdx, drugs.length - 1)];
-    const ph = PHARMA_DB[drug.substanceId] as any;
+    const ph = PHARMA_DB[String(drug.substanceId || '').toLowerCase()] as any;
     if (!ph?.pk || !ph?.pd) return null;
     const perWeek = injectionsPerWeek(drug.frequency as number | string | undefined);
     return simulateHysteresis({

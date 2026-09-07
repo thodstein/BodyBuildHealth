@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 
-const mockCourse: any[] = [
+let mockCourse: any[] = [
   { substanceId: 'test_enan', doseValue: 250, frequency: '2x/wk', startWeek: 1, endWeek: 12 },
 ];
 let captured: any = null;
@@ -70,5 +70,20 @@ describe('HysteresisChart wiring', () => {
     expect(captured).not.toBeNull();
     expect(captured.dosingIntervalHours).toBe(84);
     expect(container.querySelector('svg')).not.toBeNull();
+  });
+
+  it('6. id в другом регистре не выпадает из симуляции', () => {
+    const prev = mockCourse;
+    mockCourse = [
+      { substanceId: 'TEST_ENAN', doseValue: 250, frequency: '2x/wk', startWeek: 1, endWeek: 12 },
+    ];
+    try {
+      captured = null;
+      const { container } = render(<HysteresisChart />);
+      expect(captured).not.toBeNull();
+      expect(container.querySelector('svg')).not.toBeNull();
+    } finally {
+      mockCourse = prev;
+    }
   });
 });
