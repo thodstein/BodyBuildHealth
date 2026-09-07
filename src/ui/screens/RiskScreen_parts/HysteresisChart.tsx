@@ -14,6 +14,29 @@ const MARGIN = { top: 8, right: 8, bottom: 22, left: 30 };
 const INNER_W = CHART_W - MARGIN.left - MARGIN.right;
 const INNER_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
+/**
+ * Инъекций в неделю из CourseEntry.frequency. В проде лежат строки
+ * '2x/wk', 'daily', 'eod' и числа (раз в неделю), а старый код брал
+ * parseFloat (2x/wk→2→24ч вместо 84ч; daily→NaN→168ч вместо 24ч).
+ * Экспортируется для тестов.
+ */
+export function injectionsPerWeek(freq: number | string | undefined): number {
+  if (typeof freq === 'number' && Number.isFinite(freq)) return Math.max(1, freq);
+  const s = String(freq ?? '').trim().toLowerCase();
+  if (!s) return 1;
+  if (s === 'daily' || s === 'qd' || s === 'ed' || s === '1x/d' || s === 'sid') return 7;
+  if (s === 'eod' || s === 'qod') return 3.5;
+  if (s === 'weekly' || s === 'qw' || s === '1x/w' || s === '1x/wk' || s === '1x/week') return 1;
+  let m = s.match(/(\d+(?:[.,]\d+)?)\s*x\s*\/\s*(d|day|w|wk|week)/);
+  if (m) {
+    const n = parseFloat(m[1].replace(',', '.'));
+    if (Number.isFinite(n) && n > 0) return m[2].startsWith('d') ? n * 7 : n;
+  }
+  const leading = parseFloat(s);
+  if (Number.isFinite(leading) && leading > 0) return leading;
+  return 1;
+}
+
 export const HysteresisChart: React.FC = () => {
   const linked = useDataLink();
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -30,10 +53,10 @@ export const HysteresisChart: React.FC = () => {
     const drug = drugs[Math.min(selectedIdx, drugs.length - 1)];
     const ph = PHARMA_DB[drug.substanceId] as any;
     if (!ph?.pk || !ph?.pd) return null;
-    const freq = typeof drug.frequency === 'number' ? drug.frequency : parseFloat(String(drug.frequency)) || 1;
+    const perWeek = injectionsPerWeek(drug.frequency as number | string | undefined);
     return simulateHysteresis({
       doseMg: drug.doseValue || 100,
-      dosingIntervalHours: freq > 1 ? 24 : 7 * 24,
+      dosingIntervalHours: 168 / perWeek,
       halfLifeHours: ph.pk.halfLifeHours || 72,
       ec50: ph.ec50 || 300,
       nHill: ph.n_hill || 2,
