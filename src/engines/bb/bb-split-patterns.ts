@@ -469,9 +469,19 @@ export function getPattern(id: string): SplitPattern | undefined {
   const legacyIds: Record<string, string> = {
     ppl_6day: 'ppl_6',
     fullbody_3x: 'fullbody_3',
+    ppl: 'ppl_6',
+    push_pull_legs: 'ppl_6',
+    push_pull_4: 'push_pull_2',
+    'ppl 6x/week': 'ppl_6',
+    'ppl_6day_detailed': 'ppl_6',
+    fullbody: 'fullbody_3',
+    full_body: 'fullbody_3',
   };
-  const resolvedId = legacyIds[id] ?? id;
-  const found = SPLIT_PATTERNS.find(p => p.id === resolvedId);
+  const raw = String(id || '');
+  const norm = raw.toLowerCase().trim().replace(/\s+/g, '_');
+  const resolvedId = legacyIds[raw] ?? legacyIds[norm] ?? raw;
+  let found = SPLIT_PATTERNS.find(p => p.id === resolvedId);
+  if (!found) found = SPLIT_PATTERNS.find(p => p.id.toLowerCase() === String(resolvedId || '').toLowerCase());
   if (!found) {
     console.warn(`[bb-split-patterns] getPattern: pattern id="${id}" не найден. Доступные: ${SPLIT_PATTERNS.map(p => p.id).join(', ')}`);
   }

@@ -3111,16 +3111,18 @@ for (const week of next.weeks) {
     }
   }
   syncBBPlanSetShape(next);
-  // Глобальный кап: максимум 5 рабочих сетов на упражнение (про-правило) —
-  // source-планы (program/cycle) могут нести 8+ сетов из исходника; объём
-  // добивается дополнительными упражнениями, а не 6-8 подходами в одном.
+  // Глобальный кап из единого источника perExerciseCap (legacy 3-arg: 5, enhanced 3+
+  // на главных — 8). Раньше хардкод 5 срезал enhanced-минимумы обратно после билдера.
+  // BIG на курсе (8-10) приходит из билдера через mrv-капы; финализатор не душит ниже perExerciseCap.
   if (!options.preserveSource) {
     for (const week of next.weeks) for (const session of week.sessions) {
       for (const e of session.exercises) {
         if ((e as any).warmupActivator) continue;
-        if (e.sets > 5) {
-          e.sets = 5;
-          if (Array.isArray(e.workSets) && e.workSets.length > 5) e.workSets = e.workSets.slice(0, 5);
+        let exCap = 5;
+        try { exCap = perExerciseCap(options.level, (e as any).muscle, options.trainingYears); } catch { exCap = 5; }
+        if (e.sets > exCap) {
+          e.sets = exCap;
+          if (Array.isArray(e.workSets) && e.workSets.length > exCap) e.workSets = e.workSets.slice(0, exCap);
         }
       }
     }

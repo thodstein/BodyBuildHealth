@@ -173,19 +173,22 @@ describe('selectExercisesForMuscle — вынесенный слой выбор�
 describe('computeMuscleSets — вынесенный слой объёма (3.1)', () => {
   const rot: Record<string, number> = { back: 20, chest: 16, shoulders: 10 };
 
-  it('high-volume enhanced: спина/квадры поднимаются до капа 5 (бюджет выше — в сессиях/упражнениях)', () => {
-    expect(computeMuscleSets('back', 3, { level: 'enhanced', trainingYears: 5, phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(5);
-    expect(computeMuscleSets('quads', 3, { level: 'enhanced', trainingYears: 5, phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(5);
+  it('high-volume enhanced: спина/квадры идут в BIG-кап perSessionMuscleCap (18→16), а не в 5', () => {
+    // BIG-капы PED+стаж: enhanced 5 лет спина минимум 18, кап сессии 16.
+    // Старый хардкод 5 убивал high-volume минимумы — зафиксирован новым поведением.
+    expect(computeMuscleSets('back', 3, { level: 'enhanced', trainingYears: 5, phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(16);
+    // quads-минимум при 5 годах стажа — 14 (20 только с 6+ лет), кап сессии 16 не упирается
+    expect(computeMuscleSets('quads', 3, { level: 'enhanced', trainingYears: 5, phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(14);
     // Без минимума (intermediate) бюджет остаётся как задан
     expect(computeMuscleSets('back', 3, { level: 'intermediate', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(3);
   });
 
-  it('natural advanced: спина поднимается к капу 5', () => {
-    expect(computeMuscleSets('back', 3, { level: 'advanced', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(5);
+  it('natural advanced: спина поднимается к минимуму 10 (кап сессии 10)', () => {
+    expect(computeMuscleSets('back', 3, { level: 'advanced', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(10);
   });
 
-  it('deload не поднимает минимумы и кап 5 сетов', () => {
-    expect(computeMuscleSets('back', 7, { level: 'enhanced', trainingYears: 5, phase: 'deload', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBeLessThanOrEqual(5);
+  it('deload не поднимает минимумы (кап сессии 16 для enhanced 5 лет)', () => {
+    expect(computeMuscleSets('back', 7, { level: 'enhanced', trainingYears: 5, phase: 'deload', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBeLessThanOrEqual(16);
   });
 
   it('indirect overlap: при 24+ тяг бицепс режется до 20%', () => {

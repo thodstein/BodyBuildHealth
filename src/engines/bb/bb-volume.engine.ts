@@ -254,11 +254,77 @@ export function computeBBRecoveryMultiplier(input: {
   return Math.max(0.6, Math.min(1.5, value));
 }
 
-/** Единый cap сетов на упражнение — про-правило, единственный источник (Фаза 2.5). */
-export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number): number {
+/** Единый cap сетов на упражнение — про-правило, единственный источник (Фаза 2.5).
+ *  Шкала BIG с учётом PED и стажа: натурал 5-6, advanced 6-8, enhanced 3+ 8-10
+ *  на главные, 6-8 на руки/дельты, enhanced 6+ на курсе 10 на главные.
+ *  Сигнатура обратно совместима (4-й/5-й парам опциональны). */
+export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number, onCourse?: boolean): number {
   const m = (muscle || '').toLowerCase();
-  if (level === 'enhanced' && Number.isFinite(trainingYears) && (trainingYears as number) >= 3 && ['back', 'chest', 'quads', 'hamstrings', 'legs'].includes(m)) return 8;
+  const years = Number.isFinite(trainingYears) ? (trainingYears as number) : 0;
+  // BIG-ветка только при явном onCourse===true (PED). Без флага — legacy,
+  // чтобы не ломать существующие тесты (enhanced biceps 6 → 5).
+  if (onCourse === true) {
+    const isMain = ['back', 'chest', 'quads', 'hamstrings', 'legs', 'glutes', 'shoulders'].includes(m);
+    if (years >= 6) return isMain ? 10 : 8;
+    if (years >= 3) return isMain ? 8 : 6;
+    if (years >= 1) return isMain ? 6 : 5;
+    return isMain ? 6 : 5;
+  }
+  if (level === 'enhanced' && years >= 3 && ['back', 'chest', 'quads', 'hamstrings', 'legs'].includes(m)) return 8;
   return 5;
+}
+
+/** Единый cap сетов на мышцу за сессию — BIG с учётом level/стаж/PED.
+ *  Заменяет хардкод min(5) в computeMuscleSets/buildSession, который убивал
+ *  high-volume минимумы enhanced (спина 22, грудь 18, ноги 20 → все 5).
+ *  Значения — потолок одной сессии, недельный объём = cap × частота + MRV-кап. */
+export function perSessionMuscleCap(input: {
+  level?: string;
+  trainingYears?: number;
+  onCourse?: boolean;
+  muscle?: string;
+}): number {
+  const level = (input.level || 'intermediate').toLowerCase();
+  const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
+  const course = !!input.onCourse || level === 'enhanced';
+  const m = (input.muscle || '').toLowerCase();
+  const isBackLegs = ['back', 'quads', 'hamstrings', 'glutes', 'legs'].includes(m);
+  const isChest = ['chest', 'shoulders'].includes(m);
+  const isArm = ['biceps', 'triceps', 'delt_front', 'delt_mid', 'delt_rear', 'forearms'].includes(m);
+  if (course && years >= 6) {
+    if (isBackLegs) return 22;
+    if (isChest) return 18;
+    if (isArm) return 12;
+    return 16;
+  }
+  if (course && years >= 3) {
+    if (isBackLegs) return 16;
+    if (isChest) return 14;
+    if (isArm) return 10;
+    return 12;
+  }
+  if (course && years >= 1) {
+    if (isBackLegs) return 12;
+    if (isChest) return 10;
+    if (isArm) return 8;
+    return 10;
+  }
+  // Натуральные капы — умеренные (BIG только курсу/стажу выше).
+  // intermediate держим около старого поведения (кап 5 → 6-8 точечно),
+  // иначе натуральные недельные объёмы улетают за MRV (chest 22 при MRV 20).
+  if (level === 'advanced') {
+    if (isBackLegs) return 10;
+    if (isChest) return 8;
+    if (isArm) return 6;
+    return 8;
+  }
+  if (level === 'intermediate') {
+    if (isBackLegs) return 8;
+    if (isChest) return 7;
+    if (isArm) return 5;
+    return 6;
+  }
+  return 6;
 }
 
 /** Shared nutrition soft-cap used by every BB source (Helms 2022). */

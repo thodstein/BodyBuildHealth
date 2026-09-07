@@ -55,7 +55,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
@@ -991,7 +991,7 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
  *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика).
  *  C6: isDeload — во время deload floor=2 НЕ применяется (4 упр × 2 = 8 сетов
  *  нарушает intended deload ~4-6 сетов). floor=1 для deload, floor=2 для рабочих недель. */
-export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false, opts?: { level?: string; trainingYears?: number }): void {
+export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false, opts?: { level?: string; trainingYears?: number; onCourse?: boolean }): void {
   const syncWorkSets = (ex: BBExercise): void => {
     const target = Math.max(0, ex.sets || 0);
     const current = Array.isArray(ex.workSets) ? ex.workSets : [];
@@ -1013,11 +1013,11 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
     }
   }
   for (const [m, info] of Object.entries(sums)) {
-    // Per-exercise cap: единый источник perExerciseCap (8 для enhanced 3+ back/chest/quads, иначе 5)
+    // Per-exercise cap: единый источник perExerciseCap (BIG: level/стаж/PED).
     // BUG-B8: для малых мышц (forearms/calves/abs) cap = 6 — они не требуют
     // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
     // P1-4: per-exercise FLOOR — минимум 2 сета (1 сет = разминка, не рабочий объём).
-    const perExCapFor = (muscle: string) => (opts?.level ? perExerciseCap(opts.level, muscle, opts.trainingYears) : 5);
+    const perExCapFor = (muscle: string) => (opts?.level ? perExerciseCap(opts.level, muscle, opts.trainingYears, opts.onCourse) : 5);
     const floor = isDeload ? 1 : 2; // C6: deload floor=1, рабочая неделя floor=2
     for (const ex of info.exs) {
       const cap = perExCapFor(ex.muscle);
@@ -1262,7 +1262,7 @@ function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Reco
 }
 
 /** 3.1 — вынесенные слои: volume/selection/loading — единый источник для buildSession и тестов. */
-export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number>; isHeavy?: boolean }): number {
+export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number>; isHeavy?: boolean; onCourse?: boolean }): number {
   let sets = baseSets;
   // High-volume enhanced минимумы — прямой бюджет, не остаток после других групп
   if (opts.level === 'enhanced' && (opts.trainingYears ?? 0) >= 3 && opts.phase !== 'deload') {
@@ -1287,8 +1287,11 @@ export function computeMuscleSets(muscle: string, baseSets: number, opts: { leve
     else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
     else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
   }
-  // Фазовая модуляция уже применена в sessionShareFor, здесь только cap
-  return Math.max(1, Math.min(5, sets));
+  // Фазовая модуляция уже применена в sessionShareFor, здесь только cap.
+  // BIG-кап с учётом level/стаж/PED — единый источник perSessionMuscleCap
+  // (раньше хардкод 5 убивал enhanced-минимумы 18-22).
+  const sessCap = perSessionMuscleCap({ level: opts.level, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle });
+  return Math.max(1, Math.min(sessCap, sets));
 }
 
 export interface SelectExercisesForMuscleOpts {
@@ -1626,14 +1629,24 @@ function buildSession(
   const specRes = resolveSpecialization(focusGroup, weakPoints, specialization);
     // Focus-группа инжектируется в сессию, только если тег совместим:
     // FullBody — всегда, Legs/Lower — только для ног/ягодиц,
-    // Upper/Push/Pull — только для верхних групп.
-    const focusIsLegs = !!focusGroup && ['quads', 'hamstrings', 'glutes', 'calves'].includes(collapseKey(focusGroup));
-    const focusIsUpper = !!focusGroup && ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms', 'traps', 'arms'].includes(collapseKey(focusGroup));
+    // PPL строго по своим дням (иначе Push/Pull смешиваются в FullBody):
+    // Push ← chest/delt_front/delt_mid/triceps, Pull ← back/biceps/delt_rear/traps,
+    // Legs ← quads/hams/glutes/calves. Upper/смешанные — любая верхняя группа.
+    const focusCk = focusGroup ? collapseKey(focusGroup) : '';
+    const focusIsLegs = !!focusGroup && ['quads', 'hamstrings', 'glutes', 'calves'].includes(focusCk);
+    const focusIsUpper = !!focusGroup && ['chest', 'back', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'forearms', 'traps', 'arms'].includes(focusCk);
+    const tag = sched.sessionTag || '';
+    const isPushTag = /^push$/i.test(tag);
+    const isPullTag = /^pull$/i.test(tag);
+    const isLegsTag = /Legs|Lower|Glute/i.test(tag);
+    const pushOk = ['chest', 'delt_front', 'delt_mid', 'triceps', 'shoulders'].includes(focusCk);
+    const pullOk = ['back', 'biceps', 'delt_rear', 'traps', 'forearms', 'shoulders'].includes(focusCk);
+    const pplCompatible = (isPushTag && pushOk) || (isPullTag && pullOk) || (isLegsTag && focusIsLegs);
     const tagHasFocus = !!focusGroup && (
       musclesForTag(sched.sessionTag).some(m => collapseKey(m) === collapseKey(focusGroup))
       || /FullBody/.test(sched.sessionTag || '')
-      || (/Legs|Lower|Glute/i.test(sched.sessionTag || '') && focusIsLegs)
-      || (/Upper|Push|Pull|Chest|Back|Shoulders|Arms/i.test(sched.sessionTag || '') && focusIsUpper)
+      || pplCompatible
+      || (!isPushTag && !isPullTag && !isLegsTag && /Upper|Chest|Back|Shoulders|Arms/i.test(sched.sessionTag || '') && focusIsUpper)
     );
     const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup, tagHasFocus);
   const exercises: BBExercise[] = [];
@@ -1775,8 +1788,9 @@ function buildSession(
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt, isFemale);
-    // 3.1 — вынесенный слой volume: high-volume минимумы + indirect overlap
-    sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || '') });
+    // 3.1 — вынесенный слой volume: high-volume минимумы + indirect overlap.
+    // onCourse пробрасываем для BIG-капа (PED+стаж), иначе курс душился до натурала.
+    sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || ''), onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3 });
     const specVol = specializationEmphasisFactor(muscle, specRes);
     if (specVol !== 1) sets = Math.round(sets * specVol);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
@@ -1791,9 +1805,13 @@ function buildSession(
         if (sets < perSessionMeV) sets = perSessionMeV;
       }
     }
-    // Про-правило: максимум 5 рабочих сетов на упражнение (объём добивается
-    // дополнительными упражнениями/паттернами, а не 6-8 подходами в одном).
-    if (sets > 5) sets = 5;
+    // Про-правило BIG: кап сетов на мышцу за сессию из единого источника
+    // perSessionMuscleCap (level/стаж/PED). Раньше хардкод 5 убивал enhanced 18-22.
+    // Объём сверх капа добивается упражнениями/частотой, а не бесконечными сетами.
+    {
+      const sessCap = perSessionMuscleCap({ level, trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle });
+      if (sets > sessCap) sets = sessCap;
+    }
     // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
     if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
     // P1: reps/tempo/rest берутся из фазового конфига с учётом trainingFocus — единый источник.
@@ -3403,8 +3421,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         }
       }
     }
-    // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap
-    normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears });
+    // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap.
+    // onCourse пробрасываем чтобы per-exercise кап на курсе был BIG (8-10), а не 5.
+    normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears, onCourse });
     weeks.push({ week: w, phase, deload: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     // В режиме «запрет» (forbid) freshness отключён — строго те же упражнения.

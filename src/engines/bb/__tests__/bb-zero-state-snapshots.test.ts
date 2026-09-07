@@ -25,8 +25,13 @@ const directVolume = (plan: any): Record<string, number> => {
 describe('BB zero-state snapshots (baseline Этапа 10)', () => {
   it('Generic enhanced 6+ (upper_lower_4, mass, AAS 500) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, ...PED });
+    // Re-baseline (осознанно, BIG-капы PED+стаж): прайм-муверы вверх
+    // (грудь 30→36, спина 46→48, квадры 18→21 — high-volume минимумы 18-22
+    // вместо душащего капа 5); руки/ягодицы direct ниже на конкуренции
+    // сессионного бюджета, effective закрыт косвенной (бицепс 0.4×тяги,
+    // ягодицы 0.4×приседы). Валидатор зелёный, инварианты целы.
     expect(directVolume(plan)).toEqual({
-      abs: 14, back: 46, biceps: 6, calves: 10, chest: 30, delt_mid: 8, delt_rear: 7, forearms: 6, glutes: 18, hamstrings: 23, quads: 18, shoulders: 0, traps: 6, triceps: 7,
+      abs: 13, back: 48, biceps: 4, calves: 10, chest: 36, delt_mid: 10, delt_rear: 5, forearms: 5, glutes: 13, hamstrings: 23, quads: 21, shoulders: 0, traps: 5, triceps: 4,
     });
   });
 

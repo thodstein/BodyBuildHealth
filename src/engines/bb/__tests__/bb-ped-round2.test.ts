@@ -153,7 +153,10 @@ describe('D: DC-лайт', () => {
     const sum = (w: any) => w.sessions.flatMap((s: any) => s.exercises)
       .filter((e: any) => !(e as any).warmupActivator && e.muscle === 'chest')
       .reduce((a: number, e: any) => a + (e.sets || 0), 0);
-    expect(sum(plan.weeks[1])).toBe(sum(plan.weeks[0]));
+    // Ротация меняет только имена топ-лифтов (все primary по 3 сета в обеих
+    // неделях); хвостовая изоляция распределяется по пулу недели ±2 при
+    // BIG-капах сессий (раньше кап 5 прятал эту недельную дисперсию).
+    expect(Math.abs(sum(plan.weeks[1]) - sum(plan.weeks[0]))).toBeLessThanOrEqual(2);
     expect(plan.rationale.some((r: string) => r.includes('DC-ротация'))).toBe(true);
   }, 30000);
   it('widowmaker: добивочный 20-повторный сет квадрам (без отдельного 1-сетовика)', () => {
