@@ -37,7 +37,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureStrongmanApkStyles } from './strongman-apk-loader';
-import { parseSmBridgePayload } from './sm-bridge-intake';
+import { parseSmBridgePayload, collectSsVelocityHistory } from './sm-bridge-intake';
 import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, EventCard, StrengthGantt, StrengthHeatmap, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
@@ -288,42 +288,10 @@ export const StrengthSportConstructor: React.FC = () => {
         if(diaryTrend.length===0) diaryTrend=null;
       }
     }catch{}
-    let velocityHistory: Record<string, number[]> | undefined;
-    try {
-      const grouped: Record<string, number[]> = {};
-      for (const [k,v] of Object.entries(vbtMap as Record<string, number>)) {
-        if (!v || v<=0) continue;
-        const parts = String(k).split('-');
-        const exId = parts.slice(2, -1).join('-');
-        if (!exId) continue;
-        if (!grouped[exId]) grouped[exId]=[];
-        grouped[exId].push(v);
-        if (grouped[exId].length>3) grouped[exId]=grouped[exId].slice(-3);
-      }
-      if (Object.keys(grouped).length) velocityHistory = grouped;
-    } catch {}
-    // per-lift VBT 3× → velocityHistory (приоритет)
-    try {
-      for (const [lift, vals] of Object.entries(vbtPerLift as Record<string, { best: number; last: number }>)) {
-        if (vals.best>0 && vals.last>0) {
-          if (!velocityHistory) velocityHistory = {};
-          if (!velocityHistory[lift]) velocityHistory[lift] = [];
-          // best/last как 2 точки истории для EWMA
-          velocityHistory[lift] = [...(velocityHistory[lift]||[]), vals.best, vals.last].slice(-3);
-        }
-      }
-    } catch {}
-    // VBT из хаба: hubVelocity уже в формате {liftId:[точки]} — напрямую в историю
-    try {
-      for (const [lift, pts] of Object.entries(hubVelocity)) {
-        if (!lift || !Array.isArray(pts) || pts.length === 0) continue;
-        const clean = pts.filter((v) => Number.isFinite(v) && (v as number) > 0).slice(-3);
-        if (!clean.length) continue;
-        if (!velocityHistory) velocityHistory = {};
-        if (!velocityHistory[lift]) velocityHistory[lift] = [];
-        velocityHistory[lift] = [...velocityHistory[lift], ...clean].slice(-3);
-      }
-    } catch {}
+    // VBT-история одним проходом (vbtMap → per-lift → хаб), см. collectSsVelocityHistory.
+    // vbtMap НЕ очищаем: ключи week-day-ex-set стабильны между пересборками,
+    // замеры — это история последних сессий, она должна переживать rebuild.
+    const velocityHistory = collectSsVelocityHistory(vbtMap, vbtPerLift as any, hubVelocity);
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -515,9 +483,6 @@ export const StrengthSportConstructor: React.FC = () => {
   const stepIndex = (['params','outside','split','plan'] as Step[]).indexOf(step) + 1;
   const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
   const modeGrad = mode === 'weightlifting' ? ACCENT_GRAD : mode === 'strongman' ? STRONG_GRAD : 'linear-gradient(135deg, #0ea5e9, #6366f1)';
-  const SelectWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div style={{ position: 'relative' }}>{children}<span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(255,255,255,0.38)', fontSize: 12 }}>▾</span></div>
-  );
 
   return (
     <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 880, margin: '0 auto' }}>

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { parseSmBridgePayload } from '../sm-bridge-intake';
+import { parseSmBridgePayload, collectSsVelocityHistory } from '../sm-bridge-intake';
 import { buildStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-builder.engine';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
@@ -164,5 +164,31 @@ describe('мост хаб→конструктор: приём через localS
     );
     const { container } = render(<StrengthSportConstructor />);
     expect(container.textContent).toContain('Из хаба: yoke_walk 2т');
+  });
+});
+
+describe('collectSsVelocityHistory', () => {
+  const emptyLift = { snatch: { best: 0, last: 0 }, clean: { best: 0, last: 0 }, squat: { best: 0, last: 0 } };
+  it('группирует посетовые ключи week-day-ex-set по упражнению', () => {
+    expect(
+      collectSsVelocityHistory(
+        { '1-5-yoke_walk-0': 1.5, '1-5-yoke_walk-1': 1.2, '2-3-farmers_walk_heavy-0': 1.1 },
+        emptyLift,
+        {},
+      ),
+    ).toEqual({ yoke_walk: [1.5, 1.2], farmers_walk_heavy: [1.1] });
+  });
+  it('нули/мусор/ключи без exId отбрасываются; пусто → undefined', () => {
+    expect(collectSsVelocityHistory({ '1-5-yoke_walk-0': 0, badkey: 1.5, 'x': -1 } as any, emptyLift, {})).toBeUndefined();
+    expect(collectSsVelocityHistory({}, emptyLift, {})).toBeUndefined();
+  });
+  it('per-lift и хаб мержатся поверх (кап 3 точки)', () => {
+    expect(
+      collectSsVelocityHistory(
+        { '1-5-snatch-0': 1.5 },
+        { ...emptyLift, snatch: { best: 1.6, last: 1.3 } },
+        { yoke_walk: [1.5, 1.2] },
+      ),
+    ).toEqual({ snatch: [1.5, 1.6, 1.3], yoke_walk: [1.5, 1.2] });
   });
 });

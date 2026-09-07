@@ -101,3 +101,56 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     strategy,
   };
 }
+
+/**
+ * Собирает velocityHistory для билда из трёх источников (порядок = приоритет):
+ * посетовый vbtMap (ключи `week-day-ex-set`) → per-lift ввод → hubVelocity хаба.
+ *
+ * Про свежесть честно: vbtMap переживает пересборки, т.к. ключи стабильны
+ * между планами одинаковой структуры, а замеры — это история последних
+ * сессий (EWMA), а не содержимое плана. Очищать при сборке НЕЛЬЗЯ — убьёт
+ * легитимную непрерывность «собрал → подтюнил → пересобрал».
+ */
+export function collectSsVelocityHistory(
+  vbtMap: Record<string, number>,
+  vbtPerLift: Record<string, { best: number; last: number }>,
+  hubVelocity: Record<string, number[]>,
+): Record<string, number[]> | undefined {
+  let velocityHistory: Record<string, number[]> | undefined;
+  try {
+    const grouped: Record<string, number[]> = {};
+    for (const [k, v] of Object.entries(vbtMap || {})) {
+      if (!v || v <= 0) continue;
+      const parts = String(k).split('-');
+      const exId = parts.slice(2, -1).join('-');
+      if (!exId) continue;
+      if (!grouped[exId]) grouped[exId] = [];
+      grouped[exId].push(v);
+      if (grouped[exId].length > 3) grouped[exId] = grouped[exId].slice(-3);
+    }
+    if (Object.keys(grouped).length) velocityHistory = grouped;
+  } catch {}
+  // per-lift VBT 3× → velocityHistory (приоритет)
+  try {
+    for (const [lift, vals] of Object.entries(vbtPerLift || {})) {
+      if (vals != null && vals.best > 0 && vals.last > 0) {
+        if (!velocityHistory) velocityHistory = {};
+        if (!velocityHistory[lift]) velocityHistory[lift] = [];
+        // best/last как 2 точки истории для EWMA
+        velocityHistory[lift] = [...(velocityHistory[lift] || []), vals.best, vals.last].slice(-3);
+      }
+    }
+  } catch {}
+  // VBT из хаба: hubVelocity уже в формате {liftId:[точки]} — напрямую в историю
+  try {
+    for (const [lift, pts] of Object.entries(hubVelocity || {})) {
+      if (!lift || !Array.isArray(pts) || pts.length === 0) continue;
+      const clean = pts.filter((v) => Number.isFinite(v) && (v as number) > 0).slice(-3);
+      if (!clean.length) continue;
+      if (!velocityHistory) velocityHistory = {};
+      if (!velocityHistory[lift]) velocityHistory[lift] = [];
+      velocityHistory[lift] = [...velocityHistory[lift], ...clean].slice(-3);
+    }
+  } catch {}
+  return velocityHistory;
+}
