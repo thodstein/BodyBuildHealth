@@ -10,9 +10,11 @@ export default defineConfig(({ command }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       disable: command === 'serve',
-      // APK: авто-регистрация SW вшивалась в dist в обход гейта main.tsx —
-      // зелёный PWA-баннер вставал поверх hero. В native-сборке не вшиваем.
-      injectRegister: process.env.VITE_APP_PLATFORM === 'native' ? false : 'auto',
+      // Авто-регистрация SW выключена всегда: единственный путь — явный
+      // registerSW() из main.tsx (там гейты TG/web + OCR-рантайм).
+      // Авто-инжект вшивался в dist в обход гейтов и вешал зелёный
+      // PWA-баннер поверх hero в APK (волна 32).
+      injectRegister: false,
       workbox: {
         runtimeCaching: [
           {
