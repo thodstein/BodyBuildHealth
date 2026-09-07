@@ -5517,7 +5517,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
-      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay });
+      // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay });
+      // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
+      // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
+      // Если первый прогон плох — повторяем без lbmKg и берём лучший
+      // (монотонно, цена только плохим дням).
+      if (_corr.deviationPct > 8 && input.lbmKg) {
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay });
+        if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
+          _corr = _corrNoLbm;
+          notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);
+        }
+      }
       if (_corr.meals && _corr.meals.length > 0) {
         const _beforeDev = Math.max(
           _targets.kcal ? Math.abs(totals.kcal - _targets.kcal) / _targets.kcal : 0,
@@ -5697,6 +5709,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const _cDevNow = input.goalCarbsG - totals.c;
             if (_cDevNow <= 10) break;
             if (((m.items || []).length || 0) >= 8) continue;
+            // Хвост — не 4-й гарнир в приём (кап 3 на HV, зеркало посадки/_capN).
+            if (countCarbItems(m as any) >= 3) continue;
             const _have = new Set((m.items || []).map((x: any) => x.id));
             // P1a-fix2: хвост — не второе семейство в тот же приём («рис + крем»).
             const _haveFams = new Set((m.items || [])
@@ -5771,9 +5785,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // 900У из круп несут ~60-70 г клетчатки минимум, плюс овощи/фрукты/орехи ~25.
         // P1a: практика показала 115 г на 900У (цельнозерновые+отруби+семена+фрукты) —
         // кап 90 был недостижим без сноса микронутриентов (тест держит 115).
+        // P1b-фикс: min() со ставкой ккал/1000×14 давил кап до 77 на HV (ступень 115
+        // была мертва: min всегда выбирал меньшее) — трим клетчатки ел авокадо/орехи
+        // и сносил −32 г жиров дня. Пол по углям: 700У+ несут ~85-100 г неизбежной
+        // клетчатки — кап ниже 105 всегда стреляет по жирам. Тест-кап 116 цел.
         const _c = input.goalCarbsG || 0;
         const _stepCap = _c >= 700 ? 115 : _c >= 500 ? 65 : 50;
-        const _base = Math.max(25, Math.min(_stepCap, Math.round(input.goalKcal / 1000 * 14)));
+        const _kcalBased = Math.round(input.goalKcal / 1000 * 14);
+        const _tierFloor = _c >= 700 ? 105 : _c >= 500 ? 60 : 0;
+        const _base = Math.max(25, Math.min(_stepCap, Math.max(_kcalBased, _tierFloor)));
         if (typeof input.fiberCapG === 'number' && input.fiberCapG < _base) return Math.max(15, Math.round(input.fiberCapG));
         return _base;
       })();
@@ -6217,6 +6237,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // V1: второе мясо чистим только на HV (много приёмов, одного мяса хватает);
       // на обычных 6-приёмных днях второе мясо — честная нужда сходимости (P-dev 25% иначе).
       {
+        // P1b: срезанный дип-жир возвращаем маслом в тот же приём (иначе чиним
+        // тарелку ценой жира: ужатие гуака 186→100 сносит ~12 г Ж без компенсации).
+        const _dipDebt: Array<{ m: any; fat: number }> = [];
         for (const m of meals) {
           if ((m as any)._insulinWindow) continue;
           const t = String((m as any).type || '');
@@ -6271,8 +6294,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           for (const it of (m.items || [])) {
             if ((it as any)._fixedGrams) continue;
             const _lid = String(it.id || '').toLowerCase();
-            const _dipCap = _lid.includes('guacamole') ? 50 : _lid.includes('hummus') ? 100 : 0;
-            if (!_dipCap || (it.amount || 0) <= _dipCap) continue;
+            const _dipCapBase = _lid.includes('guacamole') ? 50 : _lid.includes('hummus') ? 100 : 0;
+            if (!_dipCapBase || (it.amount || 0) <= _dipCapBase) continue;
+            // P1b: дип-кап не режем в ноль при недоборе жиров дня (иначе чиним тарелку
+            // ценой жира: кейс 800У — два ужатия гуака снесли −16 г Ж). Компромисс:
+            // при недоборе кап ×2 (гуак 100 вместо 50) — и тарелка не ведро, и жиры целы.
+            // Зеркало гарда клетчаточного трима выше.
+            const _dipCap = totals.f < (input.goalFatG || 0) ? _dipCapBase * 2 : _dipCapBase;
+            if ((it.amount || 0) <= _dipCap) continue;
             const _r = _dipCap / (it.amount || 1);
             const _cut = Math.round((it.amount || 0) - _dipCap);
             it.amount = _dipCap;
@@ -6283,6 +6312,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
             notes.push(`✂️ «${m.label}»: ${it.name} ужат ${_cut} г до дипных ${_dipCap} г`);
+            _dipDebt.push({ m, fat: Math.max(0, (it.f || 0) / Math.max(0.01, _r) - (it.f || 0)) });
+          }
+        }
+        // Возврат срезанного дип-жира маслом в тот же приём (иначе чиним тарелку
+        // ценой жира). Только при недоборе дня, кап масла 15 г/приём, доступность/
+        // исключения уважаем. Ноль клетчатки — трим не тронет обратно.
+        if (totals.f < (input.goalFatG || 0)) {
+          const _oil = FOOD_DB.find((f: any) => f.id === 'olive_oil');
+          if (_oil && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has('olive_oil')) && !(input.excludedIds && input.excludedIds.has('olive_oil')) && foodAvailableForPlan(_oil)) {
+            for (const _d of _dipDebt) {
+              if (totals.f >= (input.goalFatG || 0)) break;
+              if ((_d.m.items || []).length >= 8) continue;
+              const _addG = Math.max(0, Math.min(15, Math.round(Math.min(_d.fat, (input.goalFatG || 0) - totals.f))));
+              if (_addG < 5) continue;
+              const _rr = _addG / 100;
+              const _np = 0, _nf = Math.round(100 * _rr), _nc = 0;
+              (_d.m.items || []).push({ id: 'olive_oil', name: _oil.name, amount: _addG, role: 'fat', p: _np, f: _nf, c: _nc, kcal: _nf * 9, fiber: 0, leucine_mg: 0 });
+              _d.m.totals = mealTotalsOf(_d.m.items);
+              recalcDayTotals(meals, totals);
+              notes.push(`🫒 «${_d.m.label}»: +${_addG} г масла за ужатый дип (жиры дня в норме)`);
+            }
           }
         }
       }

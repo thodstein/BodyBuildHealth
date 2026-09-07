@@ -58,6 +58,20 @@ const CollapsibleSection: React.FC<{ id: string; title: string; icon: string; co
   );
 };
 
+/**
+ * Рекомендация числа приёмов: часы бодрствования + объём макросов.
+ * Раньше считались только часы (максимум 5) — 800У/300Б на 5 приёмах дают
+ * 160У/60Б на приём (ведро). MPS/тарелка: >50 г белка или >120 г углей
+ * в приём не кладём → такие дни требуют 6–7 приёмов.
+ */
+export function recommendMealCount(awakeH: number, proteinG: number, carbsG: number): number {
+  const h = Number.isFinite(awakeH) ? awakeH : 16;
+  const byAwake = h >= 16 ? 5 : h >= 14 ? 4 : 3;
+  const byProtein = Math.ceil(Math.max(0, Number.isFinite(proteinG) ? proteinG : 0) / 50);
+  const byCarbs = Math.ceil(Math.max(0, Number.isFinite(carbsG) ? carbsG : 0) / 120);
+  return Math.max(3, Math.min(10, Math.max(byAwake, byProtein, byCarbs)));
+}
+
 export const IndividualPlanSettings: React.FC = () => {
   const {
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
@@ -1548,14 +1562,15 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
           </div>
-          {(() => {
-            const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
-            const wMin = toMin(wakeTime);
-            const bMin = toMin(bedTime);
-            const awakeH = Math.round((bMin - wMin) / 60);
-            const recCount = awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3;
-            return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
-          })()}
+            {(() => {
+              const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+              const wMin = toMin(wakeTime);
+              const bMin = toMin(bedTime);
+              const awakeH = Math.round((bMin - wMin) / 60);
+              const recCount = recommendMealCount(awakeH, effectiveP, effectiveC);
+              const byMacros = recCount > (awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3);
+              return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч{byMacros ? ` + Б${Math.round(effectiveP)}/У${Math.round(effectiveC)}` : ''} → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч{byMacros ? ', иначе >50 г белка / >120 г углей на приём' : ''}).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+            })()}
         </div>
       </GlassCard>
       )}

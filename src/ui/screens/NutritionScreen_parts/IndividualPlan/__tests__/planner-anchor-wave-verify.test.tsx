@@ -15,6 +15,7 @@ import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { correctDayToTargets } from '../day-target-corrector';
 import { IndividualPlan } from '../index';
 import { secondRecipeRoomDecision, freeSnackRoomForSecond } from '../IndividualPlanContext';
+import { recommendMealCount } from '../IndividualPlanSettings';
 import { useRenderMealList } from '../MealListRender';
 
 const base = (overrides: any = {}): MealPlanInput => ({
@@ -196,6 +197,22 @@ describe('P1b-конструктор: большой дефицит закрыв
   });
 });
 
+describe('Рекомендация числа приёмов: часы + макросы (не 5 при 800У)', () => {
+  it('16 ч + обычные макросы → 5 (как раньше)', () => {
+    expect(recommendMealCount(16, 180, 320)).toBe(5);
+  });
+  it('800У/300Б → 7 (тарелка и MPS, а не ведро)', () => {
+    expect(recommendMealCount(16, 300, 800)).toBe(7);
+  });
+  it('600У/220Б → 5–6 по углям', () => {
+    expect(recommendMealCount(16, 220, 600)).toBe(5);
+  });
+  it('короткий день не ниже 3, потолок 10', () => {
+    expect(recommendMealCount(10, 100, 150)).toBe(3);
+    expect(recommendMealCount(16, 500, 1500)).toBe(10);
+  });
+});
+
 describe('P4a: secondRecipeRoomDecision — явное решение', () => {  it('остатка нет (0/минус) → abort без комнаты', () => {
     expect(secondRecipeRoomDecision(800, 800)).toEqual({ action: 'abort', roomKcal: 0 });
     expect(secondRecipeRoomDecision(800, 950)).toEqual({ action: 'abort', roomKcal: 0 });
@@ -227,8 +244,7 @@ describe('P4a: secondRecipeRoomDecision — явное решение', () => { 
     }
   });
 
-  it('freeSnackRoomForSecond: залоченные пункты и _fixedGrams не ужимаются', () => {
-    const meals = [
+  it('freeSnackRoomForSecond: залоченные пункты и _fixedGrams не ужимаются', () => {    const meals = [
       { label: 'Обед', type: 'lunch', items: [{ id: 'a', name: 'a', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow' }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },
       { label: 'Полдник', type: 'snack', items: [{ id: 'b', name: 'b', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow', _fixedGrams: true }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },
       { label: 'Перекус', type: 'snack2', items: [{ id: 'c', name: 'c', amount: 100, kcal: 300, p: 5, f: 5, c: 50, fiber: 1, role: 'carb_slow' }], totals: { kcal: 300, p: 5, f: 5, c: 50, fiber: 1 } },

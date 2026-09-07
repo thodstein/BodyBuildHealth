@@ -95,7 +95,7 @@ function isCoreRecipeItem(meal: CorrectorMeal, itemId: string): boolean {
 // новые носители только в ХВОСТ, чтобы legacy-пул был бит-идентичен.
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein', 'egg_whole', 'tuna_canned'];
 export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'bread_white', 'whole_grain_bread', 'cream_of_rice', 'rice_basmati'];
-export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter'];
+export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter', 'coconut_oil', 'cashew'];
 
 /**
  * P1a: проверка консистентности целей приёмов с целью дня. Таргет-гарды (не растим
@@ -759,7 +759,10 @@ export function correctDayToTargets(
           addG = Math.min(addG, maxByPerItem);
         }
         const candFood = FOOD_DB.find(f => f.id === cand.it.id);
-        if (candFood && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > 85) {
+        // P1b-фикс: кламп — только носителям клетчатки. При дне уже за капом (fiber 88
+        // на HV — норма) нулевые кандидаты (масло/изолят) уходили формулой в минус
+        // и глушили всю итерацию — жиры системно недобирались на HV.
+        if (candFood && (candFood.fiber || 0) > 0 && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > 85) {
           const fiberRoom = 85 - currentFiber(meals);
           const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, candFood.fiber || 1) * 100);
           addG = Math.min(addG, maxByFiber);
@@ -945,7 +948,9 @@ export function correctDayToTargets(
         grams = Math.max(0, 85 - currentNutGrams(meals));
         if (grams < 15) break;
       }
-      if (currentFiber(meals) + (best.fiber || 0) * grams / 100 > 85) {
+      // P1b-фикс: кламп — только носителям клетчатки (см. выше: нулевые кандидаты
+      // при дне за капом уходили в минус и глушили итерацию целиком).
+      if ((best.fiber || 0) > 0 && currentFiber(meals) + (best.fiber || 0) * grams / 100 > 85) {
         const fiberRoom = 85 - currentFiber(meals);
         const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, best.fiber || 1) * 100);
         grams = Math.min(grams, maxByFiber);
@@ -1070,8 +1075,23 @@ export function correctDayToTargets(
       // свободный приём (иначе ветка роста same-id ниже перехватывает управление
       // и коктейль не строится никогда: best уже везде — «яйца 580 г»).
       // (Сам конструктор — перед newItem ниже; здесь только хост.)
+      // P1b-фикс: хост уважает те же коридоры, что legacy (_corrFull/roomy), иначе
+      // коктейль льёт белок в сытые приёмы мимо lbm-коридора (кейс anchors+lbm: Б363).
       if (!targetMeal && ((eff === 'p' && need >= 30) || (eff === 'c' && need >= 60))) {
-        const _ckEl = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !_postLocked(m) && !(m as any)._insulinWindow);
+        let _ckEl = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !_postLocked(m) && !(m as any)._insulinWindow);
+        if (eff === 'p') {
+          const _roomyCk = _ckEl.filter(m => !_corrFull(m));
+          if (_roomyCk.length > 0) _ckEl = _roomyCk;
+        }
+        if (eff === 'c' && !_staleT) {
+          const _roomyCk = _ckEl.filter(m => {
+            const _tc = (m as any).target?.c;
+            if (!(_tc > 0)) return true;
+            const _mc = (m.items || []).filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast').reduce((s: number, x: any) => s + (x.c || 0), 0);
+            return _mc < _tc + 15;
+          });
+          if (_roomyCk.length > 0) _ckEl = _roomyCk;
+        }
         if (_ckEl.length > 0) {
           targetMeal = _ckEl.reduce((a, b) => {
             const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
