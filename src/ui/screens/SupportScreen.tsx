@@ -1030,8 +1030,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   const saveCurrentStack = () => {
     const level = SUPPORT_LEVELS[supportLevel];
     if (!level) return;
+    // Живой план из движка (SUPPORT_LEVELS пуст — иначе сохраняется пустой стек)
+    const subs: string[] = effectiveLevel?.subs || [];
+    const dosages = effectiveLevel?.dosages || {};
     const id = 'stack_' + Date.now();
-    const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {}, notes: stackNotes || '' };
+    const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs, dosages, notes: stackNotes || '' };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
     writeSupportStacks(updated);

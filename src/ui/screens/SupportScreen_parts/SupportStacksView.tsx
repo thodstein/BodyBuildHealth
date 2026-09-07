@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { writeSupportStacks } from '../../../engines/stack-storage';
 
 export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -10,6 +11,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
     expandedStack, setExpandedStack,
     getStackDisplayName,
     catalogSubstances,
+    effectiveLevel, showToast,
   } = s;
 
   return (
@@ -20,13 +22,18 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
           <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
             style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
           <button onClick={() => {
-            if (!stackName.trim()) { alert('Введите название'); return; }
-            const level = SUPPORT_LEVELS[supportLevel];
-            if (!level?.subs || level.subs.length === 0) { alert('Нет препаратов в калькуляторе'); return; }
-            const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...level.subs], dosages: { ...(level.dosages||{}) }, notes: '' };
+            if (!stackName.trim()) { showToast('Введите название'); return; }
+            // Сохраняем живой план из движка: SUPPORT_LEVELS — пустая заготовка,
+            // раньше сохранялся пустой стек (и только в память, без персиста).
+            const subs: string[] = effectiveLevel?.subs || [];
+            if (subs.length === 0) { showToast('Нет препаратов в калькуляторе'); return; }
+            const dosages: Record<string, { mg: number; timing: string }> = effectiveLevel?.dosages || {};
+            const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...subs], dosages: { ...dosages }, notes: '' };
             const updated = [...savedStacks, newStack];
             setSavedStacks(updated);
+            try { writeSupportStacks(updated); } catch {}
             setStackName('');
+            showToast('✅ Стек сохранён');
           }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
         </div>
       </div>

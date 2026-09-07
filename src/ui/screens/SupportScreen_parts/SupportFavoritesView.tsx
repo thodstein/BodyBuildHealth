@@ -26,13 +26,20 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
     setJointMode,
     setEnhancedSubs,
     setMyPlansRefresh,
-    reportGenerated, setReportGenerated,
-    mixGoals, setMixGoals,
+    effectiveLevel, enhancedSubs, showToast,
+    reportGenerated, setReportGenerated,    mixGoals, setMixGoals,
     mixWorkoutType, setMixWorkoutType,
     mixTimeOfDay, setMixTimeOfDay,
     setSection, setTab, setSupportView, setCalcView,
     linked,
   } = s;
+  // Инлайн-выбор стека для добавления в план (без prompt/reload)
+  const [stackPickerOpen, setStackPickerOpen] = React.useState(false);
+  // Живой план из движка — единый источник для таба «План» и кнопок «В план».
+  // SUPPORT_LEVELS — статическая заготовка без веществ, читать её нельзя.
+  const livePlanSubs: string[] = (effectiveLevel?.subs as string[] | undefined) || [];
+  const livePlanDosages: Record<string, { mg: number; timing: string }> =
+    (effectiveLevel?.dosages as Record<string, { mg: number; timing: string }> | undefined) || {};
 
   let favIds: string[] = [];
   try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
@@ -218,16 +225,10 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     </div>
                   )}
                   <button onClick={() => {
-                    const subs = (st.subs || []).filter((id:string) => SUPPORT_LEVELS[supportLevel]?.subs ? !SUPPORT_LEVELS[supportLevel].subs.includes(id) : true);
-                    if (subs.length === 0) { alert('Все препараты стека уже в плане'); return; }
-                    const level = SUPPORT_LEVELS[supportLevel];
-                    if (level) {
-                      const newDosages = { ...level.dosages };
-                      subs.forEach((id:string) => { const d = (st.dosages||{})[id]; if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: '' } : d; });
-                      SUPPORT_LEVELS[supportLevel] = { ...level, subs: [...level.subs, ...subs], dosages: newDosages };
-                    }
-                    alert(`✅ ${subs.length} препаратов добавлено в план`);
-                    setFavRefresh((prev:number) => prev + 1);
+                    const fresh = (st.subs || []).filter((id: string) => !livePlanSubs.includes(id));
+                    if (fresh.length === 0) { showToast('Все препараты стека уже в плане'); return; }
+                    setEnhancedSubs([...(enhancedSubs || []), ...fresh]);
+                    showToast(`✅ ${fresh.length} препаратов добавлено в план`);
                   }} style={{ marginTop:4, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:600 }}>📋 В план</button>
                 </div>
               ))}
@@ -247,9 +248,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
           </div>
 
           {planSubTab === 'active' && (() => {
+            // Действующий план — посчитанный движком (livePlanSubs/livePlanDosages).
+            // SUPPORT_LEVELS — статическая заготовка без веществ: таб был вечно пуст,
+            // а «Из моих стеков» мутировал её in-memory и тут же всё сносил reload'ом.
             const level = SUPPORT_LEVELS[supportLevel];
-            const subs = level?.subs || [];
-            const dosages = level?.dosages || {};
+            const subs: string[] = livePlanSubs;
+            const dosages: Record<string, { mg: number; timing: string }> = livePlanDosages;
             const getInfo = (id: string) => {
               const sub = catalogSubstances.find((s:any) => s.id === id);
               const d = dosages[id];
@@ -262,31 +266,45 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
                 {/* Action buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
-                  <button onClick={() => {
-                    const stacks = readSupportStacks();
-                    if (stacks.length === 0) { alert('Нет сохранённых стеков'); return; }
-                    const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || ''}`).join('\n');
-                    const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
-                    if (idx < 0 || idx >= stacks.length) return;
-                    const stack = stacks[idx];
-                    const stackSubs = (stack.subs || []).filter((id: string) => !subs.includes(id));
-                    if (stackSubs.length === 0) { alert('Все препараты уже в плане'); return; }
-                    const newDosages = { ...dosages };
-                    (stackSubs || []).forEach((id: string) => {
-                      const d = stack.dosages?.[id];
-                      if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: '' } : d;
-                    });
-                    SUPPORT_LEVELS[supportLevel] = { ...level, subs: [...subs, ...stackSubs], dosages: newDosages };
-                    window.location.reload();
-                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
+                  <button onClick={() => setStackPickerOpen(o => !o)} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
                   <button onClick={() => {
                     const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.mg, timing: info.timing }; });
                     const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
                     localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
                     setCartItems([...cartItems, ...items]);
-                    alert('✅ Добавлено в корзину');
+                    showToast('✅ Добавлено в корзину');
                   }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
                 </div>
+
+                {/* Инлайн-пикер стеков: добавление идёт через setEnhancedSubs в живой план */}
+                {stackPickerOpen && (() => {
+                  const stacks = readSupportStacks();
+                  if (stacks.length === 0) return (
+                    <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>Нет сохранённых стеков. Соберите стек в «🧮 Расчёты» или каталоге.</div>
+                  );
+                  return (
+                    <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
+                      {stacks.map((st: any) => {
+                        const fresh = (st.subs || []).filter((id: string) => !subs.includes(id));
+                        return (
+                          <div key={st.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, padding:'6px 10px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{st.name || st.id}</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(st.subs || []).length} препаратов</div>
+                            </div>
+                            <button disabled={fresh.length === 0} onClick={() => {
+                              setEnhancedSubs([...(enhancedSubs || []), ...fresh]);
+                              showToast(`✅ В план добавлено: ${fresh.length}`);
+                              setStackPickerOpen(false);
+                            }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor: fresh.length === 0 ? 'default' : 'pointer', background: fresh.length === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.3)', color: fresh.length === 0 ? 'var(--text-dim)' : '#00e68a', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, opacity: fresh.length === 0 ? 0.5 : 1 }}>
+                              {fresh.length === 0 ? '✓ Всё в плане' : `＋ Добавить (${fresh.length})`}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
                 {/* Timing table */}
                 {subs.length > 0 && (
@@ -358,7 +376,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                                 try {
                                   let saved: any[] = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
                                   localStorage.setItem('he_saved_support_plans', JSON.stringify(saved.filter((x:any) => x.id !== sp.id)));
-                                  window.location.reload();
+                                  setFavRefresh((prev:number) => prev + 1);
                                 } catch {}
                               }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                             </div>
@@ -466,13 +484,13 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                               setPlanSaved('✅ План загружен в калькулятор');
                               setTimeout(() => setPlanSaved(''), 3000);
                             }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
-                            <button onClick={() => {
-                              try {
-                                let arr: any[] = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
-                                localStorage.setItem('he_my_plans', JSON.stringify(arr.filter((x: any) => x.id !== p.id)));
-                                setMyPlansRefresh((prev:number) => prev + 1);
-                              } catch {}
-                            }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                              <button onClick={() => {
+                                try {
+                                  let arr: any[] = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
+                                  localStorage.setItem('he_my_plans', JSON.stringify(arr.filter((x: any) => x.id !== p.id)));
+                                  setMyPlansRefresh((prev:number) => prev + 1);
+                                } catch {}
+                              }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                           </div>
                         </div>
                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>
@@ -678,7 +696,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       try {
                         const arch: any[] = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
                         const realIdx = arch.findIndex((x: any) => x.id === r.id);
-                        if (realIdx >= 0) { arch.splice(realIdx, 1); localStorage.setItem('he_support_reports_archive', JSON.stringify(arch)); window.location.reload(); }
+                        if (realIdx >= 0) { arch.splice(realIdx, 1); localStorage.setItem('he_support_reports_archive', JSON.stringify(arch)); setFavRefresh((prev:number) => prev + 1); }
                       } catch {}
                     }} style={{ padding:'3px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                   </div>
