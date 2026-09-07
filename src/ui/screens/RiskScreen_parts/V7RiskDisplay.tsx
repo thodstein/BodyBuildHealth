@@ -214,7 +214,7 @@ export const V7RiskDisplay: React.FC<{
             </div>
             {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
               <div style={{ fontSize: 12, color: '#fff', marginTop: 4, textAlign: 'center' }}>
-                Общий риск (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
+                Общий риск (raw): <b style={{ color: getRiskColor(fmtPct01(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct01(weeklyGlobalData[organWeek - 1].raw)}%</b>
               </div>
             )}
           </div>

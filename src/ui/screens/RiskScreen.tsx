@@ -1654,11 +1654,21 @@ const ClinicalRiskDisplay: React.FC = () => {
 };
 
 // ── Labs Risks Tab (Анализы sub-tab in Clinical) ──
-const LabsRisksTab: React.FC = () => {
+export const LabsRisksTab: React.FC = () => {
   const linked = useDataLink();
   const labs = linked.labs || [];
   const hasLabs = labs.length > 0;
   const [riskSections, setRiskSections] = useState<Record<string,boolean>>({ pharma:true, indices:true, systems:true, markers:true });
+
+  // NOTE: объявлено ДО labRisks — useMemo-фабрика выполняется синхронно при
+  // рендере, позже в коде константа уходила бы в TDZ (ReferenceError глотался
+  // try/catch → labRisks всегда null при реальных анализах).
+  const LAB_SYSTEM_GROUPS: Record<string,string[]> = {
+    hepatic:['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'], renal:['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR'],
+    endocrine:['TSH','FT3','FT4','TESTOSTERONE','TT','E2','ESTRADIOL','PRL','PROLACTIN','CORTISOL','LH','FSH','SHBG','IGF1'],
+    hematologic:['HGB','HCT','PLT','WBC','FERRITIN'], cardio:['LDL','HDL','TG','CRP','HOMOCYSTEINE'],
+    metabolic:['GLU','GLUCOSE','HBA1C','INSULIN','INS','HOMA','VITD'], reproductive:['PSA','INHB','AMH'], neuro:['HOMOCYSTEINE'], other:[]
+  };
 
   const sysLabels: Record<string,string> = {
     cardio:'Сердечно-сосудистая', hepatic:'Печень', renal:'Почки', neuro:'Нервная',
@@ -1724,20 +1734,9 @@ const LabsRisksTab: React.FC = () => {
     } catch { return null; }
   }, [hasLabs, labs]);
 
-  const penalty = useMemo(() => {
-    return calculatePenaltyCoefficients('baseline', labs, [], 1, linked.course, false);
-  }, [labs, linked.course]);
-
   const sysColors: Record<string,string> = {
     hepatic:'#22c55e', renal:'#3b82f6', endocrine:'#a855f7', hematologic:'#ef4444',
     cardio:'#f97316', metabolic:'#eab308', reproductive:'#ec4899', neuro:'#14b8a6', other:'#6b7280'
-  };
-
-  const LAB_SYSTEM_GROUPS: Record<string,string[]> = {
-    hepatic:['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'], renal:['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR'],
-    endocrine:['TSH','FT3','FT4','TESTOSTERONE','TT','E2','ESTRADIOL','PRL','PROLACTIN','CORTISOL','LH','FSH','SHBG','IGF1'],
-    hematologic:['HGB','HCT','PLT','WBC','FERRITIN'], cardio:['LDL','HDL','TG','CRP','HOMOCYSTEINE'],
-    metabolic:['GLU','GLUCOSE','HBA1C','INSULIN','INS','HOMA','VITD'], reproductive:['PSA','INHB','AMH'], neuro:['HOMOCYSTEINE'], other:[]
   };
 
   return (
