@@ -156,6 +156,28 @@ export function isCreamId(id: string): boolean {
   return /cream_of_rice|rice_cream/.test(id || '');
 }
 
+const FLESH_PROTEIN_RE = /chicken|turkey|tuna|cod|pollock|hake|beef|pork|shrimp|salmon|trout|fish|meat|duck|lamb|veal|crab|squid|octopus|seafood/i;
+const DAIRY_EGG_RE = /egg|milk|kefir|yogurt|yoghurt|cheese|cottage|curd|whey|casein|isolate|protein_powder|supp_egg/i;
+/** Мясо/рыба (тунец, курица...) — НЕ молочка/яйца/порошок (те с кремом дружат). */
+export function isFleshProteinId(id: string): boolean {
+  if (!id) return false;
+  if (DAIRY_EGG_RE.test(id)) return false;
+  return FLESH_PROTEIN_RE.test(id);
+}
+
+const SWEET_CARB_RE = /cream_of_rice|rice_cream|honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|dates|raisins|dried_/i;
+/** Сладкий углевод (крем, мёд, джем, пряники, финики, сухофрукты). */
+export function isSweetCarbId(id: string): boolean {
+  return SWEET_CARB_RE.test(id || '');
+}
+
+/**
+ * Вето «тунец + рисовый крем»: сладкий углевод не кладём к мясу/рыбе в одну
+ * тарелку (и наоборот). Молочка/яйца/порошок — исключение (каша с молоком — норма).
+ */
+export function sweetFleshClash(aId: string, bId: string): boolean {
+  return (isSweetCarbId(aId) && isFleshProteinId(bId)) || (isFleshProteinId(aId) && isSweetCarbId(bId));
+}
 /** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства). */
 export function creamMealCap(_hv?: boolean): number {
   return 2;

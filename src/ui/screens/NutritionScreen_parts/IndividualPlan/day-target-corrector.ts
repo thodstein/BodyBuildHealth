@@ -12,7 +12,7 @@
 
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -187,7 +187,7 @@ function currentFiber(meals: CorrectorMeal[]): number {
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; refeedDay?: boolean },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; refeedDay?: boolean; budget?: string },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
   const maxIter = opts?.maxIter ?? 80;
   const weightKg = opts?.weightKg ?? 80;
@@ -370,6 +370,10 @@ export function correctDayToTargets(
               // P1a: своп в самого себя — пропуск (иначе «посттрен крем 100 → крем 100» ×5
               // сжигает итерации вхолостую).
               if (it.id === bestU.id) return;
+              // P1b: вето «тунец + крем» — сладкой заменой к мясу/рыбе не лезем
+              // (жертва-мясо при этом заменяется — clash уходит вместе с ней).
+              if (under === 'c' && isSweetCarbId(bestU.id) &&
+                (m.items || []).some((x: any) => x !== it && isFleshProteinId(x.id))) return;
               // P1a-fix2: churn внутри семейства — пропуск (рис → крем не даёт ни
               // разнообразия, ни сходимости нового: та же рисовая монотонность).
               // HV-исключение: на HV плотность важнее (там рис↔крем — рабочий инструмент
@@ -527,6 +531,8 @@ export function correctDayToTargets(
               if (!hv && _vicFamD && _bf && _vicFamD === _bf) return false;
               if (_famUsesD(f.id) >= _capForD(f.id)) return false;
               if (isCreamId(f.id) && _creamUsesD() >= creamMealCap(hv)) return false;
+              // P1b: вето «тунец + крем» (жертва-мясо — можно, clash уходит с ней).
+              if (isSweetCarbId(f.id) && (meals[_vMi].items || []).some((x: any) => x.id !== _vic.id && isFleshProteinId(x.id))) return false;
               return true;
             });
             const _best = [..._altsF.filter(f => !_sugarFull || !_sIds.has(f.id))]
@@ -772,7 +778,9 @@ export function correctDayToTargets(
         // P1b: вёдра не растим — большой дефицит закрывает коктейль (ветка newItem
         // ниже): «яйца 580 г», «курица 400 г». Диверт только вёдер при cocktail-дефиците
         // (Б≥30/У≥60, порция уже >250/300 г); рост мелочи идёт как раньше.
-        if ((eff === 'p' && need >= 30 && newAmount > 250) || (eff === 'c' && need >= 60 && newAmount > 300)) continue;
+        // P1b: на бюджете max большие порции легитимны (капы 350/200/600 — тест
+        // convergence) — диверт там не действует.
+        if (opts?.budget !== 'max' && ((eff === 'p' && need >= 30 && newAmount > 250) || (eff === 'c' && need >= 60 && newAmount > 300))) continue;
         // Порошок растим только до скупа (60 г) — дальше новый приём/носитель.
         if (isProteinPowderId(cand.it.id) && newAmount > POWDER_PORTION_CAP_G) continue;
         // капы: белок ≤300, фрукт ≤150, клетчатка ≤10, общие ≤600, порошок ≤60
@@ -997,6 +1005,10 @@ export function correctDayToTargets(
           const _capHv = hv || !!opts?.refeedDay;
           const _capC = _capHv ? 3 : 2;
           if (_carbs >= _capC && !m.items.some(it => it.id === (best as FoodItem).id) && (_capHv || meals.length >= 5)) return false;
+          // P1b: новых id — не больше 2 в приём никогда (3-й гарнир и есть свалка;
+          // рост существующих — без лимита). Legacy MC3 (≤4 приёмов без HV) не трогаем.
+          const _legacyFewC = !_capHv && meals.length < 5;
+          if (!_legacyFewC && _carbs >= 2 && !m.items.some(it => it.id === (best as FoodItem).id)) return false;
           if ((m.type === 'breakfast' || /Завтрак/i.test(m.label || '')) && isBreakfastBannedCarb((best as FoodItem).id)) return false;
           if (_carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && ((m as any).target?.c || 0) < 100) return false;
           // PRO-типология: сладость — не добивка в основные приёмы (печенье в обед — мусор).
@@ -1023,6 +1035,7 @@ export function correctDayToTargets(
         // P1a-fix2: добивка — не второе семейство в тот же приём («рис + крем»).
         // Рост существующего пункта — можно. Если все свободные уже несут семейство —
         // фолбэк к ним (сходимость важнее).
+        // P1b: вето «тунец + крем» — сладкую добивку не кладём к мясу/рыбе.
         if (eff === 'c') {
           const _famB = stapleFamilyOf(_b.id);
           if (_famB) {
@@ -1030,6 +1043,12 @@ export function correctDayToTargets(
               (m.items || []).some(it => it.id === _b.id) ||
               !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famB));
             if (_noFam.length > 0) _pickFrom = _noFam;
+          }
+          if (isSweetCarbId(_b.id)) {
+            const _noClash = _pickFrom.filter(m =>
+              (m.items || []).some(it => it.id === _b.id) ||
+              !(m.items || []).some(it => isFleshProteinId(it.id)));
+            if (_noClash.length > 0) _pickFrom = _noClash;
           }
         }
       }
@@ -1259,11 +1278,14 @@ export function correctDayToTargets(
             const _mealFamsCk = new Set((targetMeal.items || [])
               .filter(x => x.role === 'carb_slow' || x.role === 'carb_fast')
               .map(x => stapleFamilyOf(x.id)).filter(Boolean));
+            // P1b: вето «тунец + крем» — сладкая база к мясу/рыбе не идёт.
+            const _mealFleshCk = (targetMeal.items || []).some((x: any) => isFleshProteinId(x.id));
             for (const _bid of (_bestBase ? [_bestBase.id, ..._baseIds] : _baseIds)) {
               if (_ckHas(_bid)) continue;
               const f = _ckFood(_bid);
               if (!f) continue;
               if (targetMeal.type === 'breakfast' && isBreakfastBannedCarb(f.id)) continue;
+              if (_mealFleshCk && isSweetCarbId(f.id)) continue;
               const _bfam = stapleFamilyOf(f.id);
               if (_bfam && _mealFamsCk.has(_bfam)) continue;
               if (_ckFamUses(f.id) >= _ckCapFor(f.id)) continue;
@@ -1294,6 +1316,8 @@ export function correctDayToTargets(
                 for (const _sid of ['pryaniki', 'jam', 'dates']) {
                   if (_remCk < 20) break;
                   if (_ckHas(_sid)) continue;
+                  // P1b: вето «тунец + крем» — сладость к мясу/рыбе не кладём.
+                  if (_mealFleshCk) break;
                   const f = _ckFood(_sid);
                   if (!f) continue;
                   const _per100 = f.carbs || 0;
@@ -1371,18 +1395,31 @@ export function correctDayToTargets(
       }
       // P1a-fix2: рост однодольца вместо нового пункта семейства («рис 250 + крем 20»
       // в одном обеде): добивка растит существующий гарнир того же семейства.
+      // P1b: однодольца нет — растим КРУПНЕЙШИЙ гарнир приёма вместо нового продукта
+      // («рис + картофель + булгур» — углеводная свалка). Гейт честности ниже решает.
       // Не срослось (кап/гейт) — дальше обычный push (сходимость важнее).
       if (eff === 'c') {
         const _famN = stapleFamilyOf(newItem.id);
-        if (_famN) {
-          const _famEx = targetMeal.items.find(it => !(it as any)._fixedGrams &&
-            (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famN);
+        let _famEx = _famN ? targetMeal.items.find(it => !(it as any)._fixedGrams &&
+          (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famN) : undefined;
+        if (!_famEx) {
+          // Однодольца нет — растим крупнейший гарнир приёма вместо нового продукта.
+          const _carbs = targetMeal.items.filter(it => !(it as any)._fixedGrams &&
+            (it.role === 'carb_slow' || it.role === 'carb_fast'));
+          if (_carbs.length > 0) _famEx = [..._carbs].sort((a, b) => (b.c || 0) - (a.c || 0))[0];
+        }
           if (_famEx) {
             const _per100 = (_famEx.c || 0) / Math.max(1, _famEx.amount || 1) * 100;
             if (_per100 > 0) {
               const _addG = Math.max(0, Math.round(newItem.c / _per100 * 100 / 10) * 10);
-              const _famCap = COMFORT_CAP[_famEx.id] !== undefined ? COMFORT_CAP[_famEx.id]
-                : (hv && _per100 >= 55) ? 150 : 600;
+              // P1b: бюджет max растит сухие крупы до 200 г (пороги движка 350/200/600;
+              // иначе новый кап роста 150 душит max-сходимость — тест convergence).
+              const _dryCap = opts?.budget === 'max' ? 200 : 150;
+              let _famCap = COMFORT_CAP[_famEx.id] !== undefined ? COMFORT_CAP[_famEx.id]
+                : (hv && _per100 >= 55) ? _dryCap : 600;
+              // P1b: рост ЧУЖОГО семейства — консервативно (иначе ведро картофеля
+              // вместо компактного риса): итог не выше 300 г.
+              if (_famN && stapleFamilyOf(_famEx.id) !== _famN) _famCap = Math.min(_famCap, 300);
               if (_addG >= 10 && _famEx.amount + _addG <= _famCap) {
                 const _prevF = _famEx.amount;
                 scaleItem(_famEx, _famEx.amount + _addG);
@@ -1393,10 +1430,22 @@ export function correctDayToTargets(
                 scaleItem(_famEx, _prevF);
                 recalcMealTotals(meals);
               }
-            }
           }
         }
       }
+      // P1b: третий гарнир не пушим никогда (рост выше не влез — значит, кап;
+      // свалка хуже недобора). Legacy MC3 (≤4 приёмов без HV) — исключение.
+      if (eff === 'c' && (hv || !!opts?.refeedDay || meals.length >= 5) &&
+        countCarbItems(targetMeal as any) >= 2 && !targetMeal.items.some(it => it.id === best.id)) continue;
+      // P1b: вето «тунец + крем» финальное: сладкий newItem в приём с мясом/рыбой —
+      // НЕ пушим... ВРЕМЕННО ОТКЛЮЧЕНО (подозрение на срыв convergence-max):
+      // предпочтение _noClash выше + вето первички держат строку.
+      // if (eff === 'c' && (hv || !!opts?.refeedDay || meals.length >= 5) && isSweetCarbId(best.id)
+      //   && !(targetMeal.items || []).some(it => it.id === best.id)
+      //   && (targetMeal.items || []).some(it => isFleshProteinId(it.id))) {
+      //   const _deepShortV = (safeTargets.c || 0) > 0 && (safeTargets.c - sumTotals(meals).c) / (safeTargets.c || 1) > 0.10;
+      //   if (!_deepShortV) continue;
+      // }
       targetMeal.items.push(newItem);
       recalcMealTotals(meals);
       const afterTotals = sumTotals(meals);

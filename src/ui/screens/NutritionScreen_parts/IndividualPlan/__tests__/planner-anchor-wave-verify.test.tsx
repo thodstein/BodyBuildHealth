@@ -16,6 +16,7 @@ import { correctDayToTargets } from '../day-target-corrector';
 import { IndividualPlan } from '../index';
 import { secondRecipeRoomDecision, freeSnackRoomForSecond } from '../IndividualPlanContext';
 import { recommendMealCount } from '../IndividualPlanSettings';
+import { sweetFleshClash } from '../food-availability';
 import { useRenderMealList } from '../MealListRender';
 
 const base = (overrides: any = {}): MealPlanInput => ({
@@ -194,6 +195,41 @@ describe('P1b-конструктор: большой дефицит закрыв
     const res = correctDayToTargets(meals as any, { kcal: 2500, p: tot.p + 10, f: 70, c: tot.c + 20 }, { weightKg: 90 });
     const tagged = res.meals.flatMap((m: any) => (m.items || []).filter((it: any) => (it as any)._cocktail));
     expect(tagged.length).toBe(0);
+  });
+});
+
+describe('P1b: один гарнир + вето «тунец + крем» (жалоба «углеводная свалка»)', () => {
+  it('sweetFleshClash: крем/мёд/пряники + мясо/рыба — clash; молочка/яйца — нет', () => {
+    expect(sweetFleshClash('cream_of_rice', 'tuna_canned')).toBe(true);
+    expect(sweetFleshClash('rice_cream', 'chicken_breast')).toBe(true);
+    expect(sweetFleshClash('pryaniki', 'turkey_breast')).toBe(true);
+    expect(sweetFleshClash('cream_of_rice', 'whey_isolate')).toBe(false);
+    expect(sweetFleshClash('cream_of_rice', 'egg_white')).toBe(false);
+    expect(sweetFleshClash('cream_of_rice', 'cottage_cheese_5')).toBe(false);
+    expect(sweetFleshClash('rice_white', 'chicken_breast')).toBe(false);
+    expect(sweetFleshClash('potato_boiled', 'tuna_canned')).toBe(false);
+  });
+
+  it('в плане нет сладко-мясных пар в одном приёме', () => {
+    for (const input of [base(), trainBase()]) {
+      const plan = buildDayPlan(input);
+      for (const m of plan.meals) {
+        const ids = (m.items || []).map((it: any) => it.id);
+        const sweets = ids.filter((id: string) => /cream_of_rice|rice_cream|honey|jam|pryaniki|dates|dried_/.test(id));
+        const flesh = ids.filter((id: string) => /chicken|turkey|tuna|cod|pollock|beef|shrimp|salmon/i.test(id) && !/egg|milk|whey|cheese|cottage/i.test(id));
+        expect(sweets.length > 0 && flesh.length > 0 ? `${m.label}: ${sweets.join(',')} + ${flesh.join(',')}` : '', `${m.label}`).toBe('');
+      }
+    }
+  });
+
+  it('гарниров в приёме ≤2 (свалка из 3+ закрыта)', () => {
+    for (const input of [base(), trainBase()]) {
+      const plan = buildDayPlan(input);
+      for (const m of plan.meals) {
+        const n = (m.items || []).filter((it: any) => it.role === 'carb_slow' || it.role === 'carb_fast').length;
+        expect(n, `${m.label}`).toBeLessThanOrEqual(2);
+      }
+    }
   });
 });
 

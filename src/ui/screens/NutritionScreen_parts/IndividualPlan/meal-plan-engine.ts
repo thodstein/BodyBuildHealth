@@ -38,7 +38,7 @@ import {
   QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
-  familyMealCap, familyMealUses, isCreamId, creamMealCap,
+  familyMealCap, familyMealUses, isCreamId, creamMealCap, sweetFleshClash, isSweetCarbId, isFleshProteinId,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
@@ -1171,35 +1171,26 @@ function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: {
   // иначе bb_quality_score хоронит хлопья/крем (score низкий) при маленьких пулах.
   // Плюс абсолютный кап ≤2 использований/день (дневник ведёт buildDayPlan через dayCarbUses) —
   // иначе при пустом fresh пул целиком возвращается и крем стоит 4 раза.
-  // P1a-fix2: кап СЕМЕЙНЫЙ (рис под 4 именами — одно): per-id кап пропускал 4-й рис
-  // под новым именем («рисовый крем везде»). Без семейства — per-id как раньше.
+  // P1b: семейный кап здесь СНЯТ (давал хаотичный решафл seeded-пиков и душил
+  // max-сходимость; рис держится капами _carbPickFinal/comfort/посадки/хвоста/корректора).
+  // Остался только крем-субкап (точечный, без решафла).
   if (opts?.uniform) {
     const _uses = _pickCtx.dayCarbUses;
-    const _hvU = !!_pickCtx.highVolumeDay;
-    const _famUsesU = _pickCtx.dayCarbFamilyUses;
     const _creamU: number = (_pickCtx as any).dayCreamMeals || 0;
     const _capOkU = (f: any): boolean => {
       if ((_uses.get(f.id) || 0) >= 2) return false;
-      const _fam = stapleFamilyOf(f.id);
-      if (_fam && ((_famUsesU.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvU }))) return false;
-      if (isCreamId(f.id) && _creamU >= creamMealCap(_hvU)) return false;
+      if (isCreamId(f.id) && _creamU >= 2) return false;
       return true;
     };
     if (_uses && _uses.size > 0) {
       const _capped = pool.filter(_capOkU);
       if (_capped.length >= 1) pool = _capped;
       else {
-        // Все варианты в капах — наименее использованные СЕМЕЙСТВА первыми
-        // (per-id least-used возвращал 4-й рис под новым именем).
+        // Все варианты уже по 2 — берём наименее использованный, а не полный пул
+        // (иначе seeded-пик снова берёт лидера и выходит 3-й/4-й крем).
         let _min = Infinity;
-        for (const f of pool) {
-          const _fam = stapleFamilyOf(f.id);
-          _min = Math.min(_min, _fam ? (_famUsesU.get(_fam) || 0) : (_uses.get(f.id) || 0));
-        }
-        const _least = pool.filter(f => {
-          const _fam = stapleFamilyOf(f.id);
-          return (_fam ? (_famUsesU.get(_fam) || 0) : (_uses.get(f.id) || 0)) <= _min;
-        });
+        for (const f of pool) _min = Math.min(_min, _uses.get(f.id) || 0);
+        const _least = pool.filter(f => (_uses.get(f.id) || 0) <= _min);
         if (_least.length > 0) pool = _least;
       }
     }
@@ -1822,6 +1813,11 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       const _unbanned = carbPickPool.filter(f => !_hvBan(f.id));
       if (_unbanned.length >= 1) carbPickPool = _unbanned;
     }
+    // P1b: вето «тунец + рисовый крем» — ВРЕМЕННО ОТКЛЮЧЕНО (подозрение на convergence).
+    // if (proteinSource && isFleshProteinId(proteinSource.id)) {
+    //   const _nosweet = carbPickPool.filter(f => !isSweetCarbId(f.id));
+    //   if (_nosweet.length >= 1) carbPickPool = _nosweet;
+    // }
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
     // чтобы удержать пер-приёмную гликемическую нагрузку (GL = GI×carbs/100) в зелёной зоне (<25).
     // На рефид-дне GL-сужение отключаем — высокая GI здесь намеренна.
@@ -2016,6 +2012,11 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     // FIX favorite-breakfast: отмечаем использованный любимый углевод — следующие приёмы дня
     // берут разнообразие (не монополизируем каждый приём), завтрак получает любимое первым.
     if (carbSource && preferredIds?.has(carbSource.id)) dayUsedPreferredIds?.add(carbSource.id);
+    // P1b: вето «тунец + рисовый крем» на первичке — ВРЕМЕННО ОТКЛЮЧЕНО (биссекция convergence).
+    // if (carbSource && proteinSource && sweetFleshClash(carbSource.id, proteinSource.id)) {
+    //   const _re = pickPriority(_carbPickFinal.filter((f: any) => !sweetFleshClash(f.id, (proteinSource as any).id)), seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds, uniform: _pickCtx.highVolumeDay });
+    //   if (_re) carbSource = _re;
+    // }
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
@@ -2096,8 +2097,39 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           // Иначе 470У/3приёма не закрыть без вёдер (кейс MC3 −17%).
           const _bigMeal = !_pickCtx.highVolumeDay && carbG >= 120;
           if (_ci === 1 && (remC <= 100 || _solidW() > 550 || (!(_pickCtx.highVolumeDay || _bigMeal)))) break;
+          // P1b: третий гарнир в comfort — только огромному приёму (цель ≥140У,
+          // кейс MC3 157У); иначе свалка. Рост primary выше уже отработал.
+          if (_ci >= 1 && (carbG || 0) < 140) break;
+          // P1b: сначала растим primary-гарнир до капа — второй продукт только если
+          // primary упёрся (иначе «рис + картофель + булгур» в одной тарелке —
+          // углеводная свалка без логики). Рост того же id счётчики дня не меняет.
+          // P1b: БЕЗ запаса ×1.5 (давал вёдра 990 г — проверено откатом): растим строго
+          // до порционного капа, дальше — второй гарнир по общим правилам.
+          const _primIt = carbSource ? items.find((i: any) => i.id === (carbSource as any).id && (i.role === 'carb_slow' || i.role === 'carb_fast')) : undefined;
+          if (_primIt) {
+            const _primCap = carbPortionCap(carbSource as any);
+            const _primRoom = _primCap - (_primIt.amount || 0);
+            if (_primRoom >= 20) {
+              const _addG = Math.min(_primRoom, Math.floor(Math.min(remC, 80) / Math.max(1, (carbSource as any).carbs || 1) * 100 / 10) * 10);
+              if (_addG >= 20) {
+                const _rr = ((_primIt.amount || 0) + _addG) / Math.max(1, _primIt.amount || 1);
+                _primIt.amount = (_primIt.amount || 0) + _addG;
+                _primIt.p = Math.round((_primIt.p || 0) * _rr * 10) / 10;
+                _primIt.f = Math.round((_primIt.f || 0) * _rr * 10) / 10;
+                _primIt.c = Math.round((_primIt.c || 0) * _rr * 10) / 10;
+                _primIt.kcal = Math.round(4 * _primIt.p + 9 * _primIt.f + 4 * _primIt.c);
+                _primIt.fiber = Math.round((_primIt.fiber || 0) * _rr * 10) / 10;
+                remP -= (_addG / 100) * ((carbSource as any).protein || 0);
+                remF -= (_addG / 100) * ((carbSource as any).fat || 0);
+                remC -= (_addG / 100) * ((carbSource as any).carbs || 0);
+                continue;
+              }
+            }
+          }
           const usedIds2 = new Set(items.map(i => i.id));
           const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
+          // P1b: вето «тунец + рисовый крем» — сладкий гарнир не кладём к мясу/рыбе.
+          const _hasFlesh2 = items.some((i: any) => isFleshProteinId(i.id));
           // P1a-fix2: второй гарнир — из ДРУГОГО семейства, чем primary (иначе «рис + крем»
           // в одной тарелке: внутриприёмный дубль рисовой монотонности).
           const usedFams2 = new Set(items.map(i => stapleFamilyOf(i.id)).filter(Boolean));
@@ -2121,6 +2153,7 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
             const _fam = stapleFamilyOf(f.id);
             if (_fam && ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvC }))) return false;
             if (isCreamId(f.id) && _creamC >= creamMealCap(_hvC)) return false;
+            if (_hasFlesh2 && isSweetCarbId(f.id)) return false;
             return true;
           };
           const _isFamFresh = (f: any): boolean => {
@@ -2159,12 +2192,15 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           const usedIds3 = new Set(items.map(i => i.id));
           const _hvDay = !!_pickCtx.highVolumeDay;
           // P1a: лестница не добавляет 3-й+ гарнир (F1-второй уже мог положить второй —
-          // иначе «рис + хлеб + крем» в одной тарелке). Лимит: 2, HV и рефид — 3.
+          // иначе «рис + хлеб + крем» в одной тарелке). P1b: потолок 2 везде
+          // (было 3 на HV — третий гарнир и есть свалка); рефид — исключение.
           const _carbCount = items.filter((i: any) => i.role === 'carb_slow' || i.role === 'carb_fast').length;
-          if (_carbCount < ((_hvDay || refeedDay) ? 3 : 2)) {
+          if (_carbCount < (refeedDay ? 3 : 2)) {
           for (const step of liveLadderSteps()) {
             if (remC <= 60) break;
             if (usedIds3.has(step.id)) continue;
+            // P1b: вето «тунец + крем» — сладкую ступень к мясу/рыбе не кладём.
+            if (isSweetCarbId(step.id) && items.some((i: any) => isFleshProteinId(i.id))) continue;
             // P1a-fix2: лестница — из другого семейства, чем уже лежащие гарниры приёма
             // (иначе «рис + крем» в одной тарелке).
             {
@@ -2387,9 +2423,47 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     }
   }
   const totals = items.reduce((acc, it) => ({
-    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c,
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
   }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  // P1b: вето «тунец + рисовый крем» постфактум: сладкий гарнир при мясе/рыбе меняем
+  // на нейтральный (рис/картофель/паста/хлеб) по углям 1:1. Детерминированно, без
+  // ре-пика пулов (ре-пик душил max-сходимость на 3.6 п.п. — доказано биссекцией).
+  // Молочка/яйца/порошок — исключение (внутри sweetFleshClash).
+  // P1b: итоги totals ниже мутируются после свопа (тот же объект — mpsCheck/return целы).
+  {
+    const _hasFleshFin = items.some((it: any) => isFleshProteinId(it.id));
+    if (_hasFleshFin) {
+      const _swFin = items.find((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && isSweetCarbId(it.id) && !(it as any)._fixedGrams
+        && (items as any[]).some((x: any) => x !== it && isFleshProteinId(x.id)));
+      if (_swFin) {
+        const _haveFin = new Set(items.map((i: any) => i.id));
+        const _repFin = ['rice_white', 'potato_boiled', 'pasta_durum', 'bread_white']
+          .map(id => FOOD_DB.find((f: any) => f.id === id))
+          .find(f => f && !_haveFin.has(f.id)
+            && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))
+            && !(lockedIds && lockedIds.has(f.id)) && foodAvailableForPlan(f));
+        if (_repFin) {
+          const _gFin = Math.max(30, Math.min(250, Math.round((_swFin.c || 0) / Math.max(1, _repFin.carbs || 1) * 100 / 10) * 10));
+          const _rrFin = _gFin / 100;
+          const _oldName = _swFin.name;
+          _swFin.id = _repFin.id; _swFin.name = _repFin.name; _swFin.amount = _gFin;
+          _swFin.p = Math.round((_repFin.protein || 0) * _rrFin * 10) / 10;
+          _swFin.f = Math.round((_repFin.fat || 0) * _rrFin * 10) / 10;
+          _swFin.c = Math.round((_repFin.carbs || 0) * _rrFin * 10) / 10;
+          _swFin.kcal = Math.round(4 * _swFin.p + 9 * _swFin.f + 4 * _swFin.c);
+          _swFin.fiber = Math.round((_repFin.fiber || 0) * _rrFin * 10) / 10;
+          rationales.push(`🔄 ${_repFin.name} вместо «${_oldName}» к мясу/рыбе (сочетаемость)`);
+          const _re2 = items.reduce((acc: any, it: any) => ({
+            kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c,
+            fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+          }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+          totals.kcal = _re2.kcal; totals.p = _re2.p; totals.f = _re2.f; totals.c = _re2.c;
+          totals.fiber = _re2.fiber; (totals as any).leucine_mg = _re2.leucine_mg;
+        }
+      }
+    }
+  }
   const mpsCheck = {
     proteinG: totals.p,
     leucineG: Math.round(totals.leucine_mg / 10) / 100,
@@ -5265,14 +5339,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // P1a: лимит гарниров/приём — HV и рефид: 3, дни ≥5 приёмов: 2 (было только HV-2).
             // Дни ≤4 приёмов — legacy (3 приёма × 157У двумя гарнирами при пуловых
             // ограничениях не закрыть).
+            // P1b: НОВЫХ id — не больше 2 в приём никогда (3-й гарнир и есть свалка;
+            // рост существующих — без лимита по числу). Иначе полы «≥20 г» не дают
+            // влезть в комнату и движок пушит 3-й/4-й мелкий пункт.
             const _capN = (_pickCtx.highVolumeDay || (input as any).refeedDay) ? 3 : (meals.length >= 5 ? 2 : 999);
             if (effWorst === 'c' && countCarbItems(_tm) >= _capN && !_tm.items.some((x: any) => x.id === cand.id)) continue;
+            // Legacy-исключение: дни ≤4 приёмов без HV/рефида закрывают 157У/приём тремя
+            // гарнирами (MC3) — их не трогаем. Исключения по дефициту здесь НЕТ:
+            // на фазе сборки дефицит всегда огромный — кап должен держать всегда;
+            // настоящий недобор добирает корректор (у него исключение есть).
+            // P1b: окна инсулина — вне капов (доза диктует состав, не эстетика).
+            const _legacyFew = !(_pickCtx.highVolumeDay || (input as any).refeedDay) && meals.length < 5;
+            const _winTm = !!(_tm as any)._insulinWindow;
+            if (!_legacyFew && !_winTm && effWorst === 'c' && countCarbItems(_tm) >= 2 && !_tm.items.some((x: any) => x.id === cand.id)) continue;
             // P1a-fix2: посадка — не второе семейство в тот же приём (иначе «рис + крем»
             // в одной тарелке). Рост существующего пункта — можно.
-            if (effWorst === 'c' && !_tm.items.some((x: any) => x.id === cand.id)) {
+            // P1b: вето «тунец + крем». Окна инсулина — вне обоих (доза, не эстетика).
+            if (!_winTm && effWorst === 'c' && !_tm.items.some((x: any) => x.id === cand.id)) {
               const _famCd = stapleFamilyOf(cand.id);
               if (_famCd && (_tm.items || []).some((x: any) =>
                 (x.role === 'carb_slow' || x.role === 'carb_fast') && stapleFamilyOf(x.id) === _famCd)) continue;
+              if (isSweetCarbId(cand.id) && (_tm.items || []).some((x: any) => isFleshProteinId(x.id))) continue;
             }
             // Portable-режим без привязки к смене: все приёмы — только портативное
             // (зеркало _needPortable; иначе фунчоза в офис через посадку).
@@ -5352,6 +5439,36 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             grams = 0;
           }
         } else if (grams > 0) {
+          // P1b: новый гарнир в приём с чужим гарниром — сначала растим крупнейший
+          // существующий (иначе «рис + картофель + булгур» — углеводная свалка).
+          // Чужое семейство растим консервативно (итог ≤300 г); не вышло — пушим как раньше.
+          if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') {
+            const _exCarbs = (targetMeal.items || []).filter((x: any) =>
+              (x.role === 'carb_slow' || x.role === 'carb_fast') && !(x as any)._fixedGrams);
+            if (_exCarbs.length > 0) {
+              const _growT = [..._exCarbs].sort((a: any, b: any) => (b.c || 0) - (a.c || 0))[0];
+              const _growFd = FOOD_DB.find((f: any) => f.id === _growT.id);
+              const _growCapBase = _growFd ? carbPortionCap(_growFd, mealCapScaleOf(targetMeal)) : 300;
+              const _sameFamGr = stapleFamilyOf(_growT.id) && stapleFamilyOf(_growT.id) === stapleFamilyOf(it.id);
+              const _growCap = _sameFamGr ? _growCapBase : Math.min(_growCapBase, 300);
+              const _growRoom = _growCap - (_growT.amount || 0);
+              if (_growRoom >= 20) {
+                const _addGr = Math.min(_growRoom, Math.round((it.c || 0) / Math.max(1, ((_growFd?.carbs || 0) || 1)) * 100 / 10) * 10);
+                if (_addGr >= 20) {
+                  const _gr = ((_growT.amount || 0) + _addGr) / Math.max(1, _growT.amount || 1);
+                  _growT.amount = (_growT.amount || 0) + _addGr;
+                  _growT.p = +((_growT.p || 0) * _gr).toFixed(1); _growT.f = +((_growT.f || 0) * _gr).toFixed(1); _growT.c = +((_growT.c || 0) * _gr).toFixed(1);
+                  _growT.kcal = Math.round(4 * _growT.p + 9 * _growT.f + 4 * _growT.c);
+                  _growT.fiber = Math.round(((_growT.fiber || 0) * _gr) * 10) / 10;
+                  targetMeal.totals = targetMeal.items.reduce((acc: any, x: any) => ({ kcal: acc.kcal + x.kcal, p: acc.p + x.p, f: acc.f + x.f, c: acc.c + x.c, fiber: acc.fiber + (x.fiber || 0), leucine_mg: acc.leucine_mg + (x.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+                  notes.push(`🌾 «${targetMeal.label}»: ${it.name} не кладём — растим ${_growT.name} (+${_addGr} г), один гарнир`);
+                  grams = 0;
+                }
+              }
+            }
+          }
+        }
+        if (grams > 0) {
           targetMeal.items.push(it);
           // v3: посадка тоже пишет в дневной счётчик — следующие итерации видят новый гарнир.
           if ((it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') {
@@ -5518,13 +5635,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
-      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay });
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget });
       // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
       // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
       // Если первый прогон плох — повторяем без lbmKg и берём лучший
       // (монотонно, цена только плохим дням).
       if (_corr.deviationPct > 8 && input.lbmKg) {
-        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay });
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget });
         if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
           _corr = _corrNoLbm;
           notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);
@@ -5709,17 +5826,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const _cDevNow = input.goalCarbsG - totals.c;
             if (_cDevNow <= 10) break;
             if (((m.items || []).length || 0) >= 8) continue;
-            // Хвост — не 4-й гарнир в приём (кап 3 на HV, зеркало посадки/_capN).
-            if (countCarbItems(m as any) >= 3) continue;
+            // P1b: хвост новым id — не 3-й гарнир (свалка); рост существующих выше.
+            // Без исключений: хвост — мелкий топ-ап, настоящий недобор добирает корректор.
+            if (countCarbItems(m as any) >= 2) continue;
             const _have = new Set((m.items || []).map((x: any) => x.id));
             // P1a-fix2: хвост — не второе семейство в тот же приём («рис + крем»).
             const _haveFams = new Set((m.items || [])
               .filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast')
               .map((x: any) => stapleFamilyOf(x.id)).filter(Boolean));
+            // P1b: вето «тунец + крем» — сладкий хвост к мясу/рыбе не кладём.
+            const _haveFleshT = (m.items || []).some((x: any) => isFleshProteinId(x.id));
             const _df = _denseIds
               .map((did: string) => FOOD_DB.find((f: any) => f.id === did))
               .filter((f: any) => f && !_have.has(f.id)
                 && !_haveFams.has(stapleFamilyOf(f.id) as string)
+                && (!isSweetCarbId(f.id) || !_haveFleshT)
                 && _denseUses(f.id) < 2
                 && _denseFamUses(f.id) < familyMealCap(stapleFamilyOf(f.id), { hv: true })
                 && (!isCreamId(f.id) || _denseCreamUses() < creamMealCap(true))
@@ -6224,6 +6345,70 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             m.items = _merged;
             m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
+          }
+        }
+      }
+      // P1b: финальная санация свалки — гарниров в приёме не больше 2 (MC3-исключение:
+      // дни ≤4 приёмов без HV/рефида закрывают 157У тремя). Мелкий вливаем в крупнейший
+      // по углям (макросы дня целы — чистый перенос, не резка). Ловит утечки всех фаз.
+      // P1b: окна инсулина не трогаем (доза).
+      {
+        const _legacyFewF = !(_pickCtx.highVolumeDay || (input as any).refeedDay) && meals.length < 5;
+        if (!_legacyFewF) {
+          for (const m of meals) {
+            if ((m as any)._insulinWindow) continue;
+            let _guardF = 4;
+            while (_guardF-- > 0) {
+              const _carbs = (m.items || []).filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !(x as any)._fixedGrams);
+              if (_carbs.length <= 2) break;
+              const _sorted = [..._carbs].sort((a: any, b: any) => (b.c || 0) - (a.c || 0));
+              const _big = _sorted[0];
+              const _small = _sorted[_sorted.length - 1];
+              if (!_big || !_small || _big === _small) break;
+              const _bigPer100 = (_big.c || 0) / Math.max(1, _big.amount || 1) * 100;
+              const _smallPer100 = (_small.c || 0) / Math.max(1, _small.amount || 1) * 100;
+              if (_bigPer100 <= 0 || _smallPer100 <= 0) break;
+              const _fdBig = FOOD_DB.find((f: any) => f.id === _big.id);
+              const _capBig = _fdBig ? carbPortionCap(_fdBig, mealCapScaleOf(m)) : 300;
+              // Сколько граммов big несёт угли small целиком.
+              const _needBigG = Math.round((_small.c || 0) / _bigPer100 * 100 / 5) * 5;
+              const _roomBig = _capBig - (_big.amount || 0);
+              if (_roomBig < _needBigG) break;
+              // Вливаем целиком: big растёт, small исчезает.
+              const _devBeforeM = Math.max(
+                input.goalKcal ? Math.abs(totals.kcal - input.goalKcal) / input.goalKcal : 0,
+                input.goalProteinG ? Math.abs(totals.p - input.goalProteinG) / input.goalProteinG : 0,
+                input.goalFatG ? Math.abs(totals.f - input.goalFatG) / input.goalFatG : 0,
+                input.goalCarbsG ? Math.abs(totals.c - input.goalCarbsG) / input.goalCarbsG : 0);
+              const _rB = ((_big.amount || 0) + _needBigG) / Math.max(1, _big.amount || 1);
+              _big.amount = (_big.amount || 0) + _needBigG;
+              _big.p = +((_big.p || 0) * _rB).toFixed(1); _big.f = +((_big.f || 0) * _rB).toFixed(1); _big.c = +((_big.c || 0) * _rB).toFixed(1);
+              _big.kcal = Math.round(4 * _big.p + 9 * _big.f + 4 * _big.c);
+              _big.fiber = Math.round(((_big.fiber || 0) * _rB) * 10) / 10;
+              const _prevBigAmt = _big.amount - _needBigG;
+              const _ixS = (m.items || []).indexOf(_small);
+              if (_ixS >= 0) (m.items as any[]).splice(_ixS, 1);
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+              const _devAfterM = Math.max(
+                input.goalKcal ? Math.abs(totals.kcal - input.goalKcal) / input.goalKcal : 0,
+                input.goalProteinG ? Math.abs(totals.p - input.goalProteinG) / input.goalProteinG : 0,
+                input.goalFatG ? Math.abs(totals.f - input.goalFatG) / input.goalFatG : 0,
+                input.goalCarbsG ? Math.abs(totals.c - input.goalCarbsG) / input.goalCarbsG : 0);
+              // Откат: слияние не должно ломать сходимость (разный белок круп).
+              if (_devAfterM > _devBeforeM + 0.005) {
+                const _rRev = _prevBigAmt / Math.max(1, _big.amount || 1);
+                _big.amount = _prevBigAmt;
+                _big.p = +((_big.p || 0) * _rRev).toFixed(1); _big.f = +((_big.f || 0) * _rRev).toFixed(1); _big.c = +((_big.c || 0) * _rRev).toFixed(1);
+                _big.kcal = Math.round(4 * _big.p + 9 * _big.f + 4 * _big.c);
+                _big.fiber = Math.round(((_big.fiber || 0) * _rRev) * 10) / 10;
+                (m.items as any[]).splice(Math.min(_ixS < 0 ? m.items.length : _ixS, m.items.length), 0, _small);
+                m.totals = mealTotalsOf(m.items);
+                recalcDayTotals(meals, totals);
+                break;
+              }
+              notes.push(`🌾 «${m.label}»: ${_small.name} влит в ${_big.name} — один гарнир вместо свалки`);
+            }
           }
         }
       }
