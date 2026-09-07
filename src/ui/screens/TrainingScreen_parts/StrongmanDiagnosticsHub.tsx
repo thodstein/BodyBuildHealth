@@ -182,6 +182,90 @@ const GRIP_OPTS = [
   { id: 'grip_support', label: SM_BIOMECH.grip_support.label, sm: 'grip_support' as SMWeakPoint },
 ];
 
+const HUB_SF = '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
+
+/** Свитч-тогл топ-уровня: трек 52×32, слайд-кноб, янтарный glow во вкл. */
+const HubToggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: React.ReactNode; style?: React.CSSProperties }> = ({ checked, onChange, label, style }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', minHeight: 56,
+      borderRadius: 16, cursor: 'pointer', textAlign: 'left', fontFamily: HUB_SF,
+      background: checked ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
+      border: '1px solid', borderColor: checked ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)',
+      color: '#fff', fontSize: 14, fontWeight: checked ? 700 : 500,
+      boxShadow: checked ? '0 0 16px rgba(245,158,11,0.22)' : 'none',
+      ...style,
+    }}
+  >
+    <span style={{
+      width: 52, height: 32, borderRadius: 16, padding: 3, display: 'flex',
+      justifyContent: checked ? 'flex-end' : 'flex-start', flexShrink: 0, transition: 'all 0.2s',
+      background: checked ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'rgba(255,255,255,0.14)',
+      boxShadow: checked ? '0 0 14px rgba(245,158,11,0.45)' : 'inset 0 1px 3px rgba(0,0,0,0.3)',
+    }}>
+      <span style={{ width: 26, height: 26, borderRadius: 13, background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }} />
+    </span>
+    <span style={{ flex: 1, lineHeight: 1.35 }}>{label}</span>
+  </button>
+);
+
+/** Попап-селект топ-уровня: карточка 60px + шит с пружиной, деском и Done. */
+const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ id: string; label: string; desc?: string }>; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = React.useState(false);
+  const sel = options.find(o => o.id === value);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-label={label}
+        style={{
+          width: '100%', padding: '10px 14px', minHeight: 60, borderRadius: 16, cursor: 'pointer',
+          background: 'rgba(22,30,52,0.88)', border: '1px solid rgba(140,190,255,0.16)',
+          color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+          textAlign: 'left', fontFamily: HUB_SF,
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: '#f5b04c' }}>{label.toUpperCase()}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</span>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)', flexShrink: 0 }}>▾</span>
+        </span>
+      </button>
+      {open && (
+        <div className="hub-sheet-backdrop" onClick={() => setOpen(false)} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.62)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'hubFade 0.22s ease' }}>
+          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid rgba(140,190,255,0.16)', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
+            <div style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' }} />
+            <div style={{ padding: '14px 16px 10px', fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'center' }}>{label}</div>
+            <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {options.map(o => {
+                const active = o.id === value;
+                return (
+                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 16px', minHeight: 60, borderRadius: 14, cursor: 'pointer', textAlign: 'left', background: active ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.02)', border: active ? '1px solid rgba(245,158,11,0.35)' : '1px solid transparent', color: '#fff', fontSize: 16, fontWeight: active ? 700 : 500 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: 11, border: '2px solid', borderColor: active ? '#f5b04c' : 'rgba(255,255,255,0.30)', background: active ? '#f59e0b' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{active ? '✓' : ''}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+                      {o.desc && <span style={{ display: 'block', fontSize: 13, color: active ? '#f5b04c' : 'rgba(255,255,255,0.55)', marginTop: 2 }}>{o.desc}</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ padding: '12px 16px' }}>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 export const StrongmanDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<SMState>(() => {
     try {
@@ -828,7 +912,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   return (
     <div className="train-strongdiag" style={{ padding: '14px 12px 22px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }`}</style>
+      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
       <div style={{ ...CARD, padding: '18px 18px 16px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -24, right: -24, width: 150, height: 150, borderRadius: 150, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -902,7 +986,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 14, position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 14, alignItems: 'center', scrollbarWidth: 'none', paddingBottom: 2 }}>
           {TAB_DEFS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : '#fff', cursor:'pointer', fontSize:13, fontWeight:700, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
+            <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : '#fff', cursor:'pointer', fontSize:14, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
               {t.icon} {t.label}
             </button>
           ))}
@@ -943,18 +1027,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <details open style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🏆 Контест пакет</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
-              <select value={state.contestId} onChange={e=>setState(s=>({...s, contestId:e.target.value}))} style={{ width:'100%', marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}>
-                <option value="">— без контеста (база)</option>
-                {Object.entries(CONTEST_PRESETS as any).map(([id,c]:any)=> <option key={id} value={id}>{c.name}</option>)}
-              </select>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#fff', marginTop:6 }}><input type="checkbox" checked={state.turnNeeded} onChange={e=>setState(s=>({...s, turnNeeded:e.target.checked}))}/> Разворот 180° (йок/фермер)</label>
+              <div style={{ marginTop:6 }}><HubPopupSelect label="Контест" value={state.contestId} onChange={v=>setState(s=>({...s, contestId:v}))} options={[{ id:'', label:'Без контеста (база)', desc:'общий план' }, ...Object.entries(CONTEST_PRESETS as any).map(([id,c]:any)=> ({ id: String(id), label: String(c.name) }))]} /></div>
+              <HubToggle checked={state.turnNeeded} onChange={v=>setState(s=>({...s, turnNeeded:v}))} label="Разворот 180° (йок/фермер)" style={{ marginTop:6 }} />
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
                 <label style={{ fontSize:13, color:'#fff' }}>Платформа см<br/><input value={state.platformHeightCm} onChange={e=>setState(s=>({...s, platformHeightCm:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6, marginTop:16 }}><input type="checkbox" checked={state.tackyUsed} onChange={e=>setState(s=>({...s, tackyUsed:e.target.checked}))}/> Tacky есть</label>
+                <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Tacky есть" style={{ marginTop:16 }} />
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
                 <label style={{ fontSize:13, color:'#fff' }}>Диаметр лога см<br/><input value={state.diameterCm} onChange={e=>setState(s=>({...s, diameterCm:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Покрытие<br/><select value={state.surface} onChange={e=>setState(s=>({...s, surface:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="">—</option><option value="резина">резина</option><option value="трава">трава</option><option value="асфальт">асфальт</option><option value="песок">песок</option></select></label>
+                <HubPopupSelect label="Покрытие" value={state.surface} onChange={v=>setState(s=>({...s, surface:v}))} options={[{ id:'', label:'Не выбрано' }, { id:'резина', label:'Резина' }, { id:'трава', label:'Трава' }, { id:'асфальт', label:'Асфальт' }, { id:'песок', label:'Песок' }]} />
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:6 }}>
                 <label style={{ fontSize:13, color:'#fff' }}>Дип см (8-12)<br/><input value={state.logDipCm} onChange={e=>setState(s=>({...s, logDipCm:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
@@ -964,10 +1045,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
               {logDipDiag && <div style={{ fontSize:12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{logDipDiag.text} (Renals braking/propulsion, Zhang dip 0.20с)</div>}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Стратегия попыток<br/><select value={state.strategy} onChange={e=>setState(s=>({...s, strategy:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="conservative">conservative 85/92/98</option><option value="balanced">balanced 88/95/100</option><option value="aggressive">aggressive 90/97/102</option></select></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Хват тяги<br/><select value={state.mixGrip} onChange={e=>setState(s=>({...s, mixGrip:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="overhand">overhand/hook</option><option value="mixed">mixed (риск)</option><option value="straps">straps</option></select></label>
+                <HubPopupSelect label="Стратегия попыток" value={state.strategy} onChange={v=>setState(s=>({...s, strategy:v}))} options={[{ id:'conservative', label:'Conservative', desc:'85 / 92 / 98' }, { id:'balanced', label:'Balanced', desc:'88 / 95 / 100' }, { id:'aggressive', label:'Aggressive', desc:'90 / 97 / 102' }]} />
+                <HubPopupSelect label="Хват тяги" value={state.mixGrip} onChange={v=>setState(s=>({...s, mixGrip:v}))} options={[{ id:'overhand', label:'Overhand / hook' }, { id:'mixed', label:'Mixed', desc:'риск бицепса' }, { id:'straps', label:'Straps' }]} />
               </div>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#fff', marginTop:6 }}><input type="checkbox" checked={state.armsBent} onChange={e=>setState(s=>({...s, armsBent:e.target.checked}))}/> Руки согнуты на камне/шине (риск бицепса)</label>
+              <HubToggle checked={state.armsBent} onChange={v=>setState(s=>({...s, armsBent:v}))} label="Руки согнуты на камне/шине (риск бицепса)" style={{ marginTop:6 }} />
               {attemptsBridge && attemptsBridge.rationale.length > 0 && <div style={{ fontSize:12, color:'#22c55e', marginTop:4 }}>{attemptsBridge.rationale.slice(0, 4).join(' · ')}</div>}
               </div>
             </details>
@@ -1065,7 +1146,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
               <label style={{ fontSize:13, color:'#fff' }}>Планка сек<br/><input value={state.corePlankSec} onChange={e=>setState(s=>({...s, corePlankSec:e.target.value}))} placeholder="120" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6, marginTop:16 }}><input type="checkbox" checked={state.conditioningFail} onChange={e=>setState(s=>({...s, conditioningFail:e.target.checked}))}/> Кондиция провал (medley &gt;60с)</label>
+              <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провал (medley >60с)" style={{ marginTop:16 }} />
             </div>
             <div style={{ fontSize:12, color: gripFails>=2?'#ef4444':'#22c55e', marginTop:4 }}>Grip fails {gripFails}/3 (калибр {gripFailsCal}/3) {gripFails>=2?'— prehab hammer 3×12 + pinch 2×15': '— норма'} · axial {axialOverload?'перегруз ≥12 сетов+300м — QL suitcase 2×20м': 'норм'} · {axialQuant.text}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>ACWR {acwr? `${acwr.ratio.toFixed(2)} ${acwr.zone}` : '—'} · conditioning как в strength-sport-conditioning (alactic 8×10с/50с)</div>
@@ -1073,19 +1154,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               const sess = smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null });
               return (
                 <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)' }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#60a5fa' }}>Кондиция → {sess.modality}</div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#60a5fa' }}>Кондиция → {sess.modality}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{sess.sets}× {sess.work} / отдых {sess.rest} · {sess.hrZone} · {sess.note}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Все системы: {allSMCondSessions().map((s) => `${s.goal} ${s.sets}×${s.work}`).join(' · ')}</div>
                 </div>
               );
             })()}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Pinch-блок<br/><select value={state.pinchWidth} onChange={e=>setState(s=>({...s, pinchWidth:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="2in">2″ (норма 30с)</option><option value="3in">3″ (норма 20с)</option><option value="4in">4″ (норма 15с)</option></select></label>
-              <label style={{ fontSize:13, color:'#fff' }}>CoC<br/><select value={state.cocLevel} onChange={e=>setState(s=>({...s, cocLevel:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="coc1">CoC 1 (20с)</option><option value="coc1_5">CoC 1.5 (30с)</option><option value="coc2">CoC 2 (40с)</option></select></label>
-              <label style={{ fontSize:13, color:'#fff' }}>FatGrip мм<br/><select value={state.fatGripMm} onChange={e=>setState(s=>({...s, fatGripMm:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="38">38 (стандарт)</option><option value="50">50 (axle)</option><option value="60">60 (толстый)</option></select></label>
+              <HubPopupSelect label="Pinch-блок" value={state.pinchWidth} onChange={v=>setState(s=>({...s, pinchWidth:v}))} options={[{ id:'2in', label:'2″', desc:'норма 30с' }, { id:'3in', label:'3″', desc:'норма 20с' }, { id:'4in', label:'4″', desc:'норма 15с' }]} />
+              <HubPopupSelect label="CoC" value={state.cocLevel} onChange={v=>setState(s=>({...s, cocLevel:v}))} options={[{ id:'coc1', label:'CoC 1', desc:'норма 20с' }, { id:'coc1_5', label:'CoC 1.5', desc:'норма 30с' }, { id:'coc2', label:'CoC 2', desc:'норма 40с' }]} />
+              <HubPopupSelect label="FatGrip мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'axle' }, { id:'60', label:'60', desc:'толстый' }]} />
             </div>
             <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleSaveGripProfile} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.25)', color:'#a78bfa', fontSize:13, cursor:'pointer' }}>💾 Grip-профиль</button>
+              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Grip-профиль</button>
               <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>SBS r=0.40 — support/pinch/crush раздельно</span>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:8 }}>
@@ -1106,19 +1187,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Мобильность — OHS 6 + асимметрия + sway</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:8 }}>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={state.ohsHeelsFlat} onChange={e=>setState(s=>({...s, ohsHeelsFlat:e.target.checked}))}/> Пятки плоско</label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={!state.ohsKneeValgus} onChange={e=>setState(s=>({...s, ohsKneeValgus:!e.target.checked}))}/> Колени без вальгуса</label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={state.ohsHipBelowParallel} onChange={e=>setState(s=>({...s, ohsHipBelowParallel:e.target.checked}))}/> Таз ниже параллели</label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={state.ohsTrunkUpright} onChange={e=>setState(s=>({...s, ohsTrunkUpright:e.target.checked}))}/> Корпус upright</label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={state.ohsArmsOverMidfoot} onChange={e=>setState(s=>({...s, ohsArmsOverMidfoot:e.target.checked}))}/> Руки над стопой</label>
-              <label style={{ fontSize:13, color:'#fff', display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={state.ohsLumbarNeutral} onChange={e=>setState(s=>({...s, ohsLumbarNeutral:e.target.checked}))}/> Нейтраль поясницы</label>
+                            <HubToggle checked={state.ohsHeelsFlat} onChange={v=>setState(s=>({...s, ohsHeelsFlat:v}))} label="Пятки плоско" />
+              <HubToggle checked={!state.ohsKneeValgus} onChange={v=>setState(s=>({...s, ohsKneeValgus:!v}))} label="Колени без вальгуса" />
+              <HubToggle checked={state.ohsHipBelowParallel} onChange={v=>setState(s=>({...s, ohsHipBelowParallel:v}))} label="Таз ниже параллели" />
+              <HubToggle checked={state.ohsTrunkUpright} onChange={v=>setState(s=>({...s, ohsTrunkUpright:v}))} label="Корпус upright" />
+              <HubToggle checked={state.ohsArmsOverMidfoot} onChange={v=>setState(s=>({...s, ohsArmsOverMidfoot:v}))} label="Руки над стопой" />
+              <HubToggle checked={state.ohsLumbarNeutral} onChange={v=>setState(s=>({...s, ohsLumbarNeutral:v}))} label="Нейтраль поясницы" />
             </div>
             <div style={{ padding:'12px 14px', borderRadius:14, background: ohs.level==='ok'?'rgba(34,197,94,0.08)': ohs.level==='warn'?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)', border:`1px solid ${ohs.level==='ok'?'rgba(34,197,94,0.18)': ohs.level==='warn'?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`, marginBottom:8 }}>
-              <div style={{ fontSize:13, fontWeight:700, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver? `· драйвер ${ohs.primaryDriver}`:''}</div>
+              <div style={{ fontSize:14, fontWeight:800, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver? `· драйвер ${ohs.primaryDriver}`:''}</div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{ohs.recommendation} {ohs.needsPhysio?'· нужен физио':''}</div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Нормы knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}</div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleSaveOHSSnap} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(34,197,94,0.14)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:13, cursor:'pointer' }}>📸 OHS-снапшот</button>
+                <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 OHS-снапшот</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smOhsTrend && smOhsTrend.n >= 2 ? `тренд ${smOhsTrend.delta >= 0 ? '+' : ''}${smOhsTrend.delta} за ${smOhsTrend.n} зам.` : `история ${smOhsHist.length}/10`}</span>
               </div>
             </div>
@@ -1138,9 +1219,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {asymmetry && (
               <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background: asymmetry.isCrit?'rgba(239,68,68,0.08)': asymmetry.isAsym?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${asymmetry.isCrit?'rgba(239,68,68,0.2)': asymmetry.isAsym?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:13, fontWeight:700, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'CRITICAL ≥12%': asymmetry.isAsym?'WARN ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker}`:''}</div>
+                <div style={{ fontSize:14, fontWeight:800, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'CRITICAL ≥12%': asymmetry.isAsym?'WARN ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker}`:''}</div>
                 <div style={{ fontSize:12, color:'#fff' }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood). {gripAsymDiag ? gripAsymDiag.text : ''}</div>
-                <button onClick={handleSaveGripSnap} style={{ marginTop:6, padding:'12px 16px', borderRadius:14, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.25)', color:'#f59e0b', fontSize:13, cursor:'pointer' }}>📸 Grip-снапшот L/R</button>
+                <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Grip-снапшот L/R</button>
               </div>
             )}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
@@ -1150,7 +1231,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {anthroDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{anthroDiag.loadAdvice} {anthroDiag.pickupAdvice} (tacky ≈{anthroDiag.tackyHeightCm}см)</div>}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
               <label style={{ fontSize:13, color:'#fff' }}>Sway см (lateral)<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="2.5" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Tacky<br/><select value={state.tackyUsed?'yes':'no'} onChange={e=>setState(s=>({...s, tackyUsed:e.target.value==='yes'}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }}><option value="no">нет</option><option value="yes">есть</option></select></label>
+              <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Tacky (магния)" />
             </div>
             {swayDiag && <div style={{ fontSize:12, color: swayDiag.severity==='ok'?'#22c55e':'#ef4444', marginTop:4 }}>{swayDiag.text} · измеряй видео сбоку 30fps</div>}
           </div>
@@ -1162,7 +1243,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>Полевая методика: телефон сбоку 30fps → Kinovea (free) → трек центра масс/йока → xLoop = sway. VBT carry: скорость ходьбы м/с.</div>
             <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см (sway = xLoop)" style={{ width:'100%', height:80, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
             <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleCsvParse} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(59,130,246,0.14)', border:'1px solid rgba(140,190,255,0.16)', color:'#60a5fa', fontSize:13, cursor:'pointer' }}>📊 Разобрать Kinovea CSV → sway</button>
+              <button onClick={handleCsvParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📊 Разобрать Kinovea CSV → sway</button>
               <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Или введи sway/VBT вручную</span>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:8 }}>
@@ -1170,28 +1251,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <label style={{ fontSize:13, color:'#fff' }}>yMax см<br/><input value={state.stoneKg} onChange={e=>setState(s=>({...s, stoneKg:e.target.value}))} placeholder="85" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
               <label style={{ fontSize:13, color:'#fff' }}>VBT yoke м/с<br/><input value={state.vbtYokeLast} onChange={e=>setState(s=>({...s, vbtYokeLast:e.target.value}))} placeholder="1.25" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
             </div>
-            {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:13, fontWeight:700, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
-            {vbtLoss && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:13, fontWeight:700, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:12, color:'#fff' }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
+            {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
+            {vbtLoss && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:12, color:'#fff' }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
             <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
             <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:6 }}>
               <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Enode: raw {swayCm ?? '—'}см → {enodeCorrected ?? '—'}см (xLoop bias Chavda 2024)<br/><span style={{ fontSize:10, color:'#60a5fa' }}>raw {swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
               <div style={{ padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
             <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:12, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
-            {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:13, fontWeight:700, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
+            {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:14, fontWeight:800, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (Hindle-нормы)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Трекер поз → экспорт CSV (t,hip,knee,ankle,shoulder) → вставь ниже. Йок: hip ROM [30,46] / knee [43,65]; лог: shoulder ≥150°.</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Лифт<br/><select value={state.poseLift} onChange={e=>setState(s=>({...s, poseLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="log_press">log</option></select></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Пол<br/><select value={state.poseSex} onChange={e=>setState(s=>({...s, poseSex:e.target.value as '' | 'male' | 'female'}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="">—</option><option value="male">М</option><option value="female">Ж</option></select></label>
-                <div style={{ display:'flex', alignItems:'flex-end' }}><button onClick={handlePoseParse} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.25)', color:'#a78bfa', fontSize:13, cursor:'pointer' }}>🦿 Разобрать углы</button></div>
+                <HubPopupSelect label="Лифт" value={state.poseLift} onChange={v=>setState(s=>({...s, poseLift:v}))} options={[{ id:'yoke_walk', label:'Yoke' }, { id:'farmers_walk', label:'Farmers' }, { id:'log_press', label:'Log' }]} />
+                <HubPopupSelect label="Пол" value={state.poseSex} onChange={v=>setState(s=>({...s, poseSex:v as '' | 'male' | 'female'}))} options={[{ id:'', label:'Не указан' }, { id:'male', label:'Мужской' }, { id:'female', label:'Женский' }]} />
+                <div style={{ display:'flex', alignItems:'flex-end' }}><button onClick={handlePoseParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🦿 Разобрать углы</button></div>
               </div>
               <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'t,hip,knee,ankle,shoulder\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
               {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color: poseResult.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>n={poseResult.n} · {poseResult.verdict.toUpperCase()} · {poseResult.lines.join(' · ')}</div>}
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={checkPoseLive} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, cursor:'pointer' }}>📷 Live-проверка модели</button>
+                <button onClick={checkPoseLive} style={{ padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>📷 Live-проверка модели</button>
                 {state.poseLive === 'loading' && <span style={{ fontSize: 12, color: '#fff' }}>проверяем CDN…</span>}
                 {state.poseLive === 'ok' && <span style={{ fontSize: 12, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
                 {state.poseLive === 'fail' && <span style={{ fontSize: 12, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
@@ -1202,14 +1283,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📈 LVP-калибровка SM (ramp → r²≥0.85)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Лифт<br/><select value={state.lvpLift} onChange={e=>setState(s=>({...s, lvpLift:e.target.value}))} style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:13 }}><option value="yoke_walk">yoke</option><option value="farmers_walk">farmers</option><option value="stone_load">stone</option><option value="log_press">log</option></select></label>
+                <HubPopupSelect label="Лифт" value={state.lvpLift} onChange={v=>setState(s=>({...s, lvpLift:v}))} options={[{ id:'yoke_walk', label:'Yoke' }, { id:'farmers_walk', label:'Farmers' }, { id:'stone_load', label:'Stone' }, { id:'log_press', label:'Log' }]} />
                 <label style={{ fontSize:13, color:'#fff' }}>50% м/с<br/><input value={state.lvp50} onChange={e=>setState(s=>({...s, lvp50:e.target.value}))} placeholder="1.90" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
                 <label style={{ fontSize:13, color:'#fff' }}>65% м/с<br/><input value={state.lvp65} onChange={e=>setState(s=>({...s, lvp65:e.target.value}))} placeholder="1.60" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
                 <label style={{ fontSize:13, color:'#fff' }}>75% м/с<br/><input value={state.lvp75} onChange={e=>setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.40" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
                 <label style={{ fontSize:13, color:'#fff' }}>90% м/с<br/><input value={state.lvp90} onChange={e=>setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.10" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleLvpFit} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(59,130,246,0.14)', border:'1px solid rgba(140,190,255,0.16)', color:'#60a5fa', fontSize:13, cursor:'pointer' }}>📈 Fit LVP</button>
+                <button onClick={handleLvpFit} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📈 Fit LVP</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'ramp 50/65/75/90 → r²≥0.85')}</span>
               </div>
               </div>
@@ -1225,7 +1306,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize:13, color:'#fff' }}>Вес кг<br/><input value={state.progBw} onChange={e=>setState(s=>({...s, progBw:e.target.value}))} placeholder="105" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleSaveProgress} style={{ padding:'12px 16px', borderRadius:14, background:'rgba(34,197,94,0.14)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:13, cursor:'pointer' }}>💾 Снапшот прогресса</button>
+                <button onClick={handleSaveProgress} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Снапшот прогресса</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · best ${smTrend.bestScore} (${smTrend.bestDate})` : `история ${smProgressHist.length}/60`}</span>
               </div>
               </div>
@@ -1256,18 +1337,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </div>
         <button onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
-          <button onClick={handleExport} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>🖨 HTML</button>
-          <button onClick={handleExportCsv} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>📥 CSV</button>
-          <button onClick={handleExportIcs} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>📅 ICS</button>
-          <button onClick={handleSaveAnnual} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>🗓 Год</button>
-          <button onClick={handleSMBackup} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>📦 Бэкап</button>
+          <button onClick={handleExport} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🖨 HTML</button>
+          <button onClick={handleExportCsv} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📥 CSV</button>
+          <button onClick={handleExportIcs} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📅 ICS</button>
+          <button onClick={handleSaveAnnual} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🗓 Год</button>
+          <button onClick={handleSMBackup} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📦 Бэкап</button>
         </div>
         <div style={{ fontSize:12, color:'#fff', marginTop:8 }}>SM-storage: {(smStoreBytes.total / 1024).toFixed(1)}КБ · quota-safe (истории урезаются при переполнении, чужие ключи не трогаем)</div>
       </div>
 
       <div style={{ position:'sticky', bottom:0, zIndex:20, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'0 -12px -22px', background:'rgba(9,18,34,0.88)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
         <span style={{ width:40, height:40, borderRadius:20, background:`conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.08) 0)`, display:'flex', alignItems:'center', justifyContent:'center', border:`2px solid ${sColor}`, fontWeight:900, color:'#fff', fontSize:13, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{score}</span>
-        <span style={{ fontSize:13, fontWeight:700, color: weakPoints.length ? '#fff' : '#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{weakPoints.length ? `${weakPoints.length} слабые: ${weakPoints.join(', ')}` : 'Выбери слабые фазы'}</span>
+        <span style={{ fontSize:14, fontWeight:800, color: weakPoints.length ? '#fff' : '#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{weakPoints.length ? `${weakPoints.length} слабые: ${weakPoints.join(', ')}` : 'Выбери слабые фазы'}</span>
         <button onClick={applyToConstructor} style={{ padding:'12px 16px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap', boxShadow:'0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг</button>
       </div>
     </div>
