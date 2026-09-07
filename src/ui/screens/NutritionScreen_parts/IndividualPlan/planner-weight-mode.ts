@@ -52,6 +52,9 @@ const DRY_PATTERNS: Array<{ test: RegExp; key: string }> = [
 
 function dryKeyFor(foodId: string): string | null {
   const id = (foodId || '').toLowerCase();
+  // P1 (HV-рацион): хлебцы/хлопья едят сухими — конверсия ×2.8 им врёт.
+  // (corn_flakes и так мимо паттернов; rice_cakes ловился бы /rice/.)
+  if (/cake|crispbread|flake/i.test(id)) return null;
   for (const { test, key } of DRY_PATTERNS) {
     if (test.test(id)) return key;
   }

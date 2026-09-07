@@ -198,6 +198,29 @@ export function creamFishClash(sweetId: string, meal: { items?: Array<{ id?: str
   if (!isCreamId(sweetId)) return false;
   return ((meal as any)?.items || []).some((x: any) => x.id !== sweetId && isFishId(x.id));
 }
+
+/**
+ * Хлопья/мюсли/гранола — снековая еда (с молоком/протеином), не гарнир к мясу.
+ * Жалоба: «хлопья и мясо — кто-то ест вообще вместе? нет?» — в приёме с мясом
+ * хлопья не кладём (полдник = манка/крем + протеин 60, мясо идёт с крупой/кремом).
+ */
+export function isFlakeId(id: string): boolean {
+  return /flake|granola|muesli/i.test(id || '');
+}
+
+/** В приёме есть мясной белок (не порошок/яйца/молочка)? */
+export function mealHasMeatProtein(meal: { items?: Array<{ id?: string; role?: string }> }): boolean {
+  return ((meal as any)?.items || []).some((x: any) =>
+    (x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein')
+    && isMeatProteinId(x.id));
+}
+
+/** Мясо/субпродукты как белковый пункт (порошок/яйца/молочка — нет). */
+export function isMeatProteinId(id: string): boolean {
+  if (!id) return false;
+  if (/whey|casein|isolate|protein_powder|egg|milk|kefir|yogurt|cottage|cheese|creatine|eaa|bcaa/i.test(id)) return false;
+  return /chicken|turkey|beef|pork|duck|lamb|veal|tuna|cod|pollock|salmon|trout|shrimp|liver|heart|tongue|pate|sardine|mackerel|venison|rabbit|quail|mintai|tilapia|seafood/i.test(id);
+}
 /** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства). */
 export function creamMealCap(_hv?: boolean): number {
   return 2;

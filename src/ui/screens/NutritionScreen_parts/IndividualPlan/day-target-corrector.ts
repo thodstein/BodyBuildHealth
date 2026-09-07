@@ -12,7 +12,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -430,10 +430,11 @@ export function correctDayToTargets(
             // Углевод свопом — не больше съедобной порции 250 г ВСЕГДА (раньше кап был только
             // при ≥30У/100 — низкоплотные (батат ~20У) его обходили: «овсянка 143 г → батат 590 г»).
             if (under === 'c') swapG = Math.min(swapG, 250);
-            // P1b: своп carb-вместо-жертвы не создаёт 3-й гарнир (жертва — не carb,
-            // приём уже с 2 гарнирами → «картофель + курага + крем» = свалка).
+            // P1b/P2 (типология): своп carb-вместо-жертвы не создаёт 2-й гарнир и
+            // не съедает белок (жертва-протеин защищена — иначе F1 «яичный белок 70<75»).
             if (under === 'c' && victimIt.role !== 'carb_slow' && victimIt.role !== 'carb_fast' &&
-              countCarbItems(meals[victimMi] as any) >= 2) continue;
+              ((victimIt as any).role === 'protein' || (victimIt as any).role === 'fast_protein' || (victimIt as any).role === 'slow_protein'
+                || countCarbItems(meals[victimMi] as any) >= 1)) continue;
             if (swapG >= 20) {
               const beforeTotals = sumTotals(meals);
               const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
@@ -549,9 +550,13 @@ export function correctDayToTargets(
             });
             let _best: FoodItem | undefined = [..._altsF.filter(f => !_sugarFull || !_sIds.has(f.id))]
               .sort((a, b) => (b.carbs || 0) / Math.max(1, b.kcal || 1) - (a.carbs || 0) / Math.max(1, a.kcal || 1))[0];
-            // P1b: density-своп не создаёт 3-й гарнир (жертва — не carb, приём уже с 2).
+            // P2 (типология): density-своп не создаёт 2-й гарнир (жертва — не carb,
+            // приём уже с гарниром).
+            // P2 (типология): density-своп не создаёт 2-й гарнир (жертва — не carb,
+            // приём уже с гарниром).
+            // P1b/P2 (типология): density-своп не создаёт 2-й гарнир и не ест белок.
             if (_best && _vic.role !== 'carb_slow' && _vic.role !== 'carb_fast' &&
-              countCarbItems(meals[_vMi] as any) >= 2) _best = undefined;
+              ((String(_vic.role || '') === 'protein') || countCarbItems(meals[_vMi] as any) >= 1)) _best = undefined;
             if (_best) {
               const _g = Math.max(30, Math.min(250, Math.round((_vic.kcal || 0) / Math.max(1, _best.kcal || 1) * 100 / 10) * 10));
               const _before = sumTotals(meals);
@@ -1020,21 +1025,23 @@ export function correctDayToTargets(
       if (eff === 'c' && best) {
         const _roomy = _pickFrom.filter(m => {
           const _carbs = (m.items || []).filter(it => it.role === 'carb_slow' || it.role === 'carb_fast').length;
-          // P1b: голодное исключение убрано — не чинит D-24 (−17.7% с ним и без),
-          // а 3-й гарнир в ужине HV-дня ломает гарантию «≤2» (свалка).
-          // P1a: 2 гарнира — потолок (третий — мусор). Было только HV; расширено на дни
-          // с ≥5 приёмами (там 2/приём хватает; HV и рефид — потолок 3). Дни ≤4 приёмов —
-          // legacy (3-приёмные дни иначе не сходятся: MC3-обед с 3 гарнирами — крайний кейс,
-          // честно помечен нотой «добавьте приём»).
+          // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
+          // приёме; второй — только десерт в обед (пряник/джем/мёд/финики ≤60 после
+          // мяса). Рост существующего — без лимита. Legacy MC3 (≤4 приёмов, не-HV) —
+          // вне капа (3 приёма × 157У иначе не сходятся).
           const _capHv = hv || !!opts?.refeedDay;
-          const _capC = _capHv ? 3 : 2;
-          if (_carbs >= _capC && !m.items.some(it => it.id === (best as FoodItem).id) && (_capHv || meals.length >= 5)) return false;
-          // P1b: новых id — не больше 2 в приём никогда (3-й гарнир и есть свалка;
-          // рост существующих — без лимита). Legacy MC3 (≤4 приёмов без HV) не трогаем.
-          const _legacyFewC = !_capHv && meals.length < 5;
-          if (!_legacyFewC && _carbs >= 2 && !m.items.some(it => it.id === (best as FoodItem).id)) return false;
-          if ((m.type === 'breakfast' || /Завтрак/i.test(m.label || '')) && isBreakfastBannedCarb((best as FoodItem).id)) return false;
+          // Legacy MC3 — только большой приём (≥100У): умеренные (~65У) — один гарнир.
+          const _legacyFewC = !_capHv && meals.length < 5 && ((m as any).target?.c || 0) >= 100;
+          const _dsrtOkC = String(m.type || '') === 'lunch'
+            && ['pryaniki', 'jam', 'honey', 'dates'].includes((best as FoodItem).id);
+          // P2 (типология): хлопья — снековая еда, к мясу в одном приёме не идём.
+          if (isFlakeId((best as FoodItem).id) && mealHasMeatProtein(m)) return false;
+          // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
+          // приёме; второй — только десерт в обед (пряник/джем/мёд/финики ≤60 после
+          // мяса). Рост существующего — без лимита. Legacy MC3 — большой приём ≥100У.
+          if (!_legacyFewC && _carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && !_dsrtOkC) return false;
           if (_carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && ((m as any).target?.c || 0) < 100) return false;
+          if ((m.type === 'breakfast' || /Завтрак/i.test(m.label || '')) && isBreakfastBannedCarb((best as FoodItem).id)) return false;
           // PRO-типология: сладость — не добивка в основные приёмы (печенье в обед — мусор).
           // Сладости живут только в перекусах мелким топ-апом.
           if (isSweetBaseId((best as FoodItem).id) && (m.type === 'breakfast' || m.type === 'lunch' || m.type === 'dinner')) return false;
@@ -1471,14 +1478,24 @@ export function correctDayToTargets(
           }
         }
       }
-      // P1b: третий гарнир не пушим никогда (рост выше не влез — значит, кап;
-      // свалка хуже недобора). Голодное исключение убрано: не чинит D-24 (−17.7%
-      // с ним и без), а даёт 3-й гарнир в ужине HV-дня. Legacy MC3 — исключение.
-      // P1b: вето «тунец + крем» финальное: крем newItem к рыбе — не пушим
-      // (рост выше отработал; фолбэка нет — иначе вето мертво, доказано дампом).
+      // P2 (типология): ОДИН углевод в приёме — push нового пункта при живом гарнире
+      // не делаем (рост выше; фолбэка нет — иначе вето мертво, доказано дампом).
+      // Исключения: десерт в обед (пряник/джем/мёд/финики ≤60), legacy MC3 (≤4 приёмов,
+      // не-HV, большой приём ≥100У — 3×157У иначе не сходятся). Глубокий недобор —
+      // исключение (сначала калории).
+      // P2 (типология): ОДИН углевод в приёме — push нового пункта при живом гарнире
+      // не делаем (рост выше; фолбэка нет — иначе вето мертво, доказано дампом).
+      // Исключения: десерт в обед (пряник/джем/мёд/финики ≤60), рефид, legacy MC3
+      // (≤4 приёмов, не-HV, большой приём ≥100У — 3×157У иначе не сходятся).
       // Глубокий недобор — исключение (сначала калории).
-      if (eff === 'c' && (hv || !!opts?.refeedDay || meals.length >= 5) &&
-        countCarbItems(targetMeal as any) >= 2 && !targetMeal.items.some(it => it.id === best.id)) {
+      if (eff === 'c' && !(!!opts?.refeedDay || (meals.length < 5 && ((targetMeal as any).target?.c || 0) >= 100)) &&
+        countCarbItems(targetMeal as any) >= 1 && !targetMeal.items.some(it => it.id === best.id)
+        && !(String(targetMeal.type || '') === 'lunch' && ['pryaniki', 'jam', 'honey', 'dates'].includes(best.id))) {
+        continue;
+      }
+      // P2 (типология): хлопья — не к мясу.
+      if (eff === 'c' && isFlakeId(best.id) && mealHasMeatProtein(targetMeal)
+        && !targetMeal.items.some(it => it.id === best.id)) {
         continue;
       }
       if (eff === 'c' && (hv || !!opts?.refeedDay || meals.length >= 5) && isCreamId(best.id)
