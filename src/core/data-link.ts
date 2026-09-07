@@ -106,11 +106,20 @@ function computeActiveDrugs(course: CourseEntry[]): Record<string, { dosePerWeek
  * Делегирует чистые функции в course-sync.ts.
  */
 export function syncCourseToProfile(course: CourseEntry[]): void {
-  if (!Array.isArray(course) || course.length === 0) return;
   try {
     const profile = getProfile();
     const pharma = (profile.settings?.pharma ?? {}) as any;
     const existing: PharmaSubstanceEntry[] = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances : [];
+    const isEmpty = !Array.isArray(course) || course.length === 0;
+    if (isEmpty) {
+      if (existing.length === 0 && !pharma.hasGH && !pharma.hasCaber && !pharma.hasGLP1) return;
+      // Clear stale course on empty — was ghosting previous substances
+      const cleared: any = { ...pharma, currentSubstances: [] };
+      // Clear PED flags that derive from course
+      ['hasCaber','hasGH','hasIGF','hasInsulin','hasSERM','hasSARMs','hasMGF','hasGLP1','ghIU','insulinIU','igfMcg','clenMcg','t3Mcg'].forEach(k=>{ delete cleared[k]; });
+      updateProfile({ settings: { ...(profile.settings || {}), pharma: cleared } });
+      return;
+    }
     if (!hasCourseDiff(course, existing)) return;
     const mapped = mapCourseToSubstances(course);
     const pedFlags = derivePedFlagsFromCourse(course);

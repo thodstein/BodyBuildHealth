@@ -3,6 +3,7 @@
 
 import type { ModuleSystemScore, ModuleResult } from './score-engine';
 import { PHARMA_DB } from '../core/pharma-database';
+import { DRUG_THRESHOLDS } from '../core/constants';
 
 // ─── Types ───
 
@@ -131,42 +132,49 @@ export function analyzePharma(input: PharmaInput): ModuleResult {
     return { ...entry, dose: c.dose, unit: c.unit, weeks: c.weeks, frequencyPerWeek: c.frequencyPerWeek };
   }).filter((x): x is any => x !== null);
 
-  // Phase 1: PD risk per system (TZ: Risk_factor_i = Σ(PD_field × multiplier))
+  // Phase 1: PD risk per system (TZ: Risk_factor_i = Σ(PD_field × multiplier × doseFactor))
   const systemScores: Record<string, number> = {};
   for (const sub of dbEntries) {
+    // Dose factor: actual weekly dose / threshold (0.2..3.0), so 100mg vs 1000mg gives different risk
+    const rawDose = (sub as any).dose ?? 0;
+    const threshold = (DRUG_THRESHOLDS as any)[sub.id]?.dosePerWeek ?? sub.dosageRange?.max ?? 300;
+    const doseFactor = threshold > 0 ? Math.max(0.2, Math.min(3, rawDose / threshold)) : 1;
     for (const [field, cfg] of Object.entries(PD_FIELD_WEIGHTS)) {
       const val = getPdField(sub, field);
       if (val > 0) {
-        systemScores[cfg.system] = (systemScores[cfg.system] || 0) + val * cfg.multiplier;
+        systemScores[cfg.system] = (systemScores[cfg.system] || 0) + val * cfg.multiplier * doseFactor;
       } else if (val < 0) {
-        // Negative = protective (hepatotoxicity: -1 means liver protection)
-        systemScores[cfg.system] = (systemScores[cfg.system] || 0) + val * cfg.multiplier * 0.5;
+        // Negative = protective
+        systemScores[cfg.system] = (systemScores[cfg.system] || 0) + val * cfg.multiplier * 0.5 * doseFactor;
       }
     }
-    // Add risks from linkedRisks
+    // Add risks from linkedRisks (also dose-weighted)
     const linkedRisks = sub.linkedRisks || [];
     for (const lr of linkedRisks) {
       if (lr.direction === 'up') {
-        systemScores[lr.system] = (systemScores[lr.system] || 0) + lr.strength * 30;
+        systemScores[lr.system] = (systemScores[lr.system] || 0) + lr.strength * 30 * doseFactor;
       } else {
-        systemScores[lr.system] = (systemScores[lr.system] || 0) - lr.strength * 20;
+        systemScores[lr.system] = (systemScores[lr.system] || 0) - lr.strength * 20 * doseFactor;
       }
     }
   }
 
-  // Phase 2: CV profile aggregation
+  // Phase 2: CV profile aggregation (dose-weighted)
   let bpRisk = 0;
   let hrRisk = 0;
   let thrombRisk = 0;
   for (const sub of dbEntries) {
     const cv = sub.cvProfile;
     if (!cv) continue;
-    if (cv.bloodPressure === 'up') bpRisk += 20;
-    else if (cv.bloodPressure === 'down') bpRisk -= 10;
-    if (cv.heartRate === 'up') hrRisk += 15;
-    else if (cv.heartRate === 'down') hrRisk -= 10;
-    if (cv.thrombosisRisk === 'high') thrombRisk += 30;
-    else if (cv.thrombosisRisk === 'medium') thrombRisk += 15;
+    const rawDose = (sub as any).dose ?? 0;
+    const threshold = (DRUG_THRESHOLDS as any)[sub.id]?.dosePerWeek ?? sub.dosageRange?.max ?? 300;
+    const doseFactor = threshold > 0 ? Math.max(0.2, Math.min(3, rawDose / threshold)) : 1;
+    if (cv.bloodPressure === 'up') bpRisk += 20 * doseFactor;
+    else if (cv.bloodPressure === 'down') bpRisk -= 10 * doseFactor;
+    if (cv.heartRate === 'up') hrRisk += 15 * doseFactor;
+    else if (cv.heartRate === 'down') hrRisk -= 10 * doseFactor;
+    if (cv.thrombosisRisk === 'high') thrombRisk += 30 * doseFactor;
+    else if (cv.thrombosisRisk === 'medium') thrombRisk += 15 * doseFactor;
   }
   if (bpRisk > 0) systemScores['cardio'] = (systemScores['cardio'] || 0) + Math.min(bpRisk, 40);
   if (hrRisk > 0) systemScores['cardio'] = (systemScores['cardio'] || 0) + Math.min(hrRisk, 30);

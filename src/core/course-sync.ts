@@ -13,10 +13,11 @@ export function mapCourseToSubstances(course: CourseEntry[]): PharmaSubstanceEnt
     .map(c => {
       const meta = PHARMA_DB[c.substanceId];
       const isOral = meta?.pk?.bioavailability !== undefined && meta.pk.bioavailability < 0.9 && !meta.esters?.length;
+      const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
       return {
         id: c.substanceId,
         name: meta?.name ?? c.substanceId,
-        doseMg: Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0,
+        doseMg: Number.isFinite(wk) ? wk : (Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0),
         unit: c.doseUnit || (meta?.class === 'insulin' || c.substanceId === 'hcg' ? 'IU' :
                              c.substanceId === 'igf1_lr3' || c.substanceId === 'mgf' ? 'mcg' : 'mg'),
         route: (isOral || c.substanceId === 'hcg' ? 'oral' : 'inject') as 'inject' | 'oral',
@@ -26,14 +27,30 @@ export function mapCourseToSubstances(course: CourseEntry[]): PharmaSubstanceEnt
     });
 }
 
-/** Проверяет, есть ли новые/удалённые вещества в course_log по сравнению с currentSubstances. */
+/** Проверяет, есть ли новые/удалённые/изменённые вещества (доза/недели/частота/единица). */
 export function hasCourseDiff(course: CourseEntry[], currentSubstances: PharmaSubstanceEntry[]): boolean {
-  if (!Array.isArray(course) || course.length === 0) return false;
-  const existingIds = new Set(currentSubstances.map(s => s.id));
-  const courseIds = new Set(course.map(c => c.substanceId));
-  const hasNew = course.some(c => !existingIds.has(c.substanceId));
-  const hasRemoved = currentSubstances.some(s => !courseIds.has(s.id));
-  return hasNew || hasRemoved;
+  if (!Array.isArray(course) || !Array.isArray(currentSubstances)) return true;
+  if (course.length !== currentSubstances.length) return true;
+  if (course.length === 0 && currentSubstances.length === 0) return false;
+  // Build map of current by id for deep compare (weekly dose, unit, weeks)
+  const curMap = new Map<string, PharmaSubstanceEntry>();
+  currentSubstances.forEach(s => curMap.set(s.id, s));
+  const expected = mapCourseToSubstances(course);
+  const expMap = new Map<string, PharmaSubstanceEntry>();
+  expected.forEach(s => expMap.set(s.id, s));
+  // Different ids
+  if (curMap.size !== expMap.size) return true;
+  for (const id of expMap.keys()) if (!curMap.has(id)) return true;
+  for (const id of curMap.keys()) if (!expMap.has(id)) return true;
+  // Same ids — check dose/unit/weeks
+  for (const [id, exp] of expMap) {
+    const cur = curMap.get(id)!;
+    if (cur.doseMg !== exp.doseMg) return true;
+    if ((cur.unit || '') !== (exp.unit || '')) return true;
+    if ((cur.startWeek ?? 0) !== (exp.startWeek ?? 0)) return true;
+    if ((cur.endWeek ?? 12) !== (exp.endWeek ?? 12)) return true;
+  }
+  return false;
 }
 
 /** Вывод PED-флагов и доз из course_log для полей UnifiedSettings.pharma. */

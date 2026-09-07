@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../../engines/drug-mapper.engine';
 import type { DrugEntry, MapperResult } from '../../../engines/drug-mapper.engine';
 import { useDataLink } from '../../../core/data-link';
+import { weeklyDose } from '../../../engines/pharma-frequency';
 
 export const MapperTab: React.FC = () => {
   const linked = useDataLink();
@@ -17,19 +18,30 @@ export const MapperTab: React.FC = () => {
 
   useEffect(() => {
     if (course.length > 0) {
-      const drugs: DrugEntry[] = course.map(c => ({
-        name: (c.substanceId||'').toLowerCase(),
-        dosageMg: c.doseUnit === 'mg/wk'
-          ? c.doseValue
-          : c.doseUnit === 'mg' ? c.doseValue : c.doseValue * 1000,
-      }));
+      const drugs: DrugEntry[] = course.map(c => {
+        const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
+        const unit = String(c.doseUnit || '').toLowerCase();
+        // Convert weekly dose to mg equivalent for mapper (DRUG_DATABASE in mg)
+        let mg = wk;
+        if (unit.includes('mcg') || unit.includes('µg')) mg = wk / 1000;
+        else if (unit.includes('IU') || unit.includes('iu')) mg = wk; // GH/IU kept as is (mapper thresholds in IU)
+        else if (unit.includes('g') && !unit.includes('mg')) mg = wk * 1000;
+        return { name: (c.substanceId||'').toLowerCase(), dosageMg: mg };
+      });
       setMapperResult(mapStackToPathologies(drugs));
     }
   }, [course]);
 
   const handleRunManual = () => {
     const drugs = useCourse && course.length > 0
-      ? course.map(c => ({ name: (c.substanceId||'').toLowerCase(), dosageMg: c.doseValue }))
+      ? course.map(c => {
+          const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
+          const unit = String(c.doseUnit || '').toLowerCase();
+          let mg = wk;
+          if (unit.includes('mcg') || unit.includes('µg')) mg = wk / 1000;
+          else if (unit.includes('g') && !unit.includes('mg')) mg = wk * 1000;
+          return { name: (c.substanceId||'').toLowerCase(), dosageMg: mg };
+        })
       : [...manualDrugs];
     if (drugs.length === 0) return;
     setMapperResult(mapStackToPathologies(drugs));

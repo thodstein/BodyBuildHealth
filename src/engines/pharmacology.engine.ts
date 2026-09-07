@@ -1,5 +1,6 @@
 import { CourseEntry, ConcentrationPoint, LabHysteresis, BayesianState } from '../core/types';
 import { PHARMA_DB, PKPD_DEFAULTS } from '../core/constants';
+import { weeklyDose } from './pharma-frequency';
 
 // ТЗ §9.3: RK4 шаг для 2-компартментной модели
 function rk4Step(A1:number,A2:number,A3:number, dt:number, ka:number, k10:number, k12:number, k21:number): [number,number,number] {
@@ -28,8 +29,9 @@ export function calculateConcentration(course: CourseEntry[], weeks: number = 52
       if(w >= (c.startWeek ?? 0) && w <= (c.endWeek ?? 0)) {
         const sub = PHARMA_DB[c.substanceId];
         const bio = sub?.pk?.bioavailability ?? PKPD_DEFAULTS.bioavailability;
-        const isWeekly = typeof c.doseUnit === 'string' && c.doseUnit.includes('/wk');
-        weekDose += (c.doseValue ?? 0) * bio * (isWeekly ? 1/7 : 1);
+        const wk = weeklyDose(c.doseValue ?? 0, c.doseUnit, c.frequency);
+        // wk is weekly total already accounting for frequency; apply bioavailability as bolus per week
+        weekDose += wk * bio;
       }
     });
     if(weekDose > 0) A1 += weekDose;

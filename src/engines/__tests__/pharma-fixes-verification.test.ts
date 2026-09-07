@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { PHARMA_CLASSES } from '../../ui/screens/PharmaScreen_parts/constants';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { injectionsPerWeek, weeklyDose } from '../pharma-frequency';
-import { validateCourse } from '../pharmacology.engine';
+import { validateCourse, calculateConcentration } from '../pharmacology.engine';
 import { calculateMultiSubstancePKPD } from '../pkpd-superposition.engine';
+import { mapCourseToSubstances, hasCourseDiff } from '../../core/course-sync';
+import { syncCourseToProfile } from '../../core/data-link';
+import { analyzePharma } from '../score-pharma';
 import type { CourseEntry } from '../../core/types';
 
 describe('P0-8 PHARMA_CLASSES includes missing families', () => {
@@ -108,5 +111,46 @@ describe('P0-3 superposition respects startWeek and does not overdose', () => {
     const avgTwice = rTwice.reduce((s,w)=>s+w.cp,0)/rTwice.length;
     expect(avgDaily).toBeGreaterThan(0);
     expect(Math.abs(avgDaily - avgTwice) / avgTwice).toBeLessThan(0.5); // within 50% (since PK model diff)
+  });
+});
+
+describe('P0-A calculateConcentration respects frequency', () => {
+  it('2x/wk vs daily same weekly dose gives similar effect', () => {
+    const daily: CourseEntry[] = [{ id:'d1', substanceId:'test_enan', doseValue:100, doseUnit:'mg', frequency:'daily', startWeek:0, endWeek:4 }];
+    const twice: CourseEntry[] = [{ id:'t1', substanceId:'test_enan', doseValue:350, doseUnit:'mg', frequency:'2x/wk', startWeek:0, endWeek:4 }];
+    // daily 100*7=700 weekly, twice 350*2=700 weekly => same weekly
+    const rDaily = calculateConcentration(daily, 4);
+    const rTwice = calculateConcentration(twice, 4);
+    expect(rDaily[4].cp).toBeGreaterThan(0);
+    expect(Math.abs(rDaily[4].cp - rTwice[4].cp) / rTwice[4].cp).toBeLessThan(0.4);
+  });
+});
+
+describe('P0-C/D hasCourseDiff and mapCourseToSubstances', () => {
+  it('detects dose change', () => {
+    const course: CourseEntry[] = [{ id:'1', substanceId:'test_enan', doseValue:300, doseUnit:'mg/wk', frequency:'2x/wk', startWeek:0, endWeek:12 }];
+    const cur = mapCourseToSubstances(course);
+    const changed: CourseEntry[] = [{ id:'1', substanceId:'test_enan', doseValue:500, doseUnit:'mg/wk', frequency:'2x/wk', startWeek:0, endWeek:12 }];
+    expect(hasCourseDiff(changed, cur)).toBe(true);
+  });
+  it('detects weeks change', () => {
+    const course: CourseEntry[] = [{ id:'1', substanceId:'test_enan', doseValue:300, doseUnit:'mg/wk', frequency:'2x/wk', startWeek:0, endWeek:12 }];
+    const cur = mapCourseToSubstances(course);
+    const changed: CourseEntry[] = [{ id:'1', substanceId:'test_enan', doseValue:300, doseUnit:'mg/wk', frequency:'2x/wk', startWeek:0, endWeek:8 }];
+    expect(hasCourseDiff(changed, cur)).toBe(true);
+  });
+  it('mapCourseToSubstances uses weeklyDose for mcg', () => {
+    const course: CourseEntry[] = [{ id:'1', substanceId:'t3', doseValue:25, doseUnit:'mcg', frequency:'daily', startWeek:0, endWeek:4 }];
+    const mapped = mapCourseToSubstances(course);
+    // 25 mcg daily => 175 weekly
+    expect(mapped[0].doseMg).toBe(175);
+  });
+});
+
+describe('P0-F score-pharma dose scaling', () => {
+  it('higher dose gives higher risk', () => {
+    const low = analyzePharma({ course: [{ substanceId:'test_enan', dose:100, unit:'mg/wk', weeks:12 }], weight:80, age:30, sex:'male' });
+    const high = analyzePharma({ course: [{ substanceId:'test_enan', dose:1000, unit:'mg/wk', weeks:12 }], weight:80, age:30, sex:'male' });
+    expect(high.overallRaw).toBeGreaterThan(low.overallRaw);
   });
 });
