@@ -760,23 +760,24 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             const xBase = 50;
             const hasSelection = selCodes.length > 0;
             return (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-                  <span style={{ fontSize: 18 }}>📈</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>Динамика маркеров</span>
-                  {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
-                  <button onClick={() => setChartGridOpen(g => !g)} style={{
-                    marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
+              <div style={{ ...LABS_CARD, marginTop:14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${LABS_ACCENT}`, paddingLeft:10, marginBottom:4 }}>
+                  <span style={{ fontSize:18 }}>📈</span>
+                  <span style={{ fontSize:15, fontWeight:800, color:'#fff', flex:1 }}>Динамика маркеров</span>
+                  {hasSelection && <span style={{ fontSize:11, color:LABS_ACCENT, fontWeight:800 }}>{selCodes.length} выбрано</span>}
+                  <button onClick={() => setChartGridOpen(g => !g)} aria-expanded={chartGridOpen} style={{
+                    marginLeft:'auto', background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)',
+                    borderRadius:999, padding:'10px 14px', fontSize:12, fontWeight:800, color:'#fff', cursor:'pointer', whiteSpace:'nowrap', minHeight:44,
                   }}>{chartGridOpen ? '▲ Скрыть' : '▼ Маркеры'}</button>
                 </div>
                 {chartGridOpen && (<>
-                <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', paddingBottom: 4 }}>
+                <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'6px 2px' }}>
                   <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
-                    padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                    background: chartFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: chartFilterSys === 'all' ? '#000' : '#fff',
-                    border: `1px solid ${chartFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+                    padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:44,
+                    background: chartFilterSys === 'all' ? `linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))` : 'rgba(21,38,66,0.60)',
+                    color: chartFilterSys === 'all' ? '#0a1a08' : '#fff',
+                    border: chartFilterSys === 'all' ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
+                    boxShadow: chartFilterSys==='all' ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
                   }}>Все</button>
                   {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
                     const sysMarkers = uniqMarkers.filter(m => {
@@ -784,12 +785,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       return codes ? codes.includes(m.code) : false;
                     });
                     if (sysMarkers.length === 0) return null;
+                    const active = chartFilterSys === sys;
                     return (
-                      <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} style={{
-                        padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                        background: chartFilterSys === sys ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: chartFilterSys === sys ? '#000' : '#fff',
-                        border: `1px solid ${chartFilterSys === sys ? 'var(--accent)' : 'var(--border)'}`,
+                      <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} aria-pressed={active} style={{
+                        padding:'10px 16px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:44,
+                        background: active ? 'var(--accent)' : 'rgba(21,38,66,0.60)',
+                        color: active ? '#000' : '#fff',
+                        border: active ? '1px solid var(--accent)' : '1px solid rgba(140,190,255,0.14)',
                       }}>
                         {sysLabels[sys] || sys}
                       </button>
@@ -1125,13 +1127,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* ─── Расширенная спермограмма (ПКТ / после ПКТ / базовый) ─── */}
           {['baseline','pct','post_pct'].includes(selectedPhase) && (
-            <div style={{ marginTop: 10 }}>
-              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
-                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ec4899' }}>🧬 Фертильность — расширенная спермограмма</h4>
-                <div style={{ fontSize:9, color:'#fff', marginBottom:6 }}>
+            <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:10 }}>
+              <div className="card" style={{ ...LABS_CARD, borderLeft:'3px solid #ec4899' }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:15, fontWeight:800, color:'#fff', borderLeft:'3px solid #ec4899', paddingLeft:10 }}>🧬 Фертильность — расширенная спермограмма</h4>
+                <div style={{ fontSize:12, color:'#fff', marginBottom:8 }}>
                   Фаза: <b>{PHASE_LABELS[selectedPhase] || selectedPhase}</b>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
                   <PopupNumber label="Объём (мл)" value={parseFloat(fertSperm.vol||'')||0} min={0} max={15} step={0.1} suffix="мл" onChange={v => updateFert('vol', String(v))} />
                   <PopupNumber label="Концентрация (млн/мл)" value={parseFloat(fertSperm.conc||'')||0} min={0} max={500} step={0.1} suffix="млн/мл" onChange={v => updateFert('conc', String(v))} />
                   <PopupNumber label="Общее кол-во (млн)" value={parseFloat(fertSperm.total||'')||0} min={0} max={1500} step={1} suffix="млн" onChange={v => updateFert('total', String(v))} />
@@ -1157,9 +1159,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
               </div>
 
-              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
-                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#8b5cf6' }}>🧬 Ингибин B и гормональный профиль</h4>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              <div className="card" style={{ ...LABS_CARD, borderLeft:'3px solid #8b5cf6' }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:15, fontWeight:800, color:'#fff', borderLeft:'3px solid #8b5cf6', paddingLeft:10 }}>🧬 Ингибин B и гормональный профиль</h4>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
                   <PopupNumber label="Ингибин B (pg/mL)" value={parseFloat(fertSperm.inhb||'')||0} min={0} max={500} step={1} suffix="pg/mL" onChange={v => updateFert('inhb', String(v))} />
                   <PopupNumber label="АМГ (ng/mL)" value={parseFloat(fertSperm.amh||'')||0} min={0} max={20} step={0.1} suffix="ng/mL" onChange={v => updateFert('amh', String(v))} />
                   <PopupNumber label="ЛГ (mIU/mL)" value={parseFloat(fertSperm.lh||'')||0} min={0} max={50} step={0.1} suffix="mIU/mL" onChange={v => updateFert('lh', String(v))} />
@@ -1172,19 +1174,20 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
               </div>
 
-              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
-                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>📋 Нормы ВОЗ 2021</h4>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'3px 12px', fontSize:9, color:'#fff' }}>
-                  <span>Объём эякулята</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥1.4 мл</span>
-                  <span>Концентрация</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥16 млн/мл</span>
-                  <span>Подвижность (PR+NP)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥42%</span>
-                  <span>Прогрессивная (PR)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥30%</span>
-                  <span>Морфология (Крюгер)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥4%</span>
-                  <span>MAR-тест</span><span style={{ fontWeight:600, color:'#f59e0b' }}>{'<'}50% (норма), {'<'}10% (идеал)</span>
-                  <span>Лейкоциты</span><span style={{ fontWeight:600, color:'#22c55e' }}>{'<'}1 млн/мл</span>
-                  <span>DFI</span><span style={{ fontWeight:600, color:'#f59e0b' }}>{'<'}30% (идеал {'<'}15%)</span>
-                  <span>Ингибин B</span><span style={{ fontWeight:600, color:'#22c55e' }}>{'>'}80 pg/mL</span>
-                  <span>pH</span><span style={{ fontWeight:600, color:'#22c55e' }}>7.2-8.0</span>
+              <div className="card" style={{ ...LABS_CARD, borderLeft:'3px solid #22c55e' }}>
+                <h4 style={{ margin:'0 0 10px', fontSize:15, fontWeight:800, color:'#fff', borderLeft:'3px solid #22c55e', paddingLeft:10 }}>📋 Нормы ВОЗ 2021</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:12, color:'#fff' }}>
+                  {([
+                    ['Объём эякулята','≥1.4 мл','#22c55e'],['Концентрация','≥16 млн/мл','#22c55e'],
+                    ['Подвижность (PR+NP)','≥42%','#22c55e'],['Прогрессивная (PR)','≥30%','#22c55e'],
+                    ['Морфология (Крюгер)','≥4%','#22c55e'],['MAR-тест','<50% (норма), <10% (идеал)','#f59e0b'],
+                    ['Лейкоциты','<1 млн/мл','#22c55e'],['DFI','<30% (идеал <15%)','#f59e0b'],
+                    ['Ингибин B','>80 pg/mL','#22c55e'],['pH','7.2-8.0','#22c55e'],
+                  ] as [string,string,string][]).map(([k,v,c]) => (
+                    <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', minHeight:44 }}>
+                      <span style={{ fontWeight:600 }}>{k}</span><span style={{ fontWeight:800, color:c, textAlign:'right' }}>{v}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1793,22 +1796,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </button>
               {riskSections.pharma && (<div style={{ padding: '0 12px 12px' }}>
               {labPharmaAlerts.length > 0 ? (
-                <div style={{ display: 'grid', gap: 3 }}>
+                <div style={{ display:'grid', gap:8 }}>
                   {labPharmaAlerts.map((a, i) => (
                     <div key={i} style={{
-                      fontSize: 9, padding: '4px 6px', borderRadius: 6,
-                      background: a.severity === 'critical' ? 'rgba(239,68,68,0.08)' : a.severity === 'high' ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
-                      border: `1px solid ${a.severity === 'critical' ? 'rgba(239,68,68,0.2)' : a.severity === 'high' ? 'rgba(245,158,11,0.2)' : 'transparent'}`,
+                      fontSize:12, padding:'12px 12px', borderRadius:14, minHeight:64,
+                      background: a.severity === 'critical' ? 'rgba(239,68,68,0.10)' : a.severity === 'high' ? 'rgba(245,158,11,0.10)' : 'rgba(21,38,66,0.60)',
+                      border: a.severity === 'critical' ? '1px solid rgba(239,68,68,0.30)' : a.severity === 'high' ? '1px solid rgba(245,158,11,0.30)' : '1px solid rgba(140,190,255,0.14)',
+                      borderLeft: `3px solid ${a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : LABS_ACCENT}`,
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                        <span style={{ fontWeight: 600, color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : 'var(--text)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontWeight:800, fontSize:13, color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#fff' }}>
                           {a.marker} {a.actualStatus === 'high' ? '↑' : a.actualStatus === 'low' ? '↓' : ''} {a.value}{a.unit}
                         </span>
-                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, fontWeight: 600, background: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e', color: a.severity === 'critical' || a.severity === 'high' ? '#fff' : '#000' }}>
+                        <span style={{ fontSize:10, padding:'3px 8px', borderRadius:999, fontWeight:800, background: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e', color: a.severity === 'critical' || a.severity === 'high' ? '#fff' : '#000', flexShrink:0 }}>
                           {a.severity === 'critical' ? 'КРИТ' : a.severity === 'high' ? 'ВЫСОК' : 'МОНИТ'}
                         </span>
                       </div>
-                      <div style={{ color: '#fff', fontSize: 8 }}>{(a.drugCause || []).map((id: string) => { const p = PHARMA_DB[id]; return p?.name || id.replace(/_/g, ' '); }).join(', ')} — {a.recommendation}</div>
+                      <div style={{ color:'#fff', fontSize:12, lineHeight:1.5 }}>{(a.drugCause || []).map((id: string) => { const p = PHARMA_DB[id]; return p?.name || id.replace(/_/g, ' '); }).join(', ')} — {a.recommendation}</div>
                     </div>
                   ))}
                 </div>
@@ -1826,39 +1830,39 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.indices ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                 📊 Композитные индексы здоровья
               </button>
-              {riskSections.indices && (<div style={{ padding: '0 12px 12px' }}><div style={{ display: 'grid', gap: 6 }}>
+              {riskSections.indices && (<div style={{ padding:'0 12px 12px' }}><div style={{ display:'grid', gap:8 }}>
                 {[
                   { label: 'ASI (Анаболический синтез)', desc: 'Способность к анаболизму', val: ASI, inv: true },
                   { label: 'HMI (Гепатический метаболизм)', desc: 'Стресс печени', val: HMI, inv: false },
                   { label: 'CR (Кардиориск)', desc: 'Липиды + воспаление', val: CR, inv: false },
                 ].map(item => (
                   <div key={item.label} style={{
-                    padding: 8, borderRadius: 8,
-                    background: item.val !== null ? `rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.06)` : 'var(--bg-secondary)',
-                    border: item.val !== null ? `1px solid rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.2)` : '1px solid var(--border)',
+                    padding:12, borderRadius:14, minHeight:72,
+                    background: item.val !== null ? `rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.08)` : 'rgba(21,38,66,0.60)',
+                    border: item.val !== null ? `1px solid rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.25)` : '1px solid rgba(140,190,255,0.14)',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 600 }}>{item.label}</div>
-                        <div style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>{item.desc}</div>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{item.label}</div>
+                        <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>{item.desc}</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
+                      <div style={{ textAlign:'right', flexShrink:0 }}>
                         {item.val !== null ? (
-                          <><div style={{ fontSize: 18, fontWeight: 700, color: statusColor(item.val, item.inv) }}>{item.val}%</div>
-                            <div style={{ fontSize: 8, color: statusColor(item.val, item.inv), fontWeight: 600 }}>{statusLabel(item.val, item.inv)}</div></>
+                          <><div style={{ fontSize:22, fontWeight:900, color: statusColor(item.val, item.inv), fontVariantNumeric:'tabular-nums' }}>{item.val}%</div>
+                            <div style={{ fontSize:10, color: statusColor(item.val, item.inv), fontWeight:800 }}>{statusLabel(item.val, item.inv)}</div></>
                         ) : (
-                          <div style={{ fontSize: 10, color: '#fff' }}>Нет данных</div>
+                          <div style={{ fontSize:12, color:'#fff' }}>Нет данных</div>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
                 {indexEntries.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginTop: 4 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:4 }}>
                     {indexEntries.map(d => (
-                      <div key={d.key} style={{ padding: '4px 6px', borderRadius: 5, background: 'var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 9 }}>{d.label}</span>
-                        <span style={{ fontWeight: 700, fontSize: 10, color: getRiskColor(d.value), minWidth: 24, textAlign: 'right' }}>{d.value}%</span>
+                      <div key={d.key} style={{ padding:'10px 10px', borderRadius:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, minHeight:48 }}>
+                        <span style={{ fontSize:12, color:'#fff', fontWeight:600 }}>{d.label}</span>
+                        <span style={{ fontWeight:800, fontSize:13, color: getRiskColor(d.value), minWidth:28, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{d.value}%</span>
                       </div>
                     ))}
                   </div>
@@ -1877,23 +1881,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </button>
               {riskSections.systems && (<div style={{ padding: '0 12px 12px' }}>
               {labRisks && Object.values(labRisks.systemBreakdown).some(v => v.net > 0) ? (
-                <div style={{ display: 'grid', gap: 3 }}>
+                <div style={{ display:'grid', gap:8 }}>
                   {Object.entries(labRisks.systemBreakdown).filter(([_, v]) => v.net > 0).sort(([_, a], [__, b]) => b.net - a.net).map(([sys, val]) => {
                     const level = val.net <= 25 ? 'low' : val.net <= 50 ? 'medium' : val.net <= 75 ? 'high' : 'critical';
                     const lc: Record<string, { bg: string; text: string; bar: string }> = {
-                      low: { bg: 'rgba(34,197,94,0.08)', text: '#22c55e', bar: '#22c55e' },
-                      medium: { bg: 'rgba(234,179,8,0.08)', text: '#eab308', bar: '#eab308' },
-                      high: { bg: 'rgba(249,115,22,0.08)', text: '#f97316', bar: '#f97316' },
-                      critical: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444', bar: '#ef4444' },
+                      low: { bg: 'rgba(34,197,94,0.10)', text: '#22c55e', bar: '#22c55e' },
+                      medium: { bg: 'rgba(234,179,8,0.10)', text: '#eab308', bar: '#eab308' },
+                      high: { bg: 'rgba(249,115,22,0.10)', text: '#f97316', bar: '#f97316' },
+                      critical: { bg: 'rgba(239,68,68,0.10)', text: '#ef4444', bar: '#ef4444' },
                     };
                     const c = lc[level];
                     return (
-                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, background: c.bg, border: `1px solid ${c.bg.replace('0.08', '0.15')}` }}>
-                        <span style={{ fontSize: 9, fontWeight: 600, minWidth: 60, color: c.text }}>{sysLabels[sys] || sys}</span>
-                        <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ width: `${Math.min(100, val.net)}%`, height: '100%', background: c.bar, borderRadius: 3, transition: 'width 0.4s ease' }} />
+                      <div key={sys} style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14, background: c.bg, border:`1px solid ${c.bg.replace('0.10', '0.22')}`, borderLeft:`3px solid ${c.bar}`, minHeight:56 }}>
+                        <span style={{ fontSize:12, fontWeight:800, minWidth:72, color:'#fff' }}>{sysLabels[sys] || sys}</span>
+                        <div style={{ flex:1, height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden' }}>
+                          <div style={{ width:`${Math.min(100, val.net)}%`, height:'100%', background: c.bar, borderRadius:999, transition:'width 0.4s ease' }} />
                         </div>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: c.text, minWidth: 28, textAlign: 'right' }}>{Math.round(val.net)}%</span>
+                        <span style={{ fontSize:14, fontWeight:900, color: c.text, minWidth:36, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Math.round(val.net)}%</span>
                       </div>
                     );
                   })}
@@ -1914,24 +1918,24 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.markers ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                 🔬 Маркеры с отклонениями
               </button>
-              {riskSections.markers && (<div style={{ padding: '0 12px 12px' }}>
+              {riskSections.markers && (<div style={{ padding:'0 12px 12px' }}>
               {deviationCount > 0 && labRisks ? (
-                <div style={{ display: 'grid', gap: 3 }}>
+                <div style={{ display:'grid', gap:8 }}>
                   {labRisks.markerDeviations.map(m => {
                     const isHigh = m.deviation > 0;
                     const absDev = Math.abs(m.deviation);
                     const devLevel = absDev <= 20 ? 'low' : absDev <= 50 ? 'medium' : absDev <= 100 ? 'high' : 'critical';
                     const devColors: Record<string, { bg: string; text: string }> = {
-                      low: { bg: 'rgba(34,197,94,0.06)', text: '#22c55e' }, medium: { bg: 'rgba(234,179,8,0.06)', text: '#eab308' },
-                      high: { bg: 'rgba(249,115,22,0.06)', text: '#f97316' }, critical: { bg: 'rgba(239,68,68,0.06)', text: '#ef4444' },
+                      low: { bg: 'rgba(34,197,94,0.08)', text: '#22c55e' }, medium: { bg: 'rgba(234,179,8,0.08)', text: '#eab308' },
+                      high: { bg: 'rgba(249,115,22,0.08)', text: '#f97316' }, critical: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444' },
                     };
                     const dc = devColors[devLevel];
                     return (
-                      <div key={m.code + m.value} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 6, background: dc.bg, border: `1px solid ${dc.bg.replace('0.06', '0.12')}` }}>
-                        <span style={{ fontSize: 8, color: '#fff', minWidth: 46 }}>{sysLabels[m.system] || m.system}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, flex: 1, color: 'var(--text)' }}>{m.name}</span>
-                        <span style={{ fontSize: 8, color: '#fff' }}>{m.lln}–{m.uln}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: dc.text }}>{m.value} <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, fontWeight: 600, background: dc.text + '22', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev}%</span></span>
+                      <div key={m.code + m.value} style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 12px', borderRadius:14, background: dc.bg, border:`1px solid ${dc.bg.replace('0.08', '0.20')}`, borderLeft:`3px solid ${dc.text}`, minHeight:56 }}>
+                        <span style={{ fontSize:10, color:'#fff', minWidth:52, fontWeight:700 }}>{sysLabels[m.system] || m.system}</span>
+                        <span style={{ fontSize:13, fontWeight:800, flex:1, color:'#fff', minWidth:0 }}>{m.name}</span>
+                        <span style={{ fontSize:10, color:'#fff', whiteSpace:'nowrap' }}>{m.lln}–{m.uln}</span>
+                        <span style={{ fontSize:13, fontWeight:800, color: dc.text, whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>{m.value} <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, fontWeight:800, background: dc.text + '26', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev}%</span></span>
                       </div>
                     );
                   })}

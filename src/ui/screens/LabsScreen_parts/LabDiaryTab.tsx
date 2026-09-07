@@ -323,36 +323,38 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         </div>
       )}
 
-      {/* ═══ ABNORMAL ═══ */}
+      {/* ═══ ABNORMAL — TOP APK 64px с кромкой ═══ */}
       {mode === 'abnormal' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {abnormalMarkers.length === 0 ? (
-            <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
-              <div style={{ fontSize: 11, color: '#00e68a', fontWeight: 600 }}>Нет аномальных маркеров</div>
-              <div style={{ fontSize: 9, color: '#fff' }}>Все показатели в пределах нормы</div>
+            <div style={{ ...GLASS, textAlign:'center', padding:24 }}>
+              <div style={{ fontSize:28, marginBottom:6 }}>✅</div>
+              <div style={{ fontSize:14, color:'#00e68a', fontWeight:800 }}>Нет аномальных маркеров</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Все показатели в пределах нормы</div>
             </div>
           ) : (
             abnormalMarkers.map((m, i) => {
               const isHigh = m.uln !== undefined && m.value > m.uln;
+              const accent = isHigh ? '#ef4444' : '#f59e0b';
               return (
                 <div key={`${m.date}-${m.code}`} style={{
-                  padding: '10px 12px', borderRadius: 10,
+                  padding:'12px 12px', borderRadius:14, minHeight:64,
                   background: normBg(m.value, m.lln, m.uln),
-                  border: '1px solid ' + (isHigh ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'),
+                  border: '1px solid ' + (isHigh ? 'rgba(239,68,68,0.30)' : 'rgba(245,158,11,0.30)'),
+                  borderLeft: `3px solid ${accent}`,
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{m.name}</div>
-                      <div style={{ fontSize: 9, color: '#fff' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{m.name}</div>
+                      <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>
                         {m.date} · {timeAgo(m.date)}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: normColor(m.value, m.lln, m.uln) }}>
-                        {m.value} <span style={{ fontSize: 9, fontWeight: 400 }}>{m.unit}</span>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ fontSize:18, fontWeight:900, color: normColor(m.value, m.lln, m.uln), fontVariantNumeric:'tabular-nums' }}>
+                        {m.value} <span style={{ fontSize:10, fontWeight:700 }}>{m.unit}</span>
                       </div>
-                      <div style={{ fontSize: 8, color: '#fff' }}>
+                      <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>
                         {m.lln !== undefined ? `норма: ${m.lln}` : ''}{m.lln !== undefined && m.uln !== undefined ? '-' : ''}{m.uln !== undefined ? `${m.uln}` : ''}
                       </div>
                     </div>
@@ -364,62 +366,63 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         </div>
       )}
 
-      {/* ═══ TIMELINE ═══ */}
+      {/* ═══ TIMELINE — TOP APK 52px ═══ */}
       {mode === 'timeline' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {diary.length === 0 ? (
-            <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 24, marginBottom: 4 }}>📓</div>
-              <div style={{ fontSize: 10, color: '#fff' }}>
-                Дневник пуст. Импортируйте результаты анализов.
+            <div style={{ ...GLASS, textAlign:'center', padding:24 }}>
+              <div style={{ fontSize:28, marginBottom:6 }}>📓</div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Дневник пуст</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>
+                Импортируйте результаты анализов.
               </div>
             </div>
           ) : (
             [...diary].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).map(day => (
               <div key={day.date} style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+                padding:'12px 12px', borderRadius:14, minHeight:64,
+                background:'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${day.abnormalCount > 0 ? '#ef4444' : LABS_ACCENT}`,
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{day.date}</span>
-                    <span style={{ fontSize: 9, color: '#fff', marginLeft: 6 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <div style={{ minWidth:0 }}>
+                    <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{day.date}</span>
+                    <span style={{ fontSize:11, color:'#fff', marginLeft:8 }}>
                       {timeAgo(day.date)}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ fontSize: 9, color: '#fff' }}>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                    <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>
                       {day.totalMarkers} маркеров
                     </span>
                     {day.abnormalCount > 0 && (
-                      <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 600 }}>
+                      <span style={{ fontSize:11, color:'#ef4444', fontWeight:800 }}>
                         ⚠ {day.abnormalCount}
                       </span>
                     )}
-                    <button onClick={() => handleDeleteEntry(day.date)}
-                      style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>✕</button>
+                    <button onClick={() => handleDeleteEntry(day.date)} aria-label={`Удалить ${day.date}`}
+                      style={{ padding:'8px 10px', borderRadius:10, fontSize:11, cursor:'pointer', fontFamily:'inherit', border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.10)', color:'#ef4444', minHeight:40, fontWeight:800 }}>✕</button>
                   </div>
                 </div>
                 {/* Markers chips */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                   {day.markers.slice(0, 10).map(m => (
                     <span key={m.code} style={{
-                      padding: '2px 6px', borderRadius: 6, fontSize: 7,
-                      background: m.inRange ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.08)',
+                      padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700,
+                      background: m.inRange ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.10)',
                       color: m.inRange ? '#00e68a' : '#ef4444',
-                      border: '1px solid ' + (m.inRange ? 'rgba(0,230,138,0.12)' : 'rgba(239,68,68,0.15)'),
+                      border:'1px solid ' + (m.inRange ? 'rgba(0,230,138,0.18)' : 'rgba(239,68,68,0.20)'),
                     }}>
                       {m.name} {m.value}{m.unit}
                     </span>
                   ))}
                   {day.markers.length > 10 && (
-                    <span style={{ fontSize: 7, color: '#fff', padding: '2px 4px' }}>
+                    <span style={{ fontSize:11, color:'#fff', padding:'6px 8px', fontWeight:700 }}>
                       +{day.markers.length - 10}
                     </span>
                   )}
                 </div>
                 {day.note && (
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontStyle: 'italic' }}>
+                  <div style={{ fontSize:11, color:'#fff', marginTop:6, fontStyle:'italic', lineHeight:1.5 }}>
                     {day.note}
                   </div>
                 )}
