@@ -248,3 +248,12 @@ describe('P0 dosage unit conversion', () => {
     expect(r.flags).toContain('unit_mismatch_iu_vs_mg');
   });
 });
+
+describe('P0 score-pharma weeks factor', () => {
+  it('longer weeks gives higher risk than short', async () => {
+    const { analyzePharma } = await import('../score-pharma');
+    const short = analyzePharma({ course: [{ substanceId:'test_enan', dose:300, unit:'mg/wk', weeks:4 }], weight:80, age:30, sex:'male' });
+    const long = analyzePharma({ course: [{ substanceId:'test_enan', dose:300, unit:'mg/wk', weeks:16 }], weight:80, age:30, sex:'male' });
+    expect(long.overallRaw).toBeGreaterThan(short.overallRaw);
+  });
+});
