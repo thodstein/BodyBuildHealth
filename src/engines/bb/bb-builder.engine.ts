@@ -2156,6 +2156,15 @@ function buildSession(
         const diverse: any[] = [];
         const usedIds = new Set<string>();
         const usedClassIdx = new Set<number>();
+        // Строгий A/B: кандидаты/углы с избегаемым паттерном пропускаем
+        // (только при явном avoid; без него — legacy 1-в-1).
+        const p9Avoid: string[] = abAvoidPatterns || [];
+        const p9Pat = (e: any): string => { try { return derivePattern(e); } catch { return 'unknown'; } };
+        const p9Fresh = (list: any[]): any[] => {
+          if (!p9Avoid.length) return list;
+          const fresh = list.filter(e => { const p = p9Pat(e); return p === 'unknown' || !p9Avoid.includes(p); });
+          return fresh.length > 0 ? fresh : [];
+        };
         // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount.
         // Сортировка внутри угла: compound barbell → dumbbell → machine → cable → one-arm.
         // Первое упражнение мышцы = самое тяжёлое (максимальное механическое натяжение).
@@ -2183,6 +2192,8 @@ function buildSession(
             const weakDiff = weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
             return weakDiff;
           });
+          // Строгий A/B: весь угол избегаемый — класс пропускаем целиком.
+          candidates = p9Fresh(candidates);
           if (candidates.length > 0) {
             // Для первого упражнения (ci=0) — всегда брать самое тяжёлое (rank 1-2).
             // Для последующих — offset для вариативности между неделями.
@@ -2211,6 +2222,8 @@ function buildSession(
             if (tierDiff !== 0) return tierDiff;
             return weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
           });
+          // Строгий A/B: весь угол избегаемый — класс пропускаем целиком.
+          candidates = p9Fresh(candidates);
           if (candidates.length > 0) {
             const offset = ci === 0 ? 0 : (selWeek * 31 + dayInRotation * 17 + ci * 7 + 3) % Math.max(1, candidates.length);
             const pick = candidates[offset];
@@ -2227,6 +2240,8 @@ function buildSession(
           if (usedIds.has(e.id) || sessionSelectedIds.includes(e.id)) continue;
           const clsIdx = classes.findIndex(c => c.match(e));
           if (clsIdx >= 0 && usedClassIdx.has(clsIdx)) continue;
+          // Строгий A/B: избегаемый паттерн не добираем.
+          if (p9Avoid.length > 0) { const p = p9Pat(e); if (p !== 'unknown' && p9Avoid.includes(p)) continue; }
           diverse.push(e); usedIds.add(e.id);
           if (clsIdx >= 0) usedClassIdx.add(clsIdx);
           sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
@@ -3267,8 +3282,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         // A/B-ротация: индекс среди sibling-сессий того же тега (только при флаге).
         const abSibIndex = input.abPatternRotation ? sessions.slice(0, i).filter(ss => (ss as any).sessionTag === s.sessionTag).length : 0;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined, abSibIndex });
+        // Строгий A/B (флаг вкл = выбор пользователя за ротацию): avoid-паттерны
+        // stash'им на сессии — weak-гарантии и фидеры финализатора их уважают
+        // (финализатор копирует сессии поверхностно, поле переживает).
+        // Без флага — undefined, legacy 1-в-1 байт-в-байт.
+        const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
+      if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
       // Только при явном флаге (иначе legacy 1-в-1 байт-в-байт).
       if (input.abPatternRotation) {
@@ -3362,6 +3383,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (/(тяга|pull|row|наклон|присед|жим|станов|отжим)/.test(nm)) s -= 3;
           if (e.exerciseType === 'isolation' || e.type === 'isolation') s += 1;
           if (usedPatterns.has(derivePattern(e))) s -= 100;
+          // Строгий A/B: избегаемый паттерн sibling-сессии — мягкий штраф
+          // (фидер обязан встать ради MEV, но выбираем не-avoided при наличии).
+          if (abAvoid && abAvoid.length > 0) {
+            try { if (abAvoid.includes(derivePattern(e))) s -= 50; } catch { /* одно упражнение не ломает день */ }
+          }
           return s;
         };
         feederPool.sort((a, b) => scoreFeeder(b) - scoreFeeder(a));
@@ -4488,7 +4514,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           // специализацией (focus), не добавляем ей ещё и weak-optional (+1) — иначе двойной акцент.
           if (focusGroup && collapseKey(focusGroup) === cw) continue;
           if (specRes.active && specRes.targets.some((t: any) => canonicalMuscle(t) === cw)) continue;
-          const iso = EXERCISE_CATALOG.find((ex: any) => {
+          const optAvoid: string[] = (sess as any)?.abAvoidPatterns || [];
+          const optMatches = EXERCISE_CATALOG.filter((ex: any) => {
             const tm = trueMuscleOf(ex);
             if (!tm || collapseKey(tm) !== cw) return false;
             if (usedNames.has(ex.name)) return false;
@@ -4500,6 +4527,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             }
             return true;
           });
+          // Строгий A/B: предпочитаем не-avoided паттерн; если все кандидаты
+          // избегаемые — берём первого (добивка обязана встать, объём цел).
+          let iso = optMatches[0];
+          if (iso && optAvoid.length > 0) {
+            try {
+              const freshIso = optMatches.find(ex => { const p = derivePattern(ex); return p === 'unknown' || !optAvoid.includes(p); });
+              if (freshIso) iso = freshIso;
+            } catch { /* одно упражнение не ломает день */ }
+          }
           if (!iso) break;
           const wm = workMax[cw] || defaultWorkMax(cw);
           const weight = Math.round((wm || 40) * 0.6 * 10) / 10;
@@ -4658,8 +4694,20 @@ function compensateCrossDayWeakPoints(
         return true;
       });
       if (!feederPool.length) continue;
-      // Берём самое короткое (минимизируем время) изоляционное упражнение
-      feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
+      // Берём самое короткое (минимизируем время) изоляционное упражнение.
+      // Строгий A/B: при stash'нутом avoid сессии-слота предпочитаем
+      // не-avoided паттерн (мягко — фидер обязан встать ради MEV).
+      const slotAvoid: string[] = (bestSlot.session as any)?.abAvoidPatterns || [];
+      feederPool.sort((a, b) => {
+        const lenDiff = (a.name?.length || 0) - (b.name?.length || 0);
+        if (!slotAvoid.length) return lenDiff;
+        let pa = 0, pb = 0;
+        try {
+          if (slotAvoid.includes(derivePattern(a))) pa -= 1000;
+          if (slotAvoid.includes(derivePattern(b))) pb -= 1000;
+        } catch { /* одно упражнение не ломает неделю */ }
+        return (pb - pa) || lenDiff;
+      });
       const fData = feederPool[0];
       const fName = fData.name || fData.id;
       const fBase = (workMax as any)[wp] || DEFAULT_WORKMAX[wp] || 50;

@@ -84,6 +84,31 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
   if (options.preserveSource) return;
   const weakPoints = options.priorityMuscles || [];
   if (!weakPoints.length) return;
+  // Строгий A/B (флаг вкл = выбор пользователя за ротацию): sibling-сессия
+  // несёт stash'нутый avoid — кандидаты с избегаемым паттерном не форсируются.
+  // Первая сессия тега (без avoid) гарантию держит, недельное покрытие цело.
+  // Без stash — legacy 1-в-1 (weak-need побеждает всегда).
+  const abAvoid: string[] = (session as any)?.abAvoidPatterns || [];
+  const isAvoided = (x: any): boolean => {
+    if (!abAvoid.length) return false;
+    try { return abAvoid.includes(derivePattern(x)); } catch { return false; }
+  };
+  // Кандидат целевого паттерна с учётом строгого A/B: предпочитаем
+  // не-avoided; если ВСЕ кандидаты избегаемые — undefined (ротация побеждает
+  // в этой сессии, первая сессия тега гарантию держит).
+  const findCandidate = (wp: string, canonical: string, working: any[]): any => {
+    const req = WEAK_PATTERN_REQ[wp];
+    const matches = (EXERCISE_CATALOG as any[]).filter((x: any) => {
+      if (trueMuscleOf(x) !== canonical) return false;
+      if (!req.test(x.name || '')) return false;
+      if (working.some((e: any) => e.name === x.name)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
+      return true;
+    });
+    if (!matches.length) return undefined;
+    return matches.find(m => !isAvoided(m)) || undefined;
+  };
       const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
   for (const wp of weakPoints) {
     const pattern = WEAK_PATTERN_REQ[wp];
@@ -101,14 +126,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
     const slot = canonicalItems.find((e: any) => e.role === 'accessory' && !pattern.test(e.name || ''))
       || canonicalItems.filter((e: any) => e.role === 'primary' && !pattern.test(e.name || '')).slice(1)[0];
         if (slot) {
-      const candidate = EXERCISE_CATALOG.find((x: any) => {
-        if (trueMuscleOf(x) !== canonical) return false;
-        if (!pattern.test(x.name || '')) return false;
-        if (working.some((e: any) => e.name === x.name)) return false;
-        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-        if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
-        return true;
-      });
+      const candidate = findCandidate(wp, canonical, working);
       if (candidate) {
         slot.name = candidate.name;
         slot.exerciseName = candidate.name;
@@ -121,14 +139,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
     // Нет слотов — добавляем, если позволяет лимит упражнений сессии.
     const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
     if (working.length >= maxEx) continue;
-    const candidate = EXERCISE_CATALOG.find((x: any) => {
-      if (trueMuscleOf(x) !== canonical) return false;
-      if (!pattern.test(x.name || '')) return false;
-      if (working.some((e: any) => e.name === x.name)) return false;
-      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-      if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
-      return true;
-    });
+    const candidate = findCandidate(wp, canonical, working);
     if (!candidate) continue;
     const baseWeight = options.workMax?.[canonical] || 50;
     session.exercises.push({
@@ -2653,7 +2664,21 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       // изоляций = мусор); deficit разбивается: первый слот до 5 сетов (cap),
       // второй — остаток (макс. 3).
       let feederSlots = 0;
-      for (const candidate of candidates.filter(item => trueMuscleOf(item) === muscle && !used.has(item.name))) {
+      // Строгий A/B: избегаемый паттерн — в конец очереди (мягко — добивка
+      // до MEV обязана встать, но выбираем не-avoided при наличии).
+      const sessAvoid: string[] = (session as any)?.abAvoidPatterns || [];
+      const feederQueue = candidates.filter(item => trueMuscleOf(item) === muscle && !used.has(item.name));
+      if (sessAvoid.length > 0) {
+        feederQueue.sort((a, b) => {
+          let pa = 0, pb = 0;
+          try {
+            if (sessAvoid.includes(derivePattern(a))) pa = 1;
+            if (sessAvoid.includes(derivePattern(b))) pb = 1;
+          } catch { /* одно упражнение не ломает добивку */ }
+          return pa - pb;
+        });
+      }
+      for (const candidate of feederQueue) {
         if (remaining <= 0 || session.exercises.length >= 10 || feederSlots >= 2) break;
         const sets = feederSlots === 0
           ? Math.min(5, Math.max(2, Math.ceil(remaining / 2)))
