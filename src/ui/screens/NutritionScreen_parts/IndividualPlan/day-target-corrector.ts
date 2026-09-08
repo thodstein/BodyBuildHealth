@@ -1055,6 +1055,8 @@ export function correctDayToTargets(
       // Завтрак-бан: лапшу/батат/перловку в завтрак не льём (все дни).
       // Aug-28 гейт: второй гарнир — только в БОЛЬШОЙ приём (target.c ≥ 100);
       // умеренный обед (~95У) держит один крупяной источник, иначе «гречка+рис».
+      // P2: плотные сухие носители relief-клапана (второй гарнир при большом недоборе дня).
+      const _dryDenseIds = ['cream_of_rice', 'corn_flakes', 'bread_white', 'whole_grain_bread', 'bread_fitness', 'pasta_durum', 'rice_semolina', 'cream_rice', 'rice_white', 'oats_dry'];
       if (eff === 'c' && best) {
         const _roomy = _pickFrom.filter(m => {
           const _carbs = (m.items || []).filter(it => it.role === 'carb_slow' || it.role === 'carb_fast').length;
@@ -1069,25 +1071,21 @@ export function correctDayToTargets(
             && ['pryaniki', 'jam', 'honey', 'dates'].includes((best as FoodItem).id);
           // P2 (типология): хлопья — снековая еда, к мясу в одном приёме не идём.
           if (isFlakeId((best as FoodItem).id) && mealHasMeatProtein(m)) return false;
+          // Relief-клапан (P2): при структурном недоборе дня (>8% углей и >40 г) приём
+          // может взять ВТОРОЙ СУХОЙ плотный носитель ИЗ ДРУГОГО семейства (хлеб+рис,
+          // крем+паста) — иначе узкопуловые (simple/minimal: 5 продуктов) и HV-дни
+          // стоят на стене «1 гарнир» и теряют 10-18% углей навсегда (DBG: dK=252
+          // после 2 итераций). Обычные дни (недобор <8%) — типология «1 гарнир» целая.
+          const _dayDefC = safeTargets.c - sumTotals(meals).c;
+          const _reliefOk = _dayDefC > Math.max(40, (safeTargets.c || 0) * 0.08)
+            && _dryDenseIds.includes((best as FoodItem).id)
+            && !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === stapleFamilyOf((best as FoodItem).id))
+            && (m.totals?.c || 0) < ((m as any).target?.c || 0) * 1.25;
           // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
           // приёме; второй — только десерт в обед (пряник/джем/мёд/финики ≤60 после
           // мяса). Рост существующего — без лимита. Legacy MC3 — большой приём ≥100У.
-          if (!_legacyFewC && _carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && !_dsrtOkC) {
-            // Relief-клапан (P2): при структурном недоборе дня (>8% углей и >40 г) приём
-            // может взять ВТОРОЙ СУХОЙ плотный носитель ИЗ ДРУГОГО семейства (хлеб+рис,
-            // крем+паста) — иначе узкопуловые (simple/minimal: 5 продуктов) и HV-дни
-            // стоят на стене «1 гарнир» и теряют 10-18% углей навсегда (DBG: dK=252
-            // после 2 итераций). Обычные дни (недобор <8%) — типология «1 гарнир» целая.
-            const _dayDefC = safeTargets.c - sumTotals(meals).c;
-            const _dryDense = ['cream_of_rice', 'corn_flakes', 'bread_white', 'whole_grain_bread', 'bread_fitness', 'pasta_durum', 'rice_semolina', 'cream_rice', 'rice_white', 'oats_dry'];
-            const _famB2 = stapleFamilyOf((best as FoodItem).id);
-            const _famDiff = !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famB2);
-            const _canSecond = _dayDefC > Math.max(40, (safeTargets.c || 0) * 0.08)
-              && _dryDense.includes((best as FoodItem).id) && _famDiff
-              && (m.totals?.c || 0) < ((m as any).target?.c || 0) * 1.25;
-            if (!_canSecond) return false;
-          }
-          if (_carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && ((m as any).target?.c || 0) < 100) return false;
+          if (!_legacyFewC && _carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && !_dsrtOkC && !_reliefOk) return false;
+          if (_carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && ((m as any).target?.c || 0) < 100 && !_reliefOk) return false;
           if ((m.type === 'breakfast' || /Завтрак/i.test(m.label || '')) && isBreakfastBannedCarb((best as FoodItem).id)) return false;
           // PRO-типология: сладость — не добивка в основные приёмы (печенье в обед — мусор).
           // Сладости живут только в перекусах мелким топ-апом.
@@ -1475,7 +1473,8 @@ export function correctDayToTargets(
         const _mergeCap = COMFORT_CAP[newItem.id] !== undefined ? COMFORT_CAP[newItem.id]
           : isProteinPowderId(newItem.id) ? POWDER_PORTION_CAP_G
           : (hv && eff === 'c' && (best.carbs || 0) >= 55) ? 150 : 600;
-        if (_dup.amount + newItem.amount > _mergeCap) break;
+        // P2-фикс: слияние — не убийца цикла (break глотал все оставшиеся итерации).
+        if (_dup.amount + newItem.amount > _mergeCap) { _deadBest.add(eff + ':' + best.id); continue; }
         scaleItem(_dup, _dup.amount + newItem.amount);
         recalcMealTotals(meals);
         const afterTotals = sumTotals(meals);
@@ -1483,7 +1482,8 @@ export function correctDayToTargets(
         if (afterDev < beforeDev - improveGate(beforeDev)) continue;
         scaleItem(_dup, _prev);
         recalcMealTotals(meals);
-        break;
+        _deadBest.add(eff + ':' + best.id);
+        continue;
       }
       // P1a-fix2: рост однодольца вместо нового пункта семейства («рис 250 + крем 20»
       // в одном обеде): добивка растит существующий гарнир того же семейства.
@@ -1538,7 +1538,14 @@ export function correctDayToTargets(
       if (eff === 'c' && !(!!opts?.refeedDay || (meals.length < 5 && ((targetMeal as any).target?.c || 0) >= 100)) &&
         countCarbItems(targetMeal as any) >= 1 && !targetMeal.items.some(it => it.id === best.id)
         && !(String(targetMeal.type || '') === 'lunch' && ['pryaniki', 'jam', 'honey', 'dates'].includes(best.id))) {
-        continue;
+        // Relief-клапан (P2): тот же, что в placement — при недоборе дня >8% второй
+        // сухой плотный носитель из другого семейства разрешён (иначе push-вето глотало
+        // весь прогресс: фильтр placement проходил, а здесь откатывало).
+        const _reliefOkPush = (safeTargets.c - sumTotals(meals).c) > Math.max(40, (safeTargets.c || 0) * 0.08)
+          && _dryDenseIds.includes(best.id)
+          && !targetMeal.items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === stapleFamilyOf(best.id))
+          && ((targetMeal.totals?.c || 0) < ((targetMeal as any).target?.c || 0) * 1.25);
+        if (!_reliefOkPush) continue;
       }
       // P2 (типология): хлопья — не к мясу.
       if (eff === 'c' && isFlakeId(best.id) && mealHasMeatProtein(targetMeal)
@@ -1558,7 +1565,10 @@ export function correctDayToTargets(
       if (afterDev >= beforeDev - improveGate(beforeDev)) {
         targetMeal.items.pop();
         recalcMealTotals(meals);
-        break;
+        // P2-фикс: отклонённый push НЕ должен убивать весь цикл итераций (был `break` —
+        // корректор умирал после 1-2 итераций на simple/minimal: dK=252 навсегда).
+        // revert + continue; от полного застоя страхует no-progress гарант наверху.
+        continue;
       }
     }
   }
