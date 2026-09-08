@@ -24,6 +24,7 @@ import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, 
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
+import { isPackingActive } from '../../../engines/bb/bb-packing.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
@@ -609,6 +610,9 @@ export const BbAutoConstructor: React.FC = () => {
   // A/B-ротация паттернов: sibling-сессии одного тега в неделе — разные
   // паттерны (горизонталь vs вертикаль). Только generic-путь, дефолт выкл.
   const [abRotation, setAbRotation] = useState<boolean>(false);
+  // Packing-v2: заливка упражнений спины до индивидуальных капов (6/5/4)
+  // вместо ровного дележа. Пилот back, дефолт выкл.
+  const [packingV2, setPackingV2] = useState<boolean>(false);
   const [rotationMode, setRotationMode] = useState<'forbid' | 'strict' | 'variety'>('variety');
   const [avoidAxialLoadUi, setAvoidAxialLoadUi] = useState<boolean>(false);
   const [intensityLevel, setIntensityLevel] = useState<'light' | 'moderate' | 'high'>('moderate');
@@ -1942,6 +1946,7 @@ export const BbAutoConstructor: React.FC = () => {
           allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
           rotationMode,
           abPatternRotation: abRotation,
+          packingV2,
           intensityLevel,
           intensityTechnique: intensityTech,
          autoDeload,
@@ -2109,6 +2114,7 @@ export const BbAutoConstructor: React.FC = () => {
         fewerCompound,
         rotationMode,
         abPatternRotation: abRotation,
+        packingV2,
         intensityLevel,
         avoidAxialLoad: avoidAxialLoadUi || (prof as any).avoidAxialLoad,
         equipment: bbEquipment,
@@ -2308,6 +2314,7 @@ export const BbAutoConstructor: React.FC = () => {
             programId: selectedProgramId || undefined,
             cycleId: planMode === 'programs' ? selectedCycleId : undefined,
             abPatternRotation: abRotation === true ? true : undefined,
+            packingV2: packingV2 === true ? true : undefined,
           };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
@@ -2430,6 +2437,7 @@ export const BbAutoConstructor: React.FC = () => {
     }
     if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
     setAbRotation(v.params.abPatternRotation === true);
+    setPackingV2(v.params.packingV2 === true);
     setBbWeekSel(1);
     setStep('plan');
   };
@@ -3116,6 +3124,7 @@ export const BbAutoConstructor: React.FC = () => {
                       { icon: '🏗️', title: 'Меньше многосуставных', desc: 'Больше тренажёров и изоляций', on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true },
                       { icon: '🏋️', title: 'Становая / жим стоя', desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя' : 'Доступно в «Сила + Масса»', on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass' },
                       { icon: '🔀', title: 'A/B ротация паттернов', desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)', on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true },
+                      { icon: '📦', title: 'Packing заливка', desc: 'Меньше движений: заливка спины до 6/5/4 с пирамидой (пилот)', on: packingV2, set: setPackingV2, accent: '#a78bfa', enabled: true },
                     ].map(t => {
                       const active = t.enabled && t.on;
                       return (
@@ -3419,6 +3428,11 @@ export const BbAutoConstructor: React.FC = () => {
               icon: '🔀', title: 'A/B ротация паттернов',
               desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)',
               on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true,
+            },
+            {
+              icon: '📦', title: 'Packing заливка',
+              desc: 'Меньше движений: заливка спины до 6/5/4 с пирамидой (пилот)',
+              on: packingV2, set: setPackingV2, accent: '#a78bfa', enabled: true,
             },
           ].map(t => {
             const active = t.enabled && t.on;
@@ -4650,6 +4664,8 @@ export const BbAutoConstructor: React.FC = () => {
                     {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
                     {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
                     {abRotation && isAbRotationActive(builtPlan) ? <span style={{ fontSize:10, color:'#22d3ee', background:'rgba(34,211,238,0.10)', border:'1px solid rgba(34,211,238,0.25)', padding:'3px 7px', borderRadius:20 }}>🔀 A/B ротация</span> : null}
+                    {packingV2 && isPackingActive(builtPlan) ? <span style={{ fontSize:10, color:'#a78bfa', background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.25)', padding:'3px 7px', borderRadius:20 }}>📦 Packing заливка</span> : null}
+                    {packingV2 && !isPackingActive(builtPlan) ? <span title="Тогл включён, но заливка не сработала (weak/focus-цель, deload или нечего паковать)" style={{ fontSize:10, color:'#fff', opacity:0.55, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>Packing — не применён</span> : null}
                     {abRotation && !isAbRotationActive(builtPlan) ? <span title="Тогл включён, но план дословный (faithful) или без sibling-сессий — ротировать нечего" style={{ fontSize:10, color:'#fff', opacity:0.55, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>A/B ротация — не применена</span> : null}
                   </div>
                 </CollapsibleCard>
@@ -4685,8 +4701,10 @@ export const BbAutoConstructor: React.FC = () => {
                         { label:'Объёмный режим', selected: trainingVolumeMode, actual: actualVolMode, selectedRu: trainingVolumeMode==='high'?'Объёмный':'Стандарт', actualRu: actualVolMode==='high'?'Объёмный':'Стандарт', changed: trainingVolumeMode!==actualVolMode },
                       ];
                       const abActive = isAbRotationActive(builtPlan);
+                      const packActive = isPackingActive(builtPlan);
                       const extraItems: Array<{label:string, value:string, active:boolean}> = [
                         { label:'A/B ротация', value: !abRotation ? 'Выкл' : (abActive ? 'Вкл' : 'Вкл (не применена)'), active: abRotation && abActive },
+                        { label:'Packing заливка', value: !packingV2 ? 'Выкл' : (packActive ? 'Вкл' : 'Вкл (не применён)'), active: packingV2 && packActive },
                         { label:'BFR', value: bfrMode ? 'Вкл' : 'Выкл', active: bfrMode },
                         { label:'Blast/Cruise', value: blastCruiseEnabled ? `${blastWeeks}н/${cruiseWeeks}н` : 'Выкл', active: blastCruiseEnabled },
                         { label:'Авто-разгрузка', value: autoDeload ? 'Вкл' : 'Выкл', active: autoDeload },

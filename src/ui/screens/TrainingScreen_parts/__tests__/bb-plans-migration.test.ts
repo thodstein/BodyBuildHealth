@@ -60,4 +60,16 @@ describe('Saved BB plan legacy migration', () => {
     expect(plans.find(p => p.id === 'ab-off')?.params.abPatternRotation).toBeUndefined();
     expect(plans.find(p => p.id === 'legacy-no-flag')?.params.abPatternRotation).toBeUndefined();
   });
+
+  it('persists packingV2 flag, legacy without flag = off', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([
+      { id: 'pack-on', plan: { weeks: [{ week: 1, sessions: [] }] }, params: { packingV2: true } },
+      { id: 'pack-off', plan: { weeks: [{ week: 1, sessions: [] }] }, params: { packingV2: false } },
+      { id: 'legacy-no-flag', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {} },
+    ]));
+    const plans = loadSavedBBPlans();
+    expect(plans.find(p => p.id === 'pack-on')?.params.packingV2).toBe(true);
+    expect(plans.find(p => p.id === 'pack-off')?.params.packingV2).toBeUndefined();
+    expect(plans.find(p => p.id === 'legacy-no-flag')?.params.packingV2).toBeUndefined();
+  });
 });

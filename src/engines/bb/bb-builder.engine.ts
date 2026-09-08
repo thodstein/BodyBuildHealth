@@ -40,6 +40,7 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
+import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_PILOT_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
@@ -49,7 +50,7 @@ import { orderSessionExercises, type SessionMethodology } from './bb-session-ord
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
-import { ANGLE_CLASSES, lengthenedBonus, ensureStrictGroupCoverage } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, lengthenedBonus, ensureStrictGroupCoverage, STRICT_EXERCISE_GROUPS, strictGroupMatches } from './bb-exercise-selection.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
@@ -132,6 +133,10 @@ export interface BBBuilderInput {
    *  вертикаль), а не копии. Недельный объём цел (меняются только имена).
    *  Дефолт выкл — legacy 1-в-1. */
   abPatternRotation?: boolean;
+  /** Packing-v2 (opt-in, пилот back): заливка упражнений до индивидуальных
+   *  капов (терпеливые 6 / средние 5 / фикс 3–4) вместо ровного дележа.
+   *  Недельный объём цел (меняется только нарезка). Дефолт выкл. */
+  packingV2?: boolean;
   /** Интенсивность тренинга — управляет отдыхом/плотностью/восстановлением:
    *  - light: отдых +20% (низкая плотность, больше восстановление);
    *  - moderate: ×1.0 (стандарт);
@@ -491,6 +496,8 @@ export interface BBPlan {
     rotationMode?: string;
     /** A/B-ротация паттернов (opt-in): sibling-сессии — разные движения. */
     abPatternRotation?: boolean;
+    /** Packing-v2 заливка (opt-in, пилот back). */
+    packingV2?: boolean;
     intensityLevel?: string;
     avoidAxialLoad?: boolean;
     equipment?: string[];
@@ -1609,6 +1616,8 @@ export interface BuildSessionParams {
   abAvoidPatterns?: string[];
   /** A/B-ротация: порядковый номер среди sibling-сессий того же тега (0,1,…) — суффикс primary-слота. */
   abSibIndex?: number;
+  /** Packing-v2: заливка до индивидуальных капов (пилот back). */
+  packingV2?: boolean;
 }
 
 function buildSession(
@@ -1662,6 +1671,7 @@ function buildSession(
   skipStrictCoverage?: boolean,
   abAvoidPatterns?: string[],
   abSibIndex: number = 0,
+  packingV2: boolean = false,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2423,6 +2433,8 @@ function buildSession(
     availableBudget -= armReserveBudget; // резервируем для arms
   }
   let armAllocatedBudget = 0;
+  // Packing-v2: метка факта заливки (для штампа плана и честной выдачи UI).
+  let packingUsedHere = false;
   for (const pl of plans) {
     const phaseCfg = getPhaseConfig(phase, trainingFocus);
     const [adjMin, adjMax] = phaseCfg.repRange;
@@ -2480,9 +2492,59 @@ function buildSession(
     if (isArmOrShoulder && remainingBudget < minBudgetForArms) {
       remainingBudget = minBudgetForArms;
     }
+    // Packing-v2 (opt-in, пилот back): заливка до индивидуальных капов
+    // вместо ровного дележа. Скипы (legacy): weak/focus/spec-цель,
+    // градированные замены (vPct), не-accumulation/intensification.
+    // Объём инвариантен: сумма розданных сетов = pl.sets ровно.
+    // Spec-цель (weak/focus — специализация их и покрывает): объёмную
+    // гарантию цели не перекраиваем, скип в legacy.
+    const packingSpecTarget = isWeak(pl.muscle, weakPoints)
+      || !!(focusGroup && collapseKey(focusGroup) === pl.muscle);
+    const packingEligible = packingV2 === true
+      && (phase === 'accumulation' || phase === 'intensification')
+      && PACKING_PILOT_MUSCLES.includes(pl.muscle)
+      && !packingSpecTarget
+      && !pl.exDatas.some(d => ((d as any).substitutionVolumePct ?? 1) !== 1)
+      && !pl.exDatas.some(d => (d as any).warmupActivator);
+    let packedSets: number[] | null = null;
+    if (packingEligible && pl.exDatas.length > 0) {
+      const exMinPack = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+      const evenShare = Math.round(pl.sets / pl.exDatas.length);
+      const packCaps = pl.exDatas.map(d => packingCapFor(d as any, pl.muscle));
+      packedSets = distributePackingSets(
+        pl.sets,
+        pl.exDatas.map(() => exMinPack),
+        packCaps.map(c => c.cap),
+        packCaps.map(c => c.noPack),
+        evenShare,
+      );
+      if (packedSets) packingUsedHere = true;
+      // Фаза сброса (план v2): убрать хвостовые упражнения, перелив их сеты
+      // в терпеливые головы в пределах капов. Объём инвариантен; guards —
+      // лид, locked, sole-паттерн, sole-strict-группа, минимум 2 на мышцу.
+      if (packedSets) {
+        const dropItems = pl.exDatas.map(d => ({
+          pattern: packingPatternOf(d as any),
+          strictKeys: strictKeysFor(d as any, pl.muscle),
+        }));
+        const dropped = planPackingDrops(
+          packedSets,
+          packCaps.map(c => c.cap),
+          packCaps.map(c => c.noPack),
+          dropItems,
+          2,
+        );
+        if (dropped) {
+          pl.exDatas = pl.exDatas.filter((_, i) => dropped.keep[i]);
+          packedSets = dropped.sets.filter((_, i) => dropped.keep[i]);
+          pl.exerciseCount = pl.exDatas.length;
+        }
+      }
+    }
     // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets до 5
     // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день)
-    for (const exData of pl.exDatas) {
+    for (let ei = 0; ei < pl.exDatas.length; ei++) {
+      const exData = pl.exDatas[ei];
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
       const vPct = (exData as any).substitutionVolumePct ?? 1.0;
       const isSubstituted = (exData as any).substituted === true;
@@ -2493,11 +2555,13 @@ function buildSession(
        const setCap = (pl.muscle === 'back' && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
          : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
          : 5;
-       const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
-       // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно
-       // для гипертрофии опытного атлета.
-       const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
-       const exSets = Math.max(exMin, Math.min(setCap, exSetsRaw));
+        const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
+        // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно
+        // для гипертрофии опытного атлета.
+        const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+        // Packing-v2: залитое число сетов (сумма = pl.sets ровно, пирамида
+        // весов — ниже через backoffWeights). null (не feasible) → legacy.
+        const exSets = packedSets ? packedSets[ei] : Math.max(exMin, Math.min(setCap, exSetsRaw));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
@@ -2709,7 +2773,7 @@ function buildSession(
   // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
   // BUG-B13/B21: Stretching удалён (мёртвый код с Jul 16 — не ББ-гипертрофия, занимал слоты).
 
-  return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
+  return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises, ...(packingUsedHere ? { packingApplied: true } : {}) };
 }
 
 /** Обёртка с типизированным объектом — решает P0-2 (47 positional args → type-safe). Старый вызов оставлен для совместимости. */
@@ -2730,6 +2794,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
+    p.packingV2 ?? false,
   );
 }
 
@@ -3289,7 +3354,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2 });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -4574,6 +4639,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       sess.exercises.length = 0;
       sess.exercises.push(...ordered);
     }
+  }
+  // Packing-v2: штамп факта заливки (сессии несут packingApplied из
+  // buildSession; финализатор копирует сессии поверхностно — метка жива).
+  // Честная выдача UI (isPackingActive) и revalidate-стойкость.
+  if (input.packingV2 === true && finalized.weeks.some((w: any) => (w.sessions || []).some((s: any) => (s as any).packingApplied === true))) {
+    (finalized as any).packingV2 = true;
   }
   return finalized;
 }

@@ -62,6 +62,11 @@ describe('BB-auto UI smoke', () => {
     expect(isAbRotationActive({ weeks: [{ sessions: [{ exercises: [] }, { exercises: [], abAvoidPatterns: ['horizontal_push'] }] }] })).toBe(true);
   });
 
+  it('renderParams содержит опцию Packing заливки', () => {
+    const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
+    expect(html).toContain('Packing заливка');
+  });
+
   it('renderParams содержит выбор проф-методик: DUP, суперсеты, схема объёма, негативы', () => {
     const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
     expect(html).toContain('Волновая периодизация (DUP)');
