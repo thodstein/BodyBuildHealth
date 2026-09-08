@@ -293,3 +293,19 @@ describe('P0 androgenic index normalized', () => {
     expect(calc(600)).toBeGreaterThan(calc(300));
   });
 });
+
+describe('P0 peptide dilution and risk dose scaling', () => {
+  it('dilution 0 ml → flag, not silent 1 ml', async () => {
+    const { computeDilution } = await import('../peptide-calculator.engine');
+    const r = computeDilution({ amountValue: 2, amountUnit: 'mg', dilutionVolumeMl: 0, doseValue: 100, doseUnit: 'mcg', syringeType: 'U100_1ml' } as any);
+    expect(r.syringeUnitsDisplay).toContain('Объём разведения');
+    expect(r.doseVolumeMl).toBe(0);
+  });
+  it('peptide risk scales with dose', async () => {
+    const { computePeptideRisks, PEPTIDE_DB } = await import('../peptide-calculator.engine');
+    const pep = PEPTIDE_DB['cjc1295'];
+    const low = computePeptideRisks(pep, 50);
+    const high = computePeptideRisks(pep, 200);
+    expect(high[0].riskPercent).toBeGreaterThan(low[0].riskPercent);
+  });
+});

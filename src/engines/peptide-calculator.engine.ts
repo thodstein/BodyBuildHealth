@@ -120,9 +120,12 @@ export function computeDilution(input: DilutionInput): DilutionResult {
   if (!syringe) return { amountMcg: 0, doseMcg: 0, concentrationMcgPerMl: 0, doseVolumeMl: 0, syringeUnits: 0, syringeUnitsDisplay: '—', dosesPerVial: 0 };
   const amountMcg = input.amountValue * (input.amountUnit === 'mg' ? 1000 : 1);
   const doseMcg = input.doseValue * (input.doseUnit === 'mg' ? 1000 : 1);
-  const dilVol = input.dilutionVolumeMl > 0 ? input.dilutionVolumeMl : 1;
+  const dilVol = input.dilutionVolumeMl;
+  if (!Number.isFinite(dilVol) || dilVol <= 0) {
+    return { amountMcg, doseMcg, concentrationMcgPerMl: 0, doseVolumeMl: 0, syringeUnits: 0, syringeUnitsDisplay: '⚠ Объём разведения должен быть >0', dosesPerVial: 0 };
+  }
   const concentrationMcgPerMl = amountMcg / dilVol;
-  const doseVolumeMl = doseMcg / concentrationMcgPerMl;
+  const doseVolumeMl = concentrationMcgPerMl > 0 ? doseMcg / concentrationMcgPerMl : 0;
 
   const syringeUnits = doseVolumeMl * syringe.unitsPerMl;
 
@@ -193,15 +196,19 @@ export function computePK(input: PKInput): PKResult {
   };
 }
 
-export function computePeptideRisks(peptide: PeptideInfo): PeptideRisk[] {
+export function computePeptideRisks(peptide: PeptideInfo, doseMcg?: number): PeptideRisk[] {
   if (!peptide) return [];
-  const riskPercent = peptide.riskLevel === 'high' ? 35 : peptide.riskLevel === 'medium' ? 20 : 10;
+  const base = peptide.riskLevel === 'high' ? 35 : peptide.riskLevel === 'medium' ? 20 : 10;
+  // Dose scaling: standard dose = amountMg*1000 (флакон) vs 100 mcg typical; scale 0.5..1.5
+  const standardMcg = (peptide.amountMg || 2) * 1000;
+  const doseFactor = doseMcg && Number.isFinite(doseMcg) && standardMcg > 0 ? Math.max(0.5, Math.min(1.8, doseMcg / 100)) : 1;
+  const riskPercent = Math.round(base * doseFactor);
   return (peptide.riskNotes || []).map(noteKey => {
     const mapped = RISK_SYSTEM_MAP[noteKey];
     if (mapped) {
       return { system: mapped.system, label: mapped.label, riskPercent, notes: [noteKey] };
     }
-    return { system: 'neuro', label: String(noteKey || '').replace(/_/g, ' '), riskPercent: riskPercent / 2, notes: [noteKey] };
+    return { system: 'neuro', label: String(noteKey || '').replace(/_/g, ' '), riskPercent: Math.round(riskPercent / 2), notes: [noteKey] };
   });
 }
 

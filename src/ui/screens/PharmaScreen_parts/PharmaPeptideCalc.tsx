@@ -268,7 +268,7 @@ export const PharmaPeptideCalc: React.FC = () => {
             <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Риски: {sel.shortName}</span>
           </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {computePeptideRisks(sel).map((r: any, i: number) => (
+            {computePeptideRisks(sel, pepDose).map((r: any, i: number) => (
               <div key={i} style={{
                 padding:'6px 9px', borderRadius:20, fontSize:11, fontWeight:700,
                 background: r.riskPercent > 25 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)',
