@@ -697,9 +697,9 @@ export const V7RiskDisplay: React.FC<{
             })}
 
             {/* Internal organ labels */}
-            <text x={cx} y={15} fill="#fff" fontSize="7" fontWeight="600" textAnchor="middle">ГОЛОВА</text>
-            <text x={cx - 95} y={180} fill="#fff" fontSize="6" textAnchor="middle">Л</text>
-            <text x={cx + 95} y={180} fill="#fff" fontSize="6" textAnchor="middle">П</text>
+            <text x={cx} y={15} fill="#fff" fontSize="9" fontWeight="700" textAnchor="middle">ГОЛОВА</text>
+            <text x={cx - 95} y={180} fill="#fff" fontSize="8" fontWeight="700" textAnchor="middle">Л</text>
+            <text x={cx + 95} y={180} fill="#fff" fontSize="8" fontWeight="700" textAnchor="middle">П</text>
 
             {/* Selected organ floating label */}
             {selectedOrgan3D && (
@@ -709,15 +709,15 @@ export const V7RiskDisplay: React.FC<{
             )}
 
             {/* Legend */}
-            <g transform="translate(10, 479)">
-              <rect x={0} y={0} width={8} height={8} rx={1.5} fill="#22c55e" opacity={0.8} />
-              <text x={10} y={7} fill="#fff" fontSize="6">Низк</text>
-              <rect x={40} y={0} width={8} height={8} rx={1.5} fill="#eab308" opacity={0.8} />
-              <text x={50} y={7} fill="#fff" fontSize="6">Сред</text>
-              <rect x={80} y={0} width={8} height={8} rx={1.5} fill="#f97316" opacity={0.8} />
-              <text x={90} y={7} fill="#fff" fontSize="6">Выс</text>
-              <rect x={115} y={0} width={8} height={8} rx={1.5} fill="#ef4444" opacity={0.8} />
-              <text x={125} y={7} fill="#fff" fontSize="6">Крит</text>
+            <g transform="translate(10, 477)">
+              <rect x={0} y={0} width={9} height={9} rx={2} fill="#22c55e" opacity={0.85} />
+              <text x={11} y={8} fill="#fff" fontSize="8" fontWeight="700">Низк</text>
+              <rect x={42} y={0} width={9} height={9} rx={2} fill="#eab308" opacity={0.85} />
+              <text x={53} y={8} fill="#fff" fontSize="8" fontWeight="700">Сред</text>
+              <rect x={84} y={0} width={9} height={9} rx={2} fill="#f97316" opacity={0.85} />
+              <text x={95} y={8} fill="#fff" fontSize="8" fontWeight="700">Выс</text>
+              <rect x={121} y={0} width={9} height={9} rx={2} fill="#ef4444" opacity={0.85} />
+              <text x={132} y={8} fill="#fff" fontSize="8" fontWeight="700">Крит</text>
             </g>
           </svg>
         </div>

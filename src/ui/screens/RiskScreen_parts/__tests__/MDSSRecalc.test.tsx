@@ -22,8 +22,21 @@ vi.mock('../../../../core/data-link', () => ({
 
 import { MDSSRiskDisplay } from '../../RiskScreen';
 
+let capturedMdss: any = null;
+vi.mock('../../../../engines/mdss-engine', async (importOriginal) => {
+  const mod: any = await importOriginal();
+  return {
+    ...mod,
+    runMDSS: (args: any) => {
+      capturedMdss = args;
+      return mod.runMDSS(args);
+    },
+  };
+});
+
 beforeEach(() => {
   mockLabs = [];
+  capturedMdss = null;
 });
 
 afterEach(() => {
@@ -58,5 +71,30 @@ describe('MDSSRiskDisplay auto-recalc', () => {
     await waitFor(() => {
       expect(container.textContent).not.toBe(before);
     });
+  });
+
+  it('2. очищенное поле недель не даёт tWeeks 0 в движок (минимум 1)', async () => {
+    const { container } = render(<MDSSRiskDisplay />);
+    fireEvent.click(
+      Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Запустить анализ'),
+      ) as HTMLElement,
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('Максимальный риск');
+    });
+    const weeksInput = container.querySelector(
+      'input[type="number"]',
+    ) as HTMLInputElement;
+    fireEvent.change(weeksInput, { target: { value: '' } });
+    fireEvent.click(
+      Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Пересчитать'),
+      ) as HTMLElement,
+    );
+    await waitFor(() => {
+      expect(capturedMdss).not.toBeNull();
+    });
+    expect(capturedMdss.tWeeks).toBe(1);
   });
 });

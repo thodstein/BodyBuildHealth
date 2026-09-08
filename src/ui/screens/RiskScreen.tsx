@@ -1174,7 +1174,8 @@ export const MDSSRiskDisplay: React.FC = () => {
         { name: 'hs-CRP', value: 1.5, ec50: 3 },
       );
     }
-    setMdssResult(runMDSS({ tWeeks, weeksSinceLab, genetics, markers }));
+    // NOTE: минимум 1 неделя — очищенное поле даёт 0, движок ждёт tWeeks >= 1.
+    setMdssResult(runMDSS({ tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics, markers }));
   };
 
   const ZONE_COLORS: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
