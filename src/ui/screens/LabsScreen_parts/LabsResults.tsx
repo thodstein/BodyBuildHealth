@@ -88,10 +88,10 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                       const statusText=status==='high'? 'выше' : status==='low'? 'ниже' : status==='unknown'? '—' : 'норма';
                       return (
                         <div key={lab.code+lab.date} style={{
-                          display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14,
+                          display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14, cursor:'default',
                           background: isAbn? labsWithAlpha(statusColor, '12') : 'rgba(255,255,255,0.03)', border:`1px solid ${isAbn? labsWithAlpha(statusColor, '22') : 'rgba(140,190,255,0.12)'}`,
-                          borderLeft:`3px solid ${statusColor}`, minHeight:64,
-                        }}>
+                          borderLeft:`3px solid ${statusColor}`, minHeight:64, transition:'transform 0.14s ease, box-shadow 0.14s ease',
+                        }} onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.transform='scale(1.01)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 8px 20px rgba(0,0,0,0.20)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.transform='scale(1)'; (e.currentTarget as HTMLDivElement).style.boxShadow='none'; }}>
                           <div style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: sysColor+'1A', color: sysColor, fontWeight:800, fontSize:11, border:`1px solid ${sysColor}30` }}>{lab.code.slice(0,2).toUpperCase()}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontWeight:800, fontSize:13, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
