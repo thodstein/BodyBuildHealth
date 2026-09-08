@@ -4934,14 +4934,15 @@ html.app-native .labs-topnav button {
 
 html.app-native .labs-subtabs {
   position: sticky !important;
-  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
-  z-index: 20 !important;
-  background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
+  top: calc(max(env(safe-area-inset-top, 0px), 24px) + 56px) !important;
+  z-index: 19 !important;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.96), rgba(5, 11, 22, 0.82)) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   margin: 0 -12px !important;
   padding: 12px 12px 10px !important;
   scroll-snap-type: x proximity !important;
+  border-bottom: 1px solid rgba(140,190,255,0.08) !important;
 }
 
 html.app-native .labs-subtabs::-webkit-scrollbar {

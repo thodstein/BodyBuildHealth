@@ -685,9 +685,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── TOP NAV BAR — TOP APK: sticky glass + back 44px + титул секции ─── */}
+      {/* ─── TOP NAV BAR — FIX: sticky с учётом safe-area, не перекрывает сабтабы ─── */}
       {mainTab !== 'hero' && (
-        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.85), rgba(12,23,40,0.85))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)' }}>
+        <div className="labs-topnav" style={{ position:'sticky', top:'env(safe-area-inset-top, 0px)', zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.92), rgba(12,23,40,0.92))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', paddingTop:'calc(10px + env(safe-area-inset-top, 0px))', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)', minHeight:56 }}>
           <button onClick={() => setMainTab('hero')} aria-label="Назад в Лабораторию" style={{
             minHeight:44, minWidth:44, padding:'10px 14px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(140,190,255,0.16)', background:'rgba(21,38,66,0.70)', borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', gap:6, flexShrink:0,
           }}>←</button>
@@ -705,15 +705,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── SCROLLABLE CONTENT — отступ над нижними табами: nav(76) + табы(64) + запас ─── */}
+      {/* ─── SCROLLABLE CONTENT — один скролл-контейнер (outer), без вложенного */}
       {mainTab !== 'hero' && (
-      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom,0px))' }}>
+      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'visible', padding: '0 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom,0px))' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab pills — TOP APK: липкая лента, 44px, скролл-снап, актив с glow */}
-          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:64, zIndex:20, background:'transparent', scrollSnapType:'x proximity' }}>
+          {/* Sub-tab pills — FIX: липкая под шапкой (56px + safe-area), без перекрытия */}
+          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:'calc(env(safe-area-inset-top, 0px) + 56px)', zIndex:19, background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', margin:'0 -12px', paddingLeft:12, paddingRight:12, scrollSnapType:'x proximity' }}>
             {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
               const active = subTab === t.id;
               return (
