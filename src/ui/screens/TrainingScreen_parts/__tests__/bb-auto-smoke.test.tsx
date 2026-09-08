@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BbAutoConstructor, backSubgroupLabel, armHeadLabel } from '../BbAutoConstructor';
+import { BbAutoConstructor, backSubgroupLabel, armHeadLabel, isAbRotationActive } from '../BbAutoConstructor';
 
 /**
  * Browser-level smoke suite (остаток MAX-PLAN): SSR-рендер ключевых экранов
@@ -53,6 +53,13 @@ describe('BB-auto UI smoke', () => {
     expect(html).toContain('A/B ротация паттернов');
     // Описание честное: generic + adapt, faithful дословно (оба списка Подбора).
     expect(html).toContain('generic + adapt; faithful дословно');
+  });
+
+  it('isAbRotationActive: тогл вкл ≠ применена (stash в плане)', () => {
+    expect(isAbRotationActive(null)).toBe(false);
+    expect(isAbRotationActive({})).toBe(false);
+    expect(isAbRotationActive({ weeks: [{ sessions: [{ exercises: [] }] }] })).toBe(false);
+    expect(isAbRotationActive({ weeks: [{ sessions: [{ exercises: [] }, { exercises: [], abAvoidPatterns: ['horizontal_push'] }] }] })).toBe(true);
   });
 
   it('renderParams содержит выбор проф-методик: DUP, суперсеты, схема объёма, негативы', () => {

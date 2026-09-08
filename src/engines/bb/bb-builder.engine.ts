@@ -489,6 +489,8 @@ export interface BBPlan {
     courseIntensity?: string;
     fewerCompound?: boolean;
     rotationMode?: string;
+    /** A/B-ротация паттернов (opt-in): sibling-сессии — разные движения. */
+    abPatternRotation?: boolean;
     intensityLevel?: string;
     avoidAxialLoad?: boolean;
     equipment?: string[];

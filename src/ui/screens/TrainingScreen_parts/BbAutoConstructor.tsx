@@ -279,6 +279,15 @@ export function armHeadLabel(pattern: string): string {
   }
 }
 
+/** A/B-ротация реально применена в плане: хотя бы одна сессия несёт
+ *  stash'нутый avoid (abAvoidPatterns). Тогл вкл ≠ применена: faithful
+ *  дословно и недели без sibling-сессий ротацию не включают. */
+export function isAbRotationActive(plan: any): boolean {
+  try {
+    return (plan?.weeks || []).some((w: any) => (w?.sessions || []).some((s: any) => ((s as any).abAvoidPatterns || []).length > 0));
+  } catch { return false; }
+}
+
 /** Мини-чип для параметров упражнения (общий из training-ui). */
 
 /* ─── Годовой план → ББ-авто: маппер контекста блока (he_bb_plan_saved_ctx) ─── */
@@ -4640,7 +4649,8 @@ export const BbAutoConstructor: React.FC = () => {
                     <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
                     {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
                     {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
-                    {abRotation ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>A/B ротация</span> : null}
+                    {abRotation && isAbRotationActive(builtPlan) ? <span style={{ fontSize:10, color:'#22d3ee', background:'rgba(34,211,238,0.10)', border:'1px solid rgba(34,211,238,0.25)', padding:'3px 7px', borderRadius:20 }}>🔀 A/B ротация</span> : null}
+                    {abRotation && !isAbRotationActive(builtPlan) ? <span title="Тогл включён, но план дословный (faithful) или без sibling-сессий — ротировать нечего" style={{ fontSize:10, color:'#fff', opacity:0.55, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>A/B ротация — не применена</span> : null}
                   </div>
                 </CollapsibleCard>
                 <CollapsibleCard title="7 · Выбранные методики — детально" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge={`${[bbMethodology, loadStrategy, intensityTech, volumeScheme, supersetMode, dupMode, deloadType].filter(v=>v!=='none'&&v!=='standard'&&v!=='compound_first').length} активных`}>
@@ -4674,7 +4684,9 @@ export const BbAutoConstructor: React.FC = () => {
                         { label:'Фокус', selected: bbTrainingFocus, actual: actualFocus, selectedRu: focusRu[bbTrainingFocus]||bbTrainingFocus, actualRu: focusRu[actualFocus]||actualFocus, changed: bbTrainingFocus!==actualFocus },
                         { label:'Объёмный режим', selected: trainingVolumeMode, actual: actualVolMode, selectedRu: trainingVolumeMode==='high'?'Объёмный':'Стандарт', actualRu: actualVolMode==='high'?'Объёмный':'Стандарт', changed: trainingVolumeMode!==actualVolMode },
                       ];
+                      const abActive = isAbRotationActive(builtPlan);
                       const extraItems: Array<{label:string, value:string, active:boolean}> = [
+                        { label:'A/B ротация', value: !abRotation ? 'Выкл' : (abActive ? 'Вкл' : 'Вкл (не применена)'), active: abRotation && abActive },
                         { label:'BFR', value: bfrMode ? 'Вкл' : 'Выкл', active: bfrMode },
                         { label:'Blast/Cruise', value: blastCruiseEnabled ? `${blastWeeks}н/${cruiseWeeks}н` : 'Выкл', active: blastCruiseEnabled },
                         { label:'Авто-разгрузка', value: autoDeload ? 'Вкл' : 'Выкл', active: autoDeload },
