@@ -211,8 +211,12 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
     excludedIds: new Set<string>(), trainDay: true, athleteWeightKg: 120, seed: 3, goal: 'mass',
   });
 
-  it('best-effort dev ≤26% + честный флаг при >3%', () => {
-    expect(res1500.deviationPct).toBeLessThanOrEqual(26);
+  it('best-effort dev ≤30% + честный флаг при >3%', () => {
+    // v3: было 26 — presleep больше не качает сходимость сахаром (47У декстрозы на ночь
+    // убраны как баг; честные ~16У рецепта). Цена честности на экстриме 1500У+инсулин:
+    // фикс-рецепты + locked-окна держат пол белка ~+25% (ядро резать нельзя),
+    // добивка — только углеводными топ-апами. Флаг честный, тарелки реальные.
+    expect(res1500.deviationPct).toBeLessThanOrEqual(30);
     if (!res1500.withinTolerance) {
       expect(res1500.notes.some(n => (n || '').includes('отклонение')), 'нет честного флага').toBe(true);
     }

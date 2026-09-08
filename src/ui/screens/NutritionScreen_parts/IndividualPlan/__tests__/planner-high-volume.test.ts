@@ -125,13 +125,21 @@ describe('C: инсулин-окна первого класса (интегра
     }
   });
 
-  it('болюс рядом с бедным перекусом → топ-ап окно (безопасность, не дубль)', () => {
-    // train-day 14:00: рядом перекус ~13:30 с ~35У < 80% потребности 100У → топ-ап.
+  it('болюс рядом с перекусом → покрыт: окно-топ-ап ИЛИ богатый приём рядом (безопасность, не дубль)', () => {
+    // train-day 14:00: инвариант безопасности — болюс 10ЕД (~100У) покрыт окном
+    // ИЛИ приёмом ≤60 мин с ≥80У. Раньше рядом стоял бедный перекус ~35У → топ-ап окно;
+    // с плотными снеками (v3) рядом может стоять богатый приём — тогда окно не нужно.
     const plan = buildDayPlan(base({ goalCarbsG: 800, goalKcal: 6000, injections: [bolus] as any }));
     const wins = plan.meals.filter(m => (m.label || '').includes('Углеводы под инсулин'));
-    expect(wins.length).toBe(1);
-    expect(wins[0].totals.c).toBeGreaterThanOrEqual(30);
-    expect((wins[0] as any)._insulinWindow).toBe(true);
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const near = plan.meals.filter(m => Math.abs(toMin((m as any).time || '00:00') - toMin('14:00')) <= 60 && !(m.label || '').includes('Углеводы под инсулин'));
+    const nearC = Math.max(0, ...near.map(m => m.totals.c || 0));
+    const covered = wins.length === 1 || nearC >= 80;
+    expect(covered, `окна=${wins.length}, богатый рядом=${nearC}У`).toBe(true);
+    if (wins.length === 1) {
+      expect(wins[0].totals.c).toBeGreaterThanOrEqual(30);
+      expect((wins[0] as any)._insulinWindow).toBe(true);
+    }
   });
 });
 
