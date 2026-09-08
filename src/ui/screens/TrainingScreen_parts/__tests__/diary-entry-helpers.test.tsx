@@ -9,13 +9,14 @@
 import React from 'react';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { searchExerciseCatalog, seedForNewExercise, mrvBaseForLevel, localIsoDate, bestE1rmSeriesForWeek } from '../diary-shared';
+import { searchExerciseCatalog, seedForNewExercise, mrvBaseForLevel, localIsoDate, bestE1rmSeriesForWeek, csvCell } from '../diary-shared';
 import { QuickEntry } from '../QuickEntry';
 import { DiaryRecordingForm } from '../DiaryRecordingForm';
 import { WorkoutWeekCard } from '../diary-cards';
 import { readManualFlags, manualVirtualLog } from '../TrainingCalendarTab';
 import { WarmupDiaryView } from '../WarmupDiaryView';
 import { CooldownDiaryView } from '../CooldownDiaryView';
+import { DiaryProgressView } from '../DiaryProgressView';
 import { MindsetTab } from '../MindsetTab';
 import { MobilityTab } from '../MobilityTab';
 import { loadCheckins, buildPresetProtocol, upsertProtocol, setActiveProtocol } from '../../../../engines/mindset-protocol.engine';
@@ -240,8 +241,7 @@ describe('Warmup/Cooldown — PRO-хуки при живых записях', ()
   });
 });
 
-describe('Ритуалы — чек-ины датируются ЛОКАЛЬНЫМ днём', () => {
-  // Инстант, где UTC-дата (09-08) и локальная (09-09, UTC+10) расходятся:
+describe('Ритуалы — чек-ины датируются ЛОКАЛЬНЫМ днём', () => {  // Инстант, где UTC-дата (09-08) и локальная (09-09, UTC+10) расходятся:
   // старый toISOString-код клал чек-ин на вчера.
   const PINNED = new Date('2026-09-08T21:30:00Z');
   const mkHub = (historyWorkouts: unknown[] = []) => ({ historyWorkouts }) as unknown as DiaryHubCtx;
@@ -275,5 +275,37 @@ describe('Ритуалы — чек-ины датируются ЛОКАЛЬНЫ
     const list = loadMobilityCheckins();
     expect(list.length).toBeGreaterThan(0);
     expect(list[list.length - 1].date).toBe('2026-09-09');
+  });
+});
+
+describe('csvCell — гашение формульных инъекций', () => {
+  it('=,+,-,@ в начале гасятся апострофом', () => {
+    expect(csvCell('=cmd|xxx')).toBe("'=cmd|xxx");
+    expect(csvCell('+1+1')).toBe("'+1+1");
+    expect(csvCell('-2+3')).toBe("'-2+3");
+    expect(csvCell('@sum')).toBe("'@sum");
+  });
+  it('обычные строки/числа/пусто — без изменений', () => {
+    expect(csvCell('Жим штанги лёжа')).toBe('Жим штанги лёжа');
+    expect(csvCell(80)).toBe('80');
+    expect(csvCell(null)).toBe('');
+    expect(csvCell('a=b')).toBe('a=b');
+  });
+});
+
+describe('DiaryProgressView — PRO-хуки', () => {
+  it('замеры, история и рекорды с хуками', () => {
+    const hub = {
+      measurements: [{ date: '2026-09-08', weightKg: 80, waistCm: 85, chestCm: 100, armLeftCm: 38, armRightCm: 38, thighLeftCm: 60, thighRightCm: 60 }],
+      setMeasurements: () => {},
+      mWeight: 80, setMWeight: () => {}, mWaist: 85, setMWaist: () => {}, mChest: 100, setMChest: () => {},
+      mArm: 38, setMArm: () => {}, mThigh: 60, setMThigh: () => {}, mDate: '2026-09-08', setMDate: () => {},
+      saveMeasurementHandler: () => {}, measureAnalytics: null, repData: null,
+      historyWorkouts: [mkHistory()[0], { ...mkHistory()[0], id: 'w2', date: '2026-09-03' }],
+    };
+    const { container } = render(<DiaryProgressView hub={hub as never} />);
+    expect(container.querySelector('.pg-measure')).toBeTruthy();
+    expect(container.querySelector('.pg-hist')).toBeTruthy();
+    expect(container.querySelector('.pg-pr')).toBeTruthy();
   });
 });

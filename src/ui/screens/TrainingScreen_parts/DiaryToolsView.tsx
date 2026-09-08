@@ -8,6 +8,7 @@ import { CsvImportTab } from './CsvImportTab';
 import { WorkoutComparisonCard } from './diary-cards';
 import { diaryStyles as style } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
+import { csvCell } from './diary-shared';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
@@ -58,8 +59,8 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       const rpe = s.rpe ?? '';
                       const rir = s.rir ?? '';
                       const notes = s.notes ?? '';
-                      const safeWeight = typeof weight === 'string' ? `"${weight}"` : weight;
-                      rows.push(`${(w.date || '').slice(0, 10)},"${(ex.exerciseName || '').replace(/"/g, '""')}",${i + 1},${safeWeight},${reps},${rpe},${rir},"${String(notes).replace(/"/g, '""')}"`);
+                      const safeWeight = typeof weight === 'string' ? `"${csvCell(weight).replace(/"/g, '""')}"` : weight;
+                      rows.push(`${(w.date || '').slice(0, 10)},"${csvCell(ex.exerciseName || '').replace(/"/g, '""')}",${i + 1},${safeWeight},${reps},${rpe},${rir},"${csvCell(notes).replace(/"/g, '""')}"`);
                     });
                   });
                 });

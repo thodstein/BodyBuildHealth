@@ -185,3 +185,12 @@ export function bestE1rmSeriesForWeek(workouts: WorkoutLog[]): number[] {
   }
   return series;
 }
+
+/**
+ * Ячейка CSV без формульной инъекции: значения с =,+,-,@ в начале
+ * Excel/Sheets выполняют как формулы — гасим префиксом-апострофом.
+ */
+export function csvCell(v: unknown): string {
+  const s = String(v ?? '');
+  return /^[=+\-@]/.test(s) ? `'${s}` : s;
+}

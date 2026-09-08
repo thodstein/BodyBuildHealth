@@ -5273,7 +5273,9 @@ html.app-native .risk-systems-nav button:focus-visible,
 html.app-native .risk-verify-nav button:focus-visible,
 html.app-native .risk-info-nav button:focus-visible,
 html.app-native .risk-verify-export button:focus-visible,
-html.app-native .risk-navcards button:focus-visible {
+html.app-native .risk-navcards button:focus-visible,
+html.app-native .screen.risk details > summary:focus-visible,
+html.app-native .screen.risk .risk-weekly-chart span[role='button']:focus-visible {
   outline: 2px solid var(--accent-2) !important;
   outline-offset: 2px !important;
 }
@@ -6821,6 +6823,134 @@ html.app-native .hub-diary .train-cooldowndiary button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   html.app-native .hub-diary .train-warmupdiary .wu-foot button:active,
   html.app-native .hub-diary .train-cooldowndiary .cd-foot button:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 81. TRAINING DIARY PRO-6 — таб «Прогресс»: замеры/PR/радар ───
+ * Замеры, история, аналитика тела, тренды, отчёт, рекорды, 1ПМ, календарь PR,
+ * баланс сил, графики. Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Замеры: стекло, заголовок, кнопки 48px ── */
+html.app-native .hub-diary .train-diaryprogress .pg-measure {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-measure h4 {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-measure button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-measure button:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── История замеров и аналитика тела: строки 12px, цифры tabular ── */
+html.app-native .hub-diary .train-diaryprogress .pg-hist,
+html.app-native .hub-diary .train-diaryprogress .pg-body {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Тренды замеров: плитки со спарклайнами ── */
+html.app-native .hub-diary .train-diaryprogress .pg-trends {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-trends [style*='grid-template-columns: 1fr 1fr'] > div {
+  border-radius: 12px !important;
+  padding: 8px !important;
+}
+
+/* ── Недельный отчёт: читаемые инсайты ── */
+html.app-native .hub-diary .train-diaryprogress .pg-report {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  line-height: 1.6 !important;
+}
+
+/* ── Рекорды: строки 12px, e1RM золотом крупнее ── */
+html.app-native .hub-diary .train-diaryprogress .pg-pr {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-pr > div {
+  font-size: 12px !important;
+}
+
+/* ── 1ПМ по упражнениям: плитки, дельты цветом ── */
+html.app-native .hub-diary .train-diaryprogress .pg-e1rm {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-e1rm [style*='grid-template-columns: 1fr 1fr'] > div {
+  border-radius: 12px !important;
+  padding: 8px !important;
+}
+
+/* ── Календарь PR: скролл в ширину, ячейки-тапы ── */
+html.app-native .hub-diary .train-diaryprogress .pg-cal {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-cal::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Баланс сил: радар в ширину, строки 12px ── */
+html.app-native .hub-diary .train-diaryprogress .pg-radar {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .hub-diary .train-diaryprogress .pg-radar svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* ── Графики прогресса: в ширину экрана ── */
+html.app-native .hub-diary .train-diaryprogress .pg-charts svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Фокус новых зон */
+html.app-native .hub-diary .train-diaryprogress button:focus-visible,
+html.app-native .hub-diary .train-diaryprogress input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Мобайл 360: плитки трендов/1ПМ — auto-fit */
+@media (max-width: 380px) {
+  html.app-native .hub-diary .train-diaryprogress .pg-trends [style*='grid-template-columns: 1fr 1fr'],
+  html.app-native .hub-diary .train-diaryprogress .pg-e1rm [style*='grid-template-columns: 1fr 1fr'] {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary .train-diaryprogress .pg-measure button:active {
     transform: none !important;
   }
 }
