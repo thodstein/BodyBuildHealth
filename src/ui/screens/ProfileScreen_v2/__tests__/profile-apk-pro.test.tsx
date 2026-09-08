@@ -75,6 +75,41 @@ describe('Profile §83 — quick-jump и аккордеоны', () => {
   });
 });
 
+describe('Profile §85 — PVE-попап: хуки и тач-цели', () => {
+  it('числовой редактор: оверлей/лист/степперы/футер 44px', () => {
+    const { container } = render(<ProfileUserTab />);
+    const trig = Array.from(container.querySelectorAll('.profile-pve-btn'))
+      .find(b => (b.getAttribute('aria-label') || '').startsWith('Возраст')) as HTMLElement;
+    expect(trig).toBeTruthy();
+    fireEvent.click(trig);
+    const overlay = document.body.querySelector('.pf-pve-overlay') as HTMLElement;
+    expect(overlay).not.toBeNull();
+    expect(overlay.querySelector('.pf-pve-sheet')).not.toBeNull();
+    const close = overlay.querySelector('.pf-pve-close') as HTMLElement;
+    expect(close.style.minHeight).toBe('44px');
+    const steps = overlay.querySelectorAll('.pf-pve-step');
+    expect(steps.length).toBe(2);
+    steps.forEach(s => expect((s as HTMLElement).style.minHeight).toBe('44px'));
+    expect((overlay.querySelector('.pf-pve-save') as HTMLElement).style.minHeight).toBe('44px');
+    expect((overlay.querySelector('.pf-pve-cancel') as HTMLElement).style.minHeight).toBe('44px');
+    fireEvent.click(close);
+    expect(document.body.querySelector('.pf-pve-overlay')).toBeNull();
+  });
+
+  it('селект: опции с data-sel', () => {
+    const { container } = render(<ProfileUserTab />);
+    const trig = Array.from(container.querySelectorAll('.profile-pve-btn'))
+      .find(b => (b.getAttribute('aria-label') || '').startsWith('Пол')) as HTMLElement;
+    expect(trig).toBeTruthy();
+    fireEvent.click(trig);
+    const opts = document.body.querySelectorAll('.pf-pve-opt');
+    expect(opts.length).toBeGreaterThan(0);
+    expect(document.body.querySelector('.pf-pve-opt[data-sel="true"]')).not.toBeNull();
+    fireEvent.click(document.body.querySelector('.pf-pve-overlay') as HTMLElement);
+    expect(document.body.querySelector('.pf-pve-overlay')).toBeNull();
+  });
+});
+
 describe('Profile §83 — отчёты', () => {
   it('табы 44px и переключаются', () => {
     // initialView blocks: не монтируем ReportsScreen (IndexedDB-шум jsdom).

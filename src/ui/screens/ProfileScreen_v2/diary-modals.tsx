@@ -1110,6 +1110,7 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
   <button
     type="button"
     onClick={onClick}
+    className="dm-repeat"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -1123,10 +1124,9 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
         background: 'rgba(255,255,255,0.04)',
         color: colors.textMuted,
         marginBottom: 10,
+        minHeight: 40,
         transition: 'all 0.15s',
       }}
-    onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.borderHover; e.currentTarget.style.color = colors.text; }}
-    onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textMuted; }}
   >
     ↩ {label}
   </button>

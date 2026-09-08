@@ -8065,3 +8065,119 @@ html.app-native .pf-rep-tab:focus-visible {
     transform: none !important;
   }
 }
+
+/* 85. NATIVE PROFILE PRO-2 — попапы-редакторы и дневники.
+ * Только APK (html.app-native). TG/web — байт-в-байт.
+ * Покрывает: PVE bottom-sheet (хуки pf-pve-*), DiaryModalShell (dm-*),
+ * тесные сетки дневников на 360px, чип повтора. */
+
+/* PVE-лист: safe-area снизу, ручка и шапка уже в инлайне. */
+html.app-native .pf-pve-sheet {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+html.app-native .pf-pve-close:active {
+  transform: scale(0.9) !important;
+}
+html.app-native .pf-pve-opt:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .pf-pve-opt[data-sel='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.16) !important;
+}
+html.app-native .pf-pve-step:active {
+  transform: scale(0.9) !important;
+}
+html.app-native .pf-pve-save:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .pf-pve-cancel:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .pf-pve-clear:active {
+  transform: scale(0.9) !important;
+}
+
+/* DiaryModalShell: липкий низ с сейвом 52px, кнопки в ряд на всю ширину. */
+html.app-native .dm-card .dm-primary-btn {
+  min-height: 52px !important;
+  font-size: 14px !important;
+}
+html.app-native .dm-card .dm-ghost-btn {
+  min-height: 52px !important;
+}
+html.app-native .dm-card .dm-close-btn {
+  width: 44px !important;
+  height: 44px !important;
+}
+html.app-native .dm-card .dm-primary-btn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .dm-card .dm-repeat:active {
+  transform: scale(0.96) !important;
+}
+
+/* Тесные сетки дневников: 4 колонки схлопываются в 2 на узком. */
+html.app-native .dm-card [style*='repeat(4'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+/* Неделя сна (7 колонок): уже на 360, режем зазоры и паддинги. */
+html.app-native .sl-weekdays {
+  gap: 4px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Циркадные плитки АД: 2 в ряд на узком вместо 4. */
+html.app-native .diary-card [style*='repeat(4'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+/* Фокус попапов для клавиатуры. */
+html.app-native .pf-pve-opt:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-pve-save:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-pve-close:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .dm-card .dm-primary-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Узкий телефон 360px: лист почти на всю ширину, сейв тянется. */
+@media (max-width: 380px) {
+  html.app-native .pf-pve-sheet {
+    border-radius: 20px 20px 0 0 !important;
+  }
+  html.app-native .pf-pve-save {
+    flex: 1 !important;
+  }
+  html.app-native .dm-card .dm-primary-btn {
+    flex: 2 !important;
+  }
+  html.app-native .dm-card .dm-ghost-btn {
+    flex: 1 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-pve-opt:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-pve-save:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .dm-card .dm-primary-btn:active {
+    transform: none !important;
+  }
+}

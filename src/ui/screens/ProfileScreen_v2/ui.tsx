@@ -856,14 +856,6 @@ export const PopupValueEditor: React.FC<{
           minHeight: 58,
           transition: 'all 0.15s',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = `${withAlpha(c, '66')}`;
-          e.currentTarget.style.transform = 'translateY(-1px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = hasValue ? `${withAlpha(c, '44')}` : colors.border;
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}
       >
         <span style={{
           fontSize: 10, fontWeight: 600, color: colors.textMuted, letterSpacing: 0.3,
@@ -891,6 +883,7 @@ export const PopupValueEditor: React.FC<{
           role="dialog"
           aria-modal="true"
           aria-label={label}
+          className="pf-pve-overlay"
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -902,6 +895,7 @@ export const PopupValueEditor: React.FC<{
         >
           <div
             role="presentation"
+            className="pf-pve-sheet"
             style={{
               width: 'min(420px, 100vw)',
               maxHeight: '82vh',
@@ -940,11 +934,12 @@ export const PopupValueEditor: React.FC<{
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Закрыть"
+                className="pf-pve-close"
                 style={{
-                  width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                  width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: '50%', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
-                  color: colors.textMuted, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+                  color: colors.textMuted, fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >✕</button>
             </div>
@@ -962,12 +957,13 @@ export const PopupValueEditor: React.FC<{
                       onChange={e => setQuery(e.target.value)}
                       placeholder="Поиск…"
                       aria-label={`Поиск в ${label}`}
+                      className="pf-pve-search"
                       style={{
                         width: '100%', boxSizing: 'border-box',
-                        padding: '8px 30px 8px 28px', borderRadius: 10,
+                        padding: '8px 34px 8px 28px', borderRadius: 10,
                         border: `1px solid ${colors.border}`,
                         background: 'rgba(255,255,255,0.05)',
-                        color: colors.text, fontSize: 13, outline: 'none', minHeight: 36,
+                        color: colors.text, fontSize: 16, outline: 'none', minHeight: 44,
                       }}
                     />
                     {query && (
@@ -975,11 +971,12 @@ export const PopupValueEditor: React.FC<{
                         type="button"
                         onClick={() => setQuery('')}
                         aria-label="Очистить поиск"
+                        className="pf-pve-clear"
                         style={{
                           position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                          width: 20, height: 20, borderRadius: '50%',
+                          width: 28, height: 28, borderRadius: '50%',
                           background: 'rgba(255,255,255,0.08)', border: 'none',
-                          color: colors.textMuted, fontSize: 9, cursor: 'pointer',
+                          color: colors.textMuted, fontSize: 11, cursor: 'pointer',
                         }}
                       >✕</button>
                     )}
@@ -992,6 +989,8 @@ export const PopupValueEditor: React.FC<{
                       key={o.id}
                       type="button"
                       onClick={() => { onChange(o.id); setOpen(false); }}
+                      className="pf-pve-opt"
+                      data-sel={sel}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
                         padding: '10px 12px', borderRadius: 12, cursor: 'pointer', marginBottom: 6,
@@ -1049,8 +1048,9 @@ export const PopupValueEditor: React.FC<{
                     type="button"
                     onClick={() => stepBy(-1)}
                     aria-label="Уменьшить"
+                    className="pf-pve-step"
                     style={{
-                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
                       color: colors.text, fontSize: 18, cursor: 'pointer', transition: 'all 0.15s',
@@ -1068,8 +1068,9 @@ export const PopupValueEditor: React.FC<{
                     type="button"
                     onClick={() => stepBy(1)}
                     aria-label="Увеличить"
+                    className="pf-pve-step"
                     style={{
-                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
                       color: colors.text, fontSize: 18, cursor: 'pointer', transition: 'all 0.15s',
@@ -1121,18 +1122,20 @@ export const PopupValueEditor: React.FC<{
                   </span>
                   <button
                     onClick={() => setOpen(false)}
+                    className="pf-pve-cancel"
                     style={{
                       ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
-                      cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                      cursor: 'pointer', minHeight: 44, padding: '8px 16px',
                     }}
                   >Отмена</button>
                   <button
                     onClick={commit}
+                    className="pf-pve-save"
                     style={{
                       ...inputBase, background: `linear-gradient(135deg, ${c}, ${withAlpha(c, 'bb')})`,
                       border: `1px solid ${c}`,
                       color: '#000', cursor: 'pointer', fontWeight: 700,
-                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
+                      minHeight: 44, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
                     }}
                   >Сохранить</button>
                 </div>
@@ -1154,11 +1157,12 @@ export const PopupValueEditor: React.FC<{
                       type="button"
                       onClick={() => setLocal('')}
                       aria-label="Очистить"
+                      className="pf-pve-clear"
                       style={{
                         position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                        width: 22, height: 22, borderRadius: '50%',
+                        width: 30, height: 30, borderRadius: '50%',
                         background: 'rgba(255,255,255,0.08)', border: 'none',
-                        color: colors.textMuted, fontSize: 10, cursor: 'pointer',
+                        color: colors.textMuted, fontSize: 11, cursor: 'pointer',
                       }}
                     >✕</button>
                   )}
@@ -1169,18 +1173,20 @@ export const PopupValueEditor: React.FC<{
                   </span>
                   <button
                     onClick={() => setOpen(false)}
+                    className="pf-pve-cancel"
                     style={{
                       ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
-                      cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                      cursor: 'pointer', minHeight: 44, padding: '8px 16px',
                     }}
                   >Отмена</button>
                   <button
                     onClick={commit}
+                    className="pf-pve-save"
                     style={{
                       ...inputBase, background: `linear-gradient(135deg, ${c}, ${withAlpha(c, 'bb')})`,
                       border: `1px solid ${c}`,
                       color: '#000', cursor: 'pointer', fontWeight: 700,
-                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
+                      minHeight: 44, padding: '8px 16px', boxShadow: `0 2px 12px ${withAlpha(c, '3d')}`,
                     }}
                   >Сохранить</button>
                 </div>

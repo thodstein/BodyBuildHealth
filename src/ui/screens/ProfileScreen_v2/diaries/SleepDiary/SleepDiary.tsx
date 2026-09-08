@@ -1344,7 +1344,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         {weekdayHasData && (
           <section style={{ ...glassCard, marginBottom: 12 }}>
             <b style={{ display: 'block', marginBottom: 10 }}>🗓 По дням недели</b>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+            <div className="sl-weekdays" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
               {weekdayAvg.map((d) => (
                 <div
                   key={d.dayName}
