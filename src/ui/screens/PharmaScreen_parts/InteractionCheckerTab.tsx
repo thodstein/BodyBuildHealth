@@ -244,13 +244,13 @@ export const InteractionCheckerTab: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
+      <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
         {subTabs.map((t) => (
           <button key={t.id} onClick={() => setInteractSub(t.id)} style={{
-            padding:'7px 13px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap',
+            minHeight:44, padding:'10px 14px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0, transition:'all 0.18s ease',
             background: interactSub === t.id ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(255,255,255,0.06)',
-            color: interactSub === t.id ? '#fff' : '#fff',
+            color: '#fff',
             border:`1px solid ${interactSub === t.id ? 'rgba(239,68,68,0.32)' : 'rgba(255,255,255,0.07)'}`,
             boxShadow: interactSub===t.id ? '0 4px 12px rgba(239,68,68,0.18)' : 'none',
           }}>{t.label}</button>
@@ -399,10 +399,10 @@ export const InteractionCheckerTab: React.FC = () => {
           )}
 
           <div style={card}>
-            <div style={{ display:'flex', gap:6, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
+            <div style={{ display:'flex', gap:8, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
               {(['conflicts','instructions'] as const).map(t => (
                 <button key={t} onClick={() => setInteractDetail(t)} style={{
-                  padding:'6px 12px', borderRadius:20, fontSize:11, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap',
+                  minHeight:44, padding:'10px 14px', borderRadius:20, fontSize:12, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap',
                   background: interactDetail === t ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
                   color: interactDetail === t ? '#f87171' : '#fff',
                   border:`1px solid ${interactDetail === t ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)'}`,

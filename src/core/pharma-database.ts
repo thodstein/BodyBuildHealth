@@ -33,6 +33,16 @@ export function getPharmaDetail(id: string): PharmaSubstance | null {
   if (!raw) return null;
   const defaults = CLASS_DEFAULTS[raw.class];
   if (!defaults) return raw;
+  const rawRange: any = raw.dosageRange;
+  const defRange: any = defaults.dosageRange;
+  const mergedRange = rawRange || defRange;
+  // Нормализуем частоту к строке "Nx/wk" для консистентности (ранее number 2 → heterogeneous)
+  let normalizedRange: any = mergedRange;
+  if (mergedRange && typeof mergedRange.frequency !== 'undefined') {
+    const f = mergedRange.frequency;
+    const freqStr = typeof f === 'number' ? `${f}x/wk` : String(f);
+    normalizedRange = { ...mergedRange, frequency: freqStr };
+  }
   return {
     ...defaults,
     ...raw,
@@ -40,7 +50,7 @@ export function getPharmaDetail(id: string): PharmaSubstance | null {
     sideEffects: (Array.isArray(raw.sideEffects) && raw.sideEffects.length > 0) ? raw.sideEffects : defaults.sideEffects,
     contraindications: (Array.isArray(raw.contraindications) && raw.contraindications.length > 0) ? raw.contraindications : defaults.contraindications,
     description: raw.description || defaults.description,
-    dosageRange: raw.dosageRange || defaults.dosageRange,
+    dosageRange: normalizedRange,
   };
 }
 
