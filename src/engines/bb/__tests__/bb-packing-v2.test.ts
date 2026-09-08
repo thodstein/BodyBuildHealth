@@ -166,3 +166,37 @@ describe('Packing-v2 в плане (пилот back)', () => {
     }
   });
 });
+
+describe('Packing-v2 матрица по сплитам', () => {
+  const splits = ['ppl_6', 'upper_lower_4', 'arnold_6', 'push_pull_4'] as const;
+  const profiles = [
+    { level: 'intermediate', trainingYears: 3 },
+    { level: 'enhanced', trainingYears: 6 },
+  ] as const;
+
+  it.each(splits)('%s: объём ±2, слотов не больше, валиден', (patternId) => {
+    for (const p of profiles) {
+      const input: any = { patternId, level: p.level, trainingYears: p.trainingYears, goal: 'mass', weeks: 1, workMax: WM, equipment: EQ, volumeGoal: 'mav' };
+      const off = buildBBPlan({ ...input });
+      const on = buildBBPlan({ ...input, packingV2: true });
+      expect(Math.abs(backSets(on) - backSets(off)), `${patternId}/${p.level}: дрейф объёма`).toBeLessThanOrEqual(2);
+      expect(backSlots(on), `${patternId}/${p.level}: слоты`).toBeLessThanOrEqual(backSlots(off));
+      // Валидность: packing не добавляет ошибок (предсуществующие капы
+      // счётчика enhanced, напр. upper_lower 18/15 > 14, есть и без флага).
+      const vOn = validateBBPlan(on, { level: p.level });
+      const vOff = validateBBPlan(off, { level: p.level });
+      const nOn = vOn.issues.filter(i => i.level === 'error').length;
+      const nOff = vOff.issues.filter(i => i.level === 'error').length;
+      expect(nOn, `${patternId}/${p.level}: ошибки ${nOn} > ${nOff}`).toBeLessThanOrEqual(nOff);
+    }
+  });
+
+  it('packing включается хотя бы в одной конфигурации матрицы', () => {
+    let engaged = 0;
+    for (const patternId of splits) {
+      const on = buildBBPlan({ patternId, level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, equipment: EQ, volumeGoal: 'mav', packingV2: true } as any);
+      if (isPackingActive(on)) engaged++;
+    }
+    expect(engaged).toBeGreaterThan(0);
+  });
+});
