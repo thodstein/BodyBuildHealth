@@ -221,6 +221,7 @@ export const DosageCalculatorTab: React.FC = () => {
 
   const weeklyTotal = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
+  const doseUnitLabel = (PHARMA_DB[drug]?.dosageRange?.unit || 'mg/wk').split('/')[0].trim() || 'мг';
 
   const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','dht_inject','dht_derivative','gh','glp1','clenbuterol','thyroid','pct_gonadotropin']);
   const { pharmaFiltered, grouped, singles } = useMemo(() => {
@@ -350,9 +351,9 @@ export const DosageCalculatorTab: React.FC = () => {
               </>
             ) : (
               <div style={{ gridColumn:'1 / -1' }}>
-                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Недельная доза (мг/нед)</label>
+                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Недельная доза ({doseUnitLabel}/нед)</label>
                 <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(parseFloat(e.target.value) || 0)}
-                  style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+                  style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
               </div>
             )}
             <div>
@@ -394,12 +395,12 @@ export const DosageCalculatorTab: React.FC = () => {
                 <div style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#a78bfa' }}>{weeklyTotal.toFixed(0)}</div>
-                  <div style={{ fontSize:10, color:'#fff' }}>мг/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{doseUnitLabel}/нед</div>
                 </div>
                 <div style={{ background:'linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.04))', border:'1px solid rgba(59,130,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#60a5fa' }}>{perInjectionMg.toFixed(1)}</div>
-                  <div style={{ fontSize:10, color:'#fff' }}>мг × {injectionsPerWeek}/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{doseUnitLabel} × {injectionsPerWeek}/нед</div>
                 </div>
               </div>
               <div style={{ background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.14)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
