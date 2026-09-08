@@ -87,7 +87,7 @@ export const LabsOverview: React.FC<{
       {/* KPI — 4 карточки: mobile-first auto-fit, на 360px 2 колонки */}
       <div style={{ ...LABS_CARD, padding:14 }}>
         <LabsSectionHeader icon={<NativeIcon name="file" size={16} />} title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
-        <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
+        <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
           <LabsKpiCard icon={<NativeIcon name="flask" size={13} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
           <LabsKpiCard icon={<NativeIcon name="check" size={13} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
           <LabsKpiCard icon={<NativeIcon name="arrowUp" size={13} />} label="Выше" value={highCount} color="#ef4444" sub="нормы" />
@@ -161,7 +161,12 @@ export const LabsOverview: React.FC<{
           </div>
         </div>
       ) : (
-          <LabsEmpty icon={<NativeIcon name="flask" size={26} />} title="Нет маркеров в этой фазе" desc="Введите анализы во вкладке «Текущие» или импортируйте PDF/фото. Данные группируются по системам автоматически." />
+          <LabsEmpty
+            icon={<NativeIcon name="flask" size={32} />}
+            title="Нет маркеров в этой фазе"
+            desc="Введите анализы во вкладке «Текущие» или импортируйте PDF/фото. Данные группируются по системам автоматически."
+            action={<span style={{ fontSize:12, fontWeight:800, padding:'10px 18px', borderRadius:999, background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', display:'inline-flex', alignItems:'center', gap:6 }}>＋ Перейти к вводу</span>}
+          />
       )}
     </div>
   );

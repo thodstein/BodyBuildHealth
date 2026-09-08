@@ -301,7 +301,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
   const labs: LabPoint[] = linked.labs || [];
-  const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase || l.phase === selectedPhase)), [labs, selectedPhase]);
+  // P0 fix: legacy без phase — только baseline, иначе completion врёт во всех фазах
+  const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase ? selectedPhase === 'baseline' : l.phase === selectedPhase)), [labs, selectedPhase]);
   // P0 fix: архив — только archived, а не «все чужие фазы» (иначе архив всегда полон, а переключение фазы теряет данные)
   const archiveLabs = useMemo(() => labs.filter(l => !!l.archived), [labs]);
   const hasLabs = currentLabs && currentLabs.length > 0;
