@@ -575,16 +575,25 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     } catch (e) { setAddError('Ошибка сохранения: ' + (e instanceof Error ? e.message : String(e))); console.error(e); }
   }, [inputCode, inputValue, inputUnit, inputDate, selectedPhase]);
 
+  // P0 fix: таймаут 30с + лимит 15МБ, иначе виснет на больших PDF
   const handleFileUpload = useCallback(async (file: File) => {
     const requestId = ++ocrRequestRef.current;
+    if (file.size > 15 * 1024 * 1024) {
+      setOcrLoading(false);
+      setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл слишком большой (>15 МБ)'] });
+      return;
+    }
     setOcrLoading(true);
     setOcrResult(null);
     setSelectedLabs(new Set());
     try {
-      const result = await processUploadedFile(file);
+      const result: any = await Promise.race([
+        processUploadedFile(file),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('Таймаут обработки файла (30с)')), 30000)),
+      ]);
       if (requestId !== ocrRequestRef.current) return;
       setOcrResult(result);
-      if (result.labs.length > 0) setSelectedLabs(new Set(result.labs.map(l => l.code)));
+      if (result.labs.length > 0) setSelectedLabs(new Set(result.labs.map((l: any) => l.code)));
     } catch (e: any) {
       if (requestId !== ocrRequestRef.current) return;
       setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['' + (e?.message || String(e))] });

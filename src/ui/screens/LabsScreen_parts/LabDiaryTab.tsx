@@ -174,8 +174,10 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
               🔬 Чаще всего измеряемые
             </div>
             {topMarkers.length === 0 ? (
-              <div style={{ fontSize:12, color:'#fff', padding:12, textAlign:'center', lineHeight:1.5 }}>
-                Нет данных. Импортируйте результаты анализов.
+              <div style={{ textAlign:'center', padding:24 }}>
+                <div style={{ fontSize:32, marginBottom:8 }}>🔬</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>Нет данных</div>
+                <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>Импортируйте результаты анализов, чтобы увидеть статистику</div>
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -330,17 +332,17 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                 </div>
               )}
             </div>
-          ) : selectedMarker ? (
-            <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 10, color: '#fff' }}>
-                Нет данных для графика за выбранный период
-              </div>
+            ) : selectedMarker ? (
+            <div style={{ ...GLASS, textAlign:'center', padding:24 }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>📈</div>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>Нет данных за период</div>
+              <div style={{ fontSize:12, color:'#fff' }}>Смените период 7/30/90 или выберите другой маркер</div>
             </div>
           ) : (
-            <div style={{ ...GLASS, textAlign: 'center', padding: 20 }}>
-              <div style={{ fontSize: 10, color: '#fff' }}>
-                Выберите маркер для просмотра динамики
-              </div>
+            <div style={{ ...GLASS, textAlign:'center', padding:24 }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>🔬</div>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>Выберите маркер</div>
+              <div style={{ fontSize:12, color:'#fff' }}>Нажмите на маркер выше, чтобы увидеть график</div>
             </div>
           )}
         </div>
