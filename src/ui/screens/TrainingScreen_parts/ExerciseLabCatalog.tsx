@@ -118,7 +118,7 @@ const ExerciseLabCatalog: React.FC<{
           const equipIcon = EQUIP_ICON[ex.equipment] || '📦';
           const bio = getExerciseBio(ex.id);
           return (
-            <div key={ex.id} onClick={() => setSelectedId(isSelected ? null : ex.id)} style={{
+            <div key={ex.id} className="lib-excard" onClick={() => setSelectedId(isSelected ? null : ex.id)} style={{
               padding: '8px 10px', borderRadius: 12, cursor: 'pointer',
               background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'rgba(255,255,255,0.04)',
               border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)',
@@ -145,7 +145,7 @@ const ExerciseLabCatalog: React.FC<{
 
               {/* ПОЛНАЯ КАРТОЧКА */}
               {isSelected && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="lib-exdetail" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
 
                   {/* Бейджи */}
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -213,7 +213,7 @@ const ExerciseLabCatalog: React.FC<{
                       </div>
 
                       {/* Нагрузка на суставы — цветная шкала */}
-                      <div style={{ marginBottom: 4, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                      <div className="lib-joints" style={{ marginBottom: 4, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                         {bio.spineLoad && (
                           <div style={{ background: LOAD_COLOR[bio.spineLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.spineLoad]}30` }}>
                             <div style={{ fontSize: 11, color: '#fff' }}>🦴 Позвоночник</div>

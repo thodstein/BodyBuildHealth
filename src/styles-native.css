@@ -7202,6 +7202,24 @@ html.app-native .train-diaryhistory .th-main:focus-visible {
   }
 }
 
+/* ─── 85. TRAINING DIARY PRO-10 — сквозная навигация ───
+ * Лента на 10 разделов: snap-прокрутка, активная кнопка в фокусе.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+html.app-native .hub-diary .td-subnav {
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .hub-diary .td-subnav-btn {
+  scroll-snap-align: start !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary .td-subnav {
+    scroll-snap-type: none !important;
+  }
+}
+
 /* ─── 80. TRAINING DIARY PRO-5 — ритуалы: психика/мобильность/чек-ин/MMC ───
  * Чек-ины/шкалы/настроение под палец (было 36px и мельче), поля 48px/16px,
  * карточки-стекло с акцентной кромкой по смыслу, добор читаемости.
@@ -7863,6 +7881,125 @@ html.app-native .lib-picker .lib-list button:focus-visible {
   }
 }
 
+/* ── Детали программы: статы-плитки с лайм-кромкой, мета-лента ── */
+html.app-native .train-library .lib-stats > div {
+  border-radius: 12px !important;
+  padding: 10px 8px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-weekmeta {
+  border-radius: 18px !important;
+  padding: 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-daydetail {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.2) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-exhead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+  background: rgba(9, 18, 34, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 8px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+}
+
+html.app-native .train-library .lib-exrow {
+  border-radius: 10px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-exrow:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── ExLab: карточки-стекло, детали с блюром, суставы auto-fit ── */
+html.app-native .train-library .lib-excard {
+  border-radius: 16px !important;
+  transition: transform 0.15s, border-color 0.15s !important;
+}
+
+html.app-native .train-library .lib-excard:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .train-library .lib-exdetail {
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  padding: 10px !important;
+}
+
+html.app-native .train-library .lib-joints {
+  gap: 8px !important;
+}
+
+/* ── MyTraining progress: сводка/топ/недели — стекло с цифрами ── */
+html.app-native .train-library .lib-pstats,
+html.app-native .train-library .lib-ptop,
+html.app-native .train-library .lib-pweeks {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-pstats > div:nth-child(2) > div,
+html.app-native .train-library .lib-ptop > div,
+html.app-native .train-library .lib-pweeks > div {
+  border-radius: 12px !important;
+}
+
+/* ── Focus новых деталей ── */
+html.app-native .train-library .lib-excard:focus-visible,
+html.app-native .train-library .lib-daydetail button:focus-visible,
+html.app-native .train-library .lib-weekmeta button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Мобайл 380: суставы 3→1, таблица упражнений → скролл ── */
+@media (max-width: 380px) {
+  html.app-native .train-library .lib-stats {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-library .lib-joints {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-library .lib-exhead,
+  html.app-native .train-library .lib-exrow {
+    grid-template-columns: minmax(0, 1fr) 60px 44px 44px 50px !important;
+    font-size: 10px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-excard:active,
+  html.app-native .train-library .lib-exrow:active {
+    transform: none !important;
+  }
+}
+
 /* 83. NATIVE PROFILE PRO-FULL — топ-подача блока Профиль.
  * Только APK (html.app-native). TG/web — байт-в-байт.
  * Покрывает: hero, шапку вкладок, поднавигацию разделов, quick-jump,
@@ -8178,6 +8315,136 @@ html.app-native .dm-card .dm-primary-btn:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   html.app-native .dm-card .dm-primary-btn:active {
+    transform: none !important;
+  }
+}
+
+/* 86. NATIVE PROFILE PRO-3 — тело дневников и шапка страниц.
+ * Только APK (html.app-native). TG/web — байт-в-байт.
+ * Покрывает: рутинг-баннер, фильтры, поиск, стрик-плитки, diary-card,
+ * шапку diary-header, быстрый ввод веса. */
+
+/* Рутинг: кнопки 48px с press. */
+html.app-native .pf-routine-go:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .pf-routine-skip:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .pf-routine-x:active {
+  transform: scale(0.9) !important;
+}
+
+/* Фильтры дневников: лента со snap, press. */
+html.app-native .pf-djump {
+  scrollbar-width: none !important;
+}
+html.app-native .pf-dfilter:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-dfilter {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Поиск дневника: фокус-кольцо. */
+html.app-native .pf-dsearch:focus {
+  border-color: rgba(var(--accent-rgb), 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12) !important;
+}
+html.app-native .pf-dclear:active {
+  transform: scale(0.9) !important;
+}
+
+/* Стрик-плитки: blanket-подъём 8/9/10 до читаемых. */
+html.app-native .pf-streaks [style*='font-size: 8px'] {
+  font-size: 10px !important;
+}
+html.app-native .pf-streaks [style*='font-size: 9px'] {
+  font-size: 11px !important;
+}
+html.app-native .pf-streaks [style*='font-size: 10px'] {
+  font-size: 12px !important;
+}
+html.app-native .pf-streaks {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Карточки дневников: press на кнопках, цифры табличные. */
+html.app-native .diary-card-add:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .diary-card-open:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .diary-card {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Шапка страниц дневников: кнопки 44px, пункты меню 44px. */
+html.app-native .diary-header-btn {
+  min-height: 44px !important;
+}
+html.app-native .diary-header-btn:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .diary-header [role='menuitem'] {
+  min-height: 44px !important;
+}
+
+/* Быстрый ввод веса: press. */
+html.app-native .wt-quick-add:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .wt-tod:active {
+  transform: scale(0.95) !important;
+}
+
+/* Фокус новых зон. */
+html.app-native .pf-routine-go:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-dfilter:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .diary-header-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .diary-card-add:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Узкий телефон 360px: фильтры — скролл-лента, шапка дышит. */
+@media (max-width: 380px) {
+  html.app-native .pf-djump {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  html.app-native .pf-dfilter {
+    flex-shrink: 0 !important;
+  }
+  html.app-native .diary-header-btn {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-routine-go:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .diary-card-add:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .diary-header-btn:active {
     transform: none !important;
   }
 }

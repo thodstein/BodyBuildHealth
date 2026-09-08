@@ -291,7 +291,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
             </div>
           ) : (
             <>
-              <div className="card" style={{padding:10,marginBottom:6}}>
+              <div className="card lib-pstats" style={{padding:10,marginBottom:6}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#fff',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                   <div style={{padding:6,borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
@@ -305,7 +305,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                 </div>
               </div>
 
-              <div className="card" style={{padding:10,marginBottom:6}}>
+              <div className="card lib-ptop" style={{padding:10,marginBottom:6}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#fff',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
                 {progressData.topExercises.length === 0 ? (
                   <div style={{fontSize:11,color:'#fff'}}>Недостаточно данных</div>
@@ -353,7 +353,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                 )}
               </div>
 
-              <div className="card" style={{padding:10,marginBottom:6}}>
+              <div className="card lib-pweeks" style={{padding:10,marginBottom:6}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#fff',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
                 {progressData.weeks.length === 0 ? (
                   <div style={{fontSize:11,color:'#fff'}}>Нет данных</div>

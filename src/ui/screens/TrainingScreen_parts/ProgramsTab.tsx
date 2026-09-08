@@ -45,6 +45,7 @@ export const ProgramsTab: React.FC<{
   const [levelFilter, setLevelFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
   const [expandedDay, setExpandedDay] = React.useState<number | null>(null);
+  React.useEffect(() => { setDetailWeek(1); setExpandedDay(null); }, [selectedId]);
 
   const originalPrograms = useOriginalPrograms();
   const allPrograms = React.useMemo<FullProgram[]>(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
@@ -193,7 +194,7 @@ export const ProgramsTab: React.FC<{
         }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#fff' }}>{expandedSelected.name}</h3>
           <p style={{ fontSize: 11, color: '#fff', margin: '0 0 8px' }}>{expandedSelected.description}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 11, marginBottom: 8 }}>
+          <div className="lib-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 11, marginBottom: 8 }}>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
               <div style={{ color: '#fff', fontSize: 11 }}>Уровень</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[expandedSelected.level] || expandedSelected.level}</div>
@@ -306,7 +307,7 @@ export const ProgramsTab: React.FC<{
             const dayMap: Record<number, typeof wk.days[0]> = {};
             wk.days.forEach(d => { dayMap[d.day] = d; });
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="lib-weekmeta" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 11, color: '#fff', marginBottom: 2 }}>
                   Фаза: <b>{PHASE_LABELS[wk.phase] || wk.phase}</b> | Объём: ×{wk.volumeMultiplier} | Интенсивность: ×{wk.intensityMultiplier}
                   {wk.deload ? ' | 🟢 Разгрузка' : ''}
@@ -370,7 +371,7 @@ export const ProgramsTab: React.FC<{
                 {expandedDay !== null && dayMap[expandedDay] && (() => {
                   const day = dayMap[expandedDay];
                   return (
-                    <div style={{
+                    <div className="lib-daydetail" style={{
                       padding: 10, marginTop: 4, borderRadius: 10,
                       background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)',
                     }}>
@@ -387,7 +388,7 @@ export const ProgramsTab: React.FC<{
                       <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
                         {day.focus} · Разминка: {day.warmup} · Заминка: {day.cooldown}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div className="lib-exhead" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span>Упражнение</span>
                         <span style={{ textAlign: 'center' }}>Подходы</span>
                         <span style={{ textAlign: 'center' }}>RPE</span>
@@ -395,7 +396,7 @@ export const ProgramsTab: React.FC<{
                         <span style={{ textAlign: 'center' }}>Отдых</span>
                       </div>
                       {day.exercises.map((ex, ei) => (
-                        <div key={ei} style={{
+                        <div key={ei} className="lib-exrow" style={{
                           display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, alignItems: 'start', padding: '6px 8px',
                           borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
                           fontSize: 11,
