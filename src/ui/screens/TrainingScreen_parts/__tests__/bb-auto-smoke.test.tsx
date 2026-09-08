@@ -51,6 +51,8 @@ describe('BB-auto UI smoke', () => {
   it('renderParams содержит опцию A/B-ротации паттернов', () => {
     const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
     expect(html).toContain('A/B ротация паттернов');
+    // Описание честное: generic + adapt, faithful дословно (оба списка Подбора).
+    expect(html).toContain('generic + adapt; faithful дословно');
   });
 
   it('renderParams содержит выбор проф-методик: DUP, суперсеты, схема объёма, негативы', () => {

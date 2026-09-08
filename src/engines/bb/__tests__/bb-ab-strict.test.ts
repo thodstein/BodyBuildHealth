@@ -207,4 +207,15 @@ describe('A/B в cycle/program adapt-путях', () => {
       expect(((s as any).abAvoidPatterns || []).length).toBe(0);
     }
   });
+
+  it('inputSnapshot несёт флаг во всех путях (отчёт = реальные настройки)', () => {
+    const cOn = convertCycleToBBPlan({ cycle: AB_CYCLE, workMax: WM, level: 'intermediate', mode: 'adapt', abPatternRotation: true } as any);
+    expect((cOn as any).inputSnapshot.abPatternRotation).toBe(true);
+    const pOn = programToBBPlan(abProgram(), { workMax: WM, level: 'intermediate', mode: 'adapt', abPatternRotation: true } as any);
+    expect((pOn as any).inputSnapshot.abPatternRotation).toBe(true);
+    const cOff = convertCycleToBBPlan({ cycle: AB_CYCLE, workMax: WM, level: 'intermediate', mode: 'adapt' } as any);
+    expect((cOff as any).inputSnapshot.abPatternRotation).toBeUndefined();
+    const pOff = programToBBPlan(abProgram(), { workMax: WM, level: 'intermediate', mode: 'adapt' } as any);
+    expect((pOff as any).inputSnapshot.abPatternRotation).toBeUndefined();
+  });
 });

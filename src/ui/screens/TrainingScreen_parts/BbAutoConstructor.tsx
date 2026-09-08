@@ -2099,6 +2099,7 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity,
         fewerCompound,
         rotationMode,
+        abPatternRotation: abRotation,
         intensityLevel,
         avoidAxialLoad: avoidAxialLoadUi || (prof as any).avoidAxialLoad,
         equipment: bbEquipment,
@@ -3105,7 +3106,7 @@ export const BbAutoConstructor: React.FC = () => {
                       { icon: '🚫', title: 'Исключить осевую нагрузку', desc: 'Убрать приседы, тяги со штангой', on: avoidAxialLoadUi, set: setAvoidAxialLoadUi, accent: '#ef4444', enabled: true },
                       { icon: '🏗️', title: 'Меньше многосуставных', desc: 'Больше тренажёров и изоляций', on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true },
                       { icon: '🏋️', title: 'Становая / жим стоя', desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя' : 'Доступно в «Сила + Масса»', on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass' },
-                      { icon: '🔀', title: 'A/B ротация паттернов', desc: 'Одинаковые дни недели — разные движения (generic)', on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true },
+                      { icon: '🔀', title: 'A/B ротация паттернов', desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)', on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true },
                     ].map(t => {
                       const active = t.enabled && t.on;
                       return (
@@ -3407,7 +3408,7 @@ export const BbAutoConstructor: React.FC = () => {
             },
             {
               icon: '🔀', title: 'A/B ротация паттернов',
-              desc: 'Одинаковые дни недели — разные движения (generic)',
+              desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)',
               on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true,
             },
           ].map(t => {
