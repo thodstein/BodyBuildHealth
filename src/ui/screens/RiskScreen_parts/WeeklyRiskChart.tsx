@@ -142,7 +142,10 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       </div>
       <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:2 }}>
         {data.slice(0, Math.min(7, data.length)).map((d, i) => {
-          const idx = Math.round((data.length - 1) * i / 6);
+          // NOTE: короткий курс (<7 нед): точка на каждую неделю. Раньше формула
+          // round((len-1)*i/6) давала дубли (при 3 неделях — [0,0,1]) и последняя
+          // неделя была недостижима через точки.
+          const idx = data.length <= 7 ? i : Math.round((data.length - 1) * i / 6);
           return (
             <span key={i} onClick={() => { onWeekSelect(idx); setHoverWeek(null); }} style={{
               width:6, height:6, borderRadius:'50%', cursor:'pointer',

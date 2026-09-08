@@ -3,8 +3,8 @@
  * мёртвым (обе ветки рисовали одни точки). После фикса «Средний» показывает
  * нарастающее среднее: недели [10, 30, 60] → на нед.3 среднее 33%.
  */
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, fireEvent, cleanup } from '@testing-library/react';
 import { WeeklyRiskChart } from '../WeeklyRiskChart';
 
 afterEach(() => {
@@ -54,5 +54,24 @@ describe('WeeklyRiskChart mode', () => {
     );
     expect(container.textContent).toContain('Net: 33%');
     expect(container.textContent).toContain('среднее');
+  });
+
+  it('3. точки короткого курса (3 нед) ведут на 0/1/2 без дублей', () => {
+    const fn = vi.fn();
+    const { container } = render(
+      <WeeklyRiskChart
+        dynamics={DYNAMICS}
+        selectedWeek={0}
+        onWeekSelect={fn}
+        mode="week"
+        onModeChange={() => {}}
+      />,
+    );
+    const dots = Array.from(container.querySelectorAll('span')).filter(
+      (s) => (s as HTMLElement).style.borderRadius === '50%',
+    );
+    expect(dots.length).toBe(3);
+    fireEvent.click(dots[2] as HTMLElement);
+    expect(fn).toHaveBeenCalledWith(2);
   });
 });
