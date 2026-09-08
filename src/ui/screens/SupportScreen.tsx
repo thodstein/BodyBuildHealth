@@ -20,7 +20,6 @@ import { isCatalogJunk } from '../../data/support-catalog-extras';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
 import { SUBSTANCE_ANALOGS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
-import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getStackSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-database';
 import {
   PEPTIDE_DB, PEPTIDE_LIST,
@@ -62,7 +61,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 // @ts-ignore
 (window as any).__CANONICAL_MAP__ = CANONICAL_ID_MAP;
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports' | 'mixcalc';
 type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'diary' | 'bioavailability';
@@ -133,8 +132,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       if (!raw) return;
       const nav = JSON.parse(raw);
       if (!nav || typeof nav !== 'object') return;
-      if (typeof nav.section === 'string') setSection(nav.section);
-      if (typeof nav.tab === 'string') setTab(nav.tab);
+      // Санитизация: удалённые разделы (напр. 'hormonal'/'fertility-pct')
+      // из старого стора ведут в пустоту — откатываем на home.
+      const okSection = ['home', 'generator', 'protocols', 'info'].includes(nav.section);
+      const okTab = ['main', 'catalog', 'synergies', 'calculator', 'interactions', 'stacks', 'peptides'].includes(nav.tab);
+      if (!okSection || !okTab) return;
+      setSection(nav.section);
+      setTab(nav.tab);
       if (typeof nav.supportView === 'string') setSupportView(nav.supportView);
       if (typeof nav.calcView === 'string') setCalcView(nav.calcView);
       if (typeof nav.infoView === 'string') setInfoView(nav.infoView);
@@ -1160,6 +1164,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   const catalogSubstances = useMemo(() => {
     const allSubsMap = new Map<string, SupportSubstance>();
     for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
+    const seenIds = new Set<string>();
     return Object.values(SUPPORT_CATALOG_DATA)
       .filter(entry => {
         const eid = entry.id || '';
@@ -1168,6 +1173,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         if (cats.includes('marker')) return false;
         if (eid.endsWith('_drugs')) return false;
         if (entry.dosage && entry.dosage.mg === 0 && cats.includes('hormonal')) return false;
+        return true;
+      })
+      // БД содержит twin-записи с тем же id (NAC/nac, zinc/zinc_sup, ...):
+      // без дедупа — дубли строк, ключей React и счётчиков. Первый выигрывает
+      // (стабильно); слияние близнецов — задача владельца БД, данные не трогаем.
+      .filter(entry => {
+        const id = entry.id || '';
+        if (seenIds.has(id)) return false;
+        seenIds.add(id);
         return true;
       })
       .map(entry => {
@@ -3259,17 +3273,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
 
-      {/* ===== HORMONAL (Гормоны: ПКТ/фертильность/ГЗТ) ===== */}
-      {tab === 'fertility-pct' && (
-        <div data-sup="hormones">
-        <div data-sup="content">
-        <FertilityPCTScreen />
-        </div>
-        </div>
-      )}
-
       {/* ===== NON-MAIN CONTENT ===== */}
-      {tab !== 'main' && tab !== 'fertility-pct' && (
+      {tab !== 'main' && (
         <div data-sup="content" style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG ===== */}
@@ -3556,26 +3561,24 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       />
       )}
 
-      {/* ===== BOTTOM TAB BAR — всегда видимый app-таббар 5 разделов (hero под ним, размеры hero не меняем) ===== */}
+      {/* ===== BOTTOM TAB BAR — всегда видимый app-таббар 4 разделов (hero под ним, размеры hero не меняем) ===== */}
       {/* Стоит НАД глобальной навигацией приложения (не перекрывает её): bottom = высота глобального таба + safe-area */}
+      {/* Каждый таб выставляет ПОЛНОЕ состояние раздела — иначе экраны stack'аются (было: Инфо вело в пустоту, Протоколы не сбрасывали tab) */}
       <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
         {[
           { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
           { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
           { id:'info', label:'Инфо', icon:'📚', accent:'#a78bfa' },
-          { id:'hormonal', label:'Гормоны', icon:'⚕️', accent:'#f472b6' },
           { id:'protocols', label:'Протоколы', icon:'📋', accent:'#f59e0b' },
         ].map(item => {
           const active = section === item.id;
           return (
           <button key={item.id} aria-label={item.label} aria-pressed={active} data-active={active} onClick={() => {
-            setSection(item.id as any);
             setCalcView('main');
-            if (item.id === 'home') { setTab('main'); setSupportView('main'); }
-            if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
-            if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
-            if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
-            if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
+            if (item.id === 'home') { setSection('home'); setTab('main'); setSupportView('main'); }
+            if (item.id === 'generator') { setSection('generator'); setTab('calculator'); setSupportView('calc'); setGenTab('calculator'); }
+            if (item.id === 'info') { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
+            if (item.id === 'protocols') { setSection('protocols'); setTab('main'); setSupportView('main'); setProtocolTab(''); setProtocolView('menu'); }
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
             padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',

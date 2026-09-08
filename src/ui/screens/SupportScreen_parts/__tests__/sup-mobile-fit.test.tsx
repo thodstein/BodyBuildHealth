@@ -10,7 +10,7 @@
  * jsdom не считает layout: инлайн-стили сканируем в DOM,
  * табличные правила — строковыми ассертами по CSS-файлам.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -278,10 +278,10 @@ describe('SUP mobile fit (360px)', () => {
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
   });
 
-  it('экраны: hero, гормоны, меню протоколов — без фиксированных ширин', () => {
+  it('экраны: hero, таб каталога, меню протоколов — без фиксированных ширин', () => {
     const cases: Array<[string, React.ReactElement]> = [
       ['hero', <SupportScreen />],
-      ['hormones', <SupportScreen initialTab="fertility-pct" />],
+      ['catalog-tab', <SupportScreen initialTab="catalog" />],
       [
         'protocols-menu',
         <SupportProtocols s={{ protocolTab: '', protocolView: 'menu', setProtocolTab: noop, setProtocolView: noop }} />,
@@ -376,6 +376,17 @@ describe('SUP mobile fit (360px)', () => {
     const native = readNativeCss();
     for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp']) {
       expect(native, hook).toContain(hook);
+    }
+  });
+
+  it('легаси-каталог: twin-записи БД не дают дублей строк и ключей', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(<SupportScreen initialTab="catalog" />);
+      const keyWarns = err.mock.calls.filter((a) => String(a[0]).includes('same key'));
+      expect(keyWarns).toEqual([]);
+    } finally {
+      err.mockRestore();
     }
   });
 

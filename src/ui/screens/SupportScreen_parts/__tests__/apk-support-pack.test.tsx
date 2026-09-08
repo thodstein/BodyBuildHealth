@@ -123,7 +123,6 @@ describe('APK support pack', () => {
       "[data-sup='diary']",
       "[data-sup='research']",
       "[data-sup='modal']",
-      "[data-sup='hormones']",
       '.sup-manualpick',
       '.sup-modals',
       '.native-fab-wrap',
@@ -188,13 +187,42 @@ describe('APK support pack', () => {
     expect(root?.classList.contains('sup-apk'), 'apk class in native').toBe(true);
   });
 
-  it('Гормоны: таб fertility-pct рендерит раздел, а не пустой экран', () => {
-    const { container } = render(<SupportScreen initialTab="fertility-pct" />);
-    expect(container.querySelector("[data-sup='hormones']"), 'hormones hook').not.toBeNull();
+  it('Удалённый раздел не воскресает: старый стор hormonal ведёт на home', () => {
+    localStorage.setItem(
+      'he_sup_nav_v1',
+      JSON.stringify({ section: 'hormonal', tab: 'fertility-pct' }),
+    );
+    const { container } = render(<SupportScreen />);
+    expect(container.querySelector('.support-hero'), 'fallback home').not.toBeNull();
+    expect(container.querySelector("[data-sup='nav']"), 'nav alive').not.toBeNull();
+  });
+
+  it('Таббар из 4 разделов: Инфо открывает каталог, Протоколы не тянут чужой контент', () => {
+    const { container } = render(<SupportScreen />);
     expect(
-      container.querySelector("[data-sup='hormones'] .screen.fertility-pct"),
-      'fertility screen',
+      container.querySelectorAll("[data-sup='nav'] button").length,
+      'four tabs',
+    ).toBe(4);
+    const infoBtn = container.querySelector(
+      "[data-sup='nav'] button[aria-label='Инфо']",
+    ) as HTMLElement;
+    fireEvent.click(infoBtn);
+    // каталог реально виден, а не пустая шапка
+    expect(
+      container.querySelector("[data-sup='catalog']"),
+      'catalog content',
     ).not.toBeNull();
+    expect(
+      (container.textContent || '').length,
+      'non-empty content',
+    ).toBeGreaterThan(500);
+    const protoBtn = container.querySelector(
+      "[data-sup='nav'] button[aria-label='Протоколы']",
+    ) as HTMLElement;
+    fireEvent.click(protoBtn);
+    // только протоколы: ни каталога, ни чужого долгоживущего tab-контента
+    expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    expect(container.querySelector("[data-sup='catalog']")).toBeNull();
   });
 
   it('Навигация запоминается: уход и возврат открывают тот же раздел', () => {
