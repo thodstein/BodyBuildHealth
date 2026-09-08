@@ -442,7 +442,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       : 0;
     const markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] = [];
     for (const lab of currentLabs) {
-      const ref = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
+      // P0 fix: HbA1c кейс — HBA1C vs HbA1c
+      const ref = (UCUM_MAP as any)[lab.code] || (UCUM_MAP as any)[lab.code.toUpperCase()] || (UCUM_MAP as any)[lab.code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === String(lab.code).toLowerCase())?.[1] as any);
       if (!ref) continue;
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;
@@ -1873,15 +1874,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     background: item.val !== null ? `rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.08)` : 'rgba(21,38,66,0.60)',
                     border: item.val !== null ? `1px solid rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.25)` : '1px solid rgba(140,190,255,0.14)',
                   }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{item.label}</div>
-                        <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>{item.desc}</div>
+                        <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{item.label}</div>
+                        <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.4 }}>{item.desc}</div>
                       </div>
-                      <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ textAlign:'right', flexShrink:0, minWidth:64 }}>
                         {item.val !== null ? (
-                          <><div style={{ fontSize:22, fontWeight:900, color: statusColor(item.val, item.inv), fontVariantNumeric:'tabular-nums' }}>{item.val}%</div>
-                            <div style={{ fontSize:10, color: statusColor(item.val, item.inv), fontWeight:800 }}>{statusLabel(item.val, item.inv)}</div></>
+                          <><div style={{ fontSize:24, fontWeight:900, color: statusColor(item.val, item.inv), fontVariantNumeric:'tabular-nums', lineHeight:1 }}>{item.val}%</div>
+                            <div style={{ fontSize:11, color: statusColor(item.val, item.inv), fontWeight:800, marginTop:2 }}>{statusLabel(item.val, item.inv)}</div></>
                         ) : (
                           <div style={{ fontSize:12, color:'#fff' }}>Нет данных</div>
                         )}
