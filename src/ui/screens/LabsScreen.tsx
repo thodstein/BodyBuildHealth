@@ -2299,15 +2299,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* Lab Input Modal — full screen to bottom */}
       {showLabInput && (
         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => setShowLabInput(false)}>
-          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', padding:'0 18px calc(18px + env(safe-area-inset-bottom,0px))', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'88vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px' }} />
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:12 }}>
+          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'92dvh', overflow:'hidden', display:'flex', flexDirection:'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px', flexShrink:0 }} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'0 18px 12px', flexShrink:0 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', fontSize:17 }}>🧪</span>
                 <span style={{ fontWeight:800, fontSize:15, color:'#fff' }}>Ввести результат</span>
               </div>
               <button onClick={() => setShowLabInput(false)} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
             </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'0 18px 12px', WebkitOverflowScrolling:'touch' as any, minHeight:0 }}>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
               <div style={{ fontSize:12, color:'#fff', marginBottom:10, padding:'10px 12px', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', borderRadius:12, lineHeight:1.5 }}>
                 {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
@@ -2316,23 +2317,25 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Код маркера</label>
-                <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
+                <input value={inputCode} onChange={e => setInputCode(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} placeholder="ALT" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Значение</label>
-                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
+                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} placeholder="40" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Единица</label>
-                <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
+                <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} placeholder="U/L" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Дата</label>
-                <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:14, minHeight:48, boxSizing:'border-box' }} />
+                <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
             </div>
             {addError && <div style={{ fontSize:12, color:'#ef4444', textAlign:'center', marginTop:10, fontWeight:700 }}>{addError}</div>}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginTop:14 }}>
+            </div>
+            <div style={{ flexShrink:0, padding:'12px 18px calc(18px + env(safe-area-inset-bottom,0px))', borderTop:'1px solid rgba(140,190,255,0.12)', background:'linear-gradient(0deg, rgba(12,23,40,0.98), rgba(12,23,40,0.92))' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
               <button onClick={() => setShowLabInput(false)} style={{
                 padding:'14px', borderRadius:14, border:'1px solid rgba(140,190,255,0.14)', minHeight:52,
                 background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer',
@@ -2342,6 +2345,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', fontWeight:800, fontSize:14, cursor:'pointer',
                 boxShadow:'0 8px 24px rgba(var(--labs-accent-rgb, 0,230,138),0.35)',
               }}>✓ Сохранить</button>
+            </div>
             </div>
           </div>
         </div>
