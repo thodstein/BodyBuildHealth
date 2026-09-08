@@ -985,7 +985,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   return (
     <div className="wd-diary diary-scrollbar"
       style={{
-        position: 'fixed', inset: 0, zIndex: 2000,
+        position: 'fixed', inset: 0, top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000,
         background:
           'radial-gradient(1000px 560px at 14% -12%, rgba(52,199,89,0.14), transparent 64%), radial-gradient(820px 480px at 100% -6%, rgba(52,199,89,0.07), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: c.text,

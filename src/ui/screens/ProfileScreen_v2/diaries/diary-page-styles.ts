@@ -239,6 +239,11 @@ export const diaryShell = (accent: string): React.CSSProperties => {
   return {
     position: 'fixed',
     inset: 0,
+    // Явные края — фолбэк для WebView без поддержки inset (иначе оверлей схлопывается).
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 2000,
     background:
       `radial-gradient(900px 520px at 14% -10%, rgba(${r},${g},${b},0.13), transparent 62%),` +

@@ -84,7 +84,7 @@ export const FfmiBmiTrend: React.FC<FfmiBmiTrendProps> = ({ rows, heightCm, sex 
             {data.map((p, i) => {
               const x = tx(i);
               const y = tyFFMI(p.ffmi);
-              return <circle key={`ffmi-p-${i}`} cx={x} cy={y} r="3" fill={ffmiColor} opacity={0.9} style={{ cursor: 'pointer' }} onMouseEnter={(e) => onMove(e, p, i)} onMouseMove={(e) => onMove(e, p, i)} onMouseLeave={onLeave} onTouchStart={(e) => { e.preventDefault(); onMove(e, p, i); }} />;
+              return <circle key={`ffmi-p-${i}`} cx={x} cy={y} r="3" fill={ffmiColor} opacity={0.9} style={{ cursor: 'pointer' }} onMouseEnter={(e) => onMove(e, p, i)} onMouseMove={(e) => onMove(e, p, i)} onMouseLeave={onLeave} onTouchStart={(e) => { onMove(e, p, i); }} />;
             })}
             {data.map((p, i) => {
               if (i === 0) return null;

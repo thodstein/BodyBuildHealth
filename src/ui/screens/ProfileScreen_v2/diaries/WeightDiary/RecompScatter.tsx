@@ -160,7 +160,7 @@ export const RecompScatter: React.FC<RecompScatterProps> = ({ points }) => {
             onMouseEnter={(e) => { onMove(e, p); (e.target as SVGElement).setAttribute('r', '6'); }}
             onMouseMove={(e) => onMove(e, p)}
             onMouseLeave={(e) => { onLeave(); (e.target as SVGElement).setAttribute('r', String(p.size || 4)); }}
-            onTouchStart={(e) => { e.preventDefault(); onMove(e, p); }}
+            onTouchStart={(e) => { onMove(e, p); }}
           />
         ))}
 

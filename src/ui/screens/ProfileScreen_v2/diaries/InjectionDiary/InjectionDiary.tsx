@@ -800,7 +800,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
     <div
       className="injection-window diary-scrollbar"
       style={{
-        position: 'fixed', inset: 0, zIndex: 2000,
+        position: 'fixed', inset: 0, top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000,
         background:
           'radial-gradient(1000px 560px at 14% -12%, rgba(245,158,11,0.13), transparent 64%), radial-gradient(780px 460px at 100% -6%, rgba(245,158,11,0.07), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
