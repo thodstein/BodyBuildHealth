@@ -455,7 +455,6 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [filterText, setFilterText] = useState('');
   const [showSideEffects, setShowSideEffects] = useState<Record<string, boolean>>({});
   const [addModal, setAddModal] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
 
   const [undoStack, setUndoStack] = useState<DiaryEntry[]>([]);
 
@@ -656,12 +655,17 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   };
 
   const markAllNotTaken = () => {
+    // Сбрасываем приём, но бережём метаданные (дозы, слоты, побочки) и вещества,
+    // добавленные вручную вне плана, — иначе сброс тихо выедал данные дневника.
     setEntries(prev => {
       const updated = [...prev];
       const idx = updated.findIndex(e => e.date === today);
       if (idx < 0) return prev;
       const subs: Record<string, SubstanceIntake> = {};
-      for (const subId of planSubs) subs[subId] = { taken: false };
+      for (const [id, v] of Object.entries(updated[idx].substances || {})) {
+        subs[id] = { ...v, taken: false };
+      }
+      for (const subId of planSubs) subs[subId] = { ...(subs[subId] || { taken: false }), taken: false };
       updated[idx] = { ...updated[idx], substances: subs };
       saveDiary(updated);
       return updated;
@@ -834,7 +838,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           ['history', '📊 История'],
           ['stats', '📈 Статистика'],
           ['complaints', '🩺 Жалобы'],
-          ['compliance', '📋 Комплаенс'],
+          ['compliance', '✅ Комплаенс'],
         ].map(([id, label]) => (
           <button key={id} className="support-pill" data-active={tab === id} aria-pressed={tab === id} onClick={() => setTab(id as any)} style={sx.pill(tab === id)}>{label}</button>
         ))}
@@ -999,34 +1003,12 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                 );
                })}
 
-               {/* Bulk actions */}
-               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                 <button onClick={() => {
-                   const entry = loadToday();
-                   if (!entry) return;
-                   const updated = { ...entry.substances };
-                   planSubs.forEach(id => { updated[id] = { taken: true, timeSlot: undefined, sideEffects: [] }; });
-                   const newEntry = { ...entry, substances: updated };
-                   try { localStorage.setItem('he_support_diary', JSON.stringify({ ...loadDiary(), [today]: newEntry })); } catch {}
-                   setRefreshTick(t => t + 1);
-                 }} style={{
-                   flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)',
-                   background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontWeight: 700, fontSize: 12,
-                   cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
-                 }}>✅ Принять всё</button>
-                 <button onClick={() => {
-                   const entry = loadToday();
-                   if (!entry) return;
-                   const updated = { ...entry.substances };
-                   planSubs.forEach(id => { updated[id] = { taken: false, timeSlot: undefined, sideEffects: [] }; });
-                   const newEntry = { ...entry, substances: updated };
-                   try { localStorage.setItem('he_support_diary', JSON.stringify({ ...loadDiary(), [today]: newEntry })); } catch {}
-                   setRefreshTick(t => t + 1);
-                 }} style={{
-                   flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)',
-                   background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontWeight: 700, fontSize: 12,
-                   cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
-                  }}>✕ Очистить всё</button>
+                {/* Bulk actions */}
+                {/* ВНИМАНИЕ: здесь была вторая пара кнопок «Принять/Очистить всё»,
+                    которая писала стор объектом вместо массива ({...loadDiary(), [today]})
+                    и роняла весь дневник + затирала дозы/слоты/побочки.
+                    Осталась одна корректная пара выше (markAllTaken/markAllNotTaken). */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button onClick={exportToPDF} style={{
                     flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(59,130,246,0.2)',
                     background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 700, fontSize: 12,
