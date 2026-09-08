@@ -121,7 +121,7 @@ export function stapleFamilyOf(id: string): string | null {
   if (/oat|hercules|porridge/.test(id)) return 'oats';
   // P1a-fix: рисовые продукты — ОДНО семейство (рис/крем/рисовые хлопья/рисовый крем):
   // иначе ротация по id даёт рис в 5 приёмах под разными именами («рисовый крем везде»).
-  if (/^rice|rice_|cream_of_rice|rice_cream|rice_flakes/.test(id) && !/cake/.test(id)) return 'rice';
+  if (/^rice|rice_|cream_of_rice|rice_cream|rice_flakes/.test(id) && !/cake|oil_/.test(id)) return 'rice';
   if (/buckwheat|grechka/.test(id)) return 'buckwheat';
   if (/pasta|noodle|spaghetti|macaroni/.test(id)) return 'pasta';
   if (/potato/.test(id)) return 'potato';

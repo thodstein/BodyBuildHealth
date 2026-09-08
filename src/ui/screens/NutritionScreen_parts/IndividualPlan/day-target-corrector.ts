@@ -162,7 +162,11 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCa
   if (macro === 'c' && pool.length >= 2) {
     if (convenientCarbs) {
       // HV: плотные comfort (пряники/джем) добирают угли без объёма тарелки.
+      // P2: сладости — только если в пуле вообще нет стейпл-носителя (иначе корректор
+      // менял крем на джем 170 г, обходя сладостный кап 55 г).
+      const _hasStaple = pool.some(p => TOPUP_CARB_IDS.includes(p.id));
       for (const hid of ['pryaniki', 'jam']) {
+        if (_hasStaple) break;
         if (!pool.some(p => p.id === hid) && !(excludedIds && excludedIds.has(hid))) {
           const hf = FOOD_DB.find(f => f.id === hid);
           if (hf && foodAvailableForPlan(hf)) pool.push(hf);
@@ -932,7 +936,15 @@ export function correctDayToTargets(
         // и день перебирает белок скрытыми +15-30 г (кейс HV900 +13%).
         return (c.protein || 0) < 8;
       });
-      const _candIterRaw = (_freshSorted.length > 0 ? _freshSorted : _leastUsedFirst(_sortedPool));
+      // P2: least-used фолбэк тоже уважает семейный кап (иначе 4-й рис при заполненных
+      // 3 приёмах — fallback обходил _useCapFor, доказано F1 «rice в 4 приёмах»).
+      const _candIterRaw0 = (_freshSorted.length > 0 ? _freshSorted : _leastUsedFirst(_sortedPool));
+      const _candIterRaw = eff === 'c' && _candIterRaw0.some(c => _dayUses(c.id) >= _useCapFor(c.id))
+        ? (() => {
+            const _ok = _candIterRaw0.filter(c => _dayUses(c.id) < _useCapFor(c.id));
+            return _ok.length > 0 ? _ok : _candIterRaw0;
+          })()
+        : _candIterRaw0;
       // P1a-fix2: крем-субкап держим и в least-used фолбэке (иначе 3-й крем оттуда).
       const _candIter = _creamUses() >= creamMealCap(hv)
         ? (_candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id)).length > 0

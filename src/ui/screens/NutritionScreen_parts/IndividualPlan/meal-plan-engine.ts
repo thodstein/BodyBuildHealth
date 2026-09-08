@@ -2020,13 +2020,16 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     // первичный гарнир — плотная сухая крупа (крем/хлопья/манка), не сладости/варёный
     // крахмал. Джем/мёд/сухофрукты — десертные топ-апы корректора, не основа приёма.
     if ((snack || (type || '').startsWith('snack')) && carbG >= 60) {
-      const _snackStaple = ['cream_of_rice', 'corn_flakes', 'rice_semolina', 'oats_dry']
+      // Порядок приоритета: не-рисовые плотные крупы первыми (рис резервируем под
+      // предтрен/пост-трен — F1 «рис в ≤3 приёмах»), крем/манка — последний шанс.
+      const _snackStaple = ['corn_flakes', 'oats_dry', 'cream_of_rice', 'rice_semolina']
         .map((id: string) => FOOD_DB.find((f: any) => f.id === id))
-        .filter((f: any) => f && _carbPickFinal.some((x: any) => x.id === f.id)
+        .filter((f: any) => f
           && !((_pickCtx.dayCarbFamilyUses.get(stapleFamilyOf(f.id) || '') || 0) >= familyMealCap(stapleFamilyOf(f.id), { hv: _pickCtx.highVolumeDay }))
+          && !((_pickCtx.dayCarbUses.get(f.id) || 0) >= 2)
           && !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_pickCtx.highVolumeDay)))
           && foodAvailableForPlan(f) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
-      if (_snackStaple.length > 0 && (!carbSource || (carbSource.carbs || 0) < 45)) {
+      if (_snackStaple.length > 0 && (!carbSource || isSweetCarbId(carbSource.id))) {
         carbSource = _snackStaple[0];
       }
     }
@@ -2538,8 +2541,7 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
   // P1a: честная фактическая строка (аудит: шаблонные rationale описывали дизайн,
   // а не факт — эта строка всегда соответствует составу).
   rationales.push(`Факт: Б${Math.round(totals.p)} Ж${Math.round(totals.f)} У${Math.round(totals.c)} · ${items.length} поз.: ${items.map(it => `${it.name} ${Math.round(it.amount || 0)} г`).join(' + ')}`);
-  return { label, time, items, totals, type, rationale: rationales, mpsCheck, target: { p: proteinG, c: carbG, f: fatG } };
-}
+  return { label, time, items, totals, type, rationale: rationales, mpsCheck, target: { p: proteinG, c: carbG, f: fatG } };}
 
 // P1a: честная фактическая строка rationale (план Anchor-Wave): шаблоны описывают
 // дизайн, эта строка — всегда факт состава. Единая точка для всех билдеров приёмов
@@ -5783,6 +5785,34 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (process.env.ZZ_TRACE) {
         for (const _bm of meals) console.error(`ZZ-POSTCORR ${_bm.label}: ${(_bm.items || []).map((x: any) => `${x.id}(${x.amount})`).join(' + ')}`);
       }
+      // P2-финал: клетчаточный кап 85 г — корректор клампит свои добавки, но build-овые
+      // семечки/овощи могли остаться за капом (85.3 г). Слегка срезаем крупнейший
+      // гибкий fiber-носитель (семена/орехи/овощи; белок/стейплы не трогаем).
+      {
+        const _fibNow = meals.reduce((s: number, m: any) => s + (m.totals.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0) * (it.amount || 0) / 100, 0)), 0);
+        if (_fibNow > 85) {
+          let _best: { m: any; it: any; den: number } | null = null;
+          for (const _m of meals) {
+            for (const _it of (_m.items || [])) {
+              if ((_it as any)._fixedGrams) continue;
+              const _fd = FOOD_DB.find((f: any) => f.id === _it.id);
+              if (!_fd || (_it.role === 'protein' && (isProteinPowderId(_it.id) || (_it.p || 0) * (_it.amount || 0) / 100 > 12))) continue;
+              if (_it.role === 'carb_slow' || _it.role === 'carb_fast') continue;
+              const _fam = stapleFamilyOf(_it.id) || '';
+              if (!['nuts', 'seeds', 'veg', 'fruit'].includes(_fam) && (_fd.category || '') !== 'veg_fruit') continue;
+              const _den = (_it.fiber || 0) / Math.max(1, _it.amount || 1);
+              if (!_best || _den > _best.den) _best = { m: _m, it: _it, den: _den };
+            }
+          }
+          if (_best && (_best.it.fiber || 0) > 0) {
+            const _need = _fibNow - 85;
+            const _cut = Math.ceil(_need / (_best.it.fiber || 1) * 100);
+            _best.it.amount = Math.max(5, (_best.it.amount || 0) - _cut);
+            recalcMealTotals(meals);
+            recalcDayTotals(meals, totals);
+          }
+        }
+      }
     }
 
     // ─── Чистка-2026 (распределение КБЖУ): СТРАЖА ПЕРИ-БЮДЖЕТОВ — САМЫЙ ПОСЛЕДНИЙ проход ───
@@ -7197,6 +7227,44 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _names = _comp.map((x: any) => `${x.name} ${Math.round(x.amount || 0)} г`).join(' + ');
         if (Array.isArray((m as any).rationale)) (m as any).rationale.push(`🥤 Протеиновый коктейль (${_names} ≈ ${_pShake} г белка) — взбить блендером, выпить как единый приём`);
       });
+    }
+
+    // P2-финал: клетчаточный кап 85 г — поздние проходы (десерты/компенсация) могли
+    // вывести за кап; срезаем крупнейший гибкий fiber-носитель (семена/орехи/овощи).
+    {
+      const _fibNow = meals.reduce((s: number, m: any) => s + (m.totals.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0) * (it.amount || 0) / 100, 0)), 0);
+      if (_fibNow > 85) {
+        let _best: { it: any; den: number } | null = null;
+        for (const _m of meals) {
+          for (const _it of (_m.items || [])) {
+            if ((_it as any)._fixedGrams) continue;
+            const _fd = FOOD_DB.find((f: any) => f.id === _it.id);
+            if (!_fd) continue;
+            if (_it.role === 'protein' && (isProteinPowderId(_it.id) || (_it.p || 0) * (_it.amount || 0) / 100 > 12)) continue;
+            if ((_it.fiber || 0) < 1 || (_it.amount || 0) < 10) continue;
+            const _den = (_it.fiber || 0) / Math.max(1, _it.amount || 1);
+            if (!_best || _den > _best.den) _best = { it: _it, den: _den };
+          }
+        }
+        if (_best && (_best.it.fiber || 0) > 0) {
+          const _need = _fibNow - 85;
+          const _cut = Math.ceil(_need / (_best.it.fiber || 1) * 100);
+          const _newAmt = Math.max(5, (_best.it.amount || 0) - _cut);
+          const _r = _newAmt / Math.max(1, _best.it.amount || 1);
+          _best.it.amount = _newAmt;
+          _best.it.fiber = Math.round((_best.it.fiber || 0) * _r * 10) / 10;
+          recalcMealTotals(meals);
+          recalcDayTotals(meals, totals);
+          // fiber-поле перерасчётчики не трогают — сводим вручную (как в корректоре).
+          totals.fiber = Math.round(meals.reduce((s: number, m: any) => s + ((m.totals.fiber !== undefined)
+            ? m.totals.fiber
+            : (m.items || []).reduce((a: number, it: any) => a + (it.fiber || 0), 0)), 0) * 10) / 10;
+          for (const _m of meals) {
+            if ((_m as any).totals) (_m as any).totals.fiber = Math.round((_m.items || []).reduce((a: number, it: any) => a + (it.fiber || 0), 0) * 10) / 10;
+          }
+          totals.fiber = Math.round(meals.reduce((s: number, m: any) => s + ((m.totals.fiber !== undefined) ? m.totals.fiber : 0), 0) * 10) / 10;
+        }
+      }
     }
 
     return {
