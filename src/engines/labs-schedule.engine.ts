@@ -448,7 +448,7 @@ export function getDrugSpecificLabs(courseEntries: CourseEntry[]): { labs: strin
 function resolveSchedulePhaseKey(phase: string): string {
   const p = phase.toLowerCase();
   if (p.includes('fertility')) return 'fertility';
-  if (p.includes('course') && !p.includes('bridge')) return 'on_cycle';
+  if (p === 'on_cycle' || p.includes('on_cycle') || (p.includes('course') && !p.includes('bridge'))) return 'on_cycle';
   if (p.includes('bridge')) return 'bridge';
   if (p.includes('post_pct') || p.includes('post-pct')) return 'post_pct';
   if (p.includes('pct')) return 'pct';
