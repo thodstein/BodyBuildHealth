@@ -65,10 +65,13 @@ html.app-native .app {
   background: transparent;
 }
 
-/* Контент идёт под статус-бар (edge-to-edge), скролл — под плавающий навбар */
+/* Контент идёт под статус-бар (edge-to-edge), скролл — под плавающий навбар.
+ * Низ: WebView на Android часто отдаёт env(bottom)=0, а системный жест-бар /
+ * 3-кнопки реально съедают ~24-28px — fallback 28px, иначе низы всех экранов
+ * уходят под пилюлю навигации. */
 html.app-native main {
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px);
   scrollbar-width: none;
 }
 html.app-native main::-webkit-scrollbar {
@@ -79,7 +82,9 @@ html.app-native main::-webkit-scrollbar {
 html.app-native .tabs {
   left: 12px;
   right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  /* При битом env пилюля всплывает над системным навбаром (fallback 28px),
+   * иначе её низ съедает жест-бар / 3-кнопки, а контент — её саму. */
+  bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 10px);
   height: var(--nav-height);
   border-radius: 26px;
   border: 1px solid rgba(140, 190, 255, 0.16);
@@ -158,7 +163,7 @@ html.app-native .dashboard-hero-img {
 
 /* Кнопки дашборда — над плавающим навбаром, спортивной сеткой */
 html.app-native div[style*='calc(70px'] {
-  bottom: calc(108px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(108px + max(env(safe-area-inset-bottom, 0px), 28px)) !important;
 }
 
 /* ─── 4. ЭКРАНЫ: спортивные заголовки ──────────────────────────── */
@@ -381,11 +386,9 @@ html.app-native .native-home::-webkit-scrollbar {
 html.app-native .native-home-bg {
   position: fixed;
   inset: 0;
-  /* Ниже шторки: fixed позиционируется от viewport, а не от слоя —
-   * без этого верх картинки прячется под статус-баром.
-   * max(): если WebView не отдаёт env (старый Android), всё равно даём
-   * минимум высоты статус-бара, иначе fallback 0px всё прячет обратно. */
-  top: max(env(safe-area-inset-top, 0px), 24px);
+  /* Ниже шторки (fixed — от viewport). Fallback 56px: WebView часто даёт
+   * env()=0, а реальная шторка с вырезом — 40-56px. */
+  top: max(env(safe-area-inset-top, 0px), 56px);
   pointer-events: none;
 }
 
@@ -411,7 +414,7 @@ html.app-native .native-home-shade {
 html.app-native .native-home-content {
   position: relative;
   z-index: 1;
-  padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 32px);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 32px);
   max-width: 640px;
   margin: 0 auto;
 }
@@ -423,7 +426,9 @@ html.app-native .native-home-landing {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0 16px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 20px);
+  /* Низ: пилюля навбара при битом env поднимается на fallback 28px —
+   * запас снизу считаем от неё, иначе кнопки уходят под дашборд. */
+  padding: 0 16px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 20px);
   max-width: 640px;
   margin: 0 auto;
 }
@@ -890,7 +895,7 @@ html.app-native .nutrition-tabs-head {
 }
 
 html.app-native .nutrition-tabs-body {
-  padding: 0 12px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 html.app-native .nutrition-chip {
@@ -970,7 +975,7 @@ html.app-native .labs-topnav {
 }
 
 html.app-native .labs-body {
-  padding: 0 12px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 /* ─── 15. NATIVE RISK — PRO-подача ────────────────────────────── */
@@ -1044,7 +1049,7 @@ html.app-native .risk-topnav {
 }
 
 html.app-native .risk-body {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 /* ─── 16. NATIVE PHARMA — PRO-подача ──────────────────────────── */
@@ -1171,7 +1176,7 @@ html.app-native .articles-toolbar {
 }
 
 html.app-native .articles-list {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 /* ─── 20. NATIVE KITS DEEP — единый PRO-язык всех конструкторов ─ */
@@ -1401,7 +1406,7 @@ html.app-native .pharma-course .pc-card2 {
 html.app-native .support-subbar {
   left: 12px !important;
   right: 12px !important;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 10px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 10px) !important;
   border-radius: 22px !important;
   border: 1px solid rgba(140, 190, 255, 0.16) !important;
   background: rgba(9, 18, 34, 0.85) !important;
@@ -1410,7 +1415,7 @@ html.app-native .support-subbar {
 }
 
 html.app-native .support-screen {
-  padding-bottom: calc(var(--nav-height) * 2 + env(safe-area-inset-bottom, 0px) + 40px) !important;
+  padding-bottom: calc(var(--nav-height) * 2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px) !important;
 }
 
 html.app-native .support-backnav {
@@ -1427,7 +1432,7 @@ html.app-native .profile-head {
 }
 
 html.app-native .profile-body {
-  padding: 0 12px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 /* ─── 24. NATIVE PLAYER — плеер тренировки ───────────────────── */
@@ -1473,7 +1478,7 @@ html.app-native .screen-loading .loading-spinner {
 
 /* Тосты — стеклянные пилюли над навбаром */
 html.app-native .toast-container {
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
   left: 16px !important;
   right: 16px !important;
 }
@@ -1987,7 +1992,7 @@ html.app-native .wd-diary,
 html.app-native .injection-window,
 html.app-native .health-window,
 html.app-native .cardio-window {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 32px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 32px) !important;
 }
 
 /* Поля профиля: высота под палец, фокус лаймовый */
@@ -2154,7 +2159,7 @@ html.app-native .market-card[data-expanded='true'] {
 }
 
 html.app-native .market-body {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 /* Поддержка: топбары и пилюли */
@@ -3842,7 +3847,7 @@ html.app-native .native-chip {
 html.app-native .native-fab {
   position: fixed;
   right: 16px;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 18px);
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px);
   z-index: 1200;
   width: var(--fab-size);
   height: var(--fab-size);
@@ -3869,7 +3874,7 @@ html.app-native .native-fab:active {
 html.app-native .native-fab-wrap {
   position: fixed;
   right: 16px;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 18px);
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px);
   z-index: 1200;
   display: flex;
   flex-direction: column;
@@ -3996,7 +4001,7 @@ html.app-native .native-empty-cta {
 /* Тосты и баннеры — строго над пилюлей навигации. */
 html.app-native .toast-container,
 html.app-native [data-toast-root] {
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
 }
 
 /* Pull-to-refresh Главной: тонкая шторка поверх hero, тянется за пальцем.
@@ -4041,7 +4046,7 @@ html.app-native .native-offline {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px);
   z-index: 1190;
   display: flex;
   align-items: center;
@@ -4144,8 +4149,10 @@ html.app-native .native-home-bg img {
 }
 
 html.app-native .native-home-shade {
+  /* Верх светлее: запечённые HUD-панели читаются, а не тонут в затемнении.
+   * Низ без изменений — контент поверх него. */
   background:
-    linear-gradient(180deg, rgba(5, 11, 22, 0.28) 0%, rgba(5, 11, 22, 0.02) 32%, rgba(5, 11, 22, 0.55) 62%, rgba(5, 11, 22, 0.96) 100%) !important;
+    linear-gradient(180deg, rgba(5, 11, 22, 0.12) 0%, rgba(5, 11, 22, 0.0) 32%, rgba(5, 11, 22, 0.55) 62%, rgba(5, 11, 22, 0.96) 100%) !important;
 }
 
 /* 62.2 Трио: SVG 34px в цвете акцента вместо эмодзи. */
@@ -4861,6 +4868,19 @@ html.app-native .native-home-landing {
   padding-top: calc(max(env(safe-area-inset-top, 0px), 24px) + 12px) !important;
 }
 
+/* 73b. Главная ниже высокой шторки с вырезом (fallback 56px).
+ * Стоит ПОЗЖЕ §73 с той же специфичностью — выигрывает только для home;
+ * остальные hero/шапки сидят на §73 (24px) как раньше.
+ * Причина: edge-to-edge WebView часто отдаёт env(top)=0, а реальная шторка
+ * с камерой — 40-56px: верх hero-картинки (HUD + макушка) уходил под неё. */
+html.app-native .native-home {
+  top: max(env(safe-area-inset-top, 0px), 56px) !important;
+}
+
+html.app-native .native-home-landing {
+  padding-top: calc(max(env(safe-area-inset-top, 0px), 56px) + 12px) !important;
+}
+
 /* Липкие шапки разделов ниже статус-бара */
 html.app-native .labs-topnav,
 html.app-native .risk-topnav,
@@ -4894,11 +4914,11 @@ html.app-native .screen.predictive-analytics,
 html.app-native .screen.perf-screen,
 html.app-native .rep-screen,
 html.app-native .sup-clinic {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px) !important;
 }
 
 html.app-native .toast-container {
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
 }
 
 /* ─── 75. ANCHORED BOTTOMS ───────────────────────────────
@@ -4909,11 +4929,11 @@ html.app-native .nut-diary-toast,
 html.app-native .recipes-toast,
 html.app-native .sup-catalog-toast,
 html.app-native .symptom-toast {
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
 }
 
 html.app-native .nut-diary-fab {
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
 }
 
 /* ─── 76. LABS PRO-FULL — топ-подача вкладки «Анализы» (hero не тронут) ──
@@ -4973,6 +4993,8 @@ html.app-native .labs-bottomtabs {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35) !important;
+  /* Над поднятой пилюлей: инлайн bottom считал от битого env=0 и уходил под неё. */
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 10px) !important;
 }
 
 html.app-native .labs-bottomtabs button {
@@ -5758,7 +5780,7 @@ html.app-native .pharma-course .pc-glass {
 
 /* Корень хаба: дыхание снизу под pill-nav, каскад появления */
 html.app-native .hub-diary {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .hub-diary > div {
@@ -5950,7 +5972,7 @@ html.app-native .train-quickentry .qe-rest button {
 
 html.app-native .train-quickentry .qe-save {
   position: sticky !important;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
   z-index: 20 !important;
   min-height: 52px !important;
   border-radius: 16px !important;
@@ -6011,7 +6033,7 @@ html.app-native .train-recordform .rf-recent button {
 
 html.app-native .train-recordform .rf-save {
   position: sticky !important;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
   z-index: 20 !important;
   min-height: 52px !important;
   border-radius: 16px !important;
@@ -6040,7 +6062,7 @@ html.app-native .train-diarysetrow button {
 /* ── История: фильтры 48px, heatmap в ширину, карточки недель ── */
 html.app-native .train-diaryhistory {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-diaryhistory .th-filters {
@@ -6104,7 +6126,7 @@ html.app-native .train-diaryhistory .th-more:active {
 html.app-native .th-popup-backdrop {
   -webkit-backdrop-filter: blur(8px) !important;
   backdrop-filter: blur(8px) !important;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
 }
 
 html.app-native .th-popup-backdrop .th-popup-card {
@@ -6130,7 +6152,7 @@ html.app-native .th-popup-backdrop .th-popup-card input {
 /* ── Аналитика: стат-плитки, графики в ширину ── */
 html.app-native .train-diaryanalytics {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-diaryanalytics .ta-stats {
@@ -6156,7 +6178,7 @@ html.app-native .train-diaryprogress {
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-diaryprogress input {
@@ -6174,7 +6196,7 @@ html.app-native .train-diaryprogress button {
 /* ── Инструменты: экспортные CTA 48px ── */
 html.app-native .train-diarytools {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-diarytools button {
@@ -6317,7 +6339,7 @@ html.app-native .train-diaryhistory .ww-meta {
 html.app-native .train-sessionmodal {
   -webkit-backdrop-filter: blur(8px) !important;
   backdrop-filter: blur(8px) !important;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
 }
 
 html.app-native .train-sessionmodal .se-card {
@@ -6549,7 +6571,7 @@ html.app-native .train-mytraining [style*='font-size: 10px'] {
 
 /* ── Календарь: липкая шапка, крупные свитчеры, живые ячейки ── */
 html.app-native .train-calendar {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-calendar .cal-head {
@@ -6663,7 +6685,7 @@ html.app-native .hub-diary .train-mixdiary .mx-rec button {
 
 /* ── Мои тренировки: поля и кнопки под палец ── */
 html.app-native .hub-diary .train-mytraining {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .hub-diary .train-mytraining input,
@@ -6765,7 +6787,7 @@ html.app-native .hub-diary .comp-empty [style*='font-size: 10px'] {
 html.app-native .hub-diary .train-warmupdiary,
 html.app-native .hub-diary .train-cooldowndiary {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .hub-diary .train-warmupdiary > div,
@@ -7040,7 +7062,7 @@ html.app-native .train-diaryanalytics .ta-expert:focus-visible {
 
 /* ── Импорт: форматы-лента, поле 14px mono, кнопки 48px ── */
 html.app-native .hub-diary .train-csvimport {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .hub-diary .train-csvimport .ci-format {
@@ -7255,7 +7277,7 @@ html.app-native .hub-diary .train-mobility,
 html.app-native .hub-diary .train-checkin,
 html.app-native .hub-diary .train-mmctrack {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 /* ── Кнопки ритуалов: минимум 48px, шкалы — удобные тапы ── */
@@ -7326,7 +7348,7 @@ html.app-native .hub-diary .train-mobility .mb-foot button:active {
 /* ── Чек-ин метрик: сейв 52px липкий, плитки tabular ── */
 html.app-native .hub-diary .train-checkin .ci-save {
   position: sticky !important;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
   z-index: 20 !important;
   min-height: 52px !important;
   border-radius: 16px !important;
@@ -7403,7 +7425,7 @@ html.app-native .train-library {
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 /* ── Hero зоны: стекло с лайм-кромкой, компакт ── */
@@ -7589,7 +7611,7 @@ html.app-native .train-library .lib-rec button {
 /* ── Детали программы: липкая кнопка «назад», недели-лента ── */
 html.app-native .train-library .lib-detail {
   gap: 10px !important;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
 }
 
 html.app-native .train-library .lib-detail .lib-back {
@@ -7778,7 +7800,7 @@ html.app-native .lib-picker .lib-sheet {
 }
 
 html.app-native .lib-picker .lib-sheetbody {
-  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+  padding: 14px 16px calc(16px + max(env(safe-area-inset-bottom, 0px), 28px)) !important;
 }
 
 html.app-native .lib-picker .lib-search {
@@ -8000,6 +8022,68 @@ html.app-native .train-library .lib-weekmeta button:focus-visible {
   }
 }
 
+/* ── Каталог: чипы 44px со snap, липкие группы, пустое состояние ── */
+html.app-native .train-library .lib-chip {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  scroll-snap-align: start !important;
+  flex: 0 0 auto !important;
+}
+
+html.app-native .train-library .lib-chip:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .train-library .lib-chip[data-active='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .train-library .lib-group > div:first-child {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: rgba(9, 18, 34, 0.9) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+}
+
+html.app-native .train-library .lib-empty {
+  border-radius: 22px !important;
+  padding: 28px 20px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px dashed rgba(140, 190, 255, 0.25) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-empty button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  padding: 14px 28px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .train-library .lib-empty button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-library .lib-chip:focus-visible,
+html.app-native .train-library .lib-empty button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-chip:active,
+  html.app-native .train-library .lib-empty button:active {
+    transform: none !important;
+  }
+}
+
 /* 83. NATIVE PROFILE PRO-FULL — топ-подача блока Профиль.
  * Только APK (html.app-native). TG/web — байт-в-байт.
  * Покрывает: hero, шапку вкладок, поднавигацию разделов, quick-jump,
@@ -8017,6 +8101,12 @@ html.app-native .pf-hero-cta {
 }
 html.app-native .pf-hero-cta:active {
   transform: scale(0.96) !important;
+}
+
+/* Корень вкладки: vh-фолбэк под dvh (старый WebView иначе схлопывает высоту). */
+html.app-native .pf-inner {
+  height: calc(100vh - 120px) !important;
+  height: calc(100dvh - 120px) !important;
 }
 
 /* Шапка вкладки: стекло + blur, кнопка назад 44px. */
@@ -8210,7 +8300,7 @@ html.app-native .pf-rep-tab:focus-visible {
 
 /* PVE-лист: safe-area снизу, ручка и шапка уже в инлайне. */
 html.app-native .pf-pve-sheet {
-  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 28px) !important;
 }
 html.app-native .pf-pve-close:active {
   transform: scale(0.9) !important;

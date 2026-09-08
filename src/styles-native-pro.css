@@ -24,9 +24,10 @@ html.app-native #app {
 }
 
 /* Нижний отступ под плавающий навбар уже есть в shell; здесь — страховка
-   от перекрытия системной навигацией Android (3-кнопки/жесты). */
+   от перекрытия системной навигацией Android (3-кнопки/жесты).
+   max(): WebView часто отдаёт env(bottom)=0 — fallback 28px. */
 html.app-native .screen:last-child {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 8px);
 }
 
 /* ─── ТАЧ-ТАРГЕТЫ: минимум 44px на интерактиве ──────────────────── */
@@ -59,7 +60,7 @@ html.app-native :focus-visible {
 html.app-native .modal-backdrop,
 html.app-native [data-modal-backdrop] {
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 28px);
 }
 
 /* ─── СКРОЛЛ: стабильный, без отскока цепочки ──────────────────── */
@@ -84,7 +85,7 @@ html.app-native body {
 /* Ландшафт: учитываем боковые вырезы, навбар остаётся достижим. */
 @media (orientation: landscape) {
   html.app-native .tabs {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 6px);
   }
   html.app-native main {
     padding-left: env(safe-area-inset-left, 0px);
