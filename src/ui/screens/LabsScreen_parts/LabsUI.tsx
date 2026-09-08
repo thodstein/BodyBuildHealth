@@ -135,7 +135,7 @@ export const sysPillStyle = (active: boolean, color: string): React.CSSPropertie
 export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
   <div className="labs-sec-head" style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14, borderLeft:`3px solid ${accent}`, paddingLeft:12 }}>
     <div style={{
-      width:40, height:40, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
+      width:42, height:42, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
       background: `linear-gradient(135deg, ${labsWithAlpha(accent, '18')} 0%, ${labsWithAlpha(accent, '08')} 100%)`, border:`1px solid ${labsWithAlpha(accent, '30')}`, color: accent, flexShrink:0,
       boxShadow:`0 8px 22px ${labsWithAlpha(accent, '20')}`,
     }}>{icon}</div>
