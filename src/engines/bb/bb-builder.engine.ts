@@ -40,7 +40,7 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
-import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_PILOT_MUSCLES } from './bb-packing.engine';
+import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
@@ -133,8 +133,10 @@ export interface BBBuilderInput {
    *  вертикаль), а не копии. Недельный объём цел (меняются только имена).
    *  Дефолт выкл — legacy 1-в-1. */
   abPatternRotation?: boolean;
-  /** Packing-v2 (opt-in, пилот back): заливка упражнений до индивидуальных
-   *  капов (терпеливые 6 / средние 5 / фикс 3–4) вместо ровного дележа.
+  /** Packing-v2 (opt-in): заливка упражнений до индивидуальных капов
+   *  (терпеливые 6 / средние 5 / фикс 3–4) вместо ровного дележа.
+   *  Мышцы — PACKING_MUSCLES (спина/грудь/ягодицы; квадры/хамсы исключены
+   *  доказанно — их аддитивные гарантии дерутся со сбросами).
    *  Недельный объём цел (меняется только нарезка). Дефолт выкл. */
   packingV2?: boolean;
   /** Интенсивность тренинга — управляет отдыхом/плотностью/восстановлением:
@@ -1618,6 +1620,8 @@ export interface BuildSessionParams {
   abSibIndex?: number;
   /** Packing-v2: заливка до индивидуальных капов (пилот back). */
   packingV2?: boolean;
+  /** PPL-паттерн (мандаты ensurePPL*: packing не сбрасывает мандатные). */
+  isPPL?: boolean;
 }
 
 function buildSession(
@@ -1672,6 +1676,7 @@ function buildSession(
   abAvoidPatterns?: string[],
   abSibIndex: number = 0,
   packingV2: boolean = false,
+  isPPL: boolean = false,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2502,7 +2507,7 @@ function buildSession(
       || !!(focusGroup && collapseKey(focusGroup) === pl.muscle);
     const packingEligible = packingV2 === true
       && (phase === 'accumulation' || phase === 'intensification')
-      && PACKING_PILOT_MUSCLES.includes(pl.muscle)
+      && PACKING_MUSCLES.includes(pl.muscle)
       && !packingSpecTarget
       && !pl.exDatas.some(d => ((d as any).substitutionVolumePct ?? 1) !== 1)
       && !pl.exDatas.some(d => (d as any).warmupActivator);
@@ -2521,18 +2526,28 @@ function buildSession(
       if (packedSets) packingUsedHere = true;
       // Фаза сброса (план v2): убрать хвостовые упражнения, перелив их сеты
       // в терпеливые головы в пределах капов. Объём инвариантен; guards —
-      // лид, locked, sole-паттерн, sole-strict-группа, минимум 2 на мышцу.
+      // лид, locked, mandated (PPL-мандаты: финализатор докинул бы их обратно
+      // с 4 сетами), sole-паттерн, sole-strict-группа.
+      // Квадры в PPL держат минимум 3 (иначе финализатор добавит выпады).
       if (packedSets) {
         const dropItems = pl.exDatas.map(d => ({
           pattern: packingPatternOf(d as any),
           strictKeys: strictKeysFor(d as any, pl.muscle),
         }));
+        const dropMandated = pl.exDatas.map(d => {
+          if (!isPPL) return false;
+          const nm = String((d as any).name || '');
+          if (pl.muscle === 'chest') return /наклон|incline|жим.*(лёжа|лежа|гориз)|bench.*press|развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(nm);
+          if (pl.muscle === 'hamstrings') return /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(nm);
+          return false;
+        });
         const dropped = planPackingDrops(
           packedSets,
           packCaps.map(c => c.cap),
           packCaps.map(c => c.noPack),
           dropItems,
-          2,
+          (pl.muscle === 'quads' && isPPL) ? 3 : 2,
+          dropMandated,
         );
         if (dropped) {
           pl.exDatas = pl.exDatas.filter((_, i) => dropped.keep[i]);
@@ -2794,7 +2809,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
-    p.packingV2 ?? false,
+    p.packingV2 ?? false, p.isPPL ?? false,
   );
 }
 
@@ -3354,7 +3369,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2 });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl') });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.

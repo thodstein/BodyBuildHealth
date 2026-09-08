@@ -610,8 +610,8 @@ export const BbAutoConstructor: React.FC = () => {
   // A/B-ротация паттернов: sibling-сессии одного тега в неделе — разные
   // паттерны (горизонталь vs вертикаль). Только generic-путь, дефолт выкл.
   const [abRotation, setAbRotation] = useState<boolean>(false);
-  // Packing-v2: заливка упражнений спины до индивидуальных капов (6/5/4)
-  // вместо ровного дележа. Пилот back, дефолт выкл.
+  // Packing-v2: заливка упражнений до индивидуальных капов (6/5/4)
+  // вместо ровного дележа. Спина/грудь/ягодицы, дефолт выкл.
   const [packingV2, setPackingV2] = useState<boolean>(false);
   const [rotationMode, setRotationMode] = useState<'forbid' | 'strict' | 'variety'>('variety');
   const [avoidAxialLoadUi, setAvoidAxialLoadUi] = useState<boolean>(false);
@@ -3124,7 +3124,7 @@ export const BbAutoConstructor: React.FC = () => {
                       { icon: '🏗️', title: 'Меньше многосуставных', desc: 'Больше тренажёров и изоляций', on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true },
                       { icon: '🏋️', title: 'Становая / жим стоя', desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя' : 'Доступно в «Сила + Масса»', on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass' },
                       { icon: '🔀', title: 'A/B ротация паттернов', desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)', on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true },
-                      { icon: '📦', title: 'Packing заливка', desc: 'Меньше движений: заливка спины до 6/5/4 с пирамидой (пилот)', on: packingV2, set: setPackingV2, accent: '#a78bfa', enabled: true },
+                      { icon: '📦', title: 'Packing заливка', desc: 'Меньше движений: заливка 6/5/4 с пирамидой (спина/грудь/ягодицы)', on: packingV2, set: setPackingV2, accent: '#a78bfa', enabled: true },
                     ].map(t => {
                       const active = t.enabled && t.on;
                       return (
@@ -3431,7 +3431,7 @@ export const BbAutoConstructor: React.FC = () => {
             },
             {
               icon: '📦', title: 'Packing заливка',
-              desc: 'Меньше движений: заливка спины до 6/5/4 с пирамидой (пилот)',
+              desc: 'Меньше движений: заливка 6/5/4 с пирамидой (спина/грудь/ягодицы)',
               on: packingV2, set: setPackingV2, accent: '#a78bfa', enabled: true,
             },
           ].map(t => {

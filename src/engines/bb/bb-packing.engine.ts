@@ -28,8 +28,16 @@ import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { STRICT_EXERCISE_GROUPS, strictGroupMatches } from './bb-exercise-selection.engine';
 import { derivePattern } from '../movement-pattern';
 
-/** Пилот v2: какие мышцы пакуются (остальные — ровный legacy-делёж). */
-export const PACKING_PILOT_MUSCLES = ['back'];
+/**
+ * Packing-v2: какие мышцы пакуются (остальные — ровный legacy-делёж).
+ * Плечи/руки/икры вне скоупа осознанно: бюджеты мизерные (флоры ≈ totals),
+ * паковать нечего — дистрибьютор всё равно вернул бы legacy.
+ * Квадры/бицепс бедра ИСКЛЮЧЕНЫ доказанно (матрица bb-packing-v2):
+ * их аддитивные гарантии дерутся со сбросами — quads angle-coverage
+ * докидывает жим ногами (+3 дрейф), hams-фидер докидывает RDL (+1 слот).
+ * Им нужен отдельный мэппинг гарантий, не общий гейт.
+ */
+export const PACKING_MUSCLES = ['back', 'chest', 'glutes'];
 
 /** Явные оверрайды packing-капа по id упражнения (бьют правило ниже). */
 export const PACKING_OVERRIDES: Record<string, number> = {
@@ -174,18 +182,22 @@ export function planPackingDrops(
   locked: boolean[],
   items: PackingDropItem[],
   minKeep: number = 2,
+  mandated?: boolean[],
 ): { keep: boolean[]; sets: number[] } | null {
   const n = amounts.length;
   if (n === 0 || caps.length !== n || locked.length !== n || items.length !== n) return null;
+  const isMandated = (i: number): boolean => !!mandated?.[i];
   const keep = amounts.map(() => true);
   const sets = [...amounts];
   const keptCount = () => keep.filter(Boolean).length;
   for (;;) {
     if (keptCount() <= minKeep) break;
-    // Кандидат: наименьшие сеты среди не-лида, не-locked.
+    // Кандидат: наименьшие сеты среди не-лида, не-locked, не-mandated
+    // (PPL-мандаты: flat/incline/fly груди, колодец бицепса бедра —
+    // финализатор докинул бы их обратно с 4 сетами, стало бы хуже).
     let cand = -1;
     for (let i = 1; i < n; i++) {
-      if (!keep[i] || locked[i]) continue;
+      if (!keep[i] || locked[i] || isMandated(i)) continue;
       if (cand < 0 || sets[i] < sets[cand]) cand = i;
     }
     if (cand < 0) break;

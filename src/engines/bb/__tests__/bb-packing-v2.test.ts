@@ -13,23 +13,31 @@ import { packingCapFor, distributePackingSets, planPackingDrops, isPackingActive
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 const EQ = ['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight'];
 
-function backSets(plan: any): number {
+function muscleSets(plan: any, muscle: string): number {
   let s = 0;
   for (const w of plan.weeks) for (const sess of w.sessions) for (const e of sess.exercises) {
     if ((e as any).warmupActivator) continue;
-    if ((e as any).muscle === 'back') s += (e as any).workSets?.length || (e as any).sets || 0;
+    if ((e as any).muscle === muscle) s += (e as any).workSets?.length || (e as any).sets || 0;
   }
   return s;
 }
 
-/** Слоты упражнений спины за неделю (сумма по сессиям — именно они душат счётчик сессии). */
-function backSlots(plan: any): number {
+function backSets(plan: any): number {
+  return muscleSets(plan, 'back');
+}
+
+/** Слоты упражнений мышцы за неделю (сумма по сессиям — именно они душат счётчик сессии). */
+function muscleSlots(plan: any, muscle: string): number {
   let n = 0;
   for (const w of plan.weeks) for (const sess of w.sessions) for (const e of sess.exercises) {
     if ((e as any).warmupActivator) continue;
-    if ((e as any).muscle === 'back') n++;
+    if ((e as any).muscle === muscle) n++;
   }
   return n;
+}
+
+function backSlots(plan: any): number {
+  return muscleSlots(plan, 'back');
 }
 
 function backExCount(plan: any): number {
@@ -105,6 +113,20 @@ describe('planPackingDrops — сброс хвостов', () => {
     // Перелив не влезает в капы — null (хвост 5, головам осталось 1+1).
     expect(planPackingDrops([4, 5, 4], [5, 5, 5], [false, false, false], items(['a', 'a', 'a']), 2)).toBeNull();
   });
+
+  it('mandated не сбрасывается (PPL-мандат переживает заливку)', () => {
+    // Хвост-маленький (idx2, 2 сета) — но mandated (incline в PPL):
+    // сбрасывается idx1 (4 сета, не мандат), перелив в idx0.
+    const r = planPackingDrops(
+      [4, 4, 2], [6, 6, 6], [false, false, false],
+      items(['horizontal_push', 'horizontal_push', 'horizontal_push']),
+      2,
+      [false, false, true],
+    );
+    expect(r).not.toBeNull();
+    expect(r!.keep[2]).toBe(true);
+    expect(r!.sets.reduce((a, b) => a + b, 0)).toBe(10);
+  });
 });
 
 describe('Packing-v2 в плане (пилот back)', () => {
@@ -150,11 +172,13 @@ describe('Packing-v2 в плане (пилот back)', () => {
     expect(v.issues.filter(i => i.level === 'error')).toHaveLength(0);
   });
 
-  it('weak back + флаг: скип (паритет объёма, штампа нет)', () => {
+  it('weak back + флаг: спина не пакуется (паритет объёма)', () => {
+    // Скип per-muscle: back-сессии weak-цели идут legacy; штамп плана
+    // может стоять за счёт других мышц (грудь/ягодицы пакуются).
     const off = buildBBPlan({ ...base, weakPoints: ['back'] });
     const on = buildBBPlan({ ...base, weakPoints: ['back'], packingV2: true });
     expect(Math.abs(backSets(on) - backSets(off))).toBeLessThanOrEqual(2);
-    expect(isPackingActive(on)).toBe(false);
+    expect(backSlots(on)).toBe(backSlots(off));
   });
 
   it('без флага — legacy (штампа нет, капы 5 целы)', () => {
@@ -179,8 +203,11 @@ describe('Packing-v2 матрица по сплитам', () => {
       const input: any = { patternId, level: p.level, trainingYears: p.trainingYears, goal: 'mass', weeks: 1, workMax: WM, equipment: EQ, volumeGoal: 'mav' };
       const off = buildBBPlan({ ...input });
       const on = buildBBPlan({ ...input, packingV2: true });
-      expect(Math.abs(backSets(on) - backSets(off)), `${patternId}/${p.level}: дрейф объёма`).toBeLessThanOrEqual(2);
-      expect(backSlots(on), `${patternId}/${p.level}: слоты`).toBeLessThanOrEqual(backSlots(off));
+      // Все пакуемые мышцы: объём ±2, слотов не больше.
+      for (const m of ['back', 'chest', 'quads', 'hamstrings', 'glutes']) {
+        expect(Math.abs(muscleSets(on, m) - muscleSets(off, m)), `${patternId}/${p.level}/${m}: дрейф`).toBeLessThanOrEqual(2);
+        expect(muscleSlots(on, m), `${patternId}/${p.level}/${m}: слоты`).toBeLessThanOrEqual(muscleSlots(off, m));
+      }
       // Валидность: packing не добавляет ошибок (предсуществующие капы
       // счётчика enhanced, напр. upper_lower 18/15 > 14, есть и без флага).
       const vOn = validateBBPlan(on, { level: p.level });
