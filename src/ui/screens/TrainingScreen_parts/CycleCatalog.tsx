@@ -135,7 +135,7 @@ export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle })
 // ── Чип-кнопка — красиво, без бега
 function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{
+    <button className="lib-chip" data-active={active ? 'true' : 'false'} onClick={onClick} style={{
       padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer',
       whiteSpace: 'normal', wordBreak: 'break-word', transition: 'all 0.2s',
       background: active ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
@@ -143,6 +143,15 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
       boxShadow: active ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
     }}>{label}</button>
   );
+}
+
+/** Безопасное чтение избранного: битый storage (объект/строка/число) → [] вместо краша рендера. */
+export function readCycleFavs(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem('he_cycle_fav') || '[]');
+    if (!Array.isArray(v)) return [];
+    return v.filter((x): x is string => typeof x === 'string');
+  } catch { return []; }
 }
 
 export const CycleCatalog: React.FC<Props> = (p) => {
@@ -156,15 +165,19 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const [author, setAuthor] = React.useState('all');
   const [showRec, setShowRec] = React.useState(false);
   // ⭐ Избранные циклы (he_cycle_fav)
-  const [favs, setFavs] = React.useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_cycle_fav') || '[]'); } catch { return []; }
-  });
+  const [favs, setFavs] = React.useState<string[]>(readCycleFavs);
   const [favOnly, setFavOnly] = React.useState(false);
   React.useEffect(() => {
     try { localStorage.setItem('he_cycle_fav', JSON.stringify(favs)); } catch { /* ignore */ }
   }, [favs]);
-  const toggleFav = (id: string) => setFavs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const favCycles = React.useMemo(() => LMS_CYCLES.filter(c => favs.includes(c.meta.id)), [favs]);
+  const toggleFav = (id: string) => setFavs(prev => {
+    const arr = Array.isArray(prev) ? prev : [];
+    return arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
+  });
+  const favCycles = React.useMemo(
+    () => (Array.isArray(favs) ? LMS_CYCLES.filter(c => favs.includes(c.meta.id)) : []),
+    [favs],
+  );
 
   const base = React.useMemo(() => {
     if (cat === 'all') return LMS_CYCLES;
@@ -186,7 +199,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (weeks !== 'all' && weeksBucket(m.weeks) !== weeks) return false;
       if (freq !== 'all' && String(m.sessionsPerWeek) !== freq) return false;
       if (author !== 'all' && !(m.tags || []).includes(author)) return false;
-      if (q && !(`${m.title} ${m.description} ${m.howItWorks}`.toLowerCase().includes(q))) return false;
+      if (q && !(`${m.title || ''} ${m.description || ''} ${m.howItWorks || ''}`.toLowerCase().includes(q))) return false;
       return true;
     });
   }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs]);
@@ -217,6 +230,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
   const resetFilters = () => {
     setFocus('all'); setLevelF('all'); setPeriod('all'); setWeeks('all'); setFreq('all'); setAuthor('all'); setSearch('');
+    setFavOnly(false);
   };
 
   const focusLabel = cat === 'strength' ? 'Направление' : cat === 'bodybuilding' ? 'Специализация' : 'Специализация / направление';
@@ -371,7 +385,18 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
       {/* ── Сгруппированный список ── */}
       {filtered.length === 0 && (
-        <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', padding: 20 }}>По выбранным фильтрам циклов не найдено.</div>
+        <div className="lib-empty" style={{ fontSize: 12, color: '#fff', textAlign: 'center', padding: 20, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+          <div style={{ fontSize: 28 }}>🗂</div>
+          <div style={{ fontWeight: 800 }}>Ничего не найдено</div>
+          <div style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.5 }}>
+            {favOnly && favs.length === 0
+              ? 'Включён фильтр «⭐ Избранное», а избранных циклов пока нет — нажмите ⭐ на карточке цикла.'
+              : 'По выбранным фильтрам циклов не найдено — ослабьте условия поиска.'}
+          </div>
+          <button onClick={resetFilters} style={{ padding: '10px 20px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 48, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)' }}>
+            Показать всё ({LMS_CYCLES.length})
+          </button>
+        </div>
       )}
       {grouped.map(([fk, cycles]) => (
         <div key={fk} className="lib-group">

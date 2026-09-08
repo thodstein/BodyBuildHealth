@@ -72,10 +72,16 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
   const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const [bbFavs, setBbFavs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV) || '[]'); } catch { return []; }
+    try {
+      const v = JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV) || '[]');
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    } catch { return []; }
   });
   const [plFavs, setPlFavs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.CYCLE_FAV) || '[]'); } catch { return []; }
+    try {
+      const v = JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.CYCLE_FAV) || '[]');
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    } catch { return []; }
   });
 
   const toggleBbFav = (id: string) => {

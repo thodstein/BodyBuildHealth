@@ -70,7 +70,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const [newExRir, setNewExRir] = useState(2);
   const [savedPlans, setSavedPlans] = useState<{ id: string; name: string; date: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); return (Array.isArray(v) ? v : []).filter((p: any) => p && typeof p === 'object' && typeof p.id === 'string' && Array.isArray(p.exercises)); } catch { return []; } });
   const [planName, setPlanName] = useState('');
-  const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); } catch { return []; } });
+  const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); return Array.isArray(v) ? v.filter((p: unknown) => p && typeof p === 'object' && typeof (p as { id?: unknown }).id === 'string') : []; } catch { return []; } });
   const [cycleName, setCycleName] = useState('');
   const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'|'progress'>('exercises');
 

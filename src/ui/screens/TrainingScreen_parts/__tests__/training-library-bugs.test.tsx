@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { CycleCatalog, CYCLE_FREQ_OPTS } from '../CycleCatalog';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { CycleCatalog, CYCLE_FREQ_OPTS, readCycleFavs } from '../CycleCatalog';
 import { safeE1rm, weekKeyForDate } from '../MyTrainingTab';
 import { plCycleMatchesGoal } from '../ManualLibraryGallery';
 import { LibraryZone } from '../LibraryZone';
@@ -55,6 +55,27 @@ describe('Библиотека PRO — багфиксы', () => {
     expect(container.querySelector('.lib-filters')).not.toBeNull();
     expect(container.querySelector('.lib-rec')).not.toBeNull();
     expect(screen.queryByText('📖 Каталог тренировочных циклов')).toBeNull();
+  });
+
+  it('B6: битый he_cycle_fav не роняет каталог', () => {
+    for (const bad of ['{"a":1}', '"just-string"', '123', 'not-json{']) {
+      try { localStorage.setItem('he_cycle_fav', bad); } catch { /* ignore */ }
+      expect(readCycleFavs()).toEqual([]);
+    }
+    try { localStorage.removeItem('he_cycle_fav'); } catch { /* ignore */ }
+  });
+
+  it('B6: favOnly-ловушка — пустое состояние с кнопкой «Показать всё»', () => {
+    try { localStorage.removeItem('he_cycle_fav'); } catch { /* ignore */ }
+    render(<CycleCatalog goal="strength" level="II-KMS" daysPerWeek={3} />);
+    fireEvent.click(screen.getByText(/Избранное \(0\)/));
+    expect(screen.getByText('Ничего не найдено')).toBeTruthy();
+    const showAll = screen.getByText(/Показать всё \(/);
+    expect(showAll).toBeTruthy();
+    fireEvent.click(showAll);
+    expect(screen.queryByText('Ничего не найдено')).toBeNull();
+    expect(document.querySelector('.lib-empty')).toBeNull();
+    cleanup();
   });
 
   it('LibraryZone — корень .train-library с data-lib-tab', () => {
