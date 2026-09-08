@@ -45,7 +45,7 @@ export const RiskOverview: React.FC<{
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
   const [showSections, setShowSections] = useState<Record<string, boolean>>({
     overall:true, dynamics:!!weeklyDynamics, systems:true, key:true, sources:true,
-    recs:true, history:true, thresholds:true,
+    recs:true, history:true, thresholds:true, support_coverage:true,
   });
   const toggle = (k: string) => setShowSections(s => ({ ...s, [k]: !s[k] }));
 
@@ -211,9 +211,10 @@ export const RiskOverview: React.FC<{
             const sysLabels: Record<string, string> = { cardio:'❤️ Сердце', hepatic:'🫁 Печень', renal:'🫘 Почки', neuro:'🧠 Нервная', endocrine:'⚖️ Эндокринная', hematologic:'🩸 Кровь', reproductive:'🧬 Репрод.', musculoskeletal:'💪 Мышцы' };
             const riskMap = riskResult?.systemBreakdown || {};
             return systems.map(sys => {
+              // P0 fix: riskMap[].net уже после поддержки, не умножаем повторно
               const coverage = supportData[sys] || 0;
-              const riskVal = riskMap[sys]?.net || 0;
-              const netRisk = Math.max(0, riskVal * (1 - coverage));
+              const raw = riskMap[sys]?.raw ?? 0;
+              const net = riskMap[sys]?.net ?? Math.max(0, raw * (1 - coverage));
               const pct = Math.round(coverage * 100);
               return (
                 <div key={sys} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px', borderRadius:12 }}>
@@ -224,7 +225,7 @@ export const RiskOverview: React.FC<{
                     </div>
                     <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{pct}%</span>
                   </div>
-                  <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Риск: {Math.round(riskVal)}% → {Math.round(netRisk)}%</div>
+                  <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Риск: {Math.round(raw)}% → {Math.round(net)}%</div>
                 </div>
               );
             });
