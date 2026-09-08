@@ -150,6 +150,25 @@ function todayStr(): string {
   return todayLocalStr();
 }
 
+/** Ячейка CSV по RFC 4180: запятые/кавычки/переносы в заметках не рвут структуру. */
+export function csvCell(v: unknown): string {
+  const s = String(v ?? '');
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Валидация импорта дневника: массив или {entries}, только корректные записи. */
+export function validateDiaryImport(parsed: unknown): DiaryEntry[] {
+  const list: unknown = Array.isArray(parsed)
+    ? parsed
+    : (parsed as { entries?: unknown } | null)?.entries;
+  if (!Array.isArray(list)) return [];
+  return (list as DiaryEntry[]).filter(e =>
+    !!e && typeof (e as DiaryEntry).date === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test((e as DiaryEntry).date) &&
+    !!(e as DiaryEntry).substances && typeof (e as DiaryEntry).substances === 'object'
+  );
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
@@ -718,6 +737,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [filterSub, setFilterSub] = useState('');
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyLimit, setHistoryLimit] = useState(20);
+  // Инлайн-статус импорта вместо блокирующих alert() на телефоне
+  const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   // Персист настроек напоминаний (раньше слетали при каждом монтировании)
   useEffect(() => {
@@ -1366,14 +1387,16 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                  background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 600, fontSize: 10,
                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
                }}>📥 JSON</button>
-               <button onClick={() => {
-                 const csv = ['Date,Substance,Taken,Dose,TimeSlot,SideEffects,Mood,Notes'];
-                 entries.forEach(e => {
-                   Object.entries(e.substances).forEach(([subId, v]) => {
-                     csv.push(`${e.date},${subId},${v.taken},${v.dose || ''},${v.timeSlot || ''},${(v.sideEffects || []).join(';')},${e.mood || ''},${e.notes || ''}`);
-                   });
-                 });
-                 const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+                <button onClick={() => {
+                  const header = ['Date,Substance,Taken,Dose,TimeSlot,SideEffects,Mood,Notes'];
+                  const rows: string[] = [];
+                  entries.forEach(e => {
+                    Object.entries(e.substances).forEach(([subId, v]) => {
+                      rows.push([e.date, subId, v.taken, v.dose || '', v.timeSlot || '', (v.sideEffects || []).join(';'), e.mood || '', e.notes || ''].map(csvCell).join(','));
+                    });
+                  });
+                  // BOM — иначе Excel открывает кириллицу кракозябрами
+                  const blob = new Blob(['\uFEFF' + header.concat(rows).join('\n')], { type: 'text/csv' });
                  const url = URL.createObjectURL(blob);
                  const a = document.createElement('a');
                  a.href = url;
@@ -1398,32 +1421,32 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                     reader.onload = () => {
                       try {
                         const parsed = JSON.parse(reader.result as string);
-                        const imported: DiaryEntry[] = Array.isArray(parsed) ? parsed
-                          : Array.isArray(parsed?.entries) ? parsed.entries : [];
-                        const valid = imported.filter(e =>
-                          e && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) &&
-                          e.substances && typeof e.substances === 'object'
-                        );
-                        if (valid.length === 0) { alert('Файл не содержит корректных записей дневника'); return; }
+                        const valid = validateDiaryImport(parsed);
+                        if (valid.length === 0) { setImportMsg({ text: 'Файл не содержит корректных записей дневника', ok: false }); return; }
                         const merged = new Map<string, DiaryEntry>();
-                        for (const e of entries) merged.set(e.date, e);
+                        for (const en of entries) merged.set(en.date, en);
                         let added = 0, updated = 0;
-                        for (const e of valid) {
-                          if (merged.has(e.date)) updated++;
+                        for (const en of valid) {
+                          if (merged.has(en.date)) updated++;
                           else added++;
-                          merged.set(e.date, { ...merged.get(e.date), ...e });
+                          merged.set(en.date, { ...merged.get(en.date), ...en });
                         }
                         const result = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
                         saveDiary(result);
                         setEntries(result);
-                        alert(`Импорт завершён: +${added} новых, ${updated} обновлено`);
-                      } catch { alert('Ошибка чтения файла. Убедитесь, что это валидный JSON-экспорт дневника.'); }
+                        setImportMsg({ text: `Импорт завершён: +${added} новых, ${updated} обновлено`, ok: true });
+                      } catch { setImportMsg({ text: 'Ошибка чтения файла. Убедитесь, что это валидный JSON-экспорт дневника.', ok: false }); }
                     };
                     reader.readAsText(file);
                     e.target.value = '';
                   }} />
                 </label>
               </div>
+              {importMsg && (
+                <div style={{ marginTop: 6, padding: '8px 12px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: importMsg.ok ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)', border: importMsg.ok ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(239,68,68,0.2)', color: importMsg.ok ? '#00e68a' : '#f87171' }}>
+                  {importMsg.ok ? '✅ ' : '⚠ '}{importMsg.text}
+                </div>
+              )}
            </div>
 
       {editingDate ? (
