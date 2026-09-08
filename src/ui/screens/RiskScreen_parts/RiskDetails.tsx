@@ -84,6 +84,11 @@ export const RiskDetails: React.FC<{
         <button onClick={() => setExpanded(new Set(CORE_SYSTEMS))} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background: allOpen ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.06)', border: allOpen ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▼ Развернуть все</button>
         <button onClick={() => setExpanded(new Set())} style={{ flex:1, minHeight:44, borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>▲ Свернуть{allOpen || expanded.size > 0 ? ` (${expanded.size})` : ''}</button>
       </div>
+      <div className="risk-systems-nav" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 10px', marginBottom:10, scrollbarWidth:'none' }}>
+        {CORE_SYSTEMS.map(s => (
+          <button key={s} onClick={() => { setExpanded(prev => new Set(prev).add(s)); try { setTimeout(() => document.getElementById(`risk-detail-${s}`)?.scrollIntoView({ behavior:'smooth', block:'start' }), 50); } catch {} }} aria-label={SYSTEM_LABELS_RU[s] || s} style={{ flexShrink:0, minHeight:44, padding:'8px 14px', borderRadius:999, fontSize:13, fontWeight:800, cursor:'pointer', background: expanded.has(s) ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.06)', border: expanded.has(s) ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{SYSTEM_ICONS[s] || ''} {(SYSTEM_LABELS_RU[s] || s).split(' ')[0]}</button>
+        ))}
+      </div>
       {/* Per-system detail cards */}
       {CORE_SYSTEMS.map(coreSys => {
         const info = SYSTEM_INFO[coreSys];
@@ -96,7 +101,7 @@ export const RiskDetails: React.FC<{
         const mechs = SYSTEM_MECHANISMS[coreSys] || [];
 
         return (
-          <div key={coreSys} className="risk-system-card" style={{ marginBottom:10, borderRadius:18, overflow:'hidden', background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 10px 26px rgba(0,0,0,0.18)' }}>
+          <div key={coreSys} id={`risk-detail-${coreSys}`} className="risk-system-card" style={{ marginBottom:10, borderRadius:18, overflow:'hidden', background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 10px 26px rgba(0,0,0,0.18)', scrollMarginTop:170 }}>
             <button onClick={() => toggle(coreSys)} aria-expanded={isOpen} style={{
               display:'flex', alignItems:'center', gap:10, width:'100%', minHeight:60, padding:'13px 14px', cursor:'pointer', textAlign:'left',
               background: netPct > 40 ? `rgba(${netPct > 70 ? '239,68,68' : '249,115,22'},0.08)` : 'transparent',

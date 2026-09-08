@@ -58,4 +58,18 @@ describe('RiskDetails expand-all', () => {
     fireEvent.click(getByText(/▲ Свернуть/));
     expect(queryAllByText('⚙️ Механизмы').length).toBe(0);
   });
+
+  it('3. лента якорей: 8 чипов, клик раскрывает систему', () => {
+    const { getAllByText, getByLabelText } = render(
+      <RiskDetails
+        riskResult={mockResult()}
+        labRiskContributions={null}
+        isSyntheticLab={false}
+      />,
+    );
+    // По умолчанию раскрыта только cardio.
+    expect(getAllByText('⚙️ Механизмы').length).toBe(1);
+    fireEvent.click(getByLabelText('Печень'));
+    expect(getAllByText('⚙️ Механизмы').length).toBe(2);
+  });
 });

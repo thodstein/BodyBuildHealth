@@ -234,7 +234,13 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   // ── Понедельная динамика ──
   const weeklyData = useMemo(() => {
     if (!course.length || !result || !courseSummary) return null;
-    const weeks = Math.max(course.reduce((m, c) => Math.max(m, (c.endWeek || 12)), 0) + 4, 8);
+    // NOTE: хвост = 3 полувыведения на препарат (как maxEnd движка), а не
+    // фикс +4: иначе у длинных эфиров (деканоат ~2 нед T½ → +6 нед смыва)
+    // график обрезал хвост распада.
+    const weeks = Math.max(course.reduce((m, c) => {
+      const hl = (PHARMA_DB as any)?.[(c.substanceId || '').toLowerCase()]?.pk?.halfLifeHours ?? 168;
+      return Math.max(m, (c.endWeek || 12) + Math.ceil((hl / 168) * 3));
+    }, 0), 8);
     const data: { week: number; risk: number }[] = [];
     for (let w = 0; w <= weeks; w++) {
       const weeklyDrugs = course.map(c => {
