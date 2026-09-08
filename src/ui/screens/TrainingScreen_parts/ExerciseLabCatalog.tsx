@@ -92,16 +92,16 @@ const ExerciseLabCatalog: React.FC<{
   const filterReset = () => setVisible(40);
 
   return (
-    <div className="train-exlabcatalog" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🏋️ Каталог упражнений</div>
-      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
+    <div className="train-exlabcatalog lib-exlab" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+      <div className="lib-title" style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🏋️ Каталог упражнений</div>
+      <div className="lib-intro" style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         Полный каталог упражнений (~500+) с фильтрами, биомеханикой, техникой и распределением нагрузки.
         Кликните по упражнению для полной информации.
       </div>
 
       {/* Фильтры */}
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '10px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setVisible(40); }}
+      <div className="lib-filters" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '10px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
+        <input className="lib-search" type="text" value={search} onChange={e => { setSearch(e.target.value); setVisible(40); }}
           placeholder="🔍 Поиск по названию, мышце, технике..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box', marginBottom: 8 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <PopupSelect label="Группа" value={group} options={groupOptions} onChange={v => { setGroup(v); filterReset(); }} />
@@ -112,7 +112,7 @@ const ExerciseLabCatalog: React.FC<{
       </div>
 
       {/* Список упражнений */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto', paddingRight: 2 }}>
+      <div className="lib-list" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto', paddingRight: 2 }}>
         {visibleList.map(ex => {
           const isSelected = selectedEx?.id === ex.id;
           const equipIcon = EQUIP_ICON[ex.equipment] || '📦';

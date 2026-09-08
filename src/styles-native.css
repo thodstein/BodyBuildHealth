@@ -7158,6 +7158,50 @@ html.app-native .hub-diary .train-diarytools .tl-backup button:focus-visible {
   }
 }
 
+/* ─── 84. TRAINING DIARY PRO-9 — главная истории, аналитика, тулзы ───
+ * th-main (статы/heatmap/графики), внутренние карточки аналитики,
+ * прямые секции инструментов, точки привычек 28px.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Главная карточка истории: стекло 20px, статы tabular ── */
+html.app-native .train-diaryhistory .th-main {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Внутренние карточки аналитики: единый вид (кроме шапок/секций) ── */
+html.app-native .train-diaryanalytics > div > div:not(.ta-stats):not(.sec-head) {
+  border-radius: 20px !important;
+}
+
+/* ── Прямые секции инструментов: единый вид ── */
+html.app-native .hub-diary .train-diarytools > div {
+  border-radius: 20px !important;
+}
+
+/* ── Привычки: точки-тапы 28px, счётчик tabular ── */
+html.app-native .hub-diary .hab-week [style*='flex: 1'] {
+  min-height: 28px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+}
+
+/* Фокус новых зон */
+html.app-native .train-diaryhistory .th-main:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-diaryhistory .th-main {
+    animation: none !important;
+  }
+}
+
 /* ─── 80. TRAINING DIARY PRO-5 — ритуалы: психика/мобильность/чек-ин/MMC ───
  * Чек-ины/шкалы/настроение под палец (было 36px и мельче), поля 48px/16px,
  * карточки-стекло с акцентной кромкой по смыслу, добор читаемости.
@@ -7317,6 +7361,505 @@ html.app-native .hub-diary .train-mmctrack select:focus-visible {
   html.app-native .hub-diary .train-mobility button:active,
   html.app-native .hub-diary .train-mobility .mb-foot button:active {
     transform: none !important;
+  }
+}
+
+/* ─── 84. TRAINING LIBRARY PRO — библиотека тренировок уровня топ-приложения ───
+ * Зона «Библиотека»: каталог циклов, программы, мои тренировки, методики,
+ * каталог упражнений + галерея/drawer/пикер конструкторов.
+ * Хуки: .train-library (.lib-hero), .lib-cycles (.lib-intro/.lib-title/.lib-seg/
+ * .lib-search/.lib-filters/.lib-fav/.lib-rec/.lib-group), .lib-programs
+ * (.lib-filters/.lib-chips/.lib-grid/.lib-card/.lib-detail/.lib-back/.lib-weeks/
+ * .lib-days), .lib-methods (.lib-composite/.lib-cta/.lib-cats), .lib-exlab
+ * (.lib-filters/.lib-search/.lib-list), .lib-mytraining (.lib-subnav/.lib-pane/
+ * .lib-form), .lib-manlib (.lib-seg/.lib-filters/.lib-search/.lib-grid/.lib-card),
+ * .lib-drawer (.lib-seg/.lib-search/.lib-list), .lib-picker (.lib-search/
+ * .lib-chips/.lib-list/.lib-sheet/.lib-sheetbody).
+ * Навигация: липкие фильтры с блюром, чипы-лента со snap, сегменты 48px,
+ * поиск 48px/16px (без iOS-зума), карточки-стекло 18px, press 0.98,
+ * focus-visible лайм, цифры tabular, сетки auto-fit на 360, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Корень зоны: дыхание снизу, зазоры ── */
+html.app-native .train-library {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+/* ── Hero зоны: стекло с лайм-кромкой, компакт ── */
+html.app-native .train-library .lib-hero {
+  border-radius: 20px !important;
+  padding: 14px 16px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+/* ── Внутренние заголовки/интро: компакт, без дубля hero ── */
+html.app-native .train-library .lib-title {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .train-library .lib-intro {
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(140, 190, 255, 0.1) !important;
+}
+
+/* ── Сегменты (ББ/ПЛ, Силовые/ББ/Все): 48px, скролл-лента ── */
+html.app-native .train-library .lib-seg {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding: 6px !important;
+  border-radius: 16px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+
+html.app-native .train-library .lib-seg::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-library .lib-seg button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 16px !important;
+  flex: 1 0 auto !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-library .lib-seg button:active {
+  transform: scale(0.97) !important;
+}
+
+/* ── Поиск: 48px/16px, без iOS-зума, липкий ── */
+html.app-native .train-library .lib-search {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+  padding: 12px 14px !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(140, 190, 255, 0.16) !important;
+  color: #fff !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* ── Фильтры: липкая панель-стекло ── */
+html.app-native .train-library .lib-filters {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 14 !important;
+  border-radius: 18px !important;
+  padding: 12px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-filters select {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .train-library .lib-filters button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+/* ── Чипы-лента: горизонтальный скролл со snap вместо wrap ── */
+html.app-native .train-library .lib-chips {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-library .lib-chips::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-library .lib-chips button {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  min-height: 40px !important;
+  min-width: 40px !important;
+}
+
+/* ── Сетки карточек: стекло, auto-fit, press ── */
+html.app-native .train-library .lib-grid {
+  gap: 10px !important;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+}
+
+html.app-native .train-library .lib-card {
+  border-radius: 18px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-card:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .train-library .lib-card button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+/* ── Группы каталога: заголовок-пилюля с лайм-счётом ── */
+html.app-native .train-library .lib-group {
+  border-radius: 16px !important;
+  padding: 4px 2px !important;
+}
+
+/* ── Избранное/рекомендации: стекло с жёлтой/лайм-кромкой ── */
+html.app-native .train-library .lib-fav {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-fav button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-library .lib-rec {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-rec button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+/* ── Детали программы: липкая кнопка «назад», недели-лента ── */
+html.app-native .train-library .lib-detail {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-library .lib-detail .lib-back {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html.app-native .train-library .lib-weeks {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-library .lib-weeks::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-library .lib-weeks button {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+/* ── Дни недели 7-колоночные: скролл в ширину на телефоне ── */
+html.app-native .train-library .lib-days {
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  grid-template-columns: repeat(7, minmax(72px, 1fr)) !important;
+}
+
+html.app-native .train-library .lib-days::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Методики: композиция липкая, CTA 52px, категории-стекло ── */
+html.app-native .train-library .lib-composite {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  border-radius: 16px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html.app-native .train-library .lib-composite button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+}
+
+html.app-native .train-library .lib-cta {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.35) !important;
+}
+
+html.app-native .train-library .lib-cats {
+  gap: 8px !important;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+
+html.app-native .train-library .lib-cats button {
+  min-height: 56px !important;
+  border-radius: 14px !important;
+  text-align: left !important;
+}
+
+/* ── Каталог упражнений: список-стекло, строки 48px ── */
+html.app-native .train-library .lib-exlab .lib-list {
+  gap: 8px !important;
+  max-height: 60vh !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+}
+
+html.app-native .train-library .lib-exlab .lib-list > div {
+  border-radius: 16px !important;
+}
+
+html.app-native .train-library .lib-exlab .lib-list > button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── Мои тренировки: поднавигация-лента, форма-стекло ── */
+html.app-native .train-library .lib-subnav {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-library .lib-subnav::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-library .lib-subnav button {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+}
+
+html.app-native .train-library .lib-form {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-form input,
+html.app-native .train-library .lib-form select {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-library .lib-form button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .train-library .lib-pane button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Drawer галереи: лента табов, список, строки-тапы ── */
+html.app-native .lib-drawer .lib-seg {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .lib-drawer .lib-seg::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .lib-drawer .lib-seg button {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  padding: 10px 16px !important;
+}
+
+html.app-native .lib-drawer .lib-search {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .lib-drawer .lib-list {
+  gap: 8px !important;
+}
+
+html.app-native .lib-drawer .lib-list button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Пикер программ: шит с пружиной, опции 48px ── */
+html.app-native .lib-picker .lib-sheet {
+  border-radius: 22px !important;
+  animation-name: libSheetUp !important;
+  animation-duration: 0.28s !important;
+  animation-timing-function: ease-out !important;
+}
+
+html.app-native .lib-picker .lib-sheetbody {
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.app-native .lib-picker .lib-search {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .lib-picker .lib-chips {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .lib-picker .lib-chips::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .lib-picker .lib-chips button {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  min-height: 40px !important;
+}
+
+html.app-native .lib-picker .lib-list {
+  gap: 8px !important;
+}
+
+html.app-native .lib-picker .lib-list button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+
+@keyframes libSheetUp {
+  from {
+    transform: translateY(24px) !important;
+    opacity: 0.6 !important;
+  }
+  to {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Табличные цифры объёмов/сетов ── */
+html.app-native .train-library .lib-card,
+html.app-native .train-library .lib-detail,
+html.app-native .train-library .lib-form {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Focus-visible: лайм-кольцо ── */
+html.app-native .train-library .lib-seg button:focus-visible,
+html.app-native .train-library .lib-filters button:focus-visible,
+html.app-native .train-library .lib-filters select:focus-visible,
+html.app-native .train-library .lib-filters input:focus-visible,
+html.app-native .train-library .lib-search:focus-visible,
+html.app-native .train-library .lib-card button:focus-visible,
+html.app-native .train-library .lib-weeks button:focus-visible,
+html.app-native .train-library .lib-subnav button:focus-visible,
+html.app-native .train-library .lib-form button:focus-visible,
+html.app-native .train-library .lib-form input:focus-visible,
+html.app-native .train-library .lib-cta:focus-visible,
+html.app-native .train-library .lib-cats button:focus-visible,
+html.app-native .train-library .lib-back:focus-visible,
+html.app-native .lib-drawer .lib-seg button:focus-visible,
+html.app-native .lib-drawer .lib-search:focus-visible,
+html.app-native .lib-drawer .lib-list button:focus-visible,
+html.app-native .lib-picker .lib-search:focus-visible,
+html.app-native .lib-picker .lib-chips button:focus-visible,
+html.app-native .lib-picker .lib-list button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Мобайл 360: сетки в столбик, hero компакт ── */
+@media (max-width: 380px) {
+  html.app-native .train-library .lib-hero {
+    padding: 10px 12px !important;
+  }
+  html.app-native .train-library .lib-grid {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-library .lib-cats {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+  }
+  html.app-native .train-library .lib-composite {
+    flex-wrap: wrap !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-card:active,
+  html.app-native .train-library .lib-seg button:active,
+  html.app-native .lib-picker .lib-sheet {
+    transform: none !important;
+    animation: none !important;
   }
 }
 

@@ -67,6 +67,8 @@ function uniqKeys(cycles: SRCycleTemplate[], cat: CatFilter): string[] {
 const LEVELS: UserLevel[] = ['novice', 'II-KMS', 'KMS-MS', 'MS-MSMK', 'II-MS', 'intermediate'];
 const PERIODS = ['strength', 'peak', 'mass', 'endurance', 'mixed'];
 const AUTHORS = ['lms', 'bodybuilding', 'surovetsky', 'sheiko', 'solovyov', 'muravyov'];
+/** Доступные частоты фильтра (дн/нед) — 5-дневные циклы обязаны быть выбираемыми. */
+export const CYCLE_FREQ_OPTS = ['2', '3', '4', '5', '6'];
 
 function weeksBucket(w: number): string {
   if (w <= 8) return 'w8';
@@ -220,14 +222,11 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const focusLabel = cat === 'strength' ? 'Направление' : cat === 'bodybuilding' ? 'Специализация' : 'Специализация / направление';
 
   return (
-    <div className="train-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ background:'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(0,230,138,0.08))', border:'1px solid rgba(245,158,11,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}><span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.25)', fontSize:16 }}>📖</span><div><div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Каталог циклов</div><div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>Готовые циклы ПЛ и ББ с фильтрами и раскладкой</div></div></div><span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>каталог</span></div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 2 }}>📖 Каталог тренировочных циклов</div>
-      <div style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов. Выберите тип (силовые / бодибилдинг), уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
+    <div className="train-cycles lib-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов. Выберите тип (силовые / бодибилдинг), уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
 
       {/* ── Сегмент-контрол: Силовые / Бодибилдинг / Все ── */}
-      <div style={{ display: 'flex', gap: 4, padding: '6px', borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="lib-seg" style={{ display: 'flex', gap: 4, padding: '6px', borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
         {([
           { id: 'all' as CatFilter, label: 'Все', icon: '📚' },
           { id: 'strength' as CatFilter, label: 'Силовые', icon: '🏆' },
@@ -246,6 +245,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
       {/* ── Поиск ── */}
       <input
+        className="lib-search"
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="🔎 Поиск по названию и описанию…"
@@ -253,7 +253,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       />
 
       {/* ── Подфильтры ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="lib-filters" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -300,7 +300,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={freq === 'all'} onClick={() => setFreq('all')} />
-              {['2', '3', '4', '6'].map(f => (
+              {CYCLE_FREQ_OPTS.map(f => (
                 <Chip key={f} label={`${f} дн/нед`} active={freq === f} onClick={() => setFreq(freq === f ? 'all' : f)} />
               ))}
             </div>
@@ -329,7 +329,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
       {/* ⭐ Избранные циклы */}
       {favCycles.length > 0 && (
-        <div style={{ background: 'rgba(250,204,21,0.05)', borderRadius: 12, border: '1px solid rgba(250,204,21,0.18)', padding: 10 }}>
+        <div className="lib-fav" style={{ background: 'rgba(250,204,21,0.05)', borderRadius: 12, border: '1px solid rgba(250,204,21,0.18)', padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#facc15', marginBottom: 6 }}>⭐ Избранные циклы ({favCycles.length})</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {favCycles.map(c => {
@@ -349,7 +349,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       )}
 
       {/* ── Рекомендуемые для меня ── */}
-      <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 10 }}>
+      <div className="lib-rec" style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 10 }}>
         <button onClick={() => setShowRec(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: 0 }}>
           {showRec ? '▼' : '▶'} 💡 Рекомендуемые для меня
         </button>
@@ -374,7 +374,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', padding: 20 }}>По выбранным фильтрам циклов не найдено.</div>
       )}
       {grouped.map(([fk, cycles]) => (
-        <div key={fk}>
+        <div key={fk} className="lib-group">
           <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{FOCUS_LABELS[fk] || fk}</span>
             <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{cycles.length}</span>

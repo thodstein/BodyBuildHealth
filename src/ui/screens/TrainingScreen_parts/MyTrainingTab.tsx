@@ -29,6 +29,40 @@ import {
 import { applyToPlanner } from './planner-bridge';
 
 
+/** Безопасный расчётный 1ПМ (Эпли): reps>=30 или мусор → null вместо Infinity/отрицательных. */
+export function safeE1rm(weight: number, reps: number): number | null {
+  const w = Number(weight);
+  const r = Number(reps);
+  if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r < 1 || r >= 30) return null;
+  const denom = 1 - r / 30;
+  if (!(denom > 0)) return null;
+  return Math.round(w / denom);
+}
+
+/** Ключ недели для группировки тоннажа: ISO-неделя (YYYY-Www), локальные даты, мусор → null. */
+export function weekKeyForDate(iso: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isInteger(y) || !Number.isInteger(mo) || !Number.isInteger(d)) return null;
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(y, mo - 1, d, 12, 0, 0, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  const day = (dt.getDay() + 6) % 7;
+  const thursday = new Date(dt);
+  thursday.setDate(dt.getDate() - day + 3);
+  const isoYear = thursday.getFullYear();
+  const jan4 = new Date(isoYear, 0, 4, 12, 0, 0, 0);
+  const janDay = (jan4.getDay() + 6) % 7;
+  const week1Thu = new Date(jan4);
+  week1Thu.setDate(jan4.getDate() - janDay + 3);
+  const week = 1 + Math.round((thursday.getTime() - week1Thu.getTime()) / (7 * 86400000));
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
+}
+
 export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>>; goal?: string; level?: string; daysPerWeek?: number; mesoLength?: number; onLoadToConstructor?: (plan: { name: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }) => void }> = ({ customExercises, setCustomExercises, goal = 'bulk', level = 'intermediate', daysPerWeek = 4, mesoLength = 6, onLoadToConstructor }) => {
   const [newExName, setNewExName] = useState('');
   const [newExSets, setNewExSets] = useState(3);
@@ -55,16 +89,17 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
         for (const log of sorted) {
           for (const ex of (log as any).exercises || []) {
             const e = ex.exercise || ex.name || '';
-            const weight = parseFloat(ex.bestWeight || ex.weight || 0) || 0;
-            const reps = parseInt(ex.bestReps || ex.reps || 10) || 10;
+            const weight = parseFloat(ex.bestWeight ?? ex.weight ?? 0) || 0;
+            const reps = parseInt(ex.bestReps ?? ex.reps ?? 10, 10) || 10;
             if (e && weight > 0) {
-              const e1rm = Math.round(weight / (1 - reps / 30));
+              const e1rm = safeE1rm(weight, reps);
+              if (e1rm == null) continue;
               if (!e1rmByExercise[e]) e1rmByExercise[e] = [];
               e1rmByExercise[e].push({ date: log.date, e1rm });
             }
           }
           const dt = (log.date || '').slice(0, 10);
-          const wk = dt.slice(0, 7) + '-W' + Math.ceil(parseInt(dt.slice(8, 10)) / 7);
+          const wk = weekKeyForDate(dt) || 'nodate';
           const vol = ((log as any).exercises || []).reduce((s: number, ex: any) => s + (ex.totalVolume || 0), 0);
           (tonnageByWeek as any)[wk] = ((tonnageByWeek as any)[wk] || 0) + vol;
           totalTonnageAll += vol;
@@ -136,11 +171,11 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const groupOptions = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
 
   return (
-    <div className="train-mytraining">
-      <div style={{fontSize:14,fontWeight:700,color:'#00e68a',marginBottom:4}}>⭐ Моя тренировка</div>
-      <div style={{fontSize:11,color:'#fff',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
+    <div className="train-mytraining lib-mytraining">
+      <div className="lib-title" style={{fontSize:14,fontWeight:700,color:'#00e68a',marginBottom:4}}>⭐ Моя тренировка</div>
+      <div className="lib-intro" style={{fontSize:11,color:'#fff',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
 
-      <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+      <div className="lib-subnav" style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
         {(['exercises','plans','cycles','progress'] as const).map(t => (
           <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',background:subTab===t?'#00e68a':'rgba(24,24,27,0.55)',color:subTab===t?'#000':'#fff',border:subTab===t?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)'}}>
             {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':t==='cycles'?'🔄 Циклы':'📊 Прогресс'}
@@ -149,8 +184,8 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
       </div>
 
       {subTab === 'exercises' ? (
-        <div>
-          <div className="card" style={{padding:10,marginBottom:8}}>
+        <div className="lib-pane">
+          <div className="card lib-form" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:4}}>
               <div style={{fontSize:11,color:'#fff',paddingLeft:2}}>Упражнение</div>
@@ -279,13 +314,13 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                     const max = Math.max(...ex.history.map((d: any) => d.e1rm));
                     const low = Math.min(...ex.history.map((d: any) => d.e1rm));
                     const spread = max - low;
-                    const SHOWchied = ex.history.length > 1 ? Math.round(((max - ex.history[0].e1rm) / Math.max(1, ex.history[0].e1rm)) * 100) : 0;
+                    const showChange = ex.history.length > 1 ? Math.round(((max - ex.history[0].e1rm) / Math.max(1, ex.history[0].e1rm)) * 100) : 0;
                     return (
                       <div key={i} style={{marginBottom:6,padding:8,borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.04)'}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                           <div style={{fontSize:11,fontWeight:600,color:'#fff'}}>{i+1}. {ex.exercise}</div>
-                          <div style={{fontSize:11,fontWeight:700,color:SHOWchied>0?'#00e68a':'#fff'}}>
-                            {SHOWchied > 0 ? '+':''}{SHOWchied}% · лучший {ex.best}кг ({ex.count} тренировок)
+                          <div style={{fontSize:11,fontWeight:700,color:showChange>0?'#00e68a':'#fff'}}>
+                            {showChange > 0 ? '+':''}{showChange}% · лучший {ex.best}кг ({ex.count} тренировок)
                           </div>
                         </div>
                         <div style={{height:24,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:8,overflow:'hidden'}}>

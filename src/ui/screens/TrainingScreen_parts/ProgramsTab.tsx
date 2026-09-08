@@ -105,7 +105,7 @@ export const ProgramsTab: React.FC<{
     if (!expandedSelected) return;
     try {
       const exercises = expandedSelected.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => ({
-        name: e.name, sets: e.sets, reps: parseInt(e.reps) || 10, rir: e.rir ?? 2,
+        name: e.name, sets: e.sets, reps: parseInt(String(e.reps), 10) || 10, rir: e.rir ?? 2,
       }))));
       const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
       existing.push({ id: 'prog_' + Date.now(), name: expandedSelected.name, date: new Date().toISOString(), exercises });
@@ -119,7 +119,7 @@ export const ProgramsTab: React.FC<{
     if (!expandedSelected || !onAddToMyTraining) return;
     try {
       const exercises = expandedSelected.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => ({
-        name: e.name, sets: e.sets, reps: parseInt(e.reps) || 10, rir: e.rir ?? 2,
+        name: e.name, sets: e.sets, reps: parseInt(String(e.reps), 10) || 10, rir: e.rir ?? 2,
       }))));
       onAddToMyTraining(exercises);
       setMyTrainingMsg('✅ Добавлено в «Моя тренировка»!');
@@ -127,8 +127,8 @@ export const ProgramsTab: React.FC<{
     } catch {}
   };
 
-  return (<div className="train-programs" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-    <div className="train-programs-filters" style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+  return (<div className="train-programs lib-programs" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-programs-filters lib-filters lib-chips" style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       {GOAL_FILTER_OPTIONS.map(g => (
         <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
           style={{
@@ -139,7 +139,7 @@ export const ProgramsTab: React.FC<{
           }}>{g.label}</button>
       ))}
     </div>
-    <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+    <div className="lib-filters lib-chips" style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       <span style={{ fontSize: 11, color: '#fff', alignSelf: 'center' }}>Уровень:</span>
       {[{v:'all',l:'Все'},{v:'beginner',l:'Начинающий'},{v:'intermediate',l:'Средний'},{v:'advanced',l:'Продвинутый'},{v:'enhanced',l:'Enhanced'}].map(l => (
         <button key={l.v} onClick={() => { setLevelFilter(l.v); setSelectedId(null); }}
@@ -153,9 +153,9 @@ export const ProgramsTab: React.FC<{
     </div>
 
     {!selected && (
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div className="lib-grid" style={{ display: 'grid', gap: 8 }}>
         {programs.map(p => (
-          <div key={p.id} onClick={() => setSelectedId(p.id)}
+          <div key={p.id} className="lib-card" onClick={() => setSelectedId(p.id)}
             style={{
               padding: 12, borderRadius: 14, cursor: 'pointer',
               background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any,
@@ -179,8 +179,8 @@ export const ProgramsTab: React.FC<{
     )}
 
     {expandedSelected && (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button onClick={() => setSelectedId(null)}
+      <div className="lib-detail" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button className="lib-back" onClick={() => setSelectedId(null)}
           style={{
             alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
             cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12,
@@ -285,7 +285,7 @@ export const ProgramsTab: React.FC<{
           <h4 style={{ margin: '0 0 6px', fontSize: 13, color: '#fff' }}>
             Программа по неделям ({expandedSelected.weeks.length} из {expandedSelected.durationWeeks} нед{expandedSelected.weeks.length >= expandedSelected.durationWeeks ? ' ✅' : ' ⚠️'})
           </h4>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div className="lib-weeks" style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
             {expandedSelected.weeks.map((w, i) => (
               <button key={i} onClick={() => setDetailWeek(i + 1)}
                 style={{
@@ -314,7 +314,7 @@ export const ProgramsTab: React.FC<{
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', margin: '4px 0 6px' }}>
                   📅 Неделя {wk.week}
                 </div>
-                <div style={{
+                <div className="lib-days" style={{
                   display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3,
                   borderRadius: 10, overflow: 'hidden',
                   border: '1px solid rgba(255,255,255,0.07)',

@@ -48,8 +48,8 @@ export const LibraryZone: React.FC<Props> = (p) => {
   };
   const cur = TITLE_MAP[p.tab] || TITLE_MAP.library;
   return (
-    <>
-      <div className="hub-head" style={{ background:`linear-gradient(135deg, ${cur.accent}18, rgba(0,230,138,0.06))`, border:`1px solid ${cur.accent}30`, borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+    <div className="train-library" data-lib-tab={p.tab}>
+      <div className="hub-head lib-hero" data-lib-hero={p.tab} style={{ background:`linear-gradient(135deg, ${cur.accent}18, rgba(0,230,138,0.06))`, border:`1px solid ${cur.accent}30`, borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:`${cur.accent}22`, border:`1px solid ${cur.accent}35`, fontSize:16 }}>{cur.icon}</span>
           <div>
@@ -122,6 +122,6 @@ export const LibraryZone: React.FC<Props> = (p) => {
           <ExerciseLabCatalog />
         </InfoErrorBoundary>
       )}
-    </>
+    </div>
   );
 };

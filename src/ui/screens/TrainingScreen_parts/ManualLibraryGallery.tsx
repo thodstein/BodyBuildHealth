@@ -50,6 +50,17 @@ const DAYS_OPTS = [
 
 function favKeyBB(id: string) { return `fav_bb_${id}`; }
 
+/** Маппинг цели ББ-фильтра на период ПЛ-цикла (вкладка ПЛ): strength→сила/пик, масса→mass, атлетизм→mixed/endurance. */
+export function plCycleMatchesGoal(period: string, goal: string): boolean {
+  if (goal === 'all') return true;
+  const p = String(period || '').toLowerCase();
+  if (goal === 'strength') return p === 'strength' || p === 'peak';
+  if (goal === 'hypertrophy' || goal === 'bodybuilding') return p === 'mass';
+  if (goal === 'athletic') return p === 'mixed' || p === 'endurance';
+  if (goal === 'rehab') return p === 'endurance';
+  return true;
+}
+
 export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, onSelectBB, onSelectPL }) => {
   const [tab, setTab] = useState<Tab>('bb');
   const [search, setSearch] = useState('');
@@ -104,10 +115,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
     if (level !== 'all') arr = arr.filter((c: any) => c.meta.level === level);
     if (days !== 'all') arr = arr.filter((c: any) => String(c.meta.sessionsPerWeek) === days);
     if (favOnly) arr = arr.filter((c: any) => plFavs.includes(c.meta.id));
-    if (goal !== 'all' && tab === 'pl') {
-      // PL goal approx: peaking vs strength vs mass — filter by period
-      // keep simple: no goal filter for PL
-    }
+    if (tab === 'pl' && goal !== 'all') arr = arr.filter((c: any) => plCycleMatchesGoal(c.meta.period, goal));
     return arr as SRCycleTemplate[];
   }, [plCycles, search, level, days, favOnly, plFavs, tab, goal]);
 
@@ -159,7 +167,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
   const comparePL = compareIds.map(id => (plCycles as any[]).find((c: any) => c.meta.id === id)).filter(Boolean) as SRCycleTemplate[];
 
   return (
-    <div className="train-manlib" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="train-manlib lib-manlib" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <ManualHeader
         title="📚 Библиотека шаблонов"
         subtitle={`${bbPrograms.length} программ · ${plCycles.length} ПЛ-циклов · фильтры + превью недели-1 + сравнение`}
@@ -167,16 +175,17 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
       />
 
       {/* Табы */}
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div className="lib-seg" style={{ display: 'flex', gap: 6 }}>
         {([{ id: 'bb', label: `💪 ББ (${filteredBB.length})` }, { id: 'pl', label: `🏆 ПЛ (${filteredPL.length})` }] as const).map(t => (
           <button key={t.id} onClick={() => { setTab(t.id as Tab); setExpandedId(null); }} style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: tab === t.id ? 800 : 600, cursor: 'pointer', border: tab === t.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : '#fff' }}>{t.label}</button>
         ))}
       </div>
 
       {/* Фильтры */}
-      <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="lib-filters" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <input
+            className="lib-search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="🔍 Поиск по названию/автору..."
@@ -185,11 +194,9 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
           <select value={level} onChange={e => setLevel(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 12, minHeight: 38 }}>
             {LEVEL_OPTS.map(o => <option key={o.id} value={o.id} style={{ background: '#18181b' }}>{o.label}</option>)}
           </select>
-          {tab === 'bb' && (
-            <select value={goal} onChange={e => setGoal(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 12, minHeight: 38 }}>
-              {GOAL_OPTS_BB.map(o => <option key={o.id} value={o.id} style={{ background: '#18181b' }}>{o.label}</option>)}
-            </select>
-          )}
+          <select value={goal} onChange={e => setGoal(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 12, minHeight: 38 }}>
+            {GOAL_OPTS_BB.map(o => <option key={o.id} value={o.id} style={{ background: '#18181b' }}>{o.label}</option>)}
+          </select>
           <select value={days} onChange={e => setDays(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 12, minHeight: 38 }}>
             {DAYS_OPTS.map(o => <option key={o.id} value={o.id} style={{ background: '#18181b' }}>{o.label}</option>)}
           </select>
@@ -264,13 +271,13 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
 
       {/* Список ББ */}
       {tab === 'bb' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, maxHeight: '52vh', overflowY: 'auto', paddingRight: 2 }}>
+        <div className="lib-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, maxHeight: '52vh', overflowY: 'auto', paddingRight: 2 }}>
           {filteredBB.map(p => {
             const isFav = bbFavs.includes(p.id);
             const isExpanded = expandedId === p.id;
             const isCompared = compareIds.includes(p.id);
             return (
-              <div key={p.id} style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #00e68a' : isExpanded ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div key={p.id} className="lib-card" style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #00e68a' : isExpanded ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
                   <button onClick={() => toggleBbFav(p.id)} title={isFav ? 'Убрать из избранного' : 'В избранное'} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>
@@ -306,13 +313,13 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
 
       {/* Список ПЛ */}
       {tab === 'pl' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, maxHeight: '52vh', overflowY: 'auto', paddingRight: 2 }}>
+        <div className="lib-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, maxHeight: '52vh', overflowY: 'auto', paddingRight: 2 }}>
           {filteredPL.map((c: any) => {
             const isFav = plFavs.includes(c.meta.id);
             const isCompared = compareIds.includes(c.meta.id);
             const isExpanded = expandedId === c.meta.id;
             return (
-              <div key={c.meta.id} style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #a78bfa' : isExpanded ? '1px solid rgba(167,139,250,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div key={c.meta.id} className="lib-card" style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #a78bfa' : isExpanded ? '1px solid rgba(167,139,250,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1 }}>{c.meta.title}</span>
                   <button onClick={() => togglePlFav(c.meta.id)} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>

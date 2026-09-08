@@ -55,9 +55,9 @@ export const ManualLibraryDrawer: React.FC<{
   }, [allBB, favIds, search]);
 
   return (
-    <div className="train-manlibdrawer" style={{ display:'flex', flexDirection:'column', gap: 10 }}>
+    <div className="train-manlibdrawer lib-drawer" style={{ display:'flex', flexDirection:'column', gap: 10 }}>
       {/* Tabs */}
-      <div style={{ display:'flex', gap: 4, overflowX:'auto', paddingBottom: 4, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+      <div className="lib-seg" style={{ display:'flex', gap: 4, overflowX:'auto', paddingBottom: 4, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
         {(Object.keys(TAB_LABELS) as TabKey[]).map(k => {
           const active = tab===k;
           return (
@@ -67,8 +67,8 @@ export const ManualLibraryDrawer: React.FC<{
           );
         })}
       </div>
-      <input value={search} onChange={e=> setSearch(e.target.value)} placeholder="🔍 Поиск: название, автор, цель..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.25)', color:'#fff', fontSize:11 }} />
-      <div style={{ maxHeight:'50vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:6, paddingRight:4 }}>
+      <input className="lib-search" value={search} onChange={e=> setSearch(e.target.value)} placeholder="🔍 Поиск: название, автор, цель..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.25)', color:'#fff', fontSize:11 }} />
+      <div className="lib-list" style={{ maxHeight:'50vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:6, paddingRight:4 }}>
         {tab==='bb' && (
           <>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Найдено {filteredBB.length} из {allBB.length} программ</div>

@@ -219,8 +219,8 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     abs: 'Пресс', lower_back: 'Поясница', forearms: 'Предплечья', neck: 'Шея',
   };
 
-  return (<div>
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"8px 10px", marginBottom:8, borderRadius:10, background:"rgba(0,230,138,0.08)", border:"1px solid rgba(0,230,138,0.2)" }}>
+  return (<div className="train-methods lib-methods">
+    <div className="lib-composite" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"8px 10px", marginBottom:8, borderRadius:10, background:"rgba(0,230,138,0.08)", border:"1px solid rgba(0,230,138,0.2)" }}>
       <div style={{ fontSize:11, color:"#fff" }}>🧩 Композиция методик: <b style={{ color:"var(--accent)" }}>{Object.keys(appliedMethods).length}</b> из {cats.length} категорий {Object.keys(appliedMethods).length>0 ? "(по одной из каждой)" : ""}</div>
       <button onClick={() => onApplyComposition()} disabled={Object.keys(appliedMethods).length===0} style={{ padding:"8px 14px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background: Object.keys(appliedMethods).length>0 ? "var(--accent)" : "rgba(255,255,255,0.1)", color: Object.keys(appliedMethods).length>0 ? "#000" : '#fff', opacity: Object.keys(appliedMethods).length===0?0.5:1 }}>Применить к плану ▶</button>
     </div>
@@ -231,6 +231,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     )}
     {/* ── Data Analysis Trigger ── */}
     <button
+      className="lib-cta"
       onClick={() => setAnalysisLoaded(true)}
       style={{
         width: '100%', padding: '10px 14px', borderRadius: 10, marginBottom: 10,
@@ -416,7 +417,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
 
     {/* ── Method Reference Library (always visible) — карточная сетка как в Encyclopedia ── */}
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:8, marginBottom:10 }}>
+    <div className="lib-cats" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:8, marginBottom:10 }}>
       {[{id:'all',label:'Все',icon:'📚',hint:'все методики',cnt:methods.length}, ...CAT.map(c=> ({...c, cnt: methods.filter(m=>m.category===c.id).length}))].map(c=>{
         const on = methodCat===c.id;
         return (

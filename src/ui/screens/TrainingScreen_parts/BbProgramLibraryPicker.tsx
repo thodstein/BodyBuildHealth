@@ -79,7 +79,6 @@ function matchFilter(p: FullProgram, key: FilterKey): boolean {
   if (key === '5d') return p.daysPerWeek === 5;
   if (key === '6d') return p.daysPerWeek === 6;
   return true;
-  return true;
 }
 
 export const BbProgramLibraryPicker: React.FC<{
@@ -119,7 +118,7 @@ export const BbProgramLibraryPicker: React.FC<{
   const sel = deduped.find(p => p.id === value);
   const disabled = useMemo(() => new Set(disabledIds || []), [disabledIds]);
 
-  return <div className="train-bblib">
+  return <div className="train-bblib lib-picker">
     <button onClick={() => setOpen(true)} style={{ ...cardBtnStyle(!!value), width: '100%' }}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : '#fff' }}>
@@ -129,12 +128,12 @@ export const BbProgramLibraryPicker: React.FC<{
     </button>
     {open && (
       <PortalOverlay onClose={() => setOpen(false)}>
-        <div onClick={e => e.stopPropagation()} style={{
+        <div className="lib-sheet" onClick={e => e.stopPropagation()} style={{
           width: '92%', maxWidth: 460, maxHeight: '80vh', borderRadius: 16,
           background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
         }}>
           <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
-          <div style={{ padding: '12px 14px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
+          <div className="lib-sheetbody" style={{ padding: '12px 14px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{label}</div>
               <button onClick={() => setOpen(false)} style={{
@@ -145,14 +144,14 @@ export const BbProgramLibraryPicker: React.FC<{
             <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
               Библиотека: {deduped.length} программ · фильтр: {filtered.length}
             </div>
-            <input type='text' value={search} onChange={e => setSearch(e.target.value)} placeholder='🔍 Поиск: название, автор, цель...'
+            <input className="lib-search" type='text' value={search} onChange={e => setSearch(e.target.value)} placeholder='🔍 Поиск: название, автор, цель...'
               autoFocus
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 10,
                 border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)',
                 color: '#fff', fontSize: 12, boxSizing: 'border-box', marginBottom: 10,
               }} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+            <div className="lib-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
               {FILTERS.map(f => {
                 const active = filter === f.key;
                 return <button key={f.key} onClick={() => setFilter(f.key)} style={{
@@ -163,7 +162,7 @@ export const BbProgramLibraryPicker: React.FC<{
                 }}>{f.label}</button>;
               })}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="lib-list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {filtered.length === 0 && (
                 <div style={{ padding: '20px 12px', textAlign: 'center', color: '#fff', fontSize: 11 }}>
                   Ничего не найдено. Сбросьте фильтр или измените запрос.
