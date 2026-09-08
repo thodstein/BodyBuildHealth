@@ -256,6 +256,7 @@ export function correctDayToTargets(
   // (раньше `break` на первом же неразмещаемом кандидате глотал до 80 итераций
   // и оставлял simple/minimal дни на −14-18% — доказано DBG-трассой dK=252 после 2 итераций).
   const _deadBest = new Set<string>();
+  let _prevIterKey = '';
   for (let iter = 0; iter < maxIter; iter++) {
     // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор ДО сведения КБЖУ.
     // ВАЖНО: тримим ТОЛЬКО при переборе ккал или в норме — при недоборе ккал срезка углеводов
@@ -294,6 +295,13 @@ export function correctDayToTargets(
     const totals = sumTotals(meals);
     const dev = maxDevPct(totals as DayTargets, safeTargets);
     if (dev <= 3) break;
+    // P2-гарант: итерация без изменений тоталов не может улучшить день — экстремальные
+    // дни (1500У) крутились впустую до maxIter (DBG: it=7..14 идентичны dC=238).
+    {
+      const _keyIt = `${totals.kcal}|${totals.p}|${totals.f}|${totals.c}`;
+      if (_keyIt === _prevIterKey) break;
+      _prevIterKey = _keyIt;
+    }
     try { if ((globalThis as any).__DBG_CORR && _dbgN++ < 14) console.log(`[DBG-C] it=${iter} dev=${dev.toFixed(1)} dK=${Math.round(safeTargets.kcal - totals.kcal)} dP=${(safeTargets.p - totals.p).toFixed(0)} dF=${(safeTargets.f - totals.f).toFixed(0)} dC=${(safeTargets.c - totals.c).toFixed(0)}`); } catch {}
     // SWAP (до выбора оси): универсально — любая ПЕРЕБРАННАЯ ось (жир/угли/белок) меняется
     // на любую НЕДОБРАННУЮ, по ккал-паритету. Иначе при конфликте «жир перебран + угли
