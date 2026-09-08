@@ -40,6 +40,26 @@ export const LABS_SYS_ICON: Record<string, NativeIconName> = {
   prostate: 'search', skin: 'star', immunity: 'shield', musculoskeletal: 'move', neuro_toxicity: 'cpu',
 };
 
+export const LABS_SYSTEM_GROUPS: Record<string, string[]> = {
+  hepatic: ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB','LDH','BILIRUBIN_DIRECT','BILIRUBIN_INDIRECT'],
+  renal: ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR','K','NA','CA','P','MG'],
+  endocrine: ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1','TOTAL_T3','TOTAL_T4','TG_AB','TPO_AB','THYROGLOBULIN'],
+  hematologic: ['HGB','HCT','PLT','WBC','RBC','MCV','MCH','MCHC','RDW','IRON','TRANSFERRIN','TIBC','IRON_SAT','FERRITIN'],
+  cardio: ['LDL','HDL','TG','APOB','APOA1','NON_HDL','LP_A','CRP','hsCRP','FIBRINOGEN','D_DIMER'],
+  metabolic: ['GLUCOSE','GLU','HBA1C','INSULIN','HOMA_IR','VITD','VITAMIN_D','CALCIDIOL','B12','VITAMIN_B12','FOLATE'],
+  urinalysis: ['URINE_SG','URINE_PH','URINE_PROTEIN_QR','URINE_GLUCOSE_QR','URINE_KETONES_QR','URINE_BILIRUBIN_QR','UROBILINOGEN_QR','URINE_NITRITE_QR','URINE_LEU_QR','URINE_BLOOD_QR','URINE_LEU','URINE_ERY','URINE_EPITHELIAL','URINE_CYLINDERS'],
+  reproductive: ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
+  neuro: ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
+};
+
+export function getLabsSystem(code: string): string {
+  const upper = (code || '').toUpperCase();
+  for (const [sys, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
+    if (codes.includes(upper)) return sys;
+  }
+  return 'other';
+}
+
 // ── Карточки ──
 // TOP APK: стекло navy + blur20 + тень, радиусы 18-20 (TG и APK едино)
 export const LABS_CARD: React.CSSProperties = {

@@ -11,7 +11,7 @@ import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab-effects';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
-import { LABS_ACCENT, LABS_CARD } from './LabsScreen_parts/LabsUI';
+import { LABS_ACCENT, LABS_CARD, LABS_SYSTEM_GROUPS } from './LabsScreen_parts/LabsUI';
 import { labsWithAlpha } from './LabsScreen_parts/LabsUI';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 // import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab'; // удалено — T4 маркеры интегрированы в фазы
@@ -100,21 +100,11 @@ const sysLabels: Record<string, string> = {
   other: 'Прочее',
 };
 
-const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
-  hepatic: ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB','LDH','BILIRUBIN_DIRECT','BILIRUBIN_INDIRECT'],
-  renal: ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR','K','NA','CA','P','MG'],
-  endocrine: ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1','TOTAL_T3','TOTAL_T4','TG_AB','TPO_AB','THYROGLOBULIN'],
-  hematologic: ['HGB','HCT','PLT','WBC','RBC','MCV','MCH','MCHC','RDW','IRON','TRANSFERRIN','TIBC','IRON_SAT','FERRITIN'],
-  cardio: ['LDL','HDL','TG','APOB','APOA1','NON_HDL','LP_A','CRP','hsCRP','FIBRINOGEN','D_DIMER'],
-  metabolic: ['GLUCOSE','GLU','HBA1C','INSULIN','HOMA_IR','VITD','VITAMIN_D','CALCIDIOL','B12','VITAMIN_B12','FOLATE'],
-  urinalysis: ['URINE_SG','URINE_PH','URINE_PROTEIN_QR','URINE_GLUCOSE_QR','URINE_KETONES_QR','URINE_BILIRUBIN_QR','UROBILINOGEN_QR','URINE_NITRITE_QR','URINE_LEU_QR','URINE_BLOOD_QR','URINE_LEU','URINE_ERY','URINE_EPITHELIAL','URINE_CYLINDERS'],
-  reproductive: ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
-  neuro: ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
-};
+// LABS_SYSTEM_GROUPS теперь единый из LabsUI (дедуп, было 3 копии)
 
 function getSystemForCode(code: string): string | undefined {
   const upper = code.toUpperCase();
-  for (const [sys, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+  for (const [sys, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
     if (codes.includes(upper)) return sys;
   }
   const markerInfo = getMarkerMap(upper);
@@ -368,7 +358,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const groups: Record<string, string[]> = {};
     for (const code of requiredLabs) {
       let found = false;
-      for (const [sys, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+      for (const [sys, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
         if (codes.includes(code.toUpperCase())) {
           if (!groups[sys]) groups[sys] = [];
           groups[sys].push(code);
@@ -456,7 +446,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       else if (norm < lln) deviation = -((lln - norm) / lln);
       if (Math.abs(deviation) > 0.01) {
         let sys = 'other';
-        for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+        for (const [s, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
           if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
         }
         markerDeviations.push({
@@ -688,17 +678,17 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   }}>
                     <NativeIcon name="alertTriangle" size={18} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: '#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
-                    <div style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>
-                      {trendAlertList.slice(0, 2).map(a => `${a.name} ${a.direction === 'up' ? '↑' : '↓'}`).join(', ')}
-                      {trendAlertList.length > 2 && ` +${trendAlertList.length - 2}`}
-                    </div>
-                  </div>
-                  <span style={{ color:'#ef4444', fontSize:14, opacity:0.8, flexShrink:0 }}>→</span>
-                </button>
-              )}
-              <div style={{ marginTop:10, textAlign:'center', fontSize:11, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>Нажми на раздел — откроются инструменты и данные</div>
+          <div style={{ flex: 1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:800, marginBottom:3, color:'#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
+            <div style={{ fontSize:12, color:'#fff', lineHeight:1.5 }}>
+              {trendAlertList.slice(0, 2).map(a => `${a.name} ${a.direction === 'up' ? '↑' : '↓'}`).join(', ')}
+              {trendAlertList.length > 2 && ` +${trendAlertList.length - 2}`}
+            </div>
+          </div>
+          <span style={{ color:'#ef4444', fontSize:15, opacity:0.9, flexShrink:0 }}>→</span>
+        </button>
+      )}
+      <div style={{ marginTop:12, textAlign:'center', fontSize:12, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)', fontWeight:600 }}>Нажми на раздел — откроются инструменты и данные</div>
             </div>
           </div>
         </div>
@@ -711,15 +701,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             minHeight:44, minWidth:44, padding:'10px 14px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(140,190,255,0.16)', background:'rgba(21,38,66,0.70)', borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', gap:6, flexShrink:0,
           }}>←</button>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.1, letterSpacing:-0.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', lineHeight:1.1, letterSpacing:-0.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               {mainTab === 'risks' ? 'Риски и индексы' : (LAB_SUB_TABS.find(t => t.id === subTab)?.label || 'Анализы')}
             </div>
-            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               {mainTab === 'risks' ? 'ASI · HMI · CR · механизм-модель ТЗ' : `${currentLabs.length} маркеров · ${PHASE_LABELS[selectedPhase] || selectedPhase}`}
             </div>
           </div>
-          <div style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', color:LABS_ACCENT, flexShrink:0 }}>
-            <NativeIcon name={mainTab === 'risks' ? 'alertTriangle' : 'flask'} size={17} />
+          <div style={{ width:38, height:38, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', color:LABS_ACCENT, flexShrink:0 }}>
+            <NativeIcon name={mainTab === 'risks' ? 'alertTriangle' : 'flask'} size={18} />
           </div>
         </div>
       )}
@@ -809,7 +799,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   }}>Все</button>
                   {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
                     const sysMarkers = uniqMarkers.filter(m => {
-                      const codes = LAB_SYSTEM_GROUPS[sys];
+                      const codes = LABS_SYSTEM_GROUPS[sys];
                       return codes ? codes.includes(m.code) : false;
                     });
                     if (sysMarkers.length === 0) return null;
@@ -828,7 +818,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
                 <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:10 }}>
                   {(chartFilterSys !== 'all'
-                    ? uniqMarkers.filter(m => { const codes = LAB_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
+                    ? uniqMarkers.filter(m => { const codes = LABS_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
                     : uniqMarkers
                   ).map(m => {
                     const isSelected = chartSelectedCodes.has(m.code);
@@ -1380,7 +1370,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           else if (trendFilter === 'improved') base = report.improved;
           else if (trendFilter !== 'all') base = base.filter(t => t.significance === trendFilter);
           if (trendSystemFilter !== 'all') {
-            const sysCodes = LAB_SYSTEM_GROUPS[trendSystemFilter] || [];
+            const sysCodes = LABS_SYSTEM_GROUPS[trendSystemFilter] || [];
             base = base.filter(t => sysCodes.includes(t.code.toUpperCase()));
           }
           return base;
@@ -1438,7 +1428,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     color: trendSystemFilter === 'all' ? '#000' : '#fff',
                     border: trendSystemFilter === 'all' ? '1px solid var(--accent)' : '1px solid rgba(140,190,255,0.14)',
                   }}>Все системы</button>
-                  {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
+                  {Object.entries(LABS_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
                     const info = SYSTEM_INFO_ALL[sys];
                     const active = trendSystemFilter === sys;
                     return (

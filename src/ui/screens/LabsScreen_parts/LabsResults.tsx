@@ -1,23 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
-import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle, labsWithAlpha } from './LabsUI';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle, labsWithAlpha, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
-
-const LAB_SYSTEM_MAP: Record<string, string> = {
-  'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'ALP': 'hepatic',
-  'BILIRUBIN_TOTAL': 'hepatic', 'BIL_T': 'hepatic', 'BIL': 'hepatic', 'ALB': 'hepatic',
-  'CREATININE': 'renal', 'BUN': 'renal', 'EGFR': 'renal', 'PROTEIN_TOTAL': 'renal', 'UA': 'renal',
-  'TSH': 'endocrine', 'FT3': 'endocrine', 'FT4': 'endocrine',
-  'TESTOSTERONE': 'endocrine', 'TT': 'endocrine', 'E2': 'endocrine', 'ESTRADIOL': 'endocrine',
-  'PRL': 'endocrine', 'PROLACTIN': 'endocrine', 'CORTISOL': 'endocrine',
-  'INSULIN': 'metabolic', 'INS': 'metabolic', 'HOMA': 'metabolic',
-  'LH': 'endocrine', 'FSH': 'endocrine', 'SHBG': 'endocrine', 'IGF1': 'endocrine',
-  'HGB': 'hematologic', 'HCT': 'hematologic', 'PLT': 'hematologic', 'WBC': 'hematologic',
-  'LDL': 'cardio', 'HDL': 'cardio', 'TG': 'cardio', 'GLU': 'metabolic', 'GLUCOSE': 'metabolic',
-  'HBA1C': 'metabolic', 'HOMOCYSTEINE': 'neuro', 'FERRITIN': 'hematologic',
-  'CRP': 'cardio', 'VITD': 'metabolic', 'CALCIDIOL': 'metabolic',
-};
 
 const sysLabels: Record<string, string> = LABS_SYS_LABEL;
 const sysColors: Record<string, string> = LABS_SYS_COLOR;
@@ -42,8 +27,8 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   const sortedLabs = useMemo(() => [...labs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [labs]);
   const uniqueDates = useMemo(() => [...new Set(sortedLabs.map(l => l.date))].sort().reverse(), [sortedLabs]);
-  const systems = useMemo(() => [...new Set(labs.map(l => LAB_SYSTEM_MAP[l.code.toUpperCase()] || ''))].filter(Boolean).sort(), [labs]);
-  const filteredLabs = filterSystem === 'all' ? sortedLabs : sortedLabs.filter(l => (LAB_SYSTEM_MAP[l.code.toUpperCase()] || '') === filterSystem);
+  const systems = useMemo(() => [...new Set(labs.map(l => getLabsSystem(l.code) || ''))].filter(s => s !== 'other').sort(), [labs]);
+  const filteredLabs = filterSystem === 'all' ? sortedLabs : sortedLabs.filter(l => getLabsSystem(l.code) === filterSystem);
   const groupedByDate = uniqueDates.reduce<Record<string, LabPoint[]>>((acc, date) => { const dl = filteredLabs.filter(l=>l.date===date); if(dl.length) acc[date]=dl; return acc; }, {});
 
   const toggleDate = (date: string) => setExpandedDates(prev=>{ const n=new Set(prev); if(n.has(date)) n.delete(date); else n.add(date); return n; });
@@ -95,8 +80,8 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   <div style={{ padding:'10px 10px 10px', display:'grid', gap:6, background:'rgba(0,0,0,0.08)' }}>
                     {dateLabs.map(lab=>{
                       const status=getLabStatus(lab);
-                      const info=UCUM_MAP[lab.code.toUpperCase()];
-                      const sys=LAB_SYSTEM_MAP[lab.code.toUpperCase()]||'other';
+                      const info=UCUM_MAP[lab.code.toUpperCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lab.code.toLowerCase())?.[1] as any);
+                      const sys=getLabsSystem(lab.code)||'other';
                       const sysColor=sysColors[sys]||'#6b7280';
                       const isAbn=status==='high'||status==='low';
                       const statusColor=status==='high'? '#ef4444' : status==='low'? '#f97316' : status==='unknown'? '#6b7280' : LABS_ACCENT;

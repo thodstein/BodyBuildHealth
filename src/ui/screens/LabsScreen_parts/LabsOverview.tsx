@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
-import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty } from './LabsUI';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
 const LAB_RANGES: Record<string, { min: number; max: number; name: string; unit: string }> = {};
@@ -41,18 +41,8 @@ export const LabsOverview: React.FC<{
   const abnormalCount = highCount + lowCount;
 
   const systemGroups: Record<string, LabPoint[]> = {};
-  const labSystemMap: Record<string, string> = {
-    'LDL': 'cardio', 'HDL': 'cardio', 'TG': 'cardio', 'CHOL': 'cardio', 'GLU': 'metabolic', 'HBA1C': 'metabolic', 'HbA1c': 'metabolic', 'HOMOCYSTEINE': 'cardio',
-    'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'ALP': 'hepatic', 'BILIRUBIN_TOTAL': 'hepatic', 'BIL_T': 'hepatic', 'BIL': 'hepatic', 'DBIL': 'hepatic', 'ALB': 'hepatic',
-    'CREATININE': 'renal', 'BUN': 'renal', 'EGFR': 'renal', 'UREA': 'renal', 'PROTEIN_TOTAL': '', 'TP': '', 'UA': 'renal',
-    'TSH': 'endocrine', 'FT3': 'endocrine', 'FT4': 'endocrine', 'TESTOSTERONE': 'endocrine', 'TT': 'endocrine', 'E2': 'endocrine', 'ESTRADIOL': 'endocrine', 'PRL': 'endocrine', 'PROLACTIN': 'endocrine', 'CORTISOL': 'endocrine', 'INSULIN': 'metabolic', 'INS': 'metabolic', 'HOMA': 'metabolic', 'LH': 'endocrine', 'FSH': 'endocrine', 'SHBG': 'endocrine',
-    'HGB': 'hematologic', 'HCT': 'hematologic', 'PLT': 'hematologic', 'WBC': 'hematologic', 'RBC': 'hematologic', 'MCV': 'hematologic', 'MCH': 'hematologic', 'MCHC': 'hematologic',
-    'CRP': 'cardio', 'FERRITIN': 'hematologic', 'VITD': 'metabolic', 'CALCIDIOL': 'metabolic', 'IGF1': 'endocrine', 'DHEA_S': 'endocrine', 'PSA': 'reproductive', 'PROGESTERONE': 'reproductive', 'AMH': 'reproductive', 'INHB': 'reproductive',
-    'K': 'metabolic', 'NA': 'metabolic', 'CA': 'metabolic', 'MG': 'metabolic', 'P': 'metabolic', 'IRON': 'hematologic', 'TIBC': 'hematologic',
-  };
-
   labs.forEach(lab => {
-    const system = labSystemMap[lab.code.toUpperCase()] || 'other';
+    const system = getLabsSystem(lab.code) || 'other';
     if (!systemGroups[system]) systemGroups[system] = [];
     systemGroups[system].push(lab);
   });
