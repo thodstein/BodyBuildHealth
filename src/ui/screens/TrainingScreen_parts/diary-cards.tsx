@@ -481,7 +481,7 @@ export const HabitWeekCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ his
   const todayDone = HABIT_ROWS.filter(r => marks[r.id][todayIdx]).length;
   const weekTotals = HABIT_ROWS.map(r => ({ ...r, count: marks[r.id].filter(Boolean).length }));
   return (
-    <div style={style.card}>
+    <div className="hab-week" style={style.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={style.label}>📋 Недельный пульс привычек</div>
         <span style={{ fontSize: 9, color: '#fff' }}>сегодня: {todayDone}/{HABIT_ROWS.length}</span>

@@ -26,6 +26,7 @@ import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { WeeklyTargetsCard, SectionHeader, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
+import { localIsoDate, weekdayMon0 } from './diary-shared';
 import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, getNormTable, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
 
@@ -88,7 +89,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 sorted.forEach(w => {
                   const d = new Date(w.date);
                   const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
-                  const key = wkStart.toISOString().slice(0, 10);
+                  const key = localIsoDate(wkStart);
                   weekMap.set(key, (weekMap.get(key) || 0) + w.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0));
                 });
                 weekMap.forEach((vol, week) => weeklyVol.push({ week, vol }));
@@ -768,13 +769,14 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {/* Workout streaks */}
               {historyWorkouts.length >= 3 && (() => {
                 const sorted = [...historyWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const days = sorted.map(w => new Date(w.date).toISOString().slice(0, 10));
+                // Локальные границы суток: toISOString уводил «сегодня»/шаг на ±1 около полуночи.
+                const days = sorted.map(w => (w.date || '').slice(0, 10));
                 const uniqueDays = [...new Set(days)];
                 let currentStreak = 0;
-                const today = new Date().toISOString().slice(0, 10);
-                let checkDate = new Date();
+                const today = localIsoDate();
+                const checkDate = new Date();
                 for (let i = 0; i < 30; i++) {
-                  const ds = checkDate.toISOString().slice(0, 10);
+                  const ds = localIsoDate(checkDate);
                   if (uniqueDays.includes(ds)) { currentStreak++; } else if (ds !== today) break;
                   checkDate.setDate(checkDate.getDate() - 1);
                 }
@@ -787,11 +789,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   if (diffDays === 1) { cur++; } else { maxStreak = Math.max(maxStreak, cur); cur = 1; }
                 }
                 maxStreak = Math.max(maxStreak, cur);
-                const recentPRs = sorted.filter(w => w.date >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).reduce((count: number, w: any) => {
+                const recentPRs = sorted.filter(w => w.date >= localIsoDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))).reduce((count: number, w: any) => {
                   return count + (w.exercises || []).filter((e: any) => (e.sets || []).some((s: any) => s.isPR)).length;
                 }, 0);
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  <div className="ta-streak" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                     <div style={{ ...style.card, textAlign: 'center' }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: currentStreak >= 3 ? '#22c55e' : ACCENT }}>{currentStreak}</div>
                       <div style={{ fontSize: 9, color: '#fff' }}>🔥 Серия дней</div>
@@ -838,7 +840,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   return 'rgba(0,230,138,0.15)';
                 };
                 return (
-                  <div style={style.card}>
+                  <div className="ta-freq" style={style.card}>
                     <div style={style.label}>💪 Частота по группам (подходы/нед)</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(8, 1fr)', gap: '2px 4px', alignItems: 'center' }}>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', textAlign: 'right' }}>Н-8…Н-1</span>
@@ -867,7 +869,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {historyWorkouts.length >= 3 && (() => {
                 const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
                 const dayData = dayNames.map((name, idx) => {
-                  const dayWorkouts = historyWorkouts.filter(w => new Date(w.date).getDay() === (idx + 1) % 7);
+                  const dayWorkouts = historyWorkouts.filter(w => weekdayMon0((w.date || '').slice(0, 10)) === idx);
                   const totalSets = dayWorkouts.reduce((s, w) => s + w.exercises.reduce((sum: number, e: any) => sum + (e.sets?.length || 0), 0), 0);
                   const groups = new Map<string, number>();
                   dayWorkouts.forEach(w => w.exercises.forEach((e: any) => {
@@ -879,7 +881,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 });
                 const maxSets = Math.max(1, ...dayData.map(d => d.sets));
                 return (
-                  <div style={style.card}>
+                  <div className="ta-days" style={style.card}>
                     <div style={style.label}>📅 Дни тренировок</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
                       {dayData.map((d, i) => {
@@ -1168,7 +1170,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               })()}
               {/* Expert analytics toggle */}
               <div style={style.card}>
-                <button onClick={() => setHubAnalyticsExpanded(!hubAnalyticsExpanded)} style={{
+                <button className="ta-expert" onClick={() => setHubAnalyticsExpanded(!hubAnalyticsExpanded)} style={{
                   width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.25)', cursor: 'pointer',
                   background: hubAnalyticsExpanded ? 'rgba(168,85,247,0.08)' : 'transparent', color: '#a855f7', fontWeight: 600, fontSize: 11,
                 }}>
@@ -1200,7 +1202,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       sorted.forEach(w => {
                         const d = new Date(w.date);
                         const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
-                        const key = wkStart.toISOString().slice(0, 10);
+                        const key = localIsoDate(wkStart);
                         const prev = weekMap.get(key) || { vol: 0, sets: 0, count: 0 };
                         prev.vol += w.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0);
                         prev.sets += w.exercises.reduce((s: number, e: any) => s + (e.sets || []).length, 0);

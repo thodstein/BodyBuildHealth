@@ -194,3 +194,12 @@ export function csvCell(v: unknown): string {
   const s = String(v ?? '');
   return /^[=+\-@]/.test(s) ? `'${s}` : s;
 }
+
+/**
+ * День недели даты YYYY-MM-DD, Пн=0…Вс=6 — строго по ЛОКАЛЬНОМУ календарю.
+ * `new Date('2026-09-08').getDay()` парсит полночь UTC и врёт в UTC− зонах.
+ */
+export function weekdayMon0(dateStr: string): number {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return (d.getDay() + 6) % 7;
+}

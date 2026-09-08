@@ -9,7 +9,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { searchExerciseCatalog, seedForNewExercise, mrvBaseForLevel, localIsoDate, bestE1rmSeriesForWeek, csvCell } from '../diary-shared';
+import { searchExerciseCatalog, seedForNewExercise, mrvBaseForLevel, localIsoDate, bestE1rmSeriesForWeek, csvCell, weekdayMon0 } from '../diary-shared';
 import { QuickEntry } from '../QuickEntry';
 import { DiaryRecordingForm } from '../DiaryRecordingForm';
 import { WorkoutWeekCard } from '../diary-cards';
@@ -278,8 +278,7 @@ describe('Ритуалы — чек-ины датируются ЛОКАЛЬНЫ
   });
 });
 
-describe('csvCell — гашение формульных инъекций', () => {
-  it('=,+,-,@ в начале гасятся апострофом', () => {
+describe('csvCell — гашение формульных инъекций', () => {  it('=,+,-,@ в начале гасятся апострофом', () => {
     expect(csvCell('=cmd|xxx')).toBe("'=cmd|xxx");
     expect(csvCell('+1+1')).toBe("'+1+1");
     expect(csvCell('-2+3')).toBe("'-2+3");
@@ -307,5 +306,19 @@ describe('DiaryProgressView — PRO-хуки', () => {
     expect(container.querySelector('.pg-measure')).toBeTruthy();
     expect(container.querySelector('.pg-hist')).toBeTruthy();
     expect(container.querySelector('.pg-pr')).toBeTruthy();
+  });
+});
+
+describe('weekdayMon0 — день недели по локальному календарю', () => {
+  it('Пн=0 … Вс=6 (2026-09-07 — понедельник)', () => {
+    expect(weekdayMon0('2026-09-07')).toBe(0);
+    expect(weekdayMon0('2026-09-08')).toBe(1);
+    expect(weekdayMon0('2026-09-13')).toBe(6);
+  });
+  it('совпадает с локальным getDay-сдвигом', () => {
+    for (const d of ['2026-01-01', '2026-05-20', '2026-12-31']) {
+      const [y, m, day] = d.split('-').map(Number);
+      expect(weekdayMon0(d)).toBe((new Date(y, m - 1, day).getDay() + 6) % 7);
+    }
   });
 });
