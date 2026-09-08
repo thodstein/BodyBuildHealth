@@ -7319,3 +7319,206 @@ html.app-native .hub-diary .train-mmctrack select:focus-visible {
     transform: none !important;
   }
 }
+
+/* 83. NATIVE PROFILE PRO-FULL — топ-подача блока Профиль.
+ * Только APK (html.app-native). TG/web — байт-в-байт.
+ * Покрывает: hero, шапку вкладок, поднавигацию разделов, quick-jump,
+ * аккордеоны, редакторы значений, дневники, настройки, отчёты. */
+
+/* Hero: safe-area сверху уже в инлайне. Стекло карточек и тач-отклик. */
+html.app-native .pf-hero-card {
+  min-height: 64px !important;
+}
+html.app-native .pf-hero-card:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .pf-hero-cta {
+  min-height: 48px !important;
+}
+html.app-native .pf-hero-cta:active {
+  transform: scale(0.96) !important;
+}
+
+/* Шапка вкладки: стекло + blur, кнопка назад 44px. */
+html.app-native .pf-head {
+  min-height: 56px !important;
+  background: rgba(9, 18, 34, 0.86) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+html.app-native .pf-head-back {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+html.app-native .pf-head-back:active {
+  transform: scale(0.92) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+html.app-native .pf-undo {
+  min-height: 40px !important;
+}
+html.app-native .pf-undo:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .pf-autosave {
+  font-size: 10px !important;
+  white-space: nowrap !important;
+}
+
+/* Поднавигация разделов: липкая лента под шапкой, скролл + snap. */
+html.app-native .pf-subnav {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 18 !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native .pf-subnav::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .pf-subnav-btn {
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-subnav-btn:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-subnav-btn[data-active='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.22) !important;
+}
+
+/* Quick-jump: активный раздел светится, все цели 40px+. */
+html.app-native .pf-jump-link[data-active='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.18) !important;
+}
+html.app-native .pf-jump-link:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-toggle-btn {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-toggle-btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* Аккордеоны: раскрытый держит акцентную кромку слева. */
+html.app-native .pf-acc[data-open='true'] {
+  border-left: 3px solid var(--accent) !important;
+}
+html.app-native .pf-acc-btn:active {
+  transform: scale(0.99) !important;
+}
+
+/* Редакторы значений: поле 48px, цифры табличные. */
+html.app-native .profile-pve-btn {
+  min-height: 58px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Сетки полей: 3 и 4 колонки на телефоне дышат. */
+html.app-native .profile-fieldrow[style*='repeat(3'] {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+}
+
+/* Дневники: быстрые ссылки и карточки с press. */
+html.app-native .pf-quicklink:active {
+  transform: scale(0.98) !important;
+}
+
+/* Настройки: кнопки экспорта/сброса уже 44px в инлайне. Press сверху. */
+html.app-native .profile-settings button:active {
+  transform: scale(0.97) !important;
+}
+
+/* Отчёты: табы-сегменты 44px, скролл вместо wrap на узком. */
+html.app-native .pf-rep-tabs {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  padding-bottom: 2px !important;
+}
+html.app-native .pf-rep-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .pf-rep-tab {
+  scroll-snap-align: start !important;
+  flex-shrink: 0 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-rep-tab:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .profile-reports-item:active {
+  transform: scale(0.98) !important;
+}
+
+/* Фокус для клавиатуры и TalkBack-навигации. */
+html.app-native .pf-head-back:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-subnav-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-jump-link:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-hero-card:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-toggle-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-rep-tab:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Узкий телефон 360px: шапка и hero дышат. */
+@media (max-width: 380px) {
+  html.app-native .pf-head {
+    padding: 6px 8px !important;
+  }
+  html.app-native .pf-subnav {
+    padding: 6px 8px !important;
+  }
+  html.app-native .pf-hero-body {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  html.app-native .profile-fieldrow[style*='repeat(2'] {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-hero-card:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-subnav-btn:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-jump-link:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-rep-tab:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .profile-reports-item:active {
+    transform: none !important;
+  }
+}

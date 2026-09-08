@@ -130,15 +130,15 @@ export const ProfileReportsTab: React.FC<{
   }, [initialView]);
 
   return (
-    <div className="profile-reports" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="profile-reports-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы отчётов">
+    <div className="profile-reports pf-reports" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="profile-reports-tabs pf-rep-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы отчётов">
         {VIEW_TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setView(t.id)}
             role="tab"
             aria-selected={view === t.id}
-            className="profile-reports-tab"
+            className="profile-reports-tab pf-rep-tab"
             data-active={view === t.id}
             style={{
               padding: '7px 12px',
@@ -146,6 +146,7 @@ export const ProfileReportsTab: React.FC<{
               cursor: 'pointer',
               fontSize: 11,
               fontWeight: 700,
+              minHeight: 44,
               border: `1px solid ${view === t.id ? colors.primary : colors.border}`,
               background: view === t.id ? colors.primaryDim : 'rgba(255,255,255,0.03)',
               color: view === t.id ? colors.primary : colors.textMuted,

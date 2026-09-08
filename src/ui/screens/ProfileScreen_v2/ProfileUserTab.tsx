@@ -2,7 +2,7 @@
  * ProfileUserTab — вкладка "Пользователь" с 6 секциями.
  * Содержит sticky quick-jump для быстрой навигации по длинной форме.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { UserPersonalSection } from './sections/UserPersonalSection';
 import { UserHealthSection } from './sections/UserHealthSection';
 import { UserDietSection } from './sections/UserDietSection';
@@ -40,16 +40,25 @@ const JUMP_COLORS: Record<string, string> = {
 };
 
 export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
+  const [activeId, setActiveId] = useState('1-1');
   const handleJump = (id: string) => {
-    const el = document.getElementById(`profile-section-${id}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveId(id);
+    try {
+      const el = document.getElementById(`profile-section-${id}`);
+      if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      // Старый WebView без smooth-scroll: активный раздел уже выставлен, скролл не критичен.
+    }
+  };
+  const toggleAll = (open: boolean) => {
+    window.dispatchEvent(new CustomEvent('profile-accordion-toggle', { detail: open }));
   };
 
   return (
-    <div>
+    <div className="pf-user">
       {/* Sticky quick-jump */}
       <div
-        className="profile-jump"
+        className="profile-jump pf-jump"
         style={{
           position: 'sticky',
           top: 0,
@@ -74,37 +83,32 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
         >
           {JUMP_LINKS.map(link => {
             const c = JUMP_COLORS[link.id] || colors.primary;
+            const active = activeId === link.id;
             return (
               <button
                 key={link.id}
                 type="button"
                 onClick={() => handleJump(link.id)}
                 aria-label={`Перейти к разделу ${link.label}`}
-                className="profile-jump-link"
+                aria-current={active ? 'true' : undefined}
+                data-active={active}
+                className="profile-jump-link pf-jump-link"
                 style={{
                   flexShrink: 0,
                   padding: '6px 12px',
                   borderRadius: 16,
                   fontSize: 11,
-                  fontWeight: 600,
+                  fontWeight: active ? 800 : 600,
                   border: `1px solid ${withAlpha(c, '55')}`,
-                  background: `${withAlpha(c, '12')}`,
+                  background: `${withAlpha(c, active ? '30' : '12')}`,
                   color: c,
                   cursor: 'pointer',
-                  minHeight: 32,
+                  minHeight: 40,
                   whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 5,
                   transition: 'all 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `${withAlpha(c, '26')}`;
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = `${withAlpha(c, '12')}`;
-                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 <span aria-hidden="true" style={{ display:'inline-flex', color:c }}><NativeIcon name={link.icon} size={12} /></span>
@@ -115,7 +119,30 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
         </div>
       </div>
 
-      <div className="profile-user-sections" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="pf-toggle-all" style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+        <button
+          type="button"
+          onClick={() => toggleAll(true)}
+          className="pf-toggle-btn"
+          style={{
+            flex: 1, minHeight: 40, borderRadius: 12, cursor: 'pointer',
+            fontSize: 12, fontWeight: 700, color: colors.primary,
+            background: colors.primaryDim, border: `1px solid ${colors.border}`,
+          }}
+        >Развернуть все</button>
+        <button
+          type="button"
+          onClick={() => toggleAll(false)}
+          className="pf-toggle-btn"
+          style={{
+            flex: 1, minHeight: 40, borderRadius: 12, cursor: 'pointer',
+            fontSize: 12, fontWeight: 700, color: colors.textMuted,
+            background: 'transparent', border: `1px solid ${colors.border}`,
+          }}
+        >Свернуть</button>
+      </div>
+
+      <div className="profile-user-sections pf-sections" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <UserPersonalSection />
         <UserHealthSection />
         <UserDietSection />

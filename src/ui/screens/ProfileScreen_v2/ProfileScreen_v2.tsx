@@ -104,11 +104,12 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   }
 
   const meta = TAB_META[tab];
+  const tabs = (Object.keys(TAB_META) as Tab[]);
 
   return (
-    <div className="profile-inner" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: 0 }}>
+    <div className="profile-inner pf-inner" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 120px)', minHeight: 0 }}>
       {/* Sticky-хедер вкладки — в стиле NutritionScreen */}
-      <div className="profile-head" style={{
+      <div className="profile-head pf-head" style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
         background: '#18181b',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -117,17 +118,54 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         <button
           onClick={() => setTab(null)}
           aria-label="Назад к hero"
+          className="pf-head-back"
           style={{
             padding: '4px 8px', cursor: 'pointer', fontSize: 20, color: '#ffffff',
-            border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', minHeight: 36,
+            border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 44, minWidth: 44,
           }}
         >←</button>
         <span aria-hidden="true" style={{ display: 'inline-flex', color: meta.color }}><NativeIcon name={meta.icon} size={18} /></span>
         <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>
           {meta.title}
         </div>
-        <span style={{ fontSize: 9, color: '#ffffff' }}>авто-сохранение</span>
+        <span className="pf-autosave" style={{ fontSize: 9, color: '#ffffff' }}>авто-сохранение</span>
         <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
+      </div>
+      {/* Поднавигация по разделам профиля — без возврата в hero */}
+      <div className="pf-subnav" role="navigation" aria-label="Разделы профиля" style={{
+        display: 'flex', gap: 6, padding: '8px 12px', flexShrink: 0,
+        overflowX: 'auto', scrollbarWidth: 'none',
+        background: '#18181b', borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {tabs.map(t => {
+          const m = TAB_META[t];
+          const active = t === tab;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              aria-label={`Раздел ${m.title}`}
+              aria-current={active ? 'page' : undefined}
+              data-active={active}
+              className="pf-subnav-btn"
+              style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, minHeight: 40, whiteSpace: 'nowrap',
+                border: `1px solid ${active ? m.color : 'rgba(255,255,255,0.10)'}`,
+                background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: active ? m.color : '#fff',
+              }}
+            >
+              <span aria-hidden="true" style={{ display: 'inline-flex', color: active ? m.color : '#fff' }}>
+                <NativeIcon name={m.icon} size={13} />
+              </span>
+              {m.title}
+            </button>
+          );
+        })}
       </div>
 
       {/* Содержимое вкладки с прокруткой */}
@@ -160,22 +198,23 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 const UndoButton: React.FC<{ undoAvailable: boolean; setUndoAvailable: (v: boolean) => void }> = ({ undoAvailable, setUndoAvailable }) => {
   if (!undoAvailable) return null;
   return (
-    <button
-      onClick={() => { undoLastSnapshot(); setUndoAvailable(false); }}
-      aria-label="Отменить последнее изменение (Ctrl+Z)"
-      title="Отменить (Ctrl+Z)"
-      style={{
-        background: 'rgba(59,130,246,0.12)',
-        border: '1px solid rgba(59,130,246,0.3)',
-        color: colors.blue,
-        padding: '6px 12px',
-        borderRadius: 8,
-        fontSize: 12,
-        fontWeight: 600,
-        cursor: 'pointer',
-        minHeight: 36,
-        flexShrink: 0,
-      }}
-    >↩ Отменить</button>
+      <button
+        onClick={() => { undoLastSnapshot(); setUndoAvailable(false); }}
+        aria-label="Отменить последнее изменение (Ctrl+Z)"
+        title="Отменить (Ctrl+Z)"
+        className="pf-undo"
+        style={{
+          background: 'rgba(59,130,246,0.12)',
+          border: '1px solid rgba(59,130,246,0.3)',
+          color: colors.blue,
+          padding: '6px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+          minHeight: 40,
+          flexShrink: 0,
+        }}
+      >↩ Отменить</button>
   );
 };

@@ -586,10 +586,20 @@ export const AccordionSection: React.FC<{
 }> = ({ title, subtitle, icon, color, defaultOpen = false, children, badge, id }) => {
   const [open, setOpen] = useState(defaultOpen);
   const c = color || colors.primary;
+  // Пакетное «Развернуть все / Свернуть» из ProfileUserTab (без проп-дриллинга).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const v = (e as CustomEvent<boolean>).detail;
+      if (typeof v === 'boolean') setOpen(v);
+    };
+    window.addEventListener('profile-accordion-toggle', handler as EventListener);
+    return () => window.removeEventListener('profile-accordion-toggle', handler as EventListener);
+  }, []);
   return (
     <div
       id={id}
-      className="profile-accordion"
+      className="profile-accordion pf-acc"
+      data-open={open}
       style={{
         ...glassCard,
         backdropFilter: 'blur(10px)',
@@ -608,6 +618,8 @@ export const AccordionSection: React.FC<{
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="pf-acc-btn"
         style={{
           width: '100%',
           display: 'flex',

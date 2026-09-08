@@ -79,7 +79,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const filled = Math.round((completeness / 100) * 12);
 
   return (
-    <div className="profile-hero" style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+    <div className="profile-hero pf-hero" data-complete={filled} style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
       <HeroImg
         webp="/profile-hero.webp"
         src="/profile-hero.png"
@@ -87,8 +87,8 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
       />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
-      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
+      <div className="pf-hero-shade" style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
+      <div className="pf-hero-body" style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'calc(12px + env(safe-area-inset-top,0px)) 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
         <div>
           <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(var(--profile-accent-rgb, 52,211,153),0.14)', border:'1px solid rgba(var(--profile-accent-rgb, 52,211,153),0.22)', color:'var(--profile-accent, #34d399)', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
             <span style={{ width:5, height:5, borderRadius:5, background:'var(--profile-accent, #34d399)', boxShadow:'0 0 8px rgba(var(--profile-accent-rgb, 52,211,153),0.5)', display:'inline-block' }} /> ПРОФИЛЬ
@@ -132,36 +132,34 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             </div>
           )}
           {isNativeApp() && filled < 12 && (
-            <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
+            <div className="pf-hero-cta-row" style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
               <button
                 type="button"
                 onClick={() => onSelectTab('user')}
-                className="profile-hero-cta"
+                className="profile-hero-cta pf-hero-cta"
                 style={{
                   padding:'10px 18px', borderRadius:999, border:'none', cursor:'pointer',
                   fontSize:12, fontWeight:900, letterSpacing:'-0.1px',
                   color:'var(--accent-contrast, #0a1a08)',
                   background:'linear-gradient(135deg, var(--accent, #c9f73a), var(--accent-2, #00e68a))',
                   boxShadow:'0 8px 24px rgba(var(--accent-rgb, 201, 247, 58), 0.35)',
-                  minHeight:44,
+                  minHeight:48,
                 }}
               >Дозаполнить профиль →</button>
             </div>
           )}
         </div>
 
-        <div role="navigation" aria-label="Разделы профиля" className="profile-hero-nav" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        <div role="navigation" aria-label="Разделы профиля" className="profile-hero-nav pf-hero-nav" style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {TABS.map(t => (
             <div
               key={t.id}
               role="button"
               tabIndex={0}
               onClick={() => onSelectTab(t.id)}
-              className="profile-hero-card"
+              className="profile-hero-card pf-hero-card"
               data-id={t.id}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectTab(t.id); }}}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor=`${withAlpha(t.color, '40')}`; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${withAlpha(t.color, '18')} inset`; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}
               style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:'1px solid rgba(255,255,255,0.12)', boxShadow:'0 3px 12px rgba(0,0,0,0.30)', background:'rgba(18,18,20,0.62)', transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease' }}
             >
               <div aria-hidden="true" style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${withAlpha(t.color, '22')}, ${withAlpha(t.color, '10')})`, border:`1px solid ${withAlpha(t.color, '28')}`, fontSize:18, boxShadow:`0 3px 10px ${withAlpha(t.color, '20')}`, position:'relative', color:t.color }}><NativeIcon name={t.icon} size={19} /></div>

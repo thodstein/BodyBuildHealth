@@ -376,6 +376,7 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
   <div
     role="navigation"
     aria-label={ariaLabel}
+    className="pf-quicklinks"
     style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}
   >
     {links.map((link) => (
@@ -383,6 +384,7 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
         key={link.target}
         onClick={() => onNavigate?.(link.target)}
         aria-label={`Открыть ${link.label}: ${link.desc || ''}`}
+        className="pf-quicklink"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -400,13 +402,9 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
           position: 'relative',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-1px)';
-          e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.35)';
           e.currentTarget.style.background = `${link.color}22`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.18)';
           e.currentTarget.style.background = `${link.color}14`;
         }}
       >
