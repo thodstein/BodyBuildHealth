@@ -212,3 +212,22 @@ describe('P0 peptide filter and weekBar + getPharmaDetail fallback', () => {
     expect(filtered.some(f => f.substanceId === 'bpc157')).toBe(false);
   });
 });
+
+describe('P0 lab-pharma inverted thresholds', () => {
+  it('on_cycle tightens HCT, pct tightens LH', async () => {
+    const { analyzeLabDrugCorrelation } = await import('../lab-pharma-correlation.engine');
+    const course: any[] = [{ substanceId: 'test_enan', endWeek: 12, startWeek: 0, doseValue: 500, doseUnit: 'mg/wk', frequency: '2x/wk' }];
+    const labsHCT: any[] = [{ code: 'HCT', value: 53, unit: '%', date: new Date().toISOString(), patientId: 'current-user' }];
+    const labsLH: any[] = [{ code: 'LH', value: 0.5, unit: 'mIU/mL', date: new Date().toISOString(), patientId: 'current-user' }];
+    const alertsOn = analyzeLabDrugCorrelation(labsHCT, course, 'on_cycle');
+    const alertsPct = analyzeLabDrugCorrelation(labsLH, course, 'pct');
+    // HCT 53 on_cycle should be flagged high (tightened uln 0.95*52=49.4) vs off 52
+    const hctAlert = alertsOn.find(a => a.marker === 'HCT');
+    expect(hctAlert).toBeTruthy();
+    expect(hctAlert?.actualStatus).toBe('high');
+    // LH 0.5 pct should be flagged low (tightened lln 1.05)
+    const lhAlert = alertsPct.find(a => a.marker === 'LH');
+    expect(lhAlert).toBeTruthy();
+    expect(lhAlert?.actualStatus).toBe('low');
+  });
+});

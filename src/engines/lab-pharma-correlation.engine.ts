@@ -108,15 +108,23 @@ export function analyzeLabDrugCorrelation(
   currentPhase: string
 ): LabDrugAlert[] {
   const alerts: LabDrugAlert[] = [];
-  const activeDrugs = course.filter(c => c.endWeek >= 0);
+  // Только активные по фазе: on_cycle — в курсе, pct — недавно оконченные, иначе все
+  const activeDrugs = course.filter(c => {
+    if (currentPhase === 'on_cycle') return c.endWeek >= 0 && c.startWeek <= 52;
+    if (currentPhase === 'pct') return c.endWeek >= -4;
+    return c.endWeek >= 0;
+  });
 
   Object.entries(UCUM_MAP).forEach(([marker, meta]) => {
     const markerLabs = labs.filter(l => l.code.toUpperCase() === marker).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     if (!markerLabs.length) return;
 
     const latest = markerLabs[0].value;
-    const uln = meta.uln * (currentPhase === 'on_cycle' ? 1.25 : 1);
-    const lln = meta.lln * (currentPhase === 'pct' ? 0.8 : 1);
+    // На курсе — сужаем верхнюю границу для HCT/ALT/E2, в ПКТ — нижнюю для LH/TT
+    const isOnCycleCrit = currentPhase === 'on_cycle' && ['HCT','HGB','RBC','ALT','AST','E2','LDL','CHOL'].includes(marker);
+    const isPctCrit = currentPhase === 'pct' && ['LH','FSH','TT','FT','SHBG'].includes(marker);
+    const uln = meta.uln * (isOnCycleCrit ? 0.95 : 1);
+    const lln = meta.lln * (isPctCrit ? 1.05 : 1);
 
     const impactingDrugs: string[] = [];
     let maxSeverity = 0;
