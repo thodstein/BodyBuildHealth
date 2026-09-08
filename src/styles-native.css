@@ -5745,3 +5745,1244 @@ html.app-native .pharma-course .pc-glass {
     animation: none !important;
   }
 }
+
+/* ─── 76. TRAINING DIARY PRO — дневник тренировок уровня топ-приложения ───
+ * Только APK (html.app-native): TG/web — байт-в-байт как было.
+ * Навигация: липкая поднавигация-лента, сегменты 44px+, CTA sticky снизу.
+ * Читаемость: метки 11-12px, цифры табличные, тапы ≥44px, инпуты 16px.
+ * Хуки: .td-subnav/.td-seg/.td-today/.td-rings/.td-plan (хаб),
+ * .qe-* (быстрый ввод), .rf-* (подробная форма), .train-diarysetrow,
+ * .th-* (история), .ta-stats (аналитика), .train-diaryprogress/tools. */
+
+/* Корень хаба: дыхание снизу под pill-nav, каскад появления */
+html.app-native .hub-diary {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .hub-diary > div {
+  animation: nativeCascadeIn 0.42s cubic-bezier(0.22, 0.68, 0, 1) backwards;
+}
+
+html.app-native .hub-diary > div:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+html.app-native .hub-diary > div:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+/* Шапка хаба: стекло + крупнее заголовок, mode-бейдж — пилюлей */
+html.app-native .hub-diary .hub-head {
+  padding: 14px 16px !important;
+  border-radius: 22px !important;
+}
+
+html.app-native .hub-diary .hub-head > span:last-child {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 5px 12px !important;
+  border-radius: 999px !important;
+  background: rgba(var(--accent-rgb), 0.12) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.3) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Липкая поднавигация: лента со скроллом, актив — лайм ── */
+html.app-native .hub-diary .td-subnav {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  border-radius: 18px !important;
+  padding: 8px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .td-subnav::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .hub-diary .td-subnav-btn {
+  flex: 1 0 auto !important;
+  min-width: 96px !important;
+  min-height: 44px !important;
+  font-size: 12px !important;
+  border-radius: 13px !important;
+  white-space: nowrap !important;
+}
+
+html.app-native .hub-diary .td-subnav-btn[data-active='true'] {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  border-color: transparent !important;
+  color: #0a1a08 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .hub-diary .td-subnav-btn:active {
+  transform: scale(0.96) !important;
+}
+
+/* ── Сегменты (быстро/подробно, прогресс/календарь, ритуалы): скролл-лента ── */
+html.app-native .hub-diary .td-seg {
+  border-radius: 18px !important;
+  padding: 8px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  background: rgba(9, 18, 34, 0.72) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+html.app-native .hub-diary .td-seg::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .hub-diary .td-seg button {
+  min-height: 44px !important;
+  border-radius: 13px !important;
+  font-size: 12px !important;
+  flex: 1 0 auto !important;
+  white-space: nowrap !important;
+}
+
+html.app-native .hub-diary .td-seg button[data-active='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.25) !important;
+  font-weight: 800 !important;
+}
+
+/* ── Карточка «Сегодня»: стекло, крупные цифры, кольца 52px ── */
+html.app-native .hub-diary .td-today {
+  border-radius: 22px !important;
+  padding: 16px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.82), rgba(12, 23, 40, 0.82)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html.app-native .hub-diary .td-rings button {
+  min-width: 52px !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+}
+
+html.app-native .hub-diary .td-rings button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .hub-diary .td-plan {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-2-rgb), 0.06)) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.22) !important;
+}
+
+html.app-native .hub-diary .td-plan button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+/* ── Быстрый ввод: поиск 48px, результаты-шит, чипы, липкий сейв ── */
+html.app-native .train-quickentry {
+  gap: 12px !important;
+  padding: 16px !important;
+}
+
+html.app-native .train-quickentry input[type='text'] {
+  min-height: 48px !important;
+  border-radius: 15px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-quickentry .qe-results {
+  border-radius: 16px !important;
+  border: 1px solid rgba(140, 190, 255, 0.18) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55) !important;
+  overflow: hidden !important;
+}
+
+html.app-native .train-quickentry .qe-results > div {
+  min-height: 48px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .train-quickentry .qe-results > div:active {
+  background: rgba(var(--accent-rgb), 0.08) !important;
+}
+
+html.app-native .train-quickentry .qe-recent button {
+  min-height: 40px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  padding: 8px 12px !important;
+}
+
+html.app-native .train-quickentry .qe-repeat {
+  min-height: 48px !important;
+  border-radius: 15px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .train-quickentry .qe-rest {
+  border-radius: 18px !important;
+  padding: 14px 16px !important;
+}
+
+html.app-native .train-quickentry .qe-rest button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .train-quickentry .qe-save {
+  position: sticky !important;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  z-index: 20 !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.35) !important;
+}
+
+/* ── Подробная форма: поля под палец, чипы-лента, сетка подходов ── */
+html.app-native .train-recordform {
+  padding: 16px !important;
+  gap: 10px !important;
+}
+
+html.app-native .train-recordform input,
+html.app-native .train-recordform select {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-recordform .rf-groups {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+}
+
+html.app-native .train-recordform .rf-groups::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-recordform .rf-groups button {
+  min-height: 40px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  padding: 8px 14px !important;
+  flex: 0 0 auto !important;
+}
+
+html.app-native .train-recordform .rf-results {
+  border-radius: 16px !important;
+  border: 1px solid rgba(140, 190, 255, 0.18) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55) !important;
+  overflow: hidden !important;
+}
+
+html.app-native .train-recordform .rf-results > div {
+  min-height: 48px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .train-recordform .rf-recent button {
+  min-height: 40px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  padding: 8px 12px !important;
+}
+
+html.app-native .train-recordform .rf-save {
+  position: sticky !important;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  z-index: 20 !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.35) !important;
+}
+
+/* ── Строка подхода: инпуты 44px/16px, кнопки-тапы ── */
+html.app-native .train-diarysetrow {
+  padding: 8px 0 !important;
+}
+
+html.app-native .train-diarysetrow input {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-diarysetrow button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+/* ── История: фильтры 48px, heatmap в ширину, карточки недель ── */
+html.app-native .train-diaryhistory {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-diaryhistory .th-filters {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  padding: 8px !important;
+  margin: 0 -4px 8px !important;
+  border-radius: 18px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+
+html.app-native .train-diaryhistory .th-filters input {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-diaryhistory .th-filters > button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .train-diaryhistory .th-heatmap {
+  border-radius: 20px !important;
+  padding: 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.66), rgba(12, 23, 40, 0.66)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .train-diaryhistory .th-heatmap::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-diaryhistory .th-expand button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+html.app-native .train-diaryhistory .th-more {
+  min-height: 48px !important;
+  border-radius: 15px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .train-diaryhistory .th-more:active {
+  transform: scale(0.98) !important;
+}
+
+/* Попапы фильтров: шит с блюром, опции 48px, инпуты 16px */
+html.app-native .th-popup-backdrop {
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+}
+
+html.app-native .th-popup-backdrop .th-popup-card {
+  border-radius: 22px !important;
+  border: 1px solid rgba(140, 190, 255, 0.18) !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.96), rgba(12, 23, 40, 0.96)) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+  animation: nativeCascadeIn 0.3s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .th-popup-backdrop .th-popup-card button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .th-popup-backdrop .th-popup-card input {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+/* ── Аналитика: стат-плитки, графики в ширину ── */
+html.app-native .train-diaryanalytics {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-diaryanalytics .ta-stats {
+  gap: 10px !important;
+}
+
+html.app-native .train-diaryanalytics .ta-stats > div {
+  border-radius: 18px !important;
+  padding: 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-diaryanalytics svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* ── Прогресс: замеры под палец, сетки на 360 ── */
+html.app-native .train-diaryprogress {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-diaryprogress input {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-diaryprogress button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── Инструменты: экспортные CTA 48px ── */
+html.app-native .train-diarytools {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-diarytools button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .train-diarytools button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Пустые состояния дневника: крупнее CTA */
+html.app-native .hub-diary button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.app-native .hub-diary .qe-save:disabled {
+  opacity: 0.45 !important;
+  box-shadow: none !important;
+}
+
+html.app-native .hub-diary .rf-save:disabled {
+  opacity: 0.45 !important;
+  box-shadow: none !important;
+}
+
+/* Фокус для клавиатурной навигации */
+html.app-native .hub-diary button:focus-visible,
+html.app-native .train-quickentry input:focus-visible,
+html.app-native .train-recordform input:focus-visible,
+html.app-native .train-recordform select:focus-visible,
+html.app-native .train-diaryhistory input:focus-visible,
+html.app-native .train-diarysetrow input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Цифры — табличные, статистика не прыгает */
+html.app-native .hub-diary .ww-head,
+html.app-native .train-diaryhistory .ww-card,
+html.app-native .train-diaryhistory .th-planfact,
+html.app-native .train-diaryhistory .th-compare,
+html.app-native .train-diaryhistory .th-weeksum pre {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Мобайл 360: сабнав компактнее, сетки аналитики/прогресса — auto-fit */
+@media (max-width: 380px) {
+  html.app-native .hub-diary .td-subnav-btn {
+    min-width: 84px !important;
+    font-size: 11px !important;
+  }
+  html.app-native .train-diaryanalytics .ta-stats {
+    gap: 8px !important;
+  }
+  html.app-native .train-quickentry {
+    padding: 12px !important;
+  }
+  html.app-native .train-recordform {
+    padding: 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary > div,
+  html.app-native .th-popup-backdrop .th-popup-card {
+    animation: none !important;
+  }
+}
+
+/* ─── 77. TRAINING DIARY PRO-2 — недели, модалка, карточки истории ───
+ * Второй уровень дневника: week-карточки (тапы были 20px), модалка сессии,
+ * план-факт/сводки/MRV/сравнение, разделители секций, пустые состояния.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Week-карточка: шапка-тап 52px, статистика табличная, экшены 40px ── */
+html.app-native .train-diaryhistory .ww-card {
+  border-radius: 20px !important;
+  padding: 12px 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html.app-native .train-diaryhistory .ww-card[data-deload='true'] {
+  border-left: 3px solid #f59e0b !important;
+  border-top: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+html.app-native .train-diaryhistory .ww-head {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+  padding: 6px 4px !important;
+}
+
+html.app-native .train-diaryhistory .ww-head strong {
+  font-size: 14px !important;
+}
+
+html.app-native .train-diaryhistory .ww-head > div:last-child {
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+html.app-native .train-diaryhistory .ww-act button {
+  min-height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  padding: 8px 10px !important;
+}
+
+html.app-native .train-diaryhistory .ww-act button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .train-diaryhistory .ww-session {
+  padding: 12px 0 !important;
+}
+
+html.app-native .train-diaryhistory .ww-exlist > div {
+  font-size: 12px !important;
+  padding: 5px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+html.app-native .train-diaryhistory .ww-meta {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+/* ── Модалка сессии: стекло, мета auto-fit, сеты под палец, липкий низ ── */
+html.app-native .train-sessionmodal {
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+}
+
+html.app-native .train-sessionmodal .se-card {
+  border-radius: 22px !important;
+  border: 1px solid rgba(140, 190, 255, 0.18) !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.96), rgba(12, 23, 40, 0.96)) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+  padding: 16px !important;
+  animation: nativeCascadeIn 0.3s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .train-sessionmodal .se-meta {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.app-native .train-sessionmodal .se-card input,
+html.app-native .train-sessionmodal .se-card select {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .train-sessionmodal .se-ex {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+
+html.app-native .train-sessionmodal .se-ex [style*='grid-template-columns: 1fr 1fr 1fr 1fr 56px 28px'] {
+  grid-template-columns: 1fr 1fr 1fr 1fr 48px 40px !important;
+  gap: 6px !important;
+}
+
+html.app-native .train-sessionmodal .se-ex input {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  padding: 8px 4px !important;
+}
+
+html.app-native .train-sessionmodal .se-ex button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .train-sessionmodal .se-foot {
+  position: sticky !important;
+  bottom: 0 !important;
+  padding: 10px 0 2px !important;
+  background: linear-gradient(180deg, transparent, rgba(12, 23, 40, 0.96) 30%) !important;
+}
+
+html.app-native .train-sessionmodal .se-foot button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+}
+
+/* ── План-факт: плитка 3-в-ряд, бар толще ── */
+html.app-native .train-diaryhistory .th-planfact {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-diaryhistory .th-planfact [style*='grid-template-columns: 1fr 1fr 1fr'] > div {
+  border-radius: 12px !important;
+  padding: 10px 6px !important;
+}
+
+/* ── Сводка недели: читаемый pre + CTA 44px ── */
+html.app-native .train-diaryhistory .th-weeksum {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+html.app-native .train-diaryhistory .th-weeksum pre {
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+}
+
+html.app-native .train-diaryhistory .th-weeksum button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+/* ── MRV-алерт и сравнение недель ── */
+html.app-native .train-diaryhistory .th-mrv {
+  border-radius: 16px !important;
+  padding: 12px !important;
+}
+
+html.app-native .train-diaryhistory .th-mrv > div:first-child {
+  font-size: 12px !important;
+}
+
+html.app-native .train-diaryhistory .th-compare {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+/* ── Разделители секций аналитики: крупнее, хинт — пилюлей ── */
+html.app-native .train-diaryanalytics .sec-head {
+  margin: 14px 2px 8px !important;
+}
+
+html.app-native .train-diaryanalytics .sec-head > span:first-child {
+  font-size: 16px !important;
+}
+
+html.app-native .train-diaryanalytics .sec-head > span:nth-child(2) {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .train-diaryanalytics .sec-head > span:last-child {
+  font-size: 10px !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+}
+
+/* ── Сетки аналитики: дыхание + схлопывание 4-колоночных на 360 ── */
+html.app-native .train-diaryanalytics [style*='grid-template-columns'] {
+  gap: 8px !important;
+}
+
+/* ── Пустые состояния: крупная CTA ── */
+html.app-native .hub-diary .de-empty {
+  border-radius: 22px !important;
+  padding: 28px 20px !important;
+}
+
+html.app-native .hub-diary .de-empty button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  padding: 14px 24px !important;
+}
+
+html.app-native .hub-diary .de-empty button:active {
+  transform: scale(0.97) !important;
+}
+
+/* Фокус новых зон */
+html.app-native .train-diaryhistory .ww-head:focus-visible,
+html.app-native .train-diaryhistory .ww-act button:focus-visible,
+html.app-native .train-sessionmodal .se-card button:focus-visible,
+html.app-native .train-sessionmodal .se-card input:focus-visible,
+html.app-native .train-sessionmodal .se-card select:focus-visible,
+html.app-native .hub-diary .de-empty button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Мобайл 360: 4-колоночные мини-сетки аналитики → 2 колонки, экшены в ряд */
+@media (max-width: 380px) {
+  html.app-native .train-diaryanalytics [style*='grid-template-columns: 1fr 1fr 1fr 1fr'] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  html.app-native .train-diaryhistory .ww-act {
+    flex-wrap: wrap !important;
+  }
+  html.app-native .train-sessionmodal .se-card {
+    padding: 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sessionmodal .se-card {
+    animation: none !important;
+  }
+}
+
+/* ─── 78. TRAINING DIARY PRO-3 — календарь, миксы, мои, читаемость ───
+ * Календарь месяца/недели/мезоцикла, микс-секция, «Мои тренировки»,
+ * соревновательные циклы + blanket-подъём мелких 8/9/10px текстов дневника.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Читаемость: мелкие тексты дневника +1..2px (бейджи/подписи/строки) ── */
+html.app-native .hub-diary [style*='font-size: 8px'],
+html.app-native .train-diaryhistory [style*='font-size: 8px'],
+html.app-native .train-diaryanalytics [style*='font-size: 8px'],
+html.app-native .train-diarytools [style*='font-size: 8px'],
+html.app-native .train-diaryprogress [style*='font-size: 8px'],
+html.app-native .train-quickentry [style*='font-size: 8px'],
+html.app-native .train-recordform [style*='font-size: 8px'],
+html.app-native .train-diarysetrow [style*='font-size: 8px'],
+html.app-native .train-mixdiary [style*='font-size: 8px'],
+html.app-native .train-mytraining [style*='font-size: 8px'] {
+  font-size: 10px !important;
+}
+
+html.app-native .hub-diary [style*='font-size: 9px'],
+html.app-native .train-diaryhistory [style*='font-size: 9px'],
+html.app-native .train-diaryanalytics [style*='font-size: 9px'],
+html.app-native .train-diarytools [style*='font-size: 9px'],
+html.app-native .train-diaryprogress [style*='font-size: 9px'],
+html.app-native .train-quickentry [style*='font-size: 9px'],
+html.app-native .train-recordform [style*='font-size: 9px'],
+html.app-native .train-diarysetrow [style*='font-size: 9px'],
+html.app-native .train-mixdiary [style*='font-size: 9px'],
+html.app-native .train-mytraining [style*='font-size: 9px'] {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .hub-diary [style*='font-size: 10px'],
+html.app-native .train-diaryhistory [style*='font-size: 10px'],
+html.app-native .train-diaryanalytics [style*='font-size: 10px'],
+html.app-native .train-diarytools [style*='font-size: 10px'],
+html.app-native .train-diaryprogress [style*='font-size: 10px'],
+html.app-native .train-quickentry [style*='font-size: 10px'],
+html.app-native .train-recordform [style*='font-size: 10px'],
+html.app-native .train-diarysetrow [style*='font-size: 10px'],
+html.app-native .train-mixdiary [style*='font-size: 10px'],
+html.app-native .train-mytraining [style*='font-size: 10px'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ── Календарь: липкая шапка, крупные свитчеры, живые ячейки ── */
+html.app-native .train-calendar {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .train-calendar .cal-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  padding: 8px !important;
+  margin: 0 -4px 10px !important;
+  border-radius: 18px !important;
+  background: rgba(9, 18, 34, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+html.app-native .train-calendar button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-calendar .cal-view button {
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+  white-space: nowrap !important;
+}
+
+html.app-native .train-calendar .cal-weeks {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+}
+
+html.app-native .train-calendar .cal-weeks::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-calendar .cal-weeks button {
+  flex: 0 0 auto !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+html.app-native .train-calendar .cal-cell {
+  border-radius: 12px !important;
+  min-height: 44px !important;
+}
+
+html.app-native .train-calendar .cal-cell:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .train-calendar .cal-cell[data-today='true'] {
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.6), 0 4px 16px rgba(var(--accent-rgb), 0.25) !important;
+}
+
+html.app-native .train-calendar .cal-stat {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-calendar .cal-water,
+html.app-native .train-calendar .cal-export {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-calendar .cal-water button,
+html.app-native .train-calendar .cal-export button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── Миксы: шапка, раскрытие 44px, фазы-тапы ── */
+html.app-native .hub-diary .train-mixdiary {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .train-mixdiary .mx-expand {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+html.app-native .hub-diary .train-mixdiary .mx-rec {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+}
+
+html.app-native .hub-diary .train-mixdiary .mx-rec button {
+  min-height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 10px !important;
+  font-size: 11px !important;
+}
+
+/* ── Мои тренировки: поля и кнопки под палец ── */
+html.app-native .hub-diary .train-mytraining {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .hub-diary .train-mytraining input,
+html.app-native .hub-diary .train-mytraining select,
+html.app-native .hub-diary .train-mytraining textarea {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+html.app-native .hub-diary .train-mytraining button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .hub-diary .train-mytraining button:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── Соревновательные циклы: стекло, тапы ── */
+html.app-native .hub-diary .comp-plans > div,
+html.app-native .hub-diary .comp-empty {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+html.app-native .hub-diary .comp-plans button,
+html.app-native .hub-diary .comp-empty button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+
+/* Фокус новых зон */
+html.app-native .train-calendar button:focus-visible,
+html.app-native .train-calendar .cal-cell:focus-visible,
+html.app-native .hub-diary .train-mixdiary button:focus-visible,
+html.app-native .hub-diary .train-mytraining button:focus-visible,
+html.app-native .hub-diary .train-mytraining input:focus-visible,
+html.app-native .hub-diary .comp-plans button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Мобайл 360: шапка календаря столбиком */
+@media (max-width: 380px) {
+  html.app-native .train-calendar .cal-head {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  html.app-native .train-calendar .cal-view {
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  html.app-native .train-calendar .cal-view::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-calendar .cal-cell:active,
+  html.app-native .hub-diary .train-mytraining button:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 79. TRAINING DIARY PRO-4 — разминка/заминка + добор читаемости ───
+ * Вкладки ритуалов (статы 5-в-ряд, heatmap 56 дней, ghost-кнопки 36px),
+ * добор blanket-подъёма на warmup/cooldown/comp-ветки.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Добор читаемости: те же 8/9/10→10/11/12 на остальных ветках ── */
+html.app-native .train-warmupdiary [style*='font-size: 8px'],
+html.app-native .train-cooldowndiary [style*='font-size: 8px'],
+html.app-native .hub-diary .comp-plans [style*='font-size: 8px'],
+html.app-native .hub-diary .comp-empty [style*='font-size: 8px'] {
+  font-size: 10px !important;
+}
+
+html.app-native .train-warmupdiary [style*='font-size: 9px'],
+html.app-native .train-cooldowndiary [style*='font-size: 9px'],
+html.app-native .hub-diary .comp-plans [style*='font-size: 9px'],
+html.app-native .hub-diary .comp-empty [style*='font-size: 9px'] {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-warmupdiary [style*='font-size: 10px'],
+html.app-native .train-cooldowndiary [style*='font-size: 10px'],
+html.app-native .hub-diary .comp-plans [style*='font-size: 10px'],
+html.app-native .hub-diary .comp-empty [style*='font-size: 10px'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ── Разминка/заминка: стекло, статы с кромкой, heatmap, фут 48px ── */
+html.app-native .hub-diary .train-warmupdiary,
+html.app-native .hub-diary .train-cooldowndiary {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .hub-diary .train-warmupdiary > div,
+html.app-native .hub-diary .train-cooldowndiary > div {
+  border-radius: 20px !important;
+}
+
+html.app-native .hub-diary .train-warmupdiary .wu-stats > div,
+html.app-native .hub-diary .train-cooldowndiary .cd-stats > div {
+  border-radius: 14px !important;
+  padding: 10px 6px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .hub-diary .train-warmupdiary .wu-heat {
+  border-radius: 14px !important;
+  padding: 10px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(140, 190, 255, 0.1) !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .hub-diary .train-warmupdiary .wu-heat::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .hub-diary .train-warmupdiary .wu-foot button,
+html.app-native .hub-diary .train-cooldowndiary .cd-foot button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .hub-diary .train-warmupdiary .wu-foot button:active,
+html.app-native .hub-diary .train-cooldowndiary .cd-foot button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Фокус новых зон */
+html.app-native .hub-diary .train-warmupdiary button:focus-visible,
+html.app-native .hub-diary .train-cooldowndiary button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Мобайл 360: статы 5-в-ряд → auto-fit */
+@media (max-width: 380px) {
+  html.app-native .hub-diary .train-warmupdiary .wu-stats,
+  html.app-native .hub-diary .train-cooldowndiary .cd-stats {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary .train-warmupdiary .wu-foot button:active,
+  html.app-native .hub-diary .train-cooldowndiary .cd-foot button:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 80. TRAINING DIARY PRO-5 — ритуалы: психика/мобильность/чек-ин/MMC ───
+ * Чек-ины/шкалы/настроение под палец (было 36px и мельче), поля 48px/16px,
+ * карточки-стекло с акцентной кромкой по смыслу, добор читаемости.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Добор читаемости на ветки ритуалов ── */
+html.app-native .train-mindset [style*='font-size: 8px'],
+html.app-native .train-mobility [style*='font-size: 8px'],
+html.app-native .train-checkin [style*='font-size: 8px'],
+html.app-native .train-mmctrack [style*='font-size: 8px'] {
+  font-size: 10px !important;
+}
+
+html.app-native .train-mindset [style*='font-size: 9px'],
+html.app-native .train-mobility [style*='font-size: 9px'],
+html.app-native .train-checkin [style*='font-size: 9px'],
+html.app-native .train-mmctrack [style*='font-size: 9px'] {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-mindset [style*='font-size: 10px'],
+html.app-native .train-mobility [style*='font-size: 10px'],
+html.app-native .train-checkin [style*='font-size: 10px'],
+html.app-native .train-mmctrack [style*='font-size: 10px'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ── Корни ритуалов: дыхание снизу, зазоры ── */
+html.app-native .hub-diary .train-mindset,
+html.app-native .hub-diary .train-mobility,
+html.app-native .hub-diary .train-checkin,
+html.app-native .hub-diary .train-mmctrack {
+  gap: 10px !important;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+/* ── Кнопки ритуалов: минимум 48px, шкалы — удобные тапы ── */
+html.app-native .hub-diary .train-mindset button,
+html.app-native .hub-diary .train-mobility button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .hub-diary .train-mindset button:active,
+html.app-native .hub-diary .train-mobility button:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── Поля ритуалов: 48px/16px, без зума ── */
+html.app-native .hub-diary .train-mindset input,
+html.app-native .hub-diary .train-mindset select,
+html.app-native .hub-diary .train-mindset textarea,
+html.app-native .hub-diary .train-mobility input,
+html.app-native .hub-diary .train-mobility select,
+html.app-native .hub-diary .train-mobility textarea,
+html.app-native .hub-diary .train-checkin input,
+html.app-native .hub-diary .train-checkin select,
+html.app-native .hub-diary .train-checkin textarea,
+html.app-native .hub-diary .train-mmctrack input,
+html.app-native .hub-diary .train-mmctrack select,
+html.app-native .hub-diary .train-mmctrack textarea {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+/* ── Чек-ин психики / настроение: стекло с фиолетовой кромкой ── */
+html.app-native .hub-diary .train-mindset .ms-checkin,
+html.app-native .hub-diary .train-mindset .ms-mood {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .train-mindset .ms-moodgrid {
+  gap: 6px !important;
+}
+
+/* ── Чек-ин мобильности / оценка: стекло с синей кромкой ── */
+html.app-native .hub-diary .train-mobility .mb-checkin,
+html.app-native .hub-diary .train-mobility .mb-assess {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(96, 165, 250, 0.22) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .train-mobility .mb-foot button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .hub-diary .train-mobility .mb-foot button:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── Чек-ин метрик: сейв 52px липкий, плитки tabular ── */
+html.app-native .hub-diary .train-checkin .ci-save {
+  position: sticky !important;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  z-index: 20 !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.35) !important;
+}
+
+html.app-native .hub-diary .train-checkin button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── MMC: карточки 18px, бары толще, селекты под палец ── */
+html.app-native .hub-diary .train-mmctrack > div {
+  border-radius: 18px !important;
+  padding: 14px !important;
+}
+
+html.app-native .hub-diary .train-mmctrack button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+/* Фокус новых зон */
+html.app-native .hub-diary .train-mindset button:focus-visible,
+html.app-native .hub-diary .train-mindset input:focus-visible,
+html.app-native .hub-diary .train-mobility button:focus-visible,
+html.app-native .hub-diary .train-mobility input:focus-visible,
+html.app-native .hub-diary .train-checkin button:focus-visible,
+html.app-native .hub-diary .train-checkin input:focus-visible,
+html.app-native .hub-diary .train-mmctrack button:focus-visible,
+html.app-native .hub-diary .train-mmctrack input:focus-visible,
+html.app-native .hub-diary .train-mmctrack select:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Мобайл 360: сетки чек-ина схлопываются */
+@media (max-width: 380px) {
+  html.app-native .hub-diary .train-checkin [style*='grid-template-columns: 1fr 1fr'],
+  html.app-native .hub-diary .train-checkin [style*='grid-template-columns: 1fr 1fr 1fr'] {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary .train-mindset button:active,
+  html.app-native .hub-diary .train-mobility button:active,
+  html.app-native .hub-diary .train-mobility .mb-foot button:active {
+    transform: none !important;
+  }
+}

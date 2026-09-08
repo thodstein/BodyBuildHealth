@@ -22,6 +22,7 @@ import { collectJointPrep, jointPrepLabels } from '../../../engines/warmup-joint
 import { warmupLabel } from '../../../engines/warmup.engine';
 import { WarmupRampCard } from './diary-cards';
 import type { WorkoutLog } from '../../../core/types';
+import { localIsoDate } from './diary-shared';
 
 const CARD = diaryCard;
 const WARMUP_COLOR = '#f97316';
@@ -164,7 +165,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
         <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
           Сегодня
         </div>
-        <WarmupCheckinInline date={new Date().toISOString().slice(0, 10)} onSaved={refresh} />
+        <WarmupCheckinInline date={localIsoDate()} onSaved={refresh} />
       </div>
 
       {/* ── Сводка 30 дней ── */}
@@ -178,7 +179,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
+            <div className="wu-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
               <div style={{ padding: '8px 8px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(249,115,22,0.12), rgba(251,146,60,0.06))', border: '1px solid rgba(249,115,22,0.18)', textAlign: 'center' }}>
                 <div style={{ fontSize: 11 }}>📝</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Записей</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: WARMUP_COLOR, marginTop: 2 }}>{adherence.total}</div>
@@ -239,12 +240,12 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
               for (let i = 55; i >= 0; i--) {
                 const d = new Date(today);
                 d.setDate(today.getDate() - i);
-                const iso = d.toISOString().slice(0, 10);
+                const iso = localIsoDate(d);
                 const v = doneByDate.get(iso);
                 cells.push({ date: iso, done: v === undefined ? null : v });
               }
               return (
-                <div style={{ marginTop: 8 }}>
+                <div className="wu-heat" style={{ marginTop: 8 }}>
                   <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Тепловая карта 56 дней</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)', gap: 3 }}>
                     {cells.map(c => (
@@ -330,7 +331,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
       {/* ── Калькулятор разминочной рампы ── */}
       <WarmupRampCard />
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div className="wu-foot" style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта разминки">🖨 Отчёт</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(249,115,22,0.3)', color: WARMUP_COLOR }} aria-label="Скачать CSV дневника разминки"

@@ -14,7 +14,6 @@ import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import { DiarySetRow } from './DiarySetRow';
-import { getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
@@ -51,7 +50,7 @@ interface ExerciseRecord {
  * Общие хелперы (прошлые данные/PR) вынесены в diary-shared.ts —
  * единый источник для QuickEntry и DiaryRecordingForm.
  */
-import { getPreviousWorkoutData, getPersonalRecord } from './diary-shared';
+import { getPreviousWorkoutData, getPersonalRecord, searchExerciseCatalog, seedForNewExercise } from './diary-shared';
 
 export const QuickEntry: React.FC<QuickEntryProps> = ({
   diary, historyWorkouts, selectedWeek, onSave,
@@ -115,21 +114,13 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     };
   }, []);
 
-  // Поиск упражнений
+  // Поиск упражнений — единый хелпер (имя/id/алиасы + метки групп)
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
-    const q = searchQuery.toLowerCase();
-    const matches = EXERCISE_CATALOG
-      .filter(ex => {
-        if (ex.name.toLowerCase().includes(q) || ex.id.toLowerCase().includes(q)) return true;
-        const aliases = getAliasesForExercise(ex.id);
-        return aliases.some(a => a.toLowerCase().includes(q));
-      })
-      .slice(0, 8);
-    setSearchResults(matches);
+    setSearchResults(searchExerciseCatalog(searchQuery, 8));
   }, [searchQuery]);
 
   // Таймер отдыха
@@ -154,17 +145,19 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const addExercise = useCallback((ex: typeof EXERCISE_CATALOG[0]) => {
     pushUndo(exercises);
     const isBW = isBWExercise(ex);
+    // Сид строго из истории ДОБАВЛЯЕМОГО упражнения (не текущего выбранного).
+    const seed = seedForNewExercise(historyWorkouts, ex.name, isBW);
     const newEx: ExerciseRecord = {
       exerciseId: ex.id,
       exerciseName: ex.name,
-      sets: [{ weight: isBW ? 0 : (prevData?.weight || 0), reps: prevData?.reps || 10, rpe: 0, rir: prevData?.rir || 2, completed: false }],
+      sets: [{ weight: seed.weight, reps: seed.reps, rpe: 0, rir: seed.rir, completed: false }],
     };
     setExercises(prev => [...prev, newEx]);
     setCurrentExIdx(exercises.length);
     setCurrentSetIdx(0);
     setSearchQuery('');
     setSearchResults([]);
-  }, [prevData, exercises.length, exercises, pushUndo]);
+  }, [historyWorkouts, exercises.length, exercises, pushUndo]);
 
   const addSet = useCallback(() => {
     if (!currentEx) return;
@@ -324,7 +317,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
 
       {/* Rest timer */}
       {restTimer > 0 && (
-        <div style={{
+        <div className="qe-rest" style={{
           padding: '12px 16px', borderRadius: 12,
           background: restTimer <= 10 ? 'rgba(239,68,68,0.15)' : 'rgba(0,230,138,0.08)',
           border: `1px solid ${restTimer <= 10 ? 'rgba(239,68,68,0.3)' : 'rgba(0,230,138,0.2)'}`,
@@ -375,6 +368,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           setCurrentExIdx(0);
           setCurrentSetIdx(0);
         }}
+          className="qe-repeat"
           style={{
             width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px dashed rgba(0,230,138,0.3)',
             background: 'rgba(0,230,138,0.04)', color: ACCENT, cursor: 'pointer', fontSize: 13, minHeight: 44,
@@ -398,7 +392,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           }}
         />
         {searchResults.length > 0 && (
-          <div style={{
+          <div className="qe-results" style={{
             position: 'absolute', top: '100%', left: 0, right: 0,
             background: '#18181b', border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 12, zIndex: 100, maxHeight: 250, overflowY: 'auto',
@@ -434,7 +428,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         const recent = Array.from(recentMap.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).slice(0, 6);
         if (recent.length === 0) return null;
         return (
-          <div style={{ marginTop: 8, marginBottom: 8 }}>
+          <div className="qe-recent" style={{ marginTop: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>Недавние:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {recent.map(r => (
@@ -646,6 +640,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         <button
           onClick={handleSave}
           disabled={totalSets === 0}
+          className="qe-save"
           style={{
             width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer',
             background: totalSets > 0 ? 'linear-gradient(135deg, #00e68a, #00c853)' : 'rgba(255,255,255,0.05)',

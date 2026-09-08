@@ -106,14 +106,14 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
 
   return (
     <div className="train-sessionmodal" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, maxHeight: '86vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+      <div className="se-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, maxHeight: '86vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>✏️ Редактирование тренировки</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
         </div>
 
         {/* Meta */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+        <div className="se-meta" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
           <div><label style={{ fontSize: 10, color: '#fff' }}>Дата</label><input type="date" value={log.date} onChange={e => patch({ date: e.target.value })} style={IN} /></div>
           <div><label style={{ fontSize: 10, color: '#fff' }}>Длительность (мин)</label><input type="number" min={0} value={log.duration || 0} onChange={e => patch({ duration: parseInt(e.target.value) || 0 })} style={IN} /></div>
           <div><label style={{ fontSize: 10, color: '#fff' }}>Сплит</label>
@@ -135,7 +135,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
           const cat = EXERCISE_CATALOG.find(c => c.id === ex.exerciseId);
           const isBWEx = isBW(ex.exerciseName) || (cat?.type === 'bodyweight');
           return (
-            <div key={ex.id || ei} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', marginBottom: 8, padding: 8 }}>
+            <div key={ex.id || ei} className="se-ex" style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', marginBottom: 8, padding: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>
                   {ex.exerciseName}
@@ -187,7 +187,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
         {/* Чек-ин заминки (опционально): выполнена + качество */}
         <CooldownCheckinInline date={log.date} sessionId={workout.id} />
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="se-foot" style={{ display: 'flex', gap: 8 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Отмена</button>
           <button onClick={save} disabled={log.exercises.length === 0} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12, opacity: log.exercises.length === 0 ? 0.4 : 1 }}>💾 Сохранить</button>
         </div>

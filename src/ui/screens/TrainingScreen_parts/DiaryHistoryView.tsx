@@ -2,7 +2,6 @@
 import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { epley1RM } from '../../../engines/e1rm';
-import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine';
@@ -16,6 +15,7 @@ import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
+import { mrvBaseForLevel, bestE1rmSeriesForWeek } from './diary-shared';
 
 export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -60,10 +60,6 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       return { log, adh: cooldownAdherence(30), q: cooldownQualityTrend(30), last: log[log.length - 1] };
     } catch { return null; }
   }, [historyWorkouts.length]);
-  const e1rmSeriesAll = React.useMemo(() => {
-    const sorted = [...historyWorkouts].sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
-    return sorted.slice(-12).map((w: any) => Math.max(0, ...(Array.isArray(w.exercises) ? w.exercises : []).map((e: any) => e.estimated1RM || 0)));
-  }, [historyWorkouts]);
   return (
         <div className="train-diaryhistory">
           {/* Кнопка возврата к записи (История — подвкладка дневника) */}
@@ -117,7 +113,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const matchPct = plannedNames.size > 0 ? Math.round((matched / plannedNames.size) * 100) : 0;
             const color = adherence >= 80 ? '#22c55e' : adherence >= 50 ? '#f59e0b' : '#ef4444';
             return (
-              <div style={style.card}>
+              <div className="th-planfact" style={style.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={style.label} >📋 План vs факт</div>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>
@@ -201,7 +197,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
             ].filter(Boolean).join('\n');
             return (
-              <div style={style.card}>
+              <div className="th-weeksum" style={style.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ ...style.label, marginBottom: 0 }}>📄 Сводка недели</div>
                   <button onClick={() => navigator.clipboard?.writeText(summary)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>📋 Копировать</button>
@@ -223,18 +219,32 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={{ fontSize: 14, fontWeight: 800, color: s.color }}>{s.value}</div>
               </div>)}
             </div>
-            {/* Heatmap — redesigned with month labels + tooltips */}
+            {/* Heatmap — redesigned with month labels + tooltips; начало выровнено на понедельник */}
             {historyWorkouts.length > 0 && (() => {
               const byDay: Record<string, number> = {};
               historyWorkouts.forEach((w: any) => { byDay[w.date] = (byDay[w.date] || 0) + (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || 0), 0); });
-              const cells: { date: string; vol: number; dayOfWeek: number }[] = [];
-              const today = new Date();
-              for (let i = 83; i >= 0; i--) {
+              // Локальные даты (toISOString даёт UTC-сдвиг для UTC+3…+12) + выравнивание на Пн:
+              // иначе подписи Пн/Ср/Пт/Вс не совпадают с реальными днями недели.
+              const toLocalIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              const DAYS = 84;
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              const start = new Date(today); start.setDate(start.getDate() - (DAYS - 1));
+              const leadPad = (start.getDay() + 6) % 7;
+              const cells: { date: string; vol: number; pad: boolean }[] = [];
+              for (let i = 0; i < leadPad; i++) cells.push({ date: '', vol: -1, pad: true });
+              for (let i = DAYS - 1; i >= 0; i--) {
                 const d = new Date(today); d.setDate(d.getDate() - i);
-                cells.push({ date: d.toISOString().slice(0, 10), vol: byDay[d.toISOString().slice(0, 10)] || 0, dayOfWeek: (d.getDay() + 6) % 7 });
+                const iso = toLocalIso(d);
+                cells.push({ date: iso, vol: byDay[iso] || 0, pad: false });
               }
-              const maxVol = Math.max(1, ...cells.map(c => c.vol));
-              const heatColor = (v: number) => {
+              while (cells.length % 7 !== 0) cells.push({ date: '', vol: -1, pad: true });
+              const allWeeks: { date: string; vol: number; pad: boolean }[][] = [];
+              for (let w = 0; w < cells.length; w += 7) allWeeks.push(cells.slice(w, w + 7));
+              const weeks = allWeeks.slice(-12);
+              const maxVol = Math.max(1, ...weeks.flat().map(c => c.pad ? 0 : c.vol));
+              const heatColor = (c: { vol: number; pad: boolean }) => {
+                if (c.pad) return 'transparent';
+                const v = c.vol;
                 if (v === 0) return 'rgba(255,255,255,0.04)';
                 const t = v / maxVol;
                 if (t < 0.25) return 'rgba(0,230,138,0.2)';
@@ -242,21 +252,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 if (t < 0.75) return 'rgba(0,230,138,0.65)';
                 return 'rgba(0,230,138,0.9)';
               };
-              // Group by weeks (columns)
-              const weeks: { date: string; vol: number; dayOfWeek: number }[][] = [];
-              for (let w = 0; w < 12; w++) weeks.push(cells.slice(w * 7, w * 7 + 7));
               // Month labels: find first day of each week column
               const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
               const monthLabels: { week: number; label: string }[] = [];
               let lastMonth = -1;
               weeks.forEach((wk, wi) => {
-                if (wk.length > 0) {
-                  const m = new Date(wk[0].date).getMonth();
+                const first = wk.find(c => !c.pad);
+                if (first) {
+                  const m = new Date(first.date + 'T12:00:00').getMonth();
                   if (m !== lastMonth) { monthLabels.push({ week: wi, label: monthNames[m] }); lastMonth = m; }
                 }
               });
               return (
-                <div style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="th-heatmap" style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, marginBottom: 6 }}>🔥 Тепловая карта (12 нед)</div>
                   {/* Month labels row */}
                   <div style={{ display: 'flex', gap: 3, marginBottom: 2 }}>
@@ -275,8 +283,8 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {weeks.map((wk, wi) => (
                       <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
                         {wk.map((c, di) => (
-                          <div key={di} title={`${c.date}${c.vol > 0 ? ': ' + Math.round(c.vol) + ' кг' : ''}`}
-                            style={{ height: 12, borderRadius: 2, background: heatColor(c.vol), transition: 'background 0.2s' }} />
+                          <div key={di} title={c.pad ? undefined : `${c.date}${c.vol > 0 ? ': ' + Math.round(c.vol) + ' кг' : ''}`}
+                            style={{ height: 12, borderRadius: 2, background: heatColor(c), transition: 'background 0.2s' }} />
                         ))}
                       </div>
                     ))}
@@ -285,7 +293,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: '#fff' }}>
                     <span>меньше</span>
                     {[0.1, 0.3, 0.5, 0.8].map((t, i) => (
-                      <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: heatColor(maxVol * t) }} />
+                      <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: heatColor({ vol: maxVol * t, pad: false }) }} />
                     ))}
                     <span>больше</span>
                   </div>
@@ -294,8 +302,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             })()}
             {/* MRV alerts */}
             {historyWorkouts.length > 0 && (() => {
-              const lvlKey = (level === 'enhanced' ? 'advanced' : level) as 'beginner' | 'intermediate' | 'advanced';
-              const mrvBase = (((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv) ?? 20) * (tprofile.onCourse ? 1.2 : 1);
+              const mrvBase = mrvBaseForLevel(level, !!tprofile?.onCourse);
               const ws = (d0: Date) => { const x = new Date(d0); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; };
               const now = new Date();
               const wkSets = (weeksAgo: number) => { const s = ws(now); s.setDate(s.getDate() - weeksAgo * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10); const m: Record<string, number> = {}; historyWorkouts.forEach((w: any) => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach((ex: any) => { const cat = EXERCISE_CATALOG.find((c: any) => c.id === ex.exerciseId); if (cat) m[cat.group] = (m[cat.group] || 0) + (ex.sets?.length || 0); }); }); return m; };
@@ -307,7 +314,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const ru = (g: string) => GRP_RU[g] || g;
               const color = over2.length > 0 ? '#ef4444' : '#f59e0b';
               return (
-                <div style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: color + '12', border: '1px solid ' + color + '40' }}>
+                <div className="th-mrv" style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: color + '12', border: '1px solid ' + color + '40' }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color, marginBottom: 4 }}>{over2.length > 0 ? '🔴 Риск перетренированности' : '🟡 Превышение объёма'}</div>
                   <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                     {over2.length > 0 ? `Группы выше MRV (${Math.round(mrvBase)} сетов) 2 недели подряд: ${over2.map(ru).join(', ')}. Снизьте объём на 10–15% в следующем микроцикле.` : `Группы выше MRV на прошлой/текущей неделе: ${over1.map(ru).join(', ')}. Следите за восстановлением.`}
@@ -527,7 +534,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             prevWorkouts.forEach(w => w.exercises.forEach((e: any) => prevExNames.add(e.exerciseName || e.exerciseId)));
             const newExercises = [...exNames].filter(n => !prevExNames.has(n));
             return (
-              <div style={{ ...style.card, marginBottom: 6 }}>
+              <div className="th-compare" style={{ ...style.card, marginBottom: 6 }}>
                 <div style={style.label}>📊 {curWeek} vs {prevWeek}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10 }}>
                   <div>
@@ -569,7 +576,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           )}
           {/* Search + group filter — неблокирующий ввод (deferred), декор без изменений */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
+          <div className="th-filters" style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2, opacity: isPending ? 0.85 : 1, transition: 'opacity 0.15s' }} />
             <button onClick={() => setGroupPickerOpen(true)} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
@@ -583,8 +590,8 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </button>
           </div>
           {groupPickerOpen && (
-            <div onClick={() => setGroupPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-              <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+            <div className="th-popup-backdrop" onClick={() => setGroupPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+              <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>💪 Выбор по группам</div>
                   <button onClick={() => setGroupPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
@@ -628,8 +635,8 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </button>
               </div>
               {exPickerOpen && (
-                <div onClick={() => setExPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-                  <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                <div className="th-popup-backdrop" onClick={() => setExPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>🏋️ Фильтр по упражнению</div>
                       <button onClick={() => setExPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
@@ -676,8 +683,8 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </button>
               </div>
               {notesPickerOpen && (
-                <div onClick={() => setNotesPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-                  <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                <div className="th-popup-backdrop" onClick={() => setNotesPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>📝 Фильтр по заметкам</div>
                       <button onClick={() => setNotesPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
@@ -693,7 +700,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </>
           )}
           {filteredHistory.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
+            <div className="th-expand" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
               <button onClick={() => setHistoryExpanded('__all__')} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Развернуть все</button>
               <button onClick={() => setHistoryExpanded(null)} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Свернуть все</button>
             </div>
@@ -869,7 +876,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               weekLabel={week}
               workouts={workouts}
               prevWorkouts={wi < visibleHistory.length - 1 ? visibleHistory[wi + 1][1] : undefined}
-              e1rmSeries={e1rmSeriesAll}
+              e1rmSeries={bestE1rmSeriesForWeek(workouts)}
               expanded={historyExpanded === '__all__' || historyExpanded === week}
               onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
               onEdit={handleEditWorkout}
@@ -879,8 +886,8 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               onCancelDelete={() => setConfirmDeleteId(null)}
             />
           ))}
-                    {hasMoreHistory && (
-            <button onClick={() => setHistoryVisibleCount(historyVisibleCount + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                     {hasMoreHistory && (
+            <button className="th-more" onClick={() => setHistoryVisibleCount(historyVisibleCount + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
               Показать еще 10 · осталось {filteredHistory.length - visibleHistory.length}
             </button>
           )}

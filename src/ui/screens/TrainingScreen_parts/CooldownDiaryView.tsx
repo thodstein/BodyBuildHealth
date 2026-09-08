@@ -24,6 +24,7 @@ import {
 import { loadReadinessHistory } from './readiness-history';
 import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
 import { groupsFromExercises, prepGroupLabels, canonicalizeGroups } from '../../../engines/warmup-day.engine';
+import { localIsoDate } from './diary-shared';
 
 const CARD = diaryCard;
 const COOLDOWN_COLOR = '#38bdf8';
@@ -74,7 +75,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
   const doneStretch = stretchDone.size;
   const startStretchTimer = (id: string, sec: number) => { setTimer({ id, remaining: sec, total: sec }); };
   const saveStretchSession = () => {
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localIsoDate();
     upsertStretchLog({ date, focus: stretchFocus, durationMin: stretchDur, done: true, quality: 4 });
     if (!cooldownLogForDate(date)) {
       upsertCooldownLog({ date, done: true, quality: 4, note: 'Сессия растяжки' });
@@ -181,7 +182,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
         <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
           Сегодня
         </div>
-        <CooldownCheckinInline date={new Date().toISOString().slice(0, 10)} onSaved={refresh} />
+        <CooldownCheckinInline date={localIsoDate()} onSaved={refresh} />
       </div>
 
       {/* ── Сессия растяжки (день отдыха / глубокая заминка) ── */}
@@ -284,7 +285,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
+            <div className="cd-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Записей</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: COOLDOWN_COLOR }}>{adherence.total}</div>
@@ -401,7 +402,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div className="cd-foot" style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта заминки">🖨 Отчёт</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(56,189,248,0.3)', color: COOLDOWN_COLOR }} aria-label="Скачать CSV дневника заминки"

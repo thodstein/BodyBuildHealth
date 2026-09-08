@@ -52,8 +52,8 @@ export const WorkoutWeekCard: React.FC<{
   }, [workouts]);
   const { mindBadge, mobBadge, warmBadge, coolBadge } = badges;
   return (
-    <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
-      <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
+    <div className="ww-card" data-expanded={expanded ? 'true' : 'false'} data-deload={isDeload ? 'true' : 'false'} style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
+      <div className="ww-head" onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: '#fff', transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
           <strong style={{ color: ACCENT, fontSize: 12 }}>{weekLabel}</strong>
@@ -71,7 +71,7 @@ export const WorkoutWeekCard: React.FC<{
         </div>
       </div>
       {expanded && workouts.map(workout => (
-        <div key={workout.id} style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div key={workout.id} className="ww-session" style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span>
               {(() => {
@@ -91,7 +91,7 @@ export const WorkoutWeekCard: React.FC<{
                 );
               })()}
             </span>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div className="ww-act" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(workout.exercises.reduce((sum, e) => sum + e.totalVolume, 0)).toLocaleString()} кг</span>
               <button onClick={e => { e.stopPropagation(); onEdit?.(workout); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Редактировать">✏️</button>
               {confirmDeleteId === workout.id ? (
@@ -105,7 +105,7 @@ export const WorkoutWeekCard: React.FC<{
               <button onClick={e => { e.stopPropagation(); const lines: string[] = [`${new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} — ${workout.split || 'Тренировка'}`, '']; workout.exercises.forEach(ex => { lines.push(ex.exerciseName); ex.sets.forEach((s, i) => { lines.push(`  ${i+1}. ${s.weight}кг × ${s.reps}${s.rir !== undefined ? ` RIR${s.rir}` : ''}`); }); lines.push(''); }); if (workout.overallRPE) lines.push(`RPE: ${workout.overallRPE}`); if (workout.duration) lines.push(`Длительность: ${workout.duration} мин`); if (workout.notes) lines.push(`Заметки: ${workout.notes}`); navigator.clipboard?.writeText(lines.join('\n')); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Копировать тренировку">📋</button>
             </div>
           </div>
-          <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+          <div className="ww-exlist" style={{ display: 'grid', gap: 4, marginTop: 4 }}>
             {workout.exercises.map(exercise => {
               const previous = previousByExercise.get(exercise.exerciseId);
               const current = exercise.estimated1RM || 0;
@@ -132,7 +132,7 @@ export const WorkoutWeekCard: React.FC<{
             })}
           </div>
           {(workout.overallRPE || workout.duration || workout.notes) && (
-            <div style={{ marginTop: 6, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 9, color: '#fff' }}>
+            <div className="ww-meta" style={{ marginTop: 6, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 9, color: '#fff' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {workout.overallRPE && <span>RPE: <strong style={{ color: '#fff' }}>{workout.overallRPE}</strong></span>}
                 {workout.duration && <span>{workout.duration} мин</span>}
@@ -359,7 +359,7 @@ export const ExerciseSubstitutionCard: React.FC = () => {
 /* ─── SectionHeader — разделитель секций ─── */
 
 export const SectionHeader: React.FC<{ icon: string; title: string; hint?: string }> = ({ icon, title, hint }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 2px 6px' }}>
+  <div className="sec-head" style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 2px 6px' }}>
     <span style={{ fontSize: 13 }}>{icon}</span>
     <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.2px' }}>{title}</span>
     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -376,7 +376,7 @@ export const DiaryEmptyState: React.FC<{
   onRecord?: () => void;
   onRefresh?: () => void;
 }> = ({ icon, title, description, onRecord, onRefresh }) => (
-  <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
+  <div className="de-empty" style={{ ...style.card, textAlign: 'center', padding: 24 }}>
     <div style={{ fontSize: 36, marginBottom: 8 }}>{icon}</div>
     <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{title}</div>
     <div style={{ fontSize: 11, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>{description}</div>

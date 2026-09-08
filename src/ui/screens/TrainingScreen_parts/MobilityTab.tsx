@@ -12,6 +12,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { DiaryHubCtx } from './diary-hub-context';
 import { ACCENT, DIM, diaryCard, diaryInput } from './diary-tokens';
+import { localIsoDate } from './diary-shared';
 import { MiniLineChart } from './DiaryChart';
 import {
   MOBILITY_LIBRARY, SLOT_ORDER, SLOT_LABELS, DIRECTION_LABELS, PRESET_LABELS,
@@ -185,7 +186,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   // ── Чек-ин ──
   const saveCheckin = useCallback(() => {
     upsertMobilityCheckin({
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       done: checkin.done,
       romScore: checkin.romScore,
       note: checkin.note.trim() || undefined,
@@ -196,7 +197,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
 
   // ── Оценка мобильности ──
   const saveAssessmentEntry = useCallback(() => {
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localIsoDate();
     const scored = Object.keys(assessScores).length > 0;
     saveAssessment({ date, scores: assessScores, note: assessNote.trim() || undefined });
     setAssessSaved(true);
@@ -537,7 +538,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
           </div>
 
           {/* ── Чек-ин ── */}
-          <div style={CARD}>
+          <div className="mb-checkin" style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Чек-ин мобильности</div>
               {checkinSaved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено · сегодня</span>}
@@ -573,7 +574,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
           </div>
 
           {/* ── Оценка мобильности (объективные тесты) ── */}
-          <div style={CARD}>
+          <div className="mb-assess" style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🎯 Оценка мобильности (тесты)</div>
               {assessment.current && (
@@ -736,7 +737,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
         </>
       )}
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div className="mb-foot" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} onClick={downloadCSV} aria-label="Скачать CSV чек-инов мобильности">⬇ Чек-ины CSV</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта мобильности">🖨 Отчёт</button>

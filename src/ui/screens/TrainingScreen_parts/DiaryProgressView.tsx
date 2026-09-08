@@ -15,7 +15,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     repData, historyWorkouts,
   } = hub;
   return (
-        <div>
+        <div className="train-diaryprogress">
           <div className="card" style={{ marginBottom: 8, padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <h4 style={{ margin: 0, fontSize: 12 }}>📏 Замеры тела</h4>

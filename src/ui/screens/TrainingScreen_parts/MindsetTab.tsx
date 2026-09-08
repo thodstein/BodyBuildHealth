@@ -12,6 +12,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { DiaryHubCtx } from './diary-hub-context';
 import { ACCENT, DIM, diaryCard, diaryInput } from './diary-tokens';
+import { localIsoDate } from './diary-shared';
 import { MiniLineChart } from './DiaryChart';
 import {
   RITUAL_LIBRARY, KIND_ORDER, KIND_LABELS, DAYTYPE_LABELS, DIRECTION_LABELS, PRESET_LABELS,
@@ -227,7 +228,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
 
   // ── Чек-ин ──
   const saveCheckin = useCallback(() => {
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localIsoDate();
     upsertCheckin({
       date,
       sessionId: undefined,
@@ -243,7 +244,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
 
   // ── Настроение ──
   const saveMood = useCallback(() => {
-    upsertMood({ date: new Date().toISOString().slice(0, 10), mood: mood.value, tags: mood.tags, note: mood.note.trim() || undefined });
+    upsertMood({ date: localIsoDate(), mood: mood.value, tags: mood.tags, note: mood.note.trim() || undefined });
     setMoodSaved(true);
     setTick(t => t + 1);
   }, [mood]);
@@ -564,7 +565,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           </div>
 
           {/* ── Чек-ин сегодня ── */}
-          <div style={CARD}>
+          <div className="ms-checkin" style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Чек-ин после тренировки</div>
               {checkinSaved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено · сегодня</span>}
@@ -586,13 +587,13 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           </div>
 
           {/* ── Настроение дня ── */}
-          <div style={CARD}>
+          <div className="ms-mood" style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🌤 Настроение дня</div>
               {moodSaved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено · сегодня</span>}
             </div>
             <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>Дневник настроения: одна оценка в день + теги. Копится в тренд и влияет на фазу мотивации.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginTop: 10 }} role="radiogroup" aria-label="Настроение">
+            <div className="ms-moodgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginTop: 10 }} role="radiogroup" aria-label="Настроение">
               {[1, 2, 3, 4, 5].map(v => (
                 <button key={v} type="button" role="radio" aria-checked={mood.value === v} aria-label={`Настроение ${v}: ${MOOD_LABELS[v].label}`}
                   onClick={() => { setMood(p => ({ ...p, value: v })); setMoodSaved(false); }}

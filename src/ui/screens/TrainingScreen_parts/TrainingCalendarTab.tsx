@@ -13,6 +13,7 @@ import {
 } from '../../../engines/training-calendar.engine';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
+import { localIsoDate } from './diary-shared';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -46,6 +47,22 @@ const STATUS_LABELS: Record<string, string> = {
   planned: 'Запланировано',
   none: '',
 };
+
+const MANUAL_FLAG_KEY = 'he_cal_manual';
+
+/** Ручные отметки дат из localStorage (Set ISO-дат). */
+export function readManualFlags(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MANUAL_FLAG_KEY) || '[]'));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+/** Виртуальный лог ручной отметки (пустая тренировка-маркер для календаря). */
+export function manualVirtualLog(date: string): WorkoutLog {
+  return { id: 'cal_man_' + date, date, exercises: [], duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'manual' } as WorkoutLog;
+}
 
 export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: number) {
   if (!runtime || !Array.isArray(runtime.days) || runtime.days.length === 0) return null;
@@ -118,9 +135,7 @@ export const TrainingCalendarTab: React.FC = () => {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { /* ignore */ }
   }, []);
-  const [flaggedDates, setFlaggedDates] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('he_cal_manual') || '[]')); } catch { return new Set<string>(); }
-  });
+  const [flaggedDates, setFlaggedDates] = useState<Set<string>>(() => readManualFlags());
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +143,16 @@ export const TrainingCalendarTab: React.FC = () => {
       try {
         const diary = new StrengthDiary();
         const logs = await diary.getWorkoutLogs();
-        if (!cancelled) setHistoryWorkouts([...logs].reverse());
+        if (!cancelled) {
+          // Ручные отметки переживают перезагрузку: мержим виртуалки сразу,
+          // иначе загрузка затирала их до первого переключения флага.
+          const flags = readManualFlags();
+          const merged = [...logs];
+          for (const d of flags) {
+            if (!merged.some(w => w.date === d)) merged.push(manualVirtualLog(d));
+          }
+          setHistoryWorkouts(merged.reverse());
+        }
       } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
     })();
@@ -143,7 +167,7 @@ export const TrainingCalendarTab: React.FC = () => {
       if (runtime && Array.isArray(runtime) && runtime.length > 0) {
         const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
         const endDate = new Date(year, month + 1, 0);
-        const endStr = endDate.toISOString().slice(0, 10);
+        const endStr = localIsoDate(endDate);
         return buildPlannedMapFromBridgeSessions(runtime.map((r: any, i: number) => ({
           ...r,
           date: r.date || `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
@@ -156,7 +180,7 @@ export const TrainingCalendarTab: React.FC = () => {
       if (runtimeSessions?.length) {
         const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
         const endDate = new Date(year, month + 1, 0);
-        const endStr = endDate.toISOString().slice(0, 10);
+        const endStr = localIsoDate(endDate);
         return buildPlannedMapFromBridgeSessions(runtimeSessions, startStr, endStr);
       }
     } catch { /* ignore */ }
@@ -168,7 +192,7 @@ export const TrainingCalendarTab: React.FC = () => {
   const actualMap = useMemo(() => {
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const endDate = new Date(year, month + 1, 0);
-    const endStr = endDate.toISOString().slice(0, 10);
+    const endStr = localIsoDate(endDate);
     return buildActualMapFromWorkoutLogs(historyWorkouts, startStr, endStr);
   }, [monthKey, historyWorkouts]);
 
@@ -225,13 +249,13 @@ export const TrainingCalendarTab: React.FC = () => {
     setView('month');
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   const toggleManualDone = useCallback((date: string) => {
     setFlaggedDates(prev => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date); else next.add(date);
-      localStorage.setItem('he_cal_manual', JSON.stringify([...next]));
+      localStorage.setItem(MANUAL_FLAG_KEY, JSON.stringify([...next]));
       return next;
     });
   }, []);
@@ -239,15 +263,13 @@ export const TrainingCalendarTab: React.FC = () => {
   // После ручного флага обновляем historyWorkouts — добавляем виртуальный лог
   useEffect(() => {
     if (flaggedDates.size === 0) return;
-    const extra: WorkoutLog[] = [];
-    for (const d of flaggedDates) {
-      if (!historyWorkouts.find(w => w.date === d)) {
-        extra.push({ id: 'cal_man_' + d, date: d, exercises: [], duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'manual' } as WorkoutLog);
-      }
-    }
-    if (extra.length > 0) {
-      setHistoryWorkouts(prev => [...prev, ...extra]);
-    }
+    // Функциональный апдейт без чтения замыкания: дублей нет при любом порядке эффектов.
+    setHistoryWorkouts(prev => {
+      const extra = [...flaggedDates]
+        .filter(d => !prev.some(w => w.date === d))
+        .map(d => manualVirtualLog(d));
+      return extra.length > 0 ? [...prev, ...extra] : prev;
+    });
   }, [flaggedDates]);
 
   const totalDone = cal.weeks.flat().filter(d => d.status === 'done').length;
@@ -265,7 +287,7 @@ export const TrainingCalendarTab: React.FC = () => {
   return (
     <div className="train-calendar" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       {/* Водный баланс — вода из training-calendar.engine (ранее неиспользуемая) */}
-      <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
+      <div className="cal-water" style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>💧 Водный баланс</span>
           <span style={{ fontSize: 11, color: water.today.percentComplete >= 100 ? '#22c55e' : water.today.percentComplete >= 60 ? '#eab308' : '#ef4444', fontWeight: 700 }}>{water.today.percentComplete}%</span>
@@ -284,7 +306,7 @@ export const TrainingCalendarTab: React.FC = () => {
         </div>
       )}
       {/* Экспорт тренировок — ранее неиспользуемые exportWorkoutsToCSV/exportToJSON */}
-      <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
+      <div className="cal-export" style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>📤 Экспорт тренировок</span>
         <div style={{ fontSize: 10, color: DIM }}>Сохранить журнал тренировок (he_workout_log_v2) в CSV/JSON для анализа или передачи тренеру.</div>
         <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
@@ -293,14 +315,14 @@ export const TrainingCalendarTab: React.FC = () => {
         </div>
       </div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      <div className="cal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button onClick={() => navigateMonth(-1)} style={btnStyle}>◀</button>
           <span style={{ fontSize: 16, fontWeight: 700, margin: '0 8px', color: ACCENT, whiteSpace: 'nowrap' }}>{MONTH_NAMES_RU[month]} {year}</span>
           <button onClick={() => navigateMonth(1)} style={btnStyle}>▶</button>
           <button onClick={goToday} style={{ ...btnStyle, marginLeft: 4, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, fontSize: 10 }}>Сегодня</button>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="cal-view" style={{ display: 'flex', gap: 4 }}>
           {(['month', 'week', 'meso'] as const).map(v => (
             <button key={v} onClick={() => { setView(v); setSelectedWeek(0); }} style={{
               padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
@@ -366,7 +388,7 @@ export const TrainingCalendarTab: React.FC = () => {
       {/* Неделя detail view */}
       {view === 'week' && (
         <>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div className="cal-weeks" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
             {weekSummaries.map((ws, i) => (
               <button key={i} onClick={() => setSelectedWeek(ws.weekNumber)} style={{
                 padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
@@ -604,7 +626,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
   const hasCool = !!coolDates && coolDates.has(day.date);
 
   return (
-    <div onClick={onClick} title={[
+    <div className="cal-cell" data-status={day.status} data-today={isToday ? 'true' : 'false'} onClick={onClick} title={[
       STATUS_LABELS[day.status] || '',
       hasMind ? '🧠 психо-чек-ин' : '',
       hasMob ? '🧘 мобильность выполнена' : '',
@@ -664,7 +686,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
 
 /** Mini stat chip */
 const MiniStat: React.FC<{ label: string; value: string | number; color: string }> = ({ label, value, color }) => (
-  <div style={{
+  <div className="cal-stat" style={{
     padding: '6px 10px', borderRadius: 8, fontSize: 10,
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.08)',

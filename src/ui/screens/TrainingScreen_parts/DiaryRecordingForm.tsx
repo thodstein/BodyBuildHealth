@@ -2,14 +2,13 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { epley1RM } from '../../../engines/e1rm';
-import { getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { loadReadinessHistory } from './readiness-history';
 import { MMCSetPanel } from './MMCSetPanel';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
-import { getPreviousWorkoutData } from './diary-shared';
+import { getPreviousWorkoutData, searchExerciseCatalog, seedForNewExercise } from './diary-shared';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -223,14 +222,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     return () => window.removeEventListener('keydown', handler);
   }, [undo]);
 
-  // Search exercises
+  // Search exercises — единый хелпер (имя/id/алиасы + метки групп:
+  // групповые чипы ниже только выставляют запрос, список считает эффект)
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase();
-    const matches = EXERCISE_CATALOG
-      .filter(ex => ex.name.toLowerCase().includes(q) || ex.id.toLowerCase().includes(q) || getAliasesForExercise(ex.id).some(a => a.toLowerCase().includes(q)))
-      .slice(0, 8);
-    setSearchResults(matches);
+    setSearchResults(searchExerciseCatalog(searchQuery, 8));
   }, [searchQuery]);
 
   // Rest timer countdown
@@ -243,11 +239,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
 
   const addExercise = useCallback((ex: typeof EXERCISE_CATALOG[0]) => {
     const isBW = isBWExercise(ex);
-    const prev = getPreviousWorkoutData(historyWorkouts, ex.name);
+    const seed = seedForNewExercise(historyWorkouts, ex.name, isBW);
     const firstSet: SetRecord = {
-      weight: isBW ? 0 : (prev?.weight || 0),
-      reps: prev?.reps || 10,
-      rir: prev?.rir || 2,
+      weight: seed.weight,
+      reps: seed.reps,
+      rir: seed.rir,
       rpe: 7,
       completed: false,
     };
@@ -478,7 +474,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {/* Exercise search */}
       <div style={{ fontSize: 10, color: '#fff', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase', marginBottom: 8 }}>🏋️ Упражнения</div>
       {/* Muscle group quick filter */}
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+      <div className="rf-groups" style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
         {[
           { id: '', label: 'Все' },
           { id: 'chest', label: 'Грудь' },
@@ -490,14 +486,9 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           { id: 'core', label: 'Кор' },
         ].map(g => (
           <button key={g.id} type="button" onClick={() => {
-            if (g.id) {
-              setSearchQuery(g.label);
-              const filtered = EXERCISE_CATALOG.filter((e: any) => e.group === g.id);
-              setSearchResults(filtered);
-            } else {
-              setSearchQuery('');
-              setSearchResults([]);
-            }
+            // Только запрос: список считает search-эффект (единый хелпер знает группы),
+            // иначе эффект перезатирал вручную подставленный список.
+            setSearchQuery(g.id ? g.label : '');
           }} style={{
             padding: '3px 8px', borderRadius: 10, fontSize: 9,
             background: searchQuery === g.label ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
@@ -517,7 +508,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, boxSizing: 'border-box' as any }}
         />
         {searchResults.length > 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4 }}>
+          <div className="rf-results" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4 }}>
             {searchResults.map(ex => (
               <div key={ex.id} onClick={() => addExercise(ex)} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: '#fff' }}>{ex.name}</span>
@@ -539,7 +530,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         const recent = Array.from(recentMap.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).slice(0, 6);
         if (recent.length === 0) return null;
         return (
-          <div style={{ marginBottom: 8 }}>
+          <div className="rf-recent" style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>Недавние:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {recent.map(r => {
@@ -822,6 +813,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         </div>
       )}
       <button onClick={handleSaveWorkout} disabled={exercises.length === 0}
+        className="rf-save"
         style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: exercises.length > 0 ? 'linear-gradient(135deg,var(--accent),#00cc7a)' : 'rgba(255,255,255,0.05)', color: exercises.length > 0 ? '#000' : '#fff', fontWeight: 700, fontSize: 12, opacity: exercises.length === 0 ? 0.4 : 1 }}>
         💾 Сохранить тренировку
       </button>

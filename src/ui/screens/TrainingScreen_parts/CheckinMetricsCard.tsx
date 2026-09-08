@@ -97,7 +97,7 @@ export const CheckinMetricsCard: React.FC = () => {
         </div>
         <div style={LABEL}>Заметка</div>
         <input type="text" style={IN} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="самочувствие, комментарий" />
-        <button style={{ ...btn, marginTop: 10 }} onClick={submit}>💾 Сохранить чек-ин</button>
+        <button style={{ ...btn, marginTop: 10 }} className="ci-save" onClick={submit}>💾 Сохранить чек-ин</button>
         {saved && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6, textAlign: 'center' }}>✓ Сохранено. Сегодня: {today.date} {synced ? '· вес/сон/пульс записаны в дневники профиля' : ''}</div>}
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить готовность (из чек-ина) к планировщику: сон {form.sleepHours || 0}ч, HRV {form.hrvMs || 0}, боль {form.subjectiveSoreness || 0}/5, стресс {form.subjectiveStress || 0}/5 → корректировка объёма.</div>

@@ -7,6 +7,7 @@ import {
   readDiaryMixes, deleteDiaryMix, analyzePresetEffect, getMixIntake, toggleMixPhaseIntake,
   type DiaryMixRecord,
 } from '../../../engines/training-plan-save.engine';
+import { localIsoDate } from './diary-shared';
 
 const CARD: React.CSSProperties = {
   padding: 10, borderRadius: 12,
@@ -21,7 +22,7 @@ const PHASE_META: Record<string, { label: string; icon: string }> = {
 };
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate();
 }
 
 /** Напоминание «Принять микс/пресет» через N минут (Notification API + localStorage pref). */
@@ -83,7 +84,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
     <div className="train-mixdiary" style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>💊 Тренировочные миксы и пресеты ({records.length})</div>
-        <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'#fff', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button className="mx-expand" onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'#fff', background: 'none', border: 'none', cursor: 'pointer' }}>
           {expanded ? 'Свернуть ▲' : 'Все ▼'}
         </button>
       </div>
@@ -96,7 +97,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
         const phases = phasesOf(r);
         const taken = todayIntake[r.id] || {};
         return (
-        <div key={r.id} style={{ padding: '7px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 4 }}>
+        <div key={r.id} className="mx-rec" style={{ padding: '7px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 13 }}>{r.kind === 'preset' ? '🧪' : '💪'}</span>
             <div style={{ flex: 1 }}>

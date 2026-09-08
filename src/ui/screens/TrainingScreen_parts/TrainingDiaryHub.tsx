@@ -82,9 +82,9 @@ const RecordModeSelector: React.FC<{
 }> = ({ diary, historyWorkouts, selectedWeek, onSave, sub, onSubChange, pendingTemplate, templateKey, onTemplateApplied }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'6px' }}>
+      <div className="td-seg" style={{ display: 'flex', gap: 6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'6px' }}>
         {([['quick', '⚡ Быстро'], ['full', '📝 Подробно']] as const).map(([k, l]) => (
-          <button key={k} onClick={() => onSubChange(k)} style={{
+          <button key={k} onClick={() => onSubChange(k)} data-active={sub === k ? 'true' : 'false'} style={{
             flex: 1, padding: '8px 12px', borderRadius: 10,
             border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
             background: sub === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
@@ -502,13 +502,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Подвкладки дневника — все режимы кликабельны */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px', marginBottom:4 }}>
-            <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'record'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'record'?'linear-gradient(135deg, var(--accent), #00c853)':'rgba(255,255,255,0.04)', color: (mode as string) === 'record'?'#000':'#fff', fontWeight: (mode as string) === 'record'?800:700, fontSize: 11, cursor: 'pointer', boxShadow: (mode as string) === 'record'?'0 2px 8px rgba(0,230,138,0.25)':'none' }}>📓 Запись</button>
-            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'history'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'history'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: (mode as string) === 'history'?'var(--accent)':'#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'feedback'?'1px solid #a855f7':'1px solid rgba(168,85,247,0.22)', background: (mode as string) === 'feedback'?'rgba(168,85,247,0.14)':'rgba(168,85,247,0.06)', color: (mode as string) === 'feedback'?'#a78bfa':'rgba(168,85,247,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>📊 Фидбек</button>
-            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'mytraining'?'1px solid #f59e0b':'1px solid rgba(245,158,11,0.22)', background: (mode as string) === 'mytraining'?'rgba(245,158,11,0.14)':'rgba(245,158,11,0.06)', color: (mode as string) === 'mytraining'?'#fbbf24':'rgba(245,158,11,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>⭐ Мои</button>
-            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'competition'?'1px solid #eab308':'1px solid rgba(234,179,8,0.22)', background: (mode as string) === 'competition'?'rgba(234,179,8,0.14)':'rgba(234,179,8,0.06)', color: (mode as string) === 'competition'?'#fde68a':'rgba(234,179,8,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>🏁 Соревн.</button>
-            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'recommendations'?'1px solid #8b5cf6':'1px solid rgba(139,92,246,0.22)', background: (mode as string) === 'recommendations'?'rgba(139,92,246,0.14)':'rgba(139,92,246,0.06)', color: (mode as string) === 'recommendations'?'#a78bfa':'rgba(139,92,246,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>💡 Рекоменд.</button>
+          <div className="td-subnav" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px', marginBottom:4 }}>
+            <button onClick={() => setMode('record')} data-active={(mode as string) === 'record' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'record'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'record'?'linear-gradient(135deg, var(--accent), #00c853)':'rgba(255,255,255,0.04)', color: (mode as string) === 'record'?'#000':'#fff', fontWeight: (mode as string) === 'record'?800:700, fontSize: 11, cursor: 'pointer', boxShadow: (mode as string) === 'record'?'0 2px 8px rgba(0,230,138,0.25)':'none' }}>📓 Запись</button>
+            <button onClick={() => setMode('history')} data-active={(mode as string) === 'history' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'history'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'history'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: (mode as string) === 'history'?'var(--accent)':'#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
+            <button onClick={() => setMode('feedback')} data-active={(mode as string) === 'feedback' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'feedback'?'1px solid #a855f7':'1px solid rgba(168,85,247,0.22)', background: (mode as string) === 'feedback'?'rgba(168,85,247,0.14)':'rgba(168,85,247,0.06)', color: (mode as string) === 'feedback'?'#a78bfa':'rgba(168,85,247,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>📊 Фидбек</button>
+            <button onClick={() => setMode('mytraining')} data-active={(mode as string) === 'mytraining' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'mytraining'?'1px solid #f59e0b':'1px solid rgba(245,158,11,0.22)', background: (mode as string) === 'mytraining'?'rgba(245,158,11,0.14)':'rgba(245,158,11,0.06)', color: (mode as string) === 'mytraining'?'#fbbf24':'rgba(245,158,11,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>⭐ Мои</button>
+            <button onClick={() => setMode('competition')} data-active={(mode as string) === 'competition' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'competition'?'1px solid #eab308':'1px solid rgba(234,179,8,0.22)', background: (mode as string) === 'competition'?'rgba(234,179,8,0.14)':'rgba(234,179,8,0.06)', color: (mode as string) === 'competition'?'#fde68a':'rgba(234,179,8,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>🏁 Соревн.</button>
+            <button onClick={() => setMode('recommendations')} data-active={(mode as string) === 'recommendations' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'recommendations'?'1px solid #8b5cf6':'1px solid rgba(139,92,246,0.22)', background: (mode as string) === 'recommendations'?'rgba(139,92,246,0.14)':'rgba(139,92,246,0.06)', color: (mode as string) === 'recommendations'?'#a78bfa':'rgba(139,92,246,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>💡 Рекоменд.</button>
           </div>
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {
@@ -527,7 +527,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             const lastSleep = sleepEntries.length > 0 ? [...sleepEntries].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
             const sleepHours = typeof lastSleep?.hours === 'number' ? lastSleep.hours : null;
             return (
-              <div style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.15)' }}>
+              <div className="td-today" style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.15)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ ...diaryLabel, color: ACCENT, marginBottom: 0 }}>📅 Сегодня</div>
                   {sleepHours != null && (
@@ -592,14 +592,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                       );
                     };
                     return (
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        {rings.map(r => r.pct !== null && <Ring key={r.label} {...r} />)}
+                      <div className="td-rings" style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        {rings.filter(r => r.pct !== null).map(r => <Ring key={r.label} {...r} />)}
                       </div>
                     );
                   })()}
                 </div>
                 {planned && (
-                  <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
+                  <div className="td-plan" style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎯 По плану сегодня: {planned.name}</div>
                       {reminderTime ? (
@@ -854,9 +854,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'progress' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <div style={{ display:'flex', gap:6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
+          <div className="td-seg" style={{ display:'flex', gap:6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
             {([['progress','📏 Прогресс'],['calendar','📅 Календарь']] as const).map(([k,l]) => (
-              <button key={k} onClick={()=> setProgressSub(k)} style={{
+              <button key={k} onClick={()=> setProgressSub(k)} data-active={progressSub===k ? 'true' : 'false'} style={{
                 flex:1, padding:'7px 10px', borderRadius:10, border: progressSub===k ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)',
                 background: progressSub===k ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)', color: progressSub===k ? '#22c55e' : '#fff',
                 fontWeight: progressSub===k?800:600, fontSize:11, cursor:'pointer',
@@ -871,11 +871,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'rituals' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
+          <div className="td-seg" style={{ display:'flex', gap:6, flexWrap:'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
             {([
               ['mindset','🧠 Психология'],['mobility','🧘 Мобильность'],['warmup','🔥 Разминка'],['cooldown','❄️ Заминка'],['checkin','📋 Чек-ин'],['mmc','🔄 MMC'],
             ] as const).map(([k,l]) => (
-              <button key={k} onClick={()=> setRitualsSub(k)} style={{
+              <button key={k} onClick={()=> setRitualsSub(k)} data-active={ritualsSub===k ? 'true' : 'false'} style={{
                 flex:'1 1 90px', padding:'7px 10px', borderRadius:10, border: ritualsSub===k ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
                 background: ritualsSub===k ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)', color: ritualsSub===k ? '#a855f7' : '#fff',
                 fontWeight: ritualsSub===k?800:600, fontSize:10, cursor:'pointer',

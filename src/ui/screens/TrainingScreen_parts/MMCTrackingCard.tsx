@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { loadMMCLog, aggregateMMC, getMMCRecommendations, type MMCAggregate } from '../../../engines/mmc-tracking.engine';
 import { MMCSetPanel } from './MMCSetPanel';
+import { localIsoDate } from './diary-shared';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 };
@@ -54,7 +55,7 @@ const MMCTrackingCard: React.FC = () => {
             exerciseId={selEx.id}
             exerciseName={selEx.name}
             setNumber={setNum}
-            date={new Date().toISOString().split('T')[0]}
+            date={localIsoDate()}
           />
         )}
         <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>

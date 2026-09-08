@@ -50,10 +50,10 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     );
   }
   return (
-        <div>
+        <div className="train-diaryanalytics">
           {analytics ? (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div className="ta-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <div style={style.card}>
                   <div style={{ fontSize: 10, color: '#fff' }}>Объём/нед</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{analytics.volume.weeklyVolumeKg.toLocaleString()} кг</div>
