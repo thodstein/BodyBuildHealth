@@ -37,6 +37,15 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     } catch {}
   }, []);
 
+  useEffect(() => {
+    if (page === 'calculators' && !(['pkpd','dosage','peptides','mapper','diagnostics'] as SubTab[]).includes(subTab)) {
+      setSubTab('peptides');
+    }
+    if (page === 'info' && !(['catalog','interactions'] as SubTab[]).includes(subTab)) {
+      setSubTab('catalog');
+    }
+  }, [page]);
+
   const pharmaSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s =>
       PHARMA_CLASSES.includes(s.class as PharmaClass)
@@ -110,7 +119,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
 
           <div className="pharma-hero-cards native-fade-up" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {cards.map((c, ci) => (
-              <button key={c.key} onClick={() => setPage(c.key)} className="pharma-hero-card native-fade-up" data-key={c.key} style={{
+              <button key={c.key} onClick={() => { if (c.key === 'calculators') setSubTab('peptides'); setPage(c.key); }} className="pharma-hero-card native-fade-up" data-key={c.key} style={{
                 animationDelay: `${ci * 55}ms`,
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',

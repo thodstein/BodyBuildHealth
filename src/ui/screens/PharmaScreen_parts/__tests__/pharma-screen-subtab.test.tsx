@@ -32,4 +32,17 @@ describe('PharmaScreen — initialSubTab', () => {
     expect(screen.queryByText('Фармакология')).toBeNull();
     expect(screen.getAllByText(/Оценка курса/).length).toBeGreaterThan(0);
   });
+
+  it('калькуляторы по умолчанию — пептиды', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    render(<PharmaScreen />);
+    const calcCard = document.querySelector('[data-key="calculators"]') as HTMLElement;
+    expect(calcCard).toBeTruthy();
+    fireEvent.click(calcCard);
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Пептидный калькулятор');
+    });
+    // один из пептидов выбран по умолчанию (cjc1295)
+    expect(document.body.textContent).toContain('CJC-1295');
+  });
 });
