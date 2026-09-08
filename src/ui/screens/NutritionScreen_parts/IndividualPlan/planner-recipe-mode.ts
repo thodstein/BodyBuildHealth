@@ -1773,11 +1773,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Peri-капы после корректора (рост ядра/доборы могли залить окна).
     const _trimPeri1 = trimPeriCarbs(corr.meals as any);
     if (corrDev + 1e-9 < rb.deviationPct) {
-      if (corr.withinTolerance) {
-        return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}% (≤3%)`], withinTolerance: true, deviationPct: corrDev, appliedCount };
+      // Тримы (квота/peri) меняют тоталы ПОСЛЕ замера corrDev — пересчитываем честно
+      // (иначе флаг «≤3%» врёт: property seed=32 claims ≤3, факт 3.6%).
+      const _postTot = sumDayTotals(corr.meals as any);
+      const _postDev = Math.round(maxDeviationPct(_postTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any) * 10) / 10;
+      if (_postDev <= 3) {
+        return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}% (≤3%)`], withinTolerance: true, deviationPct: _postDev, appliedCount };
       }
       // улучшили, но не до ≤3% — отдаём лучшее с предупреждением (>3%)
-      return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${corrDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: corrDev, appliedCount };
+      return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_postDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: _postDev, appliedCount };
     }
   }
 
@@ -1790,5 +1794,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const _finTot = sumDayTotals(rb.meals);
   const _finDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
   const _finDevR = Math.round(_finDev * 10) / 10;
-  return { meals: rb.meals, notes: [...notes, ..._trimNotes, ..._trimPeri], withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount };
+  // P2 (честность флага): квота/peri-тримы могли увести за ±3% ПОСЛЕ tolerance-проверки
+  // ребаланса — предупреждение обязательно (иначе property-тест «нет предупреждения» падает).
+  const _finNotes = _finDevR <= 3 ? [...notes, ..._trimNotes, ..._trimPeri] : [...notes, ..._trimNotes, ..._trimPeri, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>3%) — попробуйте выбрать другие варианты рецептов.`];
+  return { meals: rb.meals, notes: _finNotes, withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount };
 }
