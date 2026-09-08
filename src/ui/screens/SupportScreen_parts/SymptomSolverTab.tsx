@@ -113,7 +113,9 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const allDrugs = useMemo(() => getAllLinkedDrugs(), []);
 
   const filteredSymptoms = useMemo(() => {
-    let base = SYMPTOM_DB;
+    // Копия: sort() ниже мутирует массив — шарить SYMPTOM_DB нельзя
+    // (иначе порядок БД едет глобально для всех потребителей).
+    let base = [...SYMPTOM_DB];
     if (searchQuery.trim()) base = searchSymptoms(searchQuery);
     if (selectedDrug) base = findSymptomsByDrug(selectedDrug);
     if (selectedCategory !== 'all') base = base.filter((s) => s.category === selectedCategory);
@@ -192,6 +194,9 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   }, [selectedSymptomsList, selectedForPlan]);
 
   // ── Добавление вещества в план ──
+  // Идёт в ручные добавления живого плана (enhancedSubs), а НЕ в supportDrugs:
+  // supportDrugs — это препараты курса (синкаются из linked.course и затирают
+  // чужеродные записи + портят автовыбор уровня и drugLoads рисков).
   const addSubstanceToPlan = (substanceId: string, name: string, dose?: string) => {
     const catalogId = resolveCatalogId(substanceId);
     if (!catalogId) {
@@ -203,17 +208,18 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
     if (selectedSymptom) {
       addAssignment(selectedSymptom.id, catalogId, name, dose || '');
     }
-    // Получаем текущие subs из состояния
-    const currentSubs: string[] = s.supportDrugs || [];
-    if (currentSubs.includes(catalogId)) {
+    // Получаем текущие ручные добавления живого плана
+    const liveSubs: string[] = s.effectiveLevel?.subs || [];
+    const currentSubs: string[] = s.enhancedSubs || [];
+    if (currentSubs.includes(catalogId) || liveSubs.includes(catalogId)) {
       setPlanToast(`«${name}» уже в плане`);
     } else {
       const newSubs = [...currentSubs, catalogId];
-      s.setSupportDrugs(newSubs);
+      s.setEnhancedSubs(newSubs);
       setPlanToast(`«${name}» добавлен в план`);
-      // Пересчитываем план, если есть calcSupport
+      // Пересчитываем цифры риска/мониторинга под обновлённый план
       if (typeof s.calcSupport === 'function') {
-        setTimeout(() => s.calcSupport(s.supportLevel, newSubs), 100);
+        setTimeout(() => s.calcSupport(s.supportLevel), 100);
       }
     }
     setTimeout(() => setPlanToast(''), 3000);
@@ -222,9 +228,9 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   // ── Создать план по выбранным симптомам ──
   const createPlanFromSymptoms = () => {
     if (!derivedPlan) return;
-    const currentSubs: string[] = s.supportDrugs || [];
+    const currentSubs: string[] = s.enhancedSubs || [];
     const merged = [...new Set([...currentSubs, ...derivedPlan.substanceIds])];
-    s.setSupportDrugs(merged);
+    s.setEnhancedSubs(merged);
     setShowPlanSummary(true);
     setPlanToast(`План создан: ${derivedPlan.substanceIds.length} веществ по ${derivedPlan.symptomCount} симптомам`);
     setTimeout(() => setPlanToast(''), 4000);
@@ -421,6 +427,17 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             </div>
           </div>
         )}
+
+      {/* TOAST — тот же, что в списке: подтверждение «в план» видно и в деталях */}
+      {planToast && (
+        <div className="symptom-toast" style={{
+          position: 'fixed', bottom: 20, left: 16, right: 16, zIndex: 200,
+          padding: '10px 14px', borderRadius: 12,
+          background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(0,230,138,0.3)',
+          color: '#00e68a', fontSize: 11, fontWeight: 600, textAlign: 'center',
+          backdropFilter: 'blur(8px)',
+        }}>{planToast}</div>
+      )}
       </div>
     );
   }
