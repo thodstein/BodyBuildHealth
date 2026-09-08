@@ -30,7 +30,10 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
   if (!timeline || timeline.length === 0) return null;
 
   const maxWeek = timeline.length;
-  const weekData = timeline[Math.min(selectedWeek - 1, maxWeek - 1)];
+  // NOTE: таймлайн могут пересобрать короче при выбранной дальней неделе —
+  // клампим отображение (индекс деталей уже клампился, а маркер/слайдер — нет).
+  const safeWeek = Math.min(Math.max(1, selectedWeek), maxWeek);
+  const weekData = timeline[Math.min(safeWeek - 1, maxWeek - 1)];
 
   // SVG chart dimensions
   const W = Math.min(340, Math.max(200, maxWeek * 18));
@@ -130,8 +133,8 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
         })}
 
         {/* Selected week marker */}
-        <line x1={xForWeek(selectedWeek)} y1={PAD_T} x2={xForWeek(selectedWeek)} y2={PAD_T + chartH} stroke="#00e68a" strokeWidth={1} opacity={0.6} />
-        <circle cx={xForWeek(selectedWeek)} cy={yForPct(showAfter ? weekData?.overallAfter || 0 : weekData?.overallRaw || 0)} r={3} fill="#00e68a" />
+        <line x1={xForWeek(safeWeek)} y1={PAD_T} x2={xForWeek(safeWeek)} y2={PAD_T + chartH} stroke="#00e68a" strokeWidth={1} opacity={0.6} />
+        <circle cx={xForWeek(safeWeek)} cy={yForPct(showAfter ? weekData?.overallAfter || 0 : weekData?.overallRaw || 0)} r={3} fill="#00e68a" />
 
         {/* Week labels (every few weeks) */}
         {timeline.filter((_, i) => i % Math.max(1, Math.ceil(maxWeek / 8)) === 0 || i === maxWeek - 1).map(t => (
@@ -168,15 +171,15 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
       {/* Week slider */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', fontSize: 12, fontWeight:700, color: '#fff', marginBottom: 4 }}>
-          <span>Неделя: <b style={{ color: '#fff' }}>{selectedWeek}</b> / {maxWeek}</span>
+          <span>Неделя: <b style={{ color: '#fff' }}>{safeWeek}</b> / {maxWeek}</span>
           {weekData && weekData.activeDrugs.length > 0 && (
             <span style={{ fontSize: 11, color: '#fff' }}>{weekData.activeDrugs.length} активн.</span>
           )}
         </div>
         <input
-          type="range" min={1} max={maxWeek} value={selectedWeek}
+          type="range" min={1} max={maxWeek} value={safeWeek}
           onChange={e => setSelectedWeek(parseInt(e.target.value))}
-          style={{ width: '100%', accentColor: '#00e68a', height: 28, cursor:'pointer' }}
+          style={{ width: '100%', accentColor: '#00e68a', height: 16 }}
         />
       </div>
 
@@ -208,7 +211,7 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
               return (
                 <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <span style={{ width: 8, height: 8, borderRadius: 3, background: drugColors[d], display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight:600, color: '#fff', flex: 1 }}>{d}</span>
+                  <span style={{ fontSize: 12, fontWeight:600, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d}</span>
                   <div style={{ width: 56, height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${conc * 100}%`, background: drugColors[d], borderRadius: 999 }} />
                   </div>
@@ -242,7 +245,7 @@ export const RiskTimelineChart: React.FC<RiskTimelineChartProps> = ({ timeline }
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: 14, fontSize: 12, color: '#fff' }}>
-          Нет активных препаратов на неделе {selectedWeek}
+          Нет активных препаратов на неделе {safeWeek}
         </div>
       )}
     </div>

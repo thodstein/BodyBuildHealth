@@ -238,39 +238,6 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     } catch { return null; }
   }, [linked.profile, linked.course, linked.labs, supportSubstanceIds]);
 
-  // Also compute pharma risk WITHOUT support for comparison display
-  const pharmaRiskRaw = useMemo<RiskResult | null>(() => {
-    if (!linked.profile) return null;
-    try {
-      const s = linked.profile.settings;
-      const tzResult: TZRiskResult = calculateTZRisk({
-        course: linked.course || [],
-        labs: linked.labs || [],
-        genetics: (s.genetics || {}) as any,
-        nutrition: {
-          proteinPerKg: (s.weight || 80) > 0 ? ((s.nutritionFactor ?? 0.8) * 160) / (s.weight || 80) : 1.8,
-          fiberG: 25, omega3G: 1.5, sodiumG: 3, potassiumG: 3, waterL: 2, calories: 2500,
-        },
-        training: {
-          hasHIIT: (s.workoutsPerWeek ?? 3) >= 4,
-          weeklyMinutes: (s.workoutsPerWeek ?? 3) * (s.avgWorkoutMinutes ?? 60),
-          volumeTonnes: 8000, lissMinutesPerWeek: 60,
-        },
-        weight: s.weight ?? 80, age: s.age ?? 30,
-        sex: (s.sex ?? 'male') as 'male' | 'female',
-        supportSubstances: [],
-      });
-      const compat = toCompatibleResult(tzResult);
-      return {
-        overallRaw: tzResult.overallRaw,
-        overallNet: tzResult.overallNet,
-        systemBreakdown: compat.systemBreakdown,
-        mechanismBreakdown: compat.mechanismBreakdown as any,
-        mechanismDetail: compat.mechanismDetail as any,
-      } as unknown as RiskResult;
-    } catch { return null; }
-  }, [linked.profile, linked.course, linked.labs]);
-
   // Compute lab risk contributions
   const labRiskContributions = useMemo(() => {
     if (!hasLabs) return null;
