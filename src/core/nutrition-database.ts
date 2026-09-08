@@ -859,6 +859,8 @@ export const FOOD_DB: FoodItem[] = [
   { id: 'marmalade', name: 'Мармелад', category: 'carb', kcal: 300, protein: 1, fat: 0, carbs: 75, fiber: 0, gi: 70, servingSize: '30 г', description: 'Ограниченно. Желатин + сахар', tier: 'mid', allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'], micros: { Ca: 5, Fe: 0.1, Mg: 2, P: 5, K: 10, Na: 20, Zn: 0.02, Se: 0.1, VitC: 1 } },
   { id: 'pryaniki', name: 'Пряники', category: 'carb', kcal: 348, protein: 5, fat: 3.5, carbs: 74, fiber: 1.5, gi: 70, servingSize: '50 г', description: 'Гибкая диета (20% рациона): 1-2 шт к основному приёму, не база', tier: 'mid', allergens: ['gluten'], isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { Ca: 30, Fe: 1.5, Mg: 15, P: 60, K: 130, Na: 120 } },
   { id: 'jam', name: 'Джем (варенье)', category: 'carb', kcal: 278, protein: 0.4, fat: 0, carbs: 69, fiber: 0.8, gi: 65, servingSize: '35 г', description: 'Гибкая диета (20% рациона): к хлебу/каше, не база', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { K: 60, Na: 5 } },
+  { id: 'rice_semolina', name: 'Рисовая манка (сухая)', category: 'carb', kcal: 370, protein: 7, fat: 1, carbs: 80, fiber: 1, gi: 75, servingSize: '50 г сух.', description: 'Сухая мера. Быстрые углеводы как крем риса: peri/полдник', tier: 'basic', foodState: 'dry', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [], micros: { Ca: 5, Fe: 0.3, Mg: 10, P: 40, K: 30, Na: 1 } },
+  { id: 'honey', name: 'Мёд', category: 'carb', kcal: 300, protein: 0.3, fat: 0, carbs: 82, fiber: 0.2, gi: 60, servingSize: '20 г', description: 'Гибкая диета: десерт/peri-топ, не база', tier: 'basic', allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { K: 50, Na: 4 } },
   { id: 'zefir', name: 'Зефир', category: 'carb', kcal: 319, protein: 0.8, fat: 0, carbs: 79, fiber: 0.5, gi: 70, servingSize: '50 г', description: 'Гибкая диета (20% рациона): 1 шт, без жира', tier: 'basic', allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { K: 40, Na: 25 } },
   { id: 'pastila', name: 'Пастила', category: 'carb', kcal: 303, protein: 0.5, fat: 0.1, carbs: 75, fiber: 1.5, gi: 65, servingSize: '45 г', description: 'Гибкая диета (20% рациона): яблочная основа', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { K: 90 } },
   { id: 'sushki', name: 'Сушки (баранки)', category: 'carb', kcal: 374, protein: 9.5, fat: 3.5, carbs: 76, fiber: 1.8, gi: 70, servingSize: '40 г', description: 'Гибкая диета (20% рациона): к чаю/творогу', tier: 'basic', allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: ['limited', 'treat'], micros: { Ca: 25, Fe: 1.6, Mg: 14, P: 80, K: 100, Na: 90 } },
@@ -1749,6 +1751,9 @@ export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetar
   tempeh: { allergens: ['soy'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
   seitan: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
   rice_white: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  rice_semolina: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  rice_cakes: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  honey: { allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: [] },
   rice_cream: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
   rice_brown: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
   oats: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
@@ -1837,7 +1842,7 @@ function applyDietTags(foods: FoodItem[]): FoodItem[] {
 const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string[] }> = {
   protein: {
     basic: ['chicken_breast', 'egg_whole', 'egg_white', 'whey_protein', 'white_fish_cod', 'white_fish_mintai'],
-    mid: ['turkey_breast', 'tuna_canned', 'pork_tenderloin', 'casein', 'beef_minced', 'white_fish_halibut'],
+    mid: ['turkey_breast', 'tuna_steak', 'pork_tenderloin', 'casein', 'beef_minced', 'white_fish_halibut'],
     max: ['beef_lean', 'salmon', 'red_fish'],
   },
   carb: {
@@ -1875,7 +1880,7 @@ const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string
     'fish_salmon_wild','fish_trout_rainbow','fish_tuna_steak',
     'meat_beef_ground_93','meat_beef_skirt','meat_beef_flank',
     'meat_game_venison','meat_game_rabbit',
-    'seafood_shrimp_tiger','seafood_tuna_canned_water'
+    'seafood_shrimp_tiger'
   );
   extendedProtein.mid.push(
     'poultry_duck_leg','poultry_turkey_wing','poultry_pheasant',
