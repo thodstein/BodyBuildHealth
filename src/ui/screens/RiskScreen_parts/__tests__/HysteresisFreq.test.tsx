@@ -86,4 +86,19 @@ describe('HysteresisChart wiring', () => {
       mockCourse = prev;
     }
   });
+
+  it('7. явно введённая доза 0 не подменяется выдуманными 100 мг', () => {
+    const prev = mockCourse;
+    mockCourse = [
+      { substanceId: 'test_enan', doseValue: 0, frequency: '1x/week', startWeek: 1, endWeek: 12 },
+    ];
+    try {
+      captured = null;
+      render(<HysteresisChart />);
+      expect(captured).not.toBeNull();
+      expect(captured.doseMg).toBe(0);
+    } finally {
+      mockCourse = prev;
+    }
+  });
 });

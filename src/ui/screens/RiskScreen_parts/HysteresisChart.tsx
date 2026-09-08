@@ -57,7 +57,9 @@ export const HysteresisChart: React.FC = () => {
     if (!ph?.pk || !ph?.pd) return null;
     const perWeek = injectionsPerWeek(drug.frequency as number | string | undefined);
     return simulateHysteresis({
-      doseMg: drug.doseValue || 100,
+      // NOTE: ?? а не || — явно введённая доза 0 должна симулироваться как 0,
+      // а не подменяться выдуманными 100 мг.
+      doseMg: drug.doseValue ?? 100,
       dosingIntervalHours: 168 / perWeek,
       halfLifeHours: ph.pk.halfLifeHours || 72,
       ec50: ph.ec50 || 300,
