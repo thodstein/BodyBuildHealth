@@ -257,3 +257,19 @@ describe('P0 score-pharma weeks factor', () => {
     expect(long.overallRaw).toBeGreaterThan(short.overallRaw);
   });
 });
+
+describe('P0 androgenic index normalized', () => {
+  it('300 mg test_enan ≈ 1.0, 600 mg ≈ 2.0 (threshold 300)', async () => {
+    const { DRUG_THRESHOLDS } = await import('../../core/constants');
+    const th = (DRUG_THRESHOLDS as any)['testosterone_enanthate']?.dosePerWeek ?? 300;
+    expect(th).toBe(300);
+    const calc = (dose: number) => {
+      const andro = (DRUG_THRESHOLDS as any)['testosterone_enanthate']?.androgenicity ?? 1;
+      const df = dose / th;
+      return df * andro;
+    };
+    expect(calc(300)).toBeCloseTo(1.0, 2);
+    expect(calc(600)).toBeCloseTo(2.0, 2);
+    expect(calc(600)).toBeGreaterThan(calc(300));
+  });
+});

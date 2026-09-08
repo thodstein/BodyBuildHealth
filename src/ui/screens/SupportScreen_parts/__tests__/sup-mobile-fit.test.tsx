@@ -369,6 +369,7 @@ describe('SUP mobile fit (360px)', () => {
       '86dvh',
       '68dvh',
       'top: 132px',
+      'min-width: 0',
     ]) {
       expect(css, hook).toContain(hook);
     }
@@ -376,6 +377,19 @@ describe('SUP mobile fit (360px)', () => {
     for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp']) {
       expect(native, hook).toContain(hook);
     }
+  });
+
+  it('нижний таббар стоит НАД глобальной навигацией, контент чистит обе панели', () => {
+    const { container } = render(<SupportScreen />);
+    const nav = container.querySelector("[data-sup='nav']") as HTMLElement;
+    expect(nav, 'inner nav').not.toBeNull();
+    // не bottom:0 (так он крыл глобальный таббар и тапы уходили не туда)
+    expect(nav.style.bottom).toContain('var(--nav-height');
+    const root = container.querySelector('.support-screen') as HTMLElement;
+    expect(root.style.paddingBottom).toContain('var(--nav-height');
+    // hero-контент поднят над обеими панелями
+    const heroHtml = container.querySelector('.support-hero')?.innerHTML || '';
+    expect(heroHtml).toContain('140px');
   });
 
   it('топбары не перекрывают контент: отступ ≥ высоты шапки, горизонталь зажата', () => {

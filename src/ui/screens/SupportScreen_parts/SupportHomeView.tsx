@@ -57,7 +57,7 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
       <div className="support-hero" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
         <img src="/support-hero.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
-        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px calc(64px + env(safe-area-inset-bottom, 0px))', gap: 10, overflowY: 'auto' }}>
+        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px calc(140px + env(safe-area-inset-bottom, 0px))', gap: 10, overflowY: 'auto' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 20, background: 'rgba(var(--sup-accent-rgb, 0,230,138),0.14)', border: '1px solid rgba(var(--sup-accent-rgb, 0,230,138),0.22)', color: 'var(--sup-accent, #00e68a)', fontSize: 9, fontWeight: 800, letterSpacing: '0.4px' }}>
               <span style={{ width: 5, height: 5, borderRadius: 5, background: 'var(--sup-accent, #00e68a)', boxShadow: '0 0 8px rgba(var(--sup-accent-rgb, 0,230,138),0.6)', display: 'inline-block' }} /> БЛОК БАД · ПОДДЕРЖКА

@@ -3114,12 +3114,13 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     weeklyPlan,
   };
 
-  // ── Нижняя навигация: компактная 52 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался, херо фиксирован на весь экран
+  // ── Нижняя навигация: внутренний таббар (52) + глобальный таб приложения (nav-height) + safe-area.
+  // Контент не прячется ни под одной из двух панелей.
   const BOTTOM_NAV_H = 56;
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
@@ -3556,7 +3557,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
 
       {/* ===== BOTTOM TAB BAR — всегда видимый app-таббар 5 разделов (hero под ним, размеры hero не меняем) ===== */}
-      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
+      {/* Стоит НАД глобальной навигацией приложения (не перекрывает её): bottom = высота глобального таба + safe-area */}
+      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
         {[
           { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
           { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },

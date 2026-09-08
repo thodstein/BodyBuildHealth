@@ -28,7 +28,7 @@ html.app-native .train-sup.sup-apk {
 
 /* ─── 3. НАВИГАЦИЯ — safe-area + глубокое стекло ────────────────── */
 html.app-native .train-sup.sup-apk [data-sup='nav'] {
-  bottom: env(safe-area-inset-bottom, 0px) !important;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px)) !important;
   background: rgba(9, 18, 34, 0.88) !important;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55) !important;
   backdrop-filter: blur(20px) saturate(160%) !important;
@@ -172,4 +172,11 @@ html.app-native .train-sup.sup-apk .sup-manualpick {
 
 html.app-native .train-sup.sup-apk .sup-modals {
   backdrop-filter: blur(14px) saturate(160%) !important;
+}
+
+/* ─── 12. FAB НЕ ПЕРЕКРЫВАЕТСЯ ВНУТРЕННИМ ТАББАРОМ ──────────────────
+ * Внутренний бар стоит над глобальным nav — FAB поднимаем выше него.
+ * :has поддерживается Android WebView (Chrome 105+); старые молча игнорят. */
+html.app-native:has(.train-sup.sup-apk) .native-fab-wrap {
+  bottom: calc(var(--nav-height) + 76px + env(safe-area-inset-bottom, 0px)) !important;
 }

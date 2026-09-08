@@ -126,6 +126,7 @@ describe('APK support pack', () => {
       "[data-sup='hormones']",
       '.sup-manualpick',
       '.sup-modals',
+      '.native-fab-wrap',
       'supApkSheetUp',
       'prefers-reduced-motion',
     ]) {

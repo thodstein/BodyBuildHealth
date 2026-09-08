@@ -51,7 +51,10 @@ const AndrogenicIndexCalculator: React.FC = () => {
     let total = 0;
     entries.forEach(e => {
       const dt = DRUG_THRESHOLDS[e.drug];
-      if (dt) total += e.doseMgWeek * dt.androgenicity / 100;
+      const threshold = dt?.dosePerWeek ?? 300;
+      const doseFactor = threshold > 0 ? e.doseMgWeek / threshold : 1;
+      const andro = dt?.androgenicity ?? 0;
+      total += doseFactor * andro;
     });
     setAiResult(total);
   };
@@ -61,10 +64,10 @@ const AndrogenicIndexCalculator: React.FC = () => {
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
         <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', fontSize:12 }}>📊</span>
         <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Андрогенный индекс стека</span>
-        {aiResult!==null && <span style={{ marginLeft:'auto', fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:20, background: aiResult>3?'rgba(239,68,68,0.12)': aiResult>1.5?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.12)', color: aiResult>3?'#f87171':aiResult>1.5?'#fbbf24':'#00e68a', border:`1px solid ${aiResult>3?'rgba(239,68,68,0.18)':aiResult>1.5?'rgba(245,158,11,0.18)':'rgba(0,230,138,0.18)'}` }}>{aiResult.toFixed(2)}</span>}
+        {aiResult!==null && <span style={{ marginLeft:'auto', fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:20, background: aiResult>2?'rgba(239,68,68,0.12)': aiResult>1?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.12)', color: aiResult>2?'#f87171':aiResult>1?'#fbbf24':'#00e68a', border:`1px solid ${aiResult>2?'rgba(239,68,68,0.18)':aiResult>1?'rgba(245,158,11,0.18)':'rgba(0,230,138,0.18)'}` }}>{aiResult.toFixed(2)}</span>}
       </div>
       <div style={{ fontSize:11, color:'#fff', marginBottom:12, lineHeight:1.45 }}>
-        Σ (доза × AR_affinity / 100) — сложи вклады каждого препарата. Выбери эфир — доза подтянется.
+        Σ (доза/порог × андрогенность) — нормировано по порогу курса. Выбери эфир — доза подтянется.
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, maxHeight:170, overflowY:'auto', marginBottom:12, paddingRight:2 }}>
@@ -103,8 +106,8 @@ const AndrogenicIndexCalculator: React.FC = () => {
               {PHARMA_DB[entry.drug]?.name || entry.drug}
             </span>
             {entries.length > 1 && (
-              <button onClick={() => removeEntry(i)} style={{
-                width:26, height:26, borderRadius:8, cursor:'pointer', fontSize:11,
+              <button onClick={() => removeEntry(i)} aria-label="Удалить" style={{
+                width:32, height:32, minWidth:32, minHeight:32, borderRadius:10, cursor:'pointer', fontSize:12,
                 background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', color:'#f87171',
                 display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800,
               }}>✕</button>
@@ -112,33 +115,33 @@ const AndrogenicIndexCalculator: React.FC = () => {
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <input type="number" value={entry.doseMgWeek} onChange={e => setDoseFor(i, parseFloat(e.target.value) || 0)}
-              style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+              style={{ flex:1, padding:'12px 12px', borderRadius:12, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
             <span style={{ fontSize:11, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>мг/нед</span>
           </div>
           <div style={{ fontSize:10, color:'#fff', marginTop:6, display:'flex', gap:6, alignItems:'center' }}>
-            <span style={{ background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>AR {DRUG_THRESHOLDS[entry.drug]?.androgenicity}%</span>
-            <span>· Вклад <b style={{ color:'#fff' }}>{(entry.doseMgWeek * (DRUG_THRESHOLDS[entry.drug]?.androgenicity || 0) / 100).toFixed(1)}</b></span>
+            <span style={{ background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>AR {DRUG_THRESHOLDS[entry.drug]?.androgenicity}</span>
+            <span>· Вклад <b style={{ color:'#fff' }}>{(() => { const dt=DRUG_THRESHOLDS[entry.drug]; const th=dt?.dosePerWeek??300; const df=th>0?entry.doseMgWeek/th:1; return (df*(dt?.androgenicity??0)).toFixed(2); })()}</b></span>
           </div>
         </div>
       ))}
 
       <div style={{ display:'flex', gap:8, marginTop:4 }}>
         <button onClick={addEntry} style={{
-          flex:1, padding:'9px 0', borderRadius:12, cursor:'pointer', fontSize:11, fontWeight:800,
+          flex:1, minHeight:44, padding:'12px 0', borderRadius:12, cursor:'pointer', fontSize:12, fontWeight:800,
           border:'1px dashed rgba(139,92,246,0.32)', background:'rgba(139,92,246,0.08)', color:'#a78bfa',
         }}>+ Добавить препарат</button>
         <button onClick={calcAI} style={{
-          flex:1, padding:'9px 0', borderRadius:12, border:'1px solid rgba(0,230,138,0.22)',
-          background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', fontWeight:800, cursor:'pointer', fontSize:11, boxShadow:'0 4px 12px rgba(0,230,138,0.20)',
+          flex:1, minHeight:44, padding:'12px 0', borderRadius:12, border:'1px solid rgba(0,230,138,0.22)',
+          background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', fontWeight:800, cursor:'pointer', fontSize:12, boxShadow:'0 4px 12px rgba(0,230,138,0.20)',
         }}>Рассчитать</button>
       </div>
 
       {aiResult !== null && (
         <div style={{ marginTop:12, background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.16)', borderRadius:14, padding:14, textAlign:'center' }}>
           <div style={{ fontSize:10, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Андрогенный индекс стека</div>
-          <div style={{ fontSize:30, fontWeight:900, color: aiResult > 3 ? '#f87171' : aiResult > 1.5 ? '#fbbf24' : '#00e68a', letterSpacing:-0.8 }}>{aiResult.toFixed(2)}</div>
+          <div style={{ fontSize:30, fontWeight:900, color: aiResult > 2 ? '#f87171' : aiResult > 1 ? '#fbbf24' : '#00e68a', letterSpacing:-0.8 }}>{aiResult.toFixed(2)}</div>
           <div style={{ fontSize:11, color:'#fff', marginTop:4, fontWeight:600 }}>
-            {aiResult > 3 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1.5 ? '⚠ Умеренная — следи за давлением и липидами' : '✓ Низкая — мягкий курс'}
+            {aiResult > 2 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1 ? '⚠ Умеренная — следи за давлением и липидами' : '✓ Низкая — мягкий курс'}
           </div>
         </div>
       )}

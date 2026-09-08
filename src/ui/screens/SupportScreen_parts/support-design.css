@@ -359,6 +359,11 @@
   }
 }
 
+/* Строки каталога: текстовый блок сжимается, кнопки не выдавливаются за край */
+.support-screen.support-root .sup-catalogview [style*='flex:1'] {
+  min-width: 0;
+}
+
 /* ─── 15b. Таблицы — никогда не рвут вёрстку на узком экране ────── */
 .support-screen.support-root .sup-geninfo table,
 .support-screen.support-root .sup-bio table,
@@ -496,9 +501,9 @@
   align-items: center !important;
 }
 
-/* тост каталога — над нижней навигацией */
+/* тост каталога — над ОБЕИМИ нижними панелями (внутренняя + глобальная) */
 .support-screen.support-root .sup-catalog-toast {
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(142px + env(safe-area-inset-bottom, 0px)) !important;
   max-width: calc(100% - 24px);
   border-radius: 14px !important;
   font-size: 12.5px !important;
@@ -876,9 +881,9 @@
   }
 }
 
-/* ─── 18. ТЕЛЕФОН: всплывающие тосты над жестовой панелью ───────── */
+/* ─── 18. ТЕЛЕФОН: всплывающие тосты над обеими нижними панелями ── */
 .support-screen.support-root [style*='bottom:70'] {
-  bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(142px + env(safe-area-inset-bottom, 0px)) !important;
   max-width: calc(100% - 24px);
 }
 
