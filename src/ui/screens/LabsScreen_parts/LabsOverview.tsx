@@ -155,7 +155,7 @@ export const LabsOverview: React.FC<{
             icon={<NativeIcon name="flask" size={32} />}
             title="Нет маркеров в этой фазе"
             desc="Введите анализы во вкладке «Текущие» или импортируйте PDF/фото. Данные группируются по системам автоматически."
-            action={<span style={{ fontSize:12, fontWeight:800, padding:'10px 18px', borderRadius:999, background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', display:'inline-flex', alignItems:'center', gap:6 }}>＋ Перейти к вводу</span>}
+            action={<span style={{ fontSize:13, fontWeight:800, padding:'12px 20px', borderRadius:999, background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', display:'inline-flex', alignItems:'center', gap:6, minHeight:44, boxShadow:'0 8px 22px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' }}>＋ Перейти к вводу</span>}
           />
       )}
     </div>
