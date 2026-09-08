@@ -187,8 +187,24 @@ export function getTrendIcon(direction: LabTrend['direction'], significance: Lab
 
 export function getTrendInsights(trends: LabTrend[]): string[] {
   const insights: string[] = [];
-  const worsenedSignificant = trends.filter(t => t.significance === 'significant' || t.significance === 'critical');
-  const improvedSignificant = trends.filter(t => t.significance === 'significant' || t.significance === 'critical');
+  // P0 fix: раньше оба списка фильтровались одинаково (только significance) → один тренд попадал и в ухудшение и в улучшение
+  const lowerIsBetter = new Set(['LDL','HCT','CRP','TG','GLU','HBA1C','ALT','AST','GGT','ALP','BIL','CREATININE','UA','HOMOCYSTEINE','PRL','E2','CORTISOL']);
+  const isWorsened = (t: LabTrend) => {
+    if (t.significance !== 'significant' && t.significance !== 'critical') return false;
+    const lower = lowerIsBetter.has(t.code);
+    if (t.direction === 'up') return lower ? !!t.currentAbnormal : !t.currentAbnormal;
+    if (t.direction === 'down') return lower ? !t.currentAbnormal && !!t.previousAbnormal : !!t.currentAbnormal;
+    return false;
+  };
+  const isImproved = (t: LabTrend) => {
+    if (t.significance !== 'significant' && t.significance !== 'critical') return false;
+    const lower = lowerIsBetter.has(t.code);
+    if (t.direction === 'down') return lower ? !t.currentAbnormal || !t.previousAbnormal : !!t.currentAbnormal;
+    if (t.direction === 'up') return lower ? false : !t.currentAbnormal && !!t.previousAbnormal;
+    return false;
+  };
+  const worsenedSignificant = trends.filter(isWorsened);
+  const improvedSignificant = trends.filter(isImproved);
   const newAbnormal = trends.filter(t => t.currentAbnormal && !t.previousAbnormal);
 
   if (worsenedSignificant.length > 0) {
