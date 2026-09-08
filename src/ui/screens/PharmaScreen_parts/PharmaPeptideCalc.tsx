@@ -315,11 +315,11 @@ export const PharmaPeptideCalc: React.FC = () => {
           <span style={{ width:24, height:24, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', fontSize:11 }}>🎯</span>
           <span style={{ fontSize:12, fontWeight:800, color:'#fff' }}>Генератор протокола по цели</span>
         </div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:10 }}>
           {Object.keys(PEPTIDE_GOAL_PROFILES).map(goal => (
             <button key={goal} onClick={() => setPepProtocol(generatePeptideProtocol(goal))} style={{
-              padding:'7px 10px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
-              background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.18)', color:'#c4b5fd',
+              minHeight:44, padding:'10px 14px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:800,
+              background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.18)', color:'#fff',
             }}>
               {goal === 'muscle_growth' ? '💪 Рост мышц' : goal === 'fat_loss' ? '🔥 Жиросжигание' : goal === 'recovery' ? '🔄 Восстановление' : goal === 'gi_healing' ? '🫃 ЖКТ' : goal === 'mitochondria' ? '🧬 Митохондрии' : goal === 'focus' ? '🎯 Фокус' : '😴 Сон'}
             </button>

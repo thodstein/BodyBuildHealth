@@ -34,6 +34,7 @@ describe('P0-1 frequency parsing', () => {
   it('1x/wk -> 1', () => expect(injectionsPerWeek('1x/wk')).toBe(1));
   it('3x/week -> 3', () => expect(injectionsPerWeek('3x/week')).toBe(3));
   it('number 2 -> 2', () => expect(injectionsPerWeek(2)).toBe(2));
+  it('2-3x/week -> 2.5 avg', () => expect(injectionsPerWeek('2-3x/week')).toBe(2.5));
   it('weeklyDose with /wk unit ignores frequency', () => {
     expect(weeklyDose(500, 'mg/wk', 'daily')).toBe(500);
     expect(weeklyDose(500, 'mg/wk', '2x/wk')).toBe(500);
@@ -43,6 +44,10 @@ describe('P0-1 frequency parsing', () => {
     expect(weeklyDose(250, 'mg', '2x/wk')).toBe(500);
     expect(weeklyDose(100, 'mg', 'daily')).toBe(700);
     expect(weeklyDose(50, 'mg', 'eod')).toBe(175);
+  });
+  it('weeklyDose per-day *7', () => {
+    expect(weeklyDose(50, 'mg/d', '2x/d')).toBe(350);
+    expect(weeklyDose(30, 'mg/d', 'daily')).toBe(210);
   });
 });
 
