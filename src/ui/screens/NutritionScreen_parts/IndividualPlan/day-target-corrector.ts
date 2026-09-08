@@ -12,7 +12,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -237,6 +237,19 @@ export function correctDayToTargets(
   if (safeTargets.kcal === 0 && safeTargets.p === 0 && safeTargets.f === 0 && safeTargets.c === 0) {
     return { meals, withinTolerance: true, deviationPct: 0 };
   }
+  // MealTargets: капы семейств скейлятся целью дня (900-1500У рисом 3 приёмами не закрыть).
+  const _tsCap = dayTargetScale(safeTargets.kcal);
+  // MealTargets: капы корректора тоже скейлятся целью дня. Фиксированные 85 г клетчатки
+  // на 900-1500У блокировали ЛЮБОЙ карб-добор (крупы дня уже несут 85-100 г неизбежной
+  // клетчатки → У-реализация висела на −17% при живом недоборе 250 г). HV — зеркало
+  // ступеней движка (_fiberCapDay): 50 / 65 (500-700У) / 115 (700У+); не-HV — legacy 85
+  // (движок на обычных днях тримит по 85 — формула 25-50 заводила корректор в лишние
+  // тримы, меняя траекторию: белок уплывал +5% на simple 3000).
+  const _corrFiberCap = hv
+    ? ((safeTargets.c || 0) >= 700 ? 115 : (safeTargets.c || 0) >= 500 ? 65 : 50)
+    : 85;
+  // Орехи/семена: квота × (вес × цель, кламп 2.0) + запас — зеркало катчелла движка.
+  const _corrNutCap = Math.round(60 * Math.min(2, weightScaleCorr * _tsCap)) + 10;
   // P1a: stale-цели (рефид/инфляция) — таргет-гарды ниже отключаются, иначе душат сходимость.
   const _staleT = mealTargetsStale(meals, safeTargets.c, safeTargets.p);
   // P1a: рефид — HV-режим для гарнирных капов (520У нужно больше гарниров, чем 2/приём).
@@ -250,7 +263,6 @@ export function correctDayToTargets(
     (m.totals?.p || 0) >= 0.62 * _lbmCorr;
 
   const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
-  let _dbgN = 0;
   // P2: кандидаты, у которых не нашлось места для размещения (все приёмы закрыты
   // типологией), запоминаем — следующая итерация пробует следующего, а не умирает
   // (раньше `break` на первом же неразмещаемом кандидате глотал до 80 итераций
@@ -264,8 +276,8 @@ export function correctDayToTargets(
     const nutG = currentNutGrams(meals);
     const fibG = currentFiber(meals);
     const _kcalNow = sumTotals(meals).kcal;
-    if (!(safeTargets.kcal > 0 && _kcalNow < safeTargets.kcal * 0.97) && (nutG > 85 || fibG > 85)) {
-      const isNutOver = nutG > 85;
+    if (!(safeTargets.kcal > 0 && _kcalNow < safeTargets.kcal * 0.97) && (nutG > _corrNutCap || fibG > _corrFiberCap)) {
+      const isNutOver = nutG > _corrNutCap;
       const cands = meals.flatMap((m, mi) => m.items.map((it, ii) => ({ mi, ii, it, m })))
         .filter(x => !((x.it as any)._fixedGrams) && x.m.type !== 'presleep' && x.m.type !== 'intra')
         .filter(x => {
@@ -302,7 +314,6 @@ export function correctDayToTargets(
       if (_keyIt === _prevIterKey) break;
       _prevIterKey = _keyIt;
     }
-    try { if ((globalThis as any).__DBG_CORR && _dbgN++ < 14) console.log(`[DBG-C] it=${iter} dev=${dev.toFixed(1)} dK=${Math.round(safeTargets.kcal - totals.kcal)} dP=${(safeTargets.p - totals.p).toFixed(0)} dF=${(safeTargets.f - totals.f).toFixed(0)} dC=${(safeTargets.c - totals.c).toFixed(0)}`); } catch {}
     // SWAP (до выбора оси): универсально — любая ПЕРЕБРАННАЯ ось (жир/угли/белок) меняется
     // на любую НЕДОБРАННУЮ, по ккал-паритету. Иначе при конфликте «жир перебран + угли
     // недобраны» (или «белок недобран + жир перебран») корректор по одной оси застревает:
@@ -364,10 +375,10 @@ export function correctDayToTargets(
             if (anchorSet && anchorSet.has(id)) return 3;
             const _fam = stapleFamilyOf(id);
             if (!_fam) return 2;
-            return familyMealCap(_fam, { hv });
+            return familyMealCap(_fam, { hv, ts: _tsCap });
           };
           let _candU = under === 'c'
-            ? _sortU.filter(c => _famUsesSw(c.id) < _capForSw(c.id) && (!isCreamId(c.id) || _creamUsesSw() < creamMealCap(hv)))
+            ? _sortU.filter(c => _famUsesSw(c.id) < _capForSw(c.id) && (!isCreamId(c.id) || _creamUsesSw() < creamMealCap(hv, _tsCap)))
             : _sortU;
           if (_candU.length === 0) {
             // Всё в капах — наименее использованное семейство (сходимость важнее),
@@ -381,6 +392,9 @@ export function correctDayToTargets(
           let victimIt: CorrectorItem = { id: '', name: '', amount: 0, kcal: 0, p: 0, f: 0, c: 0 };
           meals.forEach((m, mi) => {
             if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout' || _postLocked(m) || (m as any)._insulinWindow) return;
+            // D-28: ужин «загрузки под утреннюю тренировку» — минимум жиров (бюджет ≤8 г):
+            // жир-своп не кладёт авокадо/орехи/масло поверх бюджета (было Ж 19.2 > 14).
+            if (under === 'f' && m.type === 'dinner' && ((m as any).target?.f ?? 99) <= 10) return;
             // v3 portable: не-портативной заменой рабочее окно не трогаем (суп в офис — нет).
             if (_needPortM(m) && !isPortableFood(bestU as any)) return;
             // P1a: своп В завтрак — только завтрашними продуктами (иначе замена жирового
@@ -436,6 +450,9 @@ export function correctDayToTargets(
               // Замена на bestU должна НЕ ухудшать недобранные оси и СНИЖАТЬ перебранные.
               for (const u of unders) if (bm[u] + 0.001 < vm[u]) return;
               for (const o of overs) if (vm[o] + 0.001 < bm[o]) return;
+              // MealTargets: своп не съедает жиры дня — при недоборе Ж замена жирного
+              // белка (яйца/лосось) на крупу уводила Ж в −39% (simple 2500: 64→43 г).
+              if (unders.includes('f') && vm.f > bm.f + 0.001) return;
               const bad = ov * (it.amount || 0) / 100;
               if (bad > victimBad) { victimBad = bad; victimMi = mi; victimIi = ii; victimIt = it; }
             });
@@ -446,15 +463,19 @@ export function correctDayToTargets(
             // Порошок свопом — не больше скупа (иначе «курица 300 г → изолят 186 г»).
             // Универсально: плотный порошок превращает любое освобождённое ккал в ведро.
             if (isProteinPowderId(bestU.id)) swapG = Math.min(swapG, POWDER_PORTION_CAP_G);
-            // Углевод свопом — не больше съедобной порции 250 г ВСЕГДА (раньше кап был только
-            // при ≥30У/100 — низкоплотные (батат ~20У) его обходили: «овсянка 143 г → батат 590 г»).
-            if (under === 'c') swapG = Math.min(swapG, 250);
+            // Углевод/белок свопом — съедобная порция 250 г ВСЕГДА (раньше кап был только
+            // при ≥30У/100 — низкоплотные его обходили; белок: «яичный белок 372 г»).
+            if (under === 'c' || under === 'p') swapG = Math.min(swapG, 250);
             // P1b/P2 (типология): своп carb-вместо-жертвы не создаёт 2-й гарнир и
             // не съедает белок (жертва-протеин защищена — иначе F1 «яичный белок 70<75»).
-            if (under === 'c' && victimIt.role !== 'carb_slow' && victimIt.role !== 'carb_fast' &&
+            // MealTargets-фикс: защищённая жертва ОТМЕНЯЕТ своп (fall-through к
+            // density/grow), а не сжигает итерацию `continue` — иначе P2-гарант
+            // («итерация без изменений») ломал корректор на первом же безуспешном
+            // свопе, и карб-grow на 1500У никогда не запускался (У −17% навсегда).
+            const _victimProtected = under === 'c' && victimIt.role !== 'carb_slow' && victimIt.role !== 'carb_fast' &&
               ((victimIt as any).role === 'protein' || (victimIt as any).role === 'fast_protein' || (victimIt as any).role === 'slow_protein'
-                || countCarbItems(meals[victimMi] as any) >= 1)) continue;
-            if (swapG >= 20) {
+                || countCarbItems(meals[victimMi] as any) >= 1);
+            if (!_victimProtected && swapG >= 20) {
               const beforeTotals = sumTotals(meals);
               const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
               const newIt: CorrectorItem = {
@@ -471,7 +492,13 @@ export function correctDayToTargets(
               recalcMealTotals(meals);
               const afterTotals = sumTotals(meals);
               const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
-              if (afterDev < beforeDev - 0.05) continue;
+              // MealTargets/MPS: своп не выводит основной приём за его цель +15 и за
+              // MPS-коридор 0.62 г/кг LBM (иначе финальные проходы движка срезают).
+              const _mpsCapS = (_lbmCorr > 0 && !_ultraPCorr) ? 0.62 * _lbmCorr : 0;
+              const _swapOverM = under === 'p' && _mpsCapS > 0 &&
+                ['breakfast', 'lunch', 'dinner'].includes(String(meals[victimMi].type || '')) &&
+                ((meals[victimMi].totals?.p || 0) > _mpsCapS + 0.5);
+              if (!_swapOverM && afterDev < beforeDev - 0.05) continue;
               meals[victimMi].items[victimIi] = victimIt;
               recalcMealTotals(meals);
             }
@@ -560,14 +587,14 @@ export function correctDayToTargets(
               if (anchorSet && anchorSet.has(id)) return 3;
               const _fam = stapleFamilyOf(id);
               if (!_fam) return 2;
-              return familyMealCap(_fam, { hv });
+              return familyMealCap(_fam, { hv, ts: _tsCap });
             };
             const _altsF = _alts.filter(f => {
               const _bf = stapleFamilyOf(f.id);
               // HV-исключение: плотность важнее (churn-бан только обычных дней).
               if (!hv && _vicFamD && _bf && _vicFamD === _bf) return false;
               if (_famUsesD(f.id) >= _capForD(f.id)) return false;
-              if (isCreamId(f.id) && _creamUsesD() >= creamMealCap(hv)) return false;
+              if (isCreamId(f.id) && _creamUsesD() >= creamMealCap(hv, _tsCap)) return false;
               // P1b: вето «тунец + крем» (жертва-рыба — можно, clash уходит с ней).
               if (isCreamId(f.id) && (meals[_vMi].items || []).some((x: any) => x.id !== _vic.id && isFishId(x.id))) return false;
               return true;
@@ -729,8 +756,15 @@ export function correctDayToTargets(
         if (m.type === 'preworkout' || m.type === 'postworkout') return;
         // на недобор Ж не трогаем ужин-morningLoad и пост-трен (как в основном движке)
         if (eff === 'f' && (m.type === 'postworkout')) return;
+        // D-28: ужин «загрузки под утреннюю тренировку» — минимум жиров (бюджет ≤8 г):
+        // жир-добор корректора не должен лить туда авокадо/орехи поверх бюджета.
+        if (eff === 'f' && m.type === 'dinner' && ((m as any).target?.f ?? 99) <= 10) return;
         (m.items || []).forEach((it, ii) => {
           if ((it as any)._fixedGrams) return;
+          // D-28: завтрак — курируемый пул круп (овсянка/крем/хлопья): рис-гарниры/паста
+          // в завтрак не добираем (своп это гейтит — grow тоже обязан; MealTargets-фикс:
+          // разблокированный grow клал rice_white в завтрак).
+          if (m.type === 'breakfast' && eff === 'c' && isBreakfastBannedCarb(it.id)) return;
           const isCore = isCoreRecipeItem(m, it.id);
           if (isCore && opts?.allowCoreScale === false) return;
           const food = FOOD_DB.find(f => f.id === it.id);
@@ -795,10 +829,10 @@ export function correctDayToTargets(
           addG = Math.min(addG, Math.max(0, COMFORT_TOTAL_CAP[cand.it.id] - cand.it.amount));
           if (addG < 10) continue;
         }
-        // кап орехов/семян 85г и клетчатки 85г — не превышаем
+        // кап орехов/семян и клетчатки — масштаб цели (см. _corrNutCap/_corrFiberCap)
         const fam = stapleFamilyOf(cand.it.id) || '';
-        if ((fam === 'nuts' || fam === 'seeds') && currentNutGrams(meals) + addG > 85) {
-          addG = Math.max(0, 85 - currentNutGrams(meals));
+        if ((fam === 'nuts' || fam === 'seeds') && currentNutGrams(meals) + addG > _corrNutCap) {
+          addG = Math.max(0, _corrNutCap - currentNutGrams(meals));
           if (addG < 10) continue;
         }
         // орехи/семена — только добивка 15г/приём
@@ -812,8 +846,8 @@ export function correctDayToTargets(
         // P1b-фикс: кламп — только носителям клетчатки. При дне уже за капом (fiber 88
         // на HV — норма) нулевые кандидаты (масло/изолят) уходили формулой в минус
         // и глушили всю итерацию — жиры системно недобирались на HV.
-        if (candFood && (candFood.fiber || 0) > 0 && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > 85) {
-          const fiberRoom = 85 - currentFiber(meals);
+        if (candFood && (candFood.fiber || 0) > 0 && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > _corrFiberCap) {
+          const fiberRoom = _corrFiberCap - currentFiber(meals);
           const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, candFood.fiber || 1) * 100);
           addG = Math.min(addG, maxByFiber);
           if (addG < 10) continue;
@@ -846,13 +880,35 @@ export function correctDayToTargets(
         if (newAmount > cap) continue;
         const beforeTotals = sumTotals(meals);
         const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
+        const beforePd = perDev(beforeTotals as DayTargets, safeTargets);
+        const beforeDevEff = Math.abs(beforePd[eff]);
         const prevAmount = cand.it.amount;
         scaleItem(cand.it, Math.min(cap, newAmount));
         if (isCore) coreScale.set(key, curScale * cand.it.amount / prevAmount);
         recalcMealTotals(meals);
         const afterTotals = sumTotals(meals);
         const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
-        if (afterDev < beforeDev - improveGate(beforeDev)) { done = true; break; }
+        const afterDevEff = Math.abs(perDev(afterTotals as DayTargets, safeTargets)[eff]);
+        // MealTargets: гейт добора — ось-ЦЕЛЬ улучшает, НИ ОДНА ось не хуже +0.5 п.п.
+        // (иначе k-дрейф: каждая добавка «немного» хуже по ккал, суммарно −300 ккал).
+        // Чистый maxDev-гейт дедлочил: при белке на MPS-полах (перебор вечен — резать
+        // запрещено) ЛЮБОЙ карб-добор «ухудшал» белок → 900У висел на −10% У.
+        const _axisWorse = (['k', 'p', 'f', 'c'] as const)
+          .some(a => Math.abs(perDev(afterTotals as DayTargets, safeTargets)[a]) > Math.abs(beforePd[a]) + 0.005);
+        // MealTargets: рост не раздувает приём поверх его собственной цели +15
+        // (иначе P0a-трим к цели приёма потом срезает раздутый гарнир, а доборы
+        // в «сытые» приёмы заблокированы — день падает на −20% после сходки).
+        const _mtG = (meals[cand.mi] as any).target;
+        const _mealOverT = !!(_mtG && _mtG[eff] > 0 &&
+          (((meals[cand.mi] as any).totals || {} as any)[eff] || 0) > _mtG[eff] + 15);
+        // MPS-коридор движка (0.62 г/кг LBM) — рост белка не выводит основной приём
+        // за коридор (иначе финальный MPS-проход срезает рост, день падает на −10-15%).
+        const _mpsCapC = (_lbmCorr > 0 && !_ultraPCorr) ? 0.62 * _lbmCorr : 0;
+        const _mpsOver = !!(eff === 'p' && _mpsCapC > 0 &&
+          ['breakfast', 'lunch', 'dinner'].includes(String(meals[cand.mi].type || '')) &&
+          (((meals[cand.mi] as any).totals || {} as any).p || 0) > _mpsCapC + 0.5);
+        if (!_mealOverT && !_mpsOver && ((afterDevEff < beforeDevEff - improveGate(beforeDevEff) && !_axisWorse)
+          || afterDev < beforeDev - improveGate(beforeDev))) { done = true; break; }
         scaleItem(cand.it, prevAmount);
         if (isCore) coreScale.set(key, curScale);
         recalcMealTotals(meals);
@@ -922,7 +978,7 @@ export function correctDayToTargets(
         if (anchorSet && anchorSet.has(id)) return 3;
         const _fam = stapleFamilyOf(id);
         if (!_fam) return 2;
-        return familyMealCap(_fam, { hv });
+        return familyMealCap(_fam, { hv, ts: _tsCap });
       };
       const _creamUses = (): number => {
         let n = 0;
@@ -945,12 +1001,12 @@ export function correctDayToTargets(
         if (_u === 0) {
           // P1a-fix2: нулевое семейное использование — но крем-субкап всё равно держим
           // (иначе первый крем дня проходит мимо субкапа при свежем семействе).
-          if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv)) return false;
+          if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv, _tsCap)) return false;
           return true;
         }
         if (_u >= _useCapFor(c.id)) return false;
         // P1a-fix2: крем — субкап 2 внутри рисового семейства.
-        if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv)) return false;
+        if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv, _tsCap)) return false;
         // P1a: повтор — только lean-носители (Б<8/100): иначе ротация ради новизны
         // тащит белковые крупы (овёс/булгур/ржанка/хлеб 9-13Б) вместо повторного риса,
         // и день перебирает белок скрытыми +15-30 г (кейс HV900 +13%).
@@ -966,7 +1022,7 @@ export function correctDayToTargets(
           })()
         : _candIterRaw0;
       // P1a-fix2: крем-субкап держим и в least-used фолбэке (иначе 3-й крем оттуда).
-      const _candIter = _creamUses() >= creamMealCap(hv)
+      const _candIter = _creamUses() >= creamMealCap(hv, _tsCap)
         ? (_candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id)).length > 0
             ? _candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id))
             : _candIterRaw)
@@ -1010,16 +1066,16 @@ export function correctDayToTargets(
       // за добавку, ТОЛЬКО HV: иначе корректор растит «крем 250 г» поверх primary 150 г
       // (ведро 400 г). На обычных днях — legacy 200 (иначе 3-приёмные дни не сходятся).
       if (hv && eff === 'c' && (best.carbs || 0) >= 55 && COMFORT_CAP[best.id] === undefined) grams = Math.min(grams, 150);
-      // кап орехов/семян и клетчатки — не превышаем 85г
+      // кап орехов/семян и клетчатки — масштаб цели (_corrNutCap/_corrFiberCap)
       const bestFam = stapleFamilyOf(best.id) || '';
-      if ((bestFam === 'nuts' || bestFam === 'seeds') && currentNutGrams(meals) + grams > 85) {
-        grams = Math.max(0, 85 - currentNutGrams(meals));
+      if ((bestFam === 'nuts' || bestFam === 'seeds') && currentNutGrams(meals) + grams > _corrNutCap) {
+        grams = Math.max(0, _corrNutCap - currentNutGrams(meals));
         if (grams < 15) break;
       }
       // P1b-фикс: кламп — только носителям клетчатки (см. выше: нулевые кандидаты
       // при дне за капом уходили в минус и глушили итерацию целиком).
-      if ((best.fiber || 0) > 0 && currentFiber(meals) + (best.fiber || 0) * grams / 100 > 85) {
-        const fiberRoom = 85 - currentFiber(meals);
+      if ((best.fiber || 0) > 0 && currentFiber(meals) + (best.fiber || 0) * grams / 100 > _corrFiberCap) {
+        const fiberRoom = _corrFiberCap - currentFiber(meals);
         const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, best.fiber || 1) * 100);
         grams = Math.min(grams, maxByFiber);
         if (grams < 15) break;
@@ -1045,7 +1101,9 @@ export function correctDayToTargets(
         .filter(_dupFilter)
         // P1a: MPS-коридор — новый белок не кладём в полный приём (тест F2: второе мясо
         // корректора выбивало обед за 0.62 г/кг; недобор закроют другие приёмы).
-        .filter(m => eff !== 'p' || !_corrFull(m));
+        .filter(m => eff !== 'p' || !_corrFull(m))
+        // D-28: жир-добивка не льётся в ужин «загрузки под утреннюю тренировку» (бюджет ≤8 г).
+        .filter(m => !(eff === 'f' && m.type === 'dinner' && ((m as any).target?.f ?? 99) <= 10));
       // Защита от «завтрака на 2500 ккал»: в уже тяжёлый приём (≥1000 ккал)
       // добивку не льём, пока есть недогруженные альтернативы.
       const _lightFree = _freeMeals.filter(m => (m.totals?.kcal || 0) < 1000);
@@ -1289,7 +1347,7 @@ export function correctDayToTargets(
           if (anchorSet && anchorSet.has(id)) return 3;
           const _fam = stapleFamilyOf(id);
           if (!_fam) return 2;
-          return familyMealCap(_fam, { hv });
+          return familyMealCap(_fam, { hv, ts: _tsCap });
         };
         const _ckPush = (f: FoodItem, g: number, r: string): void => {
           const _rr = g / 100;
@@ -1373,7 +1431,7 @@ export function correctDayToTargets(
               const _bfam = stapleFamilyOf(f.id);
               if (_bfam && _mealFamsCk.has(_bfam)) continue;
               if (_ckFamUses(f.id) >= _ckCapFor(f.id)) continue;
-              if (isCreamId(f.id) && _ckCreamUses() >= creamMealCap(hv)) continue;
+              if (isCreamId(f.id) && _ckCreamUses() >= creamMealCap(hv, _tsCap)) continue;
               _baseCk = f;
               break;
             }
@@ -1472,6 +1530,7 @@ export function correctDayToTargets(
         // сухие крупы — 150 г (только HV), остальные — 600 г.
         const _mergeCap = COMFORT_CAP[newItem.id] !== undefined ? COMFORT_CAP[newItem.id]
           : isProteinPowderId(newItem.id) ? POWDER_PORTION_CAP_G
+          : (newItem.role === 'protein' || newItem.role === 'fast_protein' || newItem.role === 'slow_protein') ? 300
           : (hv && eff === 'c' && (best.carbs || 0) >= 55) ? 150 : 600;
         // P2-фикс: слияние — не убийца цикла (break глотал все оставшиеся итерации).
         if (_dup.amount + newItem.amount > _mergeCap) { _deadBest.add(eff + ':' + best.id); continue; }
@@ -1558,11 +1617,23 @@ export function correctDayToTargets(
         const _deepShortV = (safeTargets.c || 0) > 0 && (safeTargets.c - sumTotals(meals).c) / (safeTargets.c || 1) > 0.10;
         if (!_deepShortV) continue;
       }
+      // D-28: в завтрак рис-гарниры/паста не добираем (build/своп/cocktail гейтят —
+      // plain push тоже обязан; MealTargets-фикс: разблокированный push клал
+      // rice_white в завтрак последним пунктом).
+      if (eff === 'c' && String(targetMeal.type || '') === 'breakfast' && isBreakfastBannedCarb(best.id)) {
+        _deadBest.add(eff + ':' + best.id);
+        continue;
+      }
       targetMeal.items.push(newItem);
       recalcMealTotals(meals);
       const afterTotals = sumTotals(meals);
       const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
-      if (afterDev >= beforeDev - improveGate(beforeDev)) {
+      // MealTargets: push не раздувает приём поверх его цели +15 (зеркало grow-гейта —
+      // иначе P0a-трим к цели приёма срезает раздутый пункт, а день падает).
+      const _mtP = (targetMeal as any).target;
+      const _mealOverT2 = !!(_mtP && _mtP[eff] > 0 &&
+        (((targetMeal as any).totals || ({} as any))[eff] || 0) > _mtP[eff] + 15);
+      if (_mealOverT2 || afterDev >= beforeDev - improveGate(beforeDev)) {
         targetMeal.items.pop();
         recalcMealTotals(meals);
         // P2-фикс: отклонённый push НЕ должен убивать весь цикл итераций (был `break` —

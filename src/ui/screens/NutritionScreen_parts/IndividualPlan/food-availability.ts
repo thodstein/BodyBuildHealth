@@ -141,16 +141,21 @@ export function stapleFamilyOf(id: string): string | null {
  * Один рис под 4 именами (rice/cream/rice_cream/flakes) — всё равно рис:
  * per-id капы его не ловят. Без семейства (null) — только per-id капы.
  */
-export function familyMealCap(fam: string | null, opts?: { hv?: boolean }): number {
+export function familyMealCap(fam: string | null, opts?: { hv?: boolean; ts?: number }): number {
   if (!fam) return Infinity;
-  if (fam === 'oats') return 2;
+  // Масштаб цели (MealTargets): 1161У рисом тремя приёмами не закрыть, 900У — тоже.
+  // Цель дня растягивает семейство: 3 → 4 (цель ≥1.3) → 5 (≥1.5). Без ts — legacy бит-в-бит.
+  const ts = Math.max(1, Math.min(1.6, Number(opts?.ts) || 0));
+  const step = ts >= 1.5 ? 2 : ts >= 1.3 ? 1 : 0;
+  if (fam === 'oats') return 2 + Math.min(1, step);
   // P1a-fix2: HV-дням плотность важнее моно-строгости (900У/9пр тремя рисовыми
   // приёмами не закрыть — движок уходил в фолбэки мимо капа: рис всё равно стоял
   // в 5 приёмах + сходимость −9%). Рису на HV — 4, крему при этом свой субкап 2.
   // P2: рис 4→3 и на HV — «один гарнир в нормальной порции» (капы сухого 120-150)
   // поднимают порции; 4-й рис в дне — монотонность (F1 держит ≤3).
-  if (fam === 'rice') return 3;
-  return 3;
+  // Масштаб цели возвращает ступени: per-ID анти-моно ≤3 остаётся (разные имена риса).
+  if (fam === 'rice') return 3 + step;
+  return 3 + step;
 }
 
 /** Рисовый крем — подкап внутри рисового семейства (жалоба «везде рисовый крем»). */
@@ -223,9 +228,11 @@ export function isMeatProteinId(id: string): boolean {
   if (/whey|casein|isolate|protein_powder|egg|milk|kefir|yogurt|cottage|cheese|creatine|eaa|bcaa/i.test(id)) return false;
   return /chicken|turkey|beef|pork|duck|lamb|veal|tuna|cod|pollock|salmon|trout|shrimp|liver|heart|tongue|pate|sardine|mackerel|venison|rabbit|quail|mintai|tilapia|seafood/i.test(id);
 }
-/** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства). */
-export function creamMealCap(_hv?: boolean): number {
-  return 2;
+/** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства).
+ *  Масштаб цели: 900-1500У крем — главный сухой стейпл, 2 → 3 при цели ≥1.5. */
+export function creamMealCap(_hv?: boolean, ts?: number): number {
+  const _ts = Math.max(1, Math.min(1.6, Number(ts) || 0));
+  return _ts >= 1.5 ? 3 : 2;
 }
 
 /** Сколько приёмов дня уже несут то же семейство гарнира (по id — если семейства нет). */
@@ -295,6 +302,10 @@ export interface DailyQuotaState {
   /** B8 (Эпик B): масштаб грамм-лимитов от веса (80 кг = 1.0, кламп 0.75–1.6).
    *  120+ кг атлет на 5000+ ккал не должен упираться в орехово-масляный потолок 80-кг атлета. */
   weightScale: number;
+  /** Масштаб от ЦЕЛИ дня (dayTargetScale): 900–1500У/500Б растягивают капы семейств —
+   *  иначе фиксированные лимиты 80-кг натурала блокируют реализацию цели
+   *  (рис ≤3 приёмов/день не закрывает 1161У; порошок ≤2 приёма — 500Б). 1.0 = legacy. */
+  targetScale: number;
 }
 
 /** B8: масштаб квот от веса. Без веса/некорректный вес → 1.0 (обратно-совместимо). */
@@ -304,8 +315,26 @@ export function quotaWeightScale(weightKg?: number): number {
   return Math.max(0.75, Math.min(1.6, w / 80));
 }
 
-export function createDailyQuota(weightKg?: number): DailyQuotaState {
-  return { powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0, weightScale: quotaWeightScale(weightKg) };
+/**
+ * Масштаб квот/бюджетов от ЦЕЛИ дня: обычный день (≤3000 ккал) = 1.0 бит-в-бит;
+ * HV-цели (900У/1500У/500Б — 5000–9000 ккал) растягивают до 1.6.
+ * Без цели/некорректная цель → 1.0 (обратно-совместимо, все старые вызовы не меняются).
+ */
+export function dayTargetScale(goalKcal?: number): number {
+  const kcal = Math.max(0, Number(goalKcal) || 0);
+  if (!kcal) return 1;
+  return Math.max(1, Math.min(1.6, kcal / 3000));
+}
+
+/** Ступень приёмных капов от масштаба цели: ≤1.3 → base, ≥1.3 → +1, ≥1.5 → +2 (кламп max). */
+export function quotaMealCap(base: number, targetScale: number, max: number): number {
+  const ts = Math.max(1, Math.min(1.6, Number(targetScale) || 1));
+  const step = ts >= 1.5 ? 2 : ts >= 1.3 ? 1 : 0;
+  return Math.min(max, base + step);
+}
+
+export function createDailyQuota(weightKg?: number, targetScale?: number): DailyQuotaState {
+  return { powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0, weightScale: quotaWeightScale(weightKg), targetScale: Math.max(1, Math.min(1.6, Number(targetScale) || 1)) };
 }
 
 // ── Лимиты (доказательная база: см. план «Профессиональный планировщик») ──
@@ -334,26 +363,32 @@ export const QUOTA_LIMITS = {
 export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string): Set<string> {
   const blocked = new Set<string>();
   // B8: грамм-лимиты масштабируются от веса атлета (приём-лимиты — нет).
+  // Масштаб цели: грамм-лимиты × (вес × цель, кламп 2.0) — 1500У-дню орехи 60 г
+  // не закрывают жировую комнату, а 500Б-дню порошок 2×60 г не даёт белка.
   const sc = (q as DailyQuotaState).weightScale || 1;
-  const nutCapG = Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * sc);
-  const oilCapG = Math.round(QUOTA_LIMITS.maxOilGramsPerDay * sc);
-  const eggCapG = Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * sc);
+  const ts = (q as DailyQuotaState).targetScale || 1;
+  const gramScale = Math.min(2, sc * ts);
+  const nutCapG = Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * gramScale);
+  const oilCapG = Math.round(QUOTA_LIMITS.maxOilGramsPerDay * gramScale);
+  const eggCapG = Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * gramScale);
   // Один слот порошка резервируется под post-workout (трен-день) — перекусы не съедают оба.
-  const _powderCap = nextMealType === 'postworkout' ? QUOTA_LIMITS.maxPowderMeals : QUOTA_LIMITS.maxPowderMeals - 1;
-  if (q.powderMeals >= _powderCap) {
+  const _powderCap = quotaMealCap(QUOTA_LIMITS.maxPowderMeals, ts, 3);
+  const _powderEff = nextMealType === 'postworkout' ? _powderCap : _powderCap - 1;
+  if (q.powderMeals >= _powderEff) {
     for (const id of POWDER_PROTEIN_IDS) blocked.add(id);
   }
-  const familyMealCap = (fam: string) => (fam === 'oats' ? QUOTA_LIMITS.maxOatsFamilyMeals : QUOTA_LIMITS.maxFamilyMeals);
+  const _famCap = quotaMealCap(QUOTA_LIMITS.maxFamilyMeals, ts, 5);
+  const familyMealCap = (fam: string) => (fam === 'oats' ? quotaMealCap(QUOTA_LIMITS.maxOatsFamilyMeals, ts, 3) : _famCap);
   for (const [fam, uses] of q.familyUses) {
-    const cap = fam === 'nuts' || fam === 'seeds' ? QUOTA_LIMITS.maxNutMeals
-      : fam === 'oils' ? QUOTA_LIMITS.maxOilMeals
+    const cap = fam === 'nuts' || fam === 'seeds' ? quotaMealCap(QUOTA_LIMITS.maxNutMeals, ts, 3)
+      : fam === 'oils' ? quotaMealCap(QUOTA_LIMITS.maxOilMeals, ts, 3)
       : familyMealCap(fam);
     if (uses >= cap) markFamilyBlocked(blocked, fam);
   }
   const nutGrams = (q.familyGrams.get('nuts') || 0) + (q.familyGrams.get('seeds') || 0);
   if (nutGrams >= nutCapG) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
   if ((q.familyGrams.get('oils') || 0) >= oilCapG) markFamilyBlocked(blocked, 'oils');
-  if (q.fruitMeals >= QUOTA_LIMITS.maxFruitMeals) blocked.add('__ALL_FRUIT__');
+  if (q.fruitMeals >= quotaMealCap(QUOTA_LIMITS.maxFruitMeals, ts, 5)) blocked.add('__ALL_FRUIT__');
   if (q.eggWhGrams >= eggCapG) blocked.add('egg_whole');
   void nextMealType;
   return blocked;

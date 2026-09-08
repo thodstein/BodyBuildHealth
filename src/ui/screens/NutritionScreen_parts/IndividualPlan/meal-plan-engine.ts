@@ -40,6 +40,7 @@ import {
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
   familyMealCap, familyMealUses, isCreamId, creamMealCap, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
   isCannedFoodId, CANNED_SUBSTITUTE, isFlakeId, isMeatProteinId, mealHasMeatProtein,
+  dayTargetScale, quotaMealCap,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
@@ -1078,6 +1079,9 @@ const _pickCtx: {
   // P2 (типология): число приёмов дня — buildWholeMeal решает по нему legacy MC3
   // (≤4 приёмов × 157У = второй гарнир легитимен). Сброс в начале buildDayPlan.
   mealsCountCtx: number;
+  // MealTargets: масштаб цели дня (900У/1500У/500Б → 1.6) — капы семейств/квоты и
+  // familyMealCap скейлятся им; обычные дни (≤3000 ккал) = 1.0 бит-в-бит.
+  dayTargetScale: number;
   _locked: boolean;
 } = {
   tasteProfile: undefined,
@@ -1098,6 +1102,7 @@ const _pickCtx: {
   dayProtAnchors: [],
   allergenTags: undefined,
   denseDay: false,
+  dayTargetScale: 1,
   _locked: false,
 };
 
@@ -1975,8 +1980,8 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
         const _capOkF = (f: any): boolean => {
           if ((_pickCtx.dayCarbUses.get(f.id) || 0) >= (_anchC.includes(f.id) ? 3 : 2)) return false;
           const _fam = stapleFamilyOf(f.id);
-          if (_fam && ((_famUsesF.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvF }))) return false;
-          if (isCreamId(f.id) && _creamF >= creamMealCap(_hvF)) return false;
+          if (_fam && ((_famUsesF.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvF, ts: _pickCtx.dayTargetScale }))) return false;
+          if (isCreamId(f.id) && _creamF >= creamMealCap(_hvF, _pickCtx.dayTargetScale)) return false;
           return true;
         };
         const capped = pool.filter(_capOkF);
@@ -2031,9 +2036,9 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       const _snackStaple = ['corn_flakes', 'oats_dry', 'cream_of_rice', 'rice_semolina']
         .map((id: string) => FOOD_DB.find((f: any) => f.id === id))
         .filter((f: any) => f
-          && !((_pickCtx.dayCarbFamilyUses.get(stapleFamilyOf(f.id) || '') || 0) >= familyMealCap(stapleFamilyOf(f.id), { hv: _pickCtx.highVolumeDay }))
+          && !((_pickCtx.dayCarbFamilyUses.get(stapleFamilyOf(f.id) || '') || 0) >= familyMealCap(stapleFamilyOf(f.id), { hv: _pickCtx.highVolumeDay, ts: _pickCtx.dayTargetScale }))
           && !((_pickCtx.dayCarbUses.get(f.id) || 0) >= 2)
-          && !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_pickCtx.highVolumeDay)))
+          && !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_pickCtx.highVolumeDay, _pickCtx.dayTargetScale)))
           && foodAvailableForPlan(f) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
       if (_snackStaple.length > 0 && (!carbSource || isSweetCarbId(carbSource.id))) {
         carbSource = _snackStaple[0];
@@ -2212,8 +2217,8 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           const _creamC: number = (_pickCtx as any).dayCreamMeals || 0;
           const _capOkC = (f: any): boolean => {
             const _fam = stapleFamilyOf(f.id);
-            if (_fam && ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvC }))) return false;
-            if (isCreamId(f.id) && _creamC >= creamMealCap(_hvC)) return false;
+            if (_fam && ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) >= familyMealCap(_fam, { hv: _hvC, ts: _pickCtx.dayTargetScale }))) return false;
+            if (isCreamId(f.id) && _creamC >= creamMealCap(_hvC, _pickCtx.dayTargetScale)) return false;
             if (isCreamId(f.id) && items.some((i: any) => isFishId(i.id))) return false;
             return true;
           };
@@ -2275,12 +2280,12 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
             // P1a-fix2: HV-ослабление риса (4) + крем-субкап 2.
             {
               const _famL = stapleFamilyOf(step.id);
-              const _capL = _famL ? familyMealCap(_famL, { hv: _hvDay }) : 2;
+              const _capL = _famL ? familyMealCap(_famL, { hv: _hvDay, ts: _pickCtx.dayTargetScale }) : 2;
               const _usesL = _famL
                 ? (_pickCtx.dayCarbFamilyUses.get(_famL) || 0)
                 : (_pickCtx.dayCarbUses.get(step.id) || 0);
               if (_usesL >= _capL) continue;
-              if (isCreamId(step.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvDay))) continue;
+              if (isCreamId(step.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvDay, _pickCtx.dayTargetScale))) continue;
             }
             if (!_hvDay && step.kind !== 'grain' && step.kind !== 'bake') continue;
             if (step.kind === 'drink') continue;
@@ -2998,6 +3003,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // F1 (Эпик F): г/кг углей дня — для включения второго гарнира на high-carb днях.
   _pickCtx.currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
   _pickCtx.mealsCountCtx = input.mealsCount;
+  // MealTargets: масштаб цели дня (900У/1500У/500Б → 1.6, обычные дни 1.0 бит-в-бит).
+  _pickCtx.dayTargetScale = dayTargetScale(input.goalKcal);
   (_pickCtx as any).dayOffsetCtx = input.dayOffset ?? 0;
   _pickCtx.currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   _pickCtx.dayCarbUses = new Map();
@@ -3459,7 +3466,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (_pPerKg >= 3.0) notes.push(`🥩 Белок ${_pPerKg.toFixed(1)} г/кг — выше потолка Morton 2.2 / сушка 3.1: избыток окислится, держим для сытости и MPS-частоты.`);
     if (_bolusUnits > 0) notes.push(`💉 Инсулин-режим: болюс ${_bolusUnits} ЕД — окна dose×10 г быстрых У закреплены и защищены от коррекций.`);
   }
-  const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
+  // MealTargets (бюджеты = цель дня): на углеводном дне (≥6 г/кг — инсулин/масса)
+  // 20%TEI-пол жира превращался из МИНИМУМА в ОVERRADE (8720 ккал → 194 г жира при
+  // цели 80 г: meal-таргеты жира дня ×2.4, факт +12%). Правило planner-targets:
+  // на фарме кап жира 0.5 г/кг СИЛЬНЕЕ пола. Обычные дни (угли < 6 г/кг) — бит-в-бит.
+  const _carbForwardDay = (adjustedCarbsG || input.goalCarbsG) / Math.max(40, input.weightKg || 80) >= 6;
+  const fatTotal = _carbForwardDay
+    ? Math.max(20, adjustedFatG || input.goalFatG)
+    : Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
   // P2-fix: бюджет перекуса сразу 25г (mTOR порог), а не 15г с добивкой сывороткой — тогда usedP/residualP корректны
@@ -3502,15 +3516,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _mainRoles = _regular.filter(_isMainRole);
   const _snackRoles = _regular.filter(r => !_isMainRole(r) && r !== 'preSleep');
   const _preSleepFixedP = (_keep.has('preSleep') && wantPreSleep) ? 28 : 0;
-  const _regP = Math.max(0, (adjustedProteinG || input.goalProteinG) - periProteinFixed - _preSleepFixedP);
+  // MealTargets: белок болюс-окон заранее вычтен из дневной цели — окна строятся
+  // ПОСЛЕ бюджетов с фиксированными ~20 г белка каждый, и регулярные приёмы их
+  // не знали: 3 окна = +60 г поверх цели, мейны добирали их же (перебор +14-23%).
+  const _windowProteinReserved = _insulinPlanned.length * 20;
+  const _regP = Math.max(0, (adjustedProteinG || input.goalProteinG) - periProteinFixed - _preSleepFixedP - _windowProteinReserved);
+  // UltraP (500Б при 110 кг = выше потолка Morton): best-effort — мейн-бюджет растёт
+  // до 68 г (0.62 г/кг LBM), иначе targets дня −7% и мердж доливает белок в обед,
+  // вытесняя углеводы (У-реализация −23% при живом остатке).
+  const _ultraPBudget = (adjustedProteinG || input.goalProteinG) >= 350 || (adjustedProteinG || input.goalProteinG) / Math.max(40, input.weightKg || 80) >= 3.5;
+  const _mainPCap = _ultraPBudget ? 68 : 55;
   let _mainP = Math.max(25, Math.min(50, Math.round(input.lbmKg * 0.45)));
   let _snkP = Math.max(20, Math.min(35, Math.round(input.lbmKg * 0.30)));
   {
     const _sumP = () => _mainP * _mainRoles.length + _snkP * _snackRoles.length;
+    // MealTargets: полы тоже масштабируются вниз — при целях ниже суммы полов
+    // (160Б на 5 приёмах, 220Б на 10 + окна) фиксированные 22/15 давали перебор
+    // белка ещё в билде (+6-15%), который резать запрещено (MPS).
     let guard = 80;
-    while (_sumP() > _regP && guard-- > 0) { if (_snkP > 15) _snkP--; else if (_mainP > 22) _mainP--; else break; }
+    while (_sumP() > _regP && guard-- > 0) { if (_snkP > 14) _snkP--; else if (_mainP > 18) _mainP--; else break; }
     guard = 80;
-    while (_sumP() < _regP && guard-- > 0) { if (_mainP < 55) _mainP++; else if (_snkP < 40) _snkP++; else break; }
+    while (_sumP() < _regP && guard-- > 0) { if (_mainP < _mainPCap) _mainP++; else if (_snkP < 40) _snkP++; else break; }
   }
   const roleP: Record<string, number> = {};
   for (const r of _regular) {
@@ -3584,7 +3610,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Эпик B: дневные квоты реалистичной тарелки — порошок ≤2 приёма, гарнир-семейство
   // ≤1 приёма (овсянка ≤2), орехи/семена ≤2 приёмов ≤45 г, масла ≤2 приёмов, фрукты ≤3,
   // яйца ≤230 г. Блок-лист вычисляется перед КАЖДЫМ приёмом, после сборки — регистрация.
-  const quota = createDailyQuota(input.weightKg);
+  // MealTargets: квоты скейлятся целью дня (900У/1500У/500Б растягивают капы).
+  const quota = createDailyQuota(input.weightKg, _pickCtx.dayTargetScale);
   // Гейт семейств для пост-сборочных добавок (посадка/omega-fallback): они идут
   // мимо пуловых фильтров — квоты семейств проверяем напрямую. B8: грамм-лимиты ×масштаб веса.
   const _quotaFamilyOk = (id: string): boolean => {
@@ -3592,11 +3619,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (!fam) return true;
     const uses = quota.familyUses.get(fam) || 0;
     const grams = quota.familyGrams.get(fam) || 0;
-    const _sc = quota.weightScale || 1;
-    if (fam === 'nuts' || fam === 'seeds') return uses < QUOTA_LIMITS.maxNutMeals && grams < Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * _sc);
-    if (fam === 'oils') return uses < QUOTA_LIMITS.maxOilMeals && grams < Math.round(QUOTA_LIMITS.maxOilGramsPerDay * _sc);
-    if (fam === 'oats') return uses < QUOTA_LIMITS.maxOatsFamilyMeals;
-    return uses < QUOTA_LIMITS.maxFamilyMeals;
+    const _sc = Math.min(2, (quota.weightScale || 1) * (quota.targetScale || 1));
+    if (fam === 'nuts' || fam === 'seeds') return uses < quotaMealCap(QUOTA_LIMITS.maxNutMeals, quota.targetScale, 3) && grams < Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * _sc);
+    if (fam === 'oils') return uses < quotaMealCap(QUOTA_LIMITS.maxOilMeals, quota.targetScale, 3) && grams < Math.round(QUOTA_LIMITS.maxOilGramsPerDay * _sc);
+    if (fam === 'oats') return uses < quotaMealCap(QUOTA_LIMITS.maxOatsFamilyMeals, quota.targetScale, 3);
+    return uses < quotaMealCap(QUOTA_LIMITS.maxFamilyMeals, quota.targetScale, 5);
   };
   // Д-4: intra-day diversity — foods already used today are deprioritized for subsequent meals
   // (recentFoodIds only covers PREVIOUS days; without this a food can repeat across today's meals).
@@ -4998,7 +5025,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     const _nutG = meals.flatMap(m => m.items).filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
     // B3/B8: единый катчелл-потолок = квота × масштаб веса + запас (было хардкод 70).
-    const _nutCap = nutCatchupCap(quota.weightScale || 1);
+    const _nutCap = nutCatchupCap(Math.min(2, (quota.weightScale || 1) * (quota.targetScale || 1)));
     if (_nutG > _nutCap) {
       const _cutShare = Math.min(0.6, (_nutG - _nutCap) / _nutG);
       for (const m of meals) {
@@ -5482,12 +5509,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // P1a-fix2: HV-ослабление риса (4) + крем-субкап 2.
             if (effWorst === 'c' && _pickCtx.highVolumeDay) {
               const _famP = stapleFamilyOf(cand.id);
-              const _capP = _famP ? familyMealCap(_famP, { hv: true }) : 2;
+              const _capP = _famP ? familyMealCap(_famP, { hv: true, ts: _pickCtx.dayTargetScale }) : 2;
               const _usesP = _famP
                 ? (_pickCtx.dayCarbFamilyUses.get(_famP) || 0)
                 : (_pickCtx.dayCarbUses.get(cand.id) || 0);
               if (_usesP >= _capP) continue;
-              if (isCreamId(cand.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(true))) continue;
+              if (isCreamId(cand.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(true, _pickCtx.dayTargetScale))) continue;
             }
             const _exC = _tm.items.find((x:any) => x.id === cand.id);
             const _capC = carbPortionCap(cand, mealCapScaleOf(_tm));
@@ -5627,7 +5654,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     // Эпик B: орехи/семена и масла ПОСЛЕ посадки (договы идут мимо квот).
     // B3/B8: единые катчелл-потолки (квота × масштаб веса + запас; было 70/30).
-    const _nutCapFinal = nutCatchupCap(quota.weightScale || 1);
+    const _nutCapFinal = nutCatchupCap(Math.min(2, (quota.weightScale || 1) * (quota.targetScale || 1)));
     const _nutGFinal = meals.flatMap(m => m.items).filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
     if (_nutGFinal > _nutCapFinal) {
       const _cut = Math.min(0.55, (_nutGFinal - _nutCapFinal) / _nutGFinal);
@@ -5644,7 +5671,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
-    const _oilCapFinal = oilCatchupCap(quota.weightScale || 1);
+    const _oilCapFinal = oilCatchupCap(Math.min(2, (quota.weightScale || 1) * (quota.targetScale || 1)));
     const _oilGFinal = meals.flatMap(m => m.items).filter(it => stapleFamilyOf(it.id) === 'oils').reduce((s, it) => s + it.amount, 0);
     if (_oilGFinal > _oilCapFinal) {
       const _cut = Math.min(0.6, (_oilGFinal - _oilCapFinal) / _oilGFinal);
@@ -6015,8 +6042,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
                 && (_isLunchDsrt || !_sweetIdsDsrt.has(f.id) || (_sNowDsrt + 50 <= (input.goalCarbsG || 0) * _sCapDsrt))
                 && !(_noFlakesDinner && /flake/i.test(f.id))
                 && _denseUses(f.id) < 2
-                && _denseFamUses(f.id) < familyMealCap(stapleFamilyOf(f.id), { hv: true })
-                && (!isCreamId(f.id) || _denseCreamUses() < creamMealCap(true))
+                && _denseFamUses(f.id) < familyMealCap(stapleFamilyOf(f.id), { hv: true, ts: _pickCtx.dayTargetScale })
+                && (!isCreamId(f.id) || _denseCreamUses() < creamMealCap(true, _pickCtx.dayTargetScale))
                 && !(input.excludedIds && input.excludedIds.has(f.id))
                 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))
                 // v3 portable: в рабочее окно — только портативное (хлопья/хлеб/мёд), не каша/суп.
@@ -6395,7 +6422,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // Не переносим в уже тяжёлый (≥700 г) приём — иначе концентрируем раздув в нём.
             // P1a: овощи/фрукты в завтрак не переносим (типология завтрака без veg — тест D-28 П10).
             const _recs = meals.filter((x: any) => x !== m && !(x as any)._insulinWindow && _flexMeal(x) && _solidOf(x) < MAX_MEAL_SOLID_G
-              && !((it.role === 'veg' || it.role === 'fruit') && (x as any).type === 'breakfast'))
+              // P1a: овощи/фрукты в завтрак не переносим (типология завтрака без veg — тест D-28 П10).
+              // MealTargets: рис-гарниры/паста в завтрак тоже (перенос клал rice_white в завтрак).
+              && !((it.role === 'veg' || it.role === 'fruit') && (x as any).type === 'breakfast')
+              && !((it.role === 'carb_slow' || it.role === 'carb_fast') && (x as any).type === 'breakfast' && isBreakfastBannedCarb(it.id)))
               .map((x: any) => ({ x, room: _roomKcalOf(x) }))
               .filter(x => x.room >= 100)
               .sort((a, b) => b.room - a.room);
@@ -7290,6 +7320,30 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_removed) recalcDayTotals(meals, totals);
     }
 
+    // MealTargets: страховка «порция белка ≤300 г» (тест D-28) — поздние проходы
+    // (посадка-мердж молока в завтрак и т.п.) могли растить белковый пункт сверх капа.
+    // Обрезаем до 300 и честно пересчитываем приём/день.
+    {
+      let _pClamped = false;
+      for (const m of meals) {
+        for (const it of m.items || []) {
+          if ((it as any)._fixedGrams) continue;
+          if (!(it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein')) continue;
+          if ((it.amount || 0) <= 300) continue;
+          const _r = 300 / (it.amount || 1);
+          it.amount = 300;
+          it.p = Math.round((it.p || 0) * _r * 10) / 10;
+          it.f = Math.round((it.f || 0) * _r * 10) / 10;
+          it.c = Math.round((it.c || 0) * _r * 10) / 10;
+          it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
+          if (it.fiber != null) it.fiber = Math.round(it.fiber * _r * 10) / 10;
+          _pClamped = true;
+        }
+        if (_pClamped) m.totals = mealTotalsOf(m.items || []);
+      }
+      if (_pClamped) recalcDayTotals(meals, totals);
+    }
+
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -7314,6 +7368,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.currentCarbGPerKg = 0;
   _pickCtx.highVolumeDay = false;
   _pickCtx.mealsCountCtx = 5;
+  _pickCtx.dayTargetScale = 1;
   (_pickCtx as any).dayOffsetCtx = 0;
   _pickCtx.dayCarbAnchors = [];
   _pickCtx.dayProtAnchors = [];
