@@ -11,8 +11,8 @@ export function mapCourseToSubstances(course: CourseEntry[]): PharmaSubstanceEnt
   return course
     .filter(c => c && typeof c.substanceId === 'string' && c.substanceId.length > 0)
     .map(c => {
-      const meta = PHARMA_DB[c.substanceId];
-      const isOral = meta?.pk?.bioavailability !== undefined && meta.pk.bioavailability < 0.9 && !meta.esters?.length;
+      const meta = PHARMA_DB[c.substanceId] as any;
+      const isOral = Array.isArray(meta?.route) ? meta.route.includes('oral') : meta?.class === 'oral_17aa';
       const wk = weeklyDose(c.doseValue, c.doseUnit, c.frequency);
       return {
         id: c.substanceId,

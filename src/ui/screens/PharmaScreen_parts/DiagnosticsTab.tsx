@@ -150,24 +150,24 @@ export const DiagnosticsTab: React.FC = () => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, marginBottom:10 }}>
           <div>
-            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>HRV (мс)</label>
+            <label style={{ fontSize:11, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>HRV (мс)</label>
             <input type="number" value={hrv} onChange={e => setHrv(parseFloat(e.target.value) || 0)}
-              style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+              style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
           </div>
           <div>
-            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>RHR (уд/мин)</label>
+            <label style={{ fontSize:11, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>RHR (уд/мин)</label>
             <input type="number" value={rhr} onChange={e => setRhr(parseFloat(e.target.value) || 0)}
-              style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+              style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
           </div>
           <div>
-            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>АД сист.</label>
+            <label style={{ fontSize:11, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>АД сист.</label>
             <input type="number" value={bpSys} onChange={e => setBpSys(parseFloat(e.target.value) || 0)}
-              style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+              style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
           </div>
           <div>
-            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>АД диаст.</label>
+            <label style={{ fontSize:11, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>АД диаст.</label>
             <input type="number" value={bpDia} onChange={e => setBpDia(parseFloat(e.target.value) || 0)}
-              style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+              style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
           </div>
         </div>
         <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>

@@ -263,6 +263,21 @@ describe('P0 score-pharma weeks factor', () => {
   });
 });
 
+describe('P0 isOral GH not oral', () => {
+  it('GH should be inject not oral', async () => {
+    const { mapCourseToSubstances } = await import('../../core/course-sync');
+    const course: any[] = [{ substanceId: 'gh', doseValue: 4, doseUnit: 'IU', frequency: 'daily', startWeek: 0, endWeek: 12 }];
+    const mapped = mapCourseToSubstances(course);
+    expect(mapped[0].route).toBe('inject');
+    const course2: any[] = [{ substanceId: 'test_enan', doseValue: 250, doseUnit: 'mg/wk', frequency: '2x/wk', startWeek: 0, endWeek: 12 }];
+    const mapped2 = mapCourseToSubstances(course2);
+    expect(mapped2[0].route).toBe('inject');
+    const oralCourse: any[] = [{ substanceId: 'oxan', doseValue: 30, doseUnit: 'mg/d', frequency: 'daily', startWeek: 0, endWeek: 6 }];
+    const mappedOral = mapCourseToSubstances(oralCourse);
+    expect(mappedOral[0].route).toBe('oral');
+  });
+});
+
 describe('P0 androgenic index normalized', () => {
   it('300 mg test_enan ≈ 1.0, 600 mg ≈ 2.0 (threshold 300)', async () => {
     const { DRUG_THRESHOLDS } = await import('../../core/constants');
