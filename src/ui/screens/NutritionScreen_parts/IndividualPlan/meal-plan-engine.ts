@@ -1943,6 +1943,12 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
         const _fb = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && !/glass|funchose|rice_noodles/.test(f.id) && (f.carbs || 0) >= 20 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
         if (_fb.length >= 1) carbPickPool = _fb.slice(0, 6) as any;
       }
+      // P2 (variety): хлеб как гарнир каждый день давал bread в 7/7 днях —
+      // дневная ротация: каждый 3-й день хлеб исключён из пулов гарнира.
+      if (((_pickCtx as any).dayOffsetCtx ?? 0) % 3 === 2) {
+        const _noBread = carbPickPool.filter((f: any) => !/bread/.test(f.id));
+        if (_noBread.length >= 2) carbPickPool = _noBread;
+      }
     }
     const _carbPickFinal = (() => {
       let pool = carbPickPool;
@@ -2992,6 +2998,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // F1 (Эпик F): г/кг углей дня — для включения второго гарнира на high-carb днях.
   _pickCtx.currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
   _pickCtx.mealsCountCtx = input.mealsCount;
+  (_pickCtx as any).dayOffsetCtx = input.dayOffset ?? 0;
   _pickCtx.currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   _pickCtx.dayCarbUses = new Map();
   _pickCtx.dayCarbFamilyUses = new Map();
@@ -5740,13 +5747,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
-      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags });
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0 });
       // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
       // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
       // Если первый прогон плох — повторяем без lbmKg и берём лучший
       // (монотонно, цена только плохим дням).
       if (_corr.deviationPct > 8 && input.lbmKg) {
-        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags });
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0 });
         if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
           _corr = _corrNoLbm;
           notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);
@@ -7057,10 +7064,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
           m.totals = mealTotalsOf(_its);
         }
-        // 2) овощи — 1 пункт (крупнейший)
+        // 2) овощи — 1 пункт (крупнейший). В перекусах овощи — мусор по типологии
+        // (E7: перекус = протеин + хлопья/крупа + фрукт) — выносим ВСЕ.
+        const _snackTy = String((m as any).type || '').startsWith('snack') || (m as any).type === 'snack';
         const _veg = _its.filter((it: any) => it.role === 'veg');
-        if (_veg.length > 1) {
-          const _keep = [..._veg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0];
+        if (_veg.length > (_snackTy ? 0 : 1)) {
+          const _keep = _snackTy ? null : [..._veg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0];
           for (const _v of _veg) {
             if (_v === _keep) continue;
             const _ix = _its.indexOf(_v);
@@ -7267,6 +7276,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // P2 (variety): хлеб-топ-апы могли попасть мимо дневной ротации — на «безхлебных»
+    // днях (каждый 3-й) выносим хлебные пункты из приёмов окончательно.
+    if (((_pickCtx as any).dayOffsetCtx ?? 0) % 3 === 2) {
+      let _removed = false;
+      for (const m of meals) {
+        const _its2 = m.items || [];
+        for (let _bi = _its2.length - 1; _bi >= 0; _bi--) {
+          if (/bread/.test(String((_its2[_bi] as any).id || ''))) { _its2.splice(_bi, 1); _removed = true; }
+        }
+        if (_removed) m.totals = mealTotalsOf(_its2);
+      }
+      if (_removed) recalcDayTotals(meals, totals);
+    }
+
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -7291,6 +7314,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.currentCarbGPerKg = 0;
   _pickCtx.highVolumeDay = false;
   _pickCtx.mealsCountCtx = 5;
+  (_pickCtx as any).dayOffsetCtx = 0;
   _pickCtx.dayCarbAnchors = [];
   _pickCtx.dayProtAnchors = [];
   (_pickCtx as any).denseDay = false;

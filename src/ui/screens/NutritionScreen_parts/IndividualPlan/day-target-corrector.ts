@@ -1,4 +1,4 @@
-/**
+﻿/**
  * day-target-corrector.ts — единый корректор дневных КБЖУ к целям.
  *
  * Задача: после ВСЕХ порционных капов/полов/квот/санитарий довести день до ≤3%
@@ -141,9 +141,14 @@ function allergenOkCorr(f: { id: string; allergens?: string[] }, allergenTags?: 
   return ![...allergenTags].some(t => tags.includes(t));
 }
 
-function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>): FoodItem[] {
+function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>, daySalt?: number): FoodItem[] {
   const ids = macro === 'p' ? TOPUP_PROTEIN_IDS : macro === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
   let pool = ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !(excludedIds && excludedIds.has(f.id)) && foodAvailableForPlan(f) && allergenOkCorr(f, allergenTags));
+  // P2 (variety): хлеб как топ-ап носитель каждый день давал bread в 7/7 днях —
+  // ротация по дню: каждый 3-й день хлебные топ-апы отключены (семейство ≤5/7).
+  if (macro === 'c' && daySalt !== undefined && daySalt % 3 === 2) {
+    pool = pool.filter(f => !/bread/.test(f.id));
+  }
   // Жидкие peri-носители (декстроза/амилопектин/изотоник/сок) — НИКОГДА не добивка
   // обычных приёмов: только postw/intra/инсулин-окна (отдельные билдеры).
   // Иначе корректор кладёт «декстрозу на завтрак» при недоборе углей.
@@ -162,11 +167,8 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCa
   if (macro === 'c' && pool.length >= 2) {
     if (convenientCarbs) {
       // HV: плотные comfort (пряники/джем) добирают угли без объёма тарелки.
-      // P2: сладости — только если в пуле вообще нет стейпл-носителя (иначе корректор
-      // менял крем на джем 170 г, обходя сладостный кап 55 г).
-      const _hasStaple = pool.some(p => TOPUP_CARB_IDS.includes(p.id));
+      // (P2: своп-пути не ставят сладость ВМЕСТО стейпла — это защита ниже в DENSITY-SWAP.)
       for (const hid of ['pryaniki', 'jam']) {
-        if (_hasStaple) break;
         if (!pool.some(p => p.id === hid) && !(excludedIds && excludedIds.has(hid))) {
           const hf = FOOD_DB.find(f => f.id === hid);
           if (hf && foodAvailableForPlan(hf)) pool.push(hf);
@@ -199,7 +201,7 @@ function currentFiber(meals: CorrectorMeal[]): number {
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; refeedDay?: boolean; budget?: string; allergenTags?: Set<string> },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; refeedDay?: boolean; budget?: string; allergenTags?: Set<string>; daySalt?: number },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
   const maxIter = opts?.maxIter ?? 80;
   const weightKg = opts?.weightKg ?? 80;
@@ -311,7 +313,7 @@ export function correctDayToTargets(
         const over = overs[0];
         const needFor = (f: FoodItem) => under === 'p' ? (f.protein || 0) : under === 'c' ? (f.carbs || 0) : (f.fat || 0);
         const overFor = (f: FoodItem) => over === 'p' ? (f.protein || 0) : over === 'c' ? (f.carbs || 0) : (f.fat || 0);
-        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags).filter(f => needFor(f) > 0);
+        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
           // Углеводы в convenient-режиме: удобство первым (низкая клетчатка) — иначе swap тащит батат.
           const _sortU = [...underPool].sort((a, b) => {
@@ -472,7 +474,7 @@ export function correctDayToTargets(
       const _dC = safeTargets.c - totals.c;
       const _hasOver = (safeTargets.p - totals.p) < -5 || (safeTargets.f - totals.f) < -2 || (safeTargets.c - totals.c) < -5;
         if (_dC > 30 && !_hasOver) {
-        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags).filter(f => (f.carbs || 0) >= 45);
+        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt).filter(f => (f.carbs || 0) >= 45);
         if (_pool.length > 0) {
           let _vMi = -1, _vIi = -1;
           let _vWorst = 0;
@@ -503,7 +505,12 @@ export function correctDayToTargets(
             // Portable-режим: не-портативной заменой рабочее окно не трогаем
             // (иначе фунчоза в офис — регресс D-28 portable).
             const _altsAll = _pool.filter(f => f.id !== _vic.id && !(_isBf && isBreakfastBannedCarb(f.id)));
-            const _alts = (_needPortM(_m) ? _altsAll.filter(f => isPortableFood(f as any)) : _altsAll);
+            // P2: стейпл-жертву не меняем на сладость (джем/пряники — аддитивный топ-ап,
+            // не замена гарнира; иначе полдник терял крем в пользу джема 170 г).
+            const _vicIsSweet = isSweetCarbId(_vic.id);
+            const _altsNoSweet = _vicIsSweet ? _altsAll : _altsAll.filter(f => !isSweetCarbId(f.id));
+            const _altsBase = _altsNoSweet.length > 0 ? _altsNoSweet : _altsAll;
+            const _alts = (_needPortM(_m) ? _altsBase.filter(f => isPortableFood(f as any)) : _altsBase);
             if (_alts.length === 0) {
               // В рабочее окно нечего поставить из портативного — пропускаем блок,
               // а не весь цикл (иначе одна рабочая тарелка стопарит весь корректор).
@@ -849,7 +856,7 @@ export function correctDayToTargets(
         if (Math.abs(need) < 0.3) continue;
       }
       // 2) не нашли куда нарастить — добавляем новый item из пула
-      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags);
+      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt);
       // Сахарный потолок дня — скользящий: 15% база, 20% при ≥1000У, 25% при ≥1300У.
       // Интернет-практика высокоуровневых дней (рис/крем + мёд/джем/финики/сок):
       // 1500У из одних круп — 190У/приём сверх сухих капов, без сахара не закрыть.
