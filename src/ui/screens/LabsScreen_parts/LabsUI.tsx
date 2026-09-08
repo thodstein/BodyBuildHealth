@@ -133,15 +133,15 @@ export const sysPillStyle = (active: boolean, color: string): React.CSSPropertie
 // ── Мини-компоненты ──
 
 export const LabsSectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; right?: React.ReactNode; accent?: string }> = ({ icon, title, subtitle, right, accent = LABS_ACCENT }) => (
-  <div className="labs-sec-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, borderLeft: `3px solid ${accent}`, paddingLeft: 10 }}>
+  <div className="labs-sec-head" style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12, borderLeft:`3px solid ${accent}`, paddingLeft:12 }}>
     <div style={{
-      width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: labsWithAlpha(accent, '18'), border: `1px solid ${labsWithAlpha(accent, '30')}`, color: accent, flexShrink: 0,
-      boxShadow: `0 4px 14px ${labsWithAlpha(accent, '25')}`,
+      width:38, height:38, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center',
+      background: labsWithAlpha(accent, '16'), border:`1px solid ${labsWithAlpha(accent, '28')}`, color: accent, flexShrink:0,
+      boxShadow:`0 6px 18px ${labsWithAlpha(accent, '22')}`,
     }}>{icon}</div>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.1, letterSpacing: -0.2 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 11, color: '#fff', marginTop: 3, lineHeight: 1.4 }}>{subtitle}</div>}
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={{ fontSize:16, fontWeight:800, color:'#fff', lineHeight:1.1, letterSpacing:-0.2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize:12, color:'#fff', marginTop:3, lineHeight:1.5 }}>{subtitle}</div>}
     </div>
     {right}
   </div>
