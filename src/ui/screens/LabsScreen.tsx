@@ -575,9 +575,17 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     } catch (e) { setAddError('Ошибка сохранения: ' + (e instanceof Error ? e.message : String(e))); console.error(e); }
   }, [inputCode, inputValue, inputUnit, inputDate, selectedPhase]);
 
-  // P0 fix: таймаут 30с + лимит 15МБ, иначе виснет на больших PDF
+  // P0 fix: MIME-гейт + 15МБ + 30с таймаут
   const handleFileUpload = useCallback(async (file: File) => {
     const requestId = ++ocrRequestRef.current;
+    const name = (file.name || '').toLowerCase();
+    const type = (file.type || '').toLowerCase();
+    const okType = type.includes('pdf') || type.startsWith('image/') || type.includes('text') || type.includes('csv') || /\.(pdf|png|jpe?g|webp|bmp|gif|txt|csv)$/.test(name);
+    if (!okType) {
+      setOcrLoading(false);
+      setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Неподдерживаемый тип файла'] });
+      return;
+    }
     if (file.size > 15 * 1024 * 1024) {
       setOcrLoading(false);
       setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл слишком большой (>15 МБ)'] });
@@ -2158,16 +2166,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
        )}
       {/* ─── BOTTOM TABS — TOP APK: липкая CTA-панель 52px, safe-area, nowrap ─── */}
       {mainTab === 'lab' && (
-        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:8, overflowX:'auto', padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.85), rgba(12,23,40,0.88))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid rgba(140,190,255,0.14)', scrollbarWidth:'none', boxShadow:'0 -8px 24px rgba(0,0,0,0.35)' }}>
+        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:10, overflowX:'auto', padding:'12px 12px calc(12px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.90), rgba(12,23,40,0.92))', backdropFilter:'blur(22px)', WebkitBackdropFilter:'blur(22px)', borderTop:'1px solid rgba(140,190,255,0.16)', scrollbarWidth:'none', boxShadow:'0 -12px 32px rgba(0,0,0,0.40)' }}>
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
             const active = subTab===t.id;
             return (
               <button key={t.id} onClick={() => setSubTab(t.id)} aria-pressed={active} style={{
-                flex:'0 0 auto', padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', minHeight:44,
-                background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.60)', color: active ? '#0a1a08' : '#fff', border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
-                boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
-                display:'inline-flex', alignItems:'center', gap:6,
-              }}><NativeIcon name={t.icon} size={13} /> {t.label}</button>
+                flex:'0 0 auto', padding:'12px 18px', borderRadius:999, fontSize:13, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', minHeight:48,
+                background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.65)', color: active ? '#0a1a08' : '#fff', border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.16)',
+                boxShadow: active ? '0 8px 22px rgba(var(--labs-accent-rgb, 0,230,138),0.38)' : 'none',
+                display:'inline-flex', alignItems:'center', gap:7,
+              }}><NativeIcon name={t.icon} size={14} /> {t.label}</button>
             );
           })}
         </div>
