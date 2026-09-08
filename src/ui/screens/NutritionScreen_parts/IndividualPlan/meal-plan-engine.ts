@@ -2016,6 +2016,20 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       const _alt = _carbPickFinal.filter((f: any) => !isFlakeId(f.id));
       if (_alt.length > 0) carbSource = pickPriority(_alt, seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds, uniform: _pickCtx.highVolumeDay });
     }
+    // P2 (плотностная маршрутизация, спека «полдник: манка 150 + протеин 60»): в снеках
+    // первичный гарнир — плотная сухая крупа (крем/хлопья/манка), не сладости/варёный
+    // крахмал. Джем/мёд/сухофрукты — десертные топ-апы корректора, не основа приёма.
+    if ((snack || (type || '').startsWith('snack')) && carbG >= 60) {
+      const _snackStaple = ['cream_of_rice', 'corn_flakes', 'rice_semolina', 'oats_dry']
+        .map((id: string) => FOOD_DB.find((f: any) => f.id === id))
+        .filter((f: any) => f && _carbPickFinal.some((x: any) => x.id === f.id)
+          && !((_pickCtx.dayCarbFamilyUses.get(stapleFamilyOf(f.id) || '') || 0) >= familyMealCap(stapleFamilyOf(f.id), { hv: _pickCtx.highVolumeDay }))
+          && !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_pickCtx.highVolumeDay)))
+          && foodAvailableForPlan(f) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
+      if (_snackStaple.length > 0 && (!carbSource || (carbSource.carbs || 0) < 45)) {
+        carbSource = _snackStaple[0];
+      }
+    }
     // Итерация B: вето белкового носителя — углеводный источник не должен нести >75%
     // белковой цели приёма («лепешка 242 г = 20 г белка» при цели 22 г ломает низкобелковые
     // дни; а тортилья GI30 при цели 40 г — хороший носитель, не трогаем). Одна fallback-
