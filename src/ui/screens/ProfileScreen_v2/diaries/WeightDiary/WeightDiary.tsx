@@ -1135,7 +1135,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ ...metricLabel, marginBottom: 0, color: '#34c759', fontWeight: 800 }}>⚡ Быстрый ввод</span>
             <input
-              style={{ ...input, width: 96 }}
+              className="wt-quick-input"
+              style={{ ...input, width: 96, minHeight: 44, fontSize: 16 }}
               type="number" step="0.1" min={isLbs ? 44 : 20} max={isLbs ? 880 : 400}
               placeholder={`Вес, ${wUnit}`}
               value={quickW}
@@ -1151,10 +1152,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   role="radio"
                   aria-checked={quickTod === t}
                   onClick={() => setQuickTod(t)}
+                  className="wt-tod"
                   style={{
                     ...input,
                     width: 88,
-                    minHeight: 38,
+                    minHeight: 44,
                     cursor: 'pointer',
                     textAlign: 'center',
                     border: 'none',
@@ -1170,7 +1172,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               ))}
             </div>
             <button
-              style={{ ...btnPrimary, minHeight: 36 }}
+              className="wt-quick-add"
+              style={{ ...btnPrimary, minHeight: 44 }}
               onClick={quickAdd}
               disabled={!(Number(quickW) > 0 && Number(quickW) <= (isLbs ? 880 : 400))}
             >

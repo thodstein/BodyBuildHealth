@@ -324,14 +324,6 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           borderLeftColor: meta.color,
           borderColor: `${meta.color}44`,
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.4)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
-        }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '26px 16px 20px', gap: 12 }}>
           <div
@@ -378,9 +370,10 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             <button
               onClick={(e) => { e.stopPropagation(); onAdd(); }}
               aria-label={`Добавить запись в дневник ${meta.title}`}
+              className="diary-card-add"
               style={{
                 flex: 1,
-                minHeight: 40,
+                minHeight: 44,
                 padding: '10px 16px',
                 borderRadius: 10,
                 fontSize: 13,
@@ -391,23 +384,16 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                 cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.transform = 'scale(1.02)';
-                e.currentTarget.style.boxShadow = `0 4px 12px ${meta.color}44`;
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
             >
               + Добавить первую запись
             </button>
             <button
               onClick={onOpen}
               aria-label={`Открыть дневник ${meta.title}`}
+              className="diary-card-open"
               style={{
                 flex: 1,
-                minHeight: 40,
+                minHeight: 44,
                 padding: '10px 16px',
                 borderRadius: 10,
                 fontSize: 13,
@@ -417,12 +403,6 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                 border: `1px solid rgba(255,255,255,0.16)`,
                 cursor: 'pointer',
                 transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
               }}
             >
               📋 Открыть дневник
@@ -454,14 +434,6 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             boxShadow: stale
               ? `0 4px 14px ${staleColor}22, 0 2px 8px rgba(0,0,0,0.3)`
               : '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
-          }}
-          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.4)';
-          }}
-          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -535,9 +507,10 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             <button
               onClick={onAdd}
               aria-label={`Добавить запись в дневник ${meta.title}`}
+              className="diary-card-add"
               style={{
                 flex: 1,
-                minHeight: 30,
+                minHeight: 40,
                 padding: '6px 8px',
                 borderRadius: 7,
                 fontSize: 11,
@@ -553,9 +526,10 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             <button
               onClick={onOpen}
               aria-label={`Открыть дневник ${meta.title}`}
+              className="diary-card-open"
               style={{
                 flex: 1,
-                minHeight: 30,
+                minHeight: 40,
                 padding: '6px 8px',
                 borderRadius: 7,
                 fontSize: 11,

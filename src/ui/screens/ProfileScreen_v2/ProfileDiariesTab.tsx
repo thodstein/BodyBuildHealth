@@ -1146,8 +1146,9 @@ const exportAllDiariesPdf = () => {
                         padding: '6px 12px',
                         borderRadius: 9,
                         flexShrink: 0,
-                        minHeight: 32,
+                        minHeight: 44,
                       }}
+                      className="pf-routine-skip"
                     >
                       ⏭ Пропустить
                     </button>
@@ -1155,15 +1156,18 @@ const exportAllDiariesPdf = () => {
                       type="button"
                       onClick={() => setRoutinePersist(null)}
                       aria-label="Отменить лог"
+                      className="pf-routine-x"
                       style={{
                         background: 'transparent',
                         border: 'none',
                         color: '#fbbf24',
                         cursor: 'pointer',
-                        fontSize: 12,
-                        width: 28,
-                        height: 28,
-                        borderRadius: 7,
+                        fontSize: 14,
+                        width: 40,
+                        height: 40,
+                        minWidth: 40,
+                        minHeight: 40,
+                        borderRadius: 10,
                         flexShrink: 0,
                       }}
                     >
@@ -1178,9 +1182,11 @@ const exportAllDiariesPdf = () => {
                         setRoutinePersist({ kind: 'morning', step: 'sleep' });
                         openRoutineStepModal({ kind: 'morning', step: 'sleep' });
                       }}
+                      className="pf-routine-go"
                       style={{
                         flex: 1,
                         minWidth: 180,
+                        minHeight: 48,
                         padding: '10px 12px',
                         borderRadius: 12,
                         cursor: 'pointer',
@@ -1202,9 +1208,11 @@ const exportAllDiariesPdf = () => {
                         setRoutinePersist({ kind: 'evening', step: 'bp' });
                         openRoutineStepModal({ kind: 'evening', step: 'bp' });
                       }}
+                      className="pf-routine-go"
                       style={{
                         flex: 1,
                         minWidth: 150,
+                        minHeight: 48,
                         padding: '10px 12px',
                         borderRadius: 12,
                         cursor: 'pointer',
@@ -1224,6 +1232,7 @@ const exportAllDiariesPdf = () => {
                 )}
                 {/* Темп-цели и streak-карта */}
                 <div
+                  className="pf-streaks"
                   style={{
                     marginTop: 10,
                     display: 'grid',
@@ -1411,13 +1420,14 @@ const exportAllDiariesPdf = () => {
           >
             {/* Sticky quick-jump navigation */}
             <div
-              style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 10,
-                display: 'flex',
-                gap: 4,
-                flexWrap: 'wrap',
+                className="pf-djump"
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  display: 'flex',
+                  gap: 4,
+                  flexWrap: 'wrap',
                 padding: '8px 4px 4px',
                 margin: '-12px -16px 8px',
                 background: 'linear-gradient(180deg, rgba(28,28,32,0.95), rgba(28,28,32,0.7) 80%, transparent)',
@@ -1433,14 +1443,20 @@ const exportAllDiariesPdf = () => {
                   key={d.key}
                   type="button"
                   onClick={() => {
-                    const target = document.querySelector(`[data-diary-key="${d.key}"]`);
-                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    try {
+                      const target = document.querySelector(`[data-diary-key="${d.key}"]`);
+                      if (target && typeof (target as HTMLElement).scrollIntoView === 'function') {
+                        (target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } catch {}
                   }}
                   aria-label={`Перейти к дневнику ${DIARY_META[d.key].title}`}
+                  className="pf-dfilter"
                   style={{
                     flex: '1 1 auto',
                     minWidth: 72,
                     maxWidth: 100,
+                    minHeight: 40,
                     padding: '6px 8px',
                     borderRadius: 8,
                     fontSize: 10,
@@ -1469,16 +1485,18 @@ const exportAllDiariesPdf = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск дневника…"
+                className="pf-dsearch"
                 style={{
                   width: '100%',
                   background: 'rgba(0,0,0,0.3)',
                   border: `1px solid ${colors.border}`,
                   borderRadius: 8,
-                  padding: '8px 30px 8px 10px',
+                  padding: '8px 36px 8px 10px',
                   color: colors.text,
-                  fontSize: 12,
+                  fontSize: 16,
                   outline: 'none',
                   boxSizing: 'border-box',
+                  minHeight: 44,
                 }}
                 aria-label="Поиск дневника"
               />
@@ -1486,6 +1504,7 @@ const exportAllDiariesPdf = () => {
                 <button
                   onClick={() => setSearchQuery('')}
                   aria-label="Очистить поиск"
+                  className="pf-dclear"
                   style={{
                     position: 'absolute',
                     right: 6,
@@ -1496,8 +1515,8 @@ const exportAllDiariesPdf = () => {
                     borderRadius: 6,
                     color: colors.textMuted,
                     cursor: 'pointer',
-                    width: 22,
-                    height: 22,
+                    width: 30,
+                    height: 30,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

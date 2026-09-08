@@ -898,7 +898,10 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                 style={{ ...chip, fontSize: 11 }}
                 onClick={() => {
                   const id = label === 'График' ? 'sleep-chart' : label === 'Хитмап' ? 'sleep-calendar' : label === 'Тренды' ? 'sleep-trends' : label === 'Инсайты' ? 'sleep-insights' : 'sleep-table';
-                  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  try {
+                    const el = document.getElementById(id);
+                    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } catch {}
                 }}
               >
                 {icon} {label}

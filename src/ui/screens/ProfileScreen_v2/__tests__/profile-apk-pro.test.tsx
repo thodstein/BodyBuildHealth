@@ -110,6 +110,47 @@ describe('Profile §85 — PVE-попап: хуки и тач-цели', () => {
   });
 });
 
+describe('Profile §86 — тело дневников: рутинг, фильтры, поиск', () => {
+  it('кнопки рутинга 48px, пропуск 44, закрытие 40', async () => {
+    const { ProfileDiariesTab } = await import('../ProfileDiariesTab');
+    const { container, getByText, getByLabelText, queryByLabelText } = render(<ProfileDiariesTab />);
+    const go = getByText(/Утренний лог/) as HTMLElement;
+    expect(go.className).toContain('pf-routine-go');
+    expect(go.style.minHeight).toBe('48px');
+    expect((getByText(/Вечерний лог/) as HTMLElement).style.minHeight).toBe('48px');
+    // Пропуск/закрытие видны только при активном рутинге — стартуем его.
+    expect(queryByLabelText('Отменить лог')).toBeNull();
+    fireEvent.click(go);
+    expect((getByText(/Пропустить/) as HTMLElement).style.minHeight).toBe('44px');
+    expect((getByLabelText('Отменить лог') as HTMLElement).style.minHeight).toBe('40px');
+    expect(container.querySelector('.pf-streaks')).not.toBeNull();
+    cleanup();
+  });
+
+  it('поиск 16px/44px, фильтры 40px', async () => {
+    const { ProfileDiariesTab } = await import('../ProfileDiariesTab');
+    const { container, getByLabelText } = render(<ProfileDiariesTab />);
+    const search = getByLabelText('Поиск дневника') as HTMLInputElement;
+    expect(search.style.fontSize).toBe('16px');
+    expect(search.style.minHeight).toBe('44px');
+    const filters = container.querySelectorAll('.pf-dfilter');
+    expect(filters.length).toBeGreaterThan(0);
+    filters.forEach(f => expect((f as HTMLElement).style.minHeight).toBe('40px'));
+    cleanup();
+  });
+
+  it('DiaryCard: быстрые действия 40px+ с хуками', async () => {
+    const { DiaryCard } = await import('../diary-ui');
+    const noop = () => {};
+    const { container } = render(
+      <DiaryCard diaryKey="sleep" count={5} last="сегодня" daysSinceLast={1} loggedToday={false} onAdd={noop} onOpen={noop} history={[]} />,
+    );
+    expect((container.querySelector('.diary-card-add') as HTMLElement).style.minHeight).toBe('40px');
+    expect((container.querySelector('.diary-card-open') as HTMLElement).style.minHeight).toBe('40px');
+    cleanup();
+  });
+});
+
 describe('Profile §83 — отчёты', () => {
   it('табы 44px и переключаются', () => {
     // initialView blocks: не монтируем ReportsScreen (IndexedDB-шум jsdom).
