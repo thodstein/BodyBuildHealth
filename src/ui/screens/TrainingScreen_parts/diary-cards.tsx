@@ -173,7 +173,7 @@ export const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({
     { label: 'Тоннаж', actual: actualTonnage, target: targets.tonnage, unit: 'кг', color: '#a855f7', key: 'tonnage' as const },
   ];
   return (
-    <div style={style.card}>
+    <div className="wt-card" style={style.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={style.label}>🎯 Цели недели</div>
         <span style={{ fontSize: 9, color: '#fff' }}>Эта неделя</span>
@@ -399,7 +399,7 @@ export const WarmupRampCard: React.FC = () => {
   const [wuWeight, setWuWeight] = useState(100);
   const ramp = activeRampRows(wuWeight);
   return (
-    <div style={style.card}>
+    <div className="wr-card" style={style.card}>
       <div style={style.label}>🔥 Разминочная рампа</div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Автоподбор разминки по рабочему весу (единый канон: гриф×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1)</div>
       <div style={{ marginBottom: 6 }}>

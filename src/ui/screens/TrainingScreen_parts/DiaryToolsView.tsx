@@ -147,7 +147,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           </div>
           {/* Workout templates from history — мемоизировано (не пересобираем на каждый ввод) */}
           {templatesMemo.length > 0 && (
-              <div style={style.card}>
+              <div className="tl-templates" style={style.card}>
                 <div style={style.label}>📋 Шаблоны из дневника</div>
                 <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Повторить тренировку из прошлого</div>
                 {templatesMemo.map(([key, t], i) => (
@@ -168,7 +168,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 ))}
               </div>
             )}
-          <div style={style.card}>
+          <div className="tl-reports" style={style.card}>
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>📄 Отчёты</div>
             <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => {
@@ -274,7 +274,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           </div>
           {/* Хранилище: диагностика дублей + импорт/экспорт веса (Google Fit мост) */}
-          <div style={style.card}>
+          <div className="tl-storage" style={style.card}>
             <div style={style.label}>🧹 Хранилище: дубли и вес</div>
             <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
               Поиск одинаковых тренировок (дата + контент) и синхронизация веса с внешними приложениями.
@@ -363,7 +363,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           </div>
           {/* JSON Full Backup */}
-          <div style={style.card}>
+          <div className="tl-backup" style={style.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div style={style.label} >💾 Полный бэкап</div>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)' }}>

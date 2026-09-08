@@ -17,6 +17,7 @@ import { readManualFlags, manualVirtualLog } from '../TrainingCalendarTab';
 import { WarmupDiaryView } from '../WarmupDiaryView';
 import { CooldownDiaryView } from '../CooldownDiaryView';
 import { DiaryProgressView } from '../DiaryProgressView';
+import { csvImportParsers } from '../CsvImportTab';
 import { MindsetTab } from '../MindsetTab';
 import { MobilityTab } from '../MobilityTab';
 import { loadCheckins, buildPresetProtocol, upsertProtocol, setActiveProtocol } from '../../../../engines/mindset-protocol.engine';
@@ -320,5 +321,28 @@ describe('weekdayMon0 — день недели по локальному кал
       const [y, m, day] = d.split('-').map(Number);
       expect(weekdayMon0(d)).toBe((new Date(y, m - 1, day).getDay() + 6) % 7);
     }
+  });
+});
+
+describe('csvImportParsers — без потерь и мусора', () => {
+  it('hevy: вес 0 (свой вес) сохраняется, пустые поля — пусто, а не undefined', () => {
+    const out = csvImportParsers.parseHevy(JSON.stringify([
+      { start_time: '2026-09-08T10:00:00Z', exercises: [{ title: 'Подтягивания', sets: [{ weight_kg: 0, reps: 10 }] }] },
+    ]));
+    const row = out.split('\n')[1];
+    expect(row).toContain(',0,10,');
+    expect(out).not.toContain('undefined');
+  });
+  it('strong/mesomorph: 0 и пропуски без undefined', () => {
+    const s = csvImportParsers.parseStrong(JSON.stringify([
+      { Date: '2026-09-08', Exercises: [{ Name: 'Жим', Sets: [{ WeightKg: 0, Reps: 5 }] }] },
+    ]));
+    expect(s.split('\n')[1]).toContain(',0,5,');
+    const m = csvImportParsers.parseMesomorph(JSON.stringify({ date: '2026-09-08', exercises: [{ name: 'Тяга', sets: [{ weight: 60 }] }] }));
+    expect(m).not.toContain('undefined');
+  });
+  it('csvName: запятая в названии — в кавычки', () => {
+    expect(csvImportParsers.csvName('Жим, лёжа')).toBe('"Жим, лёжа"');
+    expect(csvImportParsers.csvName('Жим')).toBe('Жим');
   });
 });

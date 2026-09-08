@@ -73,7 +73,8 @@ function parseHevy(json: string): string {
       if (!date) return;
       (wo.exercises || []).forEach((ex: any) => {
         (ex.sets || []).forEach((s: any, si: number) => {
-          lines.push([date, ex.title || ex.name || 'Упражнение', si + 1, s.weight_kg || s.weight, s.reps, s.rpe || '', ''].join(','));
+          // ?? вместо ||: вес 0 (свой вес) — валиден и не должен теряться.
+          lines.push([date, csvName(ex.title || ex.name || 'Упражнение'), si + 1, s.weight_kg ?? s.weight ?? '', s.reps ?? '', s.rpe ?? '', ''].join(','));
         });
       });
     });
@@ -93,7 +94,7 @@ function parseStrong(json: string): string {
       if (!date) return;
       (wo.Exercises || wo.exercises || []).forEach((ex: any) => {
         (ex.Sets || ex.sets || []).forEach((s: any, si: number) => {
-          lines.push([date, ex.Name || ex.name || 'Упражнение', si + 1, s.WeightKg ?? s.weight ?? s.weight_kg, s.Reps ?? s.reps, String(s.RPE ?? s.rpe ?? ''), String(s.RIR ?? s.rir ?? '')].join(','));
+          lines.push([date, csvName(ex.Name || ex.name || 'Упражнение'), si + 1, s.WeightKg ?? s.weight ?? s.weight_kg ?? '', s.Reps ?? s.reps ?? '', String(s.RPE ?? s.rpe ?? ''), String(s.RIR ?? s.rir ?? '')].join(','));
         });
       });
     });
@@ -113,7 +114,7 @@ function parseMesomorph(json: string): string {
       if (!date) return;
       (wo.exercises || wo.Exercises || []).forEach((ex: any) => {
         (ex.sets || ex.Sets || []).forEach((s: any, si: number) => {
-          lines.push([date, ex.name || ex.Name || ex.title || 'Упражнение', si + 1, s.weight || s.WeightKg || s.weight_kg || s.Weight, s.reps || s.Reps, s.rpe || s.RPE || '', s.rir || s.RIR || ''].join(','));
+          lines.push([date, csvName(ex.name || ex.Name || ex.title || 'Упражнение'), si + 1, s.weight ?? s.WeightKg ?? s.weight_kg ?? s.Weight ?? '', s.reps ?? s.Reps ?? '', s.rpe ?? s.RPE ?? '', s.rir ?? s.RIR ?? ''].join(','));
         });
       });
     });
@@ -122,6 +123,14 @@ function parseMesomorph(json: string): string {
     throw new Error('Mesomorph JSON parse error: ' + e.message);
   }
 }
+
+/** Имя упражнения в CSV: кавычки при запятых/кавычках, иначе запятая рвёт колонки. */
+export function csvName(name: unknown): string {
+  const s = String(name ?? 'Упражнение');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export const csvImportParsers = { parseHevy, parseStrong, parseMesomorph, csvName };
 
 export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
   const [text, setText] = useState('');
@@ -148,7 +157,7 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
     <div className="train-csvimport" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>📥 Импорт тренировок</div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+      <div className="ci-format" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         {FORMATS.map(f => (
           <button key={f.id} onClick={() => { setFormat(f.id); setResult(null); }}
             style={{
@@ -179,7 +188,7 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
       </div>
 
       {result && (
-        <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: result.importedSessions > 0 ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', border: '1px solid ' + (result.importedSessions > 0 ? 'rgba(0,230,138,0.25)' : 'rgba(239,68,68,0.25)') }}>
+        <div className="ci-result" style={{ marginTop: 10, padding: 12, borderRadius: 10, background: result.importedSessions > 0 ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', border: '1px solid ' + (result.importedSessions > 0 ? 'rgba(0,230,138,0.25)' : 'rgba(239,68,68,0.25)') }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: result.importedSessions > 0 ? ACCENT : '#ef4444' }}>
             {result.importedSessions > 0 ? `✅ Импортировано: ${result.importedSessions} сессий, ${result.importedSets} сетов` : '⚠ Ничего не импортировано'}
           </div>

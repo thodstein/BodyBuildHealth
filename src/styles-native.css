@@ -7033,6 +7033,131 @@ html.app-native .train-diaryanalytics .ta-expert:focus-visible {
   }
 }
 
+/* ─── 83. TRAINING DIARY PRO-8 — импорт, цели, рампа, инструменты ───
+ * Форматы/поле импорта 44px+, цели недели и рампа под палец,
+ * шаблоны/отчёты/хранилище/бэкап — стекло и CTA, привычки читаемее.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Импорт: форматы-лента, поле 14px mono, кнопки 48px ── */
+html.app-native .hub-diary .train-csvimport {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px) !important;
+}
+
+html.app-native .hub-diary .train-csvimport .ci-format {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+}
+
+html.app-native .hub-diary .train-csvimport .ci-format::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .hub-diary .train-csvimport .ci-format button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 16px !important;
+  flex: 0 0 auto !important;
+}
+
+html.app-native .hub-diary .train-csvimport textarea {
+  min-height: 160px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .hub-diary .train-csvimport button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .hub-diary .train-csvimport .ci-result {
+  border-radius: 16px !important;
+  padding: 14px !important;
+}
+
+/* ── Цели недели: инпуты под палец, бары толще ── */
+html.app-native .hub-diary .wt-card {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+html.app-native .hub-diary .wt-card input {
+  min-height: 44px !important;
+  min-width: 56px !important;
+  border-radius: 10px !important;
+  font-size: 14px !important;
+}
+
+/* ── Разминочная рампа: поле 48px, строки 12px ── */
+html.app-native .hub-diary .wr-card {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+html.app-native .hub-diary .wr-card input {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+/* ── Инструменты: секции-стекло, строки и CTA ── */
+html.app-native .hub-diary .train-diarytools .tl-templates,
+html.app-native .hub-diary .train-diarytools .tl-reports,
+html.app-native .hub-diary .train-diarytools .tl-storage,
+html.app-native .hub-diary .train-diarytools .tl-backup {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .hub-diary .train-diarytools .tl-templates button,
+html.app-native .hub-diary .train-diarytools .tl-reports button,
+html.app-native .hub-diary .train-diarytools .tl-storage button,
+html.app-native .hub-diary .train-diarytools .tl-backup button,
+html.app-native .hub-diary .train-diarytools .tl-backup label {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── Привычки: добор читаемости ветки ── */
+html.app-native .hub-diary .hab-week [style*='font-size: 8px'] {
+  font-size: 10px !important;
+}
+
+html.app-native .hub-diary .hab-week [style*='font-size: 9px'] {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .hub-diary .hab-week [style*='font-size: 10px'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* Фокус новых зон */
+html.app-native .hub-diary .train-csvimport button:focus-visible,
+html.app-native .hub-diary .train-csvimport textarea:focus-visible,
+html.app-native .hub-diary .wt-card input:focus-visible,
+html.app-native .hub-diary .wt-card button:focus-visible,
+html.app-native .hub-diary .wr-card input:focus-visible,
+html.app-native .hub-diary .train-diarytools .tl-templates button:focus-visible,
+html.app-native .hub-diary .train-diarytools .tl-backup button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-diary .train-csvimport button:active {
+    transform: none !important;
+  }
+}
+
 /* ─── 80. TRAINING DIARY PRO-5 — ритуалы: психика/мобильность/чек-ин/MMC ───
  * Чек-ины/шкалы/настроение под палец (было 36px и мельче), поля 48px/16px,
  * карточки-стекло с акцентной кромкой по смыслу, добор читаемости.
