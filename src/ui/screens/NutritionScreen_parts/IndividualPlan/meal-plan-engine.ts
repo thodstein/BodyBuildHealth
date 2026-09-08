@@ -6989,6 +6989,77 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── P2 (типология): ЧИСТКА МУСОРА — финальный проход перед MPS-коридором ───
+    // Жалоба «в плане много мусора» (300У): дегустационные обрезки (хлеб 32 г, орехи 18 г),
+    // два овоща в одной тарелке, второе мясо-фулл-порция рядом с первым. Низкоуглеводные
+    // дни собирают много мелочи, потому что остаток ккал добивается чем угодно.
+    // 1) пункты <30 г (кроме добавок/жиров-носителей/преслипа) — долой, их ккал шум;
+    // 2) овощи — максимум 1 пункт на приём (крупнейший);
+    // 3) два целых мяса в мейне — меньшее вливается в большее по белку (тарелка «одно мясо»).
+    {
+      for (const m of meals) {
+        if ((m as any)._insulinWindow || String((m as any).type || '') === 'presleep') continue;
+        const _its = m.items || [];
+        // 1) мелочь <30 г: БЕЛОК НЕ МУСОР (MPS), только углеводные/овощные/фруктовые обрезки
+        const _smallCut = _its.filter((it: any) => !(it as any)._fixedGrams
+          && it.role !== 'supplement' && it.role !== 'liquid'
+          && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
+          && !(it.role === 'fat' && (it.amount || 0) <= 20)
+          && (it.amount || 0) < 30);
+        if (_smallCut.length > 0) {
+          for (const _sc of _smallCut) {
+            const _ix = _its.indexOf(_sc);
+            if (_ix >= 0) _its.splice(_ix, 1);
+          }
+          m.totals = mealTotalsOf(_its);
+        }
+        // 2) овощи — 1 пункт (крупнейший)
+        const _veg = _its.filter((it: any) => it.role === 'veg');
+        if (_veg.length > 1) {
+          const _keep = [..._veg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0];
+          for (const _v of _veg) {
+            if (_v === _keep) continue;
+            const _ix = _its.indexOf(_v);
+            if (_ix >= 0) _its.splice(_ix, 1);
+          }
+          m.totals = mealTotalsOf(_its);
+        }
+        // 3) два целых мяса в мейне — меньшее вливается в большее (белок дня цел).
+        // Только при явном переборе белка дня (иначе MPS-коридор дальше сносит
+        // меньшее мясо сам и день недобирает −10% — «чистка хуже мусора»).
+        if (['breakfast', 'lunch', 'dinner'].includes(String((m as any).type || ''))
+          && totals.p > (input.goalProteinG || 0) + 8) {
+          const _meats = _its.filter((it: any) => (it.role === 'protein' || it.role === 'slow_protein' || it.role === 'fast_protein')
+            && isMeatProteinId(it.id) && !(it as any)._fixedGrams && (it.amount || 0) >= 30);
+          if (_meats.length > 1) {
+            const _sorted = [..._meats].sort((a: any, b: any) => (b.p || 0) - (a.p || 0));
+            const _big = _sorted[0];
+            const _fdB = FOOD_DB.find((f: any) => f.id === _big.id);
+            for (let _k = 1; _k < _sorted.length; _k++) {
+              const _sm = _sorted[_k];
+              const _pMove = _sm.p || 0;
+              const _per = (_fdB?.protein || 0) / 100;
+              if (!(_per > 0)) break;
+              const _gAdd = Math.round(_pMove / _per / 5) * 5;
+              if ((_big.amount || 0) + _gAdd > 350) break;
+              const _ix = _its.indexOf(_sm);
+              if (_ix >= 0) _its.splice(_ix, 1);
+              const _r = ((_big.amount || 0) + _gAdd) / Math.max(1, _big.amount || 1);
+              _big.amount = (_big.amount || 0) + _gAdd;
+              _big.f = +((_big.f || 0) * _r).toFixed(1);
+              _big.c = +((_big.c || 0) * _r).toFixed(1);
+              _big.fiber = Math.round(((_big.fiber || 0) * _r) * 10) / 10;
+              _big.p = Math.round(_big.p + _pMove * 10) / 10;
+              _big.kcal = Math.round(4 * _big.p + 9 * _big.f + 4 * _big.c);
+              m.totals = mealTotalsOf(_its);
+            }
+          }
+        }
+      }
+      recalcMealTotals(meals);
+      recalcDayTotals(meals, totals);
+    }
+
     // ─── P1a: MPS-коридор — финальный инвариант (тест F2) ───
     // Каскад доводит ДЕНЬ, но концентрирует белок в одном приёме (обед 48 г при коридоре
     // 45.8: второе мясо корректора + белки гарнира/овощей). Здесь, ПОСЛЕ всех доборов:
@@ -7006,12 +7077,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (_mp <= _capP) continue;
           const _meats = (m.items || []).filter((it: any) => it.role === 'protein' && !(it as any)._fixedGrams && !isProteinPowderId(it.id));
           // Шаг 1: меньшие мяса — целиком (остаток не ниже коридора −8 г).
+          // P2: НЕ убираем, если белок дня упадёт ниже goal −5% (коридор — эстетика CV,
+          // сходимость дня важнее: был кейс «лосось убран → день −10% белка»).
           if (_meats.length >= 2) {
             const _smalls = [..._meats].sort((a: any, b: any) => (a.p || 0) - (b.p || 0)).slice(0, -1);
             for (const _d of _smalls) {
               if (_mp <= _capP) break;
               if ((_d.p || 0) <= 0) continue;
               if (_mp - (_d.p || 0) < _capP - 8) continue;
+              if (totals.p - (_d.p || 0) < (input.goalProteinG || 0) * 0.95) continue;
               const _ix = (m.items || []).indexOf(_d);
               if (_ix >= 0) (m.items as any[]).splice(_ix, 1);
               _mp = Math.round((_mp - (_d.p || 0)) * 10) / 10;
