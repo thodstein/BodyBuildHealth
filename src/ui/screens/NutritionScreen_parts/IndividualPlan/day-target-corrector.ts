@@ -251,6 +251,11 @@ export function correctDayToTargets(
 
   const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
   let _dbgN = 0;
+  // P2: кандидаты, у которых не нашлось места для размещения (все приёмы закрыты
+  // типологией), запоминаем — следующая итерация пробует следующего, а не умирает
+  // (раньше `break` на первом же неразмещаемом кандидате глотал до 80 итераций
+  // и оставлял simple/minimal дни на −14-18% — доказано DBG-трассой dK=252 после 2 итераций).
+  const _deadBest = new Set<string>();
   for (let iter = 0; iter < maxIter; iter++) {
     // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор ДО сведения КБЖУ.
     // ВАЖНО: тримим ТОЛЬКО при переборе ккал или в норме — при недоборе ккал срезка углеводов
@@ -959,6 +964,7 @@ export function correctDayToTargets(
             : _candIterRaw)
         : _candIterRaw;
       for (const cand of _candIter) {
+        if (_deadBest.has(eff + ':' + cand.id)) continue;
         if (isProteinPowderId(cand.id)) {
           const _roomAny = meals.some(m => {
             if (!_eligibleTypes(m)) return false;
@@ -1058,7 +1064,21 @@ export function correctDayToTargets(
           // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
           // приёме; второй — только десерт в обед (пряник/джем/мёд/финики ≤60 после
           // мяса). Рост существующего — без лимита. Legacy MC3 — большой приём ≥100У.
-          if (!_legacyFewC && _carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && !_dsrtOkC) return false;
+          if (!_legacyFewC && _carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && !_dsrtOkC) {
+            // Relief-клапан (P2): при структурном недоборе дня (>8% углей и >40 г) приём
+            // может взять ВТОРОЙ СУХОЙ плотный носитель ИЗ ДРУГОГО семейства (хлеб+рис,
+            // крем+паста) — иначе узкопуловые (simple/minimal: 5 продуктов) и HV-дни
+            // стоят на стене «1 гарнир» и теряют 10-18% углей навсегда (DBG: dK=252
+            // после 2 итераций). Обычные дни (недобор <8%) — типология «1 гарнир» целая.
+            const _dayDefC = safeTargets.c - sumTotals(meals).c;
+            const _dryDense = ['cream_of_rice', 'corn_flakes', 'bread_white', 'whole_grain_bread', 'bread_fitness', 'pasta_durum', 'rice_semolina', 'cream_rice', 'rice_white', 'oats_dry'];
+            const _famB2 = stapleFamilyOf((best as FoodItem).id);
+            const _famDiff = !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === _famB2);
+            const _canSecond = _dayDefC > Math.max(40, (safeTargets.c || 0) * 0.08)
+              && _dryDense.includes((best as FoodItem).id) && _famDiff
+              && (m.totals?.c || 0) < ((m as any).target?.c || 0) * 1.25;
+            if (!_canSecond) return false;
+          }
           if (_carbs >= 1 && !m.items.some(it => it.id === (best as FoodItem).id) && ((m as any).target?.c || 0) < 100) return false;
           if ((m.type === 'breakfast' || /Завтрак/i.test(m.label || '')) && isBreakfastBannedCarb((best as FoodItem).id)) return false;
           // PRO-типология: сладость — не добивка в основные приёмы (печенье в обед — мусор).
@@ -1081,7 +1101,7 @@ export function correctDayToTargets(
           if (isHeavyAnimalFat(_b.id)) return false;
           return true;
         });
-        if (_pickFrom.length === 0) break;
+        if (_pickFrom.length === 0) { _deadBest.add(eff + ':' + (best as FoodItem).id); continue; }
         // P1a-fix2: добивка — не второе семейство в тот же приём («рис + крем»).
         // Рост существующего пункта — можно. Если все свободные уже несут семейство —
         // фолбэк к ним (сходимость важнее).
