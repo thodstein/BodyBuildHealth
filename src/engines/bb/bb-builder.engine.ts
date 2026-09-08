@@ -135,8 +135,8 @@ export interface BBBuilderInput {
   abPatternRotation?: boolean;
   /** Packing-v2 (opt-in): заливка упражнений до индивидуальных капов
    *  (терпеливые 6 / средние 5 / фикс 3–4) вместо ровного дележа.
-   *  Мышцы — PACKING_MUSCLES (спина/грудь/ягодицы; квадры/хамсы исключены
-   *  доказанно — их аддитивные гарантии дерутся со сбросами).
+   *  Мышцы — PACKING_MUSCLES (спина/грудь; ноги исключены доказанно —
+   *  любое изменение формы флиппует MEV-фидеры через косвенный микс).
    *  Недельный объём цел (меняется только нарезка). Дефолт выкл. */
   packingV2?: boolean;
   /** Интенсивность тренинга — управляет отдыхом/плотностью/восстановлением:
@@ -2497,8 +2497,8 @@ function buildSession(
     if (isArmOrShoulder && remainingBudget < minBudgetForArms) {
       remainingBudget = minBudgetForArms;
     }
-    // Packing-v2 (opt-in, пилот back): заливка до индивидуальных капов
-    // вместо ровного дележа. Скипы (legacy): weak/focus/spec-цель,
+    // Packing-v2 (opt-in): заливка до индивидуальных капов вместо ровного
+    // дележа (мышцы — PACKING_MUSCLES). Скипы (legacy): weak/focus/spec-цель,
     // градированные замены (vPct), не-accumulation/intensification.
     // Объём инвариантен: сумма розданных сетов = pl.sets ровно.
     // Spec-цель (weak/focus — специализация их и покрывает): объёмную
@@ -2526,9 +2526,11 @@ function buildSession(
       if (packedSets) packingUsedHere = true;
       // Фаза сброса (план v2): убрать хвостовые упражнения, перелив их сеты
       // в терпеливые головы в пределах капов. Объём инвариантен; guards —
-      // лид, locked, mandated (PPL-мандаты: финализатор докинул бы их обратно
-      // с 4 сетами), sole-паттерн, sole-strict-группа.
-      // Квадры в PPL держат минимум 3 (иначе финализатор добавит выпады).
+      // лид, locked, mandated (PPL-мандаты груди: финализатор докинул бы их
+      // обратно с 4 сетами), sole-паттерн, sole-strict-группа.
+      // Только спина/грудь: у ног любое изменение формы флиппует MEV-фидеры
+      // через косвенный микс (quads +3, hams +1 слот, glutes +4 — всё докидки
+      // гарантий, доказано дампами), поэтому ноги вне PACKING_MUSCLES.
       if (packedSets) {
         const dropItems = pl.exDatas.map(d => ({
           pattern: packingPatternOf(d as any),
@@ -2546,7 +2548,7 @@ function buildSession(
           packCaps.map(c => c.cap),
           packCaps.map(c => c.noPack),
           dropItems,
-          (pl.muscle === 'quads' && isPPL) ? 3 : 2,
+          2,
           dropMandated,
         );
         if (dropped) {
