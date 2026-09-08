@@ -74,4 +74,37 @@ describe('WeeklyRiskChart mode', () => {
     fireEvent.click(dots[2] as HTMLElement);
     expect(fn).toHaveBeenCalledWith(2);
   });
+
+  it('4. выбранная дальняя неделя при ужатом курсе клампится (10 → нед.3)', () => {
+    const { container } = render(
+      <WeeklyRiskChart
+        dynamics={DYNAMICS}
+        selectedWeek={10}
+        onWeekSelect={() => {}}
+        mode="week"
+        onModeChange={() => {}}
+      />,
+    );
+    expect(container.textContent).toContain('Нед. 3');
+  });
+
+  it('5. точки доступны: role=button и подпись недели', () => {
+    const { container } = render(
+      <WeeklyRiskChart
+        dynamics={DYNAMICS}
+        selectedWeek={0}
+        onWeekSelect={() => {}}
+        mode="week"
+        onModeChange={() => {}}
+      />,
+    );
+    const dots = Array.from(container.querySelectorAll('span')).filter(
+      (s) => (s as HTMLElement).style.borderRadius === '50%',
+    );
+    expect(dots.length).toBe(3);
+    for (const d of dots) {
+      expect((d as HTMLElement).getAttribute('role')).toBe('button');
+      expect((d as HTMLElement).getAttribute('aria-label')).toMatch(/Неделя \d/);
+    }
+  });
 });

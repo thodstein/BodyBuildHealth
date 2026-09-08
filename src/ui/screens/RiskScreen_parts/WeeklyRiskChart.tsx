@@ -46,7 +46,11 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
   const rawPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(d.overallRaw)}`).join(' ');
   const netPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(d.overallNet)}`).join(' ');
 
-  const activePoint = displayWeek != null && displayWeek >= 0 && displayWeek < data.length ? data[displayWeek] : null;
+  // NOTE: курс могли укоротить при выбранной дальней неделе — клампим только
+  // отображение (состояние родителя не трогаем), иначе подсветка и карточка
+  // пропадали/уезжали за график.
+  const safeWeek = displayWeek != null ? Math.min(Math.max(0, displayWeek), data.length - 1) : null;
+  const activePoint = safeWeek != null ? data[safeWeek] : null;
 
   return (
     <div className="card risk-weekly-chart" style={{ padding: 16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)', boxShadow:'0 12px 30px rgba(0,0,0,0.20)' }}>
@@ -109,12 +113,12 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
         ))}
 
         {/* Selected week highlight */}
-        {displayWeek != null && displayWeek >= 0 && displayWeek < data.length && (
+        {safeWeek != null && (
           <>
-            <line x1={toX(displayWeek)} y1={pad.top} x2={toX(displayWeek)} y2={pad.top + ch}
+            <line x1={toX(safeWeek)} y1={pad.top} x2={toX(safeWeek)} y2={pad.top + ch}
               stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 3" opacity={0.4} />
-            <circle cx={toX(displayWeek)} cy={toY(data[displayWeek].overallNet)} r={7} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
-            <circle cx={toX(displayWeek)} cy={toY(data[displayWeek].overallRaw)} r={5} fill="none" stroke="#ef4444" strokeWidth={2} />
+            <circle cx={toX(safeWeek)} cy={toY(data[safeWeek].overallNet)} r={7} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+            <circle cx={toX(safeWeek)} cy={toY(data[safeWeek].overallRaw)} r={5} fill="none" stroke="#ef4444" strokeWidth={2} />
           </>
         )}
 
@@ -129,7 +133,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
         <span style={{ fontSize:12, fontWeight:800, color:'#fff', whiteSpace:'nowrap', minWidth:30, textAlign:'right' }}>
           {data.length > 0 ? `1` : ''}
         </span>
-        <input type="range" min={0} max={Math.max(0, data.length - 1)} value={displayWeek ?? 0}
+        <input type="range" min={0} max={Math.max(0, data.length - 1)} value={safeWeek ?? 0}
           onChange={e => {
             const idx = Number(e.target.value);
             onWeekSelect(idx);
@@ -140,16 +144,19 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
           {data.length > 0 ? `${data.length}` : ''}
         </span>
       </div>
-      <div style={{ display:'flex', justifyContent:'space-between', padding:'0 2px', marginTop:2 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0 2px', marginTop:2, minHeight:28 }}>
         {data.slice(0, Math.min(7, data.length)).map((d, i) => {
           // NOTE: короткий курс (<7 нед): точка на каждую неделю. Раньше формула
           // round((len-1)*i/6) давала дубли (при 3 неделях — [0,0,1]) и последняя
           // неделя была недостижима через точки.
           const idx = data.length <= 7 ? i : Math.round((data.length - 1) * i / 6);
           return (
-            <span key={i} onClick={() => { onWeekSelect(idx); setHoverWeek(null); }} style={{
-              width:6, height:6, borderRadius:'50%', cursor:'pointer',
-              background: displayWeek === idx ? 'var(--accent)' : 'rgba(255,255,255,0.12)',
+            <span key={i} role="button" tabIndex={0} aria-label={`Неделя ${data[idx] ? data[idx].week : idx + 1}`}
+              onClick={() => { onWeekSelect(idx); setHoverWeek(null); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onWeekSelect(idx); setHoverWeek(null); } }} style={{
+              width:10, height:10, borderRadius:'50%', cursor:'pointer', flexShrink:0,
+              background: safeWeek === idx ? 'var(--accent)' : 'rgba(255,255,255,0.12)',
+              boxShadow: safeWeek === idx ? '0 0 8px var(--accent)' : 'none',
               transition:'all 0.2s',
             }} />
           );
