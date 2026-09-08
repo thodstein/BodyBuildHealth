@@ -1868,6 +1868,7 @@ export const BbAutoConstructor: React.FC = () => {
           fewerCompound,
           allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
           rotationMode,
+          abPatternRotation: abRotation,
           intensityLevel,
           equipment: bbEquipment,
           peds,

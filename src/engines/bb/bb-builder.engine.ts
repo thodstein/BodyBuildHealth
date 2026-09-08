@@ -845,7 +845,7 @@ function collapseKey(muscle: string): string {
  *  2-3 паттернах на мышцу второй сессии оставались бы объедки и срабатывал
  *  фолбэк на полный пул (ротации фактически не было). Возвращает [] — пула
  *  хватает всегда (один паттерн из пула не выводит). */
-function abDominantPattern(patterns: string[] | undefined): string[] {
+export function abDominantPattern(patterns: string[] | undefined): string[] {
   if (!patterns || patterns.length === 0) return [];
   const counts = new Map<string, number>();
   for (const p of patterns) counts.set(p, (counts.get(p) || 0) + 1);

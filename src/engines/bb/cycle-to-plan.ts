@@ -6,7 +6,7 @@
  */
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
-import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern } from './bb-builder.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -18,7 +18,7 @@ import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-pl
 import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName, type SessionMethodology } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
-import { trueMuscleOf } from '../movement-pattern';
+import { trueMuscleOf, derivePattern } from '../movement-pattern';
 import { loadSRPESessions } from '../pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
@@ -393,6 +393,10 @@ export interface CycleToPlanInput {
   equipment?: string[];
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
   mode?: 'faithful' | 'adapt';
+  /** A/B-ротация паттернов (opt-in): только adapt — sibling-сессии получают
+   *  stash avoid, weak-гарантии/фидеры финализатора его уважают. В faithful
+   *  флаг игнится (цикл дословно). Без флага — legacy 1-в-1. */
+  abPatternRotation?: boolean;
   /** Единая методика порядка упражнений для всех BB-источников. */
   methodology?: SessionMethodology;
   /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
@@ -825,6 +829,36 @@ function classifyAngle(exName: string): string {
 /**
  * Convert an SRCycleTemplate (BB cycle with concrete exercises) to a full BBPlan.
  */
+/**
+ * Строгий A/B для cycle/program adapt-путей (выбора упражнений там нет —
+ * состав задаёт источник): sibling-сессии одного тега получают stash avoid
+ * (доминантный паттерн предыдущих сессий тега недели). Weak-гарантии и
+ * фидеры финализатора его уважают (финализатор копирует сессии
+ * поверхностно — поле переживает). Только adapt; faithful дословно.
+ */
+export function stashAbAvoidForWeekSessions(weeks: Array<{ sessions?: any[] }>): void {
+  for (const week of weeks) {
+    const seen = new Map<string, string[]>();
+    for (const sess of week.sessions || []) {
+      const tag = (sess as any).sessionTag || '';
+      const prev = seen.get(tag) || [];
+      if (prev.length > 0) {
+        const dom = abDominantPattern(prev);
+        if (dom.length > 0) (sess as any).abAvoidPatterns = [...dom];
+      }
+      const pats: string[] = [];
+      for (const ex of (sess as any).exercises || []) {
+        if ((ex as any).warmupActivator) continue;
+        try {
+          const p = derivePattern({ name: (ex as any).name || (ex as any).exerciseName, group: (ex as any).muscle, type: (ex as any).type, targetMuscle: (ex as any).muscle, muscle: (ex as any).muscle } as any);
+          if (p && p !== 'unknown') pats.push(p);
+        } catch { /* одно упражнение не ломает неделю */ }
+      }
+      seen.set(tag, [...prev, ...pats]);
+    }
+  }
+}
+
 export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const {
     cycle, workMax: inputWorkMax, peds = [], pedDoses, courseIntensity,
@@ -1299,6 +1333,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     }
   }
 
+  // Строгий A/B (adapt-only; faithful дословно — флаг игнится).
+  if (mode === 'adapt' && input.abPatternRotation) stashAbAvoidForWeekSessions(finalPlan.weeks);
+
   const finalized = finalizeBBPlan({
     ...finalPlan,
     volumeLandmarks,
@@ -1430,6 +1467,10 @@ export interface ProgramToBBPlanOpts {
   specializationSchedule?: SpecializationBlock[];
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
   mode?: 'faithful' | 'adapt';
+  /** A/B-ротация паттернов (opt-in): только adapt — sibling-сессии получают
+   *  stash avoid, weak-гарантии/фидеры финализатора его уважают. В faithful
+   *  флаг игнится (программа дословно). Без флага — legacy 1-в-1. */
+  abPatternRotation?: boolean;
   /** Единая методика порядка упражнений для всех BB-источников. */
   methodology?: SessionMethodology;
   trainingFocus?: BBTrainingFocus;
@@ -2231,6 +2272,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
+  // Строгий A/B (adapt-only; faithful дословно — флаг игнится).
+  if (mode === 'adapt' && opts.abPatternRotation) stashAbAvoidForWeekSessions(finalPlan.weeks);
+
   const finalized = finalizeBBPlan({
     ...finalPlan,
     volumeLandmarks,

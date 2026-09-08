@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { validateBBPlan } from '../bb-validator.engine';
+import { convertCycleToBBPlan, programToBBPlan } from '../cycle-to-plan';
+import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import type { FullProgram } from '../../complete-program-library.engine';
 
 /* ═══════════════════════════════════════════════════════════════════
  * Строгий A/B (флаг вкл = выбор пользователя за ротацию):
@@ -104,5 +107,104 @@ describe('Строгий A/B: avoid stashится и уважается', () => 
     expect(chestSets).toBeGreaterThan(0);
     const v = validateBBPlan(on, { level: 'intermediate' });
     expect(v.issues.filter(i => i.code === 'effective_mrv_overflow')).toHaveLength(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+ * A/B в cycle/program adapt-путях (выбора упражнений там нет — состав
+ * задаёт источник): флаг stash'ит avoid на sibling-сессии, финализатор
+ * его уважает. Faithful дословно — флаг игнится (паритет без флага).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+const AB_CYCLE: SRCycleTemplate = {
+  meta: {
+    id: 'test-ab-cycle', title: 'AB cycle', direction: 'bodybuilding', level: 'intermediate', period: 'mass',
+    sessionsPerWeek: 3, weeks: 1, correctionPct: 0,
+  },
+  week1: [
+    { exercises: [
+      { name: 'Жим штанги лёжа', group: 'Грудь', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.7, reps: 8, sets: 3, rir: 2 }] },
+      { name: 'Французский жим лёжа', group: 'Трицепс', coef: 1, mnosz: 1, load: 'Лёгкая', sets: [{ pct: 0.5, reps: 12, sets: 2, rir: 3 }] },
+    ] },
+    { exercises: [
+      { name: 'Жим гантелей лёжа', group: 'Грудь', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.7, reps: 8, sets: 3, rir: 2 }] },
+      { name: 'Разгибание рук на блоке', group: 'Трицепс', coef: 1, mnosz: 1, load: 'Лёгкая', sets: [{ pct: 0.5, reps: 12, sets: 2, rir: 3 }] },
+    ] },
+    { exercises: [
+      { name: 'Присед со штангой', group: 'Ноги', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.7, reps: 8, sets: 3, rir: 2 }] },
+    ] },
+  ],
+};
+
+function abProgram(): FullProgram {
+  const day = (d: number, exs: Array<[string, number, string]>) => ({
+    day: d, name: `День ${d}`, focus: d === 3 ? 'legs' : 'chest', warmup: '',
+    exercises: exs.map(([name, sets, reps]) => ({ name, sets, reps, rir: 2 })),
+  });
+  return {
+    id: 'test-ab-program', name: 'AB program', author: 'test', type: 'bodybuilding', goal: 'bodybuilding',
+    direction: 'bodybuilding', level: 'intermediate', durationWeeks: 1, daysPerWeek: 3, sessionTimeMin: '60',
+    description: '', targetAudience: '', equipmentNeeded: [],
+    weeks: [{ week: 1, phase: 'accumulation', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+      day(1, [['Жим штанги лёжа', 3, '8'], ['Французский жим лёжа', 2, '12']]),
+      day(2, [['Жим гантелей лёжа', 3, '8'], ['Разгибание рук на блоке', 2, '12']]),
+      day(3, [['Присед со штангой', 3, '8']]),
+    ] }],
+    progressionModel: '', deloadProtocol: '', customization: [], warnings: [], expectedResults: '',
+  };
+}
+
+/** Группировка сессий недели по тегу; возвращает первый тег с 2+ сессиями. */
+function siblingPair(plan: any): [any, any] {
+  const byTag = new Map<string, any[]>();
+  for (const s of plan.weeks[0].sessions) {
+    const t = (s as any).sessionTag || '';
+    byTag.set(t, [...(byTag.get(t) || []), s]);
+  }
+  for (const [, arr] of byTag) {
+    if (arr.length >= 2) return [arr[0], arr[1]];
+  }
+  throw new Error('нет sibling-сессий одного тега: ' + [...byTag.keys()].join(','));
+}
+
+describe('A/B в cycle/program adapt-путях', () => {
+  it('adapt cycle + флаг: sibling несёт stash, план валиден', () => {
+    const plan = convertCycleToBBPlan({ cycle: AB_CYCLE, workMax: WM, level: 'intermediate', mode: 'adapt', abPatternRotation: true } as any);
+    const [first, second] = siblingPair(plan);
+    expect(((first as any).abAvoidPatterns || []).length).toBe(0);
+    expect(((second as any).abAvoidPatterns || []).length).toBeGreaterThanOrEqual(1);
+    const v = validateBBPlan(plan, { level: 'intermediate' });
+    expect(v.issues.filter(i => i.level === 'error')).toHaveLength(0);
+  });
+
+  it('faithful cycle + флаг: stash нигде (флаг игнится, дословно)', () => {
+    const plan = convertCycleToBBPlan({ cycle: AB_CYCLE, workMax: WM, level: 'intermediate', mode: 'faithful', abPatternRotation: true } as any);
+    for (const s of plan.weeks[0].sessions) {
+      expect(((s as any).abAvoidPatterns || []).length).toBe(0);
+    }
+  });
+
+  it('adapt program + флаг: sibling несёт stash, план валиден', () => {
+    const plan = programToBBPlan(abProgram(), { workMax: WM, level: 'intermediate', mode: 'adapt', abPatternRotation: true } as any);
+    const [first, second] = siblingPair(plan);
+    expect(((first as any).abAvoidPatterns || []).length).toBe(0);
+    expect(((second as any).abAvoidPatterns || []).length).toBeGreaterThanOrEqual(1);
+    const v = validateBBPlan(plan, { level: 'intermediate' });
+    expect(v.issues.filter(i => i.level === 'error')).toHaveLength(0);
+  });
+
+  it('faithful program + флаг: stash нигде (флаг игнится, дословно)', () => {
+    const plan = programToBBPlan(abProgram(), { workMax: WM, level: 'intermediate', mode: 'faithful', abPatternRotation: true } as any);
+    for (const s of plan.weeks[0].sessions) {
+      expect(((s as any).abAvoidPatterns || []).length).toBe(0);
+    }
+  });
+
+  it('adapt без флага: stash нигде (legacy 1-в-1)', () => {
+    const c = convertCycleToBBPlan({ cycle: AB_CYCLE, workMax: WM, level: 'intermediate', mode: 'adapt' } as any);
+    const p = programToBBPlan(abProgram(), { workMax: WM, level: 'intermediate', mode: 'adapt' } as any);
+    for (const s of [...c.weeks[0].sessions, ...p.weeks[0].sessions]) {
+      expect(((s as any).abAvoidPatterns || []).length).toBe(0);
+    }
   });
 });
