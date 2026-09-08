@@ -263,15 +263,22 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             };
             return (
               <>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>📋 Действующий план поддержки</div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: {level?.label || supportLevel}</div>
-
-                {/* Режимы плана: раньше включались только из модалки, которую ничто не открывало */}
-                <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap', alignItems:'center' }}>
-                  {jointMode && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🦴 Суставы</span>}
-                  {boostEnabled && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#fca5a5' }}>🔥 Усиление</span>}
-                  <button onClick={() => setShowModal('intel')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>⚙️ Уровень и режимы</button>
-                  <button onClick={() => setShowModal('weekSelect')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>📅 Неделя {courseWeekState ?? '—'}</button>
+                {/* Шапка плана: уровень, состав, режимы и управление — одним взглядом */}
+                <div style={{ borderRadius:16, padding:'12px 14px', marginBottom:10, background:'linear-gradient(135deg, rgba(0,230,138,0.09), rgba(0,0,0,0.22))', border:'1px solid rgba(0,230,138,0.20)', boxShadow:'0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:'-0.2px' }}>📋 Действующий план поддержки</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Уровень: {level?.label || supportLevel} · {subs.length} препаратов</div>
+                    </div>
+                    <span style={{ fontSize:16, fontWeight:800, color:'#00e68a', background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.25)', padding:'6px 10px', borderRadius:12, flexShrink:0 }}>{subs.length}</span>
+                  </div>
+                  {/* Режимы плана: раньше включались только из модалки, которую ничто не открывало */}
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    {jointMode && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🦴 Суставы</span>}
+                    {boostEnabled && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#fca5a5' }}>🔥 Усиление</span>}
+                    <button onClick={() => setShowModal('intel')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>⚙️ Уровень и режимы</button>
+                    <button onClick={() => setShowModal('weekSelect')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>📅 Неделя {courseWeekState ?? '—'}</button>
+                  </div>
                 </div>
 
                 {/* Action buttons */}
