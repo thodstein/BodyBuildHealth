@@ -259,7 +259,7 @@ export function exportTrendsToCSV(report: LabTrendReport): string {
     const escape = (v: any) => {
       if (v === undefined || v === null) return '';
       const s = String(v);
-      return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r') ? `"${s.replace(/"/g, '""')}"` : s;
     };
     return [
       escape(t.code),

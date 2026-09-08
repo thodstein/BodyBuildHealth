@@ -88,16 +88,16 @@ export const LabsOverview: React.FC<{
       <div style={{ ...LABS_CARD, padding:14 }}>
         <LabsSectionHeader icon={<NativeIcon name="file" size={16} />} title="Сводка по фазе" subtitle={`${labs.length} маркеров • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
         <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
-          <LabsKpiCard icon={<NativeIcon name="flask" size={13} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
-          <LabsKpiCard icon={<NativeIcon name="check" size={13} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
-          <LabsKpiCard icon={<NativeIcon name="arrowUp" size={13} />} label="Выше" value={highCount} color="#ef4444" sub="нормы" />
-          <LabsKpiCard icon={<NativeIcon name="arrowDown" size={13} />} label="Ниже" value={lowCount} color="#f97316" sub="нормы" />
+          <LabsKpiCard icon={<NativeIcon name="flask" size={14} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
+          <LabsKpiCard icon={<NativeIcon name="check" size={14} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
+          <LabsKpiCard icon={<NativeIcon name="arrowUp" size={14} />} label="Выше" value={highCount} color="#ef4444" sub="нормы" />
+          <LabsKpiCard icon={<NativeIcon name="arrowDown" size={14} />} label="Ниже" value={lowCount} color="#f97316" sub="нормы" />
         </div>
         {labs.length>0 && (
-          <div style={{ marginTop:10, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999, overflow:'hidden', display:'flex' }}>
-            <div style={{ width:`${pctNormal}%`, background:'#22c55e', transition:'width 0.4s' }} />
-            <div style={{ width:`${labs.length? Math.round(highCount/labs.length*100):0}%`, background:'#ef4444' }} />
-            <div style={{ width:`${labs.length? Math.round(lowCount/labs.length*100):0}%`, background:'#f97316' }} />
+          <div style={{ marginTop:12, height:8, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden', display:'flex', boxShadow:'inset 0 1px 2px rgba(0,0,0,0.2)' }}>
+            <div style={{ width:`${pctNormal}%`, background:'linear-gradient(90deg, #22c55e, #16a34a)', transition:'width 0.4s' }} />
+            <div style={{ width:`${labs.length? Math.round(highCount/labs.length*100):0}%`, background:'linear-gradient(90deg, #ef4444, #dc2626)' }} />
+            <div style={{ width:`${labs.length? Math.round(lowCount/labs.length*100):0}%`, background:'linear-gradient(90deg, #f97316, #ea580c)' }} />
           </div>
         )}
         {abnormalCount>0 && (
