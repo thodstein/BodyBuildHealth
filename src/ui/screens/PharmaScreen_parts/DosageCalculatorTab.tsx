@@ -200,9 +200,12 @@ export const DosageCalculatorTab: React.FC = () => {
     if (!drug) return;
     const baseMg = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
     const perInjectionMg = baseMg / Math.max(1, injectionsPerWeek);
+    const doseUnitRaw = (PHARMA_DB[drug]?.dosageRange?.unit || 'mg/wk').split('/')[0].trim().toLowerCase();
     const dose = calculateDose({
       targetDoseMg: perInjectionMg,
+      targetDoseUnit: doseUnitRaw,
       concentrationMgPerMl: concentration,
+      concentrationUnit: 'mg/ml',
       roundingStepMl: 0.01,
       syringeVolumeMl: syringeMl,
       vialVolumeMl: vialMl,

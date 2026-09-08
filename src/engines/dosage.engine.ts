@@ -6,7 +6,21 @@ export function calculateDose(req: DoseRequest): DoseResult {
   const flags: string[] = [];
   let dose = req.targetDoseMg ?? 0;
   if (req.bodyWeightKg && req.targetDosePerKg) dose = req.targetDosePerKg * req.bodyWeightKg;
-  const conc = req.concentrationMgPerMl;
+  // Unit conversion: doseUnit vs concentrationUnit (mg vs mcg vs IU)
+  const doseUnit = String((req as any).targetDoseUnit || 'mg').toLowerCase();
+  const concUnit = String((req as any).concentrationUnit || 'mg/ml').toLowerCase();
+  let doseMg = dose;
+  if (doseUnit.includes('mcg') || doseUnit.includes('µg') || doseUnit.includes('ug')) doseMg = dose / 1000;
+  else if (doseUnit === 'g' || doseUnit.includes('g/')) doseMg = dose * 1000;
+  else if (doseUnit.includes('iu')) {
+    // IU not convertible to mg without substance-specific factor; flag mismatch if conc is mg/ml
+    if (concUnit.includes('mg')) flags.push('unit_mismatch_iu_vs_mg');
+  }
+  let concMgMl = req.concentrationMgPerMl;
+  if (concUnit.includes('mcg')) concMgMl = concMgMl / 1000;
+  else if (concUnit.includes('g/') && !concUnit.includes('mg')) concMgMl = concMgMl * 1000;
+  dose = doseMg;
+  const conc = concMgMl;
   if (dose <= 0 || !conc || typeof conc !== 'number' || conc <= 0) {
     flags.push('invalid_input');
     return { volumeMl: 0, divisions: 0, dosesPerVial: 0, flags };

@@ -231,3 +231,20 @@ describe('P0 lab-pharma inverted thresholds', () => {
     expect(lhAlert?.actualStatus).toBe('low');
   });
 });
+
+describe('P0 dosage unit conversion', () => {
+  it('clen 100 mcg vs 100 mg gives 1000x different volume', async () => {
+    const { calculateDose } = await import('../dosage.engine');
+    const volMcg = calculateDose({ targetDoseMg: 100, targetDoseUnit: 'mcg', concentrationMgPerMl: 250, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10, roundingStepMl: 0.0001 });
+    const volMg = calculateDose({ targetDoseMg: 100, targetDoseUnit: 'mg', concentrationMgPerMl: 250, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10, roundingStepMl: 0.0001 });
+    // Engine rounds to 3 decimals, so 0.0004 -> 0.000
+    expect(volMcg.volumeMl).toBeLessThan(0.001);
+    expect(volMg.volumeMl).toBeCloseTo(0.4, 3);
+    expect(volMcg.volumeMl).toBeLessThan(volMg.volumeMl / 10);
+  });
+  it('GH IU vs mg mismatch flags', async () => {
+    const { calculateDose } = await import('../dosage.engine');
+    const r = calculateDose({ targetDoseMg: 4, targetDoseUnit: 'IU', concentrationMgPerMl: 10, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10 });
+    expect(r.flags).toContain('unit_mismatch_iu_vs_mg');
+  });
+});

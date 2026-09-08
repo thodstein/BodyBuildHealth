@@ -6,9 +6,11 @@ export type DoseResponse = 'linear' | 'sigmoid';
 
 export interface DoseRequest {
   targetDoseMg?: number;
+  targetDoseUnit?: string;
   bodyWeightKg?: number;
   targetDosePerKg?: number;
   concentrationMgPerMl: number;
+  concentrationUnit?: string;
   roundingStepMl?: number;
   syringeVolumeMl: number;
   vialVolumeMl?: number;
