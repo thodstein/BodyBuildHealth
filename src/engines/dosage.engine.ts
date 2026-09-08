@@ -10,15 +10,30 @@ export function calculateDose(req: DoseRequest): DoseResult {
   const doseUnit = String((req as any).targetDoseUnit || 'mg').toLowerCase();
   const concUnit = String((req as any).concentrationUnit || 'mg/ml').toLowerCase();
   let doseMg = dose;
+  const subId = String((req as any).substanceId || '').toLowerCase();
+  const isInsulin = subId.includes('ins_') || subId === 'insulin' || subId.includes('insulin');
   if (doseUnit.includes('mcg') || doseUnit.includes('µg') || doseUnit.includes('ug')) doseMg = dose / 1000;
   else if (doseUnit === 'g' || doseUnit.includes('g/')) doseMg = dose * 1000;
   else if (doseUnit.includes('iu')) {
-    // IU not convertible to mg without substance-specific factor; flag mismatch if conc is mg/ml
-    if (concUnit.includes('mg')) flags.push('unit_mismatch_iu_vs_mg');
+    if (concUnit.includes('mg')) {
+      // GH: 1 mg ≈ 3 IU, инсулин: 1 IU ≈ 0.0347 mg
+      const iuToMg = isInsulin ? 0.0347 : 0.333;
+      doseMg = dose * iuToMg;
+    } else if (concUnit.includes('iu')) {
+      // both IU → no conversion, keep IU as is (volume = IU / IU/ml)
+      doseMg = dose;
+    } else {
+      flags.push('unit_mismatch_iu_vs_mg');
+    }
   }
   let concMgMl = req.concentrationMgPerMl;
   if (concUnit.includes('mcg')) concMgMl = concMgMl / 1000;
   else if (concUnit.includes('g/') && !concUnit.includes('mg')) concMgMl = concMgMl * 1000;
+  else if (concUnit.includes('iu') && doseUnit.includes('mg')) {
+    // mg dose vs IU/ml conc → convert conc IU/ml to mg/ml
+    const iuToMg = isInsulin ? 0.0347 : 0.333;
+    concMgMl = concMgMl * iuToMg;
+  }
   dose = doseMg;
   const conc = concMgMl;
   if (dose <= 0 || !conc || typeof conc !== 'number' || conc <= 0) {

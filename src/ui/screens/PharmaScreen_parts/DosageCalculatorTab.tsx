@@ -207,6 +207,7 @@ export const DosageCalculatorTab: React.FC = () => {
     const dose = calculateDose({
       targetDoseMg: perInjectionMg,
       targetDoseUnit: doseUnitRaw,
+      substanceId: drug,
       concentrationMgPerMl: concentration,
       concentrationUnit: 'mg/ml',
       roundingStepMl: 0.01,

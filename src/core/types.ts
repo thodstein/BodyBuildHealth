@@ -7,6 +7,7 @@ export type DoseResponse = 'linear' | 'sigmoid';
 export interface DoseRequest {
   targetDoseMg?: number;
   targetDoseUnit?: string;
+  substanceId?: string;
   bodyWeightKg?: number;
   targetDosePerKg?: number;
   concentrationMgPerMl: number;

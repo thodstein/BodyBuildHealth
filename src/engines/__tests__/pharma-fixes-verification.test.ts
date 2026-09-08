@@ -247,10 +247,14 @@ describe('P0 dosage unit conversion', () => {
     expect(volMg.volumeMl).toBeCloseTo(0.4, 3);
     expect(volMcg.volumeMl).toBeLessThan(volMg.volumeMl / 10);
   });
-  it('GH IU vs mg mismatch flags', async () => {
+  it('GH IU vs mg converts (4 IU ≈1.33 mg → 0.133 ml)', async () => {
     const { calculateDose } = await import('../dosage.engine');
-    const r = calculateDose({ targetDoseMg: 4, targetDoseUnit: 'IU', concentrationMgPerMl: 10, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10 });
-    expect(r.flags).toContain('unit_mismatch_iu_vs_mg');
+    const r = calculateDose({ targetDoseMg: 4, targetDoseUnit: 'IU', substanceId: 'gh', concentrationMgPerMl: 10, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10, roundingStepMl: 0.01 });
+    expect(r.volumeMl).toBeCloseTo(0.133, 2);
+    expect(r.flags).not.toContain('unit_mismatch_iu_vs_mg');
+    const r2 = calculateDose({ targetDoseMg: 4, targetDoseUnit: 'IU', substanceId: 'unknown_peptide', concentrationMgPerMl: 10, concentrationUnit: 'mg/ml', syringeVolumeMl: 1, vialVolumeMl: 10, roundingStepMl: 0.01 });
+    // unknown IU still converts via GH factor, no flag
+    expect(r2.volumeMl).toBeGreaterThan(0);
   });
 });
 
