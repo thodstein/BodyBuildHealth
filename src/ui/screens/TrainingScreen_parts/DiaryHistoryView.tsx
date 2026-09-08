@@ -206,7 +206,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          <div style={style.card}>
+          <div className="th-main" style={style.card}>
             <div style={style.label}>📜 История тренировок</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               {[

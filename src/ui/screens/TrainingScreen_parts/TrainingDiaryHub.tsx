@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useDeferredValue, useTransition } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue, useTransition, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { Sparkline } from './Sparkline';
 import { OneRmCalcTab } from './OneRmCalcTab';
@@ -103,6 +103,67 @@ const RecordModeSelector: React.FC<{
   );
 };
 
+/* ─── DiarySubnav — сквозная навигация хаба (видна во ВСЕХ режимах) ───
+ * Липкая лента (стили — .td-subnav PRO-слоя): horizontally scrollable,
+ * активный раздел подсвечен через data-active. Раньше жила только в record
+ * и покрывала 6 из 10 разделов — Прогресс/Анализ/Ритуалы/Инструменты были
+ * недоступны без возврата в родительские вкладки. */
+interface DiaryNavItem {
+  mode: HubMode;
+  label: string;
+  color: string;
+  bg: string;
+  activeBg: string;
+  activeColor: string;
+}
+
+const DIARY_NAV_ITEMS: DiaryNavItem[] = [
+  { mode: 'record', label: '📓 Запись', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'linear-gradient(135deg, var(--accent), #00c853)', activeColor: '#000' },
+  { mode: 'history', label: '📜 История', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'rgba(0,230,138,0.12)', activeColor: 'var(--accent)' },
+  { mode: 'progress', label: '📏 Прогресс', color: '#34d399', bg: 'rgba(52,211,153,0.06)', activeBg: 'rgba(52,211,153,0.14)', activeColor: '#34d399' },
+  { mode: 'analytics_lite', label: '📈 Анализ', color: '#60a5fa', bg: 'rgba(96,165,250,0.06)', activeBg: 'rgba(96,165,250,0.14)', activeColor: '#60a5fa' },
+  { mode: 'rituals', label: '🧘 Ритуалы', color: '#f472b6', bg: 'rgba(244,114,182,0.06)', activeBg: 'rgba(244,114,182,0.14)', activeColor: '#f472b6' },
+  { mode: 'feedback', label: '📊 Фидбек', color: '#a855f7', bg: 'rgba(168,85,247,0.06)', activeBg: 'rgba(168,85,247,0.14)', activeColor: '#a78bfa' },
+  { mode: 'mytraining', label: '⭐ Мои', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', activeBg: 'rgba(245,158,11,0.14)', activeColor: '#fbbf24' },
+  { mode: 'competition', label: '🏁 Соревн.', color: '#eab308', bg: 'rgba(234,179,8,0.06)', activeBg: 'rgba(234,179,8,0.14)', activeColor: '#fde68a' },
+  { mode: 'recommendations', label: '💡 Рекоменд.', color: '#8b5cf6', bg: 'rgba(139,92,246,0.06)', activeBg: 'rgba(139,92,246,0.14)', activeColor: '#a78bfa' },
+  { mode: 'tools', label: '🛠 Инструменты', color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', activeBg: 'rgba(148,163,184,0.14)', activeColor: '#cbd5e1' },
+];
+
+const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ mode, onGo }) => {
+  const navRef = useRef<HTMLDivElement | null>(null);
+  // Активная кнопка всегда в фокусе ленты: при переходе на дальний раздел
+  // (напр. «Инструменты») лента сама довозит его в видимую зону.
+  useEffect(() => {
+    try {
+      const el = navRef.current?.querySelector('[data-active="true"]') as HTMLElement | null;
+      (el as any)?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'auto' as any });
+    } catch { /* ignore (jsdom/SSR) */ }
+  }, [mode]);
+  return (
+  <div ref={navRef} className="td-subnav" aria-label="Разделы дневника" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any, borderRadius: 12, padding: '8px', marginBottom: 4 }}>
+    {DIARY_NAV_ITEMS.map(item => {
+      const active = mode === item.mode;
+      const idleColor = item.mode === 'record' ? '#fff' : item.color;
+      return (
+        <button key={item.mode} aria-pressed={active} onClick={() => onGo(item.mode)}
+          data-active={active ? 'true' : 'false'} className="td-subnav-btn"
+          style={{
+            flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10,
+            border: active ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.08)',
+            background: active ? item.activeBg : item.bg,
+            color: active ? item.activeColor : idleColor,
+            fontWeight: active ? 800 : 700, fontSize: 11, cursor: 'pointer',
+            boxShadow: active && item.mode === 'record' ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
+          }}>
+          {item.label}
+        </button>
+      );
+    })}
+  </div>
+  );
+};
+
 /* Токены дневника (ACCENT/DIM/GRP_RU/GROUP_COLORS) — общие, из diary-tokens.ts */
 
 const style = diaryStyles;
@@ -147,6 +208,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // The hub is reused while the parent tab changes. Keep the visible content
   // in sync instead of relying on a remount/key as an accidental reset.
   useEffect(() => { setMode(resolvedMode); }, [resolvedMode]);
+  // Навигация как табы топ-приложения: переход — всегда наверх списка.
+  useEffect(() => {
+    try {
+      const el = document.querySelector('.screen.training-screen');
+      if (el && typeof (el as HTMLElement).scrollTo === 'function') {
+        (el as HTMLElement).scrollTo({ top: 0, behavior: 'auto' });
+      }
+    } catch { /* ignore */ }
+  }, [mode]);
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
@@ -470,7 +540,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
   return (
     <DiaryHubContext.Provider value={hub}>
-    <div key={mode} className="diary-mode-pop hub-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {/* key — только на контенте: навигация/шапка не перемонтируются,
+        лента не сбрасывает скролл при переходе между разделами */}
+    <div className="hub-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="hub-head" style={{ background:'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(168,85,247,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.18)', border:'1px solid rgba(168,85,247,0.30)', fontSize:16 }}>📓</span>
@@ -497,19 +569,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           </div>
         </div>
       )}
+      {/* Сквозная навигация по всем разделам (над контентом любого режима) */}
+      <DiarySubnav mode={mode} onGo={setMode} />
+      {/* Контент режима: анимация появления — только здесь */}
+      <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Подвкладки дневника — все режимы кликабельны */}
-          <div className="td-subnav" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px', marginBottom:4 }}>
-            <button onClick={() => setMode('record')} data-active={(mode as string) === 'record' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'record'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'record'?'linear-gradient(135deg, var(--accent), #00c853)':'rgba(255,255,255,0.04)', color: (mode as string) === 'record'?'#000':'#fff', fontWeight: (mode as string) === 'record'?800:700, fontSize: 11, cursor: 'pointer', boxShadow: (mode as string) === 'record'?'0 2px 8px rgba(0,230,138,0.25)':'none' }}>📓 Запись</button>
-            <button onClick={() => setMode('history')} data-active={(mode as string) === 'history' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'history'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: (mode as string) === 'history'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: (mode as string) === 'history'?'var(--accent)':'#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('feedback')} data-active={(mode as string) === 'feedback' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'feedback'?'1px solid #a855f7':'1px solid rgba(168,85,247,0.22)', background: (mode as string) === 'feedback'?'rgba(168,85,247,0.14)':'rgba(168,85,247,0.06)', color: (mode as string) === 'feedback'?'#a78bfa':'rgba(168,85,247,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>📊 Фидбек</button>
-            <button onClick={() => setMode('mytraining')} data-active={(mode as string) === 'mytraining' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'mytraining'?'1px solid #f59e0b':'1px solid rgba(245,158,11,0.22)', background: (mode as string) === 'mytraining'?'rgba(245,158,11,0.14)':'rgba(245,158,11,0.06)', color: (mode as string) === 'mytraining'?'#fbbf24':'rgba(245,158,11,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>⭐ Мои</button>
-            <button onClick={() => setMode('competition')} data-active={(mode as string) === 'competition' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'competition'?'1px solid #eab308':'1px solid rgba(234,179,8,0.22)', background: (mode as string) === 'competition'?'rgba(234,179,8,0.14)':'rgba(234,179,8,0.06)', color: (mode as string) === 'competition'?'#fde68a':'rgba(234,179,8,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>🏁 Соревн.</button>
-            <button onClick={() => setMode('recommendations')} data-active={(mode as string) === 'recommendations' ? 'true' : 'false'} className="td-subnav-btn" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: (mode as string) === 'recommendations'?'1px solid #8b5cf6':'1px solid rgba(139,92,246,0.22)', background: (mode as string) === 'recommendations'?'rgba(139,92,246,0.14)':'rgba(139,92,246,0.06)', color: (mode as string) === 'recommendations'?'#a78bfa':'rgba(139,92,246,0.85)', fontWeight: 700, fontSize: 10, cursor:'pointer' }}>💡 Рекоменд.</button>
-          </div>
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {
             try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
@@ -899,6 +966,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <DiaryToolsView hub={hub} />
         </div>
       )}
+
+      </div>
+      {/* /контент режима */}
 
       {/* Редактор сохранённой тренировки */}
       {editingWorkout && (

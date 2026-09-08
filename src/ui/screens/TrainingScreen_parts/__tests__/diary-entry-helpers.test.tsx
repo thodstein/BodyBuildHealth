@@ -18,6 +18,7 @@ import { WarmupDiaryView } from '../WarmupDiaryView';
 import { CooldownDiaryView } from '../CooldownDiaryView';
 import { DiaryProgressView } from '../DiaryProgressView';
 import { csvImportParsers } from '../CsvImportTab';
+import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import { MindsetTab } from '../MindsetTab';
 import { MobilityTab } from '../MobilityTab';
 import { loadCheckins, buildPresetProtocol, upsertProtocol, setActiveProtocol } from '../../../../engines/mindset-protocol.engine';
@@ -344,5 +345,86 @@ describe('csvImportParsers — без потерь и мусора', () => {
   it('csvName: запятая в названии — в кавычки', () => {
     expect(csvImportParsers.csvName('Жим, лёжа')).toBe('"Жим, лёжа"');
     expect(csvImportParsers.csvName('Жим')).toBe('Жим');
+  });
+});
+
+describe('DiaryHistoryView — главная карточка истории', () => {  it('history-режим хаба рендерит th-main со статой', async () => {
+    const { TrainingDiaryHub } = await import('../TrainingDiaryHub');
+    const w1 = mkHistory()[0];
+    const w2 = { ...w1, id: 'w2', date: '2026-09-03' };
+    const { container } = render(
+      <TrainingDiaryHub
+        initialMode="history"
+        diary={{ checkProgressionAlerts: async () => [] } as never}
+        diaryStats={[]}
+        diaryProgress={[{ week: 36, year: 2026, totalVolume: 5000, workoutCount: 2, compoundWorkouts: 2, isolationWorkouts: 0, total1RM: 100 }]}
+        historyWorkouts={[w1, w2] as never}
+        macrocycle={null}
+        selectedWeek={1}
+        level="intermediate"
+        onRefresh={() => {}}
+        trainingOutput={null}
+        goal="bulk"
+        daysPerWeek={3}
+        splitType="auto"
+        periodizationType="auto"
+        mesoLength={8}
+        tprofile={{ onCourse: false }}
+        linked={{}}
+      />,
+    );
+    expect(container.querySelector('.th-main')).toBeTruthy();
+    expect(container.querySelector('.ww-card')).toBeTruthy();
+  });
+});
+
+describe('DiarySubnav — сквозная навигация по 10 разделам', () => {
+  const renderHub = () => {
+    const w1 = mkHistory()[0];
+    return render(
+      <TrainingDiaryHub
+        diary={{ checkProgressionAlerts: async () => [] } as never}
+        diaryStats={[]}
+        diaryProgress={[{ week: 36, year: 2026, totalVolume: 5000, workoutCount: 2, compoundWorkouts: 2, isolationWorkouts: 0, total1RM: 100 }]}
+        historyWorkouts={[w1, { ...w1, id: 'w2', date: '2026-09-03' }] as never}
+        macrocycle={null}
+        selectedWeek={1}
+        level="intermediate"
+        onRefresh={() => {}}
+        trainingOutput={null}
+        goal="bulk"
+        daysPerWeek={3}
+        splitType="auto"
+        periodizationType="auto"
+        mesoLength={8}
+        tprofile={{ onCourse: false }}
+        linked={{}}
+      />,
+    );
+  };
+
+  it('все 10 кнопок на месте', () => {
+    renderHub();
+    for (const label of ['📓 Запись', '📜 История', '📏 Прогресс', '📈 Анализ', '🧘 Ритуалы', '📊 Фидбек', '⭐ Мои', '🏁 Соревн.', '💡 Рекоменд.', '🛠 Инструменты']) {
+      expect(screen.getByRole('button', { name: label })).toBeTruthy();
+    }
+  });
+
+  it('переходы работают, subnav не пропадает, актив подсвечен', () => {
+    renderHub();
+    fireEvent.click(screen.getByRole('button', { name: '📜 История' }));
+    expect(screen.getByText('📜 История тренировок')).toBeTruthy();
+    expect(document.querySelector('.td-subnav')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '📏 Прогресс' }));
+    expect(screen.getByText('📏 Замеры тела')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '📈 Анализ' }));
+    expect(screen.getByText('Объём/нед')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Ритуалы' }));
+    expect(screen.getByText('Протокол ещё не собран')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '🛠 Инструменты' }));
+    expect(screen.getByText('📥 Экспорт CSV')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '🛠 Инструменты' }).getAttribute('data-active')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '📓 Запись' }));
+    expect(screen.getByText('⚡ Быстро')).toBeTruthy();
   });
 });
