@@ -82,7 +82,7 @@ function loadReaderFont(): number {
   }
 }
 
-function renderMarkdown(md: string, bodyPx = 14): string {
+export function renderMarkdown(md: string, bodyPx = 14): string {
   let html = md
     .replace(/^### (.+)$/gm, (_, h) =>
       `<h4 style="font-size:13px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid ${ART_ACC};padding-left:10px">${h}</h4>`)
@@ -120,16 +120,18 @@ function renderMarkdown(md: string, bodyPx = 14): string {
   }).join('\n');
   if (inTable) html += '</tbody></table></div>';
 
+  // NOTE: чеклисты ДО списков — иначе `^- ` заворачивает `- [ ]` в <li>
+  // с тире-префиксом и чекбокс-паттерны (дефис) больше не матчатся.
   html = html
+    .replace(/^- \[ \] (.+)$/gm, (_, t) =>
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:#fff"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.25);display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0"></span>${t}</span><br/>`)
+    .replace(/^- \[x\] (.+)$/gm, (_, t) =>
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:${ART_ACC}"><span style="width:16px;height:16px;border-radius:5px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`)
     .replace(/^- (.+)$/gm, (_, item) =>
       `<li style="margin:6px 0;font-size:13px;line-height:1.6;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
     .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:12px 0;padding:0;list-style:none">${m}</ul>`)
     .replace(/^---$/gm, `<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,${artA(0.22)},transparent);margin:22px 0"/>`)
-    .replace(/\n\n/g, '<div style="height:8px"></div>')
-    .replace(/- \[ \] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:#fff"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.25);display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0"></span>${t}</span><br/>`)
-    .replace(/- \[x\] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:${ART_ACC}"><span style="width:16px;height:16px;border-radius:5px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`);
+    .replace(/\n\n/g, '<div style="height:8px"></div>');
 
   html = html
     .replace(/^> (.+)$/gm, (_, q) =>
