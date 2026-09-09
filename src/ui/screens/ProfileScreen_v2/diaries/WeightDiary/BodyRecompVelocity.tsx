@@ -133,7 +133,7 @@ export const BodyRecompVelocity: React.FC<BodyRecompVelocityProps> = ({ rows, he
       
       {/* Mini chart - fat vs lean velocity over time */}
       <div style={{ marginTop: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 10, color: c.text3 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 11, fontWeight: 700, color: c.text3 }}>
           <span style={{ color: c.orange }}>Жир (кг/нед)</span>
           <span style={{ color: c.green }}>Мышцы (кг/нед)</span>
         </div>
@@ -192,7 +192,7 @@ export const BodyRecompVelocity: React.FC<BodyRecompVelocityProps> = ({ rows, he
             <line x1="0" y1="35" x2="100%" y2="35" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" strokeDasharray="4,4" />
           </svg>
         </div>
-        <small style={{ color: c.text3, fontSize: 9, display: 'block', textAlign: 'center', marginTop: 6 }}>← старее · новее →</small>
+        <small style={{ color: c.text3, fontSize: 10.5, display: 'block', textAlign: 'center', marginTop: 8 }}>← старее · новее →</small>
       </div>
     </section>
   );

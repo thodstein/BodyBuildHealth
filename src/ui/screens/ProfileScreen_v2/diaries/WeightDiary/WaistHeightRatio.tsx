@@ -124,7 +124,7 @@ export const WaistHeightRatio: React.FC<WaistHeightRatioProps> = ({ rows, height
       
       {/* Progress bar */}
       <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 10, color: c.text3 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 11, fontWeight: 700, color: c.text3, fontVariantNumeric: 'tabular-nums' }}>
           <span>0.4 Оптимум</span>
           <span>0.5 Норма</span>
           <span>0.6 Риск</span>
@@ -132,7 +132,7 @@ export const WaistHeightRatio: React.FC<WaistHeightRatioProps> = ({ rows, height
         <div style={progressBar(statusGrad, 10)}>
           <div style={progressFill(statusGrad, Math.min(100, (ratio / 0.7) * 100))} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9, color: c.text3 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, fontWeight: 600, color: c.text3 }}>
           <span style={{ color: c.green }}>🟢 {'<'}0.4</span>
           <span style={{ color: '#fbbf24' }}>🟡 0.4-0.5</span>
           <span style={{ color: c.orange }}>🟠 0.5-0.6</span>

@@ -178,32 +178,40 @@ export const groupRow: React.CSSProperties = {
 /* ── Кнопки ───────────────────────────────────────────────────────── */
 
 export const btn: React.CSSProperties = {
-  minHeight: 36,
-  padding: '6px 12px',
-  borderRadius: 12,
+  minHeight: 44,
+  padding: '10px 16px',
+  borderRadius: 14,
   cursor: 'pointer',
   background: 'rgba(255,255,255,0.07)',
-  border: '1px solid rgba(255,255,255,0.09)',
+  border: '1px solid rgba(255,255,255,0.11)',
   color: c.text,
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: 13.5,
+  fontWeight: 600,
   fontFamily: FONT,
   transition: 'background 0.15s, transform 0.1s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
 };
 
 export const btnPrimary: React.CSSProperties = {
-  minHeight: 36,
-  padding: '6px 16px',
-  borderRadius: 12,
+  minHeight: 44,
+  padding: '10px 18px',
+  borderRadius: 14,
   cursor: 'pointer',
   background: c.gradGreen,
-  border: '1px solid rgba(48,209,88,0.4)',
+  border: '1px solid rgba(48,209,88,0.45)',
   color: '#fff',
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: 13.5,
+  fontWeight: 700,
   fontFamily: FONT,
-  boxShadow: '0 2px 10px rgba(48,209,88,0.28), inset 0 1px 0 rgba(255,255,255,0.15)',
+  boxShadow: '0 6px 20px rgba(48,209,88,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
   transition: 'filter 0.15s, transform 0.1s, box-shadow 0.15s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
 };
 
 export const btnSecondary: React.CSSProperties = {
@@ -217,9 +225,9 @@ export const btnSecondary: React.CSSProperties = {
 };
 
 export const btnGlass: (color?: string) => React.CSSProperties = (color = c.blue) => ({
-  minHeight: 36,
-  padding: '6px 16px',
-  borderRadius: 12,
+  minHeight: 44,
+  padding: '10px 18px',
+  borderRadius: 14,
   cursor: 'pointer',
   background: 'rgba(255,255,255,0.08)',
   backdropFilter: 'blur(8px)',
@@ -227,10 +235,14 @@ export const btnGlass: (color?: string) => React.CSSProperties = (color = c.blue
   border: `1px solid ${c.glassBorder}`,
   boxShadow: `0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 ${c.glassHighlight}`,
   color: c.text,
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: 13.5,
+  fontWeight: 700,
   fontFamily: FONT,
   transition: 'background 0.15s, transform 0.1s, box-shadow 0.15s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
 });
 
 export const btnGradient: (grad?: string) => React.CSSProperties = (grad = c.gradGreen) => ({
@@ -240,14 +252,16 @@ export const btnGradient: (grad?: string) => React.CSSProperties = (grad = c.gra
 });
 
 export const iconBtn: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 12,
+  width: 44,
+  height: 44,
+  minWidth: 44,
+  minHeight: 44,
+  borderRadius: 14,
   cursor: 'pointer',
   background: 'rgba(255,255,255,0.07)',
-  border: '1px solid rgba(255,255,255,0.09)',
+  border: '1px solid rgba(255,255,255,0.11)',
   color: c.text2,
-  fontSize: 15,
+  fontSize: 16,
   fontFamily: FONT,
   display: 'inline-flex',
   alignItems: 'center',
@@ -268,10 +282,14 @@ export const iconBtnGlass: React.CSSProperties = {
 
 export const segWrap: React.CSSProperties = {
   display: 'inline-flex',
-  gap: 2,
-  padding: 2,
-  background: 'rgba(255,255,255,0.08)',
-  borderRadius: 10,
+  gap: 4,
+  padding: 4,
+  background: 'rgba(255,255,255,0.06)',
+  borderRadius: 15,
+  border: '1px solid rgba(255,255,255,0.08)',
+  maxWidth: '100%',
+  overflowX: 'auto',
+  scrollbarWidth: 'none',
 };
 
 export const segWrapGlass: React.CSSProperties = {
@@ -284,95 +302,103 @@ export const segWrapGlass: React.CSSProperties = {
 };
 
 export const segBtn = (active: boolean): React.CSSProperties => ({
-  minHeight: 30,
-  padding: '0 14px',
-  borderRadius: 8,
+  minHeight: 40,
+  padding: '0 16px',
+  borderRadius: 11,
   cursor: 'pointer',
   border: 'none',
-  fontSize: 12,
-  fontWeight: 600,
+  fontSize: 12.5,
+  fontWeight: active ? 800 : 600,
   fontFamily: FONT,
+  whiteSpace: 'nowrap',
   color: active ? '#fff' : c.text3,
-  background: active ? 'rgba(118,118,128,0.32)' : 'transparent',
-  transition: 'background 0.15s, color 0.15s',
+  background: active ? 'linear-gradient(135deg, #30d158, #22c55e)' : 'transparent',
+  boxShadow: active ? '0 4px 14px rgba(48,209,88,0.32), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+  transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
 });
 
 export const segBtnGlass = (active: boolean): React.CSSProperties => ({
-  minHeight: 30,
-  padding: '0 14px',
-  borderRadius: 8,
+  minHeight: 40,
+  padding: '0 16px',
+  borderRadius: 11,
   cursor: 'pointer',
   border: 'none',
-  fontSize: 12,
-  fontWeight: 600,
+  fontSize: 12.5,
+  fontWeight: active ? 800 : 600,
   fontFamily: FONT,
+  whiteSpace: 'nowrap',
   color: active ? '#fff' : c.text2,
   background: active ? c.gradBlue : 'transparent',
-  boxShadow: active ? '0 2px 8px rgba(10,132,255,0.3)' : 'none',
+  boxShadow: active ? '0 4px 14px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
   transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
 });
 
 /* ── Чипы ─────────────────────────────────────────────────────────── */
 
 export const chip = (active: boolean, color: string): React.CSSProperties => ({
-  minHeight: 30,
-  padding: '0 12px',
+  minHeight: 40,
+  padding: '8px 15px',
   borderRadius: 999,
   cursor: 'pointer',
-  border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.1)'}`,
-  background: active ? `${color}1f` : 'transparent',
-  color: active ? color : c.text3,
-  fontSize: 11.5,
-  fontWeight: 500,
+  border: `1px solid ${active ? `${color}60` : 'rgba(255,255,255,0.11)'}`,
+  background: active ? `linear-gradient(135deg, ${color}30, ${color}12)` : 'rgba(255,255,255,0.04)',
+  color: active ? '#fff' : c.text3,
+  fontSize: 12.5,
+  fontWeight: active ? 800 : 600,
   fontFamily: FONT,
   whiteSpace: 'nowrap',
-  transition: 'background 0.15s, color 0.15s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
+  boxShadow: active ? `0 4px 14px ${color}28` : 'none',
 });
 
 export const chipGlass = (active: boolean, color: string): React.CSSProperties => ({
-  minHeight: 30,
-  padding: '0 12px',
+  minHeight: 40,
+  padding: '8px 15px',
   borderRadius: 999,
   cursor: 'pointer',
   border: `1px solid ${active ? `${color}66` : c.glassBorder}`,
-  background: active ? `${color}22` : c.glass,
+  background: active ? `linear-gradient(135deg, ${color}2e, ${color}12)` : c.glass,
   backdropFilter: 'blur(16px) saturate(180%)',
   WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-  boxShadow: active ? `0 2px 10px ${color}33, inset 0 1px 0 ${c.glassHighlight}` : `inset 0 1px 0 ${c.glassHighlight}`,
-  color: active ? color : c.text2,
-  fontSize: 11.5,
-  fontWeight: 500,
+  boxShadow: active ? `0 4px 14px ${color}33, inset 0 1px 0 ${c.glassHighlight}` : `inset 0 1px 0 ${c.glassHighlight}`,
+  color: active ? '#fff' : c.text2,
+  fontSize: 12.5,
+  fontWeight: active ? 800 : 600,
   fontFamily: FONT,
   whiteSpace: 'nowrap',
+  display: 'inline-flex',
+  alignItems: 'center',
   transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
 });
 
 /* ── Инпуты ───────────────────────────────────────────────────────── */
 
 export const input: React.CSSProperties = {
-  minHeight: 36,
-  padding: '6px 12px',
-  borderRadius: 10,
+  minHeight: 48,
+  padding: '12px 14px',
+  borderRadius: 14,
   background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.09)',
+  border: '1px solid rgba(255,255,255,0.11)',
   color: c.text,
-  fontSize: 13,
+  fontSize: 16,
   outline: 'none',
   fontFamily: FONT,
   boxSizing: 'border-box',
-  transition: 'border-color 0.15s',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 };
 
 /* ── Метрика: лейбл + значение (iOS Health-стиль) ────────────────── */
 
 export const metricLabel: React.CSSProperties = {
   display: 'block',
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: '0.4px',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.7px',
   textTransform: 'uppercase',
-  color: c.text3,
-  marginBottom: 2,
+  color: 'rgba(255,255,255,0.6)',
+  marginBottom: 3,
   fontFamily: FONT,
 };
 

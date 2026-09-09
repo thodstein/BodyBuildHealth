@@ -53,18 +53,18 @@ export const FfmiBmiTrend: React.FC<FfmiBmiTrendProps> = ({ rows, heightCm, sex 
   const onLeave = () => setTooltip(null);
 
   return (
-    <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
-      <b>📊 FFMI / BMI</b>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-        <div style={{ padding: 10, background: '#27272a', borderRadius: 8, minWidth: 100 }}>
-          <div style={{ fontSize: 10, color: colors.textMuted }}>FFMI</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: ffmiColor }}>{latest.ffmi.toFixed(1)}</div>
-          <div style={{ fontSize: 10, color: colors.textMuted }}>{ffmiLabel(latest.ffmi)}</div>
+    <section style={{ padding: 15, background: 'linear-gradient(180deg, rgba(30,30,36,0.9), rgba(18,18,22,0.9))', borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)', marginBottom: 12, boxShadow: '0 10px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+      <b style={{ fontSize: 14 }}>📊 FFMI / BMI</b>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10, alignItems: 'stretch' }}>
+        <div style={{ padding: 12, background: '#222227', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', minWidth: 108 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.7px', color: 'rgba(255,255,255,0.55)' }}>FFMI</div>
+          <div style={{ fontSize: 19, fontWeight: 800, color: ffmiColor, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{latest.ffmi.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{ffmiLabel(latest.ffmi)}</div>
         </div>
-        <div style={{ padding: 10, background: '#27272a', borderRadius: 8, minWidth: 100 }}>
-          <div style={{ fontSize: 10, color: colors.textMuted }}>BMI</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#a78bfa' }}>{latest.bmi.toFixed(1)}</div>
-          <div style={{ fontSize: 10, color: colors.textMuted }}>
+        <div style={{ padding: 12, background: '#222227', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', minWidth: 108 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.7px', color: 'rgba(255,255,255,0.55)' }}>BMI</div>
+          <div style={{ fontSize: 19, fontWeight: 800, color: '#a78bfa', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{latest.bmi.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
             {latest.bmi < 18.5 ? 'Дефицит' : latest.bmi < 25 ? 'Норма' : latest.bmi < 30 ? 'Избыток' : 'Ожирение'}
           </div>
         </div>

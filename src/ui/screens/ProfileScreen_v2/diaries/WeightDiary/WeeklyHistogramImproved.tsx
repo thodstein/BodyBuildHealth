@@ -60,11 +60,11 @@ const WeeklyHistogramImproved: React.FC<WeeklyHistogramImprovedProps> = ({ rows 
   const globalMean = weeks.reduce((s, w) => s + w.mean, 0) / weeks.length;
 
   return (
-    <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
-      <b>📊 Среднее по неделям</b>
-      <div style={{ position: 'relative', height: chartH + 30, marginTop: 8 }}>
+    <section style={{ padding: 15, background: 'linear-gradient(180deg, rgba(30,30,36,0.9), rgba(18,18,22,0.9))', borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)', marginBottom: 12, boxShadow: '0 10px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+      <b style={{ fontSize: 14 }}>📊 Среднее по неделям</b>
+      <div style={{ position: 'relative', height: chartH + 30, marginTop: 10 }}>
         {/* Y axis */}
-        <div style={{ position: 'absolute', left: 0, top: 0, height: barMaxH, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 9, color: '#ffffff' }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, height: barMaxH, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
           <span>{maxMean.toFixed(1)}</span>
           <span>{((maxMean + minMean) / 2).toFixed(1)}</span>
           <span>{minMean.toFixed(1)}</span>
@@ -87,9 +87,9 @@ const WeeklyHistogramImproved: React.FC<WeeklyHistogramImprovedProps> = ({ rows 
                 onMouseEnter={() => setHover({ ...w, x: 0, y: 0 })}
                 onMouseLeave={() => setHover(null)}
               >
-                <div style={{ fontSize: 8, color: '#ffffff', marginBottom: 1 }}>{w.mean.toFixed(1)}</div>
-                <div style={{ height: h, background: bg, borderRadius: '2px 2px 0 0', transition: 'opacity 0.15s' }} />
-                <div style={{ fontSize: 7, color: '#ffffff', marginTop: 2, whiteSpace: 'nowrap' }}>{w.week.slice(5)}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 2, fontVariantNumeric: 'tabular-nums' }}>{w.mean.toFixed(1)}</div>
+                <div style={{ height: h, background: bg, borderRadius: '4px 4px 0 0', transition: 'opacity 0.15s' }} />
+                <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.6)', marginTop: 3, whiteSpace: 'nowrap' }}>{w.week.slice(5)}</div>
               </div>
             );
           })}
@@ -97,8 +97,9 @@ const WeeklyHistogramImproved: React.FC<WeeklyHistogramImprovedProps> = ({ rows 
         {/* Tooltip */}
         {hover && (
           <div style={{
-            position: 'absolute', left: 40, top: 10, background: 'rgba(0,0,0,0.9)', border: '1px solid #3f3f46',
-            borderRadius: 8, padding: '6px 8px', fontSize: 11, pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap',
+            position: 'absolute', left: 40, top: 10, background: 'rgba(0,0,0,0.92)', border: '1px solid #555',
+            borderRadius: 14, padding: '10px 13px', fontSize: 12, pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.55)', fontVariantNumeric: 'tabular-nums',
           }}>
             <div style={{ color: '#ffffff', marginBottom: 2 }}>{hover.week}</div>
             <div>Среднее: <b>{hover.mean.toFixed(1)} кг</b></div>

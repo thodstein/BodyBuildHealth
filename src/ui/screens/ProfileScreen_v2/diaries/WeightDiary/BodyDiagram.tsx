@@ -177,22 +177,23 @@ export const BodyDiagram: React.FC<BodyDiagramProps> = ({ measurements, sex }) =
             <div
               key={r.id}
               style={{
-                padding: '6px 10px',
-                borderRadius: 7,
-                background: statusColor(r.status) + '22',
-                border: `1px solid ${statusColor(r.status)}44`,
-                fontSize: 12,
+                padding: '8px 12px',
+                borderRadius: 12,
+                background: statusColor(r.status) + '1f',
+                border: `1px solid ${statusColor(r.status)}45`,
+                fontSize: 12.5,
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
               <span style={{ color: '#ffffff' }}>{r.label}: </span>
-              <b style={{ color: statusColor(r.status) }}>{r.value}</b>
-              <small style={{ color: '#ffffff' }}> (идеал {r.ideal[0]}-{r.ideal[1]})</small>
+              <b style={{ color: '#fff' }}>{r.value}</b>
+              <small style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11 }}> (идеал {r.ideal[0]}-{r.ideal[1]})</small>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', fontSize: 10, color: '#ffffff' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
         <span>🔴 &lt;35%</span>
         <span>🟠 35-65%</span>
         <span>🟡 65-85%</span>

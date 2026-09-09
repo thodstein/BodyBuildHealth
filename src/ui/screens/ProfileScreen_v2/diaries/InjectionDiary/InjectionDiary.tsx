@@ -148,8 +148,8 @@ const ZoneMap: React.FC<{
 
   return (
     <div style={{ ...card, marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 10px', fontSize: 13 }}>🗺 Карта зон</h3>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>🗺 Карта зон</h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {INJECTION_ZONES.map((zone) => {
           const days = zoneDays.get(zone.id) ?? 999;
           const c = zoneColor(days);
@@ -159,17 +159,20 @@ const ZoneMap: React.FC<{
             <button
               key={zone.id}
               onClick={() => onSelectZone(zone.id)}
+              aria-pressed={isSelected}
               style={{
-                padding: '6px 10px',
-                borderRadius: 8,
+                padding: '8px 14px',
+                borderRadius: 12,
                 cursor: 'pointer',
-                fontSize: 11,
-                fontWeight: 600,
+                fontSize: 12.5,
+                fontWeight: isSelected ? 800 : 600,
                 background: isSelected ? c.bg.replace('.15', '.25').replace('.12', '.2').replace('.10', '.18').replace('.10', '.18') : c.bg,
                 border: missed ? `2px dashed ${isSelected ? '#fff' : '#fca5a5'}` : `1px solid ${isSelected ? c.text : c.border}`,
-                color: c.text,
+                boxShadow: isSelected ? `0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)` : 'none',
+                color: isSelected ? '#fff' : c.text,
                 transition: 'all 0.15s',
-                minHeight: 32,
+                minHeight: 40,
+                fontVariantNumeric: 'tabular-nums',
               }}
               title={
                 missed
@@ -186,12 +189,12 @@ const ZoneMap: React.FC<{
           );
         })}
       </div>
-      <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 10, color: colors.textMuted, flexWrap: 'wrap' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(0,230,138,.2)', border: '1px solid rgba(0,230,138,.3)' }} /> Свежая (&lt;3д)</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }} /> 3-7д</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)' }} /> 7-14д</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)' }} /> ≥14д</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: '2px dashed #fca5a5' }} /> ⏭ пропущена по расписанию</span>
+      <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.6)', flexWrap: 'wrap', lineHeight: 1.5 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: 'rgba(0,230,138,.2)', border: '1px solid rgba(0,230,138,.3)' }} /> Свежая (&lt;3д)</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }} /> 3-7д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)' }} /> 7-14д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)' }} /> ≥14д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 4, border: '2px dashed #fca5a5' }} /> ⏭ пропущена по расписанию</span>
       </div>
     </div>
   );
@@ -416,12 +419,14 @@ const InjectionEditor: React.FC<{
             role="status"
             style={{
               margin: '0 0 12px',
-              padding: '8px 10px',
-              borderRadius: 8,
-              fontSize: 12,
-              color: '#fcd34d',
-              background: 'rgba(245,158,11,0.10)',
-              border: '1px solid rgba(245,158,11,0.3)',
+              padding: '11px 14px',
+              borderRadius: 14,
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: '#fde68a',
+              background: 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(245,158,11,0.05))',
+              border: '1px solid rgba(245,158,11,0.32)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
             }}
           >
             {compatIssues.slice(0, 2).map((issue) => (
@@ -497,12 +502,12 @@ const ScheduleItemEditor: React.FC<{
   };
   const valid = () => !!item.substance.trim() && !!item.dose.trim() && item.daysOfWeek.length > 0;
   return (
-    <div style={{ ...card, marginBottom: 12, borderColor: 'rgba(245,158,11,.35)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>
+    <div style={{ ...card, marginBottom: 12, borderColor: 'rgba(245,158,11,.4)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.2px' }}>
           {initial ? '✎ Редактировать пункт расписания' : '➕ Новый пункт расписания'}
         </h3>
-        <button style={{ ...button, minHeight: 32, padding: '4px 10px' }} onClick={onClose}>
+        <button style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={onClose} aria-label="Закрыть редактор расписания">
           ✕
         </button>
       </div>
@@ -889,13 +894,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     ? `Критических аномалий: ${anomalies.filter(a => a.severity === 'danger').length}`
                     : `Предупреждений: ${anomalies.length}`}
                 </strong>
-                <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.65)', marginTop: 3, lineHeight: 1.5 }}>
                   {anomalies.slice(0, 3).map(a => a.message).join(' · ')}
                   {anomalies.length > 3 && ` · ещё ${anomalies.length - 3}`}
                 </div>
               </div>
               <button
-                style={{ ...button, fontSize: 11, padding: '6px 10px' }}
+                style={{ ...button, fontSize: 12.5, padding: '8px 14px', minHeight: 40 }}
                 onClick={() => setMode('stats')}
               >
                 📊 Детали
@@ -1267,19 +1272,24 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               </div>
             )}
             <section style={{ ...card, marginTop: 12 }}>
-              <h3 style={{ margin: '0 0 8px' }}>🚨 Осложнения и аномалии ({anomalies.length})</h3>
+              <h3 style={{ margin: '0 0 10px', fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.2px' }}>🚨 Осложнения и аномалии ({anomalies.length})</h3>
               {anomalies.length ? (
                 anomalies.slice(0, 20).map((item, index) => (
                   <div
                     key={`${item.date}-${item.category}-${index}`}
                     style={{
-                      padding: '8px 0',
-                      borderBottom: `1px solid ${colors.border}`,
-                      color: item.severity === 'danger' ? '#fca5a5' : '#fcd34d',
+                      padding: '9px 12px',
+                      borderRadius: 12,
+                      background: item.severity === 'danger' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.07)',
+                      border: `1px solid ${item.severity === 'danger' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.22)'}`,
+                      marginBottom: 6,
+                      fontSize: 12.5,
+                      lineHeight: 1.5,
+                      color: item.severity === 'danger' ? '#fecaca' : '#fde68a',
                     }}
                   >
-                    ⚠ <b>{item.date}</b> · {item.message}{' '}
-                    <small style={{ color: colors.textMuted }}>({item.category})</small>
+                    ⚠ <b style={{ fontVariantNumeric: 'tabular-nums' }}>{item.date}</b> · {item.message}{' '}
+                    <small style={{ color: 'rgba(255,255,255,0.5)' }}>({item.category})</small>
                   </div>
                 ))
               ) : (
@@ -1444,7 +1454,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                   {dueToday.map((s) => `${s.substance} ${s.dose}`).join(' · ')}
                 </div>
                 <button
-                  style={{ ...button, minHeight: 32, padding: '5px 12px', background: 'rgba(245,158,11,.2)', color: '#fbbf24' }}
+                  style={{ ...button, minHeight: 44, padding: '9px 16px', background: 'linear-gradient(135deg, rgba(245,158,11,.28), rgba(245,158,11,.12))', color: '#fff', borderColor: 'rgba(245,158,11,0.5)', fontWeight: 800 }}
                   onClick={() => {
                     const item = dueToday[0];
                     setRepeatDraft({
@@ -1492,21 +1502,23 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 {adherence.map((row) => (
                   <div key={row.item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.1px' }}>
                         {row.item.substance}{' '}
-                        <span style={{ color: colors.textMuted, fontWeight: 400 }}>{row.item.dose}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{row.item.dose}</span>
                       </div>
-                      <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
                         {SCHEDULE_WEEKDAYS.map((label, day) => (
                           <span
                             key={label}
                             style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: 6,
-                              color: row.item.daysOfWeek.includes(day) ? '#fbbf24' : colors.textMuted,
-                              background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
+                              fontSize: 10.5,
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              color: row.item.daysOfWeek.includes(day) ? '#fff' : 'rgba(255,255,255,0.4)',
+                              background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.22)' : 'rgba(255,255,255,.03)',
+                              border: `1px solid ${row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                              fontVariantNumeric: 'tabular-nums',
                             }}
                           >
                             {label}
@@ -1515,13 +1527,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                       </div>
                     </div>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'rgba(255,255,255,0.65)', marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
                         <span>Соблюдение · {row.planned} по плану</span>
-                        <b style={{ color: row.pct !== null && row.pct < 60 ? colors.danger : row.pct !== null && row.pct < 85 ? colors.warning : colors.green }}>
+                        <b style={{ color: '#fff' }}>
                           {row.pct !== null ? `${row.pct}%` : '—'}
                         </b>
                       </div>
-                      <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
                         <div
                           style={{
                             height: '100%',
@@ -1529,28 +1541,30 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                             borderRadius: 999,
                             background:
                               row.pct !== null && row.pct < 60
-                                ? colors.danger
+                                ? 'linear-gradient(90deg,#ef4444,#f87171)'
                                 : row.pct !== null && row.pct < 85
-                                  ? colors.warning
-                                  : colors.green,
+                                  ? 'linear-gradient(90deg,#f59e0b,#fbbf24)'
+                                  : 'linear-gradient(90deg,#22c55e,#4ade80)',
                           }}
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button
-                        style={{ ...button, minHeight: 32, padding: '4px 10px' }}
+                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
                         onClick={() => setScheduleEditor({ open: true, item: row.item })}
+                        aria-label="Редактировать пункт расписания"
                       >
                         ✎
                       </button>
                       <button
-                        style={{ ...button, minHeight: 32, padding: '4px 10px', background: colors.dangerDim, color: colors.danger }}
+                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', background: 'rgba(239,68,68,0.12)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                         onClick={() => {
                           if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
                             setSchedule(removeScheduleItem(row.item.id));
                           }
                         }}
+                        aria-label="Удалить пункт расписания"
                       >
                         🗑
                       </button>
@@ -1588,7 +1602,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 {dueToday.map((s) => `${s.substance} ${s.dose}`).join(' · ')}
               </div>
               <button
-                style={{ ...button, minHeight: 32, padding: '5px 12px', background: 'rgba(245,158,11,.2)', color: '#fbbf24' }}
+                style={{ ...button, minHeight: 44, padding: '9px 16px', background: 'linear-gradient(135deg, rgba(245,158,11,.28), rgba(245,158,11,.12))', color: '#fff', borderColor: 'rgba(245,158,11,0.5)', fontWeight: 800 }}
                 onClick={() => {
                   const item = dueToday[0];
                   setRepeatDraft({
@@ -1620,12 +1634,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
             <div
               style={{
                 marginBottom: 10,
-                padding: '9px 12px',
-                borderRadius: 10,
-                fontSize: 12,
-                color: '#fca5a5',
-                background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.25)',
+                padding: '11px 14px',
+                borderRadius: 14,
+                fontSize: 12.5,
+                lineHeight: 1.5,
+                color: '#fecaca',
+                background: 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04))',
+                border: '1px solid rgba(239,68,68,0.28)',
               }}
             >
               ⏭ Пропущено за 7 дней: {missed.map((m) => `${m.item.substance} (${m.date})`).join(', ')}
@@ -1636,21 +1651,22 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               {adherence.map((row) => (
                 <div key={row.item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.1px' }}>
                       {row.item.substance}{' '}
-                      <span style={{ color: colors.textMuted, fontWeight: 400 }}>{row.item.dose}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{row.item.dose}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
                       {SCHEDULE_WEEKDAYS.map((label, day) => (
                         <span
                           key={label}
                           style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: 6,
-                            color: row.item.daysOfWeek.includes(day) ? '#fbbf24' : colors.textMuted,
-                            background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            color: row.item.daysOfWeek.includes(day) ? '#fff' : 'rgba(255,255,255,0.4)',
+                            background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.22)' : 'rgba(255,255,255,.03)',
+                            border: `1px solid ${row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.07)'}`,
                           }}
                         >
                           {label}
@@ -1659,13 +1675,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     </div>
                   </div>
                   <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'rgba(255,255,255,0.65)', marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
                       <span>Соблюдение · {row.planned} по плану</span>
-                      <b style={{ color: row.pct !== null && row.pct < 60 ? colors.danger : row.pct !== null && row.pct < 85 ? colors.warning : colors.green }}>
+                      <b style={{ color: '#fff' }}>
                         {row.pct !== null ? `${row.pct}%` : '—'}
                       </b>
                     </div>
-                    <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
                       <div
                         style={{
                           height: '100%',
@@ -1673,28 +1689,30 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                           borderRadius: 999,
                           background:
                             row.pct !== null && row.pct < 60
-                              ? colors.danger
+                              ? 'linear-gradient(90deg,#ef4444,#f87171)'
                               : row.pct !== null && row.pct < 85
-                                ? colors.warning
-                                : colors.green,
+                                ? 'linear-gradient(90deg,#f59e0b,#fbbf24)'
+                                : 'linear-gradient(90deg,#22c55e,#4ade80)',
                         }}
                       />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...button, minHeight: 32, padding: '4px 10px' }}
+                      style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
                       onClick={() => setScheduleEditor({ open: true, item: row.item })}
+                      aria-label="Редактировать пункт расписания"
                     >
                       ✎
                     </button>
                     <button
-                      style={{ ...dangerButton, minHeight: 32, padding: '4px 10px' }}
+                      style={{ ...dangerButton, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
                       onClick={() => {
                         if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
                           setSchedule(removeScheduleItem(row.item.id));
                         }
                       }}
+                      aria-label="Удалить пункт расписания"
                     >
                       🗑
                     </button>
@@ -1786,33 +1804,33 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               </select>
             </div>
             {zoneAdvice && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginBottom: 8 }}>
-                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, color: colors.textMuted }}>Игла</div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.needleGauge} × {zoneAdvice.needleLength}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginBottom: 10 }}>
+                <div style={{ padding: '10px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.6px', color: 'rgba(255,255,255,0.55)' }}>ИГЛА</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{zoneAdvice.needleGauge} × {zoneAdvice.needleLength}</div>
                 </div>
-                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, color: colors.textMuted }}>Угол / Макс. объём</div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.angle} / {zoneAdvice.maxVolumeMl} мл</div>
+                <div style={{ padding: '10px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.6px', color: 'rgba(255,255,255,0.55)' }}>УГОЛ / МАКС. ОБЪЁМ</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{zoneAdvice.angle} / {zoneAdvice.maxVolumeMl} мл</div>
                 </div>
-                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, color: colors.textMuted }}>Раствор / Риск</div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.solutionType} · {zoneAdvice.risk}</div>
+                <div style={{ padding: '10px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.6px', color: 'rgba(255,255,255,0.55)' }}>РАСТВОР / РИСК</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{zoneAdvice.solutionType} · {zoneAdvice.risk}</div>
                 </div>
               </div>
             )}
             {zoneAdvice && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
                 {zoneAdvice.warnings.map((w, i) => (
-                  <div key={i} style={{ fontSize: 12, color: '#fca5a5' }}>⚠ {w}</div>
+                  <div key={i} style={{ fontSize: 12.5, color: '#fca5a5', lineHeight: 1.5 }}>⚠ {w}</div>
                 ))}
                 {zoneAdvice.tips.map((t, i) => (
-                  <div key={i} style={{ fontSize: 12, color: colors.textMuted }}>→ {t}</div>
+                  <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>→ {t}</div>
                 ))}
               </div>
             )}
             {substanceAdvice && (
-              <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', marginBottom: 8 }}>
+              <div style={{ padding: '12px 14px', borderRadius: 15, background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))', border: '1px solid rgba(59,130,246,0.25)', marginBottom: 10, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: colors.blue }}>Рекомендации для препарата</div>
                   <select
@@ -1844,10 +1862,11 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {summary.recommendations.map((rec: import('../../../../../engines/injection-diary.engine').InjectionRecommendation, idx: number) => (
                   <div key={idx} style={{
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    background: rec.priority === 'high' ? 'rgba(239,68,68,0.12)' : rec.priority === 'medium' ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${rec.priority === 'high' ? 'rgba(239,68,68,0.35)' : rec.priority === 'medium' ? 'rgba(249,115,22,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                    padding: '11px 14px',
+                    borderRadius: 14,
+                    background: rec.priority === 'high' ? 'linear-gradient(135deg, rgba(239,68,68,0.16), rgba(239,68,68,0.05))' : rec.priority === 'medium' ? 'linear-gradient(135deg, rgba(249,115,22,0.14), rgba(249,115,22,0.05))' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${rec.priority === 'high' ? 'rgba(239,68,68,0.35)' : rec.priority === 'medium' ? 'rgba(249,115,22,0.35)' : 'rgba(255,255,255,0.09)'}`,
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: rec.action ? 4 : 0, color: rec.priority === 'high' ? '#fca5a5' : rec.priority === 'medium' ? '#fdba74' : colors.text }}>
                       {rec.message}

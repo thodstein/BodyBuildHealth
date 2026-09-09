@@ -274,43 +274,43 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
                 </span>
               </div>
               {p.weeks.length > 1 && (
-                <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
+                <div style={{ marginTop: 8, display: 'flex', gap: 7, flexWrap: 'wrap', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
                   {p.weeks.map((w, wi) => {
                     const pedBadges = w.activeSubstances?.map(s => {
                       const color = PED_COLORS[s.replace(/^(test|eq|dht)[-_]?/i, '')] || PED_COLORS[s.split(/[-_]/)[0]] || '#ef4444';
-                      return <span key={s} style={{ padding: '0 3px', borderRadius: 3, background: color + '33', color, fontSize: 9, border: `1px solid ${color}44` }}>{s.split(/[-_]/)[0]}</span>;
+                      return <span key={s} style={{ padding: '1px 6px', borderRadius: 999, background: color + '2e', color: '#fff', fontSize: 10, fontWeight: 700, border: `1px solid ${color}55` }}>{s.split(/[-_]/)[0]}</span>;
                     });
                     return (
                       <span
                         key={wi}
                         style={{
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          background: w.deltaWeight < 0 ? '#22c55e22' : w.deltaWeight > 0 ? '#f59e0b22' : '#27272a',
-                          color: w.deltaWeight < 0 ? '#22c55e' : w.deltaWeight > 0 ? '#f59e0b' : '#ffffff',
-                          border: `1px solid ${w.deltaWeight < 0 ? '#22c55e44' : w.deltaWeight > 0 ? '#f59e0b44' : '#3f3f46'}`,
+                          padding: '5px 10px',
+                          borderRadius: 10,
+                          background: w.deltaWeight < 0 ? '#22c55e1f' : w.deltaWeight > 0 ? '#f59e0b1f' : '#27272a',
+                          color: '#fff',
+                          border: `1px solid ${w.deltaWeight < 0 ? '#22c55e45' : w.deltaWeight > 0 ? '#f59e0b45' : '#3f3f46'}`,
                           display: 'inline-flex',
                           flexDirection: 'column',
-                          gap: 2,
+                          gap: 3,
                         }}
                         title={`${w.weekStart}: ${w.meanWeight.toFixed(1)} кг${w.activeSubstances?.length ? ' · ' + w.activeSubstances.join(', ') : ''}`}
                       >
                         <span>{w.weekStart.slice(5)}: {w.deltaWeight > 0 ? '+' : ''}{w.deltaWeight.toFixed(1)}кг</span>
-                        {pedBadges && <span style={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>{pedBadges}</span>}
+                        {pedBadges && <span style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{pedBadges}</span>}
                       </span>
                     );
                   })}
                 </div>
               )}
               {p.substances && p.substances.length > 0 && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                   {p.substances.slice(0, 5).map((s, j) => (
-                    <span key={j} style={{ padding: '2px 6px', borderRadius: 4, background: '#ef444433', color: '#f87171', fontSize: 10, border: '1px solid #ef444455' }}>
+                    <span key={j} style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(239,68,68,0.16)', color: '#fca5a5', fontSize: 11, fontWeight: 700, border: '1px solid rgba(239,68,68,0.3)' }}>
                       💉 {s}
                     </span>
                   ))}
                   {p.substances.length > 5 && (
-                    <span style={{ padding: '2px 6px', borderRadius: 4, background: '#27272a', color: '#ffffff', fontSize: 10 }}>
+                    <span style={{ padding: '4px 10px', borderRadius: 999, background: '#27272a', color: '#ffffff', fontSize: 11, border: '1px solid rgba(255,255,255,0.1)' }}>
                       +{p.substances.length - 5}
                     </span>
                   )}

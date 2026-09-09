@@ -126,14 +126,14 @@ const thStyle: React.CSSProperties = {
   top: 0,
   zIndex: 1,
   background: '#1c1c1e',
-  padding: '8px 6px',
+  padding: '10px 8px',
   textAlign: 'left',
   borderBottom: '1px solid rgba(255,255,255,0.08)',
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: '0.4px',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.6px',
   textTransform: 'uppercase',
-  color: c.text3,
+  color: 'rgba(255,255,255,0.55)',
 };
 
 const sum: React.CSSProperties = {
@@ -929,13 +929,14 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const badge = (color: string): React.CSSProperties => ({
     display: 'inline-block',
     marginLeft: 6,
-    padding: '1px 6px',
+    padding: '3px 9px',
     borderRadius: 999,
-    fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: '0.3px',
-    background: color === 'green' ? '#30d15822' : color === 'red' ? '#ff453a22' : color === 'orange' ? '#ff9f0a22' : '#0a84ff22',
-    color: color === 'green' ? '#30d158' : color === 'red' ? '#ff453a' : color === 'orange' ? '#ff9f0a' : '#0a84ff',
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: '0.4px',
+    background: color === 'green' ? '#30d15826' : color === 'red' ? '#ff453a26' : color === 'orange' ? '#ff9f0a26' : '#0a84ff26',
+    border: `1px solid ${color === 'green' ? '#30d15855' : color === 'red' ? '#ff453a55' : color === 'orange' ? '#ff9f0a55' : '#0a84ff55'}`,
+    color: '#fff',
     lineHeight: '16px',
     whiteSpace: 'nowrap',
   });
@@ -1098,7 +1099,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               aria-label="Поиск по дате и полям"
             />
             {query && (
-              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: c.text3, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: c.text3, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
             )}
           </div>
           <div style={segWrap} role="radiogroup" aria-label="Единицы измерения">
@@ -1429,10 +1430,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   <span style={{ color: '#111', fontSize: 10 }}>⇔</span>
                 </div>
               </div>
-              <span style={{ position: 'absolute', left: 8, top: 8, padding: '3px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.6)', fontSize: 10, color: '#fff' }}>
+              <span style={{ position: 'absolute', left: 8, top: 8, padding: '4px 11px', borderRadius: 999, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 11, fontWeight: 700, color: '#fff' }}>
                 До ({photoPairs.before.date.slice(5)})
               </span>
-              <span style={{ position: 'absolute', right: 8, top: 8, padding: '3px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.6)', fontSize: 10, color: '#fff' }}>
+              <span style={{ position: 'absolute', right: 8, top: 8, padding: '4px 11px', borderRadius: 999, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 11, fontWeight: 700, color: '#fff' }}>
                 После ({photoPairs.after.date.slice(5)})
               </span>
             </div>
@@ -1451,25 +1452,25 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               <span>🗓</span> Календарь веса ({heatmap.cells.flat().filter(Boolean).length} записей)
               <span style={{ marginLeft: 'auto', color: c.text3, fontSize: 11 }}>▾</span>
             </summary>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginTop: 10 }}>
               {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-                <small key={d} style={{ textAlign: 'center', color: c.text3, fontSize: 9 }}>{d}</small>
+                <small key={d} style={{ textAlign: 'center', color: c.text3, fontSize: 10, fontWeight: 700 }}>{d}</small>
               ))}
               {heatmap.cells.flat().map((cell, i) =>
                 cell ? (
                   <div
                     key={i}
                     title={`${cell.date}: ${fmtW(cell.value)}`}
-                    style={{ aspectRatio: '1', borderRadius: 6, background: `rgba(48,209,88,${(0.12 + cell.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ aspectRatio: '1', borderRadius: 8, background: `rgba(48,209,88,${(0.12 + cell.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <small style={{ fontSize: 8, color: '#ffffff' }}>{(dispW(cell.value) as number).toFixed(0)}</small>
+                    <small style={{ fontSize: 9, fontWeight: 700, color: '#ffffff' }}>{(dispW(cell.value) as number).toFixed(0)}</small>
                   </div>
                 ) : (
-                  <div key={i} style={{ aspectRatio: '1', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.06)' }} />
+                  <div key={i} style={{ aspectRatio: '1', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.07)' }} />
                 ),
               )}
             </div>
-            <small style={{ display: 'block', marginTop: 6, color: c.text3, fontSize: 10 }}>
+            <small style={{ display: 'block', marginTop: 8, color: c.text3, fontSize: 11 }}>
               Мин {fmtW(heatmap.min)} · Макс {fmtW(heatmap.max)}
             </small>
           </details>
@@ -1562,8 +1563,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               <span style={{ marginLeft: 'auto', color: c.text3, fontSize: 11 }}>▾</span>
             </summary>
             {anomalies.slice(-5).map((a, i) => (
-              <div key={`${a.date}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: c.text2 }}>
-                {a.date}: {a.message}
+              <div key={`${a.date}-${i}`} style={{ padding: '8px 11px', borderRadius: 10, background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.18)', marginBottom: 6, fontSize: 12.5, color: c.text2, lineHeight: 1.5 }}>
+                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{a.date}</b>: {a.message}
               </div>
             ))}
           </details>
@@ -1575,14 +1576,14 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               <span>🏋️</span> Сила и инсайты
               <span style={{ marginLeft: 'auto', color: c.text3, fontSize: 11 }}>▾</span>
             </summary>
-            <div style={{ fontSize: 12, marginTop: 6, color: c.text2 }}>
+            <div style={{ fontSize: 12.5, marginTop: 8, color: c.text2, lineHeight: 1.6, fontVariantNumeric: 'tabular-nums' }}>
               Последний объём: <b style={{ color: c.text }}>{Math.round(training.volume)}</b>
               {correlation && (
                 <span> · связь вес/объём: <b style={{ color: c.text }}>{correlation.r.toFixed(2)}</b> ({correlation.n} пар)</span>
               )}
             </div>
             {training.progress.slice(-4).map((x) => (
-              <div key={x.week} style={{ fontSize: 12, padding: '4px 0', color: c.text2 }}>
+              <div key={x.week} style={{ fontSize: 12.5, padding: '6px 0', color: c.text2, borderBottom: '1px solid rgba(255,255,255,0.05)', fontVariantNumeric: 'tabular-nums' }}>
                 Неделя {x.week}: объём {Math.round(x.totalVolume)} · тренировок {x.workoutCount} · 1RM {Math.round(x.total1RM)}
               </div>
             ))}
@@ -1617,7 +1618,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   { label: 'Все', cols: [...FIELDS] as Field[] },
                   { label: 'Сброс', cols: [...DEFAULT_VISIBLE] as Field[] },
                 ] as const).map(p => (
-                  <button key={p.label} style={{ ...btn, minHeight: 30, padding: '4px 10px', fontSize: 11 }} onClick={() => setVisibleCols([...p.cols])}>
+                  <button key={p.label} style={{ ...btn, minHeight: 40, padding: '8px 14px', fontSize: 12 }} onClick={() => setVisibleCols([...p.cols])}>
                     {p.label}
                   </button>
                 ))}
@@ -1640,12 +1641,12 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </div>
           )}
           <div className="wd-table-wrap" style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: Math.max(720, 260 + visibleCols.length * 56), fontSize: 11 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: Math.max(720, 260 + visibleCols.length * 56), fontSize: 12.5 }}>
               <thead>
                 <tr>
                   <th style={thStyle}>
                     <button
-                      style={{ background: 'none', border: 'none', color: sort.key === 'date' ? c.green : c.text3, cursor: 'pointer', padding: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}
+                      style={{ background: 'none', border: 'none', color: sort.key === 'date' ? c.green : c.text3, cursor: 'pointer', padding: 6, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px', minHeight: 32 }}
                       onClick={() => setSort({ key: 'date', dir: sort.key === 'date' && sort.dir === 'asc' ? 'desc' : 'asc' })}
                     >
                       Дата{sort.key === 'date' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -1655,7 +1656,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   {visibleCols.map((f) => (
                     <th key={f} style={thStyle}>
                       <button
-                        style={{ background: 'none', border: 'none', color: sort.key === LABELS[f] ? c.green : c.text3, cursor: 'pointer', padding: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}
+                        style={{ background: 'none', border: 'none', color: sort.key === LABELS[f] ? c.green : c.text3, cursor: 'pointer', padding: 6, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px', minHeight: 32 }}
                         onClick={() => setSort({ key: LABELS[f], dir: sort.key === LABELS[f] && sort.dir === 'asc' ? 'desc' : 'asc' })}
                       >
                         {LABELS[f]}{sort.key === LABELS[f] ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}

@@ -29,12 +29,13 @@ export const CompletenessIndicator: React.FC<CompletenessIndicatorProps> = ({ en
             <span
               key={f}
               style={{
-                fontSize: 9,
-                padding: '1px 5px',
-                borderRadius: 3,
-                background: has ? (FIELD_COLORS[f] || '#ffffff') + '33' : '#27272a',
-                color: has ? (FIELD_COLORS[f] || '#ffffff') : '#ffffff',
-                border: `1px solid ${has ? (FIELD_COLORS[f] || '#ffffff') + '66' : '#3f3f46'}`,
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: has ? (FIELD_COLORS[f] || '#ffffff') + '2e' : '#27272a',
+                color: has ? '#fff' : '#a1a1aa',
+                border: `1px solid ${has ? (FIELD_COLORS[f] || '#ffffff') + '55' : '#3f3f46'}`,
               }}
             >
               {FIELD_LABELS[f] || f}

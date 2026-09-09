@@ -40,30 +40,30 @@ export const MeasurementRatios: React.FC<MeasurementRatiosProps> = ({ ratios }) 
           const trendIcon = r.trend === 'up' ? '▲' : r.trend === 'down' ? '▼' : '●';
           const trendColor = r.trend === 'up' ? '#22c55e' : r.trend === 'down' ? '#ef4444' : '#ffffff';
           return (
-            <div key={r.id} style={{ padding: 10, background: state.color, borderRadius: 8, border: `1px solid ${state.text}44` }}>
-              <div style={{ fontSize: 11, color: colors.textMuted, display: 'flex', justifyContent: 'space-between' }}>
+            <div key={r.id} style={{ padding: 12, background: state.color, borderRadius: 14, border: `1px solid ${state.text}44`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.65)', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                 <span>{r.label}</span>
                 <span style={{ color: trendColor }}>{trendIcon}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                <b style={{ fontSize: 16, color: state.text }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 3 }}>
+                <b style={{ fontSize: 17, color: state.text, fontVariantNumeric: 'tabular-nums' }}>
                   {r.value !== null ? r.value.toFixed(2) : '—'}
                 </b>
-                {r.unit && <small style={{ color: colors.textMuted }}>{r.unit}</small>}
+                {r.unit && <small style={{ color: colors.textMuted, fontSize: 11 }}>{r.unit}</small>}
                 {r.delta !== undefined && Math.abs(r.delta) > 0.001 && (
-                  <small style={{ color: r.delta > 0 ? '#22c55e' : '#ef4444', fontSize: 10 }}>
+                  <small style={{ color: r.delta > 0 ? '#22c55e' : '#ef4444', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
                     {r.delta > 0 ? '+' : ''}{r.delta.toFixed(2)}
                   </small>
                 )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                <div style={{ fontSize: 10, color: state.text }}>{state.label}</div>
-                <div style={{ fontSize: 10, color: '#ffffff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: state.text, fontWeight: 700 }}>{state.label}</div>
+                <div style={{ fontSize: 11, color: '#ffffff' }}>
                   идеал {r.ideal[0]}-{r.ideal[1]}
                 </div>
               </div>
               {r.value !== null && (
-                <div style={{ marginTop: 6, height: 4, borderRadius: 2, background: '#3f3f46', overflow: 'hidden' }}>
+                <div style={{ marginTop: 7, height: 6, borderRadius: 99, background: '#3f3f46', overflow: 'hidden' }}>
                   <div
                     style={{
                       width: `${Math.min(100, Math.max(0, ((r.value - r.ideal[0]) / (r.ideal[1] - r.ideal[0])) * 100))}%`,

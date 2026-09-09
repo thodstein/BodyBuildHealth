@@ -88,17 +88,19 @@ const Tooltip: React.FC<TooltipState> = ({ x, y, date, values }) => {
         left: x + 12,
         top,
         background: 'rgba(0,0,0,0.92)',
-        border: '1px solid #3f3f46',
-        borderRadius: 10,
-        padding: '8px 10px',
+        border: '1px solid #555',
+        borderRadius: 14,
+        padding: '10px 13px',
         pointerEvents: 'none',
         zIndex: 50,
-        minWidth: 140,
+        minWidth: 150,
+        boxShadow: '0 8px 28px rgba(0,0,0,0.55)',
+        fontVariantNumeric: 'tabular-nums',
       }}
     >
-      <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 4 }}>{date}</div>
+      <div style={{ fontSize: 11.5, color: '#ffffff', marginBottom: 5, fontWeight: 700 }}>{date}</div>
       {values.map(v => (
-        <div key={v.field} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <div key={v.field} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
           <span style={{ width: 8, height: 8, borderRadius: 4, background: v.color, display: 'inline-block' }} />
           <span style={{ color: '#ffffff' }}>{v.label}:</span>
           <b>{Number.isInteger(v.value) ? v.value : v.value.toFixed(1)}</b>
@@ -236,8 +238,8 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
         {onSvg && (
           <button
             style={{
-              minHeight: 32, padding: '4px 10px', borderRadius: 6, background: '#27272a',
-              border: '1px solid #3f3f46', color: '#fff', cursor: 'pointer', fontSize: 12,
+              minHeight: 40, padding: '8px 14px', borderRadius: 12, background: '#27272a',
+              border: '1px solid #4b4b52', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
             }}
             onClick={() => svgRef.current && onSvg(svgRef.current)}
           >
@@ -247,8 +249,8 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
         {onPng && (
           <button
             style={{
-              minHeight: 32, padding: '4px 10px', borderRadius: 6, background: '#27272a',
-              border: '1px solid #3f3f46', color: '#fff', cursor: 'pointer', fontSize: 12,
+              minHeight: 40, padding: '8px 14px', borderRadius: 12, background: '#27272a',
+              border: '1px solid #4b4b52', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
             }}
             onClick={() => svgRef.current && onPng(svgRef.current)}
           >
