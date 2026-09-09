@@ -35,7 +35,7 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
-import { AdRoot, AdHead, AdSteps, AdCard, AdSec, AdGrid, AdField, AdCheck, AdChip, AdBtn, AdBanner, type AdStepDef } from './arm-design-system';
+import { AdRoot, AdHead, AdSteps, AdCard, AdSec, AdGrid, AdField, AdCheck, AdChip, AdBtn, AdBanner, AdEmpty, AdCta, type AdStepDef } from './arm-design-system';
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 
@@ -506,7 +506,7 @@ export function ArmAutoConstructor() {
         icon="🤝"
         title="Арм-конструктор PRO"
         sub="Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard."
-        side={best ? (<><div>{best.name}</div><div className="ad-muted">{ranked[0]?.score ?? 0} баллов</div></>) : '—'}
+        side={best ? (<div className="ad-hero-side"><div className="ad-hero-score" aria-hidden><b>{ranked[0]?.score ?? 0}</b><span>баллов</span></div><div className="ad-hero-name">{best.name}<span>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
       <AdSteps steps={STEP_DEFS} active={step} onSelect={(id) => setStep(id as Step)} hook="steps" />
@@ -905,8 +905,10 @@ export function ArmAutoConstructor() {
             })()}
           </AdSec>
 
-          <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
-          <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+          <AdCta>
+            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
+            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+          </AdCta>
         </AdCard>
       )}
 
@@ -924,26 +926,32 @@ export function ArmAutoConstructor() {
           <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
             <div className="ad-list" data-arm="split-list">
               {ranked.slice(0,6).map((r,i)=> (
-                <div key={r.pattern.id} className="ad-sec" data-active={patternId===r.pattern.id} onClick={()=>setPatternId(r.pattern.id)} role="button" tabIndex={0} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setPatternId(r.pattern.id); }}>
-                  <div><b>{i===0 ? '★ ' : ''}{r.pattern.name}</b> <span className="ad-muted">— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span> <span className="ad-stat-v">{r.score}</span></div>
-                  <div className="ad-muted">{r.pattern.description}</div>
+                <div key={r.pattern.id} className="ad-sec ad-split" data-active={patternId===r.pattern.id || (!patternId && i===0)} onClick={()=>setPatternId(r.pattern.id)} role="button" tabIndex={0} aria-pressed={patternId===r.pattern.id} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setPatternId(r.pattern.id); }}>
+                  <div className="ad-split-top">
+                    <span className="ad-split-radio" aria-hidden />
+                    <span className="ad-split-name">{i===0 ? '★ ' : ''}{r.pattern.name} <span>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span></span>
+                    <span className="ad-split-score">{r.score}</span>
+                  </div>
+                  <div className="ad-split-desc">{r.pattern.description}</div>
                   {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
                   {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
                 </div>
               ))}
             </div>
           </AdSec>
-          <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать с выбранным сплитом</AdBtn>
+          <AdCta>
+            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать с выбранным сплитом</AdBtn>
+          </AdCta>
         </AdCard>
       )}
 
       {step === 'plan' && (
         <AdCard>
-          {!builtPlan ? <AdBanner tone="info">План не собран — вернись в «Параметры».</AdBanner> : (
+          {!builtPlan ? <AdEmpty icon="📋" title="План не собран — вернись в «Параметры»." sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
               {planDash && (
-                <div className="ad-stats">
+                <div className="ad-stats" data-arm="plan-dash">
                   <div className="ad-stat"><div className="ad-stat-v">{planDash.weeks}</div><div className="ad-stat-l">Недель</div></div>
                   <div className="ad-stat"><div className="ad-stat-v">{planDash.sess}</div><div className="ad-stat-l">Сессий</div><div className="ad-stat-s">{planDash.ex} упр.</div></div>
                   <div className="ad-stat"><div className="ad-stat-v">{planDash.tablePct}%</div><div className="ad-stat-l">Стол</div></div>
@@ -975,10 +983,13 @@ export function ArmAutoConstructor() {
                         <div key={ei} className="ad-ex">
                           <div className="ad-ex-top">
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl"><b>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag">RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-tag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
+                            <span className="ad-ex-vl"><b>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag">RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
                           </div>
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
+                          )}
+                          {ex.workSets?.[0]?.weight > 0 && ex.sets > 1 && (
+                            <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((ex.sets / 5) * 100))}%` }} /></div>
                           )}
                         </div>
                       ))}
@@ -1023,7 +1034,7 @@ export function ArmAutoConstructor() {
 
       {step === 'quality' && (
         <AdCard>
-          {!builtPlan ? <AdBanner tone="info">Сначала собери план.</AdBanner> : (
+          {!builtPlan ? <AdEmpty icon="📊" title="Сначала собери план." sub="Качество, MRV, humerus/UCL/shoulder/tendon-гейты и тепловая карта появятся после сборки."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <AdSec title="📊 Качество">
                 <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
@@ -1063,7 +1074,7 @@ export function ArmAutoConstructor() {
       {step === 'weights' && (
         <AdCard>
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
-            {!builtPlan ? <AdBanner tone="info">Сначала собери план в «Параметры».</AdBanner> : (
+            {!builtPlan ? <AdEmpty icon="🏋️" title="Сначала собери план в «Параметры»." sub="Веса считаются от рабочих максимумов: тяж 82%, техника 60%, памп 68%."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
               <>
                 <div className="ad-stats">
                   {Object.entries(workMax).map(([k,v])=> (

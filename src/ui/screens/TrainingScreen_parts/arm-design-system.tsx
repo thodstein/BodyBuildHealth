@@ -246,14 +246,47 @@ export function AdBtn({
   block,
   hero,
   children,
+  onClick,
   ...rest
 }: BtnProps & { variant?: 'primary' | 'ghost' | 'amber' | 'danger' | 'dark'; block?: boolean; hero?: boolean }) {
   const cls = `ad-btn${block ? ' ad-btn-block' : ''}${hero ? ' ad-btn-hero' : ''}`;
   return (
-    <button className={cls} data-variant={variant} {...rest}>
+    <button
+      className={cls}
+      data-variant={variant}
+      onClick={(e) => { buzz(); onClick?.(e); }}
+      {...rest}
+    >
       {children}
     </button>
   );
+}
+
+export function AdEmpty({
+  icon,
+  title,
+  sub,
+  children,
+}: {
+  icon: string;
+  title: string;
+  sub?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="ad-empty">
+      <div className="ad-empty-ic" aria-hidden>
+        {icon}
+      </div>
+      <div className="ad-empty-t">{title}</div>
+      {sub ? <p className="ad-empty-s">{sub}</p> : null}
+      {children}
+    </div>
+  );
+}
+
+export function AdCta({ children }: { children: React.ReactNode }) {
+  return <div className="ad-cta">{children}</div>;
 }
 
 export function AdBanner({

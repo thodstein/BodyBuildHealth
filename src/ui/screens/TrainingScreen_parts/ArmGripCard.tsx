@@ -36,10 +36,10 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
   const apply = () => { if (onApplyWeak) onApplyWeak(diag.weakMuscles.slice(0,2)); };
 
   return (
-    <div className="train-armgrip">
+    <div className="train-armgrip" data-arm="grip-card">
       <AdCard>
         <div className="ad-sec-t">✊ Хват — диагностика</div>
-        <p className="ad-muted">Введи максимумы — увидишь слабые зоны хвата.</p>
+        <p className="ad-muted">Введи максимумы — увидишь слабые зоны хвата. Support (RT/Axle) · pinch · crush — объёмы и PRO-гейты подтянутся сами.</p>
         <AdGrid cols="auto-sm">
           <AdField label="Rolling Thunder (кг)">
             <input value={rt} onChange={e=>setRt(e.target.value)} placeholder="60" inputMode="decimal" />

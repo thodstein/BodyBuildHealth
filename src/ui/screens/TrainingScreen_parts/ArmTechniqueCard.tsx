@@ -42,10 +42,10 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
   };
 
   return (
-    <div className="train-armtech">
+    <div className="train-armtech" data-arm="tech-card">
       <AdCard>
         <div className="ad-sec-t">🎯 Диагностика слабых звеньев</div>
-        <p className="ad-muted">Где проваливаешься за столом? Отметь — получишь слабые мышцы и упражнения.</p>
+        <p className="ad-muted">Где проваливаешься за столом? Отметь — получишь слабые мышцы и упражнения. Cup/rising/pronation/supination → точный разбор.</p>
         <div className="ad-row">
           <select value={technique} onChange={e => setTechnique(e.target.value)} aria-label="Техника">
             <option value="balanced">Сбалансировано</option>
