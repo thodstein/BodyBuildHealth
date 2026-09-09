@@ -42,6 +42,11 @@ describe('Arm hub tabpanel', () => {
     expect(container.querySelector("[data-arm='hub-tabs']"), 'tabs alive').not.toBeNull();
   });
 
+  it('лента табов объявляется вкладками, а не шагами', () => {
+    const { container } = render(<ArmDiagnosticsHub />);
+    expect(container.querySelector("[data-arm='hub-tabs']")?.getAttribute('aria-label')).toBe('Вкладки');
+  });
+
   it('слой: keyframes перехода + reduced-motion', () => {
     const css = readBaseCss();
     expect(css).toContain('@keyframes adTabIn');

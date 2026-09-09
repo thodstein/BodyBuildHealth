@@ -27,6 +27,7 @@ describe('Arm wizard navigation', () => {
       '5📋 План и проверка',
     ]);
     expect(document.body.textContent).toContain('Дисциплина');
+    expect(container.querySelector("[data-arm='steps']")?.getAttribute('aria-label')).toBe('Шаги');
   });
 
   it('«Далее/Назад» ведут по цепочке params → athlete → grip', () => {

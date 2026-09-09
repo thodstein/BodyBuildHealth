@@ -85,15 +85,17 @@ export function AdSteps({
   onSelect,
   hook,
   numbered = true,
+  label,
 }: {
   steps: AdStepDef[];
   active: string;
   onSelect: (id: string) => void;
   hook: string;
   numbered?: boolean;
+  label?: string;
 }) {
   return (
-    <div className="ad-steps" data-arm={hook} aria-label="Шаги">
+    <div className="ad-steps" data-arm={hook} aria-label={label ?? (numbered ? 'Шаги' : 'Вкладки')}>
       {steps.map((s, i) => (
         <button
           key={s.id}
