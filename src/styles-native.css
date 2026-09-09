@@ -147,10 +147,10 @@ html.app-native .hero-fullscreen-img {
   object-position: center top !important;
 }
 
-/* Отмена мобильного contain — в APK hero всегда cover на весь экран */
+/* Главная: ПОЛНАЯ версия hero и в APK — без обрезки верха (contain от верха) */
 @media (max-width: 480px) {
   html.app-native .dashboard-hero-img {
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: center top !important;
     background: #050b16 !important;
   }

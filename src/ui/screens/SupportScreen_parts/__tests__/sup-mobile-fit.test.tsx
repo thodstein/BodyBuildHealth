@@ -375,11 +375,18 @@ describe('SUP mobile fit (360px)', () => {
       '1fr 1fr 1fr',
       'table-layout: fixed',
       'pre-wrap',
+      // §24 MOBILE PRO-MAX: микрошрифты 6/7→11px, 8/9→12px, тапы 44px,
+      // 2-колонки в 1 на 380px, комплаенс/жалобы 4→2, матрицы в скролле
+      'font-size: 11px',
+      'font-size: 12px',
+      'min-width: 44px',
+      'repeat(2, 1fr)',
+      'flex-wrap: wrap',
     ]) {
       expect(css, hook).toContain(hook);
     }
     const native = readNativeCss();
-    for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp']) {
+    for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp', 'sup-compliance', 'sup-synergy', 'sup-interact', 'sup-weekplan', 'sup-complaints']) {
       expect(native, hook).toContain(hook);
     }
   });

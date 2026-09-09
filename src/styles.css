@@ -3410,12 +3410,13 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   will-change:auto;
   filter:none !important;
 }
-.dashboard-hero-img { object-fit:cover !important; object-position:center top !important; }
-/* Дашборд: мобильный портрет — строго без обрезки (переопределяет глобальный cover, стоит последним) */
+.dashboard-hero-img { object-fit:contain !important; object-position:center top !important; background:#07070a !important; }
+/* Главная: ПОЛНАЯ версия hero без обрезки на любом экране (contain от верха).
+ * Переопределяет глобальный cover ниже: та же специфичность, стоит последним. */
 @media (max-width: 480px) {
   .dashboard-hero-img {
     object-fit:contain !important;
-    object-position:center center !important;
+    object-position:center top !important;
     background:#07070a !important;
     filter:none !important;
   }
@@ -3499,7 +3500,7 @@ body {
 .tabs {
   left: 12px;
   right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px)) + 10px);
   top: auto;
   height: var(--nav-height);
   border-radius: 26px;
@@ -3679,21 +3680,14 @@ button[data-variant='primary'] {
   animation: fadeUpV2 0.3s cubic-bezier(0.22, 0.68, 0, 1);
 }
 
-/* ─── Hero всегда cover на весь экран (отмена мобильного contain) ─── */
-.hero-fullscreen-img {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: cover !important;
-  object-position: center top !important;
-}
-
-@media (max-width: 480px) {
-  .dashboard-hero-img {
-    object-fit: cover !important;
-    object-position: center top !important;
-  }
+/* ─── Главная: ПОЛНАЯ версия hero — верх фото не вырезан ───
+ * contain от верха + сдвиг на высоту шторки/Telegram-safe-area, чтобы
+ * запечённые HUD-надписи не уходили под статус-бар. Остальные hero
+ * (articles/risk/…) остаются cover на весь экран. */
+.dashboard-hero-img {
+  object-fit: contain !important;
+  object-position: 50% calc(env(safe-area-inset-top, 0px) + var(--tg-safe-top, 0px)) !important;
+  background: #07070a !important;
 }
 
 /* ─── Узкие экраны: навбар в одну строку ─── */
@@ -3721,4 +3715,60 @@ button[data-variant='primary'] {
   .native-fade-up {
     animation: none;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * BOTTOM-DASHBOARD CLEARANCE FIX (все платформы: APK + TG + web).
+ * Причина: плавающая pill-навигация (.tabs: bottom 10px + height
+ * var(--nav-height) + safe-area) перекрывала концы списков и внутренние
+ * фиксированные бары (support-subbar / labs-bottomtabs / editor-bottomnav),
+ * которые стояли на bottom: var(--nav-height) без +10px смещения пилюли
+ * и без --tg-safe-bottom (в TG WebView env() часто 0).
+ * Правило: только отступы/позиция, логика и движки не тронуты.
+ * ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --tabbar-h: var(--nav-height, 76px);
+  --tabbar-offset: 10px;
+  --tabbar-safe: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px));
+  --tabbar-clear: calc(var(--tabbar-h) + var(--tabbar-offset) + var(--tabbar-safe) + 24px);
+  --tabbar-lift: calc(var(--tabbar-h) + var(--tabbar-offset) + var(--tabbar-safe) + 8px);
+  /* Унификация: --bottom-nav-h был 64px и топил editor-bottomnav под пилюлю 76px. */
+  --bottom-nav-h: var(--tabbar-h);
+}
+
+main,
+.screen {
+  scroll-padding-bottom: var(--tabbar-clear);
+}
+
+/* Аддитивный зазор в конце скролл-контейнеров: не уменьшает существующие
+ * большие отступы (labs +84, support +56), только гарантирует недостающие
+ * ~18-20px (смещение пилюли 10px + расхождение 68/76 + TG-safe). */
+.screen::after,
+.pharma-body::after,
+.labs-body::after,
+.risk-body::after,
+.support-root::after,
+.tp-body::after {
+  content: '';
+  display: block;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+/* В APK WebView часто отдаёт env(bottom)=0 при реальном жест-баре ~28px:
+ * safe берём с тем же fallback 28px, что у нативной пилюли. */
+html.app-native {
+  --tabbar-safe: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px), 28px);
+}
+
+/* Внутренние нижние бары — строго ВЫШЕ плавающей пилюли, с зазором 8px. */
+.support-subbar {
+  bottom: var(--tabbar-lift) !important;
+}
+.labs-bottomtabs {
+  bottom: var(--tabbar-lift) !important;
+}
+.manual-constructor--editor .editor-bottomnav {
+  bottom: var(--tabbar-lift) !important;
 }

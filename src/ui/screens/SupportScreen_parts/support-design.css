@@ -994,3 +994,133 @@
   max-width: 100% !important;
   overflow-x: auto !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §24. MOBILE PRO-MAX — телефон 360px (TG + web + APK-база).
+ * Добивка: микрошрифты 6/7/8/9 → читаемые 11/12px во ВСЕХ зонах
+ * (био/избранное/дневник/синергии/взаимодействия/жалобы/комплаенс/
+ *  протоколы/решатель/неделя/гормоны/каталог/стеки/исследования/
+ *  пептиды/дозы/тайминг/аналоги/генератор); крошечные кнопки-шевроны
+ *  ▲▼/✕/📂/🗑 → тап 44px; плотные 2-колоночные сетки → 1 колонка
+ *  на ≤380px; матрицы совместимости — только горизонтальный скролл;
+ *  hero-компакт на узком экране. Только подача, логика/строки целы.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 24.1. МИКРОШРИФТ 6px → 11px (все зоны, оба формата пробелов) ── */
+.support-screen.support-root [data-sup] [style*='font-size: 6'],
+.support-screen.support-root [data-sup] [style*='font-size:6'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  padding: 3px 7px !important;
+  border-radius: 6px !important;
+}
+
+/* ─── 24.2. МИКРОШРИФТ 7px → 11px ────────────────────────────────── */
+.support-screen.support-root [data-sup] [style*='font-size: 7'],
+.support-screen.support-root [data-sup] [style*='font-size:7'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  padding: 3px 7px !important;
+  border-radius: 6px !important;
+}
+
+/* ─── 24.3. МЕЛКИЙ ТЕКСТ 8-9px → 12px ────────────────────────────── */
+.support-screen.support-root [data-sup] [style*='font-size: 8'],
+.support-screen.support-root [data-sup] [style*='font-size:8'],
+.support-screen.support-root [data-sup] [style*='font-size: 9'],
+.support-screen.support-root [data-sup] [style*='font-size:9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── 24.4. КРОШЕЧНЫЕ КНОПКИ → ТАП 44px ────────────────────────────
+ * Шевроны секций (padding 2px 6px / 3px 8px), иконки ✕/📂/🗑/★/💊,
+ * «Убрать»/«+ Мой стек»/«+ Добавить» — палец попадает с первого раза. */
+.support-screen.support-root [data-sup] button[style*='padding: 1px'],
+.support-screen.support-root [data-sup] button[style*='padding:1px'],
+.support-screen.support-root [data-sup] button[style*='padding: 2px'],
+.support-screen.support-root [data-sup] button[style*='padding:2px'],
+.support-screen.support-root [data-sup] button[style*='padding: 3px 8px'],
+.support-screen.support-root [data-sup] button[style*='padding:3px 8px'] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+
+/* ─── 24.5. ПЛОТНЫЕ 2-КОЛОНОЧНЫЕ СЕТКИ → 1 КОЛОНКА (≤380px) ───────
+ * Дозы/био/синергии/тайминг/аналоги/пептиды/каталог/избранное/
+ * дневник/стеки/исследования: на 360px две колонки ~160px жмут
+ * PopupSelect и бейджи с nowrap — складываем в одну. Матрицы
+ * совместимости (40px repeat / 36px) НЕ трогаем — у них свой скролл. */
+@media (max-width: 380px) {
+  .support-screen.support-root [data-sup='calc'] [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root [data-sup='calc'] [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root [data-sup='catalog'] [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root [data-sup='catalog'] [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-diary [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-diary [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-stacks [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-stacks [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-fav [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-fav [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-research [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-research [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-bio [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-bio [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-pepcalc [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-pepcalc [style*='grid-template-columns:1fr 1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── 24.6. КОМПЛАЕНС 4-КОЛОНКИ → 2 НА ТЕЛЕФОНЕ ───────────────────
+ * Недельные точки приёма: 4 в ряд на 360px = ~80px/точка, палец
+ * мажет. Две в ряд — комфортные ~160px. */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-compliance [style*='repeat(4, 1fr)'],
+  .support-screen.support-root .sup-diary [style*='repeat(4, 1fr)'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ─── 24.7. ЖАЛОБЫ 4-КОЛОНКИ → 2 НА ТЕЛЕФОНЕ ────────────────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-complaints [style*='1fr 1fr 1fr 1fr'],
+  .support-screen.support-root .sup-complaints [style*='repeat(4'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ─── 24.8. МАТРИЦЫ — ГОРИЗОНТАЛЬНЫЙ СКРОЛЛ, НЕ РАЗРЫВ ────────────
+ * Геометрию ячеек не трогаем (как в §20): контейнер скроллится,
+ * страница не уезжает вширь. */
+.support-screen.support-root .sup-synergy [style*='repeat('],
+.support-screen.support-root .sup-interact [style*='repeat('] {
+  max-width: 100% !important;
+}
+.support-screen.support-root .sup-synergy,
+.support-screen.support-root .sup-interact {
+  overflow-x: auto !important;
+}
+
+/* ─── 24.9. СТРОКИ С БЕЙДЖАМИ — ПЕРЕНОС НА УЗКОМ ЭКРАНЕ ───────────
+ * Ряды «название + чипы + кнопки» (каталог/избранное/дневник/стеки):
+ * длинное название сжимается, кнопки не выдавливаются за край. */
+@media (max-width: 480px) {
+  .support-screen.support-root [data-sup] [style*='display: flex'][style*='justify-content: space-between'],
+  .support-screen.support-root [data-sup] [style*='display:flex'][style*='justify-content: space-between'] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+}
+
+/* ─── 24.10. ТАБЛИЦЫ: ЯЧЕЙКИ С ВОЗДУХОМ НА ТЕЛЕФОНЕ ─────────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root [data-sup] th,
+  .support-screen.support-root [data-sup] td {
+    padding: 8px !important;
+    font-size: 12px !important;
+  }
+}

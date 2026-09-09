@@ -1101,3 +1101,174 @@ html.app-native .train-sup.sup-apk .sup-diary button:focus-visible {
     transform: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §18. MOBILE PRO-MAX — телефон 360px поверх §24 TG-базы.
+ * Добивка §24: стекло тесных зон, glow активного, press 0.97,
+ * focus-visible, tabular-цифры, safe-area низов, snap ленты пилюль,
+ * 380px-компакт, reduced-motion. Только native (каждый селектор —
+ * с html.app-native, без hex — чекер цел). TG/web — байт-в-байт.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 18.1. ТЕСНЫЕ ЗОНЫ — СТЕКЛО 18px ───────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints {
+  border-radius: 18px !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance {
+  border-radius: 18px !important;
+}
+html.app-native .train-sup.sup-apk .sup-synergy {
+  border-radius: 18px !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact {
+  border-radius: 18px !important;
+}
+html.app-native .train-sup.sup-apk .sup-weekplan {
+  border-radius: 18px !important;
+}
+
+/* ─── 18.2. КНОПКИ-ШЕРОНЫ 44px — СТЕКЛО + PRESS ─────────────────── */
+html.app-native .train-sup.sup-apk .sup-bio button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-fav button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-diary button {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-complaints button {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance button {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-synergy button {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact button {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+}
+
+/* ─── 18.3. PRESS 0.97 НА НОВЫХ ЗОНАХ ───────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-sup.sup-apk .sup-synergy button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-sup.sup-apk .sup-weekplan button:active {
+  transform: scale(0.97) !important;
+}
+
+/* ─── 18.4. FOCUS-VISIBLE ЛАЙМ ──────────────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-sup.sup-apk .sup-synergy button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-sup.sup-apk .sup-bio input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 1px !important;
+}
+html.app-native .train-sup.sup-apk .sup-fav input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 1px !important;
+}
+
+/* ─── 18.5. TABULAR-ЦИФРЫ В ТЕСНЫХ ЗОНАХ ────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-sup.sup-apk .sup-synergy {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-sup.sup-apk .sup-weekplan {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 18.6. НИЗЫ НАД СУББАРОМ + SAFE-AREA ───────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+html.app-native .train-sup.sup-apk .sup-compliance {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+html.app-native .train-sup.sup-apk .sup-weekplan {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* ─── 18.7. МАТРИЦЫ — СТЕКЛО СКРОЛЛ-КОНТЕЙНЕРА ──────────────────── */
+html.app-native .train-sup.sup-apk .sup-synergy {
+  scrollbar-width: thin !important;
+}
+html.app-native .train-sup.sup-apk .sup-interact {
+  scrollbar-width: thin !important;
+}
+
+/* ─── 18.8. КОМПАКТ 380px ───────────────────────────────────────── */
+@media (max-width: 380px) {
+  html.app-native .train-sup.sup-apk .sup-complaints button {
+    min-height: 48px !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-compliance button {
+    min-height: 48px !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-synergy button {
+    min-height: 48px !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-interact button {
+    min-height: 48px !important;
+  }
+}
+
+/* ─── 18.9. REDUCED MOTION ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk .sup-complaints button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-compliance button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-synergy button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-interact button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-weekplan button:active {
+    transform: none !important;
+  }
+}

@@ -41,11 +41,31 @@ const JUMP_COLORS: Record<string, string> = {
 
 export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
   const [activeId, setActiveId] = useState('1-1');
-  const handleJump = (id: string) => {
+  const handleJump = (id: string, btn?: HTMLElement | null) => {
     setActiveId(id);
     try {
-      const el = document.getElementById(`profile-section-${id}`);
-      if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Поднавигация обязана раскрывать целевой аккордеон: иначе клик по
+      // закрытому разделу только скроллит к 68px-шапке и выглядит «не работает».
+      window.dispatchEvent(new CustomEvent('profile-accordion-open', { detail: `profile-section-${id}` }));
+      // Активную пилюлю довозим в видимую зону ленты (только горизонтально,
+      // чтобы не дёргать вертикальный скролл).
+      try {
+        if (btn && typeof btn.scrollIntoView === 'function') {
+          btn.scrollIntoView({ block: 'nearest', inline: 'center' } as ScrollIntoViewOptions);
+        }
+      } catch { /* не критично */ }
+      // Скролл после раскрытия: аккордеон меняет layout в следующем кадре,
+      // поэтому целимся дважды — сразу и после paint.
+      const scrollToTarget = () => {
+        const el = document.getElementById(`profile-section-${id}`);
+        if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      scrollToTarget();
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => window.setTimeout(scrollToTarget, 60));
+      } else {
+        window.setTimeout(scrollToTarget, 60);
+      }
     } catch {
       // Старый WebView без smooth-scroll: активный раздел уже выставлен, скролл не критичен.
     }
@@ -88,7 +108,7 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
               <button
                 key={link.id}
                 type="button"
-                onClick={() => handleJump(link.id)}
+                onClick={e => handleJump(link.id, e.currentTarget)}
                 aria-label={`Перейти к разделу ${link.label}`}
                 aria-current={active ? 'true' : undefined}
                 data-active={active}

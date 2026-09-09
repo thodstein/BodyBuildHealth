@@ -1,5 +1,9 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Главная: ПОЛНАЯ версия hero без вырезанного верха (Sep 09 2026, НЕ пушить — очередь чужих)
+
+Жалоба: верх главного hero фактически отсутствует (вырезан). Причина: хвост `styles.css` поздним правилом отменял мобильный contain и ставил `.dashboard-hero-img` в cover — на узком телефоне бока резались, а верх уходил под шторку/Telegram-хедер. Фикс — полная версия везде: база `.dashboard-hero-img` = contain от верха + фон (бьёт generic cover порядком), хвост заменён на contain со сдвигом `object-position: 50% calc(env(safe-area)+var(--tg-safe-top))` (десктоп = center top, телефон — ниже шторки); инлайн `DashboardScreen` cover→contain; §3 `styles-native` cover→contain (на случай fallback на классику в APK). APK-native (`contain center top` + фон ниже шторки) уже был полным — не тронут, тесты его целы. Проверено: dashboard-native/first-run + apk-top-pack + profile-accent + home-profile-shop **77/77**, `verify:apk-design` OK. Файлы: `styles.css`, `DashboardScreen.tsx`, `styles-native.css` (§3). НЕ ПУШИТЬ.
+
 ## Дневник питания: TOP-АПК 12 раундов + структурный разрез (Sep 09 2026, НЕ пушить — очередь чужих)
 
 Постановка: вкладка «Дневник питания» до уровня современного АПК + полная структурная перестройка (только структура, поведение 1-в-1). Паттерн: TG-инлайн единый для обеих платформ (хуки `nd-*` + тач 44px + инпуты 16px), АПК-специфика только под `html.app-native` (§89-§94 `styles-native.css`, без hex — чекер цел). Чужие зоны не тронуты: планировщик питания, `NutritionQualityCard`/hero-kit, движки, каталог/корзина.

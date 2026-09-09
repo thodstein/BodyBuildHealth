@@ -2172,10 +2172,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-        {/* OCR Import — TOP APK bottom-sheet */}
+        {/* OCR Import — floating bottom-sheet above nav + labs-bottomtabs */}
       {showImport && (
-         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={backdropClick}>
-          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', maxHeight:'88vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }} onClick={e => e.stopPropagation()}>
+         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px))' }} onClick={backdropClick}>
+          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', maxHeight:'80vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 2px', flexShrink:0 }} />
             <div style={{ padding:'12px 16px', borderBottom:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexShrink:0 }}>
               <span style={{ fontWeight:800, fontSize:15, color:'#fff', display:'inline-flex', alignItems:'center', gap:8 }}><NativeIcon name="file" size={16} /> Импорт анализов</span>
@@ -2296,10 +2296,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* Lab Input Modal — full screen to bottom */}
+      {/* Lab Input Modal — floating sheet above nav + labs-bottomtabs */}
       {showLabInput && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => setShowLabInput(false)}>
-          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'92dvh', overflow:'hidden', display:'flex', flexDirection:'column' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px))' }} onClick={() => setShowLabInput(false)}>
+          <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'80dvh', overflow:'hidden', display:'flex', flexDirection:'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px', flexShrink:0 }} />
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'0 18px 12px', flexShrink:0 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>

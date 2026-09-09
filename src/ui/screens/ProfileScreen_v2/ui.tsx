@@ -594,15 +594,24 @@ export const AccordionSection: React.FC<{
 }> = ({ title, subtitle, icon, color, defaultOpen = false, children, badge, id }) => {
   const [open, setOpen] = useState(defaultOpen);
   const c = color || colors.primary;
-  // Пакетное «Развернуть все / Свернуть» из ProfileUserTab (без проп-дриллинга).
+  // Пакетное «Развернуть все / Свернуть» из ProfileUserTab (без проп-дриллинга)
+  // + точечное «открыть раздел» из quick-jump (поднавигация обязана раскрывать цель).
   useEffect(() => {
     const handler = (e: Event) => {
       const v = (e as CustomEvent<boolean>).detail;
       if (typeof v === 'boolean') setOpen(v);
     };
+    const openOne = (e: Event) => {
+      const targetId = (e as CustomEvent<string>).detail;
+      if (typeof targetId === 'string' && targetId && id && targetId === id) setOpen(true);
+    };
     window.addEventListener('profile-accordion-toggle', handler as EventListener);
-    return () => window.removeEventListener('profile-accordion-toggle', handler as EventListener);
-  }, []);
+    window.addEventListener('profile-accordion-open', openOne as EventListener);
+    return () => {
+      window.removeEventListener('profile-accordion-toggle', handler as EventListener);
+      window.removeEventListener('profile-accordion-open', openOne as EventListener);
+    };
+  }, [id]);
   return (
     <div
       id={id}

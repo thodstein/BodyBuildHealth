@@ -628,8 +628,8 @@ export default function LabsCatalogTab({
         const numVal = parseFloat(val);
         const hasVal = val.trim() !== '' && !isNaN(numVal);
         return (
-          <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => setDetailEntry(null)}>
-            <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px 22px 0 0', padding:'0 18px calc(18px + env(safe-area-inset-bottom,0px))', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', maxHeight:'88vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px))' }} onClick={() => setDetailEntry(null)}>
+            <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', padding:'0 18px calc(18px + env(safe-area-inset-bottom,0px))', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', maxHeight:'80vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px' }} />
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:12 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>

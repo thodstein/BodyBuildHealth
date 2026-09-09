@@ -131,25 +131,13 @@ export function analyzeLabDrugCorrelation(
     const effects: string[] = [];
 
     activeDrugs.forEach(d => {
-      // Check PHARMA_LAB_MARKERS first (explicit mapping)
+      // Только явная связь из PHARMA_LAB_MARKERS — иначе засоряется причинность (любой ААС → любой маркер)
       const markerList = PHARMA_LAB_MARKERS[d.substanceId];
       if (markerList && markerList.includes(marker)) {
         impactingDrugs.push(d.substanceId);
         const ef = getDrugMarkerEffect(d.substanceId, marker);
         maxSeverity = Math.max(maxSeverity, ef.severity);
         effects.push(`${d.substanceId}:${ef.effect}`);
-        return;
-      }
-      // Fallback: check general drug class impact
-      const ef = getDrugMarkerEffect(d.substanceId, marker);
-      if (ef.severity > 0.3) {
-        const cls = getDrugClassName(d.substanceId);
-        const markerListAll = Object.entries(PHARMA_LAB_MARKERS).find(([k]) => k === d.substanceId);
-        if (!markerListAll) {
-          impactingDrugs.push(d.substanceId);
-          maxSeverity = Math.max(maxSeverity, ef.severity);
-          effects.push(`${d.substanceId}:${ef.effect}`);
-        }
       }
     });
 
