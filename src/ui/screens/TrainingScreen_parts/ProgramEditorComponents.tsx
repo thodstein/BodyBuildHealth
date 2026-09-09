@@ -599,14 +599,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                 </div>
               );
             })()}
-            <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span className="editor-week-actions" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <button aria-label={`Копировать неделю ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', fontSize: 12 }} onClick={() => cloneWeek(wi)} title="Клонировать — +2.5% к весу">⧉</button>
               <button aria-label={`Заметка недели ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: noteWeekIdx === wi ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', background: noteWeekIdx === wi ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', color: noteWeekIdx === wi ? '#00e68a' : 'rgba(255,255,255,0.65)', cursor: 'pointer', fontSize: 12 }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка">💬</button>
               <button aria-label={`Удалить неделю ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(239,68,68,0.18)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 12 }} onClick={() => removeWeek(wi)}>✕</button>
             </span>
           </div>
           {/* Meta row — фаза / RIR / deload / кол-во тренировок / объём */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.16)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="editor-week-meta" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.16)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <PhasePicker value={w.phase} options={[{ id: 'accumulation', label: 'Накопление' }, { id: 'intensification', label: 'Интенсификация' }, { id: 'deload', label: 'Разгрузка' }, { id: 'peaking', label: 'Пик' }]} onChange={v => updateWeek(wi, { phase: v as UserWeek['phase'] })} ariaLabel={`Фаза недели ${w.week}`} />
             {(() => {
               const phaseRir: Record<string, string> = { accumulation: '3→1', intensification: '2→0', deload: '4', peaking: '1→0' };
@@ -622,7 +622,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             <button style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, border: volWeekIdx === wi ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.08)', background: volWeekIdx === wi ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: volWeekIdx === wi ? '#00e68a' : 'rgba(255,255,255,0.65)', cursor: 'pointer', marginLeft: 'auto' }} onClick={() => { setExpandedWeekIdx(wi); setVolWeekIdx(volWeekIdx === wi ? null : wi); }}>{volWeekIdx === wi ? 'Скрыть объём' : '📊 Объём'}</button>
           </div>
           {/* Actions row — перемещение недели */}
-          <div style={{ display: 'flex', gap: 4, padding: '6px 10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
+          <div className="editor-week-move" style={{ display: 'flex', gap: 4, padding: '6px 10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Порядок:</span>
             {wi > 0 ? <button aria-label={`Переместить неделю ${w.week} выше`} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.22)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa', cursor: 'pointer' }} onClick={() => swapWeek(wi, wi - 1)}>▲ выше</button> : <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>— начало</span>}
             {wi < body.weeks.length - 1 ? <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.22)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa', cursor: 'pointer' }} onClick={() => swapWeek(wi, wi + 1)}>▼ ниже</button> : <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>— конец</span>}
@@ -829,7 +829,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
                 <div className="editor-session-day" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: '#fff' }}>{s.name || 'Без названия'} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.45)' }}>· {s.blocks.length} упр.</span></div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 3, marginLeft: 8, flexShrink: 0, alignItems: 'center' }}>
+            <div className="editor-session-actions" style={{ display: 'flex', gap: 3, marginLeft: 8, flexShrink: 0, alignItems: 'center' }}>
               <button aria-label={`Вверх тренировка ${si + 1}`} disabled={si === 0} onClick={() => moveSession(si, -1)} title="Вверх" style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: si===0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)', cursor: si===0 ? 'not-allowed' : 'pointer', fontSize: 10 }}>▲</button>
               <button aria-label={`Вниз тренировка ${si + 1}`} disabled={si === sessions.length - 1} onClick={() => moveSession(si, 1)} title="Вниз" style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: si===sessions.length-1 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)', cursor: si===sessions.length-1 ? 'not-allowed' : 'pointer', fontSize: 10 }}>▼</button>
               <button aria-label={`Заметка тренировки ${si + 1}`} style={{ width: 28, height: 28, borderRadius: 8, border: noteOpenIdx === si ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', background: noteOpenIdx === si ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: noteOpenIdx === si ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer', fontSize: 11 }} onClick={() => setNoteOpenIdx(noteOpenIdx === si ? null : si)} title="Заметка">💬</button>
@@ -838,7 +838,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
             </div>
           </div>
           <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="editor-session-fields" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <input style={{ ...IN, padding: '7px 10px', fontSize: 11, flex: '1 1 120px', minHeight: 38, background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(255,255,255,0.08)' }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня (например: Грудь / Трицепс)" aria-label={`Название тренировки ${si + 1}`} />
             <DayOfWeekPicker value={dow} occupied={sessions.flatMap((other, oi) => oi === si ? [] : [sessionDayOfWeek(other, oi)])} onChange={d => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })} ariaLabel={`День недели тренировки ${si + 1}`} />
             <input style={{ ...IN, padding: '7px 10px', fontSize: 11, flex: '1 1 120px', minHeight: 38, background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(255,255,255,0.08)' }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />

@@ -11868,3 +11868,173 @@ html.app-native .manual-constructor .manual-compare button {
     transform: none !important;
   }
 }
+
+/* ─── 102. MANUAL WEEK/SESSION PRO — недели и тренировки редактора ───
+ * Хуки: .editor-week-card (.is-open), .editor-week-toggle,
+ * .editor-week-summary, .editor-week-actions, .editor-week-meta,
+ * .editor-week-move, .editor-session-card, .editor-session-heading,
+ * .editor-session-actions, .editor-session-fields, .editor-add-session,
+ * .editor-action-card.
+ * Тоглы/иконки 44px, инпуты 44px/16px, сводки tabular, press + focus,
+ * мета-лента со snap, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Карточка недели: радиус 18, сводка tabular ── */
+html.app-native .manual-constructor .editor-week-card {
+  border-radius: 18px !important;
+}
+
+html.app-native .manual-constructor .editor-week-summary {
+  font-variant-numeric: tabular-nums !important;
+  font-size: 12px !important;
+}
+
+/* ── Тогл и кнопки шапки недели: 44px + press/focus ── */
+html.app-native .manual-constructor .editor-week-toggle {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .manual-constructor .editor-week-actions button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .manual-constructor .editor-week-actions button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .manual-constructor .editor-week-toggle:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .editor-week-actions button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Мета-ряд: скролл-лента, контролы 44px ── */
+html.app-native .manual-constructor .editor-week-meta {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .manual-constructor .editor-week-meta::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .manual-constructor .editor-week-meta > * {
+  flex-shrink: 0 !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .manual-constructor .editor-week-meta button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-week-move button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* ── Заметка недели: 16px без зума ── */
+html.app-native .manual-constructor .editor-week-card textarea {
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Карточка тренировки: радиус 16, кнопки 44px, поля 44/16 ── */
+html.app-native .manual-constructor .editor-session-card {
+  border-radius: 16px !important;
+}
+
+html.app-native .manual-constructor .editor-session-actions button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+}
+
+html.app-native .manual-constructor .editor-session-actions button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .manual-constructor .editor-session-actions button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .editor-session-fields input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-session-card textarea {
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-kicker {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Добавление дня: CTA 52px ── */
+html.app-native .manual-constructor .editor-add-session {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+}
+
+html.app-native .manual-constructor .editor-add-session:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .editor-action-card {
+  border-radius: 14px !important;
+}
+
+html.app-native .manual-constructor .editor-action-card:active {
+  transform: scale(0.98) !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-session-heading {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-week-actions button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-session-actions button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-add-session:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-action-card:active {
+    transform: none !important;
+  }
+}

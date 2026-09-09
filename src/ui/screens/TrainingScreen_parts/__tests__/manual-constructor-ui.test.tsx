@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { buildProgramIcs } from '../ManualExport';
 import { ManualLibraryGallery } from '../ManualLibraryGallery';
 import { ProgramManagerPanelWithProvider } from '../ProgramManagerPanel';
@@ -119,6 +119,27 @@ describe('Менеджер: хуки §101 и честные счётчики б
     expect(screen.getByText(/программ · клон/)).toBeInTheDocument();
     expect(screen.getByText(/ПЛ-циклов · immutable/)).toBeInTheDocument();
   });
+});
+
+describe('Редактор: хуки недель/сессий §102', () => {
+  it('неделя и тренировка несут APK-хуки', async () => {
+    saveUserProgram(cloneFromLibrary(getAllPrograms()[0]), 'seed');
+    const { container } = render(<ProgramManagerPanelWithProvider />);
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    // открыть программу в редакторе
+    fireEvent.click(screen.getByText('Открыть'));
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeInTheDocument(), { timeout: 15000 });
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
+    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeInTheDocument(), { timeout: 15000 });
+    fireEvent.click(screen.getByText('Далее: Недели →'));
+    await waitFor(() => expect(container.querySelector('.editor-week-card')).toBeInTheDocument(), { timeout: 15000 });
+    expect(container.querySelector('.editor-week-toggle')).toBeInTheDocument();
+    expect(container.querySelector('.editor-week-actions')).toBeInTheDocument();
+    expect(container.querySelector('.editor-week-meta')).toBeInTheDocument();
+    expect(container.querySelector('.editor-session-card')).toBeInTheDocument();
+    expect(container.querySelector('.editor-session-actions')).toBeInTheDocument();
+    expect(container.querySelector('.editor-session-fields')).toBeInTheDocument();
+  }, 60000);
 });
 
 describe('ManualUI хуки для APK-слоя (§100)', () => {
