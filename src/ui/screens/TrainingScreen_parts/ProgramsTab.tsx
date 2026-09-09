@@ -220,15 +220,15 @@ export const ProgramsTab: React.FC<{
             <b>Разгрузка:</b> {expandedSelected.deloadProtocol}
           </div>
           {expandedSelected.warnings.length > 0 && (
-            <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+            <div className="lib-warn" style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
               {expandedSelected.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
             </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--accent)', background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+          <div className="lib-result" style={{ fontSize: 11, color: 'var(--accent)', background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
             <b>Ожидаемый результат:</b> {expandedSelected.expectedResults}
           </div>
 
-          <button onClick={handleLoadProgram}
+          <button className="lib-act" onClick={handleLoadProgram}
             style={{
               width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, marginBottom: 6,
@@ -237,7 +237,7 @@ export const ProgramsTab: React.FC<{
             📋 Загрузить программу
           </button>
           {onLoadToConstructor && (
-            <button onClick={handleLoadToConstructor}
+            <button className="lib-act" onClick={handleLoadToConstructor}
               style={{
                 width: '100%', padding: 12, borderRadius: 10, border: '1px solid #8b5cf6', cursor: 'pointer',
                 background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontWeight: 700, fontSize: 13, marginBottom: 6,
@@ -246,7 +246,7 @@ export const ProgramsTab: React.FC<{
               📥 Загрузить в конструктор (все {expandedSelected.weeks.length} нед)
             </button>
           )}
-          <button onClick={handleSaveToMyPrograms}
+          <button className="lib-act" onClick={handleSaveToMyPrograms}
             style={{
               width: '100%', padding: 10, borderRadius: 10, border: '1px solid var(--accent)', cursor: 'pointer',
               background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 6,
@@ -254,7 +254,7 @@ export const ProgramsTab: React.FC<{
             }}>
             📋 В мои программы
           </button>
-          <button onClick={handleAddToMyTraining}
+          <button className="lib-act" onClick={handleAddToMyTraining}
             style={{
               width: '100%', padding: 10, borderRadius: 10, border: '1px solid #8b5cf6', cursor: 'pointer',
               background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontWeight: 700, fontSize: 12, marginBottom: 6,
@@ -264,7 +264,7 @@ export const ProgramsTab: React.FC<{
           </button>
           {/* Кнопка "В ББ-авто" — только для BB/hypertrophy программ (не ПЛ!) */}
           {(expandedSelected.goal === 'hypertrophy' || expandedSelected.goal === 'bodybuilding' || expandedSelected.direction === 'bodybuilding' || expandedSelected.goal === 'athletic') && (
-            <button onClick={handleSendToBbAuto}
+            <button className="lib-act" onClick={handleSendToBbAuto}
               style={{
                 width: '100%', padding: 10, borderRadius: 10, border: '1px solid #00e68a', cursor: 'pointer',
                 background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 700, fontSize: 12, marginBottom: 6,

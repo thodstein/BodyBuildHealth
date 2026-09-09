@@ -8179,6 +8179,155 @@ html.app-native .lib-picker .lib-opt:focus-visible {
   }
 }
 
+/* ── Программы: CTA-стек 52px, warn/result стекло ── */
+html.app-native .train-library .lib-act {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .train-library .lib-act:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-library .lib-warn,
+html.app-native .train-library .lib-result {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+/* ── Методики: рекомендации и интенсивность — стекло ── */
+html.app-native .train-library .lib-reclist,
+html.app-native .train-library .lib-intensity {
+  border-radius: 20px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-reclist button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+}
+
+/* ── ExLab: бейджи-лента, био-стекло, пик 52px, сворачивание 48px ── */
+html.app-native .train-library .lib-badges {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding-bottom: 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-library .lib-badges::-webkit-scrollbar {
+  display: none;
+}
+
+html.app-native .train-library .lib-badges > span {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  font-size: 11px !important;
+}
+
+html.app-native .train-library .lib-bio {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+html.app-native .train-library .lib-pick {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .train-library .lib-pick:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-library .lib-collapse {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+}
+
+/* ── Мои: строки 48px с крестом 44px, тост над пилюлей ── */
+html.app-native .train-library .lib-myex {
+  border-radius: 14px !important;
+  padding: 8px 8px 8px 12px !important;
+  min-height: 48px !important;
+}
+
+html.app-native .train-library .lib-myex button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+}
+
+html.app-native .train-library .lib-toast {
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  border-radius: 16px !important;
+  font-size: 13px !important;
+  max-width: 94% !important;
+}
+
+/* ── Галерея: иконки 44px, превью-стекло ── */
+html.app-native .lib-manlib .lib-icon {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .lib-manlib .lib-icon:active {
+  transform: scale(0.92) !important;
+}
+
+html.app-native .lib-manlib .lib-preview {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+/* ── Пикер: счётчик-пилюля tabular ── */
+html.app-native .lib-picker .lib-count {
+  font-size: 11px !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  font-variant-numeric: tabular-nums !important;
+  display: inline-block !important;
+}
+
+/* ── Focus раунда 5 ── */
+html.app-native .train-library .lib-act:focus-visible,
+html.app-native .train-library .lib-reclist button:focus-visible,
+html.app-native .train-library .lib-pick:focus-visible,
+html.app-native .train-library .lib-collapse:focus-visible,
+html.app-native .train-library .lib-myex button:focus-visible,
+html.app-native .lib-manlib .lib-icon:focus-visible,
+html.app-native .lib-manlib .lib-preview button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-act:active,
+  html.app-native .train-library .lib-pick:active,
+  html.app-native .lib-manlib .lib-icon:active {
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.app-native .train-library .lib-chip:active,
   html.app-native .train-library .lib-empty button:active {

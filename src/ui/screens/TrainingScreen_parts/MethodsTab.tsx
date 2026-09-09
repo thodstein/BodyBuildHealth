@@ -332,7 +332,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
 
         {/* Intensity Distribution */}
         {intensityDist && (
-          <div className="card" style={{ marginBottom: 8, padding: 10 }}>
+          <div className="card lib-intensity" style={{ marginBottom: 8, padding: 10 }}>
             <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🎯 Распределение интенсивности (RIR)</h4>
             <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
               <div style={{ width: `${intensityDist.low}%`, background: '#ef4444' }} title="RIR 0-1" />
@@ -389,7 +389,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
 
         {/* Dynamic Recommendations */}
         {recommendations.length > 0 && (
-          <div className="card" style={{ marginBottom: 8, padding: 10, border: '1px solid rgba(139,92,246,0.2)' }}>
+          <div className="card lib-reclist" style={{ marginBottom: 8, padding: 10, border: '1px solid rgba(139,92,246,0.2)' }}>
             <h4 style={{ margin: '0 0 6px', fontSize: 12, color: '#8b5cf6' }}>💡 Рекомендованные методики</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {recommendations.map((r, i) => r.method && (

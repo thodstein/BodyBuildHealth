@@ -146,9 +146,7 @@ const ExerciseLabCatalog: React.FC<{
               {/* ПОЛНАЯ КАРТОЧКА */}
               {isSelected && (
                 <div className="lib-exdetail" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-
-                  {/* Бейджи */}
-                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <div className="lib-badges" style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                     <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: 'var(--accent)' }}>{ex.type === 'compound' ? '🔩 Базовое' : '🎯 Изолирующее'}</span>
                     {ex.difficulty && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: ex.difficulty === 'advanced' ? 'rgba(239,68,68,0.08)' : 'rgba(249,115,22,0.08)', color: ex.difficulty === 'advanced' ? '#ef4444' : ex.difficulty === 'intermediate' ? '#f97316' : '#22c55e' }}>{DIFF_RU[ex.difficulty]}</span>}
                     <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.08)', color: '#8b5cf6' }}>Усталость: {ex.fatigueCost}/10</span>
@@ -208,7 +206,7 @@ const ExerciseLabCatalog: React.FC<{
                   {/* БИОМЕХАНИКА — полная */}
                   {bio && (
                     <>
-                      <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff' }}>
+                      <div className="lib-bio" style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff' }}>
                         <b style={{ color: '#60a5fa' }}>🔬 Биомеханика:</b> {CATEGORY_RU[bio.category] || bio.category} · {PATTERN_RU[bio.pattern] || bio.pattern} · Крутящий момент: {TORQUE_RU[bio.torqueProfile] || bio.torqueProfile}
                       </div>
 
@@ -326,6 +324,7 @@ const ExerciseLabCatalog: React.FC<{
                   {/* Кнопка выбора — если в режиме выбора */}
                   {onSelectExercise && (
                     <button
+                      className="lib-pick"
                       onClick={(e) => { e.stopPropagation(); onSelectExercise(ex); }}
                       style={{ width: '100%', marginTop: 6, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #00e68a, #00b36b)', color: '#000', fontWeight: 800, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,230,138,0.3)' }}
                     >
@@ -333,7 +332,7 @@ const ExerciseLabCatalog: React.FC<{
                     </button>
                   )}
 
-                  <button onClick={() => setSelectedId(null)} style={{ width: '100%', marginTop: 4, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer', transition: 'all 0.3s' }}>
+                  <button className="lib-collapse" onClick={() => setSelectedId(null)} style={{ width: '100%', marginTop: 4, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer', transition: 'all 0.3s' }}>
                     ▲ Свернуть
                   </button>
                 </div>

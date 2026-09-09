@@ -286,8 +286,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
               <div key={p.id} className="lib-card" style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #00e68a' : isExpanded ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
-                  <button onClick={() => toggleBbFav(p.id)} title={isFav ? 'Убрать из избранного' : 'В избранное'} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>
-                  <button onClick={() => toggleCompare(p.id)} title="Сравнить" style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: isCompared ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isCompared ? '#00e68a' : '#fff' }}>{isCompared ? '✓' : '⇄'}</button>
+                  <button className="lib-icon" onClick={() => toggleBbFav(p.id)} title={isFav ? 'Убрать из избранного' : 'В избранное'} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>
+                  <button className="lib-icon" onClick={() => toggleCompare(p.id)} title="Сравнить" style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: isCompared ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isCompared ? '#00e68a' : '#fff' }}>{isCompared ? '✓' : '⇄'}</button>
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   <Badge color={p.level === 'beginner' ? '#22c55e' : p.level === 'advanced' ? '#f59e0b' : '#60a5fa'} bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)">{p.level}</Badge>
@@ -303,7 +303,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
                   <button onClick={() => onSelectBB(p)} style={{ ...BTN, flex: 1, minHeight: 36, fontSize: 11, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }}>📥 Взять за основу</button>
                 </div>
                 {isExpanded && p.weeks[0] && (
-                  <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="lib-preview" style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {p.weeks[0].days.map((d, di) => (
                       <div key={di} style={{ fontSize: 10, color: '#fff' }}><b style={{ color: '#00e68a' }}>{d.name}</b> · {d.focus} — {d.exercises.slice(0, 3).map(e => e.name).join(', ')}{d.exercises.length > 3 ? ` +${d.exercises.length - 3}` : ''}</div>
                     ))}
@@ -328,8 +328,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
               <div key={c.meta.id} className="lib-card" style={{ padding: 10, borderRadius: 12, background: isCompared ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.04)', border: isCompared ? '2px solid #a78bfa' : isExpanded ? '1px solid rgba(167,139,250,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1 }}>{c.meta.title}</span>
-                  <button onClick={() => togglePlFav(c.meta.id)} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>
-                  <button onClick={() => toggleCompare(c.meta.id)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: isCompared ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isCompared ? '#a78bfa' : '#fff' }}>{isCompared ? '✓' : '⇄'}</button>
+                  <button className="lib-icon" onClick={() => togglePlFav(c.meta.id)} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff' }}>{isFav ? '★' : '☆'}</button>
+                  <button className="lib-icon" onClick={() => toggleCompare(c.meta.id)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: isCompared ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isCompared ? '#a78bfa' : '#fff' }}>{isCompared ? '✓' : '⇄'}</button>
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   <Badge color="#a78bfa">{c.meta.level}</Badge>
@@ -344,7 +344,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
                   <button onClick={() => onSelectPL(c.meta.id)} style={{ ...BTN, flex: 1, minHeight: 36, fontSize: 11, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800 }}>📥 Подключить цикл</button>
                 </div>
                 {isExpanded && (
-                  <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.15)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+                  <div className="lib-preview" style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.15)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                     <div>ID: {c.meta.id}</div>
                     <div>Период: {c.meta.period} · {periodLabelRu(c.meta.period)}</div>
                     {c.weeks?.[0] && <div style={{ marginTop: 4 }}>Нед-1: {(c.weeks[0] as any).days?.map((d: any) => d.name || d.lift).join(' · ') || '—'}</div>}

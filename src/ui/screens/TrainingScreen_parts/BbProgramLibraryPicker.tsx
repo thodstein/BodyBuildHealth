@@ -141,7 +141,7 @@ export const BbProgramLibraryPicker: React.FC<{
                 color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>✕</button>
             </div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
+            <div className="lib-count" style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
               Библиотека: {deduped.length} программ · фильтр: {filtered.length}
             </div>
             <input className="lib-search" type='text' value={search} onChange={e => setSearch(e.target.value)} placeholder='🔍 Поиск: название, автор, цель...'

@@ -122,6 +122,21 @@ describe('Библиотека PRO — багфиксы', () => {
     cleanup();
   });
 
+  it('B8: хуки раунда 5 — actions/badges/bio/myex/toast', async () => {
+    const Wrap: React.FC = () => {
+      const [sel, setSel] = React.useState<string | null>(null);
+      return <ProgramsTab selectedProgram={sel} setSelectedProgram={setSel} />;
+    };
+    render(<Wrap />);
+    const cards = document.querySelectorAll('.lib-card');
+    fireEvent.click(cards[0]);
+    expect(await screen.findAllByText('📋 Загрузить программу')).toBeTruthy();
+    const acts = document.querySelectorAll('.lib-act');
+    expect(acts.length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelector('.lib-result')).not.toBeNull();
+    cleanup();
+  });
+
   it('LibraryZone — корень .train-library с data-lib-tab', () => {
     const noop = () => undefined;
     const { container } = render(

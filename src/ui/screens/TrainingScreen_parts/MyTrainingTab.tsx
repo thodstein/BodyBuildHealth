@@ -199,7 +199,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <input type="number" min="1" max="30" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Напр. 10" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
               <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
             </div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+            <div className="lib-chips" style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
               <span style={{fontSize:11,color:'#fff',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
               {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:8,fontSize:11,cursor:'pointer',background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)',color:'#fff'}}>{GROUP_LABELS[g] || g}</button>)}
             </div>
@@ -211,7 +211,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <h4 style={{margin:'0 0 6px',fontSize:12}}>📝 Мои упражнения ({customExercises.length})</h4>
               <div style={{display:'flex',flexDirection:'column',gap:4}}>
                 {customExercises.map((ex,i) => (
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div key={i} className="lib-myex" style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:11,fontWeight:600,color:'#fff'}}>{ex.name}</div>
                       <div style={{fontSize:11,color:'#fff'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
@@ -381,7 +381,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
 
       {/* Всплывающее уведомление: что и куда сохранено/загружено */}
       {toast && (
-        <div role="status" style={{ position:'fixed', bottom: 84, left:'50%', transform:'translateX(-50%)', zIndex: 400, maxWidth:'92%', padding:'10px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, lineHeight: 1.4, color: '#fff', background: toast.type === 'ok' ? 'rgba(0,230,138,0.16)' : 'rgba(239,68,68,0.18)', border: '1px solid ' + (toast.type === 'ok' ? 'rgba(0,230,138,0.45)' : 'rgba(239,68,68,0.5)'), boxShadow:'0 6px 24px rgba(0,0,0,0.45)', backdropFilter:'blur(8px)' }}>
+        <div role="status" className="lib-toast" style={{ position:'fixed', bottom: 84, left:'50%', transform:'translateX(-50%)', zIndex: 400, maxWidth:'92%', padding:'10px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, lineHeight: 1.4, color: '#fff', background: toast.type === 'ok' ? 'rgba(0,230,138,0.16)' : 'rgba(239,68,68,0.18)', border: '1px solid ' + (toast.type === 'ok' ? 'rgba(0,230,138,0.45)' : 'rgba(239,68,68,0.5)'), boxShadow:'0 6px 24px rgba(0,0,0,0.45)', backdropFilter:'blur(8px)' }}>
           {toast.type === 'ok' ? '✅ ' : '⚠️ '}{toast.msg}
         </div>
       )}
