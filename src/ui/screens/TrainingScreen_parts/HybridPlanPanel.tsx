@@ -102,7 +102,7 @@ export const HybridPlanPanel: React.FC<{
       <div style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (сила + масса)</div>
       <div style={{ fontSize: 11, color: DIM }}>Проф. ПЛ-цикл (тяжёлые присед/жим/тяга, immutable) + ББ-аксессуары на мышцы-антагонисты после каждого тяжёлого дня.</div>
 
-      <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="manual-hybrid-form" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4 }}>
           ПЛ-цикл (источник силы)
           <EditorPopupSelect
@@ -144,7 +144,7 @@ export const HybridPlanPanel: React.FC<{
       </div>
 
       {built && (
-        <div style={{ ...CARD, padding: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
+        <div className="manual-hybrid-result" style={{ ...CARD, padding: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>📋 {built.cycle.meta.title}</div>
           <div style={{ fontSize: 11, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>{built.rationale}</div>
           {built.daysByWeek.map((days, wi) => (

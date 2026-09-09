@@ -11,6 +11,7 @@ import { saveUserProgram, cloneFromLibrary } from '../../../../engines/user-prog
 import { ManualProgramWizard } from '../ManualProgramWizard';
 import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
+import { HybridPlanPanel } from '../HybridPlanPanel';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -197,6 +198,19 @@ describe('ПЛ-редактор: хуки §106 (custom-путь, 2 недели
     expect(container.querySelector('.editor-week-jump')).toBeInTheDocument();
     expect(container.querySelector('.editor-pl-day-tpl')).toBeInTheDocument();
     expect(container.querySelector('.editor-fill-empty')).toBeInTheDocument();
+  });
+});
+
+describe('Гибрид-панель: хуки §107', () => {
+  it('форма сборки на месте, CTA 48px-класса', () => {
+    const program = {
+      meta: { id: 'hyb1', title: 'Гибрид', author: '', goal: 'strength_mass', level: 'intermediate', daysPerWeek: 4, weeks: 8, direction: 'hybrid', createdAt: '', updatedAt: '', source: 'custom' },
+    } as any;
+    const { container } = render(
+      <HybridPlanPanel program={program} onChange={() => {}} onSave={() => {}} />,
+    );
+    expect(container.querySelector('.manual-hybrid-form')).toBeInTheDocument();
+    expect(screen.getByText(/Собрать powerbuilder-план/)).toBeInTheDocument();
   });
 });
 

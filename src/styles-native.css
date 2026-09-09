@@ -12474,3 +12474,64 @@ html.app-native .manual-constructor .editor-pl-overlay button:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 107. MANUAL HYBRID PRO — Powerbuilder-панель топ-уровня ───
+ * Хуки: .train-hybrid (корень), NEW .manual-hybrid-form/.manual-hybrid-result.
+ * Инпуты 44px/16px без iOS-зума, CTA 48px с press/focus, результат
+ * стеклом 18px + tabular, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Форма: стекло 18px, инпуты 44/16 ── */
+html.app-native .manual-constructor .manual-hybrid-form {
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(59, 130, 246, 0.45) !important;
+}
+
+html.app-native .manual-constructor .manual-hybrid-form input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-hybrid-form textarea {
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-hybrid-form button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-hybrid-form button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-hybrid-form button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── CTA сборки: 48px во всю ширину ── */
+html.app-native .manual-constructor .manual-hybrid-form button {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+/* ── Результат: стекло + tabular ── */
+html.app-native .manual-constructor .manual-hybrid-result {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .manual-hybrid-form {
+    padding: 8px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-hybrid-form button:active {
+    transform: none !important;
+  }
+}
