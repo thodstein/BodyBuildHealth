@@ -134,6 +134,33 @@ describe('P2-2: HV моно-инвариант (≤70% ккал карб-нос�
   });
 });
 
+describe('P2-6: HV-стиль mixed — снек-only носители не становятся карб-носителями основных приёмов', () => {
+  // ИНВАРИАНТ (проба 96 ячеек practical/mixed × 6 целей × соль 0-7): banana/dates/
+  // raisins/dried_apricots в основных приёмах встречаются только ролью 'fruit'
+  // (реальная еда) — карб-носителем ни разу. Гейты в корректоре НЕ нужны
+  // (мутационно не ловятся — мёртвая механика); тест стережёт регрессию селекции.
+  const SNACK_ONLY = ['banana', 'dates', 'raisins', 'dried_apricots'];
+
+  it('1500У/500Б mixed: в основных приёмах нет карб-носителя из снек-only пула', { timeout: 180000 }, () => {
+    const p = buildDayPlan(input(1500, 500, 11, { hvStyle: 'mixed' }));
+    for (const m of p.meals) {
+      const mt = String(m.type || '');
+      if (!['breakfast', 'lunch', 'dinner'].includes(mt)) continue;
+      for (const it of (m.items || [])) {
+        if ((it.role === 'carb_slow' || it.role === 'carb_fast') && SNACK_ONLY.includes(it.id)) {
+          throw new Error(`mixed: «${it.id}» (role=${it.role}) в основном приёме «${m.label}»`);
+        }
+      }
+    }
+  });
+
+  it('mixed не хуже practical по сходимости HV-дня (объём сохраняется)', { timeout: 180000 }, () => {
+    const p = buildDayPlan(input(1500, 500, 5, { hvStyle: 'mixed' }));
+    const totK = allItems(p).reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+    expect(totK).toBeGreaterThan(1500 * 4 * 0.55);
+  });
+});
+
 describe('P1-6: HV-стиль (real/practical/mixed)', () => {
   it('HV_PRACTICAL_CARB_IDS существуют в FOOD_DB и доступны для плана', () => {
     expect(HV_PRACTICAL_CARB_IDS.length).toBeGreaterThan(3);

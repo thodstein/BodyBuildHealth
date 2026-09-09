@@ -9,6 +9,7 @@ import {
 } from '../planner-variety-ledger';
 import { weekRotateTopups } from '../planner-recipe-mode';
 import { correctDayToTargets, TOPUP_CARB_IDS, TOPUP_PROTEIN_IDS } from '../day-target-corrector';
+import { buildDayPlan } from '../meal-plan-engine';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 describe('planner-variety-ledger: персист с капами', () => {
@@ -60,6 +61,33 @@ describe('planner-variety-ledger: персист с капами', () => {
   });
 });
 
+describe('P1-5: строгость разнообразия — hard-window движка (strict=всё, soft=стейплы+белки)', () => {
+  // Engine effHardRecentIds: 'strict' → полный hard-window; 'soft' → только
+  // стейпл-семейства + основные белки предыдущих дней (мягкая еда разрешена).
+  const countId = (p: any, id: string): number =>
+    p.meals.flatMap((m: any) => m.items || []).filter((it: any) => it.id === id).length;
+
+  it('strict исключает мягкие продукты прошлых дней, soft — разрешает', { timeout: 120000 }, () => {
+    const base = {
+      weightKg: 80, lbmKg: 70, bodyFatPct: 15, sex: 'male' as const,
+      goalKcal: 2900, goalProteinG: 160, goalFatG: 85, goalCarbsG: 330,
+      mealsCount: 5, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, excludedIds: new Set<string>(), allergenTags: new Set<string>(),
+      budget: 'max' as const, dayOffset: 1, cyclePhase: 'course', variety: 'high' as const, quality: 'full' as const,
+      randomSalt: 7, wakeTime: '07:00', bedTime: '23:00',
+      hardRecentIds: new Set(['pineapple', 'mango', 'kiwi']),
+    };
+    const strict = buildDayPlan({ ...base, varietyStrictness: 'strict' } as any);
+    const soft = buildDayPlan({ ...base, varietyStrictness: 'soft' } as any);
+    // strict: ни один из «мягких» вчерашних продуктов не возвращается
+    for (const id of ['pineapple', 'mango', 'kiwi']) {
+      expect(countId(strict, id), `strict: ${id} вернулся`).toBe(0);
+    }
+    // soft: хотя бы один мягкий вернулся (жёсткое окно сужено до стейплов)
+    const softHits = ['pineapple', 'mango', 'kiwi'].reduce((s, id) => s + countId(soft, id), 0);
+    expect(softHits, 'soft: мягкие продукты под полным запретом — strictness не работает').toBeGreaterThan(0);
+  });
+});
 describe('P1-7: недельная субротация топапов (сдвиг порядка, содержимое инвариантно)', () => {
   const BASE = ['a', 'b', 'c', 'd', 'e'];
 

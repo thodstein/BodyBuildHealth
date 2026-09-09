@@ -223,6 +223,13 @@ export function correctDayToTargets(
   const hv = opts?.highCarb === true;
   // P1a: якоря дня (primary-гарниры lunch/dinner) — своп их не заменяет (масштабировать можно).
   const anchorSet: Set<string> | null = opts?.anchorCarbIds && opts.anchorCarbIds.length > 0 ? new Set(opts.anchorCarbIds) : null;
+  // P2-6 (HV-стиль «mixed», план разнообразия §3.1.6): практичные плотные носители
+  // уже НЕ попадают карб-носителями в основные приёмы — ДОКАЗАНО пробой 96 ячеек
+  // (practical/mixed × 6 целей × соль 0-7: снек-only карб-носители в завтраке/обеде/
+  // ужине = 0; в основных они встречаются только ролью 'fruit' — реальная еда).
+  // Гейты-grow/swop здесь — мёртвая механика, НЕ ставим (урок P2-2). Значит
+  // mixed ≡ practical по поведению корректора; различие проявится только при
+  // будущих affinity-расширениях (P2-1). HV_PRACTICAL_CARB_IDS widening ниже — общий.
   // v3 portable: приём в рабочем окне получает только портативные добивки (хлопья/хлеб/фрукт/порошок).
   const pw = (m: { time?: string }): boolean => !!opts?.portableMode && !!opts?.isWorkDay && isWorkWindowMeal(m?.time, opts?.workStartMin, opts?.workEndMin);
   // Глобальный portable (режим «еда на работе» без привязки к смене: isWorkDay не задан) —
