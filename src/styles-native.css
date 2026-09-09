@@ -12656,3 +12656,60 @@ html.app-native .lib-picker .lib-sheet-close:focus-visible {
     transform: none !important;
   }
 }
+
+/* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
+html.app-native .nd-data-btn {
+  min-height: 44px !important;
+}
+html.app-native .nd-data-btn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-data-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-daybtn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-mealbtn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-storebtn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-storebtn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-storedismiss:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-daycount {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-gauge-mini {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-gauge-mini {
+    min-width: 100px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .nd-sec-count {
+    font-size: 8px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-data-btn:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-storebtn:active {
+    transform: none !important;
+  }
+}
