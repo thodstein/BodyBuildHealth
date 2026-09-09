@@ -81,9 +81,9 @@ export const ManualProgramWizard: React.FC<Props> = ({
   }, [step, direction, goal, level, days, weeks]);
 
   const content = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="manual-wizard" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Stepper — 3 шага вместо 5 (Тип → Параметры → Превью), без потери контроля */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, overflowX: 'auto' }}>
+      <div className="manual-wiz-steps" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, overflowX: 'auto' }}>
         {([1,2,3] as WizardStep[]).map(s => {
           const active = s === effStep;
           const done = s < effStep;
@@ -96,14 +96,14 @@ export const ManualProgramWizard: React.FC<Props> = ({
           );
         })}
       </div>
-      {effStep === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {effStep === 1 && <div className="manual-wiz-dir" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 1 из 3: что вы тренируете?</div>
         <div style={{ fontSize: 10, color: DIM }}>Выберите основной тип программы. Его можно будет редактировать после создания.</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {DIRECTIONS.map(([id, label, defaultGoal]) => <button key={id} onClick={() => onDirection(id, defaultGoal)} style={{ ...BTN, flex: 1, minHeight: 44, background: direction === id ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: direction === id ? '#fff' : '#a78bfa' }}>{label}</button>)}
+          {DIRECTIONS.map(([id, label, defaultGoal]) => <button key={id} data-active={direction === id ? 'true' : 'false'} onClick={() => onDirection(id, defaultGoal)} style={{ ...BTN, flex: 1, minHeight: 44, background: direction === id ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: direction === id ? '#fff' : '#a78bfa' }}>{label}</button>)}
         </div>
       </div>}
-      {effStep === 2 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {effStep === 2 && <div className="manual-wiz-params" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 2 из 3: параметры</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Цель, уровень и формат — всё в одном шаге (было 3 шага). {direction === 'pl' ? 'Для ПЛ цель фиксирована.' : ''}</div>
         <EditorPopupSelect
@@ -129,13 +129,13 @@ export const ManualProgramWizard: React.FC<Props> = ({
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед<input type="number" style={IN} min={2} max={6} value={days} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onDays(Math.max(2, Math.min(6, Math.round(v)))); }} aria-label="Дней в неделю" inputMode="numeric" /></label>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель<input type="number" style={IN} min={4} max={24} value={weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" /></label>
         </div>
-        <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 8, background: 'rgba(167,139,250,0.06)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div className="constructor-surface constructor-surface--tinted manual-wiz-summary" style={{ ...CARD, padding: 8, background: 'rgba(167,139,250,0.06)', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ fontSize: 11, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b> · {goal} · {level} · {days}д × {weeks} нед</div>
           <div style={{ fontSize: 10, color: DIM, lineHeight: 1.45 }}>{pro ? 'Далее — превью качественной программы (неделя-1 + балл качества).' : '💡 Рекомендуем «⚡ Создать и заполнить» — качественная программа в 1 клик.'}</div>
         </div>
       </div>}
       {effStep === 3 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="manual-wiz-preview" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 3 из 3: превью — как будет выглядеть программа</div>
           {!preview || (preview as any).kind === 'error' ? (
             <InfoBanner tone="warn">⚠ Не удалось собрать превью — проверьте профиль (оборудование/уровень) и попробуйте снова. Можно создать пустой каркас.</InfoBanner>
@@ -183,7 +183,7 @@ export const ManualProgramWizard: React.FC<Props> = ({
           <InfoBanner tone="info">💡 Это превью авто-сборки. После создания вы сможете вручную править каждое упражнение, сеты и RIR.</InfoBanner>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+      <div className="manual-wiz-nav" style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         {effStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => onStep(Math.max(1, effStep - 1) as WizardStep)}>← Назад</button>}
         {effStep < 3 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onStep((effStep + 1) as WizardStep)}>Далее →</button>}
         {effStep === 3 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44, minWidth: 140 }} onClick={() => onCreate(false)} title="Создать пустую структуру">📄 Пустой каркас</button>}

@@ -12136,6 +12136,108 @@ html.app-native .manual-constructor .editor-set-index {
   font-size: 12px !important;
 }
 
+/* ─── 104. MANUAL WIZARD PRO — визард создания топ-уровня ───
+ * Хуки: .manual-wizard, .manual-wiz-steps, .manual-wiz-dir
+ * (кнопки data-active), .manual-wiz-params, .manual-wiz-summary,
+ * .manual-wiz-preview, .manual-wiz-nav.
+ * Кнопки 48px (CTA 52px с glow), инпуты 48px/16px без iOS-зума,
+ * степпер-лента со snap, press + focus-visible, tabular, 380px,
+ * reduced-motion. Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Корень и степпер-лента ── */
+html.app-native .manual-constructor .manual-wizard {
+  gap: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-steps {
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  padding-bottom: 2px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-steps::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* ── Шаг 1: кнопки направлений 48px с glow активного ── */
+html.app-native .manual-constructor .manual-wiz-dir button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-dir button[data-active='true'] {
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35) !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-dir button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-dir button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Шаг 2: селекты и инпуты 48/16, сводка стеклом ── */
+html.app-native .manual-constructor .manual-wiz-params button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-params input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-summary {
+  border-radius: 16px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Шаг 3: превью стеклом + tabular ── */
+html.app-native .manual-constructor .manual-wiz-preview {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Навигация: CTA 48-52px ── */
+html.app-native .manual-constructor .manual-wiz-nav button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-nav button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-wiz-nav button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .manual-wiz-nav button {
+    font-size: 13px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-wiz-dir button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-wiz-nav button:active {
+    transform: none !important;
+  }
+}
+
 /* ── Микро-степперы сета (±1/±2.5, инлайн 16-18px): компакт 32px ── */
 html.app-native .manual-constructor .bb-set-editor button[style*='width:18'] {
   min-width: 32px !important;

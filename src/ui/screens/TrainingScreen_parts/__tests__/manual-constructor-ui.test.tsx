@@ -8,6 +8,7 @@ import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import type { UserProgram } from '../../../../engines/user-program/user-program.types';
 import { suggestExercisesForGroup } from '../../../../engines/manual-constructor';
 import { saveUserProgram, cloneFromLibrary } from '../../../../engines/user-program/program-store';
+import { ManualProgramWizard } from '../ManualProgramWizard';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -145,6 +146,31 @@ describe('Редактор: хуки недель/сессий §102', () => {
     expect(container.querySelector('.bb-set-editor')).toBeInTheDocument();
     expect(container.querySelector('.editor-sets-heading')).toBeInTheDocument();
   }, 60000);
+});
+
+describe('Визард: хуки §104 по шагам', () => {
+  const wizProps = {
+    open: true, embedded: true, direction: 'bb' as const, goal: 'hypertrophy', level: 'intermediate',
+    days: 3, weeks: 8, pro: false, onClose: () => {}, onStep: () => {}, onDirection: () => {},
+    onGoal: () => {}, onLevel: () => {}, onDays: () => {}, onWeeks: () => {}, onCreate: () => {},
+  };
+  it('шаг 1: wizard + steps + dir с data-active', async () => {
+    const { container } = render(<ManualProgramWizard {...wizProps} step={1} />);
+    expect(container.querySelector('.manual-wizard')).toBeInTheDocument();
+    expect(container.querySelector('.manual-wiz-steps')).toBeInTheDocument();
+    expect(container.querySelector('.manual-wiz-dir')).toBeInTheDocument();
+    expect(container.querySelector('.manual-wiz-dir button[data-active="true"]')).toBeInTheDocument();
+    expect(container.querySelector('.manual-wiz-nav')).toBeInTheDocument();
+  });
+  it('шаг 2: params + summary', async () => {
+    const { container } = render(<ManualProgramWizard {...wizProps} step={2} />);
+    expect(container.querySelector('.manual-wiz-params')).toBeInTheDocument();
+    expect(container.querySelector('.manual-wiz-summary')).toBeInTheDocument();
+  });
+  it('шаг 3 (ПЛ): preview без тяжёлой сборки', async () => {
+    const { container } = render(<ManualProgramWizard {...wizProps} step={3} direction="pl" />);
+    expect(container.querySelector('.manual-wiz-preview')).toBeInTheDocument();
+  });
 });
 
 describe('ManualUI хуки для APK-слоя (§100)', () => {
