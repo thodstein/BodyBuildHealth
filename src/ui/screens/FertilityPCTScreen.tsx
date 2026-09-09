@@ -275,7 +275,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
         })}
       </div>
 
-      <div style={{ width: '100%', overflowX: 'hidden', overflowY: 'auto', wordBreak: 'break-word' }}>
+      <div style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', wordBreak: 'break-word' }}>
 
       {/* ─── OVERVIEW TAB ─── */}
       {tab === 'overview' && restrictToMode !== 'fertility' && (

@@ -370,6 +370,11 @@ describe('SUP mobile fit (360px)', () => {
       '68dvh',
       'top: 132px',
       'min-width: 0',
+      // мобильный фит Инфо/Протоколов: коллапс 3-колоночных сеток,
+      // фиксированный расклад таблиц, перенос pre
+      '1fr 1fr 1fr',
+      'table-layout: fixed',
+      'pre-wrap',
     ]) {
       expect(css, hook).toContain(hook);
     }
@@ -377,6 +382,68 @@ describe('SUP mobile fit (360px)', () => {
     for (const hook of ['safe-area-inset-top', 'safe-area-inset-bottom', 'supApkSheetUp']) {
       expect(native, hook).toContain(hook);
     }
+  });
+
+  it('CSS: нет мёртвых camelCase [style*=] селекторов (браузер сериализует инлайны в kebab)', () => {
+    // Прецедент: [style*='gridTemplateColumns'] никогда не матчится, т.к.
+    // style-атрибут содержит `grid-template-columns`. Такие селекторы молча
+    // отключали весь мобильный коллапс сеток Инфо/Протоколов.
+    const css = readDesignCss();
+    const dead = css.match(/\[style\*='[^']*[a-z][A-Z][^']*'\]/g) || [];
+    expect(dead, 'dead camelCase selectors').toEqual([]);
+  });
+
+  it('протоколы ПКТ/ГЗТ/фертильность: контент не обрезается, без фиксированных ширин', async () => {
+    const { FertilityPCTScreen } = await import('../../FertilityPCTScreen');
+    const tabs = [undefined, 'pct-plan', 'hrt'] as const;
+    for (const initialTab of tabs) {
+      const { container, unmount } = render(
+        <FertilityPCTScreen initialTab={initialTab as never} />,
+      );
+      expect(fixedOverflows(container), `fertility ${initialTab ?? 'overview'}`).toEqual([]);
+      // полноширинная обёртка не должна резать контент clip'ом: иначе широкие
+      // таблицы/дозы на телефоне просто исчезают за краем
+      const clipped: string[] = [];
+      container.querySelectorAll('*').forEach((el) => {
+        const e = el as HTMLElement;
+        if (e.style && e.style.overflowX === 'hidden' && e.style.width === '100%') {
+          clipped.push(`${e.tagName}.${String(e.className || '').slice(0, 30)}`);
+        }
+      });
+      expect(clipped, `fertility clip ${initialTab ?? 'overview'}`).toEqual([]);
+      unmount();
+    }
+  });
+
+  it('каталог: фильтры стеков 1fr×3 — цель CSS-коллапса, без фиксированных ширин', () => {
+    const { container, unmount } = render(
+      <SupportCatalogView
+        s={{
+          ...catalogMocks,
+          catalogSubTab: 'stack',
+          stkFilterSystem: 'all',
+          stkFilterQty: 'all',
+          stkFilterScore: 'all',
+          filteredStacks: [],
+          ALL_STACKS: [],
+          SUPPORT_TIER_GROUPS: [],
+          SUPPORT_CATALOG_DATA: {},
+          stackExpanded: null,
+          setStackExpanded: noop,
+          setFavRefresh: noop,
+        }}
+      />,
+    );
+    expect(fixedOverflows(container), 'stack filters').toEqual([]);
+    // сетка фильтров реально 3-колоночная в инлайне — на телефоне её складывает
+    // CSS-правило [style*='1fr 1fr 1fr'] → 1fr (проверено строковыми хуками выше)
+    const grids: string[] = [];
+    container.querySelectorAll('*').forEach((el) => {
+      const v = (el as HTMLElement).style?.gridTemplateColumns || '';
+      if (v.includes('1fr 1fr 1fr')) grids.push(v);
+    });
+    expect(grids.length > 0, 'stack filter 3-col grid present').toBe(true);
+    unmount();
   });
 
   it('легаси-каталог: twin-записи БД не дают дублей строк и ключей', () => {

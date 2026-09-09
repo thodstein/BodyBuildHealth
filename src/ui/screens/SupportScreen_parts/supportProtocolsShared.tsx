@@ -54,8 +54,8 @@ export const PhaseLabel: React.FC<{ label: string; color: string }> = ({ label, 
 
 export const ItemRow: React.FC<{ name: string; dose: string; timing: string; note: string; color: string }> = ({ name, dose, timing, note, color }) => (
   <div className="sup-itemrow" style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{name}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', minWidth: 0 }}>{name}</span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color }}>{dose}</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>{timing}</span>
@@ -150,8 +150,8 @@ export const monitoringBlock = (markers: Array<{ marker: string; target: string;
       </div>
       {markers.map((m: any, i: number) => (
         <div key={i} style={{ padding: '12px', borderRadius: 12, marginBottom: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.10)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>{m.marker}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', minWidth: 0 }}>{m.marker}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', background: 'rgba(59,130,246,0.12)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(59,130,246,0.18)' }}>{m.when}</span>
           </div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}><b style={{ color: '#60a5fa' }}>Цель: {m.target}</b></div>
