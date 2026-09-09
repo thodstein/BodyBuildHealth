@@ -839,16 +839,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {/* Edit modal */}
       {editItem && (
-        <div className="nd-edit" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', padding: '12px' }}
+        <div role="dialog" aria-modal="true" aria-label="Изменить количество" className="nd-edit" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', padding: '12px' }}
           onClick={() => setEditItem(null)}>
           <div onClick={e => e.stopPropagation()} className="nd-editsheet" style={{ width: '100%', maxWidth: 400, padding: '16px 20px 28px', borderRadius: '20px', background: '#18181b', boxShadow: '0 18px 54px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 2, letterSpacing: -0.3 }}>✎ {editItem.item.name}</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Изменить количество</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <button onClick={() => setEditQty(Math.max(10, editQty - 10))} aria-label="Уменьшить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <input type="number" value={editQty} onChange={e => { const raw = parseFloat(e.target.value); setEditQty(Number.isFinite(raw) && raw >= 10 ? Math.round(raw) : 10); }} style={{ width: 80, padding: '8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 20, fontWeight: 700, textAlign: 'center', outline: 'none' }} />
+                <input type="number" value={editQty} onChange={e => { const raw = parseFloat(e.target.value); setEditQty(Number.isFinite(raw) && raw >= 10 ? Math.round(raw) : 10); }} aria-label="Количество, грамм" style={{ width: 80, padding: '8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 20, fontWeight: 700, textAlign: 'center', outline: 'none' }} />
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>грамм</div>
               </div>
               <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} aria-label="Увеличить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>

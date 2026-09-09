@@ -217,7 +217,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   };
 
   return (
-    <div className="nd-scan" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
+    <div role="dialog" aria-modal="true" aria-label="Сканировать продукт" className="nd-scan" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0, color: '#fff', fontSize: 18 }}>📷 Сканировать продукт</h3>
         <button type="button" onClick={() => { void stopScanner(); onCloseRef.current(); }} aria-label="Закрыть сканер" className="nd-scanclose" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>✕</button>
@@ -233,7 +233,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       {mode === 'manual' && (
         <div>
           <label style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 4, display: 'block' }}>Штрихкод (EAN-13)</label>
-           <input value={barcode} onChange={e => { barcodeRef.current = e.target.value; setBarcode(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" style={inputStyle} autoFocus />
+           <input value={barcode} onChange={e => { barcodeRef.current = e.target.value; setBarcode(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" aria-label="Штрихкод" style={inputStyle} autoFocus />
           {barcode.replace(/\D/g,'').startsWith('46') && <div style={{ fontSize:10, color:'#00e68a', marginTop:4 }}>🇷🇺 Российский штрихкод 460… — ищем в RU-базе первым</div>}
            <button type="button" onClick={() => void handleBarcodeLookup()} disabled={loading || !barcode.trim()} style={{ ...btnStyle, width: '100%', marginTop: 10, opacity: loading || !barcode.trim() ? 0.5 : 1 }}>
             {loading ? 'Поиск...' : 'Найти по штрихкоду'}
@@ -245,7 +245,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         <div>
           <label style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 4, display: 'block' }}>Название продукта</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNameSearch()} placeholder="Молоко 3.2%" style={{ ...inputStyle, flex: 1 }} autoFocus />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNameSearch()} placeholder="Молоко 3.2%" aria-label="Поиск продукта по названию" style={{ ...inputStyle, flex: 1 }} autoFocus />
              <button type="button" onClick={() => void handleNameSearch()} disabled={loading || !searchQuery.trim()} style={{ ...btnStyle, opacity: loading || !searchQuery.trim() ? 0.5 : 1 }}>
               {loading ? '...' : '🔍'}
             </button>
