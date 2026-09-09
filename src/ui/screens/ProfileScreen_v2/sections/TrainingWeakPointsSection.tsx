@@ -48,7 +48,7 @@ export const TrainingWeakPointsSection: React.FC = React.memo(function TrainingW
       color={colors.pink}
     >
       <GroupHeader icon={<NativeIcon name="trendingDown" size={14} />} title="Слабые группы мышц" color={colors.pink} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
         {WEAK_GROUPS.map(g => (
           <BoolChip
             key={g.id}
@@ -60,8 +60,8 @@ export const TrainingWeakPointsSection: React.FC = React.memo(function TrainingW
         ))}
       </div>
 
-      <GroupHeader icon={<NativeIcon name="dumbbell" size={14} />} title="Доступное оборудование" color={colors.primary} style={{ marginTop: 12 }} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <GroupHeader icon={<NativeIcon name="dumbbell" size={14} />} title="Доступное оборудование" color={colors.primary} style={{ marginTop: 14 }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {EQUIPMENT.map(e => (
           <BoolChip
             key={e.id}

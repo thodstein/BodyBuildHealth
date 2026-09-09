@@ -10008,6 +10008,26 @@ html.app-native .pf-inj-add:focus-visible {
   outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
   outline-offset: 2px !important;
 }
+html.app-native .pf-wm-cat {
+  border-radius: 16px !important;
+}
+html.app-native .pf-wm-cat[data-open='true'] {
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.14) !important;
+}
+html.app-native .pf-wm-clear {
+  min-height: 40px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-wm-clear:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .pf-wm-clear:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .profile-slider {
+  font-variant-numeric: tabular-nums !important;
+}
 @media (max-width: 380px) {
   html.app-native .pf-hero-body {
     padding-left: 10px !important;

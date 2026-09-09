@@ -169,8 +169,9 @@ export const UserDietSection: React.FC = React.memo(function UserDietSection() {
         />
       </div>
 
-      <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-        💡 БАДы и лекарства управляются в <b>Калькуляторе поддержки</b> (через <code>nutrition.currentSupplements/Medications</code>). Здесь хранятся общие предпочтения.
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, padding: '11px 13px', borderRadius: 14, background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+        <span aria-hidden="true" style={{ flexShrink: 0 }}>💡</span>
+        <span>БАДы и лекарства управляются в <b>Калькуляторе поддержки</b> (через <code>nutrition.currentSupplements/Medications</code>). Здесь хранятся общие предпочтения.</span>
       </div>
     </AccordionSection>
   );

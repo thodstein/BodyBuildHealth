@@ -143,17 +143,18 @@ export const UserGoalsSection: React.FC = React.memo(function UserGoalsSection()
 
       {delta !== null && delta !== 0 && (
         <div style={{
-          marginTop: 14, padding: 12, borderRadius: 12,
-          background: `linear-gradient(135deg, ${delta > 0 ? 'rgba(0,230,138,0.12)' : 'rgba(245,158,11,0.12)'}, transparent)`,
-          border: `1px solid ${delta > 0 ? colors.primaryDim : colors.warningDim}`,
-          display: 'flex', alignItems: 'center', gap: 10,
+          marginTop: 14, padding: 15, borderRadius: 18,
+          background: `linear-gradient(135deg, ${delta > 0 ? 'rgba(52,211,153,0.14)' : 'rgba(245,158,11,0.14)'}, ${delta > 0 ? 'rgba(52,211,153,0.04)' : 'rgba(245,158,11,0.04)'})`,
+          border: `1px solid ${delta > 0 ? 'rgba(52,211,153,0.28)' : 'rgba(245,158,11,0.28)'}`,
+          boxShadow: `0 8px 24px ${delta > 0 ? 'rgba(52,211,153,0.14)' : 'rgba(245,158,11,0.14)'}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+          display: 'flex', alignItems: 'center', gap: 13,
         }}>
-          <span aria-hidden="true" style={{ fontSize: 18 }}>{delta > 0 ? '⬆' : '⬇'}</span>
+          <span aria-hidden="true" style={{ width: 44, height: 44, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, color: '#fff', background: `linear-gradient(135deg, ${delta > 0 ? 'rgba(52,211,153,0.4), rgba(52,211,153,0.15)' : 'rgba(245,158,11,0.4), rgba(245,158,11,0.15)'})`, border: `1px solid ${delta > 0 ? 'rgba(52,211,153,0.45)' : 'rgba(245,158,11,0.45)'}` }}>{delta > 0 ? '⬆' : '⬇'}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: colors.text }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>
               {delta > 0 ? `До цели: набрать ${delta} кг` : `До цели: сбросить ${Math.abs(delta)} кг`}
             </div>
-            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
               Текущий вес: {personal.weight} кг → цель: {goals.targetWeight} кг
             </div>
           </div>

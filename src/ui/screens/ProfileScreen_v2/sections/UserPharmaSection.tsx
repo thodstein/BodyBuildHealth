@@ -58,24 +58,26 @@ export const UserPharmaSection: React.FC = React.memo(function UserPharmaSection
     >
       {pharma.phase && PHASE_META[pharma.phase] && (
         <div style={{
-          marginBottom: 14, padding: '10px 12px', borderRadius: 12,
-          background: `${PHASE_META[pharma.phase].color}14`,
-          border: `1px solid ${PHASE_META[pharma.phase].color}44`,
-          display: 'flex', alignItems: 'center', gap: 10,
+          marginBottom: 14, padding: '13px 14px', borderRadius: 16,
+          background: `linear-gradient(135deg, ${PHASE_META[pharma.phase].color}20, ${PHASE_META[pharma.phase].color}08)`,
+          border: `1px solid ${PHASE_META[pharma.phase].color}45`,
+          boxShadow: `0 6px 20px ${PHASE_META[pharma.phase].color}18, inset 0 1px 0 rgba(255,255,255,0.07)`,
+          display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <span aria-hidden="true" style={{
-            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+            width: 44, height: 44, borderRadius: 14, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, background: `${PHASE_META[pharma.phase].color}22`,
-            border: `1px solid ${PHASE_META[pharma.phase].color}44`,
+            fontSize: 19, color: '#fff',
+            background: `linear-gradient(135deg, ${PHASE_META[pharma.phase].color}55, ${PHASE_META[pharma.phase].color}22)`,
+            border: `1px solid ${PHASE_META[pharma.phase].color}55`,
           }}>{PHASE_META[pharma.phase].icon}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{
-              fontSize: 12, fontWeight: 800, color: PHASE_META[pharma.phase].color, letterSpacing: -0.1,
+              fontSize: 13.5, fontWeight: 800, color: '#fff', letterSpacing: -0.1,
             }}>
               Фаза: {PHASES.find(p => p.id === pharma.phase)?.label || pharma.phase}
             </div>
-            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>{PHASE_META[pharma.phase].note}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{PHASE_META[pharma.phase].note}</div>
           </div>
         </div>
       )}
@@ -180,9 +182,9 @@ export const UserPharmaSection: React.FC = React.memo(function UserPharmaSection
         />
       </div>
 
-      <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-        💡 Конкретные препараты с дозами управляются на экране <b>💊 Мой курс</b> (PharmaScreen).
-        Список currentSubstances в этом профиле является зеркалом.
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, padding: '11px 13px', borderRadius: 14, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)', fontSize: 11.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+        <span aria-hidden="true" style={{ flexShrink: 0 }}>💡</span>
+        <span>Конкретные препараты с дозами управляются на экране <b>💊 Мой курс</b> (PharmaScreen). Список currentSubstances в этом профиле является зеркалом.</span>
       </div>
     </AccordionSection>
   );

@@ -522,27 +522,31 @@ export const SliderInput: React.FC<{
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   const dirColor = direction === 'good' ? '#22c55e' : direction === 'bad' ? '#ef4444' : null;
   return (
-    <div>
+    <div className="profile-slider">
       {label && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>{label}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{label}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{
-              fontSize: 11, fontWeight: 700, color: c,
-              background: `${withAlpha(c, '1a')}`, border: `1px solid ${withAlpha(c, '33')}`,
-              padding: '1px 8px', borderRadius: 8, minWidth: 36, textAlign: 'center',
+              fontSize: 13, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums',
+              background: `linear-gradient(135deg, ${withAlpha(c, '35')}, ${withAlpha(c, '15')})`,
+              border: `1px solid ${withAlpha(c, '45')}`,
+              padding: '3px 11px', borderRadius: 999, minWidth: 44, textAlign: 'center',
+              boxShadow: `0 2px 10px ${withAlpha(c, '25')}`,
             }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
           </span>
         </div>
       )}
-      <div style={{ position: 'relative', height: 26, display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'relative', height: 32, display: 'flex', alignItems: 'center' }}>
         <div style={{
-          position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2,
+          position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 99,
           background: 'rgba(255,255,255,0.08)',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
         }} />
         <div style={{
-          position: 'absolute', left: 0, width: `${pct}%`, height: 4, borderRadius: 2,
-          background: `linear-gradient(90deg, ${withAlpha(c, '55')}, ${c})`,
+          position: 'absolute', left: 0, width: `${pct}%`, height: 6, borderRadius: 99,
+          background: `linear-gradient(90deg, ${withAlpha(c, '60')}, ${c})`,
+          boxShadow: `0 0 10px ${withAlpha(c, '40')}`,
         }} />
         <input
           type="range"
@@ -553,21 +557,21 @@ export const SliderInput: React.FC<{
           onChange={e => onChange(Number(e.target.value))}
           aria-label={label}
           style={{
-            position: 'relative', width: '100%', height: 26, opacity: 0, cursor: 'pointer', margin: 0,
+            position: 'relative', width: '100%', height: 32, opacity: 0, cursor: 'pointer', margin: 0,
           }}
         />
         <div style={{
-          position: 'absolute', left: `calc(${pct}% - 9px)`,
-          width: 18, height: 18, borderRadius: '50%',
-          background: `radial-gradient(circle at 35% 30%, ${c}, ${withAlpha(c, 'cc')})`,
+          position: 'absolute', left: `calc(${pct}% - 11px)`,
+          width: 22, height: 22, borderRadius: '50%',
+          background: `radial-gradient(circle at 35% 30%, #fff, ${c} 65%)`,
           border: `2px solid ${c}`,
-          boxShadow: `0 0 0 4px ${withAlpha(c, '2e')}, 0 2px 8px ${withAlpha(c, '55')}`,
+          boxShadow: `0 0 0 5px ${withAlpha(c, '22')}, 0 3px 10px ${withAlpha(c, '50')}`,
           pointerEvents: 'none',
-          transition: 'left 0.1s',
+          transition: 'left 0.12s',
         }} />
       </div>
       {(minLabel || maxLabel) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 10, color: '#ffffff', lineHeight: 1.35 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, fontSize: 10.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
           <span style={{ flex: 1, minWidth: 0 }}>{minLabel ? `${min} — ${minLabel}` : ''}</span>
           <span style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>{maxLabel ? `${max} — ${maxLabel}` : ''}</span>
         </div>

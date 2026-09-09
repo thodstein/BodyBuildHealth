@@ -96,11 +96,11 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
         />
       </FieldRow>
 
-      <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 0' }} />
 
       <FieldRow cols={3}>
         <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Восстановление (1-10)</div>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.6px', marginBottom: 8 }}>ВОССТАНОВЛЕНИЕ (1–10)</div>
           <SliderInput
             value={training.recovery}
             onChange={v => updateTraining({ recovery: v })}
@@ -111,7 +111,7 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
           />
         </div>
         <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Мотивация (1-10)</div>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.6px', marginBottom: 8 }}>МОТИВАЦИЯ (1–10)</div>
           <SliderInput
             value={training.motivation}
             onChange={v => updateTraining({ motivation: v })}
@@ -122,7 +122,7 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
           />
         </div>
         <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>DOMS (1-10)</div>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.6px', marginBottom: 8 }}>DOMS (1–10)</div>
           <SliderInput
             value={training.doms}
             onChange={v => updateTraining({ doms: v })}
@@ -134,9 +134,9 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
         </div>
       </FieldRow>
 
-      <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 0' }} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <PopupExerciseList
           label="⭐ Любимые упражнения"
           ids={training.favoriteExercises || []}
@@ -150,7 +150,7 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
           accent="#ef4444"
         />
       </div>
-      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 10, lineHeight: 1.5 }}>
         Любимые получают приоритет при отборе упражнений в ББ-авто. Не любимые полностью исключаются из генерации плана.
       </div>
     </AccordionSection>
