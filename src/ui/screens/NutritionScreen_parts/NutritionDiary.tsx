@@ -16,6 +16,7 @@ import { useDiaryPresets } from './diary/hooks/useDiaryPresets';
 // Extracted components
 import { DiarySection } from './diary/DiarySection';
 import { WeekDaySelector } from './diary/WeekDaySelector';
+import { StorageErrorBanner } from './diary/StorageErrorBanner';
 import { MacroSummary } from './diary/MacroSummary';
 import { MealCard } from './diary/MealCard';
 import { AddFoodPanel } from './diary/AddFoodPanel';
@@ -119,14 +120,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
       )}
       
-      {storageError && (
-        <div role="alert" className="nd-storerr" style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12, fontWeight: 500 }}>
-          ⚠️ {storageError}
-          <button onClick={() => setStorageError(null)} aria-label="Закрыть ошибку" className="nd-storerr-x" style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontSize: 12, minWidth: 44, minHeight: 44 }}>
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Живой баннер ошибок хранилища (PRO-стекло + детали; без recovery-кнопок: экспорта хватает в секции Данные) */}
+      <StorageErrorBanner error={storageError} onDismiss={() => setStorageError(null)} />
       
       
       <ModernHero icon="📓" title="Дневник питания" subtitle="Учёт приёмов, КБЖУ, микронутриенты и качество — с OCR, штрихкодом и аналитикой. Все данные локально." count={Object.keys(diaryData).length} stats={[
