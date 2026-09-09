@@ -11166,3 +11166,70 @@ html.app-native .tp-wrap-bb {
     height: 36px !important;
   }
 }
+
+/* ─── 97. TRAINING FALLBACK PRO — карточка-мост планировщика ───
+ * Хуки: .tp-fallback/.tp-fallback-title/.tp-fallback-text/
+ * .tp-fallback-go/.tp-fallback-open.
+ * Стекло 18px с верхней кромкой, текст 12px/1.55, CTA 48px с glow,
+ * press 0.98, focus-visible, 380px. Только APK: TG/web — как было. */
+html.app-native .tp-fallback {
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .tp-fallback-title {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}
+html.app-native .tp-fallback-text {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-fallback-go {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.3) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-fallback-go:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .tp-fallback-open {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-fallback-open:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .tp-fallback-go:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .tp-fallback-open:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .tp-fallback-go {
+    flex: 1 1 100% !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .tp-fallback-open {
+    flex: 1 1 100% !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .tp-fallback-go:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .tp-fallback-open:active {
+    transform: none !important;
+  }
+}
