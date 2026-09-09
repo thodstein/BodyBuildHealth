@@ -1199,27 +1199,32 @@
 }
 
 /* ─── PRO ХАБ: bio-карточки мёртвых точек ─────────────────────────── */
-:is(.train-armdiag) .ad-bio {
+:is(.train-arm, .train-armdiag) .ad-bio {
   border-left: 3px solid var(--ad-edge2);
   border-radius: 15px;
   transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-:is(.train-armdiag) .ad-bio[data-valid='ok'] {
+:is(.train-arm, .train-armdiag) .ad-bio[data-valid='ok'] {
   border-left-color: var(--ad-green);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(34, 197, 94, 0.12);
 }
 
-:is(.train-armdiag) .ad-bio[data-valid='bad'] {
+:is(.train-arm, .train-armdiag) .ad-bio[data-valid='bad'] {
   border-left-color: var(--ad-red);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(239, 68, 68, 0.14);
 }
 
-:is(.train-armdiag) .ad-bio[data-valid='na'] {
+:is(.train-arm, .train-armdiag) .ad-bio[data-valid='warn'] {
+  border-left-color: var(--ad-amber);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(245, 158, 11, 0.14);
+}
+
+:is(.train-arm, .train-armdiag) .ad-bio[data-valid='na'] {
   border-left-color: var(--ad-amber);
 }
 
-:is(.train-armdiag) .ad-angle {
+:is(.train-arm, .train-armdiag) .ad-angle {
   font-variant-numeric: tabular-nums;
   border-color: rgba(245, 158, 11, 0.4);
   color: var(--ad-amber);
@@ -1227,7 +1232,7 @@
 }
 
 /* ─── PRO ХАБ: finding-строки с точкой-уровнем ─────────────────────── */
-:is(.train-armdiag) .ad-finding {
+:is(.train-arm, .train-armdiag) .ad-finding {
   position: relative;
   padding: 7px 10px 7px 22px;
   border-radius: 10px;
@@ -1235,13 +1240,14 @@
   margin-bottom: 6px;
   font-size: 12px;
   line-height: 1.5;
+  overflow-wrap: break-word;
 }
 
-:is(.train-armdiag) .ad-finding:last-child {
+:is(.train-arm, .train-armdiag) .ad-finding:last-child {
   margin-bottom: 0;
 }
 
-:is(.train-armdiag) .ad-finding::before {
+:is(.train-arm, .train-armdiag) .ad-finding::before {
   content: '';
   position: absolute;
   left: 9px;
@@ -1252,17 +1258,17 @@
   background: var(--ad-green);
 }
 
-:is(.train-armdiag) .ad-finding[data-level='warn']::before {
+:is(.train-arm, .train-armdiag) .ad-finding[data-level='warn']::before {
   background: var(--ad-amber);
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
 }
 
-:is(.train-armdiag) .ad-finding[data-level='critical']::before {
+:is(.train-arm, .train-armdiag) .ad-finding[data-level='critical']::before {
   background: var(--ad-red);
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
 }
 
-:is(.train-armdiag) .ad-finding[data-level='ok']::before {
+:is(.train-arm, .train-armdiag) .ad-finding[data-level='ok']::before {
   background: var(--ad-green);
 }
 
@@ -1440,6 +1446,56 @@
   background: rgba(239, 68, 68, 0.16);
   border-color: rgba(239, 68, 68, 0.5);
   color: #fca5a5;
+}
+
+/* ─── PRO: ротация сплита (тренировки/отдых) ───────────────────────── */
+:is(.train-arm) [data-arm='split-rot'] {
+  margin-top: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+:is(.train-arm) .ad-rot {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm) .ad-rot[data-ch='тяж'] {
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+}
+
+:is(.train-arm) .ad-rot[data-ch='памп'] {
+  background: rgba(34, 197, 94, 0.13);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}
+
+:is(.train-arm) .ad-rot[data-ch='техника'] {
+  background: rgba(96, 165, 250, 0.13);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #93c5fd;
+}
+
+:is(.train-arm) .ad-rest {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  color: var(--ad-faint);
+  font-weight: 800;
+  scroll-snap-align: start;
 }
 
 /* ─── Фокус с клавиатуры ─────────────────────────────────────────── */

@@ -77,6 +77,54 @@ const STEP_DEFS: AdStepDef[] = [
   { id: 'weights', label: '🏋️ Веса' },
 ];
 
+const SPLIT_TAG_RU: Record<string, string> = {
+  TableHeavy: 'Стол', GripHeavy: 'Хват', TableTech: 'Техника', Support: 'Поддержка',
+  SidePress: 'Бок', Hammer: 'Молот', TableSupination: 'Супинация', TablePronation: 'Пронация',
+};
+
+function shortSplitTag(tag?: string): string {
+  if (!tag) return '—';
+  return SPLIT_TAG_RU[tag] || tag;
+}
+
+type GateKey = 'humerus' | 'ucl' | 'shoulder' | 'tendon' | 'table' | 'volume' | 'cycle' | 'antagonist' | 'other';
+
+const GATE_META: Record<GateKey, { title: string }> = {
+  humerus: { title: '🦴 Humerus / side' },
+  ucl: { title: '🧵 UCL / баланс' },
+  shoulder: { title: '🛡 Плечо' },
+  tendon: { title: '🦾 Tendon' },
+  table: { title: '🖐️ Стол' },
+  volume: { title: '📊 Объём MRV/MEV' },
+  cycle: { title: '📚 Цикл↔сплит' },
+  antagonist: { title: '🔗 Антагонисты' },
+  other: { title: '📌 Прочее' },
+};
+
+const GUARD_KEYS: GateKey[] = ['humerus', 'ucl', 'shoulder', 'tendon'];
+const EXTRA_KEYS: GateKey[] = ['table', 'volume', 'cycle', 'antagonist', 'other'];
+
+function gateOf(msg: string): GateKey {
+  const s = String(msg).toLowerCase();
+  if (s.includes('humerus') || s.includes('side_pressure')) return 'humerus';
+  if (s.includes('ucl') || s.includes('pron') || /\bsup\b/.test(s) || s.includes('супинац') || s.includes('пронац')) return 'ucl';
+  if (s.includes('shoulder') || s.includes('плеч')) return 'shoulder';
+  if (s.includes('tendon')) return 'tendon';
+  if (s.includes('table time') || s.includes('стол')) return 'table';
+  if (s.includes('mrv') || s.includes('mev') || s.includes('сетов')) return 'volume';
+  if (s.includes('цикл')) return 'cycle';
+  if (s.includes('антагонист')) return 'antagonist';
+  return 'other';
+}
+
+function groupWarnings(warnings: string[]): Record<GateKey, string[]> {
+  const out: Record<GateKey, string[]> = {
+    humerus: [], ucl: [], shoulder: [], tendon: [], table: [], volume: [], cycle: [], antagonist: [], other: [],
+  };
+  for (const w of warnings || []) out[gateOf(w)].push(w);
+  return out;
+}
+
 export function ArmAutoConstructor() {
   const [step, setStep] = useState<Step>('params');
   const [discipline, setDiscipline] = useState<string>('armwrestling');
@@ -966,6 +1014,13 @@ export function ArmAutoConstructor() {
                     <span className="ad-split-score">{r.score}</span>
                   </div>
                   <div className="ad-split-desc">{r.pattern.description}</div>
+                  <div className="ad-strip" data-arm="split-rot" aria-hidden>
+                    {(r.pattern.schedule || []).map((d: any, di: number) => (
+                      d && d.kind === 'тренировка'
+                        ? <span key={di} className="ad-rot" data-ch={d.character || ''} title={`${d.sessionTag || ''} ${d.character || ''}`}>{shortSplitTag(d.sessionTag)}</span>
+                        : <span key={di} className="ad-rest" title="отдых">·</span>
+                    ))}
+                  </div>
                   {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
                   {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
                 </div>
@@ -1082,9 +1137,39 @@ export function ArmAutoConstructor() {
                   </div>
                 </div>
                 {builtPlan.validation && (
-                  <div className="ad-list">
-                    {builtPlan.validation.errors.length>0 && <AdBanner tone="bad">❌ Ошибки: {builtPlan.validation.errors.join(' · ')}</AdBanner>}
-                    {builtPlan.validation.warnings.length>0 && <AdBanner tone="warn">⚠ {builtPlan.validation.warnings.slice(0,8).join(' · ')}</AdBanner>}
+                  <div className="ad-list" data-arm="gates">
+                    {builtPlan.validation.errors.length>0 && (
+                      <div className="ad-sec ad-bio" data-valid="bad" data-arm="gate-errors">
+                        <div className="ad-sec-t">❌ Ошибки ({builtPlan.validation.errors.length})</div>
+                        {builtPlan.validation.errors.map((e: string, i: number) => <div key={i} className="ad-finding" data-level="critical">{e}</div>)}
+                      </div>
+                    )}
+                    {(() => {
+                      const groups = groupWarnings(builtPlan.validation.warnings || []);
+                      const cards: React.ReactNode[] = [];
+                      for (const k of GUARD_KEYS) {
+                        const list = groups[k];
+                        cards.push(
+                          <div key={k} className="ad-sec ad-bio" data-valid={list.length ? 'warn' : 'ok'} data-arm={`gate-${k}`}>
+                            <div className="ad-sec-t">{GATE_META[k].title} {list.length ? `· ${list.length}` : '· ✓ чисто'}</div>
+                            {list.slice(0, 5).map((w: string, i: number) => <div key={i} className="ad-finding" data-level="warn">{w}</div>)}
+                            {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
+                          </div>
+                        );
+                      }
+                      for (const k of EXTRA_KEYS) {
+                        const list = groups[k];
+                        if (!list.length) continue;
+                        cards.push(
+                          <div key={k} className="ad-sec ad-bio" data-valid="na" data-arm={`gate-${k}`}>
+                            <div className="ad-sec-t">{GATE_META[k].title} · {list.length}</div>
+                            {list.slice(0, 5).map((w: string, i: number) => <div key={i} className="ad-finding" data-level={k === 'other' ? 'ok' : 'warn'}>{w}</div>)}
+                            {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
+                          </div>
+                        );
+                      }
+                      return cards;
+                    })()}
                     {builtPlan.validation.valid && <AdBanner tone="ok">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</AdBanner>}
                   </div>
                 )}
