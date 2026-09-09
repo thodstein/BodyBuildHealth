@@ -39,8 +39,11 @@ export function derivePattern(ex: any): string {
   if (/паллоф|анти-?рот|антирот/.test(nm)) return 'anti_rotation';
 
   // HINGE: специфичные движения (deadlift, RDL, good_morning, hyperextension) — до общей "тяга",
-  // иначе row_*/pulldown_* ошибочно классифицируются как hinge
-  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин/.test(hay)) return 'hinge';
+  // иначе row_*/pulldown_* ошибочно классифицируются как hinge.
+  // Аудит Sep 2026: гакк-присед на бицепс бедра / колодец — задняя цепь (hinge),
+  // а не squat/quads (раньше /присед/ в общей ветке бил 'squat' → мышца quads,
+  // и quads-фидеры прикреплялись к хамстринг-упражнению).
+  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин|гакк.*бицепс|hack.*ham|hack.*бицепс|колодец/.test(hay)) return 'hinge';
   // GLUTE_BRIDGE / HIP_THRUST: до isolation-ветки (g=legs → должен быть glute_squat, не isolation_legs_ham)
   if (/ягодич|мост|thrust|hip.?thrust|glute.?bridge|ягодичн/.test(hay)) return 'glute_squat';
 
@@ -51,6 +54,10 @@ export function derivePattern(ex: any): string {
     if (g === 'arms' || g === 'forearms') return 'isolation_arms';
     if (g === 'legs') {
       if (/икронож|икры|calf|камбалов/.test(hay)) return 'isolation_calves';
+      // Аудит Sep 2026: приведение бедра — аддукторы, НЕ бицепс бедра
+      // (раньше 'бедр' в имени ловил ветку /бедр|сгибани/ → 'isolation_legs_ham',
+      // и аддуктор-машина атрибутировалась hamstrings).
+      if (/приведен|adduct/i.test(hay)) return 'adduction';
       if (/квад|quad|разгиб|присед|выпрям.*ног| squat/.test(hay)) return 'isolation_legs_quad';
       if (/бедр|сгибани|ham/.test(hay)) return 'isolation_legs_ham';
       return /квад|quad/.test(tgt) ? 'isolation_legs_quad' : 'isolation_legs_ham';
@@ -114,8 +121,13 @@ const MP_TO_MUSCLE: Record<string, string | null> = {
   squat: 'quads', lunge: 'quads', isolation_legs_quad: 'quads',
   isolation_legs_ham: 'hamstrings',
   glute_squat: 'glutes',
+  // Аудит Sep 2026: isolation_glutes не был замаплен → hip_abduction_machine/
+  // cable_kickback (mp='isolation_glutes') получали trueMuscleOf=null и выпадали
+  // из глут-пулов — abduction-паттерн (NSCA Hodge) не мог быть набран.
+  isolation_glutes: 'glutes',
   isolation_calves: 'calves',
   core: 'abs', anti_rotation: 'abs', rotation: 'abs',
+  adduction: null,
   carry: null, hinge: null,
 };
 

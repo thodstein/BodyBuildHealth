@@ -646,6 +646,14 @@ const PREFERRED_BB_EXERCISES = new Set([
   // Ноги — гакк/Смит/лег-пресс приоритет (безопасность поясницы, изоляция)
   'hack_squat', 'squat_smith', 'leg_press', 'bulgarian_split_squat', 'walking_lunge', 'walking_lunge_db',
   'rdl', 'deadlift_romanian', 'leg_curl', 'leg_ext',
+  // Задняя цепь — Kassiano 2024 (женщины): leg press + SLDL + barbell hip thrust;
+  // Plotkin 2023 (MRI): хамсы — seated curls + RDL + nordic. Аудит Sep 2026:
+  // раньше тут не было НИ ОДНОГО глут-id — heavy thrust никогда не выигрывал
+  // класс-0 и женский глут-день деградировал в floor bridge на 20 кг.
+  'hip_thrust', 'b_stance_hip_thrust', 'hip_thrust_barbell', 'back_ext_glute', 'step_up_glute',
+  'hip_abduction_machine', 'cable_hip_abduction', 'cable_kickback',
+  'leg_press_high', 'leg_press_wide', 'leg_press_single',
+  'leg_curl_seated', 'hack_squat_ham', 'nordic_curl', 'b_stance_rdl',
   // Плечи — классические жимы перед собой приоритет (не армейский жим стоя):
   // Smith press перед собой, широкий хват в Smith, жимы гантелей.
   'ohp_seated_bar', 'ohp_seated_db', 'db_press', 'smith_shoulder_press',
@@ -1910,7 +1918,15 @@ function buildSession(
     // Теперь: weight = workMax × (1.0278 − 0.0278 × reps) × rirAdj × intensityMult.
     // Для 18 reps → ~52% (памп), для 6 reps → ~86% (тяж), для 10 reps → ~75%.
     const pct = PCT_FOR_RIR[rir] ?? 0.9; // fallback если Brzycki не подходит
-    let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier);
+    // Аудит Sep 2026: spec-мышцы (focusGroup/weakPoints) без дневник-фидбека шли
+    // со статичным весом 12 недель (B-stance 45.5 → 23.7 кг — только дрифт вниз).
+    // Прогрессия нагрузки +2%/нед внутри фазы (double progression, кап +6%;
+    // делод/пик без наклона) — только для spec-мышц, generic байт-в-байт.
+    const isSpecMuscle = isFocusMuscle || isWeak(muscle, weakPoints);
+    const loadProgressMult = (isSpecMuscle && phase !== 'deload' && phase !== 'peaking')
+      ? 1 + Math.min(0.06, 0.02 * Math.max(0, phaseWeek - 1))
+      : 1;
+    let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier) * loadProgressMult;
     // P4: Eccentric overload (Schoenfeld 2021) - advanced/enhanced can handle 110-120% eccentric
     if (eccentricMult && eccentricMult > 1.0 && role === 'primary') {
       weight = Math.round(weight * eccentricMult * 10) / 10;
@@ -2266,6 +2282,14 @@ function buildSession(
           if (clsIdx >= 0 && usedClassIdx.has(clsIdx)) continue;
           // Строгий A/B: избегаемый паттерн не добираем.
           if (p9Avoid.length > 0) { const p = p9Pat(e); if (p !== 'unknown' && p9Avoid.includes(p)) continue; }
+          // Аудит Sep 2026 (Kassiano 2024 / NSCA Hodge): rehab-tier упражнения
+          // (band/bodyweight, fatigueCost ≤2, beginner — clamshell, fire hydrant)
+          // не занимают рабочие слоты тяж-дня — только памп/warmup роль.
+          // Иначе женский glute-тяж-день собирался из «Раскладушки» и «Гидранта».
+          if (String(character) === 'тяж'
+            && Number((e as any).fatigueCost ?? 5) <= 2
+            && String((e as any).difficulty || 'beginner') === 'beginner'
+            && ['band', 'bodyweight'].includes(String(e.equipment || ''))) continue;
           diverse.push(e); usedIds.add(e.id);
           if (clsIdx >= 0) usedClassIdx.add(clsIdx);
           sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
@@ -4727,7 +4751,9 @@ function compensateCrossDayWeakPoints(
   phaseByWeek?: Map<number, BBPhase>,
 ): BBPlan {
   if (!plan.weeks || plan.weeks.length === 0) return plan;
-  const weeks = plan.weeks.map((w) => ({ week: w.week, sessions: w.sessions.map((s) => ({ ...s, exercises: [...s.exercises] })) }));
+  // Аудит Sep 2026: было `{ week, sessions }` — phase/deload терялись, все weak-планы
+  // шли без фазовой разметки (volume/RIR периодизация молча выключалась).
+  const weeks = plan.weeks.map((w) => ({ ...w, week: w.week, sessions: w.sessions.map((s) => ({ ...s, exercises: [...s.exercises] })) }));
   const normLvl = normLevel(level);
   const usedAcrossWeeks = new Set<string>(); // (weekIdx|sessionIdx|exName) — глобальная дедупликация по плану
 

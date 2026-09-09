@@ -687,6 +687,136 @@ function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: num
   });
 }
 
+function ensureQuadsCoverageForGluteTags(plan: any, options: BBFinalizeOptions): void {
+  const hasGluteTags = plan.weeks.some((w: any) => (w.sessions || []).some((s: any) => /Glutes/i.test(s.sessionTag || '')));
+  if (!hasGluteTags) return;
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  const gradedMuscles = new Set(options.gradedMuscles || []);
+  if (excludedMuscles.has('quads') || gradedMuscles.has('quads')) return;
+  const lm = getVolumeLandmarks(options.level || 'intermediate', 'quads');
+  if (!lm) return;
+  // Порог = валидаторный deficit-порог (0.7×MEV), минимум 3 сета.
+  const floor = Math.max(3, Math.round(lm.mev * 0.7));
+  const equipmentOk = (c: any) => {
+    if (!(options.equipment || []).length) return true; // нет ограничений — любое оборудование
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    if (!eq.length || eq.includes('bodyweight')) return true;
+    return eq.some((x: string) => (options.equipment || []).includes(x));
+  };
+  const pickQuads = (patterns: RegExp[], usedNames: Set<string>) => {
+    for (const pattern of patterns) {
+      const c = (EXERCISE_CATALOG as any[]).find((x: any) =>
+        trueMuscleOf(x) === 'quads' && pattern.test(x.name || '') && !usedNames.has(x.name) && equipmentOk(x)
+        && !isMobilityRestricted(x, options.mobilityRestrictions)
+        && !(options.avoidAxialLoad && isAxialLoadExercise(x)));
+      if (c) return c;
+    }
+    return undefined;
+  };
+  // (локальные isPrepControlled/isGenericTaperWeek из finalizeBBPlan здесь не видны —
+  // дублируем гард: вызов уже пропущен при planHasPrep; generic taper = 2 последние недели)
+  for (const week of plan.weeks) {
+    const w: any = week;
+    const total = plan.weeks.length;
+    if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week'
+      || (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) || w.peakWeek === true) continue;
+    if ((w.phase === 'deload' || w.deload)) continue;
+    if (total >= 4 && w.week >= total - 2) continue; // generic taper
+    if (tradeoffDonorsForWeek(options, w?.week ?? 0).has('quads')) continue;
+    const existing = new Set<string>();
+    let quadsSets = 0;
+    for (const s of week.sessions || []) for (const e of s.exercises || []) {
+      if ((e as any).warmupActivator) continue;
+      if (e.muscle !== 'quads') continue;
+      existing.add(e.exerciseName || e.name);
+      quadsSets += e.sets || 0;
+    }
+    if (quadsSets >= floor) continue;
+    const deficit = floor - quadsSets;
+    const heavySess = week.sessions.find((s: any) => /GlutesHams/i.test(s.sessionTag || ''))
+      || week.sessions.find((s: any) => /Glutes/i.test(s.sessionTag || ''));
+    const pumpSess = week.sessions.find((s: any) => /Glutes/i.test(s.sessionTag || '') && String((s as any).character) === 'памп' && s !== heavySess)
+      || week.sessions.find((s: any) => /Glutes/i.test(s.sessionTag || '') && s !== heavySess);
+    const wm = options.workMax?.quads || 90;
+    // Аудит Sep 2026: машина (leg press/гакк/разгибания) может отсутствовать
+    // в инвентаре — фоллбек-цепочка до dumbbell/bodyweight (болгарские/выпады/присед).
+    const heavyCand = pickQuads([/жим.*ног|leg.?press|гакк|hack/i, /болгар|bulgarian|присед|squat|выпад|lunge/i], existing);
+    const pumpCand = pickQuads([/разгиб/i, /выпад|lunge|болгар|bulgarian/i], existing);
+    if (heavySess && heavyCand && deficit > 0) {
+      const sets = Math.min(3, deficit);
+      heavySess.exercises.push({
+        muscle: 'quads', name: heavyCand.name, exerciseName: heavyCand.name, role: 'accessory', character: 'памп',
+        sets, repsRange: [12, 15], rir: 2, warmupSets: [],
+        workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 2, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 90 })),
+        comment: `🦵 Quads-гарантия: ${heavyCand.name} ${sets}×12 RIR 2 — глут-сплит не имеет quads-слота (TAG_MUSCLES.Glutes), недельный прямой объём < 0.7×MEV (${quadsSets}/${floor}). Поддерживающий объём (Kassiano 2024: leg press — главный женский носитель quads+glutes).`,
+        rationale: 'Quads coverage для glute-сплитов: поддерживающий объём ≥ 0.7×MEV',
+      });
+      quadsSets += sets;
+      existing.add(heavyCand.name);
+    }
+    const deficit2 = floor - quadsSets;
+    if (pumpSess && pumpCand && deficit2 > 0) {
+      const sets = Math.min(3, deficit2);
+      pumpSess.exercises.push({
+        muscle: 'quads', name: pumpCand.name, exerciseName: pumpCand.name, role: 'accessory', character: 'памп',
+        sets, repsRange: [15, 20], rir: 3, warmupSets: [],
+        workSets: Array.from({ length: sets }, () => ({ reps: 18, rir: 3, weight: Math.round(wm * 0.3 * 10) / 10, restSeconds: 60 })),
+        comment: `🦵 Quads-памп: ${pumpCand.name} ${sets}×18 RIR 3 — вторая quads-сессия недели (частота 2×, Schoenfeld 2016).`,
+        rationale: 'Quads frequency 2×/нед для glute-сплитов',
+      });
+    }
+  }
+}
+
+/** Аудит Sep 2026: spec-мышца с ≥3 dedicated-сессиями/нед (female_glute_5) получала
+ *  распределение 6/6/0 — normalizeWeekMrv резал памп-день ЦЕЛИКОМ (rank-last),
+ *  и частота тихо деградировала 3×→2× (тест phase-D лгал ассертом ≥2).
+ *  Ребаланс объём-нейтрален: 2-3 сета из самой большой сессии переносятся в
+ *  пустую dedicated-сессию — кап MRV не превышается, частота 3× восстановлена. */
+function rebalanceSpecFrequency(plan: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || !options.priorityMuscles?.length) return;
+  const TAGS_FOR: Record<string, RegExp> = {
+    glutes: /Glutes/i,
+    quads: /Legs|Lower|Quad/i,
+    hamstrings: /Legs|Lower|Ham|GlutesHams/i,
+    calves: /Calves|Legs|Lower/i,
+  };
+  for (const muscle of options.priorityMuscles) {
+    const tagRe = TAGS_FOR[muscle];
+    if (!tagRe) continue;
+    for (const week of plan.weeks) {
+      const w: any = week;
+      if (w.phase === 'deload' || w.deload) continue;
+      const sessions = (week.sessions || []).filter((s: any) => tagRe.test(s.sessionTag || ''));
+      if (sessions.length < 3) continue;
+      const setsOf = (s: any) => s.exercises.filter((e: any) => e.muscle === muscle && !(e as any).warmupActivator)
+        .reduce((t: number, e: any) => t + (e.sets || 0), 0);
+      const empties = sessions.filter((s: any) => setsOf(s) === 0);
+      if (!empties.length) continue;
+      const donors = sessions.filter((s: any) => setsOf(s) >= 5).sort((a: any, b: any) => setsOf(b) - setsOf(a));
+      for (const empty of empties) {
+        const donor = donors.shift();
+        if (!donor) break;
+        // Перенос ЦЕЛОГО упражнения: cap-adjust уже ужимает донора к полу 2 сета
+        // (sets>2 не найти — резать нечего). Lead-thrust не трогаем (главное движение
+        // дня стабильно); кандидаты — изоляции мышцы с ≥2 сетами.
+        const movable = (donor.exercises as any[]).filter((e: any) => e.muscle === muscle
+          && !(e as any).warmupActivator && (e.sets || 0) >= 2
+          && !/мост|hip.?thrust|glute.?bridge/i.test(e.name || ''))
+          .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        const ex = movable[0];
+        if (!ex) continue;
+        const move = ex.sets || 0;
+        donor.exercises = (donor.exercises as any[]).filter((x: any) => x !== ex);
+        ex.character = 'памп';
+        ex.comment = `🔁 Частота: упражнение перенесено из тяж-дня в dedicated-сессию — частота ${muscle} 3×/нед (Schoenfeld 2016), недельный объём не изменён.`;
+        ex.rationale = 'Spec frequency rebalance: объём-нейтральное восстановление 3-й сессии';
+        empty.exercises.push(ex);
+      }
+    }
+  }
+}
+
 function allocateExperiencedLegSession(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   const legDonors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
@@ -1949,6 +2079,10 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   // «две тяги/два жима подряд»). Разминка другим движением того же паттерна — допустима.
   const hasSameName = session.exercises.some((e: any) => (e.name || '') === candidate.name || (e.exerciseName || '') === candidate.name);
   if (hasSameName) return;
+  // Аудит Sep 2026: глут-дни — разминка-активатор дублировал паттерн дня (heavy hip thrust
+  // уже рабочее движение, а сверху шёл «мост на полу 3s» на 20 кг в НАЧАЛЕ сессии).
+  // Если день уже содержит thrust/bridge как рабочее движение — активатор не нужен.
+  if (lead === 'glutes' && session.exercises.some((e: any) => !(e as any).warmupActivator && /мост|hip.?thrust|glute.?bridge/i.test(e.name || e.exerciseName || ''))) return;
   const base = options.workMax?.[lead] || 50;
   const weight = Math.max(5, Math.round(base * 0.25 * 10) / 10);
   session.exercises.unshift({
@@ -3063,6 +3197,9 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     }
     }
   }
+  // Аудит Sep 2026 (P0-3): quads-гарантия для женских глут-сплитов (female_glute_5
+  // не имеет quads-слота, leg-гарантии гейтятся на /Legs|Lower/ и мимо тегов Glutes).
+  if (!options.preserveSource && !planHasPrep) ensureQuadsCoverageForGluteTags(next, options);
 for (const week of next.weeks) {
     // 🏁 Prep guard: недели, управляемые contest prep, не проходят MEV-guard/
     // tidy/fit/repair/back-баланс — повторная финализация (revalidate после ручных
@@ -3600,7 +3737,11 @@ for (const week of next.weeks) {
         volumeGoal: options.volumeGoal || 'mav',
       });
     }
-    next.volumeTargets = targets;
+    // Аудит Sep 2026 (P0-3): пик-факт НЕ перезаписывает предписанные таргеты билдера —
+    // раньше одноразовый quads-фидер в пик-неделе зеркалился как «таргет quads:8»
+    // для сплита, который quad-работу вообще не планировал. Прескриптивные таргеты
+    // билдера приоритетны; пик-факт дозаполняет только отсутствующие мышцы.
+    next.volumeTargets = { ...targets, ...(next.volumeTargets || {}) };
   }
   enrichExerciseRationale(next);
   // FIX-B3: autoAssignIntensityTechniques — автоматическое назначение
@@ -3703,6 +3844,19 @@ for (const week of next.weeks) {
     // режутся первыми по завышенному indirect, а флор потом не влезает.
     const CAP_MUSCLES = ['quads', 'hamstrings', 'glutes', 'chest', 'back', 'shoulders', 'calves', 'forearms', 'traps', 'abs', 'delt_front', 'delt_mid', 'delt_rear', 'triceps', 'biceps'] as const;
     const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
+    // Аудит Sep 2026: определение изоляции — по каталогу (exerciseType/type), имя-regex
+    // только fallback для неизвестных имён. Раньше «Раскладушка»/«Гидрант» (не матчат
+    // regex) считались не-изоляцией и переживали резку, а machine abduction снимался.
+    const catByName = new Map<string, any>((EXERCISE_CATALOG as any[]).map((c: any) => [c.name, c]));
+    const isIsolationEx = (e: any) => {
+      const t = String(e.exerciseType || '').toLowerCase();
+      if (t === 'isolation') return true;
+      if (t === 'compound') return false;
+      const cat = catByName.get(e.exerciseName || e.name || '');
+      if (cat) return String(cat.type) === 'isolation';
+      return isIsolationName(e.name || '');
+    };
+    const fatigueOf = (e: any) => Number(catByName.get(e.exerciseName || e.name || '')?.fatigueCost ?? 99);
     for (const week of next.weeks) {
       const w: any = week;
       if (w.phase === 'deload') continue;
@@ -3747,8 +3901,12 @@ for (const week of next.weeks) {
         if (need <= 0) continue;
         // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
         const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
-        const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
-        const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        // Порядок резки изоляций: меньше сеты → ниже fatigueCost (rehab-дрели первыми) →
+        // отведение последним (NSCA Hodge: abduction — отдельный глут-паттерн, не «добивка»).
+        const abdLast = (e: any) => (/отведен.*бедр|abduction/i.test(e.name || '') ? 1 : 0);
+        const isolations = candidates.filter(isIsolationEx).sort((a: any, b: any) =>
+          ((a.sets || 0) - (b.sets || 0)) || (fatigueOf(a) - fatigueOf(b)) || (abdLast(a) - abdLast(b)));
+        const others = candidates.filter(e => !isIsolationEx(e)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         // PPL-минимумы по-сессионно (bb-ppl-invariant: Pull biceps 8, Push
         // triceps 8): режем сначала сессии ВЫШЕ минимума, сессии на минимуме
         // щадим — иначе глобальный smallest-first складывает всю резку в одну
@@ -3894,8 +4052,14 @@ for (const week of next.weeks) {
         }
       }
     }
+  }
 
-
+  // Аудит Sep 2026: восстановление частоты spec-мышцы ПОСЛЕ cap-adjust —
+  // именно cap-adjust резал памп-dedicated-сессию до нуля (6/6/6 → 6/6/0),
+  // и частота 3×/нед тихо деградировала в 2×. Ребаланс объём-нейтрален.
+  if (!options.preserveSource && (next as any).pattern?.id && !planHasPrep) {
+    rebalanceSpecFrequency(next, options);
+    syncBBPlanSetShape(next);
   }
 
   // PPL-гарантия по-сессионных минимумов (bb-ppl-invariant): cap-adjust и

@@ -45,6 +45,8 @@ export interface LoadingInput {
   eccentricMult?: number;
   isSubstituted?: boolean;
   isFemale?: boolean;
+  /** Аудит Sep 2026: spec-мышца (focus/weak) → прогрессия нагрузки +2%/нед внутри фазы (parity с buildSession). */
+  isSpecMuscle?: boolean;
 }
 
 export interface LoadingOutput {
@@ -91,7 +93,12 @@ export function computeLoading(input: LoadingInput): LoadingOutput {
   const rir = bbRir(input.character, input.phase, input.phaseWeek, input.trainingFocus);
 
   // Weight: Brzycki inverse %1RM formula (P1-4 audit)
-  let weight = weightForRepMax(reps, input.workMax, rir, phaseCfg.intensityMultiplier);
+  // + spec-прогрессия нагрузки +2%/нед внутри фазы (кап +6%; делод/пик без наклона) —
+  // parity с buildSession (аудит Sep 2026: spec-мышцы шли со статичным весом).
+  const loadProgressMult = (input.isSpecMuscle && input.phase !== 'deload' && input.phase !== 'peaking')
+    ? 1 + Math.min(0.06, 0.02 * Math.max(0, input.phaseWeek - 1))
+    : 1;
+  let weight = weightForRepMax(reps, input.workMax, rir, phaseCfg.intensityMultiplier) * loadProgressMult;
 
   // Eccentric overload (Schoenfeld 2021)
   if (input.eccentricMult && input.eccentricMult > 1.0 && input.role === 'primary') {

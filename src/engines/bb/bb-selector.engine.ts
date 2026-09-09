@@ -164,8 +164,17 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     // D1: Female glute focus — бонус для female_glute_5 сплита.
     if (input.sex === 'female' && input.focusGroup === 'glutes') {
+      // Аудит Sep 2026: avg-частота по ВСЕМ 15 группам наказывала глут-сплит
+      // за нулевые quads/forearms (.Pull-день вместо второго Upper) и выбивал
+      // его из топ-3. Для сплита специализации главный критерий — частота
+      // ЦЕЛЕВОЙ мышцы: glutes 3×/нед (Schoenfeld 2016).
+      const gf = freq['glutes'] || 0;
+      if (gf >= 2 && gf <= 3) { score += 18; rationale.push(`частота цели (glutes) ${gf}×/нед — оптимум гипертрофии`); }
+      else if (gf > 3) { score += 8; rationale.push(`высокая частота цели ${gf}×/нед`); }
+      else if (gf < 2) { warnings.push(`частота цели (glutes) ${gf}×/нед ниже 2×`); }
+      if (gf >= 2 && (input.goal === 'mass' || input.goal === 'strength_mass')) score += 12;
       if (p.id === 'female_glute_5') {
-        score += 25;
+        score += 30;
         rationale.push('♀ Женский glute-фокус: 3 glute-сессии/нед (Schoenfeld 2016)');
       }
       if (p.id === 'glute_focus_4') {

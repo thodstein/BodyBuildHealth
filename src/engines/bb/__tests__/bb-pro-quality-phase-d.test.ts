@@ -79,7 +79,10 @@ describe('D1: Female glute path — female_glute_5 split', () => {
     expect(maxGluteSets).toBeGreaterThanOrEqual(3);
   });
 
-  it('buildBBPlan: female_glute_5 → glutes встречаются в ≥3 сессиях/нед', () => {
+  it('buildBBPlan: female_glute_5 → glutes в ≥3 сессиях/нед РАБОЧИМИ сетами (не warmup-активатором)', () => {
+    // Аудит Sep 2026: раньше тест назывался «≥3 сессий», ассерт был ≥2 —
+    // реальный план давал ровно 2 (MRV-проход стирал памп-глут блок).
+    // Теперь: рабочие глут-сеты (warmupActivator исключён) в ≥3 сессиях недели 1.
     const plan = buildBBPlan(makeInput({
       patternId: 'female_glute_5',
       weeks: 4,
@@ -88,9 +91,69 @@ describe('D1: Female glute path — female_glute_5 split', () => {
     }));
     const w1 = plan.weeks[0];
     const gluteSessions = w1.sessions.filter(s =>
-      s.exercises.some(e => e.muscle === 'glutes')
+      s.exercises.some(e => e.muscle === 'glutes' && !e.warmupActivator && (e.sets || 0) > 0)
     );
-    expect(gluteSessions.length).toBeGreaterThanOrEqual(2);
+    expect(gluteSessions.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('female_glute_5: heavy barbell hip thrust присутствует в неделе (Kassiano 2024)', () => {
+    // Аудит Sep 2026: за 12 недель не было НИ ОДНОГО barbell hip thrust —
+    // класс-0 всегда выигрывал floor/B-stance мост, а «мост на полу 3s»
+    // в начале сессии был finalize warmup-активатором, не рабочим движением.
+    const plan = buildBBPlan(makeInput({
+      patternId: 'female_glute_5',
+      weeks: 4,
+      sex: 'female',
+      focusGroup: 'glutes',
+    }));
+    const w1 = plan.weeks[0];
+    const thrust = w1.sessions.flatMap(s => s.exercises).find(e =>
+      e.muscle === 'glutes' && !e.warmupActivator && /мост|hip.?thrust/i.test(e.name || '') && e.role === 'primary');
+    expect(thrust).toBeTruthy();
+  });
+
+  it('female_glute_5: квадрицепс получает поддерживающий объём ≥ 0.7×MEV', () => {
+    // Аудит Sep 2026: TAG_MUSCLES.Glutes без quads + leg-гарантии на /Legs|Lower/
+    // → quads = 0 сетов в 11 из 12 недель при таргете 8. Гарантия ставит
+    // ≥ 0.7×MEV в рабочих неделях (taper/делод — по фазовой семантике не добираем).
+    const plan = buildBBPlan(makeInput({
+      patternId: 'female_glute_5',
+      weeks: 8,
+      sex: 'female',
+      focusGroup: 'glutes',
+    }));
+    const total = plan.weeks.length;
+    const working = plan.weeks.filter(w => !w.deload && w.phase !== 'deload' && w.week < total - 2);
+    expect(working.length).toBeGreaterThan(0);
+    for (const w of working) {
+      const quads = w.sessions.flatMap(s => s.exercises)
+        .filter(e => e.muscle === 'quads' && !e.warmupActivator)
+        .reduce((sum, e) => sum + (e.sets || 0), 0);
+      expect(quads, `week ${w.week}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('female_glute_5: rehab-дрели (clamshell/гидрант) не на тяж-днях, отведение присутствует', () => {
+    // Аудит Sep 2026: clamshell/fire hydrant («Реабилитация») занимали primary
+    // тяж-дня через fallback-fill, а machine abduction снимался имённым regex.
+    const plan = buildBBPlan(makeInput({
+      patternId: 'female_glute_5',
+      weeks: 4,
+      sex: 'female',
+      focusGroup: 'glutes',
+    }));
+    for (const w of plan.weeks) {
+      for (const s of w.sessions) {
+        if (String(s.character) !== 'тяж') continue;
+        const rehab = s.exercises.find(e =>
+          !e.warmupActivator && /раскладуш|clamshell|гидрант|hydrant/i.test(e.name || ''));
+        expect(rehab, `week ${w.week} day ${s.day}`).toBeUndefined();
+      }
+    }
+    const abdSets = plan.weeks.slice(0, 4).flatMap(w => w.sessions.flatMap(s => s.exercises))
+      .filter(e => e.muscle === 'glutes' && !e.warmupActivator && /отведен.*бедр|abduction/i.test(e.name || ''))
+      .reduce((s, e) => s + (e.sets || 0), 0);
+    expect(abdSets).toBeGreaterThanOrEqual(2);
   });
 });
 

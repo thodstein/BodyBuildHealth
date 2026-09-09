@@ -456,11 +456,11 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'тренировка', character: 'тяж', sessionTag: 'GlutesHams' },
       { kind: 'отдых', character: null },
       { kind: 'тренировка', character: 'памп', sessionTag: 'Glutes' },
-      { kind: 'тренировка', character: 'памп', sessionTag: 'Upper' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Pull' },
       { kind: 'отдых', character: null },
     ],
     level: ['intermediate', 'advanced', 'enhanced'],
-    description: 'Женский сплит 5×/нед с приоритетом ягодичных: 3 glute-сессии (2 тяж + 1 памп) + 2 upper. Ягодичные 3×/нед (Schoenfeld 2016), верх тела 2×/нед.',
+    description: 'Женский сплит 5×/нед с приоритетом ягодичных: 3 glute-сессии (2 тяж + 1 памп) + Upper (push) + Pull. Ягодичные 3×/нед (Schoenfeld 2016). Аудит Sep 2026: вторая верхняя сессия Pull-доминанта — back ≥ chest weekly (женский physique: спина ключева, баланс 2 push-стека грудь 16 vs спина 8).',
     direction: 'bodybuilding',
   },
 ];
