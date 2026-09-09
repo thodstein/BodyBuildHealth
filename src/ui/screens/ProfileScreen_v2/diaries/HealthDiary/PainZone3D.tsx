@@ -487,14 +487,16 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           const val = zones[hoverInfo.base] || 0;
           return (
             <div style={{
-              position: 'absolute', top: 8, left: 8,
+              position: 'absolute', top: 10, left: 10,
               background: 'rgba(0,0,0,0.85)', color: '#fff',
-              padding: '6px 10px', borderRadius: 6, fontSize: 11,
+              padding: '8px 13px', borderRadius: 12, fontSize: 12.5,
               pointerEvents: 'none', zIndex: 10,
-              border: `1px solid ${painZoneColor(val)}55`,
+              border: `1px solid ${painZoneColor(val)}66`,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+              fontVariantNumeric: 'tabular-nums',
             }}>
               <b>{hoverInfo.label}</b>
-              <span style={{ marginLeft: 6, fontWeight: 700, color: painZoneColor(val) }}>
+              <span style={{ marginLeft: 7, fontWeight: 800, color: '#fff' }}>
                 {val}/10
               </span>
             </div>
@@ -504,13 +506,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
 
       {/* Управление */}
       {onChange && (
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
           <button
             onClick={selectAll}
             style={{
-              minHeight: 36, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(236,72,153,0.14)', border: '1px solid rgba(236,72,153,0.4)',
-              color: '#f472b6', fontSize: 12, fontWeight: 700,
+              minHeight: 44, padding: '9px 16px', borderRadius: 13, cursor: 'pointer',
+              background: 'linear-gradient(135deg, rgba(236,72,153,0.24), rgba(236,72,153,0.1))', border: '1px solid rgba(236,72,153,0.45)',
+              color: '#fff', fontSize: 12.5, fontWeight: 800,
+              boxShadow: '0 4px 14px rgba(236,72,153,0.22)',
             }}
           >
             🎯 Выбрать все
@@ -518,14 +521,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           <button
             onClick={clearAll}
             style={{
-              minHeight: 36, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-              color: '#ffffff', fontSize: 12, fontWeight: 600,
+              minHeight: 44, padding: '9px 16px', borderRadius: 13, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.13)',
+              color: '#ffffff', fontSize: 12.5, fontWeight: 700,
             }}
           >
             🧹 Сбросить
           </button>
-          <span style={{ fontSize: 10, color: '#ffffff', marginLeft: 4 }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginLeft: 4 }}>
             Клик по телу — анализ зоны (одно нажатие)
           </span>
         </div>
@@ -540,30 +543,32 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         const analysis = analysisFor ? analysisFor(base) : null;
         const c = painZoneColor(val);
         return (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44` }}>
+          <div style={{ marginTop: 10, padding: 13, borderRadius: 15, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: `1px solid ${c}45`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <b style={{ fontSize: 12, color: c }}>{meta.label}</b>
+              <b style={{ fontSize: 13.5, color: '#fff' }}>{meta.label}</b>
               <button
                 onClick={() => selectZone(selectedZone)}
-                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: 14, minWidth: 32, minHeight: 32 }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', cursor: 'pointer', fontSize: 13, minWidth: 36, minHeight: 36, borderRadius: 11 }}
                 aria-label="Закрыть"
               >
                 ✕
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: '#ffffff', marginRight: 2 }}>Боль:</span>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 9, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.65)', marginRight: 3 }}>Боль:</span>
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
                 <button
                   key={v}
                   onClick={() => setZoneValue(base, v)}
                   disabled={!onChange}
                   style={{
-                    minWidth: 26, height: 28, borderRadius: 8, fontSize: 10, fontWeight: 800,
+                    minWidth: 32, height: 36, borderRadius: 10, fontSize: 12, fontWeight: 800,
                     cursor: onChange ? 'pointer' : 'default', fontFamily: 'inherit',
-                    background: val === v ? `${painZoneColor(v)}33` : 'rgba(255,255,255,0.04)',
+                    background: val === v ? `${painZoneColor(v)}30` : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${val === v ? painZoneColor(v) : 'rgba(255,255,255,0.1)'}`,
-                    color: val === v ? painZoneColor(v) : 'rgba(255,255,255,0.6)',
+                    boxShadow: val === v ? `0 0 0 2px ${painZoneColor(v)}33` : 'none',
+                    color: val === v ? '#fff' : 'rgba(255,255,255,0.6)',
+                    fontVariantNumeric: 'tabular-nums',
                   }}
                   aria-pressed={val === v}
                 >
@@ -572,12 +577,12 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               ))}
             </div>
             {analysis && (
-              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', fontSize: 11, color: '#ffffff' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: c, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+              <div style={{ marginTop: 10, padding: 11, borderRadius: 12, background: 'rgba(0,0,0,0.25)', fontSize: 12, color: '#ffffff', lineHeight: 1.55, fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 5 }}>
                   📊 Сводный анализ
                 </div>
                 <div>Последняя запись: {analysis.last ?? '—'}/10 · среднее за 30 дней: {analysis.avg30 ?? '—'}/10</div>
-                <div style={{ marginTop: 2 }}>
+                <div style={{ marginTop: 3 }}>
                   Записей с зоной: {analysis.count ?? 0}
                   {analysis.trend
                     ? ` · динамика: ${analysis.trend === 'up' ? '📈 ухудшение' : analysis.trend === 'down' ? '📉 улучшение' : '➡️ стабильно'}`
@@ -586,7 +591,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               </div>
             )}
             {!analysis && (
-              <div style={{ marginTop: 6, fontSize: 10, color: '#ffffff' }}>
+              <div style={{ marginTop: 8, fontSize: 11.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
                 Записей с этой зоной пока нет — отметьте уровень боли выше.
               </div>
             )}
@@ -595,7 +600,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
       })()}
 
       {/* Чипы зон: 13 (левая/правая стороны) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 9 }}>
         {SIDE_ZONES.map((z) => {
           const val = zones[z.base] || 0;
           const active = z.id === selectedZone;
@@ -605,12 +610,13 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               key={z.id}
               onClick={() => selectZone(z.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 10,
-                fontSize: 10, fontWeight: active ? 700 : 500, cursor: 'pointer',
-                background: active ? `${c}33` : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${active ? c : 'rgba(255,255,255,0.08)'}`,
-                color: active ? c : 'rgba(255,255,255,0.65)',
+                display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 999,
+                fontSize: 11.5, fontWeight: active ? 800 : 600, cursor: 'pointer', minHeight: 32,
+                background: active ? `${c}2e` : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${active ? c : 'rgba(255,255,255,0.09)'}`,
+                color: active ? '#fff' : 'rgba(255,255,255,0.65)',
                 transition: 'all 0.15s',
+                fontVariantNumeric: 'tabular-nums',
               }}
               aria-pressed={active}
               title={`${z.label}: ${val}/10 — клик для анализа`}

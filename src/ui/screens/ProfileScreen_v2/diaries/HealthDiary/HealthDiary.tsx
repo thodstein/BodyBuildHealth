@@ -82,15 +82,16 @@ const card: React.CSSProperties = { ...glassSection };
 const input: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  padding: '8px 10px',
-  borderRadius: 10,
-  border: `1px solid ${colors.border}`,
+  padding: '12px 14px',
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.11)',
   background: 'rgba(255,255,255,0.06)',
   color: '#fff',
-  fontSize: 14,
+  fontSize: 16,
   outline: 'none',
-  minHeight: 38,
+  minHeight: 48,
   fontFamily: 'inherit',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 };
 
 type Symptom = UnifiedHealthEntry['symptoms'][number];
@@ -466,7 +467,7 @@ const EntryEditor: React.FC<{
             <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/{PAIN_MAX}</div>
           </FieldGroup>
           <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>Нажмите на часть тела — VAS 0–10</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>Нажмите на часть тела — VAS 0–10</div>
             <PainZone3D zones={painZones} onChange={(zones) => setPain({ zones, totalScore: score(zones) })} height={300} />
           </div>
         </div>
@@ -556,13 +557,14 @@ const EntryEditor: React.FC<{
             </button>
           </div>
           {draft.symptoms.map((s) => (
-            <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 0', fontSize: 11 }}>
+            <div key={s.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '9px 12px', fontSize: 12.5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, marginBottom: 6, fontVariantNumeric: 'tabular-nums' }}>
               <span style={{ flex: 1 }}>{s.name}</span>
               <b>{s.severity}/5</b>
-              <span>{s.duration || ''}</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{s.duration || ''}</span>
               <button
-                style={{ ...button, minHeight: 30, padding: '3px 8px', color: '#ef4444' }}
+                style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                 onClick={() => setDraft((d) => ({ ...d, symptoms: d.symptoms.filter((x) => x.id !== s.id) }))}
+                aria-label="Удалить симптом"
               >
                 ×
               </button>
@@ -976,14 +978,16 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
         badge={
           <div style={{
-            padding: '4px 10px',
-            borderRadius: 8,
+            padding: '5px 12px',
+            borderRadius: 999,
             background: scoreDim,
             border: `1px solid ${scoreColor}`,
-            color: scoreColor,
-            fontSize: 12,
-            fontWeight: 700,
+            color: '#fff',
+            fontSize: 12.5,
+            fontWeight: 800,
             whiteSpace: 'nowrap',
+            fontVariantNumeric: 'tabular-nums',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
           }} title={`${healthScore.label}: ${healthScore.overallScore}/100 · Дневник ${diaryScore}/100${healthScore.topIssues.length ? ' · ' + healthScore.topIssues.join(', ') : ''}`}>
             💚 {healthScore.overallScore}
           </div>
@@ -1024,17 +1028,17 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
               <span style={{ color: colors.textMuted, fontSize: 11 }}>{plan.summary.verdict}</span>
             </div>
             {plan.recommendations.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: colors.textMuted, marginBottom: 3 }}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'rgba(255,255,255,0.65)', marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
                   <span>✅ Выполнено: {doneCount} из {plan.recommendations.length}</span>
-                  <span>{planProgressPct}%</span>
+                  <span><b style={{ color: '#fff' }}>{planProgressPct}%</b></span>
                 </div>
-                <div style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${planProgressPct}%`, background: '#8b5cf6', borderRadius: 999, transition: 'width 0.3s' }} />
+                <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
+                  <div style={{ height: '100%', width: `${planProgressPct}%`, background: 'linear-gradient(90deg,#8b5cf6,#a78bfa)', borderRadius: 999, transition: 'width 0.3s' }} />
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
               {(
                 [
                   ['critical', '🔴', '#ef4444'],
@@ -1043,7 +1047,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                   ['low', '🟢', '#22c55e'],
                 ] as const
               ).map(([label, icon, c]) => (
-                <span key={label} style={{ fontSize: 10, fontWeight: 800, color: c, background: `${c}1f`, borderRadius: 999, padding: '2px 8px' }}>
+                <span key={label} style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: `${c}26`, borderRadius: 999, padding: '4px 11px', border: `1px solid ${c}45`, fontVariantNumeric: 'tabular-nums' }}>
                   {icon} {plan.summary[label]}
                 </span>
               ))}
@@ -1107,16 +1111,16 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             ['Симптомы', symptomStats?.total || 0, '#ec4899'],
             ['Серия', streak.current, '#f59e0b'],
           ].map(([label, value, color]) => (
-            <div key={String(label)} className="diary-card" style={{ ...statCard, border: `1px solid ${String(color)}30`, background: `linear-gradient(135deg, ${String(color)}14, transparent 70%), rgba(28,28,32,0.74)`, borderLeft: `2px solid ${String(color)}88`, position: 'relative', overflow: 'hidden' }}>
-              <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${String(color)}12, transparent 62%)`, pointerEvents: 'none' }} />
-              <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>{label}</small>
-              <strong style={{ display: 'block', color: String(color), fontSize: 20, fontWeight: 800, position: 'relative', letterSpacing: '-0.3px', marginTop: 2 }}>{value}</strong>
+            <div key={String(label)} className="diary-card" style={{ ...statCard, border: `1px solid ${String(color)}35`, background: `linear-gradient(135deg, ${String(color)}16, transparent 70%), rgba(24,24,30,0.8)`, borderLeft: `2px solid ${String(color)}88`, position: 'relative', overflow: 'hidden' }}>
+              <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${String(color)}14, transparent 62%)`, pointerEvents: 'none' }} />
+              <small style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', position: 'relative' }}>{label}</small>
+              <strong style={{ display: 'block', color: '#fff', fontSize: 22, fontWeight: 800, position: 'relative', letterSpacing: '-0.3px', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{value}</strong>
             </div>
           ))}
         </section>
-        <section style={{ ...card, marginBottom: 12, padding: '8px 12px' }}>
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', fontSize: 10 }}>
-            <b style={{ color: colors.textMuted, marginRight: 2 }}>🧬 Индекс здоровья: {healthScore.overallScore}/100 · {healthScore.label}</b>
+        <section style={{ ...card, marginBottom: 12, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', fontSize: 11 }}>
+            <b style={{ color: 'rgba(255,255,255,0.7)', marginRight: 2 }}>🧬 Индекс здоровья: {healthScore.overallScore}/100 · {healthScore.label}</b>
             {(
               [
                 ['Фарма', healthScore.breakdown.pharma.score],
@@ -1127,7 +1131,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 ['Композ.', healthScore.breakdown.bodyComp.score],
               ] as const
             ).map(([label, v]) => (
-              <span key={label} title={label} style={{ fontWeight: 700, color: v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444', background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: '2px 8px' }}>
+              <span key={label} title={label} style={{ fontWeight: 800, color: '#fff', background: v >= 70 ? 'rgba(34,197,94,0.16)' : v >= 45 ? 'rgba(245,158,11,0.16)' : 'rgba(239,68,68,0.16)', borderRadius: 999, padding: '4px 11px', border: `1px solid ${v >= 70 ? 'rgba(34,197,94,0.3)' : v >= 45 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`, fontVariantNumeric: 'tabular-nums' }}>
                 {label} {v}
               </span>
             ))}
@@ -1372,10 +1376,10 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                   setPage(1);
                 }}
                 placeholder="🔍 Поиск по дате/показателю"
-                style={{ ...input, flex: 1, paddingRight: query ? 30 : undefined }}
+                style={{ ...input, flex: 1, paddingRight: query ? 38 : undefined }}
               />
               {query && (
-                <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+                <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
               )}
             </div>
             <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>
@@ -1413,11 +1417,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                     <td style={tableTd}>{row.pain?.linkedExercise || ''}</td>
                     <td style={tableTd}>{row.notes ? (row.notes.length > 20 ? row.notes.slice(0, 20) + '…' : row.notes) : ''}</td>
                     <td style={tableTd}>
-                      <button style={{ ...button, minHeight: 32, padding: '3px 7px' }} onClick={() => setEdit(row)}>
+                      <button style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={() => setEdit(row)} aria-label="Редактировать запись">
                         ✏️
                       </button>{' '}
                       <button
-                        style={{ ...button, minHeight: 32, padding: '3px 7px', color: '#ef4444' }}
+                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                         onClick={() => {
                           if (confirm(`Удалить запись ${row.date}?`)) {
                             commit(deleteUnifiedHealthEntry(row.date));

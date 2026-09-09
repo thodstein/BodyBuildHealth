@@ -346,33 +346,33 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       />
       <div style={{ ...pageMain, paddingBottom: 72 }}>
 
-      {flash && <div style={{ color: ACCENT, fontSize: 13, fontWeight: 700, padding: '8px 10px', marginTop: 6, background: `${ACCENT}10`, border: `1px solid ${ACCENT}22`, borderRadius: 10 }} role="status">{flash}</div>}
+      {flash && <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, padding: '11px 14px', marginTop: 8, background: `linear-gradient(135deg, ${ACCENT}26, ${ACCENT}0d)`, border: `1px solid ${ACCENT}45`, borderRadius: 14, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)' }} role="status">{flash}</div>}
 
       {weekHint && (
-        <div style={{ fontSize: 12, fontWeight: 600, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.78)', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12, padding: '10px 12px', marginTop: 12, marginBottom: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.18)' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 15, padding: '12px 14px', marginTop: 12, marginBottom: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.2)' }}>
           {HINT_ICON[weekHint.kind] ?? '💡'} Нед {weekHint.week}: {weekHint.text}
         </div>
       )}
 
       {adherence && (
-        <div className="diary-card" style={{ ...heroCard(ACCENT), padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>📈 Активный цикл — план vs факт · нед {adherence.week}</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.4px' }}>
-            {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин <span style={{ fontWeight: 600, color: ACCENT, fontSize: 14 }}>· {adherence.pctMinutes}%</span>
+        <div className="diary-card" style={{ ...heroCard(ACCENT), padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>📈 Активный цикл — план vs факт · нед {adherence.week}</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.4px', fontVariantNumeric: 'tabular-nums' }}>
+            {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин <span style={{ fontWeight: 800, color: ACCENT, fontSize: 15 }}>· {adherence.pctMinutes}%</span>
           </div>
-          <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginTop: 8 }}>
-            <div style={{ height: '100%', width: `${Math.max(6, Math.min(100, adherence.pctMinutes))}%`, background: ACCENT, borderRadius: 999, boxShadow: `0 0 10px ${ACCENT}66`, transition: 'width 0.4s ease' }} />
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 10, boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
+            <div style={{ height: '100%', width: `${Math.max(6, Math.min(100, adherence.pctMinutes))}%`, background: `linear-gradient(90deg, ${ACCENT}99, ${ACCENT})`, borderRadius: 999, boxShadow: `0 0 12px ${ACCENT}66`, transition: 'width 0.4s ease' }} />
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 6 }}>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
             Фаза: {adherence.weekPhase ? CARDIO_PHASE_LABELS[adherence.weekPhase] : '—'} · прогресс цикла {Math.round((adherence.week / adherence.cycle.totalWeeks) * 100)}%
           </div>
         </div>
       )}
       {hrCompliance && hrCompliance.checks.length > 0 && hrCompliance.advice && (
-        <div style={{ ...glassCard, padding: 12, marginBottom: 12, borderColor: 'rgba(74,222,128,0.35)' }}>
-          <div style={{ ...labelStyle, marginBottom: 6 }}>🎯 Пульс по факту (28д, n={hrCompliance.checks.length}, в зоне {hrCompliance.inZonePct}%)</div>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{hrCompliance.advice}</div>
-          <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>Среднее отклонение: {hrCompliance.avgDelta != null ? `${hrCompliance.avgDelta > 0 ? '+' : ''}${hrCompliance.avgDelta} уд` : '—'}</div>
+        <div style={{ ...glassCard, padding: 15, marginBottom: 12, borderColor: 'rgba(74,222,128,0.4)', boxShadow: '0 10px 28px rgba(0,0,0,0.3), 0 0 0 1px rgba(74,222,128,0.08)' }}>
+          <div style={{ ...labelStyle, marginBottom: 7, fontSize: 12 }}>🎯 Пульс по факту (28д, n={hrCompliance.checks.length}, в зоне {hrCompliance.inZonePct}%)</div>
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', lineHeight: 1.55 }}>{hrCompliance.advice}</div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 7, fontVariantNumeric: 'tabular-nums' }}>Среднее отклонение: {hrCompliance.avgDelta != null ? `${hrCompliance.avgDelta > 0 ? '+' : ''}${hrCompliance.avgDelta} уд` : '—'}</div>
         </div>
       )}
 
@@ -383,11 +383,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           { label: '28 дней', val: `${stats28.sessions} сесс.`, sub: `${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.avgPace ? ` · ${stats28.avgPace}` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}` },
           { label: 'Всего', val: `${doneSessions} сесс.`, sub: `${totalMinutes} мин` },
         ].map((c) => (
-          <div key={c.label} className="diary-card" style={{ ...statCard, background: `linear-gradient(135deg, ${ACCENT}12, transparent 68%), rgba(28,28,32,0.74)`, borderLeft: `2px solid ${ACCENT}88`, position: 'relative', overflow: 'hidden' }}>
-            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(420px 90px at 14% 0%, ${ACCENT}12, transparent 62%)`, pointerEvents: 'none' }} />
-            <div style={{ ...labelStyle, position: 'relative', color: 'rgba(255,255,255,0.44)', fontWeight: 700 }}>{c.label}</div>
-            <strong style={{ fontSize: 20, color: ACCENT, position: 'relative', letterSpacing: '-0.3px' }}>{c.val}</strong>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', position: 'relative', marginTop: 2, lineHeight: 1.35 }}>{c.sub}</div>
+          <div key={c.label} className="diary-card" style={{ ...statCard, background: `linear-gradient(135deg, ${ACCENT}15, transparent 68%), rgba(24,24,30,0.8)`, borderLeft: `2px solid ${ACCENT}88`, position: 'relative', overflow: 'hidden' }}>
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(420px 90px at 14% 0%, ${ACCENT}14, transparent 62%)`, pointerEvents: 'none' }} />
+            <div style={{ ...labelStyle, position: 'relative', color: 'rgba(255,255,255,0.55)', fontWeight: 800 }}>{c.label}</div>
+            <strong style={{ fontSize: 22, color: '#fff', position: 'relative', letterSpacing: '-0.3px', fontVariantNumeric: 'tabular-nums' }}>{c.val}</strong>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', position: 'relative', marginTop: 3, lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{c.sub}</div>
           </div>
         ))}
       </div>
@@ -395,15 +395,15 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       {weeklyHistogram.length > 0 && (() => {
         const maxMean = Math.max(...weeklyHistogram.map(x => x.mean), 1);
         return (
-          <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>
-            <div style={{ ...labelStyle, marginBottom: 6 }}>📊 Недельная гистограмма (мин/нед)</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ ...glassCard, padding: 15, marginBottom: 12 }}>
+            <div style={{ ...labelStyle, marginBottom: 9, fontSize: 12 }}>📊 Недельная гистограмма (мин/нед)</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               {weeklyHistogram.slice(-8).map(w => (
-                <div key={w.weekStart} title={`${w.weekStart}: ${w.mean.toFixed(0)} мин, ${w.count} сесс`} style={{ flex: '1 1 80px', textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 62 }}>
-                  <div style={{ height: `${Math.max(8, (w.mean / maxMean) * 30)}px`, background: `linear-gradient(180deg, ${ACCENT}, #16a34a)`, borderRadius: 4, marginBottom: 4, opacity: 0.9 }} />
-                  <div style={{ fontSize: 10, color: colors.textMuted }}>{w.weekStart.slice(5)}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{w.mean.toFixed(0)}</div>
-                  <div style={{ fontSize: 10, color: colors.textMuted }}>{w.count} сесс</div>
+                <div key={w.weekStart} title={`${w.weekStart}: ${w.mean.toFixed(0)} мин, ${w.count} сесс`} style={{ flex: '1 1 84px', textAlign: 'center', padding: '8px 5px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 68 }}>
+                  <div style={{ height: `${Math.max(8, (w.mean / maxMean) * 30)}px`, background: `linear-gradient(180deg, ${ACCENT}, #16a34a)`, borderRadius: 5, marginBottom: 5, opacity: 0.92 }} />
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{w.weekStart.slice(5)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{w.mean.toFixed(0)}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{w.count} сесс</div>
                 </div>
               ))}
             </div>
@@ -482,23 +482,23 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           )}
         </div>
         {Object.keys(warnings).length > 0 && (
-          <div role="alert" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.35)', color: '#fca5a5', fontSize: 12 }}>
+          <div role="alert" style={{ marginTop: 10, padding: '11px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(248,113,113,0.15), rgba(248,113,113,0.05))', border: '1px solid rgba(248,113,113,0.35)', color: '#fecaca', fontSize: 12.5, lineHeight: 1.55, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
             {Object.entries(warnings).map(([k, v]) => <div key={k}>⚠ {v}</div>)}
           </div>
         )}
         {todayLegDay?.isLegDay && (
-          <div role="status" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#fcd34d', fontSize: 12 }}>
+          <div role="status" style={{ marginTop: 10, padding: '11px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))', border: '1px solid rgba(245,158,11,0.35)', color: '#fde68a', fontSize: 12.5, lineHeight: 1.55, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
             🦵 Сегодня день тяжёлых ног — интенсивное кардио лучше перенести (recovery — можно)
           </div>
         )}
       </div>
 
       {/* Импорт с часов — Apple / Huawei / Samsung / Garmin / Polar / Xiaomi */}
-      <div className="diary-card" style={{ ...glassCard, padding: 15, marginBottom: 14, border: `1px solid ${ACCENT}18`, background: `linear-gradient(135deg, ${ACCENT}08, transparent 70%), rgba(28,28,32,0.74)` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-          <div style={{ ...sectionTitle, color: ACCENT, marginBottom: 0 }}>⌚ Импорт с часов</div>
-          <span style={{ fontSize: 11, color: colors.textMuted }}>Apple Watch · Huawei · Samsung · Garmin · Polar · Suunto · Fitbit · Xiaomi</span>
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textMuted }}>CSV · TCX · GPX · Apple export.xml · JSON · FIT</span>
+      <div className="diary-card" style={{ ...glassCard, padding: 16, marginBottom: 14, border: `1px solid ${ACCENT}22`, background: `linear-gradient(135deg, ${ACCENT}0d, transparent 70%), rgba(24,24,30,0.8)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ ...sectionTitle, color: '#fff', marginBottom: 0 }}>⌚ Импорт с часов</div>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Apple Watch · Huawei · Samsung · Garmin · Polar · Suunto · Fitbit · Xiaomi</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>CSV · TCX · GPX · Apple export.xml · JSON · FIT</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input ref={importInputRef} type="file" accept=".csv,.tcx,.gpx,.xml,.json,.fit,.zip" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
@@ -516,30 +516,30 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           )}
         </div>
         {importPreview && (
-          <div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: importPreview.entries.length ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${importPreview.entries.length ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: importPreview.entries.length ? '#4ade80' : '#f87171', marginBottom: 6 }}>
+          <div style={{ marginTop: 12, padding: 13, borderRadius: 14, background: importPreview.entries.length ? 'rgba(74,222,128,0.09)' : 'rgba(239,68,68,0.09)', border: `1px solid ${importPreview.entries.length ? 'rgba(74,222,128,0.28)' : 'rgba(239,68,68,0.28)'}` }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: importPreview.entries.length ? '#4ade80' : '#f87171', marginBottom: 7, fontVariantNumeric: 'tabular-nums' }}>
               {importPreview.fileName} → {importPreview.format} · найдено {importPreview.entries.length} тренировок
             </div>
             {importPreview.warnings.length > 0 && (
-              <div style={{ fontSize: 11, color: '#fbbf24', marginBottom: 6 }}>
+              <div style={{ fontSize: 11.5, color: '#fbbf24', marginBottom: 7, lineHeight: 1.5 }}>
                 {importPreview.warnings.slice(0, 4).map((w, i) => <div key={i}>⚠ {w}</div>)}
                 {importPreview.warnings.length > 4 && <div>… и ещё {importPreview.warnings.length - 4}</div>}
               </div>
             )}
             {importPreview.entries.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 220, overflowY: 'auto' }}>
                 {importPreview.entries.slice(0, 5).map(e => (
-                  <div key={e.id} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ color: colors.textMuted }}>{e.date}</span>
-                    <span style={{ fontWeight: 700, color: TYPES.find(t=>t.id===e.type)?.color || ACCENT }}>{TYPES.find(t=>t.id===e.type)?.label || e.type}</span>
+                  <div key={e.id} style={{ display: 'flex', gap: 8, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.date}</span>
+                    <span style={{ fontWeight: 800, color: '#fff' }}>{TYPES.find(t=>t.id===e.type)?.label || e.type}</span>
                     <span>{e.durationMin} мин</span>
                     {e.distanceKm && <span>{e.distanceKm} км</span>}
                     {e.avgHr && <span>{e.avgHr} уд</span>}
                     {e.calories && <span>{e.calories} ккал</span>}
-                    {e.notes && <span style={{ color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{e.notes}</span>}
+                    {e.notes && <span style={{ color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{e.notes}</span>}
                   </div>
                 ))}
-                {importPreview.entries.length > 5 && <div style={{ fontSize: 11, color: colors.textMuted }}>… и ещё {importPreview.entries.length - 5} тренировок</div>}
+                {importPreview.entries.length > 5 && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>… и ещё {importPreview.entries.length - 5} тренировок</div>}
               </div>
             )}
           </div>
@@ -554,7 +554,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 </ul>
               </details>
             ))}
-            <div style={{ fontSize: 11, color: colors.textMuted, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.09)', border: '1px solid rgba(96,165,250,0.22)', lineHeight: 1.55 }}>
               💡 CSV — самый надёжный: экспортируйте таблицу из приложения часов (Huawei Health / Samsung Health / Fitbit / Zepp) и загрузите её. TCX/GPX — для треков с GPS, Apple export.xml — весь архив Здоровья.
             </div>
           </div>
@@ -568,46 +568,46 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         ))}
         <div style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <input style={{ ...inputStyle, width: 180, paddingRight: query ? 30 : undefined }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+          <input style={{ ...inputStyle, width: 180, fontSize: 16, minHeight: 44, paddingRight: query ? 38 : undefined }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
           {query && (
-            <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+            <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
           )}
         </div>
       </div>
-      <div className="diary-card" style={{ ...glassCard, padding: 15 }}>
-        <div style={{ ...sectionTitle, marginBottom: 10 }}>📓 Журнал <span style={{ color: ACCENT, fontWeight: 800 }}>{filteredLog.length}</span><span style={{ color: 'rgba(255,255,255,0.38)', fontWeight: 500 }}>/{log.length}</span></div>
-        {filteredLog.length === 0 && <div style={{ fontSize: 13, color: colors.textMuted }}>{log.length === 0 ? 'Пока пусто — запишите первую кардио-сессию.' : 'Нет записей по фильтру.'}</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="diary-card" style={{ ...glassCard, padding: 16 }}>
+        <div style={{ ...sectionTitle, marginBottom: 12, fontSize: 12 }}>📓 Журнал <span style={{ color: ACCENT, fontWeight: 800 }}>{filteredLog.length}</span><span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>/{log.length}</span></div>
+        {filteredLog.length === 0 && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', padding: '14px 4px' }}>{log.length === 0 ? 'Пока пусто — запишите первую кардио-сессию.' : 'Нет записей по фильтру.'}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pageItems.map(e => {
             const t = TYPES.find(x => x.id === e.type);
             return (
-              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ width: 84, fontSize: 12, color: colors.textMuted }}>{e.date}</span>
-                <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
-                <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
-                {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.date}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{t?.label ?? e.type}</span>
+                <span style={{ fontSize: 12.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{e.durationMin} мин</span>
+                {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.calories} ккал</span>}
                 {e.distanceKm != null && e.distanceKm > 0 && (
                   <>
-                    <span style={{ fontSize: 12, color: colors.textMuted }}>{e.distanceKm} км</span>
-                    <span style={{ fontSize: 12, color: colors.textMuted }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.distanceKm} км</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
                   </>
                 )}
-                {e.avgHr != null && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.avgHr} уд</span>}
-                {e.rpe != null && <span style={{ fontSize: 12, color: colors.textMuted }}>RPE {e.rpe}</span>}
-                {e.notes && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.notes}>{e.notes}</span>}
-                {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}
+                {e.avgHr != null && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.avgHr} уд</span>}
+                {e.rpe != null && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>RPE {e.rpe}</span>}
+                {e.notes && <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.notes}>{e.notes}</span>}
+                {!e.completed && <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', padding: '3px 9px', borderRadius: 999 }}>пропущена</span>}
                 <span style={{ flex: 1 }} />
                 <button
                   onClick={() => startEdit(e)}
                   aria-label={`Редактировать ${e.date}`}
-                  style={{ ...btnBase(ACCENT), minHeight: 30, padding: '4px 9px', color: '#fbbf24', borderColor: 'rgba(245,158,11,0.3)' }}
+                  style={{ ...btnBase(ACCENT), minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fff', borderColor: 'rgba(245,158,11,0.4)' }}
                 >
                   ✎
                 </button>
                 <button
                   onClick={() => { if (editingId === e.id) setEditingId(null); remove(e.id); }}
                   aria-label={`Удалить ${e.date}`}
-                  style={{ ...btnBase(ACCENT), minHeight: 30, padding: '4px 9px', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)' }}
+                  style={{ ...btnBase(ACCENT), minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                 >
                   ✕
                 </button>
