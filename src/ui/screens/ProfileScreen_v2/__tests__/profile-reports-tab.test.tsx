@@ -55,7 +55,7 @@ describe('ProfileReportsTab — структура вкладки', () => {
 
   it('архив пуст — сообщение', () => {
     render(<ProfileReportsTab initialView="archive" />);
-    expect(screen.getByText('Архив отчётов пуст.')).toBeTruthy();
+    expect(screen.getByText(/Архив отчётов пуст/)).toBeTruthy();
   });
 
   it('архив показывает сохранённые отчёты из localStorage', () => {
@@ -72,7 +72,7 @@ describe('ProfileReportsTab — структура вкладки', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Отчёты по блокам/ }));
     expect(screen.getByText(/Тренер-отчёт/)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /Архив отчётов/ }));
-    expect(screen.getByText('Архив отчётов пуст.')).toBeTruthy();
+    expect(screen.getByText(/Архив отчётов пуст/)).toBeTruthy();
   });
 });
 

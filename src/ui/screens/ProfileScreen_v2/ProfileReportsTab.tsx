@@ -131,7 +131,7 @@ export const ProfileReportsTab: React.FC<{
 
   return (
     <div className="profile-reports pf-reports" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="profile-reports-tabs pf-rep-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы отчётов">
+      <div className="profile-reports-tabs pf-rep-tabs" style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', padding: 4, margin: -4, borderRadius: 16 }} role="tablist" aria-label="Разделы отчётов">
         {VIEW_TABS.map((t) => (
           <button
             key={t.id}
@@ -141,21 +141,24 @@ export const ProfileReportsTab: React.FC<{
             className="profile-reports-tab pf-rep-tab"
             data-active={view === t.id}
             style={{
-              padding: '7px 12px',
-              borderRadius: 8,
+              padding: '9px 16px',
+              borderRadius: 999,
               cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: 12.5,
+              fontWeight: 800,
               minHeight: 44,
-              border: `1px solid ${view === t.id ? colors.primary : colors.border}`,
-              background: view === t.id ? colors.primaryDim : 'rgba(255,255,255,0.03)',
-              color: view === t.id ? colors.primary : colors.textMuted,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              border: `1px solid ${view === t.id ? colors.primary : 'rgba(255,255,255,0.10)'}`,
+              background: view === t.id ? 'linear-gradient(135deg, rgba(52,211,153,0.28), rgba(52,211,153,0.10))' : 'rgba(255,255,255,0.04)',
+              color: view === t.id ? '#fff' : 'rgba(255,255,255,0.65)',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 7,
+              boxShadow: view === t.id ? '0 4px 16px rgba(52,211,153,0.25), inset 0 1px 0 rgba(255,255,255,0.12)' : 'none',
             }}
           >
-            <NativeIcon name={t.icon} size={12} />
+            <span aria-hidden="true" style={{ display: 'inline-flex', color: view === t.id ? colors.primary : 'rgba(255,255,255,0.5)' }}><NativeIcon name={t.icon} size={13} /></span>
             {t.label}
           </button>
         ))}
@@ -169,11 +172,11 @@ export const ProfileReportsTab: React.FC<{
 
       {view === 'blocks' && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: colors.teal }}><NativeIcon name="grid" size={14} /></span> Отчёты по блокам</div>
-          <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 10, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.2px' }}><span style={{ display: 'inline-flex', color: colors.teal }}><NativeIcon name="grid" size={15} /></span> Отчёты по блокам</div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginBottom: 12, lineHeight: 1.5 }}>
             Переход к страницам отчётов модулей: откроется именно отчёт с кнопкой генерации, а не главная страница блока.
           </div>
-          <div role="list" className="profile-reports-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div role="list" className="profile-reports-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {REPORT_SOURCES.map((src) => {
               const list = readReportEntries(src);
               const last = list[0];
@@ -187,54 +190,57 @@ export const ProfileReportsTab: React.FC<{
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    padding: '12px 14px',
-                    borderRadius: 10,
+                    gap: 13,
+                    padding: '13px 14px',
+                    borderRadius: 18,
                     cursor: 'pointer',
                     textAlign: 'left',
-                    minHeight: 60,
-                    background: `${src.color}10`,
-                    border: `1px solid ${src.color}44`,
+                    minHeight: 68,
+                    background: `linear-gradient(135deg, ${src.color}1f, ${src.color}08)`,
+                    border: `1px solid ${src.color}40`,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
                     color: colors.text,
                     transition: 'transform 0.15s, box-shadow 0.15s',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.4)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)';
                   }}
                 >
                   <div
                     aria-hidden="true"
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
+                      width: 46,
+                      height: 46,
+                      borderRadius: 14,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      background: `${src.color}26`,
-                      color: src.color,
+                      background: `linear-gradient(135deg, ${src.color}30, ${src.color}10)`,
+                      border: `1px solid ${src.color}45`,
+                      boxShadow: `0 4px 14px ${src.color}28, inset 0 1px 0 rgba(255,255,255,0.12)`,
+                      color: '#fff',
                     }}
                   >
-                    <NativeIcon name={src.icon} size={20} />
+                    <NativeIcon name={src.icon} size={21} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', letterSpacing: '-0.1px' }}>
                       {src.label}
                     </div>
-                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{src.desc}</div>
-                    <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 3, opacity: 0.8 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4 }}>{src.desc}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
                       {list.length === 0
                         ? 'Нет отчётов'
                         : `${list.length} ${list.length === 1 ? 'отчёт' : list.length < 5 ? 'отчёта' : 'отчётов'}${last?.date ? ` · последний ${new Date(last.date).toLocaleDateString('ru-RU')}` : ''}`}
                     </div>
                   </div>
-                  <span style={{ color: src.color, fontSize: 18, opacity: 0.7 }}>→</span>
+                  <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${src.color}1a`, border: `1px solid ${src.color}35`, color: '#fff', fontSize: 14, fontWeight: 800 }}>→</span>
                 </button>
               );
             })}
@@ -244,14 +250,14 @@ export const ProfileReportsTab: React.FC<{
 
       {view === 'archive' && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: colors.text, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-flex', color: colors.orange }}><NativeIcon name="inbox" size={14} /></span> Архив отчётов</div>
-          <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 10, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.2px' }}><span style={{ display: 'inline-flex', color: colors.orange }}><NativeIcon name="inbox" size={15} /></span> Архив отчётов</div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginBottom: 12, lineHeight: 1.5 }}>
             Сохранённые отчёты всех блоков. Каждый пункт ведёт к странице отчёта своего модуля.
           </div>
           {REPORT_SOURCES.every((src) => readReportEntries(src).length === 0) ? (
-            <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Архив отчётов пуст.</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12.5, padding: 16, textAlign: 'center', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.14)' }}>📭 Архив отчётов пуст.</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {REPORT_SOURCES.flatMap((src) =>
                 readReportEntries(src).map((rep, i) => ({ src, rep, key: `${src.target}-${i}` })),
               ).map(({ src, rep, key }) => (
@@ -259,18 +265,20 @@ export const ProfileReportsTab: React.FC<{
                   key={key}
                   onClick={() => onNavigate?.(src.target)}
                   aria-label={`Открыть архив: ${src.label}`}
+                  className="profile-reports-item"
                   style={{
-                    padding: 10,
-                    borderRadius: 8,
+                    padding: '12px 14px',
+                    borderRadius: 15,
                     textAlign: 'left',
                     cursor: 'pointer',
                     background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${colors.border}`,
+                    border: '1px solid rgba(255,255,255,0.09)',
                     color: colors.text,
+                    minHeight: 56,
                   }}
                 >
-                  <div style={{ color: src.color, fontWeight: 700, fontSize: 12 }}>{src.label}</div>
-                  <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>
+                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 12.5 }}>{src.label}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
                     {rep.date ? new Date(rep.date).toLocaleString('ru-RU') : 'Архивный отчёт'}
                   </div>
                 </button>

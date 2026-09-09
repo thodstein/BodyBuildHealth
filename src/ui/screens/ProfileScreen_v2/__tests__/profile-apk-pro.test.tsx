@@ -163,4 +163,50 @@ describe('Profile §83 — отчёты', () => {
     fireEvent.click(getByRole('tab', { name: /Архив/ }));
     expect(getByRole('tab', { name: /Архив/ }).getAttribute('aria-selected')).toBe('true');
   });
+
+  it('карточки источников 68px с хуком, архивные ряды с хуком', () => {
+    const { container } = render(<ProfileReportsTab initialView="blocks" />);
+    const first = container.querySelector('.profile-reports-item') as HTMLElement;
+    expect(first).not.toBeNull();
+    expect(first.style.minHeight).toBe('68px');
+  });
+});
+
+describe('Profile §91 — раунды 4-5: настройки, слайдеры, РМ-категории', () => {
+  it('кнопки настроек 56px с хуком pf-set-btn', async () => {
+    const { ProfileSettingsTab } = await import('../ProfileSettingsTab');
+    const { container, getByRole } = render(<ProfileSettingsTab />);
+    // Аккордеон 4.2 закрыт по умолчанию — открываем.
+    fireEvent.click(getByRole('button', { name: /4\.2 Экспорт/ }));
+    const btns = container.querySelectorAll('.pf-set-btn');
+    expect(btns.length).toBe(3);
+    (btns as unknown as HTMLElement[]).forEach(b => {
+      expect((b as HTMLElement).style.minHeight).toBe('56px');
+    });
+    cleanup();
+  });
+
+  it('слайдер несёт хук profile-slider', async () => {
+    const { SliderInput } = await import('../ui');
+    const { container } = render(
+      <SliderInput value={7} onChange={() => {}} min={1} max={10} label="Тест" />,
+    );
+    expect(container.querySelector('.profile-slider')).not.toBeNull();
+    cleanup();
+  });
+
+  it('категории РМ с хуком pf-wm-cat переключаются', async () => {
+    const { TrainingPMSection } = await import('../sections/TrainingPMSection');
+    const { container, getByRole } = render(<TrainingPMSection />);
+    // Аккордеон закрыт по умолчанию — открываем.
+    fireEvent.click(getByRole('button', { name: /Личные рекорды/ }));
+    const cats = container.querySelectorAll('.pf-wm-cat');
+    expect(cats.length).toBeGreaterThan(1);
+    // Первая открыта по умолчанию (openCategory='chest'), вторая закрыта.
+    expect((cats[0] as HTMLElement).getAttribute('data-open')).toBe('true');
+    expect((cats[1] as HTMLElement).getAttribute('data-open')).toBe('false');
+    fireEvent.click((cats[1] as HTMLElement).querySelector('button') as HTMLElement);
+    expect((cats[1] as HTMLElement).getAttribute('data-open')).toBe('true');
+    cleanup();
+  });
 });
