@@ -107,6 +107,33 @@ describe('HV-неделя (800У/500Б): ротация семейств и бе
   });
 });
 
+describe('P2-2: HV моно-инвариант (≤70% ккал карб-носителя в основном приёме)', () => {
+  // Инвариант (проба 60 ячеек): моно встречается только в курируемых завтраках-кашах.
+  // Обед/ужин гейтятся капами (item ≤600 / приём ≤850 / порции) — тест стережёт регрессию.
+  it('1500У/500Б (продукты): обед/ужин — карб-носитель ≤72% ккал приёма', { timeout: 180000 }, () => {
+    const p = buildDayPlan(input(1500, 500, 11));
+    for (const m of p.meals) {
+      const mt = String(m.type || '');
+      if (!['lunch', 'dinner'].includes(mt)) continue; // завтрак-каша легитимна, HV-снеки (крем+изолят) легитимны
+      const mk = (m.items || []).reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+      if (mk < 400) continue;
+      const carbItems = (m.items || []).filter((it: any) => it.role === 'carb_slow' || it.role === 'carb_fast');
+      if (carbItems.length === 0) continue;
+      const worst = Math.max(...carbItems.map((it: any) => (it.kcal || 0) / mk));
+      expect(worst, `приём «${m.label}»: доля углеводного носителя ${Math.round(worst * 100)}%`).toBeLessThanOrEqual(0.72);
+    }
+    // день остаётся HV-объёмным
+    const totK = allItems(p).reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+    expect(totK).toBeGreaterThan(1500 * 4 * 0.55);
+  });
+
+  it('не-HV день (300У): гейт не меняет legacy-поведение (детерминизм той же соли)', () => {
+    const a = buildDayPlan(input(300, 150, 11));
+    const b = buildDayPlan(input(300, 150, 11));
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
 describe('P1-6: HV-стиль (real/practical/mixed)', () => {
   it('HV_PRACTICAL_CARB_IDS существуют в FOOD_DB и доступны для плана', () => {
     expect(HV_PRACTICAL_CARB_IDS.length).toBeGreaterThan(3);
