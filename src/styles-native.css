@@ -9366,3 +9366,123 @@ html.app-native .training-constructor .tp-cclose:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 90. TRAINING CONSTRUCTOR PRO — окно конструктора 3/3 ───
+ * Верх окна (шаг 3/3): назад, трек с иконкой 40px, пилюля шага, закрытие.
+ * Хуки: .training-constructor[data-track] (.tp-cbar/.tp-cback/.tp-ctrack/
+ * .tp-cicon[data-track]/.tp-ctitle/.tp-csub/.tp-cstep/.tp-cclose/.tp-cbody).
+ * Стекло 56px, кнопки 44px, иконка трека с glow в цвете направления,
+ * заголовок 13px + подпись-hint 10px с ellipsis, цифры tabular,
+ * press 0.97, focus-visible лайм, тело с дыханием под pill-nav,
+ * 380px-компакт, reduced-motion. Только APK: TG/web — как было. */
+html.app-native .training-constructor {
+  background:
+    radial-gradient(1100px 520px at 15% -10%, rgba(var(--accent-rgb), 0.08), transparent 60%),
+    radial-gradient(900px 460px at 92% 4%, rgba(var(--accent-2-rgb), 0.08), transparent 60%),
+    rgba(5, 11, 22, 1) !important;
+}
+html.app-native .training-constructor .tp-cbody {
+  padding: 12px 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+  scrollbar-width: thin !important;
+}
+html.app-native .training-constructor .tp-ctrack {
+  gap: 10px !important;
+}
+html.app-native .training-constructor .tp-cicon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.28) !important;
+}
+html.app-native .training-constructor .tp-ctitle {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+html.app-native .training-constructor .tp-csub {
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+html.app-native .training-constructor .tp-cstep {
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+}
+/* Цвет направления: иконка и пилюля шага в цвете трека. */
+html.app-native .training-constructor[data-track='pl'] .tp-cicon {
+  background: rgba(167, 139, 250, 0.14) !important;
+  border-color: rgba(167, 139, 250, 0.4) !important;
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.35) !important;
+  color: rgba(216, 203, 255, 1) !important;
+}
+html.app-native .training-constructor[data-track='manual'] .tp-cicon {
+  background: rgba(59, 130, 246, 0.14) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.35) !important;
+  color: rgba(191, 219, 254, 1) !important;
+}
+html.app-native .training-constructor[data-track='cardio'] .tp-cicon {
+  background: rgba(239, 68, 68, 0.14) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35) !important;
+  color: rgba(254, 202, 202, 1) !important;
+}
+html.app-native .training-constructor[data-track='strength'] .tp-cicon {
+  background: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35) !important;
+  color: rgba(253, 230, 180, 1) !important;
+}
+html.app-native .training-constructor[data-track='combat'] .tp-cicon {
+  background: rgba(236, 72, 153, 0.14) !important;
+  border-color: rgba(236, 72, 153, 0.4) !important;
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.35) !important;
+  color: rgba(249, 205, 227, 1) !important;
+}
+html.app-native .training-constructor[data-track='pl'] .tp-cstep {
+  border-color: rgba(167, 139, 250, 0.4) !important;
+  box-shadow: 0 2px 12px rgba(167, 139, 250, 0.25) !important;
+}
+html.app-native .training-constructor[data-track='manual'] .tp-cstep {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.25) !important;
+}
+html.app-native .training-constructor[data-track='cardio'] .tp-cstep {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.25) !important;
+}
+html.app-native .training-constructor[data-track='strength'] .tp-cstep {
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.25) !important;
+}
+html.app-native .training-constructor[data-track='combat'] .tp-cstep {
+  border-color: rgba(236, 72, 153, 0.4) !important;
+  box-shadow: 0 2px 12px rgba(236, 72, 153, 0.25) !important;
+}
+html.app-native .training-constructor .tp-cicon:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .training-constructor .tp-csub {
+    display: none !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-constructor .tp-cicon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-constructor .tp-cback {
+    padding: 10px 10px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-constructor .tp-cicon {
+    box-shadow: none !important;
+  }
+}

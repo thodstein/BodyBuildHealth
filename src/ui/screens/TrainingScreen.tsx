@@ -689,17 +689,20 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── CONSTRUCTOR WINDOW — уровень 3: сам конструктор (новое окно, 100% контента) ─── */}
       {page === 'constructor' && (
-        <div className="training-constructor" style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
+        <div className="training-constructor" data-track={planningTrack as string} style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
           <div className="tp-cbar" style={{ flexShrink:0, padding:'8px 10px', minHeight:56, background: trainAlpha(TRAIN_ACCENT_VAR, '08'), borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:8 }}>
             <button className="tp-cback" onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'10px 14px', minHeight:44, borderRadius:12, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
-            <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:12, display: 'inline-flex', color: '#fff' }}><NativeIcon name={PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? 'layers'} size={12} /></span>
-              <span style={{ fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</span>
+            <div className="tp-ctrack" style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:10 }}>
+              <span className="tp-cicon" data-track={planningTrack as string} style={{ width:40, height:40, borderRadius:12, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border:`1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, color:'#fff' }}><NativeIcon name={PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? 'layers'} size={18} /></span>
+              <span style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:1 }}>
+                <span className="tp-ctitle" style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</span>
+                <span className="tp-csub" style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.55)', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.hint ?? 'Сборка плана'}</span>
+              </span>
             </div>
             <span className="tp-cstep" style={{ fontSize:11, fontWeight:700, color:TRAIN_ACCENT_VAR, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, borderRadius:20, padding:'8px 12px', minHeight:32, display:'inline-flex', alignItems:'center', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>3/3</span>
             <button className="tp-cclose" onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'10px 12px', minHeight:44, minWidth:44, borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
           </div>
-          <div style={{ flex:1, overflow:'auto', padding:'12px', paddingBottom:'calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)', WebkitOverflowScrolling:'touch' }}>
+          <div className="tp-cbody" style={{ flex:1, overflow:'auto', padding:'12px', paddingBottom:'calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)', WebkitOverflowScrolling:'touch' }}>
             {(planningTrack as string) === 'pl' && <PlannerPlAuto />}
             {(planningTrack as string) === 'bb' && <PlannerBbAuto />}
             {(planningTrack as string) === 'manual' && <ProgramManagerPanel />}
