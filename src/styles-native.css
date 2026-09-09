@@ -9724,6 +9724,143 @@ html.app-native .nd-dayempty {
     transform: none !important;
   }
 }
+/* --- 90. NUTRITION DIARY PRO-2: quality/mood/freq/sheets --- */
+html.app-native .nd-quality {
+  gap: 10px !important;
+}
+html.app-native .nd-qscore {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-defchip {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-mood {
+  border-radius: 18px !important;
+}
+html.app-native .nd-mood-note {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .nd-patterns {
+  border-radius: 18px !important;
+}
+html.app-native .nd-patterns button:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-patterns button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-useful {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-micros {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-recent {
+  border-radius: 18px !important;
+}
+html.app-native .nd-recent-chip {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-recent-chip:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-freqchips {
+  scrollbar-width: none !important;
+  scroll-snap-type: x proximity !important;
+}
+html.app-native .nd-freqchips::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .nd-freqchip {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+}
+html.app-native .nd-freqchip:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-freqchip:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-freqchip[data-active="true"] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .nd-freqitem {
+  min-height: 56px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-freqitem:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .nd-freqtoggle {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-freqmore {
+  min-height: 44px !important;
+}
+html.app-native .nd-copyday {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-pasteday {
+  min-height: 44px !important;
+}
+html.app-native .nd-daypreset-save {
+  min-height: 44px !important;
+}
+html.app-native .nd-printday {
+  min-height: 44px !important;
+}
+html.app-native .nd-daypreset {
+  min-height: 44px !important;
+}
+html.app-native .nd-copyday:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-printday:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-editsheet {
+  border-radius: 22px !important;
+}
+html.app-native .nd-editqty {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-editqty:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-import {
+  min-height: 44px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-freqchips {
+    margin: 0 -2px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .nd-recent-chip {
+    font-size: 11px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-freqchip {
+    box-shadow: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-recent-chip {
+    transform: none !important;
+  }
+}
 
 /* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
  * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.
@@ -9904,6 +10041,240 @@ html.app-native .pf-inj-add:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   html.app-native .profile-boolchip:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 92. COMBAT CONSTRUCTOR PRO — единоборства уровня топ-приложения ───
+ * Хуки: .combat-constructor[data-step] (.cb-hero/.cb-hero-icon/.cb-hero-title/
+ * .cb-hero-sub/.cb-hero-step/.cb-progress/.cb-steps/.cb-status/.cb-msg/
+ * .cb-pane[data-pane]/.cb-split-card[data-active]/.cb-split-freq/
+ * .cb-split-preview/.cb-split-active/.cb-build/.cb-next/.cb-profile/.cb-empty
+ * + kit: .kit-section/.kit-sectionnav-opt/.kit-progress).
+ * Hero-стекло 20px с верхней кромкой, иконка 48px с glow, шаги-лента 44px
+ * с актив-градиентом, сплит-карточки 18px с glow выбранной, CTA 52px,
+ * инпуты 48px/16px (без iOS-зума), range 26px, цифры tabular,
+ * press 0.98, focus-visible, 380px, reduced-motion. Только APK. */
+html.app-native .combat-constructor {
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 4px) !important;
+}
+html.app-native .combat-constructor .cb-hero {
+  border-radius: 20px !important;
+  padding: 16px 16px 14px !important;
+  background: linear-gradient(180deg, rgba(46, 32, 72, 0.78), rgba(16, 14, 28, 0.78)) !important;
+  border: 1px solid rgba(196, 181, 253, 0.14) !important;
+  border-top: 2px solid rgba(168, 85, 247, 0.5) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+}
+html.app-native .combat-constructor .cb-hero-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 22px rgba(168, 85, 247, 0.45) !important;
+}
+html.app-native .combat-constructor .cb-hero-title {
+  font-size: 16px !important;
+  line-height: 1.15 !important;
+}
+html.app-native .combat-constructor .cb-hero-sub {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .combat-constructor .cb-hero-step {
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+html.app-native .combat-constructor .cb-progress {
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4)) !important;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  border-radius: 14px !important;
+  padding: 5px !important;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav::-webkit-scrollbar {
+  display: none;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt {
+  min-height: 44px !important;
+  border-radius: 11px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+  scroll-snap-align: start !important;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active='true'] {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 1), rgba(236, 72, 153, 1)) !important;
+  color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4) !important;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active='false']:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .combat-constructor .cb-status {
+  flex-wrap: wrap !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor .cb-msg {
+  min-height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+html.app-native .combat-constructor .cb-pane {
+  gap: 12px !important;
+}
+html.app-native .combat-constructor .kit-section {
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(168, 85, 247, 0.3) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .combat-constructor .cb-split-card {
+  border-radius: 18px !important;
+  padding: 14px !important;
+}
+html.app-native .combat-constructor .cb-split-card:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-constructor .cb-split-card[data-active='true'] {
+  box-shadow: 0 8px 26px rgba(168, 85, 247, 0.28) !important;
+}
+html.app-native .combat-constructor .cb-split-freq {
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+html.app-native .combat-constructor .cb-split-preview {
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+  scrollbar-width: none !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor .cb-split-preview::-webkit-scrollbar {
+  display: none;
+}
+html.app-native .combat-constructor .cb-build {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 1), rgba(236, 72, 153, 1)) !important;
+  box-shadow: 0 8px 26px rgba(168, 85, 247, 0.4) !important;
+}
+html.app-native .combat-constructor .cb-build:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-constructor .cb-next {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 22px rgba(168, 85, 247, 0.35) !important;
+}
+html.app-native .combat-constructor .cb-next:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-constructor .cb-profile {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+html.app-native .combat-constructor .cb-profile:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-constructor .cb-empty {
+  border-radius: 20px !important;
+  gap: 10px !important;
+}
+html.app-native .combat-constructor input:not([type='range']):not([type='checkbox']) {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-constructor select {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-constructor input[type='range'] {
+  height: 8px !important;
+  min-height: 28px !important;
+}
+html.app-native .combat-constructor input[type='range']::-webkit-slider-thumb {
+  width: 26px !important;
+  height: 26px !important;
+}
+html.app-native .combat-constructor input[type='range']::-moz-range-thumb {
+  width: 26px !important;
+  height: 26px !important;
+}
+html.app-native .combat-constructor input[type='checkbox'] {
+  width: 22px !important;
+  height: 22px !important;
+}
+html.app-native .combat-constructor div[style*='grid-template-columns: 1fr 1fr 1fr'] {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor .cb-split-card:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-build:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-next:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-profile:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active]:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor div[style*='grid-template-columns: 1fr 1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor .cb-hero-sub {
+    display: none !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor .cb-hero-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-split-card:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-build:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-next:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-profile:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active='false']:active {
     transform: none !important;
   }
 }

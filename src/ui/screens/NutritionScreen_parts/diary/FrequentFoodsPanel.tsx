@@ -60,23 +60,23 @@ export const FrequentFoodsPanel: React.FC<FrequentFoodsPanelProps> = ({
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {!collapsed && (
-            <button onClick={() => setShowAll(!showAll)} style={{ padding: '6px 10px', borderRadius: 999, fontSize: 9, fontWeight: 600, cursor: 'pointer', background: showAll ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showAll ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`, color: showAll ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
+            <button onClick={() => setShowAll(!showAll)} aria-label="Показать все частые" className="nd-freqmore" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44, background: showAll ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showAll ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`, color: showAll ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
               {showAll ? '▲ Скрыть' : 'Ещё'}
             </button>
           )}
-          <button onClick={() => setCollapsed(!collapsed)} style={{ width: 32, height: 32, borderRadius: 10, background: collapsed ? 'rgba(255,255,255,0.04)' : 'rgba(0,230,138,0.12)', border: `1px solid ${collapsed ? 'rgba(255,255,255,0.06)' : 'rgba(0,230,138,0.2)'}`, color: collapsed ? 'rgba(255,255,255,0.6)' : '#00e68a', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Развернуть частые' : 'Свернуть частые'} className="nd-freqtoggle" style={{ width: 44, height: 44, borderRadius: 12, background: collapsed ? 'rgba(255,255,255,0.04)' : 'rgba(0,230,138,0.12)', border: `1px solid ${collapsed ? 'rgba(255,255,255,0.06)' : 'rgba(0,230,138,0.2)'}`, color: collapsed ? 'rgba(255,255,255,0.6)' : '#00e68a', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {collapsed ? '▼' : '▲'}
           </button>
         </div>
       </div>
       {!collapsed && (
         <>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div className="nd-freqchips" style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 4 }}>
         {MEAL_TYPES.map(type => {
           const isActive = selectedMealType === type;
           const icon = type === 'Завтрак' ? '🌅' : type === 'Обед' ? '☀️' : type === 'Ужин' ? '🌙' : type === 'Перекус' ? '🍿' : type.includes('тренировки') ? '💪' : '🍽';
           return (
-            <button key={type} onClick={() => setSelectedMealType(type)} style={{ padding: '7px 10px', borderRadius: 999, fontSize: 10, fontWeight: isActive ? 700 : 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? '#00e68a' : 'rgba(255,255,255,0.06)'}`, color: isActive ? '#000' : 'rgba(255,255,255,0.65)', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none', transition: 'all 0.15s' }}>
+            <button key={type} onClick={() => setSelectedMealType(type)} aria-pressed={isActive} data-active={isActive} className="nd-freqchip" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, minHeight: 44, background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? '#00e68a' : 'rgba(255,255,255,0.06)'}`, color: isActive ? '#000' : 'rgba(255,255,255,0.65)', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none', transition: 'all 0.15s' }}>
               <span style={{ fontSize: 11 }}>{icon}</span> {type}
             </button>
           );
@@ -91,8 +91,8 @@ export const FrequentFoodsPanel: React.FC<FrequentFoodsPanelProps> = ({
           const f = Math.round(((Number(food.f) || 0) * qty / 100) * 10) / 10;
           const c = Math.round(((Number(food.c) || 0) * qty / 100) * 10) / 10;
           return (
-            <button key={`${food.name}-${idx}`} onClick={() => handleAdd(food)} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))', border: '1px solid rgba(0,230,138,0.12)', backdropFilter: 'blur(8px)', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 4 }} onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,200,160,0.06))')} onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))')} title={`${food.name}\n${kcal} ккал | Б: ${p} Ж: ${f} У: ${c}`}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+            <button key={`${food.name}-${idx}`} onClick={() => handleAdd(food)} className="nd-freqitem" style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))', border: '1px solid rgba(0,230,138,0.12)', backdropFilter: 'blur(8px)', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 4, minHeight: 56 }} onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,200,160,0.06))')} onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))')} title={`${food.name}\n${kcal} ккал | Б: ${p} Ж: ${f} У: ${c}`}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
                 <span style={{ background: 'rgba(0,230,138,0.12)', color: '#00e68a', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>{qty}г</span>
                 <span style={{ color: 'rgba(255,255,255,0.6)' }}>→</span>
