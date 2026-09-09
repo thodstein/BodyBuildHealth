@@ -248,7 +248,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 {retailResults.map(p => {
                   const meta = RETAIL_CHAINS[p.source];
                   return (
-                    <div key={`${p.source}-${p.id}`} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(0,230,138,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, background: 'rgba(0,230,138,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.03)'; }}>
+                    <div key={`${p.source}-${p.id}`} className="nd-netrow" style={{ padding: '10px 12px', fontSize: 12, borderBottom: '1px solid rgba(0,230,138,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 56, background: 'rgba(0,230,138,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.03)'; }}>
                       <div onClick={() => onAddFoodFromDB(retailToFoodItem(p) as any)} role="button" aria-label={`Добавить ${p.name} из ${meta.label}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer', minWidth: 0 }}>
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999, background: `${meta.color}1c`, color: meta.color, border: `1px solid ${meta.color}35`, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta.emoji} {meta.label}</span>
                         <span style={{ fontWeight: 600, flex: 1, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.brand ? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}> • {p.brand}</span> : null}</span>
@@ -284,7 +284,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto', borderRadius: 10, background: '#202023', border: '1px solid rgba(59,130,246,0.12)' }}>
               {internetResults.map(f => (
-                <div key={f.id} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(59,130,246,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, background: 'rgba(59,130,246,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(59,130,246,0.08)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(59,130,246,0.03)'}>
+                <div key={f.id} className="nd-netrow" style={{ padding: '10px 12px', fontSize: 12, borderBottom: '1px solid rgba(59,130,246,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 56, background: 'rgba(59,130,246,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(59,130,246,0.08)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(59,130,246,0.03)'}>
                   <div onClick={() => onAddFoodFromDB(f)} role="button" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
                     <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>🌐</span>
                     <span style={{ fontWeight: 600, flex: 1, lineHeight: 1.2 }}>{f.name}{f.brand ? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}> • {f.brand}</span> : null}</span>
@@ -311,7 +311,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
             <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>История:</span>
             {history.map(h=>(
-              <button key={h} onClick={()=>onFoodSearchChange(h)} style={{ padding:'4px 8px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>{h}</button>
+              <button key={h} onClick={()=>onFoodSearchChange(h)} className="nd-hist" style={{ padding:'8px 12px', borderRadius:8, fontSize:11, minHeight:40, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>{h}</button>
             ))}
             <button onClick={()=>{ setHistory([]); try{localStorage.removeItem('he_search_history');}catch{} }} style={{ fontSize:9, color:'rgba(255,255,255,0.3)', background:'none', border:'none', cursor:'pointer' }}>✕</button>
           </div>
@@ -389,7 +389,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 { id: 'last', label: '🆕 Последние', count: lastAdded.length },
                 { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
               ].map(tab => (
-                <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: quickTab === tab.id ? 'linear-gradient(135deg, rgba(0,230,138,0.15), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}>
+                <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: 1, padding: '10px 8px', borderRadius: 10, fontSize: 12, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: quickTab === tab.id ? 'linear-gradient(135deg, rgba(0,230,138,0.15), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}>
                   {tab.label}
                   {tab.count > 0 && <span style={{ background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)', color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.6)', padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700 }}>{tab.count}</span>}
                 </button>
@@ -577,7 +577,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         <div key={xi}>
                           <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 1, display: 'block' }}>{x.l}</label>
                           <input type="number" value={x.v} onChange={e => x.f(Number.parseFloat(e.target.value) || 0)}
-                            style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, minHeight: 28 }} />
+                            aria-label={x.l} className="nd-qedit-num"
+                            style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, minHeight: 44 }} />
                         </div>
                       ))}
                     </div>
@@ -654,19 +655,19 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             {parsedItems.some(item => typeof item.confidence === 'number' && item.confidence < 0.5) && onFixAllLowConfidence && (
               <button onClick={onFixAllLowConfidence} aria-label="Исправить все"
                 style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.25)',
-                  background: 'rgba(245,158,11,0.06)', color: '#fbbf24', cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 40 }}>
+                  background: 'rgba(245,158,11,0.06)', color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 44 }}>
                 ⚡ Исправить все ({parsedItems.filter(item => typeof item.confidence === 'number' && item.confidence < 0.5).length})
               </button>
             )}
             <button onClick={onFillMicros} aria-label="Микронутриенты"
               style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.2)',
-                background: 'rgba(34,197,94,0.06)', color: '#86efac', cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 40 }}>
+                background: 'rgba(34,197,94,0.06)', color: '#86efac', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 44 }}>
               ✨ Микронутриенты
             </button>
             <button onClick={onSaveItems} aria-label="Сохранить"
               style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
                 background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, 
-                fontSize: 12, minHeight: 40, boxShadow: '0 4px 16px rgba(0,230,138,0.2)' }}>
+                fontSize: 12, minHeight: 48, boxShadow: '0 4px 16px rgba(0,230,138,0.2)' }}>
               💾 Сохранить {parsedItems.length} поз.
             </button>
           </div>
@@ -687,8 +688,9 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       {showCustomFood && (
         <div style={{ padding: 12, borderRadius: 14, background: '#202023', border: '1px solid rgba(139,92,246,0.15)' }}>
           <input value={customFoodName} onChange={e => onCustomFoodNameChange(e.target.value)} placeholder="Название"
+            aria-label="Название своей еды" className="nd-cfood-name"
             style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: '#18181b',
-              border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 12, marginBottom: 8, boxSizing: 'border-box', minHeight: 40 }} />
+              border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, marginBottom: 8, boxSizing: 'border-box', minHeight: 48 }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
             {[
               { l: 'Ккал', v: customFoodKcal, f: 'customFoodKcal' },
@@ -697,16 +699,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               { l: 'Угл.', v: customFoodC, f: 'customFoodC' },
             ].map((x, i) => (
               <div key={i}>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 2, display: 'block' }}>{x.l}</label>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 2, display: 'block' }}>{x.l}</label>
                 <input type="number" value={x.v} onChange={e => onCustomFoodFieldChange(x.f, e.target.value)}
+                  aria-label={x.l} className="nd-cfood-num"
                   style={{ width: '100%', padding: '8px', borderRadius: 8, background: '#18181b',
-                    border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 12, boxSizing: 'border-box', minHeight: 36 }} />
+                    border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, boxSizing: 'border-box', minHeight: 44 }} />
               </div>
             ))}
           </div>
-          <button onClick={onAddCustomFood} style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10,
+          <button onClick={onAddCustomFood} aria-label="Добавить свою еду" className="nd-cfood-add" style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10,
             border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
-            color: '#000', fontWeight: 700, fontSize: 12, minHeight: 40 }}>
+            color: '#000', fontWeight: 700, fontSize: 12, minHeight: 48 }}>
             + Добавить
           </button>
         </div>

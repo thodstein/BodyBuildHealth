@@ -9861,6 +9861,140 @@ html.app-native .nd-import {
     transform: none !important;
   }
 }
+/* --- 91. NUTRITION DIARY PRO-3: queue/scan/charts/sheets --- */
+html.app-native .nd-qtab {
+  min-height: 44px !important;
+}
+html.app-native .nd-qtab:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-qtab:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-qtab[data-active="true"] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .nd-hist {
+  min-height: 40px !important;
+}
+html.app-native .nd-cfood-name {
+  min-height: 48px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-cfood-num {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-cfood-add {
+  min-height: 48px !important;
+}
+html.app-native .nd-cfood-add:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .nd-netrow {
+  min-height: 56px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-netrow:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .nd-qedit-num {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-scanmodes {
+  scrollbar-width: none !important;
+}
+html.app-native .nd-scanmode {
+  min-height: 44px !important;
+  flex: 1 !important;
+}
+html.app-native .nd-scanmode:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-scanmode[data-active="true"] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .nd-scanclose {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-scanrow {
+  min-height: 56px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-scanrow:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .nd-scancreate {
+  min-height: 48px !important;
+}
+html.app-native .nd-scanname {
+  min-height: 48px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-charts {
+  gap: 10px !important;
+}
+html.app-native .nd-donutleg {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-spark {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-sparkempty {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-gauge {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-topname {
+  font-size: 11px !important;
+}
+html.app-native .nd-mealscount {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-mealmeta {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-pastebtn {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+html.app-native .nd-pastebtn:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-storeerr {
+  border-radius: 18px !important;
+}
+html.app-native .nd-storebtn {
+  min-height: 44px !important;
+}
+html.app-native .nd-storedismiss {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-qtab {
+    font-size: 11px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .nd-topname {
+    width: 72px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-qtab {
+    box-shadow: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-scanmode {
+    box-shadow: none !important;
+  }
+}
 
 /* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
  * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.

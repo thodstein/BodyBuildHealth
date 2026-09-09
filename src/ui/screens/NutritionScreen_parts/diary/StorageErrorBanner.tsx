@@ -51,7 +51,7 @@ export const StorageErrorBanner: React.FC<StorageErrorBannerProps> = ({
   };
   
   return (
-    <div className={`nut-storageerr border rounded-lg p-4 mb-4 ${isQuotaError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+    <div className={`nut-storageerr nd-storeerr border rounded-lg p-4 mb-4 ${isQuotaError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
       <div className="flex justify-between items-start">
         <div className={`flex-1 ${isQuotaError ? 'bg-red-50' : 'bg-yellow-50'}`}>
           <div className="flex items-center gap-2 mb-2">
@@ -88,15 +88,15 @@ export const StorageErrorBanner: React.FC<StorageErrorBannerProps> = ({
             <div className="mt-3 flex gap-2 flex-wrap">
               <button
                 onClick={handleExportAndClear}
-                className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                className="nd-storebtn px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
               >
                 Экспортировать и очистить старые данные
               </button>
-              
+
               {onClearOldData && (
                 <button
                   onClick={onClearOldData}
-                  className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                  className="nd-storebtn px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
                 >
                   Очистить данные старше 90 дней
                 </button>
@@ -107,7 +107,7 @@ export const StorageErrorBanner: React.FC<StorageErrorBannerProps> = ({
         
         <button
           onClick={onDismiss}
-          className="text-gray-500 hover:text-gray-700 ml-2"
+          className="nd-storedismiss text-gray-500 hover:text-gray-700 ml-2"
           aria-label="Закрыть"
         >
           ✕

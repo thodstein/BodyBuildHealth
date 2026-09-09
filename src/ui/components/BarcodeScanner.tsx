@@ -32,7 +32,7 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
     return (
       <div style={{ marginTop:12, padding:12, borderRadius:14, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.03))', border:'1px solid rgba(239,68,68,0.18)', backdropFilter:'blur(8px)' }}>
         <div style={{ color: '#fca5a5', fontSize: 12, marginBottom:10, lineHeight:1.4 }}>{error}</div>
-        <button type="button" onClick={()=>setOpen(true)} style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>➕ Создать свою еду (оффлайн)</button>
+        <button type="button" onClick={()=>setOpen(true)} className="nd-scancreate" style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', minHeight:48, boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>➕ Создать свою еду (оффлайн)</button>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', textAlign:'center', marginTop:6 }}>Без сети — сохранится в кэш и найдётся при след. сканировании</div>
       </div>
     );
@@ -45,7 +45,7 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
         <span style={{ marginLeft:'auto', fontSize:8, padding:'3px 7px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>оффлайн</span>
       </div>
       <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:8, lineHeight:1.4 }}>{error}</div>
-      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Название с этикетки, например: Йогурт 2%" autoFocus style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none', marginBottom:8 }} />
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Название с этикетки, например: Йогурт 2%" autoFocus aria-label="Название продукта" className="nd-scanname" style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:16, outline:'none', marginBottom:8, minHeight:48 }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         {[
           { l:'Ккал', v:kcal, s:setKcal, ph:'100' },
@@ -54,14 +54,14 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
           { l:'У', v:c, s:setC, ph:'10' },
         ].map(x=>(
           <div key={x.l}>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:600, textAlign:'center' }}>{x.l}</div>
-            <input type="number" value={x.v} onChange={e=>x.s(e.target.value)} placeholder={x.ph} style={{ width:'100%', boxSizing:'border-box', padding:'8px 6px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center', outline:'none' }} />
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:600, textAlign:'center' }}>{x.l}</div>
+            <input type="number" value={x.v} onChange={e=>x.s(e.target.value)} placeholder={x.ph} aria-label={x.l} style={{ width:'100%', boxSizing:'border-box', padding:'8px 6px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:16, textAlign:'center', outline:'none', minHeight:44 }} />
           </div>
         ))}
       </div>
       <div style={{ display:'flex', gap:8 }}>
-        <button type="button" onClick={()=>setOpen(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-        <button type="button" onClick={handleSave} disabled={!canSave || saving} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background: canSave ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.06)', color: canSave ? '#000' : 'rgba(255,255,255,0.3)', fontWeight:700, cursor: canSave ? 'pointer' : 'not-allowed', opacity: saving?0.7:1 }}>{saving ? '⏳ Сохранение…' : '✓ Создать'}</button>
+        <button type="button" onClick={()=>setOpen(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer', minHeight:44 }}>Отмена</button>
+        <button type="button" onClick={handleSave} disabled={!canSave || saving} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background: canSave ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.06)', color: canSave ? '#000' : 'rgba(255,255,255,0.3)', fontWeight:700, cursor: canSave ? 'pointer' : 'not-allowed', opacity: saving?0.7:1, minHeight:44 }}>{saving ? '⏳ Сохранение…' : '✓ Создать'}</button>
       </div>
       <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', textAlign:'center', marginTop:6 }}>Сохранится локально • 100г база • потом можно менять граммы</div>
     </div>
@@ -205,29 +205,29 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   }, []);
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)',
-    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box',
+    width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid var(--border)',
+    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 16, boxSizing: 'border-box', minHeight: 48,
   };
   const btnStyle: React.CSSProperties = {
     background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8,
-    padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontWeight: 600,
+    padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontWeight: 600, minHeight: 44,
   };
   const btnSecondary: React.CSSProperties = {
     ...btnStyle, background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
+    <div className="nd-scan" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0, color: '#fff', fontSize: 18 }}>📷 Сканировать продукт</h3>
-        <button type="button" onClick={() => { void stopScanner(); onCloseRef.current(); }} aria-label="Закрыть сканер" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}>✕</button>
+        <button type="button" onClick={() => { void stopScanner(); onCloseRef.current(); }} aria-label="Закрыть сканер" className="nd-scanclose" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>✕</button>
       </div>
       <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:8, lineHeight:1.4 }}>Без ключа • Работает в РФ через ru.openfoodfacts.org • Кэш 7 дней + оффлайн из FOOD_DB</div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button type="button" onClick={() => setMode('manual')} style={mode === 'manual' ? btnStyle : btnSecondary}>Штрихкод</button>
-        <button type="button" onClick={() => setMode('search')} style={mode === 'search' ? btnStyle : btnSecondary}>Поиск</button>
-        <button type="button" onClick={() => setMode('scan')} style={mode === 'scan' ? btnStyle : btnSecondary}>Камера</button>
+      <div className="nd-scanmodes" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button type="button" onClick={() => setMode('manual')} aria-pressed={mode === 'manual'} data-active={mode === 'manual'} className="nd-scanmode" style={mode === 'manual' ? btnStyle : btnSecondary}>Штрихкод</button>
+        <button type="button" onClick={() => setMode('search')} aria-pressed={mode === 'search'} data-active={mode === 'search'} className="nd-scanmode" style={mode === 'search' ? btnStyle : btnSecondary}>Поиск</button>
+        <button type="button" onClick={() => setMode('scan')} aria-pressed={mode === 'scan'} data-active={mode === 'scan'} className="nd-scanmode" style={mode === 'scan' ? btnStyle : btnSecondary}>Камера</button>
       </div>
 
       {mode === 'manual' && (
@@ -253,7 +253,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
           {searchResults.length > 0 && (
             <div style={{ marginTop: 12, maxHeight: '50vh', overflowY: 'auto' }}>
               {searchResults.map(p => (
-                <button key={p.barcode || p.id} onClick={() => handleSelectProduct(p)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 6, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <button key={p.barcode || p.id} onClick={() => handleSelectProduct(p)} className="nd-scanrow" style={{ display: 'block', width: '100%', textAlign: 'left', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginBottom: 6, cursor: 'pointer', color: 'var(--text-primary)', minHeight: 56 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-light)' }}>
                     {p.brand && <span>{p.brand} • </span>}

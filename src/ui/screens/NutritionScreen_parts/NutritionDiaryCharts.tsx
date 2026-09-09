@@ -51,7 +51,7 @@ const DonutChart: React.FC<{ protein: number; fat: number; carbs: number; size?:
           </text>
         </svg>
       </div>
-      <div style={{ display: 'flex', gap: 8, fontSize: 8 }}>
+      <div className="nd-donutleg" style={{ display: 'flex', gap: 8, fontSize: 11, flexWrap: 'wrap', justifyContent: 'center' }}>
         {segments.map((s, i) => (
           <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding:'3px 7px', borderRadius:999, background:`${s.color}12`, border:`1px solid ${s.color}18` }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, boxShadow:`0 0 6px ${s.color}60` }} />
@@ -67,10 +67,10 @@ const DonutChart: React.FC<{ protein: number; fat: number; carbs: number; size?:
 const Sparkline: React.FC<{ data: number[]; color: string; height?: number; label: string; unit: string }> = ({ data, color, height = 42, label, unit }) => {
   const valid = data.filter(d => d > 0);
   if (valid.length < 2) return (
-    <div style={{ textAlign: 'center', padding: 8, minWidth:110, background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px dashed rgba(255,255,255,0.06)' }}>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight:600, letterSpacing:0.4, textTransform:'uppercase' as const }}>{label}</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>—</div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)' }}>нужно ≥2 дней</div>
+    <div className="nd-sparkempty" style={{ textAlign: 'center', padding: 8, minWidth:110, background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px dashed rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight:600, letterSpacing:0.4, textTransform:'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>—</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>нужно ≥2 дней</div>
     </div>
   );
   const max = Math.max(...valid, 1);
@@ -91,8 +91,8 @@ const Sparkline: React.FC<{ data: number[]; color: string; height?: number; labe
   const isUp = trend > 2, isDown = trend < -2;
 
   return (
-    <div style={{ textAlign: 'center', padding: '8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', minWidth:150 }}>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const, display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+    <div className="nd-spark" style={{ textAlign: 'center', padding: '8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', minWidth:150 }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const, display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
         <span style={{ width:6, height:6, borderRadius:4, background:color, boxShadow:`0 0 6px ${color}80` }} /> {label}
       </div>
       <svg width={w} height={h} style={{ overflow: 'visible', display:'block', margin:'0 auto' }}>
@@ -117,7 +117,7 @@ const Sparkline: React.FC<{ data: number[]; color: string; height?: number; labe
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:2 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color }}>{avg}<span style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.5)' }}>{unit}</span></span>
         {trend !== 0 && (
-          <span style={{ fontSize: 8, fontWeight:700, padding:'2px 6px', borderRadius:999, background: isUp ? 'rgba(239,68,68,0.12)' : isDown ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: isUp ? '#ef4444' : isDown ? '#22c55e' : 'rgba(255,255,255,0.6)', border:`1px solid ${isUp ? 'rgba(239,68,68,0.18)' : isDown ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}` }}>
+          <span style={{ fontSize: 10, fontWeight:700, padding:'2px 6px', borderRadius:999, background: isUp ? 'rgba(239,68,68,0.12)' : isDown ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: isUp ? '#ef4444' : isDown ? '#22c55e' : 'rgba(255,255,255,0.6)', border:`1px solid ${isUp ? 'rgba(239,68,68,0.18)' : isDown ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}` }}>
             {isUp ? '↗' : isDown ? '↘' : '→'} {trend > 0 ? '+' : ''}{Math.round(trend)}%
           </span>
         )}
@@ -177,7 +177,7 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
       </div>
       {freq.map((f, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', width: 88, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right', fontWeight:500 }}
+          <span className="nd-topname" style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', width: 88, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right', fontWeight:500 }}
             title={`${f.name} • ${f.count} раз • ${Math.round(f.totalKcal)} ккал`}>
             {f.name.length > 16 ? f.name.slice(0, 15) + '…' : f.name}
           </span>
@@ -185,10 +185,10 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
             <div style={{ height: '100%', width: `${Math.round(f.count / maxCount * 100)}%`, borderRadius: 7, background: barGradients[i % barGradients.length], transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)', minWidth: 6, boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
           </div>
           <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', minWidth: 22, textAlign: 'right', background:'rgba(255,255,255,0.06)', padding:'2px 6px', borderRadius:6 }}>{f.count}</span>
-          <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', minWidth:42 }}>{Math.round(f.totalKcal)} ккал</span>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', minWidth:42 }}>{Math.round(f.totalKcal)} ккал</span>
         </div>
       ))}
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign:'center', padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.03)' }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign:'center', padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.03)' }}>
         Частота за последние 30 дней • тап — быстро добавить (в вкладке ➕)
       </div>
     </div>
@@ -203,7 +203,7 @@ const MacroBalanceGauge: React.FC<{ actual: number; target: number; label: strin
   const bgColor = isOk ? `${color}12` : isOver ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)';
   const borderColor = isOk ? `${color}18` : isOver ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
   return (
-    <div style={{ textAlign: 'center', padding:'8px 6px', borderRadius:12, background:bgColor, border:`1px solid ${borderColor}`, minWidth:74 }}>
+    <div className="nd-gauge" style={{ textAlign: 'center', padding:'8px 6px', borderRadius:12, background:bgColor, border:`1px solid ${borderColor}`, minWidth:74 }}>
       <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto' }}>
         <svg width={56} height={56} viewBox="0 0 56 56" style={{ filter: `drop-shadow(0 2px 6px ${displayColor}20)` }}>
           <circle cx={28} cy={28} r={22} fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
@@ -219,8 +219,8 @@ const MacroBalanceGauge: React.FC<{ actual: number; target: number; label: strin
           {isOk ? '✓' : isOver ? '↑' : '↓'}
         </div>
       </div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 4, fontWeight:600, letterSpacing:0.3, textTransform:'uppercase' as const }}>{label}</div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: displayColor }}>{Math.round(actual)}/{target}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 4, fontWeight:600, letterSpacing:0.3, textTransform:'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: displayColor, fontVariantNumeric: 'tabular-nums' }}>{Math.round(actual)}/{target}</div>
     </div>
   );
 };
@@ -253,7 +253,7 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
   if (!hasData) return null;
 
   return (
-    <div className="nut-diarycharts" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="nut-diarycharts nd-charts" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Macro distribution donut + gauge cards */}
       <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap', padding:16 }}>
         <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={92} />
@@ -267,10 +267,10 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
       <div style={{ ...cardStyle, display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap:8, padding:12 }}>
         <Sparkline data={weeklyKcal} color="#00e68a" label="Ккал • 7 дн" unit="" />
         <Sparkline data={weeklyProtein} color="#3b82f6" label="Белок • 7 дн" unit="г" />
-        <div style={{ textAlign: 'center', padding: '10px 14px', background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06))', borderRadius:12, border:'1px solid rgba(139,92,246,0.15)', minWidth:88 }}>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Приёмов</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: '#a78bfa', lineHeight:1 }}>{Object.keys(dayMeals).length}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop:2 }}>за день</div>
+        <div className="nd-mealscount" style={{ textAlign: 'center', padding: '10px 14px', background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06))', borderRadius:12, border:'1px solid rgba(139,92,246,0.15)', minWidth:88 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Приёмов</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: '#a78bfa', lineHeight:1, fontVariantNumeric: 'tabular-nums' }}>{Object.keys(dayMeals).length}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop:2 }}>за день</div>
         </div>
       </div>
 

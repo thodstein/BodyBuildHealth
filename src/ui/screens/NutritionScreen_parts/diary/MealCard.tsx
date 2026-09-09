@@ -39,10 +39,10 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width:8, height:8, borderRadius:4, background: accent.dot, boxShadow:`0 0 6px ${accent.dot}60` }} />
           <span style={{ fontWeight: 700, fontSize: 12, color: accent.color }}>{mealName}</span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:6 }}>{items.length} поз.</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:6 }}>{items.length} поз.</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginRight: 2, display:'flex', gap:4 }}>
+          <div className="nd-mealmeta" style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginRight: 2, display:'flex', gap:4, fontVariantNumeric: 'tabular-nums' }}>
             <span style={{ color:'#60a5fa' }}>Б{Math.round(mealP)}</span>
             <span style={{ color:'rgba(255,255,255,0.2)' }}>·</span>
             <span style={{ color:'#f59e0b' }}>Ж{Math.round(mealF)}</span>
@@ -68,10 +68,10 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
                   <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '1px 5px', borderRadius: 4 }}>⚠</span>
                 )}
               </div>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{item.qty || '100 г'}</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{item.qty || '100 г'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
                 {Math.round(item.kcal || 0)} ккал
               </span>
               <button onClick={() => onEditItem(mealName, idx, item)} aria-label="Изменить" className="nd-itemedit"

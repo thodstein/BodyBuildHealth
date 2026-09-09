@@ -79,14 +79,14 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
           background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', marginBottom: 10 }}>
           <span style={{ fontSize: 11, color: '#8b5cf6', fontWeight: 600 }}>📋 Вставить «{copySource}»?</span>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => onPasteMeal(selectedDate)} aria-label="Вставить"
+            <button onClick={() => onPasteMeal(selectedDate)} aria-label="Вставить" className="nd-pastebtn"
               style={{ padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'rgba(139,92,246,0.2)', color: '#8b5cf6', fontSize: 10, fontWeight: 600, minHeight: 32 }}>
+                background: 'rgba(139,92,246,0.2)', color: '#8b5cf6', fontSize: 12, fontWeight: 600, minHeight: 44, minWidth: 44 }}>
               Сюда
             </button>
-            <button onClick={onCancelCopy} aria-label="Отмена"
+            <button onClick={onCancelCopy} aria-label="Отмена" className="nd-pastebtn"
               style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 10, minHeight: 32 }}>
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, minHeight: 44, minWidth: 44 }}>
               ✕
             </button>
           </div>

@@ -1,5 +1,5 @@
 /**
- * Guard-тест PRO-слоя дневника питания (§89-90).
+ * Guard-тест PRO-слоя дневника питания (§89-91).
  * Ловит молчаливый откат nd-хуков: без них APK-CSS не цепляется.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -9,6 +9,8 @@ import { WeekDaySelector } from '../diary/WeekDaySelector';
 import { MealCard } from '../diary/MealCard';
 import { DayMealsList } from '../diary/DayMealsList';
 import { QualityInsights } from '../diary/QualityInsights';
+import { NutritionDiaryCharts } from '../NutritionDiaryCharts';
+import { StorageErrorBanner } from '../diary/StorageErrorBanner';
 
 vi.mock('../useNutritionDiary', () => ({
   useFrequentFoods: vi.fn(() => []),
@@ -103,6 +105,45 @@ describe('nutrition-diary-pro hooks', () => {
     expect(full.querySelector('.nd-mood')).not.toBeNull();
     expect(full.querySelector('.nd-patterns')).not.toBeNull();
     expect(full.querySelector('.nd-mood-note')).not.toBeNull();
+  });
+
+  it('NutritionDiaryCharts: корень + гейджи + топ-хук', () => {
+    const dayMeals = {
+      'Завтрак': [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
+      'Обед': [{ name: 'Гречка', qty: '100 г', kcal: 130, p: 4, f: 1, c: 27 }],
+    };
+    const diaryData = {
+      '2026-09-08': { meals: { 'Обед': [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
+      '2026-09-09': { meals: dayMeals },
+    };
+    const { container } = render(
+      <NutritionDiaryCharts dayMeals={dayMeals} dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        diaryData={diaryData} selectedDate="2026-09-09" refreshKey={0} />
+    );
+    expect(container.querySelector('.nd-charts')).not.toBeNull();
+    expect(container.querySelector('.nd-donutleg')).not.toBeNull();
+    expect(container.querySelectorAll('.nd-gauge')).toHaveLength(2);
+    expect(container.querySelector('.nd-topname')).not.toBeNull();
+    expect(container.querySelector('.nd-mealscount')).not.toBeNull();
+  });
+
+  it('NutritionDiaryCharts: пусто — null', () => {
+    const { container } = render(
+      <NutritionDiaryCharts dayMeals={{}} dayTotals={{ kcal: 0, p: 0, f: 0, c: 0 }}
+        diaryData={{}} selectedDate="2026-09-09" refreshKey={0} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('StorageErrorBanner: пусто — null; с ошибкой — nd-storeerr', () => {
+    const { container } = render(<StorageErrorBanner error={null} onDismiss={noop} />);
+    expect(container.firstChild).toBeNull();
+    const { container: full } = render(
+      <StorageErrorBanner error="Тестовая ошибка квоты" onDismiss={noop} />
+    );
+    expect(full.querySelector('.nd-storeerr')).not.toBeNull();
+    expect(full.querySelector('.nd-storedismiss')).not.toBeNull();
   });
 
   it('FrequentFoodsPanel: хуки ленты и чипов', () => {
