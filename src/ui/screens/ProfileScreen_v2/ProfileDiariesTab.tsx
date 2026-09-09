@@ -1044,18 +1044,18 @@ const exportAllDiariesPdf = () => {
                       })()}
                     </div>
                     {completion.missing.length > 0 && (
-                      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 5, lineHeight: 1.45 }}>
                         Не заполнено: {completion.missing.map((k) => DIARY_META[k as DiaryKey].title).join(', ')}
                       </div>
                     )}
                     {completion.pct === 100 && (
-                      <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 700, marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: '#4ade80', fontWeight: 800, marginTop: 5 }}>
                         🎉 Все дневники заполнены на сегодня!
                       </div>
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
                   {completionKeys.map((k) => {
                     const filled = k.hasEntry && k.lastDate === todayIso();
                     return (
@@ -1067,20 +1067,22 @@ const exportAllDiariesPdf = () => {
                         tabIndex={0}
                         aria-label={DIARY_META[k.key].title}
                         style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 13,
                           cursor: 'pointer',
-                          background: filled ? `${DIARY_META[k.key].color}33` : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${filled ? DIARY_META[k.key].color : colors.border}`,
+                          background: filled ? `linear-gradient(135deg, ${DIARY_META[k.key].color}40, ${DIARY_META[k.key].color}14)` : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${filled ? DIARY_META[k.key].color : 'rgba(255,255,255,0.1)'}`,
+                          boxShadow: filled ? `0 4px 14px ${DIARY_META[k.key].color}30, inset 0 1px 0 rgba(255,255,255,0.1)` : 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: isWeightDiaryKey(k.key) ? 18 : 14,
                           lineHeight: 1,
+                          color: filled ? '#fff' : 'rgba(255,255,255,0.7)',
                         }}
                       >
-                        <span style={isWeightDiaryKey(k.key) ? { transform: 'scale(1.18)', display: 'inline-block' } : undefined}><NativeIcon name={DIARY_META[k.key].icon} size={15} /></span>
+                        <span style={isWeightDiaryKey(k.key) ? { transform: 'scale(1.18)', display: 'inline-block' } : undefined}><NativeIcon name={DIARY_META[k.key].icon} size={16} /></span>
                       </div>
                     );
                   })}
@@ -1090,25 +1092,25 @@ const exportAllDiariesPdf = () => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
-                      marginTop: 10,
-                      padding: '9px 11px',
-                      borderRadius: 12,
-                      background: 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))',
-                      border: '1px solid rgba(245,158,11,0.4)',
-                      boxShadow: '0 4px 14px rgba(245,158,11,0.10)',
+                      gap: 10,
+                      marginTop: 12,
+                      padding: '11px 13px',
+                      borderRadius: 15,
+                      background: 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))',
+                      border: '1px solid rgba(245,158,11,0.42)',
+                      boxShadow: '0 6px 18px rgba(245,158,11,0.14), inset 0 1px 0 rgba(255,255,255,0.07)',
                     }}
                   >
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>
                       {routine.kind === 'morning' ? '🌅' : '🌆'} {ROUTINE_KIND_LABELS[routine.kind]} · {ROUTINE_STEP_LABELS[routine.step]} ({routineIdx + 1}/{routineTotal})
                     </span>
-                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.1)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
                       <div
                         style={{
                           width: `${((routineIdx + 1) / routineTotal) * 100}%`,
                           height: '100%',
                           background: 'linear-gradient(90deg, #fbbf24, #f59e0b)',
-                          borderRadius: 2,
+                          borderRadius: 99,
                           transition: 'width 0.35s ease',
                         }}
                       />
@@ -1118,16 +1120,17 @@ const exportAllDiariesPdf = () => {
                       onClick={() => openRoutineStepModal(routine)}
                       aria-label={`Заполнить: ${ROUTINE_STEP_LABELS[routine.step]}`}
                       style={{
-                        background: 'rgba(245,158,11,0.18)',
-                        border: '1px solid rgba(245,158,11,0.45)',
-                        color: '#fbbf24',
+                        background: 'linear-gradient(135deg, rgba(245,158,11,0.3), rgba(245,158,11,0.12))',
+                        border: '1px solid rgba(245,158,11,0.5)',
+                        color: '#fff',
                         cursor: 'pointer',
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 800,
-                        padding: '6px 12px',
-                        borderRadius: 9,
+                        padding: '8px 14px',
+                        borderRadius: 12,
                         flexShrink: 0,
-                        minHeight: 32,
+                        minHeight: 40,
+                        boxShadow: '0 4px 14px rgba(245,158,11,0.22)',
                       }}
                     >
                       ✍ Заполнить
@@ -1367,47 +1370,47 @@ const exportAllDiariesPdf = () => {
                 {hist.length > 0 && (() => {
                   const maxMean = Math.max(...hist.map(x => x.mean), 1);
                   return (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10, alignItems: 'flex-end' }}>
                       {hist.slice(-6).map(h => (
-                        <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д${h.goal ? ` (цель ${h.goal.target}ч)` : ''}`} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 56 }}>
-                          <div style={{ 
-                            height: `${Math.max(8, (h.mean / maxMean) * 28)}px`, 
-                            background: h.goalStatus === 'met' ? 'linear-gradient(180deg, #22c55e, #16a34a)' : 
+                        <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д${h.goal ? ` (цель ${h.goal.target}ч)` : ''}`} style={{ flex: '1 1 64px', textAlign: 'center', padding: 7, borderRadius: 12, background: 'linear-gradient(180deg, rgba(167,139,250,0.12), rgba(167,139,250,0.03))', border: '1px solid rgba(167,139,250,0.2)', fontSize: 11, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 62, fontVariantNumeric: 'tabular-nums' }}>
+                          <div style={{
+                            height: `${Math.max(8, (h.mean / maxMean) * 30)}px`,
+                            background: h.goalStatus === 'met' ? 'linear-gradient(180deg, #22c55e, #16a34a)' :
                                       h.goalStatus === 'exceeded' ? 'linear-gradient(180deg, #4ade80, #22c55e)' :
                                       h.goalStatus === 'below' ? 'linear-gradient(180deg, #f59e0b, #d97706)' :
-                                      'linear-gradient(180deg, #a78bfa, #7c3aed)', 
-                            borderRadius: 4, marginBottom: 4, opacity: 0.9, transition: 'height 0.3s' }} />
-                          {h.goal && <div style={{ fontSize: 8, color: h.goalStatus === 'met' || h.goalStatus === 'exceeded' ? '#22c55e' : '#f59e0b', marginBottom: 2, fontWeight: 700 }}>🎯 {h.goal.target}ч</div>}
-                          <div style={{ color: colors.textMuted }}>{h.weekStart.slice(5)}</div>
-                          <div style={{ fontWeight: 700, color: '#a78bfa' }}>{h.mean.toFixed(1)}</div>
-                          <div style={{ color: colors.textMuted }}>{h.count}д</div>
+                                      'linear-gradient(180deg, #a78bfa, #7c3aed)',
+                            borderRadius: 5, marginBottom: 5, opacity: 0.92, transition: 'height 0.3s' }} />
+                          {h.goal && <div style={{ fontSize: 9, color: h.goalStatus === 'met' || h.goalStatus === 'exceeded' ? '#4ade80' : '#fbbf24', marginBottom: 3, fontWeight: 800 }}>🎯 {h.goal.target}ч</div>}
+                          <div style={{ color: 'rgba(255,255,255,0.55)' }}>{h.weekStart.slice(5)}</div>
+                          <div style={{ fontWeight: 800, color: '#fff', fontSize: 12 }}>{h.mean.toFixed(1)}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.55)' }}>{h.count}д</div>
                         </div>
                       ))}
                     </div>
                   );
                 })()}
                 {strongCorrs.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                     {strongCorrs.map(c => (
-                      <span key={c.label} title={c.interpretation} style={{ padding: '4px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: c.strength==='strong'? 'rgba(245,158,11,0.18)' : 'rgba(96,165,250,0.14)', border: `1px solid ${c.strength==='strong'? 'rgba(245,158,11,0.35)' : 'rgba(96,165,250,0.25)'}`, color: c.strength==='strong'? '#f59e0b' : '#60a5fa' }}>
+                      <span key={c.label} title={c.interpretation} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 800, background: c.strength==='strong'? 'linear-gradient(135deg, rgba(245,158,11,0.24), rgba(245,158,11,0.08))' : 'linear-gradient(135deg, rgba(96,165,250,0.2), rgba(96,165,250,0.06))', border: `1px solid ${c.strength==='strong'? 'rgba(245,158,11,0.4)' : 'rgba(96,165,250,0.3)'}`, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
                         {c.label}: r={c.r.toFixed(2)} · n={c.n} {c.positive? '↗' : '↘'} {c.strength==='strong'? 'сильная' : 'умеренная'}
                       </span>
                     ))}
                   </div>
                 ) : weakCorrs.length > 0 ? (
-                  <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>Слабые связи: {weakCorrs.map(c=>`${c.label} r=${c.r.toFixed(2)}`).join(' · ')} — нужно больше парных дней.</div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.5 }}>Слабые связи: {weakCorrs.map(c=>`${c.label} r=${c.r.toFixed(2)}`).join(' · ')} — нужно больше парных дней.</div>
                 ) : (
-                  <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>Недостаточно парных дат для корреляций (нужно ≥3 общих дня).</div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.5 }}>Недостаточно парных дат для корреляций (нужно ≥3 общих дня).</div>
                 )}
                 {(bpTrend || weightTrend) && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11, color: colors.textMuted, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'rgba(255,255,255,0.65)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8, fontVariantNumeric: 'tabular-nums' }}>
                     {bpTrend && typeof bpTrend === 'object' && 'slope' in (bpTrend as any) && (
-                      <span>АД тренд: <b style={{ color: (bpTrend as any).slope > 0.1 ? '#ef4444' : (bpTrend as any).slope < -0.1 ? '#22c55e' : colors.text }}>{(bpTrend as any).slope > 0 ? '↗' : (bpTrend as any).slope < 0 ? '↘' : '→'} {(bpTrend as any).slope?.toFixed?.(2) ?? ''}</b></span>
+                      <span>АД тренд: <b style={{ color: '#fff' }}>{(bpTrend as any).slope > 0 ? '↗' : (bpTrend as any).slope < 0 ? '↘' : '→'} {(bpTrend as any).slope?.toFixed?.(2) ?? ''}</b></span>
                     )}
                     {weightTrend && (
                       <span>Вес Δ {((weightTrend.slopePerDay*7).toFixed(2))} кг/нед {weightTrend.slopePerDay>0.05? '↗' : weightTrend.slopePerDay<-0.05? '↘' : '→'}</span>
                     )}
-                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7 }}>r≥0.4 — порог умеренной связи</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10.5, opacity: 0.7 }}>r≥0.4 — порог умеренной связи</span>
                   </div>
                 )}
               </div>
@@ -1591,11 +1594,11 @@ const exportAllDiariesPdf = () => {
             {searchQuery.trim() &&
               builtInDiaries.filter((d) => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()))
                 .length === 0 && (
-                <div style={{ marginTop: 12, padding: 20, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-                  <div style={{ marginBottom: 6, color: colors.textMuted, display: 'flex', justifyContent: 'center' }}><NativeIcon name="search" size={28} /></div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>Ничего не найдено</div>
-                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>По запросу «{searchQuery}» дневников нет</div>
-                  <button onClick={() => setSearchQuery('')} style={{ marginTop: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: `1px solid ${colors.border}`, color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Сбросить поиск</button>
+                <div style={{ marginTop: 12, padding: 24, borderRadius: 18, background: 'linear-gradient(180deg, rgba(30,30,36,0.9), rgba(18,18,22,0.9))', border: '1px dashed rgba(255,255,255,0.14)', textAlign: 'center' }}>
+                  <div style={{ marginBottom: 8, color: 'rgba(255,255,255,0.5)', display: 'flex', justifyContent: 'center' }}><NativeIcon name="search" size={30} /></div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Ничего не найдено</div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 5 }}>По запросу «{searchQuery}» дневников нет</div>
+                  <button onClick={() => setSearchQuery('')} style={{ marginTop: 12, padding: '9px 18px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 800, minHeight: 44 }}>Сбросить поиск</button>
                 </div>
               )}
           </AccordionSection>
@@ -1606,42 +1609,48 @@ const exportAllDiariesPdf = () => {
             icon={<NativeIcon name="inbox" size={20} />}
             color={colors.blue}
           >
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
               <button
                 onClick={exportAllDiaries}
+                className="pf-data-btn"
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
+                  padding: '10px 16px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: 'rgba(96,165,250,0.14)',
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  minHeight: 48,
+                  background: 'linear-gradient(135deg, rgba(96,165,250,0.22), rgba(96,165,250,0.07))',
                   border: '1px solid rgba(96,165,250,0.4)',
-                  color: '#60a5fa',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
+                  boxShadow: '0 4px 16px rgba(96,165,250,0.16)',
                 }}
               >
                 📤 Экспорт всех дневников (JSON)
               </button>
               <button
                 onClick={exportAllDiariesPdf}
+                className="pf-data-btn"
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
+                  padding: '10px 16px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: 'rgba(239,68,68,0.12)',
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  minHeight: 48,
+                  background: 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.06))',
                   border: '1px solid rgba(239,68,68,0.4)',
-                  color: '#f87171',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
+                  boxShadow: '0 4px 16px rgba(239,68,68,0.14)',
                 }}
               >
-                <NativeIcon name="file" size={13} /> Экспорт всех дневников (PDF)
+                <NativeIcon name="file" size={14} /> Экспорт всех дневников (PDF)
               </button>
               <input
                 ref={importInputRef}
@@ -1657,18 +1666,21 @@ const exportAllDiariesPdf = () => {
               />
               <button
                 onClick={() => importInputRef.current?.click()}
+                className="pf-data-btn"
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
+                  padding: '10px 16px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: 'rgba(34,197,94,0.14)',
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  minHeight: 48,
+                  background: 'linear-gradient(135deg, rgba(34,197,94,0.22), rgba(34,197,94,0.07))',
                   border: '1px solid rgba(34,197,94,0.4)',
-                  color: '#22c55e',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
+                  boxShadow: '0 4px 16px rgba(34,197,94,0.14)',
                 }}
               >
                 📥 Импорт
@@ -1729,21 +1741,24 @@ const exportAllDiariesPdf = () => {
                     Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
                   });
                 }}
+                className="pf-data-btn"
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
+                  padding: '10px 16px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: 'rgba(239,68,68,0.12)',
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  minHeight: 48,
+                  background: 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.06))',
                   border: '1px solid rgba(239,68,68,0.4)',
-                  color: '#ef4444',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
+                  boxShadow: '0 4px 16px rgba(239,68,68,0.14)',
                 }}
                 >
-                <NativeIcon name="trash" size={13} /> Сбросить всё
+                <NativeIcon name="trash" size={14} /> Сбросить всё
               </button>
             </div>
           </AccordionSection>
@@ -1993,7 +2008,7 @@ const exportAllDiariesPdf = () => {
       {!activeDiary && (
         <div style={{ position: 'fixed', right: 16, bottom: 88, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           {fabOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 12, background: 'rgba(28,28,34,0.97)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)', minWidth: 160 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: 10, borderRadius: 18, background: 'rgba(20,20,25,0.97)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: '0 14px 36px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)', minWidth: 176 }}>
               {([
                 [{ icon: 'moon', label: 'Сон' }, () => { setFabOpen(false); setAddSleepOpen(true); }],
                 [{ icon: 'heart', label: 'Давление' }, () => { setFabOpen(false); setAddBPOpen(true); }],
@@ -2007,25 +2022,26 @@ const exportAllDiariesPdf = () => {
                   onClick={onClick}
                   style={{
                     textAlign: 'left',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: colors.text,
+                    padding: '10px 13px',
+                    borderRadius: 13,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+                    border: '1px solid rgba(255,255,255,0.09)',
+                    color: '#fff',
                     cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    minHeight: 44,
                     opacity: fabOpen ? 1 : 0,
                     transform: fabOpen ? 'translateX(0)' : 'translateX(20px)',
                     transition: `all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 30}ms`,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 9,
                   }}
                   title={label}
                   aria-label={label}
                 >
-                  <NativeIcon name={icon as NativeIconName} size={15} />
+                  <NativeIcon name={icon as NativeIconName} size={16} />
                   {label}
                 </button>
               ))}
@@ -2035,16 +2051,16 @@ const exportAllDiariesPdf = () => {
             onClick={() => setFabOpen(v => !v)}
             aria-label={fabOpen ? 'Закрыть меню' : 'Быстро добавить запись'}
             style={{
-              width: 54,
-              height: 54,
-              borderRadius: 16,
+              width: 56,
+              height: 56,
+              borderRadius: 18,
               background: fabOpen ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg, #34d399, #22c55e)',
-              border: fabOpen ? '1px solid rgba(255,255,255,0.2)' : 'none',
+              border: fabOpen ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(52,211,153,0.5)',
               color: fabOpen ? colors.text : '#04120c',
               fontSize: 28,
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)',
+              boxShadow: '0 10px 26px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

@@ -1324,20 +1324,20 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         <section id="sleep-trends" style={{ ...glassCard, marginBottom: 12 }}>
           {trends.some((t) => t.thisWeek !== null && t.lastWeek !== null) ? (
             <>
-              <b style={{ display: 'block', marginBottom: 10 }}>📊 Эта неделя vs прошлая</b>
+              <b style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>📊 Эта неделя vs прошлая</b>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
                 {trends.map((t) => {
                   const changed = t.delta !== null && Math.abs(t.delta) >= 0.05;
                   const better = changed && (t.betterWhenUp ? t.delta! > 0 : t.delta! < 0);
                   const worse = changed && !better;
                   return (
-                    <div key={t.label} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-                      <div style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    <div key={t.label} style={{ padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
                         {t.label}
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>
+                      <div style={{ fontSize: 19, fontWeight: 800, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
                         {t.thisWeek !== null ? t.thisWeek.toFixed(1) : '—'}
-                        <span style={{ fontSize: 11, color: colors.textSubtle, fontWeight: 500 }}> vs {t.lastWeek !== null ? t.lastWeek.toFixed(1) : '—'}</span>
+                        <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}> vs {t.lastWeek !== null ? t.lastWeek.toFixed(1) : '—'}</span>
                       </div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: better ? '#34d399' : worse ? '#f87171' : 'rgba(255,255,255,0.4)' }}>
                         {changed ? `${t.delta! > 0 ? '↑ +' : '↓ '}${Math.abs(t.delta!).toFixed(1)}` : '— стабильно'}
@@ -1357,24 +1357,25 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         {/* По дням недели */}
         {weekdayHasData && (
           <section style={{ ...glassCard, marginBottom: 12 }}>
-            <b style={{ display: 'block', marginBottom: 10 }}>🗓 По дням недели</b>
-            <div className="sl-weekdays" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+            <b style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>🗓 По дням недели</b>
+            <div className="sl-weekdays" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 7 }}>
               {weekdayAvg.map((d) => (
                 <div
                   key={d.dayName}
                   style={{
                     textAlign: 'center',
-                    padding: '8px 2px',
-                    borderRadius: 10,
-                    background: d.count ? 'rgba(255,255,255,0.04)' : 'transparent',
-                    border: d.count ? `1px solid ${colors.border}` : '1px solid transparent',
+                    padding: '10px 3px',
+                    borderRadius: 13,
+                    background: d.count ? 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))' : 'transparent',
+                    border: d.count ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
+                    boxShadow: d.count ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
                   }}
                 >
-                  <div style={{ fontSize: 11, color: colors.textSubtle, fontWeight: 800, letterSpacing: '0.4px' }}>{d.dayName}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: d.avgHours === null ? colors.textSubtle : d.avgHours >= goals.targetHours ? '#34d399' : d.avgHours >= 6 ? '#fbbf24' : '#f87171', fontVariantNumeric: 'tabular-nums' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.5px' }}>{d.dayName}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: d.avgHours === null ? colors.textSubtle : d.avgHours >= goals.targetHours ? '#34d399' : d.avgHours >= 6 ? '#fbbf24' : '#f87171', fontVariantNumeric: 'tabular-nums' }}>
                     {d.avgHours === null ? '—' : `${d.avgHours.toFixed(1)}ч`}
                   </div>
-                  <div style={{ fontSize: 11, color: d.avgQuality === null ? colors.textSubtle : d.avgQuality >= 4 ? '#34d399' : d.avgQuality >= 3 ? '#fbbf24' : '#f87171' }}>
+                  <div style={{ fontSize: 11.5, marginTop: 1, color: d.avgQuality === null ? colors.textSubtle : d.avgQuality >= 4 ? '#34d399' : d.avgQuality >= 3 ? '#fbbf24' : '#f87171' }}>
                     {d.avgQuality === null ? '' : `★${d.avgQuality.toFixed(1)}`}
                   </div>
                   {d.avgHours !== null && (
