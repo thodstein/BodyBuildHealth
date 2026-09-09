@@ -11418,3 +11418,149 @@ html.app-native .combat-constructor .cb-chip:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 99. MANUAL CONSTRUCTOR PRO — ручной планировщик уровня топ-приложения ───
+ * Галерея шаблонов (.train-manlib.lib-manlib): 4 таба ББ/ПЛ/Арм/ТА·Стронг,
+ * фильтры, карточки арм/SS, мост-кнопки в конструкторы, баннер моста.
+ * Корень менеджера/редактора (.manual-constructor): дыхание снизу над пилюлей.
+ * Хуки: .lib-seg (кнопки data-active + role=tab), .lib-filters/.lib-search,
+ * .lib-grid/.lib-card (.lib-arm-card/.lib-ss-card, data-fav), .lib-icon,
+ * .lib-apply, .lib-preview, .lib-bridge-msg[role=status].
+ * Тач 44-48px, инпуты 48px/16px (без iOS-зума), стекло 18px, press 0.97-0.98,
+ * focus-visible лайм, tabular-цифры, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Корень галереи и конструктора: дыхание снизу над pill-nav ── */
+html.app-native .train-manlib {
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+}
+
+html.app-native .manual-constructor {
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+}
+
+/* ── Сегмент 4 табов: липкая скролл-лента со snap, кнопки 44px ── */
+html.app-native .lib-manlib .lib-seg {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  padding: 6px !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .lib-manlib .lib-seg::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .lib-manlib .lib-seg button {
+  flex: 1 0 auto !important;
+  min-width: 96px !important;
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Фильтры: стекло 18px, поиск 48px/16px, селекты и тоглы 44px ── */
+html.app-native .lib-manlib .lib-filters {
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .lib-manlib .lib-search {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .lib-manlib .lib-filters select {
+  min-height: 44px !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .lib-manlib .lib-filters button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Карточки: стекло 18px с верхней кромкой, кромка по треку ── */
+html.app-native .lib-manlib .lib-card {
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .lib-manlib .lib-arm-card {
+  border-top: 2px solid rgba(0, 230, 138, 0.55) !important;
+}
+
+html.app-native .lib-manlib .lib-ss-card {
+  border-top: 2px solid rgba(56, 189, 248, 0.55) !important;
+}
+
+html.app-native .lib-manlib .lib-card button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Мост-кнопки в конструкторы: CTA 48px с glow ── */
+html.app-native .lib-manlib .lib-apply {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 10px 28px rgba(var(--accent-rgb), 0.3) !important;
+}
+
+html.app-native .lib-manlib .lib-apply:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .lib-manlib .lib-apply:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Баннер моста: стекло-статус ── */
+html.app-native .lib-manlib .lib-bridge-msg {
+  border-radius: 14px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ── Счётчики табов: tabular ── */
+html.app-native .lib-manlib .lib-seg button {
+  font-variant-numeric: tabular-nums !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .lib-manlib .lib-seg button {
+    min-width: 84px !important;
+    font-size: 11px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  html.app-native .lib-manlib .lib-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .lib-manlib .lib-apply:active {
+    transform: none !important;
+  }
+}
