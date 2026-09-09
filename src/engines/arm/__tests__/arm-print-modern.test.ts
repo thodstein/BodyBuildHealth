@@ -25,6 +25,14 @@ describe('arm-print-modern', () => {
       expect(html, marker).toContain(marker);
     }
   });
+  it('печать R3: итоги недель/сессий, thead-repeat, @page, веса', () => {
+    const html = buildArmPrintHtml(demoPlan());
+    expect(html).toContain('class="wtot"');
+    expect(html).toMatch(/\d+ сетов · \d+ сесс\./);
+    expect(html).toMatch(/День 1 — .*<span class="wtot">\d+ сетов<\/span>/);
+    expect(html).toContain('table.t thead{display:table-header-group}');
+    expect(html).toContain('@page{margin:12mm}');
+  });
   it('диагностика: hero, таблица с thead, секции', () => {
     const h = buildArmDiagnosticsHtml({
       date: '2026-09-05', level: 'intermediate', technique: 'hook',
