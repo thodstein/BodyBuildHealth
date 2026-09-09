@@ -7,6 +7,9 @@ import {
   VARIETY_LEDGER_KEY, LEDGER_FOODS_CAP, LEDGER_RECIPES_CAP, LEDGER_WEEK_FAMILIES_CAP,
   loadVarietyLedger, saveVarietyLedger, familyDaysInWeek, type VarietyLedgerShape,
 } from '../planner-variety-ledger';
+import { weekRotateTopups } from '../planner-recipe-mode';
+import { correctDayToTargets, TOPUP_CARB_IDS, TOPUP_PROTEIN_IDS } from '../day-target-corrector';
+import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 describe('planner-variety-ledger: персист с капами', () => {
   beforeEach(() => { try { localStorage.removeItem(VARIETY_LEDGER_KEY); } catch {} });
@@ -54,5 +57,38 @@ describe('planner-variety-ledger: персист с капами', () => {
     expect(familyDaysInWeek([['rice'], ['rice', 'oats'], ['pasta'], []], 'rice')).toBe(2);
     expect(familyDaysInWeek([['rice'], ['rice']], 'oats')).toBe(0);
     expect(familyDaysInWeek([], 'rice')).toBe(0);
+  });
+});
+
+describe('P1-7: недельная субротация топапов (сдвиг порядка, содержимое инвариантно)', () => {
+  const BASE = ['a', 'b', 'c', 'd', 'e'];
+
+  it('weekIndex 0 = идентично, сдвиг цикличен, множество сохраняется', () => {
+    expect(weekRotateTopups(BASE, 0)).toEqual(BASE);
+    expect(weekRotateTopups(BASE, 1)).toEqual(['b', 'c', 'd', 'e', 'a']);
+    expect(weekRotateTopups(BASE, 6)).toEqual([...BASE.slice(1), 'a']);
+    expect([...weekRotateTopups(BASE, 3)].sort()).toEqual([...BASE].sort());
+    expect(weekRotateTopups(BASE, undefined)).toEqual(BASE);
+  });
+
+  it('корректор weekIndex=2: пул углей — тот же SET, другой порядок (квоты целы)', () => {
+    const _in = { kcal: 3200, p: 170, f: 90, c: 400 };
+    const mkMeal = () => ({ type: 'regular', label: 'Приём', items: [{ id: 'chicken_breast', amount: 200, kcal: 330, protein: 62, fat: 7, carbs: 0, fiber: 0 }], totals: { kcal: 330, p: 62, f: 7, c: 0, fiber: 0 } });
+    const meals = Array.from({ length: 4 }, mkMeal);
+    const a = correctDayToTargets(meals as any, _in as any, { maxIter: 4, weekIndex: 0 });
+    const b = correctDayToTargets(meals as any, _in as any, { maxIter: 4, weekIndex: 2 });
+    expect(a).toBeTruthy();
+    expect(b).toBeTruthy();
+    // содержимое топап-пула инвариантно (порядок не режет доступность)
+    const idsA = new Set(TOPUP_CARB_IDS);
+    const idsB = new Set(weekRotateTopups(TOPUP_CARB_IDS, 2));
+    expect(idsB).toEqual(idsA);
+    // weekIndex не убивает сходимость базового дня (dev в разумном коридоре без правок)
+    expect(a.deviationPct).toBeLessThan(60);
+    expect(b.deviationPct).toBeLessThan(60);
+    // неделя 2 ≠ неделя 1 по порядку пулов (детерминированный сдвиг)
+    expect(weekRotateTopups(TOPUP_PROTEIN_IDS, 1)[0]).toBe(TOPUP_PROTEIN_IDS[1]);
+    // все id существуют в FOOD_DB (sanity: ротация не вводит битые id)
+    for (const id of TOPUP_CARB_IDS) expect(FOOD_DB.find(f => f.id === id), id).toBeTruthy();
   });
 });

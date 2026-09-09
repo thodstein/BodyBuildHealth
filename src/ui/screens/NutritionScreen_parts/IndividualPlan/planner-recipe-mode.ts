@@ -360,6 +360,16 @@ function subrot(ids: string[], seed?: number): string[] {
   return [...ids.slice(s), ...ids.slice(0, s)];
 }
 
+/**
+ * P1-7 (план разнообразия): недельная субротация топап-пулов — сдвиг по индексу
+ * ledger-недели (0/7/14…), НЕ по сиду (сиды калиброваны под гарантии). Только
+ * порядок, содержимое/квоты инвариантны → гарантии соль- и сдвиг-инвариантны.
+ */
+export function weekRotateTopups(ids: string[], weekIndex?: number): string[] {
+  const w = Math.max(0, Math.floor(Number(weekIndex) || 0)) % Math.max(1, ids.length);
+  return w === 0 ? ids : [...ids.slice(w), ...ids.slice(0, w)];
+}
+
 function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
   return ids
     .map(id => FOOD_DB.find(f => f.id === id))
@@ -440,13 +450,13 @@ function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
 export function rebalanceDayAfterRecipes(
   meals: PlanMealLike[],
   targets: DayMacroTargets,
-  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; hvStyle?: string },
+  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; hvStyle?: string; weekIndex?: number },
 ): RebalanceResult {
   const notes: string[] = [];
   // Экстрим углей (≥1300): больше итераций ребаланса (24 не хватает: 15 приёмов,
   // кулдауны съедают часть) — иначе день застревает на −33% с честным флагом.
   const maxIter = opts?.maxIter ?? ((targets?.c || 0) >= 1300 ? 40 : 24);
-  const _sub = (ids: string[]) => subrot(ids, opts?.seed);
+  const _sub = (ids: string[]) => subrot(weekRotateTopups(ids, opts?.weekIndex), opts?.seed);
   // HV-gate: удобные носители/дедуп/защита снеков/ккал-гейт — только high-carb дни
   // (800У+); обычные дни идут бит-идентично прежнему (сторожит property-тест).
   const _hv = opts?.highCarb === true;
@@ -1165,9 +1175,11 @@ export interface AssembleRecipeDayArgs {
   /** P1-5 (план разнообразия): зарезервировано для мягкого окна рецептов; окна
    *  использованных имён (usedNamesAcrossDays) всегда жёсткие — откалибровано
    *  property-тестами (смягчение ломало «без повторов между днями»).
-   *  P1-6: 'practical'/'mixed' расширяют HV-топапы плотными носителями. */
+   *  P1-6: 'practical'/'mixed' расширяют HV-топапы плотными носителями.
+   *  P1-7: weekIndex — недельная субротация топапов (сдвиг порядка, 0 = неделя 1). */
   varietyStrictness?: 'soft' | 'strict';
   hvStyle?: string;
+  weekIndex?: number;
 }
 
 export interface AssembleRecipeDayResult {
@@ -1769,7 +1781,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
-  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb, hvStyle: args.hvStyle, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin });
+  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb, hvStyle: args.hvStyle, weekIndex: args.weekIndex, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin });
   const notes = [...rb.notes];
   // Peri-капы сразу после ребаланса (до корректора): топ-апы/сайды могли залить окна.
   notes.push(...trimPeriCarbs(rb.meals));
@@ -1778,7 +1790,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // Ядро рецепта трогается только в крайнем случае (±15% кумулятивно), гибкие слоты — свободно.
   const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
   if (needCorr) {
-    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80, convenientCarbs: _dayHighCarb, highCarb: _dayHighCarb, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin, hvStyle: args.hvStyle });
+    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80, convenientCarbs: _dayHighCarb, highCarb: _dayHighCarb, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin, hvStyle: args.hvStyle, weekIndex: args.weekIndex });
     const corrDev = corr.deviationPct;
     // Финальное слияние дублей: сайд tryBuild + топ-ап ребаланса + добор корректора
     // могут положить один id дважды («рисовый крем 63 + 70») — суммируем в один пункт.

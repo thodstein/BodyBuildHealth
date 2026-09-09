@@ -5815,13 +5815,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
-      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle });
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7) });
       // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
       // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
       // Если первый прогон плох — повторяем без lbmKg и берём лучший
       // (монотонно, цена только плохим дням).
       if (_corr.deviationPct > 8 && input.lbmKg) {
-        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle });
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7) });
         if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
           _corr = _corrNoLbm;
           notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);

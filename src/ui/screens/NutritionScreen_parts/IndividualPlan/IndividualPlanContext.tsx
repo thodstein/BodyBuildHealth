@@ -3480,6 +3480,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // P1-5/P1-6: строгость разнообразия и стиль HV в рецепт-путь.
             varietyStrictness,
             hvStyle,
+            // P1-7: недельная субротация топапов (по ledger-неделе, не по сиду).
+            weekIndex: Math.floor(offset / 7),
             // v3 portable: гейт добивок рецептурного пути в рабочее окно.
             portableMode: input.portableMode,
             isWorkDay: input.isWorkDay,
