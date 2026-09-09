@@ -46,7 +46,7 @@ import { useProgramUndo } from './hooks/useProgramUndo';
 import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { QuickTemplate, QuickTemplatesGrid } from './ProgramQuickTemplates';
-import { ProPanelSection, ProPanelsGroup, ThemeToggle } from './ProPanelSection';
+import { ProPanelsGroup } from './ProPanelSection';
 import { MesoHeatmap } from './MesoHeatmap';
 import { ProgramNotes, ProgramMetricsCSV, RecoveryBadge, ProgramStrengthScore } from './ProgramExtras';
 import { ProgramRevisionsDiff } from './ProgramRevisions';

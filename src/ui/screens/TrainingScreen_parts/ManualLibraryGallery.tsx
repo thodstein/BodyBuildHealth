@@ -14,8 +14,7 @@ import { ARM_CYCLE_LIBRARY, type ArmCycleTemplate } from '../../../engines/arm/a
 import { SS_CYCLES } from '../../../data/ss-cycles/ss-cycle-index';
 import type { SSCycleTemplate } from '../../../data/ss-cycles/ss-types';
 import { applyToPlanner } from './planner-bridge';
-import { ManualHeader, SectionCard, Badge, InfoBanner, BTN, BTN_GHOST, BTN_SMALL, CARD } from './ManualUI';
-import { GROUP_RU } from './program-types';
+import { ManualHeader, SectionCard, Badge, InfoBanner, BTN, BTN_GHOST, CARD } from './ManualUI';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { ACCENT, DIM } from './training-ui';
 import { loadTrainingProfile } from './training-profile';
