@@ -208,7 +208,8 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   return {
     ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading,
     showCustomFood, setShowCustomFood,
-    customFoodName, setCustomFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC,
+    customFoodName, setCustomFoodName, customFoodKcal, setCustomFoodKcal, customFoodP, setCustomFoodP,
+    customFoodF, setCustomFoodF, customFoodC, setCustomFoodC,
     addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
     fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
     addCustomFood, updateParsedItemQty, extractQty, addPresetItems,

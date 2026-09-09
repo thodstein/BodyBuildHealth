@@ -166,7 +166,7 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
   }, [diaryData, selectedDate, saveDiary, showToast]);
 
   return {
-    editItem, editQty, setEditQty, copySource, setCopySource, copiedDay,
+    editItem, setEditItem, editQty, setEditQty, copySource, setCopySource, copiedDay,
     clearDayConfirmOpen, setClearDayConfirmOpen,
     foodPatterns, foodTriggers, mealMood,
     deleteItem, clearDay, confirmClearDay, openEdit, saveEdit,
