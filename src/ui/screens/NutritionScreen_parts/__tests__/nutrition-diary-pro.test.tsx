@@ -173,6 +173,7 @@ describe('nutrition-diary-pro hooks', () => {
     );
     expect(full.querySelector('.nd-storeerr')).not.toBeNull();
     expect(full.querySelector('.nd-storedismiss')).not.toBeNull();
+    expect(full.querySelector('[role="alert"]')).not.toBeNull();
   });
 
   it('parseDateOnly: локальный парсинг без UTC-сдвига', () => {

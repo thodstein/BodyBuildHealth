@@ -48,8 +48,10 @@ describe('StorageErrorBanner', () => {
       />
     );
     
-    const banner = screen.getByText('Хранилище переполнено').closest('div');
-    expect(banner).toHaveClass('bg-red-50');
+    const heading = screen.getByRole('heading', { name: 'Хранилище переполнено' });
+    const banner = heading.closest('.nd-storeerr');
+    expect(banner).not.toBeNull();
+    expect(banner).toHaveAttribute('role', 'alert');
   });
   
   it('should show validation error styling for validation errors', () => {
@@ -60,8 +62,9 @@ describe('StorageErrorBanner', () => {
       />
     );
     
-    const banner = screen.getByText('Ошибка валидации данных').closest('div');
-    expect(banner).toHaveClass('bg-yellow-50');
+    const banner = screen.getByText('Ошибка валидации данных').closest('.nd-storeerr');
+    expect(banner).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Ошибка данных' })).toBeInTheDocument();
   });
   
   it('should show storage details when toggle clicked', () => {
@@ -69,8 +72,8 @@ describe('StorageErrorBanner', () => {
       <StorageErrorBanner error="Test error" onDismiss={mockOnDismiss} />
     );
     
-    // Click "Показать детали"
-    fireEvent.click(screen.getByText('Показать детали'));
+    // Click "Детали хранилища"
+    fireEvent.click(screen.getByText(/Детали хранилища/));
     
     // Should show storage info
     expect(screen.getByText(/Дней в дневнике/)).toBeInTheDocument();
@@ -86,7 +89,7 @@ describe('StorageErrorBanner', () => {
       />
     );
     
-    const exportButton = screen.getByText('Экспортировать и очистить старые данные');
+    const exportButton = screen.getByText(/Экспорт и очистка/);
     fireEvent.click(exportButton);
     
     expect(mockOnExport).toHaveBeenCalled();
@@ -102,7 +105,7 @@ describe('StorageErrorBanner', () => {
       />
     );
     
-    const clearButton = screen.getByText('Очистить данные старше 90 дней');
+    const clearButton = screen.getByText(/Старше 90 дней/);
     fireEvent.click(clearButton);
     
     expect(mockOnClearOldData).toHaveBeenCalled();
@@ -117,6 +120,6 @@ describe('StorageErrorBanner', () => {
       />
     );
     
-    expect(screen.queryByText('Экспортировать и очистить старые данные')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Экспорт и очистка/)).not.toBeInTheDocument();
   });
 });
