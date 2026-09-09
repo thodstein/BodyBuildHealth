@@ -27,7 +27,7 @@ export const QualityInsights: React.FC<QualityInsightsProps> = ({
         const q = mealQuality;
         const ql = getQualityLabel(q.total);
         return (
-          <div className="nd-qscore" style={{ padding: '10px 14px', borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="nd-qscore" style={{ padding: '12px 14px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.14)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{ql.emoji} Качество рациона</span>
               <span style={{ fontSize: 20, fontWeight: 800, color: ql.color }}>{q.total}/100</span>
@@ -47,7 +47,7 @@ export const QualityInsights: React.FC<QualityInsightsProps> = ({
       })()}
 
       {/* Meal mood */}
-      <div className="nd-mood" style={{ padding: '10px 14px', borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="nd-mood" style={{ padding: '12px 14px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(245,158,11,0.14)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>😋 Оценка питания</div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
           <div style={{ flex: 1 }}>
@@ -91,7 +91,7 @@ export const QualityInsights: React.FC<QualityInsightsProps> = ({
       </div>
 
       {/* Patterns & triggers */}
-      <div className="nd-patterns" style={{ padding: '10px 14px', borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="nd-patterns" style={{ padding: '12px 14px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(139,92,246,0.14)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>📊 Паттерны</div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {[

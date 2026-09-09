@@ -14,6 +14,7 @@ import { useDiaryDayOps } from './diary/hooks/useDiaryDayOps';
 import { useDiaryPresets } from './diary/hooks/useDiaryPresets';
 
 // Extracted components
+import { DiarySection } from './diary/DiarySection';
 import { WeekDaySelector } from './diary/WeekDaySelector';
 import { MacroSummary } from './diary/MacroSummary';
 import { MealCard } from './diary/MealCard';
@@ -264,9 +265,37 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'day' && (
         <>
-          {/* Product usefulness summary */}
+          {/* Полезность — внутри секции «Качество дня» ниже */}
+
+          {Object.keys(dayMicros).length > 0 && (<DiarySection id="micros" icon="🧪" title="Микронутриенты" sub="витамины · минералы · клетчатка" color="#22c55e"><div className="nd-micros" style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🧪 Микронутриенты за день</div><button onClick={() => { const txt = Object.entries(dayMicros).filter(([k]) => microLabels[k]).map(([k, v]) => { const info = microLabels[k]; return `${info.name}: ${Math.round(v * 10) / 10} ${info.unit} (${Math.round(v / info.target * 100)}%)`; }).join('\n'); try { void navigator.clipboard?.writeText(`Микро ${selectedDate}\n${txt}`); showToast('📋 Микро скопированы'); } catch { showToast('❌ Не удалось скопировать'); } }} aria-label="Копировать микронутриенты" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>📋</button></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div></DiarySection>)}
+          <DiarySection id="actions" icon="⚡" title="Действия дня" sub="копия · шаблоны · печать" color="#00e68a">
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <button onClick={copyDay} className="nd-copyday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(0,230,138,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>📋</span> Копировать день</button>
+            {copiedDay ? <button onClick={() => pasteDay(selectedDate)} className="nd-pasteday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(139,92,246,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>📥</span> Вставить {copiedDay.slice(5)}</button> : <button onClick={saveDayPreset} className="nd-daypreset-save" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(245,158,11,0.18)', background:'rgba(245,158,11,0.08)', color:'#f59e0b', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(245,158,11,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>💾</span> Шаблон дня</button>}
+            <button onClick={printDay} className="nd-printday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(59,130,246,0.18)', background:'rgba(59,130,246,0.08)', color:'#60a5fa', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6, gridColumn: copiedDay ? 'span 2' : 'auto' }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(59,130,246,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>🖨</span> Печать дня</button>
+          </div>
+          {dayPresets.length>0 && (
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+              {dayPresets.slice(0,6).map((p:any,i:number)=>(
+                <button key={i} onClick={()=>loadDayPreset(p)} className="nd-daypreset" style={{ padding:'10px 14px', borderRadius:10, fontSize:12, cursor:'pointer', minHeight:44, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.15)', color:'#f59e0b' }}>📦 {p.name}</button>
+              ))}
+            </div>
+          )}
+          </DiarySection>
+          <DiarySection id="meals" icon="🍽" title="Приёмы пищи" sub={selectedDate} color="#60a5fa" count={`${Object.values(dayMeals).flat().length} поз.`}>
+          <DayMealsList
+            dayMeals={dayMeals}
+            onEditItem={openEdit} onDeleteItem={deleteItem}
+            onCopyMeal={copyMeal} onSavePreset={savePreset}
+            onImportFromPlan={importFromPlan} onClearDay={clearDay}
+            onFillMicros={fillDayMicros}
+            selectedDate={selectedDate} copySource={copySource}
+            onPasteMeal={pasteMeal} onCancelCopy={() => setCopySource(null)}
+          />
+          </DiarySection>
+          <DiarySection id="quality" icon="⭐" title="Качество дня" sub="полезность · настроение · паттерны" color="#a78bfa">
           {dayQuality && dayQuality.scoredCount > 0 && (
-            <div className="nd-useful" style={{ padding: '10px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(139,92,246,0.15)', marginBottom: 4 }}>
+            <div className="nd-useful" style={{ padding: '10px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>⭐ Полезность продуктов</span>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
@@ -289,40 +318,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
               </div>
             </div>
           )}
-
-          {Object.keys(dayMicros).length > 0 && <div className="nd-micros" style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🧪 Микронутриенты за день</div><button onClick={() => { const txt = Object.entries(dayMicros).filter(([k]) => microLabels[k]).map(([k, v]) => { const info = microLabels[k]; return `${info.name}: ${Math.round(v * 10) / 10} ${info.unit} (${Math.round(v / info.target * 100)}%)`; }).join('\n'); try { void navigator.clipboard?.writeText(`Микро ${selectedDate}\n${txt}`); showToast('📋 Микро скопированы'); } catch { showToast('❌ Не удалось скопировать'); } }} aria-label="Копировать микронутриенты" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>📋</button></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div>}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
-            <button onClick={copyDay} className="nd-copyday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(0,230,138,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>📋</span> Копировать день</button>
-            {copiedDay ? <button onClick={() => pasteDay(selectedDate)} className="nd-pasteday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(139,92,246,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>📥</span> Вставить {copiedDay.slice(5)}</button> : <button onClick={saveDayPreset} className="nd-daypreset-save" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(245,158,11,0.18)', background:'rgba(245,158,11,0.08)', color:'#f59e0b', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(245,158,11,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>💾</span> Шаблон дня</button>}
-            <button onClick={printDay} className="nd-printday" style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(59,130,246,0.18)', background:'rgba(59,130,246,0.08)', color:'#60a5fa', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6, gridColumn: copiedDay ? 'span 2' : 'auto' }}><span style={{ width:22, height:22, borderRadius:8, background:'rgba(59,130,246,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>🖨</span> Печать дня</button>
-          </div>
-          {dayPresets.length>0 && (
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              {dayPresets.slice(0,6).map((p:any,i:number)=>(
-                <button key={i} onClick={()=>loadDayPreset(p)} className="nd-daypreset" style={{ padding:'10px 14px', borderRadius:10, fontSize:12, cursor:'pointer', minHeight:44, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.15)', color:'#f59e0b' }}>📦 {p.name}</button>
-              ))}
-            </div>
-          )}
-          <DayMealsList
-            dayMeals={dayMeals}
-            onEditItem={openEdit} onDeleteItem={deleteItem}
-            onCopyMeal={copyMeal} onSavePreset={savePreset}
-            onImportFromPlan={importFromPlan} onClearDay={clearDay}
-            onFillMicros={fillDayMicros}
-            selectedDate={selectedDate} copySource={copySource}
-            onPasteMeal={pasteMeal} onCancelCopy={() => setCopySource(null)}
-          />
-
           <QualityInsights
             mealQuality={mealQuality} selectedDate={selectedDate} dayMeals={dayMeals}
             foodPatterns={foodPatterns} foodTriggers={foodTriggers}
             onSavePattern={savePatterns} onSaveTrigger={saveTriggers}
             mealMood={mealMood} onSaveMealMood={saveMealMood}
-          />
-
-          <NutritionDiaryCharts
-            dayMeals={dayMeals} dayTotals={dayTotals} targets={targets}
-            diaryData={diaryData} selectedDate={selectedDate} refreshKey={refreshKey}
           />
 
           <NutritionQualityCard
@@ -337,6 +337,15 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             })}
             weight={weight} age={age} sex={sex} goal={sex === 'male' ? 'maintain' : 'maintain'} activityLevel="moderate"
           />
+          </DiarySection>
+          {Object.keys(dayMeals).length > 0 && (
+          <DiarySection id="charts" icon="📈" title="Аналитика" sub="баланс · динамика · топ продуктов" color="#8b5cf6">
+          <NutritionDiaryCharts
+            dayMeals={dayMeals} dayTotals={dayTotals} targets={targets}
+            diaryData={diaryData} selectedDate={selectedDate} refreshKey={refreshKey}
+          />
+          </DiarySection>
+          )}
         </>
       )}
 
@@ -381,8 +390,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
       )}
       
-      {/* Export/Import actions */}
-      <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* Данные: экспорт/импорт/очистка — modern PRO (хуки nd-import/nd-wipeall сохранены для APK-CSS) */}
+      <DiarySection id="data" icon="💾" title="Данные" sub="экспорт · импорт · очистка" color="#60a5fa">
+      <div className="nd-data-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <button
           onClick={() => {
             const json = exportDiaryJSON();
@@ -393,9 +403,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             a.download = `diary_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
           }}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#00e68a', cursor: 'pointer', fontSize: 12, fontWeight: 600, minHeight: 44 }}
+          className="nd-data-btn"
+          style={{ padding: '12px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.18)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          📥 Экспорт JSON
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📥</span> Экспорт JSON
         </button>
         
         <button
@@ -408,13 +419,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             a.download = `diary_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
           }}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#60a5fa', cursor: 'pointer', fontSize: 12, fontWeight: 600, minHeight: 44 }}
+          className="nd-data-btn"
+          style={{ padding: '12px', borderRadius: 14, border: '1px solid rgba(59,130,246,0.20)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          📥 Экспорт CSV
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📥</span> Экспорт CSV
         </button>
         
-        <label className="nd-import" style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
-          📤 Импорт JSON
+        <label className="nd-import" style={{ gridColumn: 'span 2', padding: '12px', borderRadius: 14, border: '1px solid rgba(245,158,11,0.20)', background: 'rgba(245,158,11,0.06)', color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📤</span> Импорт JSON
           <input
             type="file"
             accept=".json"
@@ -439,21 +451,22 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           />
         </label>
         
+        </div>
         <button
           onClick={() => setClearDiaryConfirmOpen(true)}
           aria-label="Очистить весь дневник"
           className="nd-wipeall"
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto', minHeight: 44 }}
+          style={{ width: '100%', padding: '12px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.20)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          🗑 Очистить всё
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>🗑</span> Очистить всё
         </button>
-        
-        {process.env.NODE_ENV === 'development' && (
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 8 }}>
-            {getStorageInfo().daysStored} дн. · {getStorageInfo().estimatedSizeKB.toFixed(1)} KB
-          </span>
-        )}
-      </div>
+        <div className="nd-data-meta" style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+          {Object.keys(diaryData).length} дн. в дневнике · данные только локально
+          {process.env.NODE_ENV === 'development' && (
+            <span> · {getStorageInfo().daysStored} дн. · {getStorageInfo().estimatedSizeKB.toFixed(1)} KB</span>
+          )}
+        </div>
+      </DiarySection>
       {tab !== 'add' && (
         <button onClick={()=>setTab('add')} aria-label="Быстро добавить" className="nut-diary-fab" style={{ position:'fixed', bottom:20, right:20, width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', boxShadow:'0 6px 20px rgba(0,230,138,0.35)', fontSize:26, cursor:'pointer', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:700 }}>＋</button>
       )}

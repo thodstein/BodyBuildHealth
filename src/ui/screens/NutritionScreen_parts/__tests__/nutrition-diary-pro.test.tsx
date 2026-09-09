@@ -20,6 +20,8 @@ vi.mock('../useNutritionDiary', () => ({
 }));
 
 import { FrequentFoodsPanel } from '../diary/FrequentFoodsPanel';
+import { DiarySection } from '../diary/DiarySection';
+import { NutritionDiary } from '../NutritionDiary';
 import { useFrequentFoods } from '../useNutritionDiary';
 
 const WEEK = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13'];
@@ -228,5 +230,53 @@ describe('nutrition-diary-pro hooks', () => {
     fireEvent.keyDown(head, { key: 'Enter' });
     expect(head.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('Гречка')).toBeInTheDocument();
+  });
+
+  it('DiarySection: секция с хуком nd-sec-<id> + заголовок + счётчик', () => {
+    const { container } = render(
+      <DiarySection id="meals" icon="🍽" title="Приёмы пищи" sub="2026-09-09" color="#60a5fa" count="3 поз.">
+        <div>тело</div>
+      </DiarySection>
+    );
+    expect(container.querySelector('.nd-section')).not.toBeNull();
+    expect(container.querySelector('.nd-sec-meals')).not.toBeNull();
+    expect(container.querySelector('.nd-sec-head')).not.toBeNull();
+    expect(container.querySelector('.nd-sec-count')).not.toBeNull();
+    expect(screen.getByText('Приёмы пищи')).toBeInTheDocument();
+    expect(screen.getByText('3 поз.')).toBeInTheDocument();
+    expect(container.querySelector('.nd-sec-body')).not.toBeNull();
+  });
+
+  it('NutritionDiaryCharts: мини-гейджи жиров/углеводов + 4 спарклайна', () => {
+    const dayMeals = {
+      'Завтрак': [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
+    };
+    const diaryData = {
+      '2026-09-08': { meals: { 'Обед': [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
+      '2026-09-09': { meals: dayMeals },
+    };
+    const { container } = render(
+      <NutritionDiaryCharts dayMeals={dayMeals} dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        diaryData={diaryData} selectedDate="2026-09-09" refreshKey={0} />
+    );
+    // большие гейджи — ровно 2 (Ккал/Белки), жиры/углеводы — мини
+    expect(container.querySelectorAll('.nd-gauge')).toHaveLength(2);
+    expect(container.querySelectorAll('.nd-gauge-mini')).toHaveLength(2);
+    expect(container.querySelector('.nd-balance')).not.toBeNull();
+    expect(container.querySelector('.nd-minigauges')).not.toBeNull();
+    expect(container.querySelector('.nd-trends')).not.toBeNull();
+    expect(container.querySelectorAll('.nd-spark').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('NutritionDiary: секция Данные с экспортом/импортом/очисткой', () => {
+    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    expect(container.querySelector('.nd-sec-data')).not.toBeNull();
+    expect(container.querySelector('.nd-data-grid')).not.toBeNull();
+    expect(container.querySelector('.nd-import')).not.toBeNull();
+    expect(container.querySelector('.nd-wipeall')).not.toBeNull();
+    expect(screen.getByText(/Экспорт JSON/)).toBeInTheDocument();
+    expect(screen.getByText(/Экспорт CSV/)).toBeInTheDocument();
+    expect(screen.getByText(/Импорт JSON/)).toBeInTheDocument();
   });
 });

@@ -225,6 +225,25 @@ const MacroBalanceGauge: React.FC<{ actual: number; target: number; label: strin
   );
 };
 
+const MacroMiniGauge: React.FC<{ actual: number; target: number; label: string; color: string; unit?: string }> = ({ actual, target, label, color, unit = 'г' }) => {
+  const pct = target > 0 ? Math.min(100, Math.round(actual / target * 100)) : 0;
+  const isOk = pct >= 85 && pct <= 115;
+  const isOver = pct > 115;
+  const barColor = isOk ? color : isOver ? '#ef4444' : '#f59e0b';
+  return (
+    <div className="nd-gauge-mini" data-over={isOver} style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: barColor, fontVariantNumeric: 'tabular-nums' }}>{Math.round(actual)}<span style={{ fontSize: 8, fontWeight: 400, color: 'rgba(255,255,255,0.35)' }}>/{target}{unit}</span></span>
+      </div>
+      <div style={{ height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.07)', marginTop: 6, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 999, background: barColor, transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)' }} />
+      </div>
+      <div style={{ fontSize: 9, color: barColor, fontWeight: 700, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{pct}% от цели</div>
+    </div>
+  );
+};
+
 export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, targets, diaryData, selectedDate, refreshKey }) => {
   const hasData = Object.keys(dayMeals).length > 0;
 
@@ -249,25 +268,47 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
 
   const weeklyKcal = useMemo(() => computeWeekly(diaryData, 'kcal'), [diaryData, selectedDate, refreshKey]);
   const weeklyProtein = useMemo(() => computeWeekly(diaryData, 'p'), [diaryData, selectedDate, refreshKey]);
+  const weeklyFats = useMemo(() => computeWeekly(diaryData, 'f'), [diaryData, selectedDate, refreshKey]);
+  const weeklyCarbs = useMemo(() => computeWeekly(diaryData, 'c'), [diaryData, selectedDate, refreshKey]);
 
   if (!hasData) return null;
 
   return (
     <div className="nut-diarycharts nd-charts" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Macro distribution donut + gauge cards */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap', padding:16 }}>
-        <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={92} />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <MacroBalanceGauge actual={dayTotals.kcal} target={targets?.kcal || 2500} label="Ккал" color="#00e68a" />
-          <MacroBalanceGauge actual={dayTotals.p} target={targets?.protein || 160} label="Белки" color="#3b82f6" />
+      <div className="nd-balance" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>⚖️</span>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>Баланс дня</div>
+          <span style={{ marginLeft: 'auto', fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>факт / цель</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={92} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <MacroBalanceGauge actual={dayTotals.kcal} target={targets?.kcal || 2500} label="Ккал" color="#00e68a" />
+            <MacroBalanceGauge actual={dayTotals.p} target={targets?.protein || 160} label="Белки" color="#3b82f6" />
+          </div>
+        </div>
+        <div className="nd-minigauges" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <MacroMiniGauge actual={dayTotals.f} target={targets?.fats || 70} label="🧈 Жиры" color="#f59e0b" />
+          <MacroMiniGauge actual={dayTotals.c} target={targets?.carbs || 300} label="🍞 Углеводы" color="#a78bfa" />
         </div>
       </div>
 
       {/* Weekly trend sparklines — enhanced */}
-      <div style={{ ...cardStyle, display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap:8, padding:12 }}>
-        <Sparkline data={weeklyKcal} color="#00e68a" label="Ккал • 7 дн" unit="" />
-        <Sparkline data={weeklyProtein} color="#3b82f6" label="Белок • 7 дн" unit="г" />
-        <div className="nd-mealscount" style={{ textAlign: 'center', padding: '10px 14px', background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06))', borderRadius:12, border:'1px solid rgba(139,92,246,0.15)', minWidth:88 }}>
+      <div className="nd-trends" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📉</span>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>Динамика недели</div>
+          <span style={{ marginLeft: 'auto', fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>среднее · тренд</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <Sparkline data={weeklyKcal} color="#00e68a" label="Ккал • 7 дн" unit="" />
+          <Sparkline data={weeklyProtein} color="#3b82f6" label="Белок • 7 дн" unit="г" />
+          <Sparkline data={weeklyFats} color="#f59e0b" label="Жиры • 7 дн" unit="г" />
+          <Sparkline data={weeklyCarbs} color="#a78bfa" label="Углев • 7 дн" unit="г" />
+        </div>
+        <div className="nd-mealscount" style={{ alignSelf: 'center', textAlign: 'center', padding: '10px 18px', background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06))', borderRadius:12, border:'1px solid rgba(139,92,246,0.15)', minWidth:200 }}>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Приёмов</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: '#a78bfa', lineHeight:1, fontVariantNumeric: 'tabular-nums' }}>{Object.keys(dayMeals).length}</div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop:2 }}>за день</div>
