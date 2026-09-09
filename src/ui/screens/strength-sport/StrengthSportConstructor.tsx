@@ -108,9 +108,25 @@ export const StrengthSportConstructor: React.FC = () => {
   const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
   // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
   // через чистый parseSmBridgePayload (см. sm-bridge-intake.ts + его тест).
+  // + мост из Библиотеки (каталог циклов → kind 'ss_cycle': ставит цикл+режим+сроки).
   useEffect(() => {
     const apply = (payload: any) => {
-      if (!payload || payload.kind !== 'weakpoints' || !payload.data) return;
+      if (!payload) return;
+      if (payload.kind === 'ss_cycle') {
+        try {
+          const id = String(payload.data?.cycleId || '');
+          const tpl = id ? getSSCycleById(id) : undefined;
+          if (!tpl) { setMsg(`⚠ Цикл ${id || '—'} не найден в библиотеке`); setTimeout(()=>setMsg(''),2200); return; }
+          setCycleId(id);
+          setMode(tpl.meta.mode as any);
+          setWeeks(tpl.meta.weeks);
+          setDays(tpl.meta.sessionsPerWeek);
+          setStep('split');
+          setMsg(`↩ Цикл из библиотеки: ${tpl.meta.title}`); setTimeout(()=>setMsg(''),2600);
+        } catch {}
+        return;
+      }
+      if (payload.kind !== 'weakpoints' || !payload.data) return;
       const p = parseSmBridgePayload(payload.data);
       // Contest packet from SM hub
       if (p.contest) {

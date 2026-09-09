@@ -118,7 +118,7 @@ const ExerciseLabCatalog: React.FC<{
           const equipIcon = EQUIP_ICON[ex.equipment] || '📦';
           const bio = getExerciseBio(ex.id);
           return (
-            <div key={ex.id} className="lib-excard" onClick={() => setSelectedId(isSelected ? null : ex.id)} style={{
+            <div key={ex.id} className="lib-excard" data-sel={isSelected ? 'true' : 'false'} onClick={() => setSelectedId(isSelected ? null : ex.id)} style={{
               padding: '8px 10px', borderRadius: 12, cursor: 'pointer',
               background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'rgba(255,255,255,0.04)',
               border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)',

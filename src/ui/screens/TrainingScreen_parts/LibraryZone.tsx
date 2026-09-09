@@ -40,7 +40,7 @@ interface Props {
 
 export const LibraryZone: React.FC<Props> = (p) => {
   const TITLE_MAP: Record<string, { icon:string; title:string; accent:string; desc:string }> = {
-    library: { icon:'📖', title:'Каталог циклов', accent:'#f59e0b', desc:'Готовые циклы ПЛ и ББ с фильтрами и раскладкой' },
+    library: { icon:'📖', title:'Каталог циклов', accent:'#f59e0b', desc:'Готовые циклы ПЛ, ББ, арм и ТА/стронг с фильтрами и раскладкой' },
     programs: { icon:'📚', title:'Программы', accent:'#8b5cf6', desc:'Полные программы по неделям и дням' },
     mytraining: { icon:'⭐', title:'Мои тренировки', accent:'#f59e0b', desc:'Пользовательские упражнения, планы и циклы + прогресс' },
     methods: { icon:'🧠', title:'Методики', accent:'#a855f7', desc:'Техники интенсификации и периодизации' },

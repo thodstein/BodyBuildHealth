@@ -183,7 +183,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
       {/* Табы */}
       <div className="lib-seg" style={{ display: 'flex', gap: 6 }}>
         {([{ id: 'bb', label: `💪 ББ (${filteredBB.length})` }, { id: 'pl', label: `🏆 ПЛ (${filteredPL.length})` }] as const).map(t => (
-          <button key={t.id} onClick={() => { setTab(t.id as Tab); setExpandedId(null); }} style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: tab === t.id ? 800 : 600, cursor: 'pointer', border: tab === t.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : '#fff' }}>{t.label}</button>
+          <button key={t.id} data-active={tab === t.id ? 'true' : 'false'} aria-pressed={tab === t.id} onClick={() => { setTab(t.id as Tab); setExpandedId(null); }} style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: tab === t.id ? 800 : 600, cursor: 'pointer', border: tab === t.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : '#fff' }}>{t.label}</button>
         ))}
       </div>
 

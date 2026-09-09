@@ -20,11 +20,13 @@
  *  - cardio    : { cycleId?, cycle? } — подключить CardioCycle к силовому плану (ссылка, не копия)
  *  - annual_block: { blockKey, program? } — блок годового плана: загрузить в редактор;
  *                  при сохранении программы изменения возвращаются в блок (he_annual_block_pending)
+ *  - arm_cycle: { cycleId } — именной цикл арм-библиотеки → ArmAutoConstructor (ставит cycId)
+ *  - ss_cycle  : { cycleId } — интернет-цикл ТА/стронга → StrengthSportConstructor (ставит cycleId+режим)
  */
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -57,6 +59,10 @@ export interface MacrocyclePayload { macro: unknown; level?: string; goal?: stri
 export interface CardioPayload { cycleId?: string; cycle?: unknown }
 export interface BBNutritionPayload { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string; label?: string }
 export interface AnnualBlockPayload { blockKey: string; program?: unknown }
+/** Именной арм-цикл из каталога библиотеки → конструктор армрестлинга/армлифтинга. */
+export interface ArmCyclePayload { cycleId: string }
+/** Интернет-цикл ТА/стронга из каталога библиотеки → конструктор ТА/стронга. */
+export interface SSCyclePayload { cycleId: string }
 
 /** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения + категорийные протоколы.
  *  key = `${lift}|${category}|${optionId}`. Протокол — из опции (не из раскладки цикла). */
@@ -67,7 +73,7 @@ export interface LimiterPayload {
   limiterDayMap?: Record<string, number[]>;
 }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -90,6 +96,8 @@ export interface PlannerApplyDataByKind {
   annual_block: AnnualBlockPayload;
   limiter: LimiterPayload;
   bb_nutrition: BBNutritionPayload;
+  arm_cycle: ArmCyclePayload;
+  ss_cycle: SSCyclePayload;
 }
 
 export type PlannerSource = 'pl-auto' | 'bb-auto' | 'intellectual' | 'manual' | string;

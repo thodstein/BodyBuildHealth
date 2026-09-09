@@ -8789,3 +8789,580 @@ html.app-native .diary-card-add:focus-visible {
     transform: none !important;
   }
 }
+
+/* 87. TRAINING LIBRARY PRO-2 — арм + ТА/стронг в каталоге циклов.
+ * Только APK (html.app-native). TG/web — байт-в-байт.
+ * Хуки: .lib-arm-group/.lib-strong-group (заголовки разделов),
+ * .lib-cat-arm/.lib-cat-strong (группы карточек), .lib-phase-strip
+ * (фазовая карта арм-цикла), .lib-ss-layout (раскладка SS-цикла),
+ * .lib-equip-badge (бейдж спец-снарядов), .lib-arm-note (подсказка моста).
+ * Стекло 18px, чипы 44px, press 0.98, focus-visible лайм, tabular-цифры,
+ * ленты со snap на 360, reduced-motion. */
+
+/* Заголовки новых разделов: кромка по дисциплине, цифры табличные. */
+html.app-native .train-library .lib-arm-group {
+  border-left: 3px solid rgba(245, 158, 11, 0.55) !important;
+  border-radius: 0 12px 12px 0 !important;
+  padding-left: 10px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-strong-group {
+  border-left: 3px solid rgba(56, 189, 248, 0.55) !important;
+  border-radius: 0 12px 12px 0 !important;
+  padding-left: 10px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Сегмент из 5 кнопок: лента со snap, кнопки 48px. */
+html.app-native .train-library .lib-seg {
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native .train-library .lib-seg button {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-seg button:active {
+  transform: scale(0.97) !important;
+}
+
+/* Чипы фильтров: тач 44px, press. */
+html.app-native .train-library .lib-chip {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-chip:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .train-library .lib-chip:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Фазовая карта арм-цикла: ячейки читаемые, цифры табличные. */
+html.app-native .train-library .lib-phase-strip {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Раскладка SS: кнопки недель 44px, press. */
+html.app-native .train-library .lib-ss-layout button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-ss-layout button:active {
+  transform: scale(0.96) !important;
+}
+
+/* Бейдж спец-снарядов и подсказка моста: читаемые 11-12px. */
+html.app-native .train-library .lib-equip-badge {
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+html.app-native .train-library .lib-arm-note {
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+/* Узкий телефон 360px: сегмент — лента, чипы не сжимаются. */
+@media (max-width: 380px) {
+  html.app-native .train-library .lib-seg {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+  }
+  html.app-native .train-library .lib-seg button {
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-seg button:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-chip:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-ss-layout button:active {
+    transform: none !important;
+  }
+}
+
+/* 88. TRAINING LIBRARY PRO-MAX — визуал библиотеки уровня топ-приложения.
+ * Только APK (html.app-native). TG/web — байт-в-байт.
+ * Хуки: .lib-hero (иконка/заголовок/бейдж), .lib-seg button[data-active]
+ * (сегменты каталога и галереи), .pl-expandcard в .train-library (карточки
+ * циклов), button[data-fav] (звёзды избранного), .lib-group (пилюля-счётчик),
+ * .lib-rec (CTA-переключатель), .lib-card (карточки программ), .lib-method
+ * (CTA применения), .lib-excard (строки каталога упражнений).
+ * Стекло 18-20px, верхние акцент-кромки, актив-glow, press 0.97-0.98,
+ * focus-visible лайм, tabular-цифры, 380px, reduced-motion. */
+
+/* Hero: светящаяся иконка, крупный заголовок, табличный бейдж. */
+html.app-native .train-library .lib-hero > div:first-child > span:first-child {
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.35) !important;
+}
+html.app-native .train-library .lib-hero > div:first-child > div > div:first-child {
+  font-size: 14px !important;
+  letter-spacing: 0.2px !important;
+}
+html.app-native .train-library .lib-hero > div:first-child > div > div:last-child {
+  line-height: 1.5 !important;
+}
+html.app-native .train-library .lib-hero > span {
+  font-variant-numeric: tabular-nums !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+
+/* Сегменты: активный — градиент с glow, неактивный — press. */
+html.app-native .train-library .lib-seg button[data-active='true'] {
+  background: linear-gradient(135deg, var(--accent), rgba(var(--accent-rgb), 0.55)) !important;
+  color: #06130d !important;
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.35) !important;
+}
+html.app-native .train-library .lib-seg button[data-active='false']:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .lib-manlib .lib-seg button[data-active='true'] {
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .lib-manlib .lib-seg button[data-active='false']:active {
+  transform: scale(0.96) !important;
+}
+
+/* Карточки циклов: стекло 18px с верхней кромкой, заголовок 14px. */
+html.app-native .train-library .pl-expandcard {
+  border-radius: 18px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+html.app-native .train-library .pl-expandcard > div:first-child:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .train-library .pl-expandcard > div:first-child > div:first-child {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.35 !important;
+}
+html.app-native .train-library .pl-expandcard > div:first-child > span {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Звёзды избранного: тач 44px, активная светится. */
+html.app-native .train-library button[data-fav] {
+  border-radius: 12px !important;
+}
+html.app-native .train-library button[data-fav]:active {
+  transform: scale(0.88) !important;
+}
+html.app-native .train-library button[data-fav='true'] {
+  filter: none !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 12px rgba(250, 204, 21, 0.8) !important;
+}
+
+/* Заголовки групп: счётчик-пилюля с glow. */
+html.app-native .train-library .lib-group > div:first-child > span:last-child {
+  background: rgba(var(--accent-rgb), 0.14) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.3) !important;
+  color: var(--accent) !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Блок рекомендаций: переключатель — градиентный CTA 48px. */
+html.app-native .train-library .lib-rec > button {
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.08)) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.18) !important;
+}
+html.app-native .train-library .lib-rec > button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Программы: верхняя кромка, заголовок 15px, бейдж-пилюля, мета tabular. */
+html.app-native .train-library .lib-card {
+  border-top: 2px solid rgba(var(--accent-rgb), 0.4) !important;
+}
+html.app-native .train-library .lib-card > div:first-child > div:first-child {
+  font-size: 15px !important;
+  line-height: 1.35 !important;
+}
+html.app-native .train-library .lib-card > div:first-child > span {
+  font-variant-numeric: tabular-nums !important;
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.2) !important;
+  white-space: nowrap !important;
+}
+html.app-native .train-library .lib-card > div:last-child {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Методики: заголовок 13px, текст 11px/1.6, CTA на всю ширину 48px. */
+html.app-native .train-library .lib-method > div:first-child {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+html.app-native .train-library .lib-method > div {
+  line-height: 1.6 !important;
+}
+html.app-native .train-library .lib-method button {
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+html.app-native .train-library .lib-method button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Каталог упражнений: иконка 40px, название 13px, чипы tabular. */
+html.app-native .train-library .lib-excard > div:first-child > div:first-child {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+}
+html.app-native .train-library .lib-excard > div:first-child > div:nth-child(2) > div:first-child {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+html.app-native .train-library .lib-excard > div:first-child > div:nth-child(2) > div:last-child {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-excard[data-sel='true'] {
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.2) !important;
+}
+
+/* Focus новых хуков. */
+html.app-native .train-library .lib-seg button[data-active]:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-library button[data-fav]:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-library .lib-rec > button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-library .lib-method button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .lib-manlib .lib-seg button[data-active]:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Узкий телефон 380px: бейдж hero прячем, шеврон компактнее. */
+@media (max-width: 380px) {
+  html.app-native .train-library .lib-hero > span {
+    display: none !important;
+  }
+  html.app-native .train-library .pl-expandcard > div:first-child > span {
+    padding: 4px 8px !important;
+    min-height: 28px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-seg button[data-active='false']:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library button[data-fav]:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .pl-expandcard > div:first-child:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-rec > button:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-method button:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .lib-manlib .lib-seg button[data-active='false']:active {
+    transform: none !important;
+  }
+}
+
+/* Мост «Библиотека → конструктор»: CTA-кнопка применения цикла 48px. */
+html.app-native .train-library .lib-apply {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.3) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-apply:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .train-library .lib-apply:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-apply:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 89. TRAINING PLANNING PRO — выбор конструктора уровня топ-приложения ───
+ * Окно «Тренировки → Планирование» + верх окна конструктора (шаг 2/3 → 3/3).
+ * Хуки: .training-planning (.tp-head/.tp-back/.tp-title/.tp-sub/.tp-step/
+ * .tp-body/.tp-hint/.tp-hint-icon/.tp-hint-text/.tp-hint-count/.tp-grid/
+ * .tp-card[data-active + data-track]/.tp-topglow/.tp-row/.tp-icon/.tp-ttitle/
+ * .tp-meta/.tp-badge/.tp-desc/.tp-openrow/.tp-openlabel/.tp-chev/.tp-foot/
+ * .tp-dot), .training-constructor (.tp-cbar/.tp-cback/.tp-cstep/.tp-cclose).
+ * Шапка липкая со стеклом, кнопки 44px, карточки-стекло 18-20px с верхней
+ * кромкой и glow выбранной, иконки 48px, цифры tabular, press 0.98,
+ * focus-visible лайм, сетка в 1 колонку на 380px, reduced-motion.
+ * Только APK: TG/web — как было. */
+html.app-native .training-planning .tp-body {
+  gap: 12px !important;
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+}
+html.app-native .training-planning .tp-head {
+  min-height: 56px !important;
+  padding: 10px 12px !important;
+  background: rgba(9, 18, 34, 0.82) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+html.app-native .training-planning .tp-back {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+}
+html.app-native .training-planning .tp-back:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .training-planning .tp-title {
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+}
+html.app-native .training-planning .tp-title-icon {
+  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.5)) !important;
+}
+html.app-native .training-planning .tp-sub {
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-planning .tp-step {
+  min-height: 32px !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: 0.3px !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.22) !important;
+  white-space: nowrap !important;
+}
+html.app-native .training-planning .tp-hint {
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  min-height: 48px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.6), rgba(12, 23, 40, 0.6)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35) !important;
+}
+html.app-native .training-planning .tp-hint-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.28) !important;
+}
+html.app-native .training-planning .tp-hint-text {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .training-planning .tp-hint-count {
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+html.app-native .training-planning .tp-grid {
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+html.app-native .training-planning .tp-card {
+  border-radius: 20px !important;
+  padding: 14px 14px 12px !important;
+  min-height: 120px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+html.app-native .training-planning .tp-card:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .training-planning .tp-card[data-active='true'] {
+  border-color: rgba(var(--accent-rgb), 0.45) !important;
+  box-shadow: 0 10px 30px rgba(var(--accent-rgb), 0.2) !important;
+}
+html.app-native .training-planning .tp-card[data-active='false']:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .training-planning .tp-icon {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+}
+html.app-native .training-planning .tp-card[data-active='true'] .tp-icon {
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.45) !important;
+}
+html.app-native .training-planning .tp-ttitle {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+html.app-native .training-planning .tp-meta {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-planning .tp-badge {
+  font-variant-numeric: tabular-nums !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.25) !important;
+}
+html.app-native .training-planning .tp-desc {
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+html.app-native .training-planning .tp-openlabel {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-planning .tp-chev {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-planning .tp-card:active .tp-chev {
+  transform: scale(0.92) !important;
+}
+html.app-native .training-planning .tp-foot {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .training-planning .tp-dot {
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4) !important;
+}
+html.app-native .training-constructor .tp-cbar {
+  min-height: 56px !important;
+  padding: 8px 10px !important;
+  background: rgba(9, 18, 34, 0.82) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+}
+html.app-native .training-constructor .tp-cback {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+html.app-native .training-constructor .tp-cback:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .training-constructor .tp-cstep {
+  font-variant-numeric: tabular-nums !important;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.22) !important;
+}
+html.app-native .training-constructor .tp-cclose {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+html.app-native .training-constructor .tp-cclose:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .training-planning .tp-back:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .training-planning .tp-card:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .training-constructor .tp-cback:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .training-constructor .tp-cclose:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .training-planning .tp-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-planning .tp-hint-count {
+    display: none !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-planning .tp-chev {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-planning .tp-card:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-planning .tp-card[data-active='false']:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-planning .tp-back:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-planning .tp-card:active .tp-chev {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-constructor .tp-cback:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-constructor .tp-cclose:active {
+    transform: none !important;
+  }
+}

@@ -191,9 +191,22 @@ export function ArmAutoConstructor() {
   }, [linked, workMaxEdit]);
 
   // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор) — PRO MAX v3 (12 мёртвых точек)
+  // + мост из Библиотеки (каталог циклов → kind 'arm_cycle': ставит именной цикл)
   useEffect(() => {
     const apply = (payload: any) => {
-      if (!payload || payload.kind !== 'weakpoints') return;
+      if (!payload) return;
+      if (payload.kind === 'arm_cycle') {
+        try {
+          const id = String(payload.data?.cycleId || '');
+          const found = ARM_CYCLE_LIBRARY.find((c) => c.id === id);
+          if (!found) { flash(`⚠ Цикл ${id || '—'} не найден в библиотеке`); return; }
+          setCycId(id);
+          setStep('params');
+          flash(`↩ Именной цикл из библиотеки: ${found.name}`);
+        } catch {}
+        return;
+      }
+      if (payload.kind !== 'weakpoints') return;
       const groups: string[] | undefined = payload.data?.groups;
       const wp: string[] | undefined = payload.data?.armWeakPoints;
       let appliedWeak: string[] | null = null;
