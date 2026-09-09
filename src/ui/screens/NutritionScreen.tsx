@@ -350,7 +350,7 @@ const CatalogTab: React.FC = () => {
     <div style={{ ...modernCardBg, padding:12 }}>
       <ModernSearch value={catSearch} onChange={setCatSearch} placeholder="Поиск по названию, описанию, категории…" />
       <div style={{ marginTop:10 }}>
-        <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:6 }}>Категории</div>
+        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:6 }}>Категории</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           <ModernPill active={catFilter==='all' && !showExclusive} onClick={() => { setShowExclusive(false); setCatFilter('all'); }}>{`Все (${allFoods.length})`}</ModernPill>
           {categories.map(c => {
@@ -375,17 +375,17 @@ const CatalogTab: React.FC = () => {
         const bbScore = (f as any).bb_quality_score;
         const scoreCol = bbScore ? (bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f59e0b' : '#ef4444') : 'rgba(255,255,255,0.2)';
         return (
-          <div key={f.id} style={{ padding:12, borderRadius:16, background:'#202023', border: isExpanded ? '1px solid rgba(0,230,138,0.14)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+          <div key={f.id} style={{ padding:12, borderRadius:16, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border: isExpanded ? '1px solid rgba(0,230,138,0.14)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
               <div style={{ flex:1 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   <span style={{ width:26, height:26, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>{f.category==='protein'?'🥩':f.category==='dairy'?'🥛':f.category==='grain'?'🌾':f.category==='carb'?'🥔':f.category==='veg_fruit'?'🥦':f.category==='fat'?'🧈':f.category==='supplement'?'💊':'📦'}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
-                  {bbScore !== undefined && <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background: scoreCol+'14', color: scoreCol, border:`1px solid ${scoreCol}30` }}>{bbScore.toFixed(1)}</span>}
+                  <span style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
+                  {bbScore !== undefined && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:999, background: scoreCol+'14', color: scoreCol, border:`1px solid ${scoreCol}30` }}>{bbScore.toFixed(1)}</span>}
                 </div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3, letterSpacing:0.2, textTransform:'uppercase' }}>{CATEGORY_LABELS[f.category] || f.category} • {f.servingSize || '100г'}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:3, letterSpacing:0.2, textTransform:'uppercase' }}>{CATEGORY_LABELS[f.category] || f.category} • {f.servingSize || '100г'}</div>
               </div>
-              <button onClick={() => toggleExpanded(f.id)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.04)', color: isExpanded ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:10 }}>{isExpanded ? '▲' : '▼'}</button>
+              <button onClick={() => toggleExpanded(f.id)} aria-label={isExpanded ? 'Свернуть детали' : 'Развернуть детали'} title={isExpanded ? 'Свернуть' : 'Подробнее'} style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.04)', color: isExpanded ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</button>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
               {[
@@ -395,14 +395,14 @@ const CatalogTab: React.FC = () => {
                 {l:'У',v:f.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
               ].map(b => (
                 <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
-                  <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
-                  <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:b.col }}>{b.v}</div>
                 </div>
               ))}
             </div>
             <div style={{ display:'flex', gap:6 }}>
-              <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
-              <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>🛒 В корзину</button>
+              <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ flex:1, padding:'12px 8px', borderRadius:12, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>⭐ В избранное</button>
+              <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ flex:1, padding:'12px 8px', borderRadius:12, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>🛒 В корзину</button>
             </div>
             {isExpanded && (() => {
               const m = (f as any).macro_100g || {};
@@ -415,12 +415,12 @@ const CatalogTab: React.FC = () => {
               const mf = (f as any).metabolic_flags || {};
               const sc = (f as any).specific_compounds_100g || {};
               const row = (items: any[], color='rgba(255,255,255,0.7)') => (
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4, fontSize:8, color }}>{items.filter(Boolean).map((it:any,i:number)=><span key={i}>{typeof it==='string'?it:it}</span>)}</div>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4, fontSize:10, color }}>{items.filter(Boolean).map((it:any,i:number)=><span key={i}>{typeof it==='string'?it:it}</span>)}</div>
               );
               return (
                 <div style={{ padding:10, borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.04)', display:'flex', flexDirection:'column', gap:6 }}>
                   {f.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.4 }}>{f.description}</div>}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
                     <span>⏱ ГИ: {f.gi ?? '—'} | ИИ: {m.insulin_index ?? '—'}</span>
                     <span>⚡ Клетчатка: {f.fiber ?? '—'}г</span>
                     {m.proteins_animal !== undefined && <span>🥩 Жив.белок: {m.proteins_animal}г</span>}
@@ -433,8 +433,8 @@ const CatalogTab: React.FC = () => {
                   {el.sodium_mg !== undefined && row([<span key="a" style={{color:'#60a5fa'}}>⚡ Эл:</span>, <span key="b">Na {el.sodium_mg}мг</span>, el.potassium_mg!==undefined && <span key="c">• K {el.potassium_mg}мг</span>, el.magnesium_mg!==undefined && <span key="d">• Mg {el.magnesium_mg}мг</span>], '#60a5fa')}
                   {vit.vitamin_a_mcg !== undefined && row([<span key="a" style={{color:'#f97316'}}>💊 Вит:</span>, <span key="b">A {vit.vitamin_a_mcg}мкг</span>, vit.vitamin_c_mg!==undefined && <span key="c">• C {vit.vitamin_c_mg}мг</span>, vit.vitamin_d_mcg!==undefined && <span key="d">• D {vit.vitamin_d_mcg}мкг</span>], '#f97316')}
                   {tr.iron_total_mg !== undefined && row([<span key="a" style={{color:'#22c55e'}}>⚙️ Микро:</span>, <span key="b">Fe {tr.iron_total_mg}мг</span>, tr.zinc_mg!==undefined && <span key="c">• Zn {tr.zinc_mg}мг</span>, tr.selenium_mcg!==undefined && <span key="d">• Se {tr.selenium_mcg}мкг</span>], '#22c55e')}
-                  {bio.creatine_mg !== undefined && <div style={{ fontSize:7, color:'#a78bfa' }}>🧪 креатин {bio.creatine_mg}мг {bio.beta_alanine_mg!==undefined?`• β-ала {bio.beta_alanine_mg}мг`:''} {bio.taurine_mg!==undefined?`• тау {bio.taurine_mg}мг`:''}</div>}
-                  {(gt.fodmap_group || mf.atherogenic_potential) && <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', display:'flex', gap:6, flexWrap:'wrap' }}>{gt.fodmap_group && <span>FODMAP {gt.fodmap_group}</span>}{mf.atherogenic_potential==='HIGH' && <span style={{color:'#ef4444'}}>🚨 Атероген</span>}{mf.anabolic_potential==='HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>}</div>}
+                  {bio.creatine_mg !== undefined && <div style={{ fontSize:9, color:'#a78bfa' }}>🧪 креатин {bio.creatine_mg}мг {bio.beta_alanine_mg!==undefined?`• β-ала {bio.beta_alanine_mg}мг`:''} {bio.taurine_mg!==undefined?`• тау {bio.taurine_mg}мг`:''}</div>}
+                  {(gt.fodmap_group || mf.atherogenic_potential) && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', display:'flex', gap:6, flexWrap:'wrap' }}>{gt.fodmap_group && <span>FODMAP {gt.fodmap_group}</span>}{mf.atherogenic_potential==='HIGH' && <span style={{color:'#ef4444'}}>🚨 Атероген</span>}{mf.anabolic_potential==='HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>}</div>}
                 </div>
               );
             })()}
@@ -450,14 +450,14 @@ const CatalogTab: React.FC = () => {
           {catInternet.map(f => {
             const isExpanded = catExpanded === f.id;
             return (
-              <div key={f.id} style={{ padding:12, borderRadius:16, background:'#202023', border: isExpanded ? '1px solid rgba(59,130,246,0.18)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+              <div key={f.id} style={{ padding:12, borderRadius:16, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border: isExpanded ? '1px solid rgba(59,130,246,0.18)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
                   <div style={{ flex:1 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ width:26, height:26, borderRadius:8, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>🌐</span>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
                     </div>
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{f.brand || 'Интернет'} • {f.servingSize || '100г'}</div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{f.brand || 'Интернет'} • {f.servingSize || '100г'}</div>
                   </div>
                   <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.12)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.18)' }}>RF</span>
                 </div>
@@ -469,14 +469,14 @@ const CatalogTab: React.FC = () => {
                     {l:'У',v:f.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
                   ].map(b => (
                     <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
-                      <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                      <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:b.col }}>{b.v}</div>
                     </div>
                   ))}
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
-                  <button onClick={() => addFav(f)} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(59,130,246,0.18)', background:'rgba(59,130,246,0.08)', color:'#60a5fa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
-                  <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category } as any)} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>🛒 В корзину</button>
+                  <button onClick={() => addFav(f)} style={{ flex:1, padding:'12px 8px', borderRadius:12, border:'1px solid rgba(59,130,246,0.18)', background:'rgba(59,130,246,0.08)', color:'#60a5fa', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>⭐ В избранное</button>
+                  <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category } as any)} style={{ flex:1, padding:'12px 8px', borderRadius:12, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>🛒 В корзину</button>
                 </div>
               </div>
             );
@@ -492,14 +492,14 @@ const CatalogTab: React.FC = () => {
           {catRetail.map(p => {
             const meta = RETAIL_CHAINS[p.source];
             return (
-              <div key={`${p.source}-${p.id}`} style={{ padding:12, borderRadius:16, background:'#202023', border:'1px solid rgba(0,230,138,0.10)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+              <div key={`${p.source}-${p.id}`} style={{ padding:12, borderRadius:16, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(0,230,138,0.10)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:999, background:`${meta.color}1c`, color:meta.color, border:`1px solid ${meta.color}35`, whiteSpace:'nowrap' }}>{meta.emoji} {meta.label}</span>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{p.name}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{p.name}</span>
                     </div>
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{[p.brand, p.weight].filter(Boolean).join(' • ') || meta.label} • на 100 г</div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{[p.brand, p.weight].filter(Boolean).join(' • ') || meta.label} • на 100 г</div>
                   </div>
                   <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>🏪</span>
                 </div>
@@ -511,12 +511,12 @@ const CatalogTab: React.FC = () => {
                     {l:'У',v:p.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
                   ].map(b => (
                     <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
-                      <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                      <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:b.col }}>{b.v}</div>
                     </div>
                   ))}
                 </div>
-                <button onClick={() => addFav({ id: `retail:${p.source}:${p.id}`, name: p.name, kcal: p.kcal, protein: p.protein, fat: p.fat, carbs: p.carbs })} style={{ width:'100%', padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
+                <button onClick={() => addFav({ id: `retail:${p.source}:${p.id}`, name: p.name, kcal: p.kcal, protein: p.protein, fat: p.fat, carbs: p.carbs })} style={{ width:'100%', padding:'12px 8px', borderRadius:12, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>⭐ В избранное</button>
               </div>
             );
           })}
