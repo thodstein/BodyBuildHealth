@@ -12274,3 +12274,93 @@ html.app-native .manual-constructor .editor-empty-exercises button {
     transform: none !important;
   }
 }
+
+/* ─── 105. MANUAL HEADER/FILTERS PRO — тоглы шапки, фильтры, заполнение ───
+ * Хуки: .editor-head-toggle, .editor-quick-filter-bar (input + button),
+ * .editor-fill-empty.
+ * Тоглы и кнопки заполнения 44px, фильтры 44px/16px без iOS-зума,
+ * press 0.97-0.98, focus-visible лайм, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Тоглы шапки (подсказка/доска/карта): 44px + press/focus ── */
+html.app-native .manual-constructor .editor-head-toggle {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+html.app-native .manual-constructor .editor-head-toggle:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-head-toggle:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Быстрые фильтры упражнений: 44px/16px, кнопка ✕ 44px ── */
+html.app-native .manual-constructor .editor-quick-filter-bar input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-quick-filter-bar button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-quick-filter-bar button:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .manual-constructor .editor-quick-filter-bar button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── «Заполнить пустые»: CTA 48px с glow ── */
+html.app-native .manual-constructor .editor-fill-empty {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.22) !important;
+}
+
+html.app-native .manual-constructor .editor-fill-empty:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-fill-empty:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-quick-filter-bar {
+    flex-wrap: wrap !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-head-toggle:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-quick-filter-bar button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-fill-empty:active {
+    transform: none !important;
+  }
+}

@@ -355,7 +355,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: howCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #60a5fa' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', flex: 1 }}>Как собрать программу</div>
-          <button aria-expanded={!howCollapsed} aria-label={howCollapsed ? 'Показать подсказку' : 'Скрыть подсказку'} onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
+          <button className="editor-head-toggle" aria-expanded={!howCollapsed} aria-label={howCollapsed ? 'Показать подсказку' : 'Скрыть подсказку'} onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
         </div>
         {!howCollapsed && (
           <>
@@ -370,7 +370,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</span>
         <span style={{ fontSize: 10, color: DIM }}>{body.weeks.length > 0 ? '— редактируйте расписание и упражнения ниже' : '— добавьте первую неделю'}</span>
         {body.weeks.length > 0 && (
-          <button aria-pressed={boardMode} aria-label={boardMode ? 'Переключить в список' : 'Переключить в доску'} onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_BOARD_MODE, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
+          <button className="editor-head-toggle" aria-pressed={boardMode} aria-label={boardMode ? 'Переключить в список' : 'Переключить в доску'} onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_BOARD_MODE, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
             {boardMode ? '📋 Список' : '🗂 Доска'}
           </button>
         )}
@@ -421,7 +421,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         <div style={{ ...CARD, padding: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>🗺 Тепловая карта объёма</span>
           <span style={{ fontSize: 10, color: DIM }}>Live по неделям · MEV/MAV/MRV</span>
-          <button onClick={() => setShowHeatmap(v => !v)} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: showHeatmap ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.12)', color: showHeatmap ? '#00e68a' : DIM }}>{showHeatmap ? 'Скрыть' : 'Показать'}</button>
+          <button className="editor-head-toggle" onClick={() => setShowHeatmap(v => !v)} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: showHeatmap ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.12)', color: showHeatmap ? '#00e68a' : DIM }}>{showHeatmap ? 'Скрыть' : 'Показать'}</button>
         </div>
       )}
       {showHeatmap && body.weeks.length > 1 && (() => {
@@ -564,7 +564,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>⚡ Пустые тренировки — 1 клик до качества</span>
             <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Добавит по 2 базовых упражнения в каждый пустой день (по фокусу, с учётом уровня/оборудования/весов)</span>
-            <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 36, marginLeft: 'auto' }} onClick={fillEmpty}>⚡ Заполнить пустые</button>
+            <button className="editor-fill-empty" style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 36, marginLeft: 'auto' }} onClick={fillEmpty}>⚡ Заполнить пустые</button>
           </div>
         );
       })()}
@@ -1233,7 +1233,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           </div>
           {quickGroup && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', alignItems: 'stretch' }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div className="editor-quick-filter-bar" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{GROUP_RU[quickGroup] ?? quickGroup}</span>
                 {(() => { try { const p=loadTrainingProfile(); return <span style={{ fontSize: 10, color: DIM }}>{(p.equipment?.length ?? 0)>0 ? `· зал: ${(p.equipment as string[]).slice(0,3).join(', ')}` : '· зал: весь'} · {(p.weakPoints?.length ?? 0)>0 ? `слабые: ${(p.weakPoints as string[]).slice(0,2).map((w:string)=>GROUP_RU[w]??w).join(', ')}` : 'слабых нет'}</span>; } catch { return null; }})()}
                 <input value={quickSearch} onChange={e => setQuickSearch(e.target.value)} placeholder="🔍 Фильтр по названию…" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 11, minHeight: 32 }} />
@@ -1308,7 +1308,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           </div>
           {quickGroup && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div className="editor-quick-filter-bar" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{GROUP_RU[quickGroup] ?? quickGroup}</span>
                 <input value={quickSearch} onChange={e => setQuickSearch(e.target.value)} placeholder="🔍 Фильтр…" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '5px 8px', color: '#fff', fontSize: 10, minHeight: 30 }} />
                 <button onClick={() => { setQuickGroup(null); setQuickSearch(''); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'rgba(255,255,255,0.06)', color: DIM, cursor: 'pointer' }}>✕</button>
@@ -2037,7 +2037,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: 'rgba(167,139,250,0.06)', borderRadius: 8, padding: '6px 8px', border: '1px dashed rgba(167,139,250,0.3)' }}>
               <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>⚡ Пустые дни — 1 клик</span>
               <span style={{ fontSize: 10, color: DIM, flex: '1 1 180px' }}>Заполнит каждый пустой день базовым шаблоном (Присед/Жим/Тяга)</span>
-              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff' }} onClick={fillEmptyPL}>⚡ Заполнить пустые</button>
+              <button className="editor-fill-empty" style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff' }} onClick={fillEmptyPL}>⚡ Заполнить пустые</button>
             </div>
           );
         })()}
