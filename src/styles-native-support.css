@@ -1003,3 +1003,101 @@ html.app-native .train-sup.sup-apk .sup-interact button:focus-visible {
     transform: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §17. INFO ROUND-5 — сравнение биоформ + дневник/жалобы/комплаенс.
+ * Сравнение: таблица 7px и кнопка «Убрать» 1px нечитаемы; дневник:
+ * переключатель темы 36px ниже тапа, пилюли табов мелкие. Только
+ * native (каждый селектор — с html.app-native, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 17.1. СРАВНЕНИЕ БИОФОРМ: шрифты и кнопка ───────────────────── */
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 7'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+}
+
+/* 3-колоночное сравнение → 1 колонка на узком экране */
+@media (max-width: 380px) {
+  html.app-native .train-sup.sup-apk .sup-bio [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── 17.2. ДЕТАЛЬ ВЕЩЕСТВА: назад + таблицы форм ────────────────── */
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 8'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── 17.3. ДНЕВНИК: пилюли 48px + тема 48px + карточки ──────────── */
+html.app-native .train-sup.sup-apk .sup-diary .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary > div:first-child button {
+  min-height: 48px !important;
+  min-width: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary {
+  font-variant-numeric: tabular-nums !important;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* ─── 17.4. ЖАЛОБЫ + КОМПЛАЕНС ──────────────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-complaints button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-compliance button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-diary button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── 17.5. REDUCED MOTION ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk .sup-diary button:active {
+    transform: none !important;
+  }
+}
