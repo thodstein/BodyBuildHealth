@@ -110,8 +110,8 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       </div>
 
       {/* Кардио */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: `1px solid ${colors.dangerDim}` }}>
-        <GroupHeader icon={<NativeIcon name="heart" size={14} />} title="Кардио" color={colors.danger} style={{ marginBottom: 10 }} />
+      <div style={{ marginBottom: 14, padding: 13, borderRadius: 16, background: 'linear-gradient(180deg, rgba(239,68,68,0.10), rgba(239,68,68,0.03))', border: '1px solid rgba(239,68,68,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <GroupHeader icon={<NativeIcon name="heart" size={14} />} title="Кардио" color={colors.danger} style={{ marginBottom: 11 }} />
         <FieldRow cols={3}>
           <PopupValueEditor
             label="Стадия АД"
@@ -180,8 +180,8 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       </div>
 
       {/* Неврология */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
-        <GroupHeader icon={<NativeIcon name="zap" size={14} />} title="Неврология" color={colors.purple} style={{ marginBottom: 10 }} />
+      <div style={{ marginBottom: 14, padding: 13, borderRadius: 16, background: 'linear-gradient(180deg, rgba(139,92,246,0.10), rgba(139,92,246,0.03))', border: '1px solid rgba(139,92,246,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <GroupHeader icon={<NativeIcon name="zap" size={14} />} title="Неврология" color={colors.purple} style={{ marginBottom: 11 }} />
         <FieldRow cols={3}>
           <SliderInput label="Дофамин (1-5)" value={health.dopamineScore} onChange={v => updateHealth({ dopamineScore: v })} min={1} max={5} color={colors.purple} direction="good" minLabel="апатия, ничего не радует" maxLabel="отличное настроение, интерес к жизни" />
           <SliderInput label="Серотонин (1-5)" value={health.serotoninScore} onChange={v => updateHealth({ serotoninScore: v })} min={1} max={5} color={colors.purple} direction="good" minLabel="подавленность, тревожность" maxLabel="спокойствие, стабильное настроение" />
@@ -207,8 +207,8 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       </div>
 
       {/* ЖКТ */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(34,197,94,0.05)', border: `1px solid ${colors.greenDim}` }}>
-        <GroupHeader icon={<NativeIcon name="bowl" size={14} />} title="ЖКТ" color={colors.green} style={{ marginBottom: 10 }} />
+      <div style={{ marginBottom: 14, padding: 13, borderRadius: 16, background: 'linear-gradient(180deg, rgba(52,211,153,0.10), rgba(52,211,153,0.03))', border: '1px solid rgba(52,211,153,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <GroupHeader icon={<NativeIcon name="bowl" size={14} />} title="ЖКТ" color={colors.green} style={{ marginBottom: 11 }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'bloating', l: 'Вздутие' },
@@ -231,8 +231,8 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       </div>
 
       {/* Психология */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
-        <GroupHeader icon={<NativeIcon name="message" size={14} />} title="Психология" color={colors.pink} style={{ marginBottom: 10 }} />
+      <div style={{ marginBottom: 14, padding: 13, borderRadius: 16, background: 'linear-gradient(180deg, rgba(236,72,153,0.10), rgba(236,72,153,0.03))', border: '1px solid rgba(236,72,153,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+        <GroupHeader icon={<NativeIcon name="message" size={14} />} title="Психология" color={colors.pink} style={{ marginBottom: 11 }} />
         <FieldRow cols={3}>
           <SliderInput label="Страх потери (1-5)" value={health.fearOfLoss} onChange={v => updateHealth({ fearOfLoss: v })} min={1} max={5} color={colors.pink} direction="bad" minLabel="нет страха потерять форму" maxLabel="постоянно боюсь потерять результаты" />
           <SliderInput label="Одержимость зеркалом (1-5)" value={health.mirrorObsession} onChange={v => updateHealth({ mirrorObsession: v })} min={1} max={5} color={colors.pink} direction="bad" minLabel="не зациклен на внешности" maxLabel="постоянно смотрюсь в зеркало, недоволен" />
@@ -257,30 +257,34 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
             />
           ))}
         </div>
-        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>Травмы:</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.8px', color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>ТРАВМЫ</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
           {(Array.isArray(health.injuries) ? health.injuries : []).filter(Boolean).map((inj, i) => (
             <span key={i} style={{
-              padding: '4px 10px', borderRadius: 12, fontSize: 11,
-              background: `${colors.warning}22`, color: colors.warning,
-              border: `1px solid ${colors.warning}44`, display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 8px 8px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+              background: 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(245,158,11,0.08))', color: '#fff',
+              border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: '0 4px 14px rgba(245,158,11,0.2)', minHeight: 40,
             }}>
               {inj?.location || '—'}
               <span
                 onClick={() => updateHealth({ injuries: (Array.isArray(health.injuries) ? health.injuries : []).filter((_, j) => j !== i) })}
-                style={{ cursor: 'pointer', opacity: 0.7 }}>✕</span>
+                role="button" aria-label={`Убрать травму ${inj?.location || ''}`} tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); updateHealth({ injuries: (Array.isArray(health.injuries) ? health.injuries : []).filter((_, j) => j !== i) }); } }}
+                style={{ cursor: 'pointer', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', fontSize: 12 }}>✕</span>
             </span>
           ))}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {COMMON_INJURIES.filter(loc => !(Array.isArray(health.injuries) ? health.injuries : []).some(i => i?.location === loc)).map(loc => (
             <button
               key={loc}
               onClick={() => updateHealth({ injuries: [...(Array.isArray(health.injuries) ? health.injuries : []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: new Date().toISOString().slice(0, 10) }] })}
+              className="pf-inj-add"
               style={{
-                padding: '4px 10px', borderRadius: 12, fontSize: 10,
-                background: 'transparent', color: colors.textMuted,
-                border: `1px solid ${colors.border}`, cursor: 'pointer',
+                padding: '8px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)',
+                border: '1px dashed rgba(255,255,255,0.18)', cursor: 'pointer', minHeight: 40,
               }}
             >+ {loc}</button>
           ))}
