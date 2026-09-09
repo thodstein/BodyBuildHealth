@@ -41,7 +41,7 @@ describe('minLevelFor — якоря', () => {
   });
 
   it('середина — intermediate (каталог уважаем)', () => {
-    for (const id of ['bench_bar', 'ohp_bar', 'rdl', 'row_bar', 'pullup', 'dips_tricep']) {
+    for (const id of ['bench_bar', 'ohp', 'rdl', 'row_bar', 'pullup', 'dips_tricep']) {
       expect(minLevelFor(byId(id)), id).toBe('intermediate');
     }
   });

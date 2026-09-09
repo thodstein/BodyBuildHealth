@@ -695,22 +695,29 @@ export const EXERCISE_CATALOG: Exercise[] = [
   }
 
   // P0.3: слить точные дубликаты по имени — объединить equipment в массив,
-  // оставить первую запись, удалить последующие (16 пар: legs/shoulders/arms/core/chest).
+  // оставить ПЕРВУЮ запись, удалить последующие (18 пар: legs/shoulders/arms/core/chest).
   // Без этого пул содержит две одноимённые записи → планировщик может выбрать
   // одно и то же упражнение дважды в разных днях/слотах.
+  // Аудит Sep 2026: прежняя реализация шла с хвоста и фактически хранила
+  // ПОСЛЕДНЮЮ запись — это убивало канонические compound-версии (hip_thrust
+  // вытеснялся изоляцией glute_bridge_barbell, ohp — ohp_bar и т.д.).
+  // Keep-first возвращает 18 канонических записей (в т.ч. hip_thrust — центр
+  // женской задней цепи, Kassiano 2024) и чинит «исчезнувшие» id пулов.
   const seen = new Map<string, any>();
-  for (let i = EXERCISE_CATALOG.length - 1; i >= 0; i--) {
+  const removedIdx: number[] = [];
+  for (let i = 0; i < EXERCISE_CATALOG.length; i++) {
     const ex = EXERCISE_CATALOG[i];
     const first = seen.get(ex.name);
     if (first) {
       const eqA = Array.isArray(first.equipment) ? first.equipment : [first.equipment].filter(Boolean);
       const eqB = Array.isArray(ex.equipment) ? ex.equipment : [ex.equipment].filter(Boolean);
       first.equipment = Array.from(new Set([...eqA, ...eqB]));
-      EXERCISE_CATALOG.splice(i, 1);
+      removedIdx.push(i);
     } else {
       seen.set(ex.name, ex);
     }
   }
+  for (let k = removedIdx.length - 1; k >= 0; k--) EXERCISE_CATALOG.splice(removedIdx[k], 1);
 })();
 
 export const SUBSTITUTION_MAP: ExerciseSubstitution[] = [
