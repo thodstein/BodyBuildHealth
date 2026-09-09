@@ -875,3 +875,131 @@ html.app-native .train-sup.sup-apk .sup-fav button:active {
     transform: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §16. INFO ROUND-4 — тайминг/матрица/исследования/модалки.
+ * Тайминг: поиск 10px и чипы 8px нечитаемы; матрица совместимости:
+ * геометрию НЕ трогаем (свой overflow-x), правим только подписи 5-7px
+ * и легенду; исследования: быстрые чипы 8px и кнопка поиска ниже 44px;
+ * модалки: шит с safe-area. Только native, без hex.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 16.1. ТАЙМИНГ: поиск 52px/16px, чипы-тапы ──────────────────── */
+html.app-native .train-sup.sup-apk .sup-timing input[placeholder*='Поиск'] {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 8'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing [style*='cursor: pointer'] {
+  min-height: 40px !important;
+  align-items: center !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* расписание: заголовки слотов и строки */
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── 16.2. МАТРИЦА: только подписи и легенда (геометрия цела) ───── */
+html.app-native .train-sup.sup-apk .sup-interact [style*='font-size: 5'] {
+  font-size: 8px !important;
+  line-height: 1.3 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-interact [style*='font-size: 6'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-interact [style*='font-size: 7'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+/* ─── 16.3. ИССЛЕДОВАНИЯ: чипы 44px, поиск 52px, карточки 18px ───── */
+html.app-native .train-sup.sup-apk .sup-research input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research .card {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research [style*='font-size: 8'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  padding: 8px 10px !important;
+  min-height: 44px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research a[style*='border-radius: 8'] {
+  border-radius: 14px !important;
+  padding: 12px !important;
+}
+
+/* ─── 16.4. МОДАЛКИ: шит с safe-area ────────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-manualpick > div {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-modals > div {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-manualpick button {
+  min-height: 48px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-modals button {
+  min-height: 48px !important;
+}
+
+/* ─── 16.5. PRESS + FOCUS ───────────────────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-timing button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-interact button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-interact button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── 16.6. REDUCED MOTION ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk .sup-timing button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-interact button:active {
+    transform: none !important;
+  }
+}
