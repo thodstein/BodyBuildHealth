@@ -12,7 +12,7 @@ import { ManualProgramWizard } from '../ManualProgramWizard';
 import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
 import { HybridPlanPanel } from '../HybridPlanPanel';
-import { PlanSummaryTable } from '../ProgramEditorPanels';
+import { PlanSummaryTable } from '../editor-panels/summary';
 import { ProgramMetricsCSV } from '../ProgramExtras';
 
 describe('ManualExport ICS', () => {

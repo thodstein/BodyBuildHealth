@@ -67,7 +67,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
                       const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk, wi: number) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s, si: number) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
                       onChange(upd);
                       showToast('✅ ' + ex.name + ' → ' + (GROUP_RU[w.muscle] ?? w.muscle));
-                    }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}>+ {ex.name}</button>
+                    }} className="panel-add-ex" style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}>+ {ex.name}</button>
                   ))}
                 </div>
               </div>

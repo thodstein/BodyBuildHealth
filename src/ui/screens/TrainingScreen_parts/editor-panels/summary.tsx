@@ -36,7 +36,7 @@ export const PlanSummaryTable: React.FC<{
           {body.weeks.map((w, i) => {
             const pc = phaseColors[w.phase] || '#666';
             return (
-              <button key={i} onClick={() => onShowWeekChange?.(w.week)}
+              <button key={i} className="panel-week-tab" onClick={() => onShowWeekChange?.(w.week)}
                 style={{
                   padding: '5px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', minHeight: 34, minWidth: 36,
                   background: showWeek === w.week ? pc + '20' : 'rgba(255,255,255,0.04)',

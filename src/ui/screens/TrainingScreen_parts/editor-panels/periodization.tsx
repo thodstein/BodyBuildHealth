@@ -47,7 +47,7 @@ export const AutoPeriodizationPanel: React.FC<{
         );
       })}
       {onApply && (
-        <button onClick={() => onApply(phases)} style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', fontWeight: 700, minHeight: 38, width: '100%' }}>
+        <button className="panel-apply" onClick={() => onApply(phases)} style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', fontWeight: 700, minHeight: 38, width: '100%' }}>
           🔧 Применить периодизацию
         </button>
       )}
