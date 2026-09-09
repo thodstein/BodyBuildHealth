@@ -26,6 +26,7 @@ import { buildArmCalendar, superSeriesYear } from '../../../engines/arm/arm-cale
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
+import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
@@ -498,6 +499,13 @@ export function ArmAutoConstructor() {
   const summPro = `${proBw || '—'} кг · ${proArm==='both'?'обе':proArm==='left'?'левая':'правая'} · ${proDate || 'без даты'}`;
   const summTop = [topOpp!=='unknown'&&'матчап', topRfd&&'RFD', topSim&&'sim', topContinuity&&'cross-meso', topGripAuto&&'авто-RPE', topLadder&&'лестница'].filter(Boolean).join(' · ') || 'Выкл';
   const summCyc = cycId ? ((()=>{ try { return ARM_CYCLE_LIBRARY.find(c=>c.id===cycId)?.name || cycId; } catch { return cycId; } })()) : 'Обычный план';
+  const rankedCycles = useMemo(() => {
+    try {
+      return rankArmCycles({ discipline, level, goal, weeks, daysPerWeek, gripFocus }).slice(0, 3);
+    } catch { return []; }
+  }, [discipline, level, goal, weeks, daysPerWeek, gripFocus]);
+  const CYC_LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Enhanced' };
+  const CYC_PHASE_RU: Record<string, string> = { accumulation: 'накопление', intensification: 'интенсификация', deload: 'делод', peaking: 'пик' };
   const summFocus = (()=>{ try { return GRIP_FOCI.find(g=>g.id===gripFocus)?.label || gripFocus; } catch { return gripFocus; } })();
 
   return (
@@ -790,6 +798,31 @@ export function ArmAutoConstructor() {
               <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
             <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc}>
+              {rankedCycles.length > 0 && (
+                <div className="ad-list" data-arm="cycle-picker">
+                  {rankedCycles.map(({ cycle: c, score, reasons }) => (
+                    <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>setCycId(cycId===c.id ? '' : c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setCycId(cycId===c.id ? '' : c.id); }}>
+                      <div className="ad-split-top">
+                        <span className="ad-split-radio" aria-hidden />
+                        <span className="ad-split-name">{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
+                        <span className="ad-split-score">{score}</span>
+                      </div>
+                      <div className="ad-row" data-arm="cycle-chips">
+                        <span className="ad-tag">{c.rpe}</span>
+                        {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
+                        <span className="ad-tag">{c.level.map(l=>CYC_LEVEL_RU[l] || l).join('/')}</span>
+                      </div>
+                      <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
+                        {Array.from({ length: c.weeks }, (_, i) => {
+                          const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
+                          return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${CYC_PHASE_RU[ph] || ph}`}>{i + 1}</span>;
+                        })}
+                      </div>
+                      <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <AdGrid cols="2">
                 <AdField label="Цикл">
                   <select value={cycId} onChange={e=>setCycId(e.target.value)}>
