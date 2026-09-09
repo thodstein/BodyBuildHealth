@@ -176,20 +176,21 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
             display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
-            padding: '8px 13px',
-            borderRadius: 12,
-            fontSize: 12,
+            padding: '9px 15px',
+            borderRadius: 14,
+            fontSize: 12.5,
             fontWeight: 800,
             cursor: 'pointer',
             fontFamily: 'inherit',
-            color: factorsOpen ? '#a78bfa' : colors.textMuted,
-            border: `1px solid ${factorsOpen ? 'rgba(167,139,250,0.5)' : colors.border}`,
-            background: factorsOpen ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',
-            minHeight: 40,
+            color: factorsOpen ? '#fff' : 'rgba(255,255,255,0.7)',
+            border: `1px solid ${factorsOpen ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.11)'}`,
+            background: factorsOpen ? 'linear-gradient(135deg, rgba(167,139,250,0.24), rgba(167,139,250,0.08))' : 'rgba(255,255,255,0.04)',
+            boxShadow: factorsOpen ? '0 4px 16px rgba(167,139,250,0.22)' : 'none',
+            minHeight: 44,
             transition: 'all 0.15s',
           }}
         >
-          <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 6 }}><NativeIcon name="flask" size={12} /></span>Факторы {factorsOpen ? '▾' : '▸'}
+          <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 4 }}><NativeIcon name="flask" size={13} /></span>Факторы {factorsOpen ? '▾' : '▸'}
         </button>
         {factorCount > 0 && !factorsOpen && (
           <span

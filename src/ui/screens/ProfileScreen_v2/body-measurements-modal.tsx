@@ -279,22 +279,24 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           onClick={() => applyPreset(p.id)}
           aria-pressed={activePreset === p.id}
           style={{
-            border: `1px solid ${activePreset === p.id ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
-            background: activePreset === p.id ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
-            color: activePreset === p.id ? '#4ade80' : '#ffffff',
-            borderRadius: 8,
-            padding: '5px 10px',
+            border: `1px solid ${activePreset === p.id ? '#22c55e' : 'rgba(255,255,255,0.12)'}`,
+            background: activePreset === p.id ? 'linear-gradient(135deg, rgba(34,197,94,0.26), rgba(34,197,94,0.1))' : 'rgba(255,255,255,0.04)',
+            boxShadow: activePreset === p.id ? '0 4px 14px rgba(34,197,94,0.22)' : 'none',
+            color: activePreset === p.id ? '#fff' : '#ffffff',
+            borderRadius: 999,
+            padding: '7px 13px',
             cursor: 'pointer',
-            fontSize: 10,
-            lineHeight: 1,
-            fontWeight: 600,
+            fontSize: 11.5,
+            lineHeight: 1.2,
+            fontWeight: activePreset === p.id ? 800 : 600,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 5,
+            minHeight: 36,
           }}
           title={p.label}
         >
-          {p.icon && <span style={{ display: 'inline-flex' }}><NativeIcon name={p.icon} size={10} /></span>} {p.label}
+          {p.icon && <span style={{ display: 'inline-flex' }}><NativeIcon name={p.icon} size={12} /></span>} {p.label}
         </button>
       ))}
     </div>
@@ -315,7 +317,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       <SectionCard icon={<NativeIcon name="kettlebell" size={16} />} title="Вес" color="#22c55e" badge={weightDelta !== null ? `${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(1)} кг` : undefined}>
         <StepperInput value={draft.values.weight || ''} onChange={(v) => setValue('weight', v)} step={0.1} min={20} max={400} unit="кг" large invalid={weightInvalid} />
         {prevWeight !== null && (
-          <div style={{ fontSize: 9, color: colors.textSubtle, marginTop: 6, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 8, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
             Прошлый вес: {prevWeight} кг · {prev && prev.date ? String(prev.date) : ''}
           </div>
         )}
@@ -369,14 +371,16 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           {draft.photos.length > 0 && (
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               {draft.photos.map((src, i) => (
-                <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                <div key={i} style={{ position: 'relative', width: 84, height: 84, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
                   <img src={src} alt="" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}
+                    aria-label="Удалить фото"
                     style={{
-                      position: 'absolute', top: 3, right: 3, background: '#ef4444cc', color: '#fff',
-                      border: 'none', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 13,
+                      position: 'absolute', top: 4, right: 4, background: 'rgba(239,68,68,0.85)', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, width: 32, height: 32, minWidth: 32, minHeight: 32, cursor: 'pointer', fontSize: 14,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
                     ×

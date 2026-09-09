@@ -976,19 +976,19 @@ export const DiaryModalShell: React.FC<{
               {stale && staleColor && (
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: 800,
-                    padding: '5px 10px',
+                    padding: '5px 11px',
                     borderRadius: 999,
                     whiteSpace: 'nowrap',
-                    color: staleColor,
-                    background: `${staleColor}1c`,
-                    border: `1px solid ${staleColor}44`,
+                    color: '#fff',
+                    background: `${staleColor}26`,
+                    border: `1px solid ${staleColor}55`,
                     animation: 'diary-badge-in 0.25s ease-out',
                   }}
                   title="Давность последней записи"
                 >
-                  <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 5 }}><NativeIcon name="clock" size={10} /></span>{daysAgoLabel(stale.days)}
+                  <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 5 }}><NativeIcon name="clock" size={11} /></span>{daysAgoLabel(stale.days)}
                 </span>
               )}
               <button
@@ -1119,18 +1119,19 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 7,
-        padding: '8px 13px',
+        gap: 8,
+        padding: '9px 16px',
         borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 700,
+        fontSize: 12.5,
+        fontWeight: 800,
         cursor: 'pointer',
-        border: `1px solid ${colors.border}`,
-        background: 'rgba(255,255,255,0.04)',
-        color: colors.textMuted,
-        marginBottom: 10,
-        minHeight: 40,
+        border: '1px solid rgba(255,255,255,0.14)',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+        color: '#fff',
+        marginBottom: 12,
+        minHeight: 44,
         transition: 'all 0.15s',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
       }}
   >
     ↩ {label}

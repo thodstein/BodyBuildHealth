@@ -252,23 +252,25 @@ export const AddBPModal: React.FC<{
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           {ARM_OPTIONS.map((o) => (
             <button
               key={o.id}
               type="button"
               onClick={() => set('arm', o.id)}
+              aria-pressed={draft.arm === o.id}
               style={{
                 flex: 1,
-                minHeight: 40,
-                padding: '8px 10px',
-                borderRadius: 10,
+                minHeight: 44,
+                padding: '9px 12px',
+                borderRadius: 13,
                 cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 700,
-                border: `1px solid ${draft.arm === o.id ? '#ef4444' : colors.border}`,
-                background: draft.arm === o.id ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
-                color: draft.arm === o.id ? '#f87171' : colors.textMuted,
+                fontSize: 12.5,
+                fontWeight: 800,
+                border: `1px solid ${draft.arm === o.id ? '#ef4444' : 'rgba(255,255,255,0.11)'}`,
+                background: draft.arm === o.id ? 'linear-gradient(135deg, rgba(239,68,68,0.26), rgba(239,68,68,0.1))' : 'rgba(255,255,255,0.03)',
+                boxShadow: draft.arm === o.id ? '0 4px 14px rgba(239,68,68,0.25)' : 'none',
+                color: draft.arm === o.id ? '#fff' : 'rgba(255,255,255,0.65)',
                 transition: 'all 0.15s',
               }}
             >
@@ -276,23 +278,25 @@ export const AddBPModal: React.FC<{
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           {POSITION_OPTIONS.map((o) => (
             <button
               key={o.id}
               type="button"
               onClick={() => set('position', o.id)}
+              aria-pressed={draft.position === o.id}
               style={{
                 flex: 1,
-                minHeight: 40,
-                padding: '8px 10px',
-                borderRadius: 10,
+                minHeight: 44,
+                padding: '9px 12px',
+                borderRadius: 13,
                 cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 700,
-                border: `1px solid ${draft.position === o.id ? '#ef4444' : colors.border}`,
-                background: draft.position === o.id ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
-                color: draft.position === o.id ? '#f87171' : colors.textMuted,
+                fontSize: 12.5,
+                fontWeight: 800,
+                border: `1px solid ${draft.position === o.id ? '#ef4444' : 'rgba(255,255,255,0.11)'}`,
+                background: draft.position === o.id ? 'linear-gradient(135deg, rgba(239,68,68,0.26), rgba(239,68,68,0.1))' : 'rgba(255,255,255,0.03)',
+                boxShadow: draft.position === o.id ? '0 4px 14px rgba(239,68,68,0.25)' : 'none',
+                color: draft.position === o.id ? '#fff' : 'rgba(255,255,255,0.65)',
                 transition: 'all 0.15s',
               }}
             >
@@ -319,27 +323,27 @@ export const AddBPModal: React.FC<{
 
         {/* PP / MAP row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 10 }}>
-          <div style={{ padding: '10px 12px', borderRadius: 12, background: `rgba(239,68,68,${ppWarn ? '0.18' : '0.08'})`, border: `1px solid ${ppWarn ? '#ef444466' : '#ef444433'}`, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Пульсовое давление (PP)</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: ppWarn ? '#ef4444' : '#f87171', marginTop: 2 }}>{pp !== null ? `${pp} мм` : '—'}</div>
-            <div style={{ fontSize: 9, color: ppWarn ? '#ef4444' : colors.textSubtle, marginTop: 2 }}>{ppWarn ? (pp! > 60 ? '⚠ Расширено' : '⚠ Сужено') : 'Норма 30–60'}</div>
+          <div style={{ padding: '12px 14px', borderRadius: 15, background: `linear-gradient(180deg, rgba(239,68,68,${ppWarn ? '0.2' : '0.09'}), rgba(239,68,68,0.03))`, border: `1px solid ${ppWarn ? '#ef444466' : '#ef444433'}`, textAlign: 'center', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.7 }}>Пульсовое давление (PP)</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{pp !== null ? `${pp} мм` : '—'}</div>
+            <div style={{ fontSize: 10.5, color: ppWarn ? '#fca5a5' : 'rgba(255,255,255,0.5)', marginTop: 3 }}>{ppWarn ? (pp! > 60 ? '⚠ Расширено' : '⚠ Сужено') : 'Норма 30–60'}</div>
           </div>
-          <div style={{ padding: '10px 12px', borderRadius: 12, background: `rgba(167,139,250,${mapWarn ? '0.18' : '0.08'})`, border: `1px solid ${mapWarn ? '#a78bfa66' : '#a78bfa33'}`, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>СРД (MAP)</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: mapWarn ? '#a78bfa' : '#c4b5fd', marginTop: 2 }}>{map !== null ? `${map} мм` : '—'}</div>
-            <div style={{ fontSize: 9, color: mapWarn ? '#a78bfa' : colors.textSubtle, marginTop: 2 }}>{mapWarn ? (map! > 110 ? '⚠ Высокое' : '⚠ Низкое') : 'Норма 70–110'}</div>
+          <div style={{ padding: '12px 14px', borderRadius: 15, background: `linear-gradient(180deg, rgba(167,139,250,${mapWarn ? '0.2' : '0.09'}), rgba(167,139,250,0.03))`, border: `1px solid ${mapWarn ? '#a78bfa66' : '#a78bfa33'}`, textAlign: 'center', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.7 }}>СРД (MAP)</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{map !== null ? `${map} мм` : '—'}</div>
+            <div style={{ fontSize: 10.5, color: mapWarn ? '#c4b5fd' : 'rgba(255,255,255,0.5)', marginTop: 3 }}>{mapWarn ? (map! > 110 ? '⚠ Высокое' : '⚠ Низкое') : 'Норма 70–110'}</div>
           </div>
         </div>
 
         {/* Dual mini sparkline */}
         {(spark.sys.length > 1 || spark.dia.length > 1) && (
-          <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase' }}>Динамика 7 дн</span>
-              <span style={{ display: 'inline-flex', width: 12, height: 3, borderRadius: 2, background: '#f87171' }}></span>
-              <span style={{ fontSize: 10, color: '#f87171' }}>Систола</span>
-              <span style={{ display: 'inline-flex', width: 12, height: 3, borderRadius: 2, background: '#60a5fa' }}></span>
-              <span style={{ fontSize: 10, color: '#60a5fa' }}>Диастола</span>
+          <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Динамика 7 дн</span>
+              <span style={{ display: 'inline-flex', width: 14, height: 4, borderRadius: 2, background: '#f87171' }}></span>
+              <span style={{ fontSize: 11, color: '#f87171', fontWeight: 700 }}>Систола</span>
+              <span style={{ display: 'inline-flex', width: 14, height: 4, borderRadius: 2, background: '#60a5fa' }}></span>
+              <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700 }}>Диастола</span>
             </div>
             <div style={{ height: 36 }}>
               <svg width="100%" height="36" viewBox="0 0 200 36" style={{ overflow: 'visible' }} aria-hidden="true">
@@ -372,17 +376,17 @@ export const AddBPModal: React.FC<{
 
         {/* Averages */}
         {(avg3 || avg7) && (
-          <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {avg3 && (
-              <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', fontSize: 11 }}>
-                <span style={{ color: '#22c55e', fontWeight: 700 }}>Ср. за 3 дня: </span>
-                <span style={{ color: '#4ade80' }}>{avg3.sys}/{avg3.dia}</span>
+              <div style={{ padding: '10px 14px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(34,197,94,0.16), rgba(34,197,94,0.05))', border: '1px solid rgba(34,197,94,0.32)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ color: '#4ade80', fontWeight: 800 }}>Ср. за 3 дня: </span>
+                <span style={{ color: '#fff', fontWeight: 800 }}>{avg3.sys}/{avg3.dia}</span>
               </div>
             )}
             {avg7 && (
-              <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', fontSize: 11 }}>
-                <span style={{ color: '#60a5fa', fontWeight: 700 }}>Ср. за 7 дней: </span>
-                <span style={{ color: '#93c5fd' }}>{avg7.sys}/{avg7.dia}</span>
+              <div style={{ padding: '10px 14px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(96,165,250,0.16), rgba(96,165,250,0.05))', border: '1px solid rgba(96,165,250,0.32)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ color: '#93c5fd', fontWeight: 800 }}>Ср. за 7 дней: </span>
+                <span style={{ color: '#fff', fontWeight: 800 }}>{avg7.sys}/{avg7.dia}</span>
               </div>
             )}
           </div>

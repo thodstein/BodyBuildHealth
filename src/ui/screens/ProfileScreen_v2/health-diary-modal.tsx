@@ -327,19 +327,20 @@ export const AddHealthModal: React.FC<{
               style={{
                 flex: 1,
                 minHeight: 44,
-                minWidth: 88,
-                padding: '7px 9px',
-                borderRadius: 12,
+                minWidth: 92,
+                padding: '8px 10px',
+                borderRadius: 14,
                 cursor: 'pointer',
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: 800,
-                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.1)'}`,
-                background: active ? `${t.color}22` : 'rgba(255,255,255,0.025)',
-                color: active ? t.color : colors.textMuted,
+                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.11)'}`,
+                background: active ? `linear-gradient(135deg, ${t.color}30, ${t.color}10)` : 'rgba(255,255,255,0.03)',
+                boxShadow: active ? `0 4px 14px ${t.color}28` : 'none',
+                color: active ? '#fff' : 'rgba(255,255,255,0.6)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 4,
+                gap: 5,
                 boxShadow: active ? `0 3px 12px ${t.color}2e` : undefined,
                 transition: 'all 0.15s',
               }}
@@ -349,12 +350,14 @@ export const AddHealthModal: React.FC<{
               {t.badge && (
                 <span
                   style={{
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: 800,
-                    color: t.color,
-                    background: `${t.color}30`,
+                    color: '#fff',
+                    background: `${t.color}40`,
+                    border: `1px solid ${t.color}55`,
                     borderRadius: 999,
-                    padding: '1px 6px',
+                    padding: '2px 7px',
+                    fontVariantNumeric: 'tabular-nums',
                   }}
                 >
                   {t.badge}
@@ -482,27 +485,30 @@ export const AddHealthModal: React.FC<{
                 <div
                   key={s.id}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 9,
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 13,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                   }}
                 >
-                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: colors.text }}>{s.name}</span>
+                  <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: colors.text }}>{s.name}</span>
                   <span
                     style={{
-                      fontSize: 10, fontWeight: 800, color: SEVERITY_TONE(s.severity),
-                      background: `${SEVERITY_TONE(s.severity)}1f`, borderRadius: 999, padding: '2px 8px',
+                      fontSize: 11, fontWeight: 800, color: '#fff',
+                      background: `${SEVERITY_TONE(s.severity)}2e`, borderRadius: 999, padding: '3px 10px',
+                      border: `1px solid ${SEVERITY_TONE(s.severity)}45`,
+                      fontVariantNumeric: 'tabular-nums',
                     }}
                   >
                     {s.severity}/5
                   </span>
-                  {s.duration && <span style={{ fontSize: 10, color: colors.textMuted }}>{s.duration}</span>}
+                  {s.duration && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{s.duration}</span>}
                   <button
                     type="button"
                     onClick={() => removeSymptom(s.id)}
                     aria-label={`Удалить симптом ${s.name}`}
                     style={{
-                      background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer',
-                      fontSize: 16, padding: '4px 8px', minWidth: 40, minHeight: 40, borderRadius: 8,
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5', cursor: 'pointer',
+                      fontSize: 15, padding: '4px 8px', minWidth: 40, minHeight: 40, borderRadius: 12,
                     }}
                   >
                     ×
