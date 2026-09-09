@@ -12896,6 +12896,61 @@ html.app-native .manual-constructor .proacc-head:focus-visible {
   }
 }
 
+/* ─── 112. MANUAL CYCTPL PRO — шаблоны циклов топ-уровня ───
+ * Хуки: .train-cycletemplates (корень), NEW .cyc-tpl-tab/.cyc-tpl-apply.
+ * Табы/кнопки 44px + press/focus, tabular, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+html.app-native .manual-constructor .train-cycletemplates {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-tab {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-tab:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-tab:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-apply {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-apply:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .cyc-tpl-apply:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .cyc-tpl-tab:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .cyc-tpl-apply:active {
+    transform: none !important;
+  }
+}
+
 /* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
 html.app-native .nd-data-btn {
   min-height: 44px !important;

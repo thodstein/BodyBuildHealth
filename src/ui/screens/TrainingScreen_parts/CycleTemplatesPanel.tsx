@@ -149,8 +149,8 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
         <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>📚 Шаблоны циклов</span>
         <span style={{ fontSize: 10, color: DIM }}>{weeks} нед × {days}д/нед · {level} · {dir.toUpperCase()}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button onClick={() => setTab('bb')} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28, borderColor: tab === 'bb' ? '#00e68a' : 'rgba(255,255,255,0.08)', color: tab === 'bb' ? '#00e68a' : DIM }}>ББ сплиты</button>
-          <button onClick={() => setTab('pl')} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28, borderColor: tab === 'pl' ? '#a78bfa' : 'rgba(255,255,255,0.08)', color: tab === 'pl' ? '#a78bfa' : DIM }}>ПЛ циклы</button>
+          <button className="cyc-tpl-tab" onClick={() => setTab('bb')} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28, borderColor: tab === 'bb' ? '#00e68a' : 'rgba(255,255,255,0.08)', color: tab === 'bb' ? '#00e68a' : DIM }}>ББ сплиты</button>
+          <button className="cyc-tpl-tab" onClick={() => setTab('pl')} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28, borderColor: tab === 'pl' ? '#a78bfa' : 'rgba(255,255,255,0.08)', color: tab === 'pl' ? '#a78bfa' : DIM }}>ПЛ циклы</button>
         </div>
       </div>
 
@@ -177,7 +177,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
           const updated = applyPhaseModulation(program.bb!.weeks, { goal: program.meta.goal, level: program.meta.level, weeksTotal: weeks });
           onChange({ ...program, bb: { ...program.bb!, weeks: updated } });
           showToast('📈 Фазы применены к неделям');
-        }} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(96,165,250,0.3)', color: '#60a5fa', alignSelf: 'flex-start' }}>📈 Применить фазы к неделям</button>
+        }} className="cyc-tpl-apply" style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(96,165,250,0.3)', color: '#60a5fa', alignSelf: 'flex-start' }}>📈 Применить фазы к неделям</button>
       )}
       {weeks >= 6 && !phasePreview.some((p: any) => p.phase === 'deload') && (
         <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, padding: '6px 8px' }}>⚠ Рекомендуется делод: для {weeks} нед добавьте разгрузочную неделю — нажмите «Применить фазы» или добавьте вручную в «Неделях».</div>
@@ -205,7 +205,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
                     ))}
                   </div>
                 </div>
-                <button onClick={() => applyBbPattern(p)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, whiteSpace: 'nowrap', borderColor: isActive ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.12)', color: isActive ? '#00e68a' : '#a78bfa' }}>{isActive ? '✓ Выбран' : 'Применить'}</button>
+                <button className="cyc-tpl-apply" onClick={() => applyBbPattern(p)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, whiteSpace: 'nowrap', borderColor: isActive ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.12)', color: isActive ? '#00e68a' : '#a78bfa' }}>{isActive ? '✓ Выбран' : 'Применить'}</button>
               </div>
             );
           })}
@@ -229,7 +229,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
                   </div>
                   <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{directionLabelRu(c.meta.direction)} · {periodLabelRu(c.meta.period)} {c.meta.correctionPct ? '· ' + (c.meta.correctionPct*100).toFixed(1) + '%/нед' : ''}</div>
                 </div>
-                <button onClick={() => applyPlCycle(c)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, whiteSpace: 'nowrap', borderColor: isActive ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.12)', color: isActive ? '#a78bfa' : ACCENT }}>{isActive ? '✓ Подключён' : 'Подключить'}</button>
+                <button className="cyc-tpl-apply" onClick={() => applyPlCycle(c)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, whiteSpace: 'nowrap', borderColor: isActive ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.12)', color: isActive ? '#a78bfa' : ACCENT }}>{isActive ? '✓ Подключён' : 'Подключить'}</button>
               </div>
             );
           })}

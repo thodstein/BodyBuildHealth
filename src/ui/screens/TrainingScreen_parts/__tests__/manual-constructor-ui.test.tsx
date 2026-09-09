@@ -137,6 +137,11 @@ describe('Редактор: хуки недель/сессий §102', () => {
     await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeInTheDocument(), { timeout: 15000 });
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeInTheDocument(), { timeout: 15000 });
+    // §112: панель шаблонов циклов — в шаге Параметры
+    expect(container.querySelector('.train-cycletemplates')).toBeInTheDocument();
+    expect(container.querySelectorAll('.cyc-tpl-tab').length).toBe(2);
+    fireEvent.click(screen.getByText('ПЛ циклы'));
+    expect(container.querySelector('.cyc-tpl-apply')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Далее: Недели →'));
     await waitFor(() => expect(container.querySelector('.editor-week-card')).toBeInTheDocument(), { timeout: 15000 });
     expect(container.querySelector('.editor-week-toggle')).toBeInTheDocument();
