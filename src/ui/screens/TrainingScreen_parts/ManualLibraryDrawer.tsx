@@ -73,7 +73,7 @@ export const ManualLibraryDrawer: React.FC<{
           <>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Найдено {filteredBB.length} из {allBB.length} программ</div>
             {filteredBB.slice(0,50).map(p=> (
-              <button key={p.id} onClick={()=> onSelectBB(p)} style={{ textAlign:'left', padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>
+              <button key={p.id} className="lib-row" onClick={()=> onSelectBB(p)} style={{ textAlign:'left', padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#00e68a' }}>{p.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.55)' }}>· {p.durationWeeks}н · {p.daysPerWeek}д · {p.level}</span></div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:2 }}>{p.type} · 🎯 {p.goal} · {p.author}</div>
               </button>
@@ -85,7 +85,7 @@ export const ManualLibraryDrawer: React.FC<{
           <>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Найдено {filteredPL.length} циклов</div>
             {filteredPL.map(c=> (
-              <button key={c.meta.id} onClick={()=> onSelectPL(c.meta.id)} style={{ textAlign:'left', padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.15)', color:'#fff', cursor:'pointer' }}>
+              <button key={c.meta.id} className="lib-row" onClick={()=> onSelectPL(c.meta.id)} style={{ textAlign:'left', padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.15)', color:'#fff', cursor:'pointer' }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>{c.meta.title} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.55)' }}>· {c.meta.weeks}н · {c.meta.sessionsPerWeek}×</span></div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>{c.meta.period} · {c.meta.level} · {c.meta.direction}</div>
               </button>

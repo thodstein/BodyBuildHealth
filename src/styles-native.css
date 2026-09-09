@@ -8077,6 +8077,108 @@ html.app-native .train-library .lib-empty button:focus-visible {
   outline-offset: 2px !important;
 }
 
+/* ── Методики: карточки с акцентной кромкой у применённой ── */
+html.app-native .train-library .lib-method {
+  border-radius: 18px !important;
+  padding: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-method[data-applied='true'] {
+  border-left: 3px solid var(--accent) !important;
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.16) !important;
+}
+
+html.app-native .train-library .lib-method button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+}
+
+html.app-native .train-library .lib-vol {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-library .lib-split {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-library .lib-split[data-open='true'] {
+  border-left: 3px solid var(--accent) !important;
+}
+
+/* ── Мои: планы/циклы — стекло, экшены 44px ── */
+html.app-native .train-library .lib-plan,
+html.app-native .train-library .lib-cycle {
+  border-radius: 18px !important;
+  padding: 12px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.app-native .train-library .lib-plan button,
+html.app-native .train-library .lib-cycle button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Галерея: рекомендации и сравнение — стекло ── */
+html.app-native .lib-manlib .lib-rec,
+html.app-native .lib-manlib .lib-compare {
+  border-radius: 20px !important;
+}
+
+html.app-native .lib-manlib .lib-rec button,
+html.app-native .lib-manlib .lib-compare button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Drawer/пикер: строки 48px, выбранная с кромкой ── */
+html.app-native .lib-drawer .lib-row {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .lib-drawer .lib-row:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .lib-picker .lib-opt {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .lib-picker .lib-opt[data-sel='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.22) !important;
+}
+
+html.app-native .lib-picker .lib-opt:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── Focus новых хуков ── */
+html.app-native .train-library .lib-method button:focus-visible,
+html.app-native .train-library .lib-plan button:focus-visible,
+html.app-native .train-library .lib-cycle button:focus-visible,
+html.app-native .lib-manlib .lib-rec button:focus-visible,
+html.app-native .lib-drawer .lib-row:focus-visible,
+html.app-native .lib-picker .lib-opt:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .lib-drawer .lib-row:active,
+  html.app-native .lib-picker .lib-opt:active {
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.app-native .train-library .lib-chip:active,
   html.app-native .train-library .lib-empty button:active {

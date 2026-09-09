@@ -232,7 +232,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
         <div>
           {savedPlans.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'#fff',fontSize:11}}>Нет сохранённых планов</div>}
           {savedPlans.map(plan => (
-            <div key={plan.id} className="card" style={{padding:10,marginBottom:6}}>
+            <div key={plan.id} className="card lib-plan" style={{padding:10,marginBottom:6}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>{plan.name}</div>
@@ -271,7 +271,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           </div>
           {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'#fff',fontSize:11}}>Нет сохранённых циклов</div>}
           {savedCycles.map(cycle => (
-            <div key={cycle.id} className="card" style={{padding:10,marginBottom:6}}>
+            <div key={cycle.id} className="card lib-cycle" style={{padding:10,marginBottom:6}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>{cycle.name}</div>

@@ -172,7 +172,7 @@ export const BbProgramLibraryPicker: React.FC<{
                 const isSel = p.id === value;
                 const isDisabled = disabled.has(p.id);
                 const srcTag = sourceTag(p);
-                return <button key={p.id} disabled={isDisabled} onClick={() => { if (isDisabled) return; onSelect(p); setOpen(false); }}
+                return <button key={p.id} className="lib-opt" data-sel={isSel ? 'true' : 'false'} disabled={isDisabled} onClick={() => { if (isDisabled) return; onSelect(p); setOpen(false); }}
                   style={{
                     display: 'block', width: '100%', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                     fontSize: 11, fontWeight: isSel ? 700 : 500,

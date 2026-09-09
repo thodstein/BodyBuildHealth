@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { CycleCatalog, CYCLE_FREQ_OPTS, readCycleFavs } from '../CycleCatalog';
+import { ProgramsTab } from '../ProgramsTab';
+import { MethodsTab } from '../MethodsTab';
 import { safeE1rm, weekKeyForDate } from '../MyTrainingTab';
 import { plCycleMatchesGoal } from '../ManualLibraryGallery';
 import { LibraryZone } from '../LibraryZone';
@@ -75,6 +77,48 @@ describe('Библиотека PRO — багфиксы', () => {
     fireEvent.click(showAll);
     expect(screen.queryByText('Ничего не найдено')).toBeNull();
     expect(document.querySelector('.lib-empty')).toBeNull();
+    cleanup();
+  });
+
+  it('B7: битый myTrainingPlans не роняет сохранение программы', async () => {
+    try { localStorage.setItem('myTrainingPlans', '{"a":1}'); } catch { /* ignore */ }
+    const Wrap: React.FC = () => {
+      const [sel, setSel] = React.useState<string | null>(null);
+      return <ProgramsTab selectedProgram={sel} setSelectedProgram={setSel} />;
+    };
+    render(<Wrap />);
+    const cards = document.querySelectorAll('.lib-card');
+    expect(cards.length).toBeGreaterThan(0);
+    fireEvent.click(cards[0]);
+    fireEvent.click(await screen.findByText('📋 В мои программы'));
+    const saved = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+    expect(Array.isArray(saved)).toBe(true);
+    expect(saved.length).toBe(1);
+    try { localStorage.removeItem('myTrainingPlans'); } catch { /* ignore */ }
+    cleanup();
+  });
+
+  it('B7: хуки раунда 4 на месте', () => {
+    const linked = { readiness: {} };
+    const { container } = render(
+      <MethodsTab
+        linked={linked as never}
+        trainingOutput={null}
+        diaryStats={[]}
+        historyWorkouts={[]}
+        goal="bulk"
+        level="intermediate"
+        daysPerWeek={3}
+        recovery={70}
+        fatigue={20}
+        appliedMethods={{}}
+        onToggleMethod={() => undefined}
+        onApplyComposition={() => undefined}
+      />,
+    );
+    expect(container.querySelector('.lib-method')).not.toBeNull();
+    expect(container.querySelector('.lib-vol')).not.toBeNull();
+    expect(container.querySelector('.lib-split')).not.toBeNull();
     cleanup();
   });
 

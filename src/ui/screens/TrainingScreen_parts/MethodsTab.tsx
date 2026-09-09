@@ -436,7 +436,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     {methodCat!=='all' && HUMAN_TIP[methodCat] && (
       <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.18)', fontSize:11, color:'rgba(255,255,255,0.85)', lineHeight:1.45, marginBottom:8 }}>{HUMAN_TIP[methodCat]}</div>
     )}
-    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+    {filtered.map((m,i) => <div key={i} className="card lib-method" data-applied={(appliedMethods[m.category] === m.name) ? 'true' : 'false'} style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'#fff' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
       <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{m.description}</div>
       <div style={{ fontSize:10, color:'#fff' }}>Лучше всего для: {m.bestFor}</div>
@@ -455,7 +455,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     <div style={{ marginBottom: 8 }}>
       <PopupSelect label="Уровень для ориентиров" value={volLevel} options={volLevelOptions} onChange={(v) => setVolLevel(v as 'beginner' | 'intermediate' | 'advanced')} />
     </div>
-    {volumes.map((v,i) => { const lvl = v[volLevel]; return <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
+    {volumes.map((v,i) => { const lvl = v[volLevel]; return <div key={i} className="card lib-vol" style={{ marginBottom:4, padding:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
         <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{v.muscle}</div>
         <div style={{ fontSize:10, color:'#00e68a', fontWeight:700 }}>MEV {lvl.mev} · MAV {lvl.mav} · MRV {lvl.mrv}</div>
@@ -473,7 +473,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     </div>; })}
 
     <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов (нажмите для раскрытия)</h4>
-    {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:6, padding:8, cursor:'pointer', border: expandedSplit===i?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)' }} onClick={() => setExpandedSplit(expandedSplit===i?null:i)}>
+    {visuals.map((s,i) => <div key={i} className="card lib-split" data-open={expandedSplit===i ? 'true' : 'false'} style={{ marginBottom:6, padding:8, cursor:'pointer', border: expandedSplit===i?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)' }} onClick={() => setExpandedSplit(expandedSplit===i?null:i)}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div style={{ fontWeight:700, fontSize:11, color: expandedSplit===i?'#00e68a':'#fff' }}>{s.name}</div>
         <span style={{ fontSize:10, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>

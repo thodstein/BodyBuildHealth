@@ -218,7 +218,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
 
       {/* Рекомендовано для вас — интеллигентный подбор */}
       {tab === 'bb' && !search && !favOnly && level === 'all' && goal === 'all' && days === 'all' && recommendedBB.length > 0 && (
-        <SectionCard title="⭐ Рекомендовано для вас" hint="На основе профиля (уровень/дни/цель) — интеллигентный подбор" accent>
+        <div className="lib-rec"><SectionCard title="⭐ Рекомендовано для вас" hint="На основе профиля (уровень/дни/цель) — интеллигентный подбор" accent>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
             {recommendedBB.map(p => (
               <div key={p.id} style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -229,10 +229,10 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
               </div>
             ))}
           </div>
-        </SectionCard>
+        </SectionCard></div>
       )}
       {tab === 'pl' && !search && !favOnly && level === 'all' && days === 'all' && (recommendedPL as any[]).length > 0 && (
-        <SectionCard title="⭐ Рекомендовано для вас" hint="ПЛ-циклы под ваш уровень и частоту" accent>
+        <div className="lib-rec"><SectionCard title="⭐ Рекомендовано для вас" hint="ПЛ-циклы под ваш уровень и частоту" accent>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
             {(recommendedPL as any[]).map((c: any) => (
               <div key={c.meta.id} style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(135deg, rgba(167,139,250,0.10), rgba(59,130,246,0.06))', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -242,12 +242,12 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
               </div>
             ))}
           </div>
-        </SectionCard>
+        </SectionCard></div>
       )}
 
       {/* Сравнение */}
       {compareIds.length === 2 && tab === 'bb' && compareBB.length === 2 && (
-        <SectionCard title="⇄ Сравнение программ" accent>
+        <div className="lib-compare"><SectionCard title="⇄ Сравнение программ" accent>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {compareBB.map(p => (
               <div key={p.id} style={{ padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -259,10 +259,10 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
             ))}
           </div>
           <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>{compareBB[0].daysPerWeek === compareBB[1].daysPerWeek ? 'Одинаковая частота' : `Разная частота: ${compareBB[0].daysPerWeek} vs ${compareBB[1].daysPerWeek} д/нед`} · {compareBB[0].level === compareBB[1].level ? 'Один уровень' : 'Разные уровни'}</div>
-        </SectionCard>
+        </SectionCard></div>
       )}
       {compareIds.length === 2 && tab === 'pl' && comparePL.length === 2 && (
-        <SectionCard title="⇄ Сравнение ПЛ-циклов" accent>
+        <div className="lib-compare"><SectionCard title="⇄ Сравнение ПЛ-циклов" accent>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {comparePL.map((c: any) => (
               <div key={c.meta.id} style={{ padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -272,7 +272,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
               </div>
             ))}
           </div>
-        </SectionCard>
+        </SectionCard></div>
       )}
 
       {/* Список ББ */}

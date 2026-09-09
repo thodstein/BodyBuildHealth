@@ -108,7 +108,8 @@ export const ProgramsTab: React.FC<{
       const exercises = expandedSelected.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => ({
         name: e.name, sets: e.sets, reps: parseInt(String(e.reps), 10) || 10, rir: e.rir ?? 2,
       }))));
-      const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+      const raw = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+      const existing = Array.isArray(raw) ? raw.filter((p: unknown) => p && typeof p === 'object') : [];
       existing.push({ id: 'prog_' + Date.now(), name: expandedSelected.name, date: new Date().toISOString(), exercises });
       localStorage.setItem('myTrainingPlans', JSON.stringify(existing));
       setMyProgMsg('✅ Добавлено в «Мои программы»!');
