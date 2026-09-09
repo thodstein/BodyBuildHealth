@@ -1084,8 +1084,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const specFactor = specializationVolumeFactor(muscle, weekSpec);
         // focusGroup: +30% (входит в specFactor)
         const focusFactor = 1.0;
-        // P0-1: female glute boost ×1.2 (как в buildBBPlan:590) —女性 glutes требуют большего объёма
-        const femaleGluteBoost = (input.sex === 'female' && muscle === 'glutes') ? 1.2 : 1.0;
+        // P0-1: female posterior boost ×1.2 (как в buildBBPlan: glutes + parity hamstrings —
+        // Plotkin 2023: хамсы не растут от приседа/хип-траста, женщинам нужен прямой объём задней цепи)
+        const femaleGluteBoost = (input.sex === 'female' && (muscle === 'glutes' || muscle === 'hamstrings')) ? 1.2 : 1.0;
         // Goal→объём (паритет с bb-builder: cut 0.72 / recomp 0.92 / maintenance 0.80 / mass 1.05 / strength_mass 1.03)
         const goalMult = mode === 'faithful' ? 1.0 : (() => {
           const g = (input.goal || 'mass').toLowerCase();
@@ -1932,8 +1933,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (isWeakMuscle) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
           if (isWeakMuscle) adjRir = Math.max(0, rir - 1);
-          // P0-1: female glute boost ×1.2 (как в buildBBPlan:590)
-          if (opts.sex === 'female' && muscle === 'glutes') adjSets = Math.round(adjSets * 1.2);
+          // P0-1: female posterior boost ×1.2 (паритет с generic-путём: glutes + hamstrings)
+          if (opts.sex === 'female' && (muscle === 'glutes' || muscle === 'hamstrings')) adjSets = Math.round(adjSets * 1.2);
           // PED volume boost (как в buildBBPlan): primary × mrvMult, accessory × max(1, mrvMult×0.8)
           if (opts.peds && opts.peds.length > 0) {
             const pedFactor = role === 'primary' ? mrvMult : Math.max(1.0, mrvMult * 0.8);

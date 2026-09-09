@@ -989,7 +989,11 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   // PED boost для accessory arms/shoulders — на курсе нужен больший объём
   const pedArmBoost = pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 && muscle && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle) ? 1.4 : 1.0;
   // Glute boost для женщин: glutes получают +20% объёма (женская физиология — больший гипертрофический потенциал ягодичных).
-  const gluteBoost = isFemale && muscle === 'glutes' ? 1.2 : 1.0;
+  // Posterior-chain parity (Plotkin 2023: хамсы НЕ растут от приседа/хип-траста; Kassiano 2024 у женщин:
+  // leg press + SLDL + hip thrust +9.3% vs +6.0% без него): hamstrings у женщин получают тот же +20%,
+  // иначе задняя цепь перекашивается в попу при нулевом бонусе хамсов (femaleAdjust обещает hams-акцент).
+  const isFemalePosterior = isFemale && (muscle === 'glutes' || muscle === 'hamstrings');
+  const gluteBoost = isFemalePosterior ? 1.2 : 1.0;
   const finalMult = pedArmBoost * gluteBoost;
   // P0-1: arms (biceps/triceps/forearms) — accessory factor повышен с 0.6 до 0.85.
   // Раньше: biceps MAV=8, 2×/нед → 8/2×0.6=2.4 → 2 сета/сессию → 1 сет на упражнение (разминка!).
@@ -998,7 +1002,7 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   const isArmMuscle = muscle === 'biceps' || muscle === 'triceps' || muscle === 'forearms';
   if (sessionsPerWeek <= 1) {
     // P5 + BUG-B2: cap на 1×/нед — Schoenfeld 2016 оптимум 12-16 сетов/день для advanced.
-    const gluteFactor = isFemale && muscle === 'glutes' ? 1.4 : 1.0;
+    const gluteFactor = isFemalePosterior ? 1.4 : 1.0;
     if (role === 'accessory') {
       const accFactor = isArmMuscle ? 0.7 : 0.5;
       return Math.max(3, Math.min(Math.round(mavRot * accFactor * gluteFactor), 8));

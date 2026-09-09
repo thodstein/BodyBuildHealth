@@ -58,7 +58,9 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
   hamstrings: [
     { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
     { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
-    { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge|гакк.*бицепс|hack.*(hamstring|колодец)|колодец/i.test(e.name) },
+    // Plotkin 2023: hip thrust — гликово-специфичен (хамсы ~0 роста); мост/траст живут в классе
+    // glutes.hip_thrust. Здесь только шарнир таза: RDL/гакк-на-бицепс/колодец.
+    { name: 'rdl_bridge', match: (e) => /румын|rdl|гакк.*бицепс|hack.*(hamstring|колодец)|колодец/i.test(e.name) },
     { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|гиперэкстенз|back.?extension/i.test(e.name) },
     { name: 'nordic_ghr', match: (e) => /норд|nordic|glute.?ham|ghr/i.test(e.name) },
     { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
@@ -245,6 +247,23 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
       key: 'quad_ext', label: 'Разгибания ног сидя',
       ids: ['leg_ext', 'leg_ext_v2', 'leg_ext_single', 'seated_leg_extension', 'single_leg_extension'],
       re: /разгибан.*ног|leg.?extension/i,
+    },
+  ],
+  // Kassiano 2024 (женщины): leg press + SLDL + hip thrust дают +9.3% толщины glute max
+  // против +6.0% без траста. NSCA Hodge 2023: 4 паттерна (thrust/squat+hinge/abduction).
+  // Жёсткие группы попы: траст меняется только на траст, отведение — только на отведение.
+  glutes: [
+    {
+      key: 'glute_thrust', label: 'Ягодичный мост / хип-траст',
+      ids: ['hip_thrust', 'hip_thrust_barbell', 'hip_thrust_single', 'b_stance_hip_thrust', 'cable_hip_thrust',
+        'glute_bridge', 'glute_bridge_v2', 'glute_bridge_barbell', 'single_leg_glute_bridge', 'banded_glute_bridge', 'bridge_walkout'],
+      re: /ягодичн.*мост|hip.?thrust|glute.?bridge|вышагиван.*мост|bridge.?walkout/i,
+    },
+    {
+      key: 'glute_abduction', label: 'Отведение бедра / кикбэк (верх попы)',
+      ids: ['cable_kickback', 'donkey_kick'],
+      re: /отведен.*(бедр|ног)|abduction|разведен.*ног|кикбэк|kick.?back|ослин.*удар|donkey.?kick|мах.*ног/i,
+      not: /тяга.*лиц|face.?pull/i,
     },
   ],
 };

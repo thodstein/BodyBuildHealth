@@ -146,6 +146,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   }, []);
   // Универсальный переход на вкладку с автоматическим выбором её зоны
   const goTab = useCallback((t: TrainingTab) => { setZone(zoneForTab(t)); setTab(t); }, []);
+  // Двусторонняя связка с ББ-авто: кнопка «🎯 ББ-диагностика» в BbAutoConstructor
+  // открывает таб диагностики (обратный путь к planning-track-open из хаба).
+  useEffect(() => {
+    const h = (e: Event) => {
+      const t = (e as CustomEvent).detail as string | undefined;
+      if (t === 'bb_diagnostics_hub' || t === 'bb_diagnostics') goTab('bb_diagnostics_hub' as TrainingTab);
+    };
+    window.addEventListener('training-open-tab', h);
+    return () => window.removeEventListener('training-open-tab', h);
+  }, [goTab]);
   // маршрутизация «Применить» для интеллектуальных тренировок (source = intellectual)
   useEffect(() => {
     if (zone === 'calculators') {

@@ -379,7 +379,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         weakHeads,
         specBlock: specPayload,
         sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
-      } as any,
+      },
       source: 'intellectual',
     });
     setToast(`✓ Применено в ББ-авто: ${report.weakZonesGranular.join(', ')} (score ${score})`);
@@ -733,7 +733,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         labDiagnosis: selectedDiagnosis ? { flags: selectedDiagnosis.flags, issues: selectedDiagnosis.issues, score: selectedDiagnosis.score } : null,
         labCorrection: action, labDelta: delta,
         bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
-      } as any,
+      },
       source: 'intellectual',
     });
     setToast(`✓ Коррекция ${action.type} → в ББ-авто${delta?.summary ? ` (${delta.summary})` : ''}`);

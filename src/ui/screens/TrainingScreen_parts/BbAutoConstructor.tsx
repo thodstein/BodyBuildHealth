@@ -46,7 +46,7 @@ import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
-import { subscribePlannerApply, applyToPlanner } from './planner-bridge';
+import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
@@ -1363,15 +1363,16 @@ export const BbAutoConstructor: React.FC = () => {
         setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
         setTimeout(() => setBridgeMsg(''), 5000);
         setStep('params');
-      } else if (payload.kind === 'weakpoints' && (Array.isArray((payload.data as any).weakZonesGranular) || Array.isArray((payload.data as any).groups))) {
-        const groups = ((payload.data as any).weakZonesGranular as string[] | undefined) ?? (payload.data as any).groups as string[];
+      } else if (payload.kind === 'weakpoints' && (Array.isArray((payload.data as WeakpointsPayload).weakZonesGranular) || Array.isArray((payload.data as WeakpointsPayload).groups))) {
+        const bbDiag = payload.data as WeakpointsPayload;
+        const groups = (bbDiag.weakZonesGranular ?? bbDiag.groups) as string[];
         const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
         if (normalized.length > 0) {
           setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: normalized, tradeoffMode: 'none' as const, donors: [] }]);
           setBridgeMsg(`🔗 Слабые группы → ББ-авто: ${normalized.join(', ')}`);
           setTimeout(() => setBridgeMsg(''), 4000);
         }
-        const pref = (payload.data as any).preferredExerciseIds as string[] | undefined;
+        const pref = bbDiag.preferredExerciseIds;
         if (Array.isArray(pref) && pref.length) {
           const clean = pref.map(s => String(s).toLowerCase().trim()).filter(Boolean).slice(0, 8);
           setPreferredExerciseIds(clean);
@@ -1379,7 +1380,7 @@ export const BbAutoConstructor: React.FC = () => {
           setBridgeMsg((prev: string) => prev ? `${prev} · упр: ${clean.join(', ')}` : `🔗 Упражнения → ББ-авто: ${clean.join(', ')}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
-        const swap = (payload.data as any).exerciseSwap as { oldId: string; newId: string } | undefined;
+        const swap = bbDiag.exerciseSwap;
         if (swap && swap.oldId && swap.newId) {
           const entry = { oldId: String(swap.oldId).toLowerCase(), newId: String(swap.newId).toLowerCase() };
           setExerciseSwaps(prev => {
@@ -1390,11 +1391,11 @@ export const BbAutoConstructor: React.FC = () => {
           setBridgeMsg((prev: string) => prev ? `${prev} · замена ${entry.oldId}→${entry.newId}` : `🔗 Замена → ББ-авто: ${entry.oldId}→${entry.newId}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
-        const labDiag = (payload.data as any).labDiagnosis;
+        const labDiag = bbDiag.labDiagnosis;
         if (labDiag) {
           try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
         }
-        const labCorr = (payload.data as any).labCorrection;
+        const labCorr = bbDiag.labCorrection;
         if (labCorr && labCorr.type) {
           setExecutionCorrections(prev => {
             const next = [...prev.filter(p => p.type !== labCorr.type || p.targetId !== labCorr.targetId), labCorr].slice(-8);
@@ -1404,22 +1405,23 @@ export const BbAutoConstructor: React.FC = () => {
           setBridgeMsg((prev: string) => prev ? `${prev} · корр ${labCorr.type}` : `🔗 Коррекция → ББ-авто: ${labCorr.type}${labCorr.targetName ? ` ${labCorr.targetName}` : ''}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
-        // MAX PRO: спец-блок из диагностики (недели/доноры/dayMap) + причины
-        const spec = (payload.data as any).specBlock as { lengthWeeks?: number; donors?: string[]; dayMap?: Record<string, number[]> } | undefined;
-        if (spec && normalized.length > 0) {
-          const wks = Math.max(3, Math.min(6, Math.round(spec.lengthWeeks ?? 5)));
-          const donors = Array.isArray(spec.donors) ? spec.donors.map((d) => String(d)).slice(0, 2) : [];
+        // MAX PRO: спец-блок из диагностики (недели/доноры/dayMap) + причины.
+        // Форма свободная (unknown) — валидируем перед применением.
+        const specRaw = bbDiag.specBlock as { lengthWeeks?: unknown; donors?: unknown } | null | undefined;
+        if (specRaw && typeof specRaw === 'object' && normalized.length > 0) {
+          const wks = Math.max(3, Math.min(6, Math.round(typeof specRaw.lengthWeeks === 'number' ? specRaw.lengthWeeks : 5)));
+          const donors = Array.isArray(specRaw.donors) ? specRaw.donors.map((d) => String(d)).slice(0, 2) : [];
           setSpecBlocks([{ id: 'spec-block-1', weeks: wks, targets: normalized, tradeoffMode: donors.length ? 'reduce_direct_to_floor' as const : 'none' as const, donors }]);
-          try { localStorage.setItem('he_bb_last_spec_block', JSON.stringify(spec)); } catch {}
+          try { localStorage.setItem('he_bb_last_spec_block', JSON.stringify(specRaw)); } catch {}
           setBridgeMsg((prev: string) => prev ? `${prev} · спец-блок ${wks} нед` : `🔗 Спец-блок → ББ-авто: ${wks} нед`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
-        const causes = (payload.data as any).weakCauses;
+        const causes = bbDiag.weakCauses;
         if (causes && typeof causes === 'object') {
           try { localStorage.setItem('he_bb_last_weak_causes', JSON.stringify(causes)); } catch {}
         }
         // Слабые головки стимула — persist для будущих сборок и смены углов
-        const heads = (payload.data as any).weakHeads;
+        const heads = bbDiag.weakHeads;
         if (Array.isArray(heads) && heads.length) {
           const clean = heads.map((h) => String(h).toLowerCase().trim()).filter(Boolean).slice(0, 2);
           try { localStorage.setItem('he_bb_last_weak_heads', JSON.stringify(clean)); } catch {}
@@ -5781,6 +5783,7 @@ export const BbAutoConstructor: React.FC = () => {
                <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
               <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#38bdf8', color:'#38bdf8' }} aria-label="Открыть ББ-диагностику" onClick={() => { try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'bb_diagnostics_hub' })); } catch {} }}>🎯 ББ-диагностика</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
               <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
               <button style={BTN_GHOST} onClick={handlePrintPlan}>📋 Вся таблица</button>

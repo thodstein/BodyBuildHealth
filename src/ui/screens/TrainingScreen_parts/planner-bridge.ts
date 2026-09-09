@@ -28,7 +28,21 @@ export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' |
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
-export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedic?: unknown; currentPain?: string[]; diagnosticExerciseMap?: Record<string, string[]>; diagnosticDayMap?: Record<string, number[]>; plWeakPoints?: { lift: string; weakPoint: string; days?: number[] }[]; weakGroupExerciseMap?: Record<string, string[]>; weakGroupDayMap?: Record<string, number[]> }
+export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedic?: unknown; currentPain?: string[]; diagnosticExerciseMap?: Record<string, string[]>; diagnosticDayMap?: Record<string, number[]>; plWeakPoints?: { lift: string; weakPoint: string; days?: number[] }[]; weakGroupExerciseMap?: Record<string, string[]>; weakGroupDayMap?: Record<string, number[]>;
+  /** ББ-диагностика (BBDiagnosticsHub → BbAutoConstructor, kind 'weakpoints', source 'intellectual').
+   *  Все поля опциональны — ПЛ/ручной путь их игнорирует. Раньше ехали через `as any` с обеих сторон. */
+  weakPoints?: string[]; weakZonesGranular?: string[]; weakMusclesCanonical?: string[];
+  preferredExerciseIds?: string[]; exerciseSwap?: { oldId: string; newId: string };
+  labDiagnosis?: unknown; labCorrection?: { type: string; targetId?: string | null; targetName?: string } & Record<string, unknown>; labDelta?: unknown;
+  bbDiagScore?: number; bbDiagLevel?: string; verification?: unknown;
+  symmetry?: unknown; stimulus?: unknown; perMuscleAcwr?: Record<string, { ratio: number; zone: string }>;
+  ohs?: { totalScore: number; failed: number }; vbt?: { lossPct: number; zone: string } | null;
+  weakCauses?: unknown; weakHeads?: string[];
+  /** Форма свободная (движок SpecBlock: weeks/lengthWeeks/donors/dayMap/rationale);
+   *  приёмник валидирует поля перед применением. */
+  specBlock?: unknown;
+  sleepHours?: number | null;
+}
 export interface PriPayload { volumeMult: number; rirShift: number }
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }
 export interface RirPayload { rirShift: number; label?: string }

@@ -3466,7 +3466,7 @@ for (const week of next.weeks) {
     const gradedMusclesFinal = new Set(options.gradedMuscles || []);
     const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
     for (const week of next.weeks) {
-      if (isPrepControlled(week)) continue; // prep-недели не добираем
+      if (isPrepControlled(week) || isGenericTaperWeek(week)) continue; // prep/taper-недели не добираем (тейпер иначе откатывается добором)
       const donors = tradeoffDonorsForWeek(options, week.week);
       // Natural: малые группы (abs/traps) добираем ТОЛЬКО если их нет во всей
       // неделе — иначе fill дублирует пресс в каждой сессии (> MRV).
