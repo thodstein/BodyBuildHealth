@@ -100,7 +100,7 @@ export const BTN_GHOST: React.CSSProperties = {
   color: ACCENT,
   boxShadow: 'none',
 };
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 40, padding: '10px 16px', fontSize: 14, borderRadius: 10, fontWeight: 700 };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 44, padding: '12px 16px', fontSize: 14, borderRadius: 10, fontWeight: 700 };
 export const INPUT: React.CSSProperties = {
   background: 'rgba(58,58,60,0.72)',
   border: '0.5px solid rgba(84,84,88,0.36)',

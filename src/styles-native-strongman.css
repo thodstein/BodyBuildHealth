@@ -565,6 +565,25 @@ html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] button:focus-visible
   outline-offset: 2px !important;
 }
 
+/* ─── 23. ТОГЛЫ КИТА — press + focus + glow активного ─────────────── */
+html.app-native .train-strong.ss-apk .kit-chiptoggle {
+  -webkit-tap-highlight-color: transparent !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-strong.ss-apk .kit-chiptoggle:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .train-strong.ss-apk .kit-chiptoggle:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-strong.ss-apk .kit-chiptoggle[data-active='true'] {
+  box-shadow: 0 6px 18px var(--ss-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.app-native .train-strong.ss-apk {
     animation: none;
