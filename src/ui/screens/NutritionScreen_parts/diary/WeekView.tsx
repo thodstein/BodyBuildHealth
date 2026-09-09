@@ -85,11 +85,11 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
             const pct = m.t > 0 ? Math.min(100, Math.round((m.v || 0) / m.t * 100)) : 0;
             const isLow = pct < 70; const isGood = pct>=85 && pct<=115;
             return (
-              <div key={m.l} style={{ textAlign: 'center', padding: '12px 6px', borderRadius: 14, background: m.bg, border:`1px solid ${isGood ? m.c+'30' : isLow ? 'rgba(245,158,11,0.20)' : 'rgba(255,255,255,0.06)'}`, boxShadow: isGood ? `0 4px 12px ${m.c}15` : '0 2px 8px rgba(0,0,0,0.08)', position:'relative', overflow:'hidden' }}>
+              <div key={m.l} className="nd-weekstat" style={{ textAlign: 'center', padding: '12px 6px', borderRadius: 14, background: m.bg, border:`1px solid ${isGood ? m.c+'30' : isLow ? 'rgba(245,158,11,0.20)' : 'rgba(255,255,255,0.06)'}`, boxShadow: isGood ? `0 4px 12px ${m.c}15` : '0 2px 8px rgba(0,0,0,0.08)', position:'relative', overflow:'hidden' }}>
                 <div style={{ position:'absolute', top:-10, right:-10, width:36, height:36, background:`radial-gradient(circle, ${m.c}12 0%, transparent 70%)`, borderRadius:'50%' }} />
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', fontWeight:600, letterSpacing:0.3 }}>{m.icon} {m.l}</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', fontWeight:600, letterSpacing:0.3 }}>{m.icon} {m.l}</div>
                 <div style={{ fontSize: 17, fontWeight: 900, color: m.c, lineHeight: 1, marginTop:4, letterSpacing:-0.5 }}>{m.v}{m.u || ''}</div>
-                <div style={{ fontSize: 8, color: isGood ? m.c : isLow ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:700, marginTop:2 }}>{pct}% от цели</div>
+                <div style={{ fontSize: 10, color: isGood ? m.c : isLow ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:700, marginTop:2 }}>{pct}% от цели</div>
                 <div style={{ height:4, borderRadius:999, background:'rgba(255,255,255,0.07)', marginTop:6, overflow:'hidden', padding:1 }}><div style={{ height:'100%', width:`${Math.min(100,pct)}%`, background: isGood? m.c : isLow ? '#f59e0b' : 'rgba(255,255,255,0.25)', borderRadius:999, transition:'width 0.5s cubic-bezier(0.22,1,0.36,1)' }} /></div>
               </div>
             );
@@ -161,7 +161,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
                   </div>
                 )}
                 {d.items > 0 && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 9, flexWrap:'wrap' }}>
+                  <div className="nd-daybju" style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 10, flexWrap:'wrap' }}>
                     <span style={{ padding:'2px 6px', borderRadius:6, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.12)', color:'#60a5fa', fontWeight:600 }}>Б {Math.round(d.p)}г</span>
                     <span style={{ padding:'2px 6px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.12)', color:'#fbbf24', fontWeight:600 }}>Ж {Math.round(d.f)}г</span>
                     <span style={{ padding:'2px 6px', borderRadius:6, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.12)', color:'#a78bfa', fontWeight:600 }}>У {Math.round(d.c)}г</span>

@@ -222,8 +222,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:4, marginLeft:8, flexShrink:0 }}>
-                  <button onClick={() => onAddFoodFromDB(f)} title="В очередь (потом Сохранить)" style={{ padding:'5px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontSize:10, cursor:'pointer', minHeight:28 }}>＋</button>
-                  {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} style={{ padding:'5px 9px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700, cursor:'pointer', minHeight:28, boxShadow:'0 2px 8px rgba(0,230,138,0.2)' }}>⚡ 100г</button>}
+                  <button onClick={() => onAddFoodFromDB(f)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={{ padding:'5px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontSize:12, cursor:'pointer', minHeight:44, minWidth:44 }}>＋</button>
+                  {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={{ padding:'5px 9px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44, boxShadow:'0 2px 8px rgba(0,230,138,0.2)' }}>⚡ 100г</button>}
                 </div>
               </div>
             ))}
@@ -260,8 +260,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, marginLeft: 8, flexShrink: 0 }}>
-                        <button onClick={() => onAddFoodFromDB(retailToFoodItem(p) as any)} title="В очередь (потом Сохранить)" style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, cursor: 'pointer', minHeight: 28 }}>＋</button>
-                        {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28 }}>⚡ 100г</button>}
+                        <button onClick={() => onAddFoodFromDB(retailToFoodItem(p) as any)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>＋</button>
+                        {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>⚡ 100г</button>}
                       </div>
                     </div>
                   );
@@ -296,8 +296,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, marginLeft: 8, flexShrink: 0 }}>
-                    <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: 10, cursor: 'pointer', minHeight: 28 }}>＋</button>
-                    {onDirectAdd && <button onClick={() => onDirectAdd(f)} style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28 }}>⚡ 100г</button>}
+                    <button onClick={() => onAddFoodFromDB(f)} aria-label="В очередь" className="nd-addq" style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: 12, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>＋</button>
+                    {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-addnow" style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>⚡ 100г</button>}
                   </div>
                 </div>
               ))}
@@ -565,7 +565,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 {isEditing ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Название"
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, minHeight: 36 }} />
+                      aria-label="Название блюда" className="nd-qedit-name"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, minHeight: 44 }} />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
                       {[
                         { l: 'г', v: editQty, f: setEditQty },
@@ -583,8 +584,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       ))}
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onClick={saveEdit} style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 32 }}>✓</button>
-                      <button onClick={() => setEditingIdx(-1)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: 'rgba(255,255,255,0.7)', fontSize: 11, minHeight: 32 }}>✕</button>
+                      <button onClick={saveEdit} aria-label="Сохранить правку" className="nd-qedit-save" style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 12, minHeight: 44 }}>✓</button>
+                      <button onClick={() => setEditingIdx(-1)} aria-label="Отменить правку" className="nd-qedit-cancel" style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: 'rgba(255,255,255,0.7)', fontSize: 12, minHeight: 44 }}>✕</button>
                     </div>
                   </div>
                 ) : (
@@ -600,13 +601,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         {!isLowConf && (
                           <button onClick={() => startEdit(i, item)} aria-label="Изменить"
                             style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 10, minHeight: 28 }}>
+                              background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 12, minHeight: 44, minWidth: 44 }}>
                             ✎
                           </button>
                         )}
                         <button onClick={() => onRemoveParsedItem(i)} aria-label="Удалить"
                           style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 10, minHeight: 28 }}>
+                            background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, minHeight: 44, minWidth: 44 }}>
                           ✕
                         </button>
                       </div>
@@ -629,11 +630,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                   </div>
                   <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
                     {[50, 100, 200, 300].map(v => (
-                      <button key={v} onClick={() => onUpdateParsedItemQty(i, v)} aria-label={`${v} грамм`}
+                      <button key={v} onClick={() => onUpdateParsedItemQty(i, v)} aria-label={`${v} грамм`} aria-pressed={q === v} className="nd-qpreset"
                         style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)',
                           background: q === v ? 'rgba(0,230,138,0.12)' : '#18181b',
                           color: q === v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor: 'pointer', 
-                          fontSize: 9, fontWeight: q === v ? 700 : 400, minHeight: 28 }}>
+                           fontSize: 11, fontWeight: q === v ? 700 : 400, minHeight: 44 }}>
                         {v}г
                       </button>
                     ))}

@@ -40,7 +40,7 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
           <button onClick={()=>shiftWeek(1)} aria-label="След. неделя" className="nd-week-nav" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
           <div style={{ marginLeft:4 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:7, height:7, borderRadius:4, background:'#00e68a', boxShadow:'0 0 8px #00e68a80' }} />{weekLabel}</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:1 }}>{weekKcalTotal.days}/7 дн • ∑ {weekKcalTotal.total} ккал</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:1, fontVariantNumeric: 'tabular-nums' }}>{weekKcalTotal.days}/7 дн • ∑ {weekKcalTotal.total} ккал</div>
           </div>
         </div>
         <button onClick={()=>onSelectDate(today)} aria-label="Сегодня" style={{ padding:'7px 12px', borderRadius:10, border:selectedDate===today?'1.5px solid #00e68a':'1px solid rgba(0,230,138,0.18)', background: selectedDate===today ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(0,230,138,0.08)', color: selectedDate===today ? '#000' : '#00e68a', fontSize:10, fontWeight:800, cursor:'pointer', boxShadow: selectedDate===today ? '0 2px 10px rgba(0,230,138,0.25)' : 'none' }}>Сегодня</button>
@@ -103,10 +103,10 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
           );
         })}
       </div>
-      <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:6 }}>
-        <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#00e68a' }} /> ≥2200</span>
-        <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#f59e0b' }} /> 1500-2200</span>
-        <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#ef4444' }} /> &gt;2600</span>
+      <div className="nd-weeklegend" style={{ display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' }}>
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#00e68a' }} /> ≥2200</span>
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#f59e0b' }} /> 1500-2200</span>
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:3, borderRadius:2, background:'#ef4444' }} /> &gt;2600</span>
       </div>
     </div>
   );

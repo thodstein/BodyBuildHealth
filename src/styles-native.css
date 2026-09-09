@@ -9995,6 +9995,65 @@ html.app-native .nd-storedismiss {
     box-shadow: none !important;
   }
 }
+/* --- 92. NUTRITION DIARY PRO-4: result actions/week tiles --- */
+html.app-native .nd-addq {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-addnow {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-addq:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-addnow:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-qpreset {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-qpreset:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-qpreset:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-qedit-name {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-qedit-save {
+  min-height: 44px !important;
+}
+html.app-native .nd-qedit-cancel {
+  min-height: 44px !important;
+}
+html.app-native .nd-qedit-save:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-weekstat {
+  font-variant-numeric: tabular-nums !important;
+  border-radius: 16px !important;
+}
+html.app-native .nd-daybju {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-weeklegend {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-weekstat {
+    padding: 10px 4px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-addnow {
+    transform: none !important;
+  }
+}
 
 /* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
  * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.
@@ -10657,6 +10716,97 @@ html.app-native .combat-planview .cb-plan-export button:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   html.app-native .combat-planview .cb-plan-export button:active {
+    transform: none !important;
+  }
+}
+
+/* ─── 94. TRAINING HERO PRO — главный экран тренировок ───
+ * Хуки: .training-hero (.tp-herobody/.tp-herotitle/.tp-herosub/
+ * .training-hero-stats/.training-hero-zones/.training-hero-zone[data-zone]/
+ * .tp-hicon/.tp-htitle/.tp-hsub/.tp-hchev).
+ * Зоны-карточки 20px с цветной левой кромкой, иконки 48px с glow,
+ * шеврон-пилюля 36px, press 0.98, focus-visible, tabular-статистика,
+ * контент со скроллом на низких экранах, 380px, reduced-motion.
+ * Только APK: TG/web — как было. */
+html.app-native .training-hero .tp-herobody {
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  gap: 0 !important;
+}
+html.app-native .training-hero .tp-herobody::-webkit-scrollbar {
+  display: none;
+}
+html.app-native .training-hero .tp-herotitle {
+  font-size: 24px !important;
+  line-height: 1.1 !important;
+}
+html.app-native .training-hero .tp-herosub {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .training-hero .training-hero-stats {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-hero .training-hero-zones {
+  gap: 10px !important;
+  padding-bottom: 4px !important;
+}
+html.app-native .training-hero .training-hero-zone {
+  min-height: 72px !important;
+  border-radius: 20px !important;
+  padding: 12px 14px !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .training-hero .training-hero-zone:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .training-hero .training-hero-zone:active .tp-hchev {
+  transform: scale(0.9) !important;
+}
+html.app-native .training-hero .tp-hicon {
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.2) !important;
+}
+html.app-native .training-hero .tp-htitle {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-hero .tp-hsub {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+html.app-native .training-hero .tp-hchev {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-hero .training-hero-zone:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .training-hero .training-hero-zone {
+    padding: 10px 12px !important;
+    gap: 10px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-hero .tp-hicon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .training-hero .tp-herosub {
+    display: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-hero .training-hero-zone:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-hero .training-hero-zone:active .tp-hchev {
     transform: none !important;
   }
 }

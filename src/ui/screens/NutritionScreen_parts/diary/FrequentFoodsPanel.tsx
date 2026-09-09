@@ -98,7 +98,7 @@ export const FrequentFoodsPanel: React.FC<FrequentFoodsPanelProps> = ({
                 <span style={{ color: 'rgba(255,255,255,0.6)' }}>→</span>
                 <span style={{ color: '#00e68a', fontWeight: 700 }}>{kcal} ккал</span>
               </div>
-              <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+              <div style={{ display: 'flex', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
                 <span style={{ color: '#60a5fa' }}>Б{p}</span><span style={{ color: '#f59e0b' }}>Ж{f}</span><span style={{ color: '#fb923c' }}>У{c}</span>
               </div>
             </button>

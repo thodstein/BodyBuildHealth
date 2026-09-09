@@ -11,6 +11,7 @@ import { DayMealsList } from '../diary/DayMealsList';
 import { QualityInsights } from '../diary/QualityInsights';
 import { NutritionDiaryCharts } from '../NutritionDiaryCharts';
 import { StorageErrorBanner } from '../diary/StorageErrorBanner';
+import { WeekView } from '../diary/WeekView';
 
 vi.mock('../useNutritionDiary', () => ({
   useFrequentFoods: vi.fn(() => []),
@@ -144,6 +145,17 @@ describe('nutrition-diary-pro hooks', () => {
     );
     expect(full.querySelector('.nd-storeerr')).not.toBeNull();
     expect(full.querySelector('.nd-storedismiss')).not.toBeNull();
+  });
+
+  it('WeekView: сводка + 4 стат-тайла + 7 строк', () => {
+    const { container } = render(
+      <WeekView diaryData={{}} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-09-09" onSelectDate={noop} />
+    );
+    expect(container.querySelector('.nd-weekview')).not.toBeNull();
+    expect(container.querySelector('.nd-weeksum')).not.toBeNull();
+    expect(container.querySelectorAll('.nd-weekstat')).toHaveLength(4);
+    expect(container.querySelectorAll('.nd-dayrow')).toHaveLength(7);
   });
 
   it('FrequentFoodsPanel: хуки ленты и чипов', () => {
