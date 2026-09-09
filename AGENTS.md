@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Арм: свитчи/шиты + русификация (Sep 10 2026, НЕ пушить — очередь чужих)
+
+Постановка: «доделай работу агента» — фикс падавших тестов после замены нативных галочек/селектов на красивые свитчи/попапы + русификация английских подписей.
+
+- **Компоненты** (`arm-design-system.tsx`): `AdSwitch` (button role="switch" + aria-checked + data-on, track 52×32/thumb 24px с градиентом, haptic) + `AdSheetSelect` (триггер aria-haspopup="dialog" с aria-label `Лейбл: значение`, bottom-sheet role="dialog" aria-label=лейбл, опции aria-pressed + ✓ на выбранном, Escape/бэкдроп/«Готово» закрывают без выбора). CSS: `.ad-switch-track/thumb/label`, `.ad-sheet-trigger/card/opt/backdrop` в `arm-design.css`; native §-append в `styles-native-arm.css` (52px, press 0.93, focus-visible, tabular).
+- **Замены**: конструктор — 25× AdCheck→AdSwitch (PED-блок, PRO-WAF, слабые зоны, TOP-флаги RFD/sim/cross-meso/Grip-RPE-авто, цикл-флаги ось/ФОР-7/Brzenk/синглы/кровоток/пирамида, платформенный помост, имплемент-пары), 8× select→AdSheetSelect (Цикл, Медли, CoC, ФОР-домен, Имплемент-лестница, Grip-RPE неделя/фаза, снаряд помоста); хаб-tabs2 — 4× свитч (Оппонент/Рука/Травма/Техника-снаряд) + 3× шит; `ArmTechniqueCard` — шит техники. Локальный `AdCheck` удалён (checkbox'ов в конструкторе 0 — guard-тест).
+- **Русификация** (GRIP_FOCI/PRO/TOP/цикл-флаги): Hub→Хаб, Enhanced→На курсе (2 места), Wrist curl→Сгибание кисти/фунт, Pron hold→Пронация/с, Cup hold→Чаша/с, CoC lvl→CoC/ур., High-hand→Верхний, Low-hand→Нижний, Flat pyramid→Плоская пирамида (Бомпа), Bloodflow→Приток крови 100×, Never fail→Без отказов, Heavy singles→Тяжёлые синглы 17–18, Brzenk→Брзенк 1+1, FOR-7→ФОР-7.
+- **Поймано своим тестом**: `FOR-7` в тесте — старое имя после русификации → ассерты переведены на `ФОР-7` (экспорт-текст FOR-7 из движка остаётся — не тронут); свёрнутые аккордеоны (`AdSec defaultOpen=false` рендерит детей с `display:none`) → `getByRole` не видит свитчи/шиты → NEW хелпер `openSec(re)` (находит кнопку-голову по aria-expanded, кликает) в 4 тестах; `openCycleSheet` в arm-cycle-picker раскрытие до клика по `/^Цикл:/`.
+- **Проверено**: arm-switch-sheet 6/6 (NEW: тоггл aria-checked/data-on, свитч в свёрнутом аккордеоне, 0 чекбоксов, шит открыть/выбрать/Escape/бэкдроп, русские подписи) + arm-top-ui/cycle-picker/grip-guide/wizard-nav **32/32** + прочие арм-UI **67/67** (7 файлов) + bridge/каталог 20/20 + engines/arm **729/729** + rest-hooks 68/68, `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK. Коммит `245283b28` (pathspec 11 своих). НЕ ПУШИТЬ.
+
 ## Арм-планировщик: перестройка в стиле ББ-авто + АПК §24 + хаб-шелл + печать (Sep 09 2026, НЕ пушить — очередь чужих)
 
 Постановка: «планировщик арм не перестроен, построение неудобное и громоздкое — оформи в стиле ББ-авто (но модернизированном)» → выбрано пользователем: 7 шагов как ББ + токены `training-ui`. Движки/строки/aria 1-в-1, тела табов хаба не тронуты.
