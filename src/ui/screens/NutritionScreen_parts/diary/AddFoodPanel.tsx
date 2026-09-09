@@ -679,11 +679,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
       {/* Custom food */}
       <button onClick={onToggleCustomFood} aria-label="Своя еда"
-        style={{ width: '100%', padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
-          background: showCustomFood ? 'rgba(139,92,246,0.12)' : '#202023',
+        style={{ width: '100%', padding: '12px', borderRadius: 14, fontSize: 12, cursor: 'pointer',
+          background: showCustomFood ? 'rgba(139,92,246,0.12)' : 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))',
           border: `1px solid ${showCustomFood ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.06)'}`,
-          color: '#8b5cf6', minHeight: 44, fontWeight: 500 }}>
-        {showCustomFood ? '✕ Скрыть' : '🍎 Своя еда (ввести вручную)'}
+          color: showCustomFood ? '#a78bfa' : 'rgba(255,255,255,0.85)', minHeight: 48, fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>🍎</span>
+        {showCustomFood ? '✕ Скрыть' : 'Своя еда (ввести вручную)'}
       </button>
       
       {showCustomFood && (

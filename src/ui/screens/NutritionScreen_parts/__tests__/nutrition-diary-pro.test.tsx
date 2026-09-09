@@ -115,7 +115,9 @@ describe('nutrition-diary-pro hooks', () => {
         onImportFromPlan={noop} onClearDay={noop} onFillMicros={noop} selectedDate="2026-09-09" copySource={null} onPasteMeal={noop} onCancelCopy={noop} />
     );
     expect(container.querySelector('.nd-dayactions')).not.toBeNull();
+    expect(container.querySelector('.nd-daycount')).not.toBeNull();
     expect(container.querySelector('.nd-mealcard')).not.toBeNull();
+    expect(container.querySelectorAll('.nd-mealbtn')).toHaveLength(2);
   });
 
   it('QualityInsights: пусто — null; с данными — nd-quality/nd-mood/nd-patterns', () => {

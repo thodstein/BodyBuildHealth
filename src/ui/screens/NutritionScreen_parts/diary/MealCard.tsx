@@ -92,13 +92,15 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
       <div className="nd-mealfoot" style={{ display: 'flex', gap: 6, padding: '0 8px 8px' }}>
         <button onClick={() => onCopyMeal(mealName)} aria-label="Копировать приём" className="nd-mealbtn"
           style={{ flex: 1, padding: '10px', borderRadius: 12, border: '1px solid rgba(139,92,246,0.2)',
-          background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
-          📋 Копировать
+          background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📋</span> Копировать
         </button>
         <button onClick={() => onSavePreset(mealName, items)} aria-label="Сохранить пресет" className="nd-mealbtn"
           style={{ flex: 1, padding: '10px', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)',
-          background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
-          💾 Пресет
+          background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>💾</span> Пресет
         </button>
       </div>
     </div>
