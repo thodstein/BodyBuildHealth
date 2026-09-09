@@ -72,10 +72,14 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
           ))}
         </div>
         {diag.priorities.length > 0 ? (
-          <div className="ad-list">
+          <div className="ad-list" data-arm="tech-results">
             {diag.priorities.map((p,i) => (
-              <div key={i} className="ad-sec">
-                <b>{p.muscle}</b> <span className="ad-muted">— {p.reason}</span>
+              <div key={i} className="ad-sec ad-bio" data-valid="warn" data-arm="tech-result">
+                <div className="ad-row">
+                  <span><b>{p.muscle}</b></span>
+                  <span className="ad-tag ad-angle">приоритет {i + 1}</span>
+                </div>
+                <div className="ad-muted">— {p.reason}</div>
                 <div className="ad-tip">{p.exercises.join(', ')}</div>
               </div>
             ))}

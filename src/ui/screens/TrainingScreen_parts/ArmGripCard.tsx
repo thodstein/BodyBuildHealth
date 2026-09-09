@@ -59,10 +59,14 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
         </AdGrid>
         <p className="ad-muted">Рекоменд объём: RT {volRT.sets}×{volRT.reps} · Axle {volAxle.sets}×{volAxle.reps} · Pinch/Side/Back — см. PRO-гейты (4 слоя)</p>
         {diag.priorities.length > 0 ? (
-          <div className="ad-list">
+          <div className="ad-list" data-arm="grip-results">
             {diag.priorities.map((p,i)=> (
-              <div key={i} className="ad-sec">
-                <b>{p.muscle}</b> — <span className="ad-muted">{p.reason}</span>
+              <div key={i} className="ad-sec ad-bio" data-valid="warn" data-arm="grip-result">
+                <div className="ad-row">
+                  <span><b>{p.muscle}</b></span>
+                  <span className="ad-tag ad-angle">приоритет {i + 1}</span>
+                </div>
+                <div className="ad-muted">— {p.reason}</div>
               </div>
             ))}
             <AdBtn variant="primary" onClick={apply}>➕ В слабые зоны</AdBtn>
