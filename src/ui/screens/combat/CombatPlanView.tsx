@@ -57,22 +57,23 @@ export const CombatPlanView: React.FC<Props> = ({
   return (
     <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Верхняя панель действий */}
-      <div style={{ ...CARD, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <div className="cb-plan-actions" style={{ ...CARD, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={onUndo} disabled={historyLen === 0} style={{
-            padding: '8px 12px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: historyLen ? 'pointer' : 'default',
+          <button className="cb-plan-undo" onClick={onUndo} disabled={historyLen === 0} style={{
+            padding: '8px 12px', minHeight: 44, borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: historyLen ? 'pointer' : 'default',
             background: historyLen ? 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.14))' : 'rgba(255,255,255,0.04)',
             color: historyLen ? '#d8b4fe' : 'rgba(255,255,255,0.32)', border: `1px solid ${historyLen ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.06)'}`,
             backdropFilter: 'blur(8px)',
           }}>↩ Отменить {historyLen ? `(${historyLen})` : ''}</button>
-          <span style={{ fontSize: 11, color: TEXT_3, fontWeight: 700 }}>История {historyLen}/10</span>
+          <span className="cb-plan-hist" style={{ fontSize: 11, color: TEXT_3, fontWeight: 700 }}>История {historyLen}/10</span>
         </div>
-        {msg && <span style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.14)', padding: '5px 10px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)' }}>{msg}</span>}
+        {msg && <span className="cb-plan-msg" style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.14)', padding: '5px 10px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)' }}>{msg}</span>}
       </div>
 
       {/* Отчёт — Apple glass + Highlights + StatTiles */}
+      <div className="cb-plan-summary">
       <SectionCard icon="📋" title="Сводка плана" subtitle={`${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед`} accent>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
+        <div className="cb-plan-stats" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
           <StatTile label="Недель" value={String(plan.weeks)} color="#a855f7" sub={plan.patternId} icon="📅" />
           <StatTile label="Сессий" value={String(plan.weeksData.reduce((a,w)=>a+w.sessions.length,0))} color="#a855f7" sub="за цикл" icon="🗓️" />
           <StatTile label="Сетов" value={String(plan.weeksData.reduce((a,w)=>a+(w.totalSets||0),0))} color="#a855f7" sub="за цикл" icon="📊" />
@@ -84,7 +85,7 @@ export const CombatPlanView: React.FC<Props> = ({
           <Badge>{plan.patternId}</Badge>
           {(plan.inputSnapshot as any)?.fightDate && <Badge color="#ef4444" bg="rgba(239,68,68,0.10)" border="rgba(239,68,68,0.18)">🏁 бой {(plan.inputSnapshot as any).fightDate}</Badge>}
         </div>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        <div className="cb-plan-weeks" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           {plan.weeksData.map(w=> (
             <span key={w.week} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':'#a855f7'}>{w.totalSets}</Highlight> сетов</span>
           ))}
@@ -122,6 +123,7 @@ export const CombatPlanView: React.FC<Props> = ({
           <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
         </details>
       </SectionCard>
+      </div>
 
       {plan.validation?.warnings.map((w, i) => (
         <InfoBanner key={i} tone="warn">{w}</InfoBanner>
@@ -188,28 +190,29 @@ export const CombatPlanView: React.FC<Props> = ({
         const phaseColor = (PHASE_RU as any)[wk.phase] ? (wk.deload ? '#f59e0b' : (wk as any).taper ? '#60a5fa' : '#a855f7') : '#a855f7';
         const border = wk.deload ? 'rgba(245,158,11,0.28)' : (wk as any).taper ? 'rgba(59,130,246,0.22)' : 'rgba(168,85,247,0.16)';
         return (
-          <div key={wk.week} style={{ ...CARD, padding: 0, overflow: 'hidden', borderColor: border, background: isOpen ? 'linear-gradient(180deg, rgba(26,24,38,0.82), rgba(18,16,28,0.66))' : CARD.background }}>
+          <div key={wk.week} className="cb-plan-week" data-open={isOpen ? 'true' : 'false'} style={{ ...CARD, padding: 0, overflow: 'hidden', borderColor: border, background: isOpen ? 'linear-gradient(180deg, rgba(26,24,38,0.82), rgba(18,16,28,0.66))' : CARD.background }}>
             <button
               onClick={() => setExpandedWeek(isOpen ? null : wk.week - 1)}
+              className="cb-plan-weekhead"
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', background: 'transparent', border: 'none',
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', minHeight: 64, background: 'transparent', border: 'none',
                 cursor: 'pointer', textAlign: 'left',
               }}
             >
-              <span style={{
+              <span className="cb-plan-weeknum" style={{
                 width: 36, height: 36, borderRadius: 11, background: wk.deload ? 'linear-gradient(135deg,#f59e0b,#f97316)' : (wk as any).taper ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : ACCENT_GRAD,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 13, flexShrink: 0,
                 boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
               }}>{wk.week}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="cb-plan-weektitle" style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}><Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload ? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper ? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· <Highlight>{wk.totalSets}</Highlight> сетов{(wk as any).totalTonnage ? <> · <Highlight>{((wk as any).totalTonnage / 1000).toFixed(1)}т</Highlight></> : ''}</span></div>
                 <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1, fontVariantNumeric:'tabular-nums' }}>Неделя {wk.week} · {wk.sessions.length} сессий · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
               </div>
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: isOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+              <span className="cb-plan-weekchev" style={{ width: 36, height: 36, borderRadius: 12, background: isOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
             </button>
 
             {!isOpen && (
-              <div style={{ padding: '0 14px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="cb-plan-weekchips" style={{ padding: '0 14px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {wk.sessions.map(s => (
                   <span key={s.day} style={{ fontSize: 10.5, padding: '4px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
                     {s.sessionTag} · {s.exercises.length}упр
@@ -219,20 +222,20 @@ export const CombatPlanView: React.FC<Props> = ({
             )}
 
             {isOpen && (
-              <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="cb-plan-weekbody" style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={() => {
+                  <button className="cb-plan-copyweek" onClick={() => {
                     const txt = wk.sessions.map(s => `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e => `  ${e.name} ${e.sets}x${e.reps} ${e.weight ? e.weight + 'кг' : ''} RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment ? ' // ' + e.comment : ''}`).join('\n')).join('\n\n');
                     navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n` + txt); doMsg(`Неделя ${wk.week} скопирована`);
                   }} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>⎙ Копировать неделю</button>
                 </div>
 
                 {wk.sessions.map(sess => (
-                  <div key={sess.day} style={{
+                  <div key={sess.day} className="cb-plan-sess" style={{
                     background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 10,
                     backdropFilter: 'blur(8px)',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap:'wrap', gap:6 }}>
+                    <div className="cb-plan-sesshead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap:'wrap', gap:6 }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}>{sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#ff9f0a': sess.character==='памп'?'#a855f7':'#60a5fa'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′</span></span>
                       <span style={{ fontSize: 10, color: TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>
                         ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха
@@ -241,7 +244,7 @@ export const CombatPlanView: React.FC<Props> = ({
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {sess.exercises.map(ex => (
-                        <div key={ex.id} style={{
+                        <div key={ex.id} className="cb-plan-ex" style={{
                           background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
                           border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 7,
                         }}>
@@ -254,7 +257,7 @@ export const CombatPlanView: React.FC<Props> = ({
                             </span>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '64px 64px 64px 1fr auto', gap: 6, alignItems: 'center' }}>
+                          <div className="cb-plan-exgrid" style={{ display: 'grid', gridTemplateColumns: '64px 64px 64px 1fr auto', gap: 6, alignItems: 'center' }}>
                             <input aria-label="вес" type="number" value={ex.weight} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
                             <input aria-label="повторы" type="text" value={ex.reps} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
                             <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
@@ -263,8 +266,8 @@ export const CombatPlanView: React.FC<Props> = ({
                               {(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => <option key={id} value={id}>{id}</option>)}
                             </select>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button aria-label="вверх" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, -1)} style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 12 }}>↑</button>
-                              <button aria-label="вниз" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, 1)} style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 12 }}>↓</button>
+                              <button aria-label="вверх" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>↑</button>
+                              <button aria-label="вниз" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>↓</button>
                             </div>
                           </div>
 
@@ -284,6 +287,7 @@ export const CombatPlanView: React.FC<Props> = ({
 
       {/* Годовой — Apple premium */}
       {annual && onBuildATR && (
+        <div className="cb-plan-annual">
         <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
           <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед · ${annual.blocks.length} блоков`} subtitle={`${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`} accent />
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
@@ -334,13 +338,15 @@ export const CombatPlanView: React.FC<Props> = ({
             </div>
           )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={onPrintAnnual} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>🖨 Печать года</button>
-            <button onClick={onDownloadIcs} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
+            <button onClick={onPrintAnnual} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>🖨 Печать года</button>
+            <button onClick={onDownloadIcs} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
           </div>
         </SectionCard>
+        </div>
       )}
 
       {/* Экспорт — Apple glass */}
+      <div className="cb-plan-export">
       <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">
         <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
@@ -357,6 +363,7 @@ export const CombatPlanView: React.FC<Props> = ({
         </div>
         <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>
       </SectionCard>
+      </div>
     </div>
   );
 };

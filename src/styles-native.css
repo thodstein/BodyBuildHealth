@@ -10298,3 +10298,217 @@ html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active]:f
     transform: none !important;
   }
 }
+
+/* ─── 93. COMBAT PLAN PRO — вывод плана единоборств ───
+ * Хуки: .combat-planview (.cb-plan-actions/.cb-plan-undo/.cb-plan-hist/
+ * .cb-plan-msg/.cb-plan-summary/.cb-plan-stats/.cb-plan-weeks/.cb-plan-week
+ * [data-open]/.cb-plan-weekhead/.cb-plan-weeknum/.cb-plan-weektitle/
+ * .cb-plan-weekchev/.cb-plan-weekchips/.cb-plan-weekbody/.cb-plan-copyweek/
+ * .cb-plan-sess/.cb-plan-sesshead/.cb-plan-ex/.cb-plan-exgrid/.cb-plan-move/
+ * .cb-plan-annual/.cb-plan-export).
+ * Панель действий липкая, сводка-стекло 20px, недели-аккордеоны 18px
+ * с шапкой 64px, сессии и упражнения с glow открытой недели, правки 40px,
+ * инпуты 48px/16px, цифры tabular, press 0.98, focus-visible,
+ * 380px (сетка правок в 3 колонки), reduced-motion. Только APK. */
+html.app-native .combat-planview .cb-plan-actions {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  border-radius: 16px !important;
+  background: rgba(16, 14, 28, 0.88) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(196, 181, 253, 0.14) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .combat-planview .cb-plan-undo {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-undo:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-planview .cb-plan-hist {
+  font-variant-numeric: tabular-nums !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+html.app-native .combat-planview .cb-plan-summary {
+  display: flex !important;
+  flex-direction: column !important;
+}
+html.app-native .combat-planview .cb-plan-stats {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-weeks {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  padding-bottom: 2px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-weeks::-webkit-scrollbar {
+  display: none;
+}
+html.app-native .combat-planview .cb-plan-weeks > span {
+  scroll-snap-align: start !important;
+  flex-shrink: 0 !important;
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+html.app-native .combat-planview .cb-plan-week {
+  border-radius: 18px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .combat-planview .cb-plan-week[data-open='true'] {
+  border-top: 2px solid rgba(168, 85, 247, 0.45) !important;
+  box-shadow: 0 12px 32px rgba(168, 85, 247, 0.18) !important;
+}
+html.app-native .combat-planview .cb-plan-weekhead {
+  min-height: 64px !important;
+  border-radius: 18px 18px 0 0 !important;
+}
+html.app-native .combat-planview .cb-plan-weekhead:active {
+  transform: scale(0.995) !important;
+}
+html.app-native .combat-planview .cb-plan-weeknum {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.35) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-weektitle {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-weekchev {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+  flex-shrink: 0 !important;
+}
+html.app-native .combat-planview .cb-plan-week:active .cb-plan-weekchev {
+  transform: scale(0.92) !important;
+}
+html.app-native .combat-planview .cb-plan-weekchips {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-copyweek {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-copyweek:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-planview .cb-plan-sess {
+  border-radius: 16px !important;
+}
+html.app-native .combat-planview .cb-plan-sesshead {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-planview .cb-plan-ex {
+  border-radius: 14px !important;
+}
+html.app-native .combat-planview .cb-plan-exgrid input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-planview .cb-plan-exgrid select {
+  min-height: 48px !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-planview .cb-plan-move {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  flex-shrink: 0 !important;
+}
+html.app-native .combat-planview .cb-plan-move:active {
+  transform: scale(0.9) !important;
+}
+html.app-native .combat-planview .cb-plan-annual {
+  display: flex !important;
+  flex-direction: column !important;
+}
+html.app-native .combat-planview .cb-plan-export {
+  display: flex !important;
+  flex-direction: column !important;
+}
+html.app-native .combat-planview .cb-plan-export button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+html.app-native .combat-planview .cb-plan-export button:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-planview .cb-plan-weekhead:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: -2px !important;
+}
+html.app-native .combat-planview .cb-plan-undo:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-planview .cb-plan-copyweek:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-planview .cb-plan-move:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-planview .cb-plan-export button:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .combat-planview .cb-plan-exgrid {
+    grid-template-columns: 1fr 1fr 1fr !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .combat-planview .cb-plan-exgrid select {
+    grid-column: 1 / -1 !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .combat-planview .cb-plan-exgrid > div:last-child {
+    grid-column: 1 / -1 !important;
+    justify-content: flex-end !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-weekhead:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-week:active .cb-plan-weekchev {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-undo:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-copyweek:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-move:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-planview .cb-plan-export button:active {
+    transform: none !important;
+  }
+}
