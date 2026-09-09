@@ -2966,6 +2966,10 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // Ручные правки пользователя применяются ДО revalidate (exerciseEdits →
   // applyEditsToPlan), поэтому ранний return их не теряет.
   if (next.weeks.some((w: any) => w.peakWeek === true || w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')))) {
+    // Safety-backstop поверх prep: HARD-движения новичка/любителя меняются на
+    // регрессию той же мышцы (объём цел — только имя/вес). Позиция — до return,
+    // иначе prep-план после revalidate остаётся со становой у новичка.
+    enforceExerciseLevels(next, options);
     syncBBPlanSetShape(next);
     return next;
   }
