@@ -1187,16 +1187,16 @@ const exportAllDiariesPdf = () => {
                         flex: 1,
                         minWidth: 180,
                         minHeight: 48,
-                        padding: '10px 12px',
-                        borderRadius: 12,
+                        padding: '12px 14px',
+                        borderRadius: 16,
                         cursor: 'pointer',
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 800,
                         textAlign: 'center',
-                        background: 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))',
-                        border: '1px solid rgba(245,158,11,0.4)',
-                        color: '#fbbf24',
-                        boxShadow: '0 4px 16px rgba(245,158,11,0.12)',
+                        background: 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(245,158,11,0.07))',
+                        border: '1px solid rgba(245,158,11,0.45)',
+                        color: '#fff',
+                        boxShadow: '0 6px 20px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
                         transition: 'all 0.2s',
                       }}
                     >
@@ -1213,16 +1213,16 @@ const exportAllDiariesPdf = () => {
                         flex: 1,
                         minWidth: 150,
                         minHeight: 48,
-                        padding: '10px 12px',
-                        borderRadius: 12,
+                        padding: '12px 14px',
+                        borderRadius: 16,
                         cursor: 'pointer',
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 800,
                         textAlign: 'center',
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06))',
-                        border: '1px solid rgba(99,102,241,0.4)',
-                        color: '#a5b4fc',
-                        boxShadow: '0 4px 16px rgba(99,102,241,0.12)',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.07))',
+                        border: '1px solid rgba(99,102,241,0.45)',
+                        color: '#fff',
+                        boxShadow: '0 6px 20px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
                         transition: 'all 0.2s',
                       }}
                     >
@@ -1234,10 +1234,10 @@ const exportAllDiariesPdf = () => {
                 <div
                   className="pf-streaks"
                   style={{
-                    marginTop: 10,
+                    marginTop: 12,
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-                    gap: 4,
+                    gap: 8,
                   }}
                 >
                   {(() => {
@@ -1271,50 +1271,53 @@ const exportAllDiariesPdf = () => {
                       <div
                         key={it.key}
                         style={{
-                          padding: 6,
-                          borderRadius: 6,
-                          background: 'rgba(255,255,255,0.03)',
-                          border: `1px solid ${it.color}22`,
+                          padding: '10px 11px',
+                          borderRadius: 14,
+                          background: `linear-gradient(180deg, ${it.color}12, rgba(255,255,255,0.02))`,
+                          border: `1px solid ${it.color}30`,
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ display: 'inline-flex', lineHeight: 1 }}><NativeIcon name={it.icon} size={12} /></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ display: 'inline-flex', lineHeight: 1, color: it.color }}><NativeIcon name={it.icon} size={13} /></span>
                           <span
                             style={{
-                              fontSize: 9,
-                              color: colors.textMuted,
-                              fontWeight: 700,
+                              fontSize: 9.5,
+                              color: 'rgba(255,255,255,0.65)',
+                              fontWeight: 800,
                               textTransform: 'uppercase',
-                              letterSpacing: 0.3,
+                              letterSpacing: 0.6,
                             }}
                           >
                             {it.label}
                           </span>
                         </div>
                         {it.streak > 0 && (
-                          <div style={{ fontSize: 10, color: it.color, fontWeight: 700, marginTop: 2 }}>
-                            🔥 Серия: {it.streak} дн.
+                          <div style={{ fontSize: 12.5, color: '#fff', fontWeight: 800, marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
+                            🔥 {it.streak} дн.
                           </div>
                         )}
                         {it.pace && (
-                          <div style={{ marginTop: 3 }}>
-                            <div style={{ fontSize: 8, color: colors.textMuted }}>
+                          <div style={{ marginTop: 6 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
                               Темп: {it.pace.achieved}/{it.pace.needed} дн.
                             </div>
                             <div
                               style={{
-                                height: 4,
-                                borderRadius: 2,
-                                background: 'rgba(255,255,255,0.06)',
+                                height: 6,
+                                borderRadius: 99,
+                                background: 'rgba(255,255,255,0.08)',
                                 overflow: 'hidden',
-                                marginTop: 2,
+                                marginTop: 4,
+                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)',
                               }}
                             >
                               <div
                                 style={{
                                   height: '100%',
                                   width: `${Math.min(100, it.pace.pct)}%`,
-                                  background: it.pace.ok ? '#22c55e' : it.color,
+                                  borderRadius: 99,
+                                  background: it.pace.ok ? 'linear-gradient(90deg,#22c55e,#4ade80)' : `linear-gradient(90deg, ${it.color}88, ${it.color})`,
                                 }}
                               />
                             </div>
@@ -1359,8 +1362,8 @@ const exportAllDiariesPdf = () => {
             const hasData = sleepPoints.length + bpPoints.length + weightPoints.length > 0;
             if (!hasData) return null;
             return (
-              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>🔗 Кросс-аналитика + тренд (r≥0.4)</div>
+              <div style={{ marginTop: 12, padding: 15, borderRadius: 18, background: 'linear-gradient(180deg, rgba(30,30,36,0.9), rgba(18,18,22,0.9))', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 10px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>🔗 Кросс-аналитика + тренд (r≥0.4)</div>
                 {hist.length > 0 && (() => {
                   const maxMean = Math.max(...hist.map(x => x.mean), 1);
                   return (
@@ -1454,16 +1457,17 @@ const exportAllDiariesPdf = () => {
                   className="pf-dfilter"
                   style={{
                     flex: '1 1 auto',
-                    minWidth: 72,
-                    maxWidth: 100,
+                    minWidth: 76,
+                    maxWidth: 110,
                     minHeight: 40,
-                    padding: '6px 8px',
-                    borderRadius: 8,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: colors.text,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${DIARY_META[d.key].color}44`,
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: '#fff',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+                    border: `1px solid ${DIARY_META[d.key].color}40`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06)`,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     textOverflow: 'ellipsis',
@@ -1471,10 +1475,10 @@ const exportAllDiariesPdf = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 4,
+                    gap: 5,
                   }}
                 >
-                  <span style={{ display: 'inline-flex', lineHeight: 1 }}><NativeIcon name={DIARY_META[d.key].icon} size={isWeightDiaryKey(d.key) ? 15 : 12} /></span>
+                  <span style={{ display: 'inline-flex', lineHeight: 1, color: DIARY_META[d.key].color }}><NativeIcon name={DIARY_META[d.key].icon} size={isWeightDiaryKey(d.key) ? 15 : 13} /></span>
                   <span>{DIARY_META[d.key].title}</span>
                 </button>
               ))}
@@ -1488,15 +1492,15 @@ const exportAllDiariesPdf = () => {
                 className="pf-dsearch"
                 style={{
                   width: '100%',
-                  background: 'rgba(0,0,0,0.3)',
+                  background: 'rgba(0,0,0,0.32)',
                   border: `1px solid ${colors.border}`,
-                  borderRadius: 8,
-                  padding: '8px 36px 8px 10px',
+                  borderRadius: 14,
+                  padding: '12px 40px 12px 14px',
                   color: colors.text,
                   fontSize: 16,
                   outline: 'none',
                   boxSizing: 'border-box',
-                  minHeight: 44,
+                  minHeight: 48,
                 }}
                 aria-label="Поиск дневника"
               />

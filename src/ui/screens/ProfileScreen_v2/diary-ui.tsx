@@ -44,30 +44,30 @@ export const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: N
 
 export const cardStyles = {
   base: {
-    borderRadius: 14,
-    padding: '14px 12px',
+    borderRadius: 18,
+    padding: '15px 14px',
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 9,
     cursor: 'pointer',
-    minHeight: 110,
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    minHeight: 124,
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
     transition: 'transform 0.18s cubic-bezier(0.32,0.72,0.28,1), box-shadow 0.18s, background 0.18s',
     position: 'relative',
     overflow: 'hidden',
   } as React.CSSProperties,
   stale: (color: string) => ({
-    background: `linear-gradient(135deg, ${withAlpha(color, '14')}, transparent)`,
-    border: `1px solid ${withAlpha(color, '77')}`,
+    background: `linear-gradient(135deg, ${withAlpha(color, '16')}, ${withAlpha(color, '05')} 55%, rgba(255,255,255,0.02))`,
+    border: `1px solid ${withAlpha(color, '55')}`,
     borderLeft: `3px solid ${color}`,
-    boxShadow: `0 4px 14px ${withAlpha(color, '22')}, 0 2px 8px rgba(0,0,0,0.3)`,
+    boxShadow: `0 8px 24px ${withAlpha(color, '20')}, 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)`,
   } as React.CSSProperties),
   normal: (color: string) => ({
-    background: 'rgba(28,28,32,0.85)',
-    border: `1px solid ${withAlpha(color, '44')}`,
+    background: 'linear-gradient(180deg, rgba(30,30,36,0.9), rgba(18,18,22,0.9))',
+    border: `1px solid ${withAlpha(color, '38')}`,
     borderLeft: `3px solid ${color}`,
-    boxShadow: '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
+    boxShadow: `0 8px 24px rgba(0,0,0,0.35), 0 0 0 1px ${withAlpha(color, '08')}, inset 0 1px 0 rgba(255,255,255,0.06)`,
   } as React.CSSProperties),
   hover: {
     transform: 'translateY(-2px)',
@@ -84,18 +84,19 @@ export const cardStyles = {
 export const isWeightDiaryKey = (_k: string) => false;
 
 export const iconBadge = (color: string, _diaryKey?: string) => ({
-  width: 40,
-  height: 40,
-  borderRadius: 11,
+  width: 44,
+  height: 44,
+  borderRadius: 14,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: `${withAlpha(color, '22')}`,
-  border: `1px solid ${withAlpha(color, '44')}`,
+  background: `linear-gradient(135deg, ${withAlpha(color, '30')}, ${withAlpha(color, '10')})`,
+  border: `1px solid ${withAlpha(color, '45')}`,
   fontSize: 20,
   lineHeight: 1,
   flexShrink: 0,
-  boxShadow: `0 2px 10px ${withAlpha(color, '18')}, inset 0 1px 0 rgba(255,255,255,0.06)`,
+  color: '#fff',
+  boxShadow: `0 4px 14px ${withAlpha(color, '25')}, inset 0 1px 0 rgba(255,255,255,0.12)`,
 } as React.CSSProperties);
 
 /* ── Статус-чипы (заполнено/сегодня/устарело) ────────────────────────────── */
@@ -194,25 +195,25 @@ export const btnDanger = {
 /* ── Поля ввода ──────────────────────────────────────────────────────────── */
 
 export const fieldLabel = {
-  fontSize: 11,
+  fontSize: 12,
   color: '#ffffff',
-  fontWeight: 700,
-  marginBottom: 5,
+  fontWeight: 800,
+  marginBottom: 6,
   display: 'block',
-  letterSpacing: 0.5,
+  letterSpacing: 0.2,
 } as React.CSSProperties;
 
 export const fieldInput = {
   width: '100%',
   background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.16)',
+  border: '1px solid rgba(255,255,255,0.13)',
   borderRadius: 14,
   padding: '12px 14px',
   color: '#fff',
-  fontSize: 14,
+  fontSize: 16,
   outline: 'none',
   boxSizing: 'border-box',
-  minHeight: 46,
+  minHeight: 48,
   transition: 'border-color 0.18s, box-shadow 0.18s, background 0.18s',
 } as React.CSSProperties;
 
@@ -240,23 +241,23 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   <div
     className="diary-section"
     style={{
-      borderRadius: 18,
-      background: `linear-gradient(180deg, ${withAlpha(color, '14')}, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
-      border: `1px solid ${withAlpha(color, '34')}`,
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 0 rgba(0,0,0,0.2)`,
-      padding: 16,
-      marginBottom: 12,
+      borderRadius: 20,
+      background: `linear-gradient(180deg, ${withAlpha(color, '13')}, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.025))`,
+      border: `1px solid ${withAlpha(color, '30')}`,
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.25)`,
+      padding: 17,
+      marginBottom: 13,
       position: 'relative',
       overflow: 'hidden',
       ...style,
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-      {icon && <span style={{ fontSize: 18, display: 'inline-block', lineHeight: 1 }}>{icon}</span>}
-      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</h3>
-      {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: `${withAlpha(color, '33')}`, color }}>{badge}</span>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
+      {icon && <span style={{ fontSize: 19, display: 'inline-block', lineHeight: 1 }}>{icon}</span>}
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.6 }}>{title}</h3>
+      {badge && <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 999, background: `${withAlpha(color, '30')}`, color: '#fff', border: `1px solid ${withAlpha(color, '40')}` }}>{badge}</span>}
     </div>
-    {hint && <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 10 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', marginBottom: 11, lineHeight: 1.5 }}>{hint}</div>}
     {children}
   </div>
 );
@@ -436,60 +437,64 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               : '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <div aria-hidden="true" style={iconBadge(meta.color, diaryKey)}>
-              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={20} /></span>
+              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={21} /></span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>{meta.title}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.2px' }}>{meta.title}</span>
                 {stale && (
                   <span
                     style={{
                       fontSize: 10,
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: 6,
+                      fontWeight: 800,
+                      padding: '3px 9px',
+                      borderRadius: 999,
                       background: `${staleColor}22`,
-                      color: staleColor,
-                      border: `1px solid ${staleColor}44`,
+                      color: '#fff',
+                      border: `1px solid ${staleColor}55`,
+                      letterSpacing: '0.2px',
                     }}
                   >
                     {daysSinceLast !== null ? `${daysSinceLast} дн. назад` : 'устарел'}
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: '#ffffff', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
                 {count} {count === 1 ? 'запись' : count < 5 ? 'записи' : 'записей'}
+                {last ? ` · ${last}` : ''}
               </div>
             </div>
-            <div style={{ flexShrink: 0 }}>
-              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={18} /></span>
+            <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${meta.color}14`, border: `1px solid ${meta.color}30`, color: '#fff' }}>
+              <span style={{ display: 'inline-block', lineHeight: 1 }}><NativeIcon name={meta.icon} size={16} /></span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 5, alignItems: 'center' }}>
             <span style={{ ...statusChip(meta.color, true), flexShrink: 0 }}>
               {count > 0 ? '✓' : '+'}
             </span>
-            {extra && <span style={{ fontSize: 11, color: '#ffffff', flex: 1 }}>{extra}</span>}
+            {extra && <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.75)', flex: 1, lineHeight: 1.45 }}>{extra}</span>}
           </div>
 
           {history && history.length > 0 && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: 10, color: '#ffffff', marginBottom: 4 }}>История (последние 5):</div>
+            <div style={{ marginTop: 9, paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.7px', color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>ИСТОРИЯ · ПОСЛЕДНИЕ 5</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {history.slice(0, 5).map((h, i) => (
                   <div
                     key={i}
                     style={{
-                      fontSize: 10,
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      color: '#ffffff',
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      padding: '4px 9px',
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.09)',
+                      color: 'rgba(255,255,255,0.8)',
                       whiteSpace: 'nowrap',
+                      fontVariantNumeric: 'tabular-nums',
                     }}
                   >
                     {h.date}
@@ -500,24 +505,25 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           )}
 
           {extra && (
-            <div style={{ fontSize: 9.5, color: meta.color, lineHeight: 1.35, marginTop: -4 }}>{extra}</div>
+            <div style={{ fontSize: 10, color: meta.color, lineHeight: 1.4, marginTop: -4 }}>{extra}</div>
           )}
 
-          <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 2 }} onClick={(e) => e.stopPropagation()}>
             <button
               onClick={onAdd}
               aria-label={`Добавить запись в дневник ${meta.title}`}
               className="diary-card-add"
               style={{
                 flex: 1,
-                minHeight: 40,
-                padding: '6px 8px',
-                borderRadius: 7,
-                fontSize: 11,
-                fontWeight: 700,
-                background: `${meta.color}26`,
-                color: meta.color,
+                minHeight: 44,
+                padding: '9px 10px',
+                borderRadius: 12,
+                fontSize: 12.5,
+                fontWeight: 800,
+                background: `linear-gradient(135deg, ${meta.color}30, ${meta.color}12)`,
+                color: '#fff',
                 border: `1px solid ${meta.color}55`,
+                boxShadow: `0 4px 14px ${meta.color}22, inset 0 1px 0 rgba(255,255,255,0.1)`,
                 cursor: 'pointer',
               }}
             >
@@ -529,14 +535,14 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               className="diary-card-open"
               style={{
                 flex: 1,
-                minHeight: 40,
-                padding: '6px 8px',
-                borderRadius: 7,
-                fontSize: 11,
+                minHeight: 44,
+                padding: '9px 10px',
+                borderRadius: 12,
+                fontSize: 12.5,
                 fontWeight: 700,
-                background: 'transparent',
+                background: 'rgba(255,255,255,0.05)',
                 color: '#ffffff',
-                border: `1px solid rgba(255,255,255,0.16)`,
+                border: `1px solid rgba(255,255,255,0.13)`,
                 cursor: 'pointer',
               }}
             >

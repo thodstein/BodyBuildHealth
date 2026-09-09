@@ -132,7 +132,7 @@ describe('Profile §86 — тело дневников: рутинг, фильт
     const { container, getByLabelText } = render(<ProfileDiariesTab />);
     const search = getByLabelText('Поиск дневника') as HTMLInputElement;
     expect(search.style.fontSize).toBe('16px');
-    expect(search.style.minHeight).toBe('44px');
+    expect(search.style.minHeight).toBe('48px');
     const filters = container.querySelectorAll('.pf-dfilter');
     expect(filters.length).toBeGreaterThan(0);
     filters.forEach(f => expect((f as HTMLElement).style.minHeight).toBe('40px'));
@@ -145,8 +145,8 @@ describe('Profile §86 — тело дневников: рутинг, фильт
     const { container } = render(
       <DiaryCard diaryKey="sleep" count={5} last="сегодня" daysSinceLast={1} loggedToday={false} onAdd={noop} onOpen={noop} history={[]} />,
     );
-    expect((container.querySelector('.diary-card-add') as HTMLElement).style.minHeight).toBe('40px');
-    expect((container.querySelector('.diary-card-open') as HTMLElement).style.minHeight).toBe('40px');
+    expect((container.querySelector('.diary-card-add') as HTMLElement).style.minHeight).toBe('44px');
+    expect((container.querySelector('.diary-card-open') as HTMLElement).style.minHeight).toBe('44px');
     cleanup();
   });
 });
