@@ -217,7 +217,8 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Сканировать продукт" className="nd-scan" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
+    <div role="dialog" aria-modal="true" aria-label="Сканировать продукт" className="nd-scan" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}
+      onKeyDown={e => { if (e.key === 'Escape') { void stopScanner(); onCloseRef.current(); } }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0, color: '#fff', fontSize: 18 }}>📷 Сканировать продукт</h3>
         <button type="button" onClick={() => { void stopScanner(); onCloseRef.current(); }} aria-label="Закрыть сканер" className="nd-scanclose" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>✕</button>

@@ -412,7 +412,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [showToast]);
 
   const pasteMeal = useCallback((targetDate: string) => {
-    if (!copySource || !diaryData[selectedDate]?.meals?.[copySource]) return;
+    if (!copySource || !diaryData[selectedDate]?.meals?.[copySource]) {
+      showToast('❌ Буфер пуст — скопируйте приём сначала');
+      return;
+    }
     const data = { ...diaryData };
     if (!data[targetDate]) data[targetDate] = { meals: {} };
     data[targetDate].meals[copySource] = JSON.parse(JSON.stringify(diaryData[selectedDate].meals[copySource]));
@@ -840,7 +843,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Edit modal */}
       {editItem && (
         <div role="dialog" aria-modal="true" aria-label="Изменить количество" className="nd-edit" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', padding: '12px' }}
-          onClick={() => setEditItem(null)}>
+          onClick={() => setEditItem(null)}
+          onKeyDown={e => { if (e.key === 'Escape') setEditItem(null); }}>
           <div onClick={e => e.stopPropagation()} className="nd-editsheet" style={{ width: '100%', maxWidth: 400, padding: '16px 20px 28px', borderRadius: '20px', background: '#18181b', boxShadow: '0 18px 54px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 2, letterSpacing: -0.3 }}>✎ {editItem.item.name}</div>
@@ -988,7 +992,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
       )}
       {clearDayConfirmOpen && (
-        <div role="alertdialog" aria-modal="true" aria-label="Очистить день" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDayConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+        <div role="alertdialog" aria-modal="true" aria-label="Очистить день" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDayConfirmOpen(false); }} onKeyDown={e => { if (e.key === 'Escape') setClearDayConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
           <div className="nd-confirm-sheet" style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить день?</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Все приёмы за <b style={{color:'#fff'}}>{selectedDate}</b> будут удалены. Это нельзя отменить.</div>
@@ -1000,7 +1004,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
       )}
       {clearDiaryConfirmOpen && (
-        <div role="alertdialog" aria-modal="true" aria-label="Очистить весь дневник" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDiaryConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+        <div role="alertdialog" aria-modal="true" aria-label="Очистить весь дневник" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDiaryConfirmOpen(false); }} onKeyDown={e => { if (e.key === 'Escape') setClearDiaryConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
           <div className="nd-confirm-sheet" style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить весь дневник?</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Удалятся все дни и приёмы без возможности восстановления. Рекомендуем сначала сделать экспорт JSON/CSV.</div>
