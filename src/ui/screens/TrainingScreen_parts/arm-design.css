@@ -520,6 +520,227 @@
   cursor: pointer;
 }
 
+/* ─── Свитчи (замена нативных галочек) ────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch:active .ad-switch-track {
+  transform: scale(0.94);
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch-track {
+  width: 52px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch[data-on='true'] .ad-switch-track {
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(0, 230, 138, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+:is(.train-armdiag) .ad-switch[data-on='true'] .ad-switch-track {
+  background: linear-gradient(135deg, var(--ad-amber), #f97316);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch[data-on='true'] .ad-switch-thumb {
+  transform: translateX(20px);
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch[data-on='true'] .ad-switch-label {
+  color: var(--ad-text);
+  font-weight: 700;
+}
+
+:is(.train-arm, .train-armdiag) .ad-switch:focus-visible {
+  outline: 2px solid var(--ad-acc);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* ─── Шит-селекты (замена нативных select) ────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-sheet-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: var(--ad-r-sm);
+  background: var(--ad-field);
+  border: 1px solid var(--ad-edge2);
+  color: var(--ad-text);
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-trigger:active {
+  transform: scale(0.99);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-trigger .ad-fl {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-chev {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: var(--ad-bg3);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-dim);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(2, 6, 14, 0.6);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  animation: adPop 0.25s cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-card {
+  width: 100%;
+  max-width: 440px;
+  max-height: 82vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%);
+  border: 1px solid var(--ad-edge);
+  border-bottom: none;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 0 14px max(16px, env(safe-area-inset-bottom));
+  animation: adIn 0.3s cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-card::-webkit-scrollbar {
+  display: none;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(140, 190, 255, 0.3);
+  margin: 10px auto 0;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-title {
+  margin: 10px 2px 8px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ad-text);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-radius: 16px;
+  background: var(--ad-bg2);
+  border: 1px solid var(--ad-edge);
+  color: var(--ad-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-opt:active {
+  transform: scale(0.98);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-opt[data-active='true'] {
+  border-color: var(--ad-acc);
+  background: rgba(0, 230, 138, 0.1);
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.12);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-opt-tx {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+:is(.train-arm, .train-armdiag) .ad-sheet-desc {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ad-dim);
+  line-height: 1.4;
+}
+
 /* ─── Чипы ───────────────────────────────────────────────────────── */
 :is(.train-arm, .train-armdiag) .ad-chip {
   min-height: 44px;

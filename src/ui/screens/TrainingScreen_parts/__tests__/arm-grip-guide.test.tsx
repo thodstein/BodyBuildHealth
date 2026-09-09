@@ -17,6 +17,12 @@ function okDots(container: HTMLElement): number {
   return container.querySelectorAll(".ad-dot[data-s='ok']").length;
 }
 
+function openSec(re: RegExp) {
+  const head = screen.getAllByRole('button', { name: re }).find((b) => b.getAttribute('aria-expanded') != null);
+  expect(head).toBeTruthy();
+  if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
+}
+
 describe('Arm grip guide', () => {
   it('шаг хвата: 3 группы и 8 снарядов с диаметрами', () => {
     const { container } = render(<ArmAutoConstructor />);
@@ -32,18 +38,21 @@ describe('Arm grip guide', () => {
     expect(document.body.textContent).toMatch(/⌀60|⌀76/);
   });
 
-  it('PED-точка зажигается по чекбоксу', () => {
+  it('PED-точка зажигается по свитчу', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    openSec(/На курсе \(PED\)/);
     const before = okDots(container);
-    fireEvent.click(screen.getByLabelText(/💉 На курсе \(PED\)/));
+    fireEvent.click(screen.getByRole('switch', { name: /💉 На курсе \(PED\)/ }));
     expect(okDots(container)).toBe(before + 1);
+    expect(screen.getByRole('switch', { name: /💉 На курсе \(PED\)/ }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('TOP-точка зажигается по RFD, цикл — по подборщику', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
-    fireEvent.click(screen.getByLabelText(/RFD speed-блок/));
+    openSec(/TOP: матчап/);
+    fireEvent.click(screen.getByRole('switch', { name: /RFD speed-блок/ }));
     expect(okDots(container)).toBeGreaterThan(0);
   });
 

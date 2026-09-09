@@ -54,12 +54,15 @@ describe('Arm wizard navigation', () => {
     expect(document.body.textContent).toContain('Выбор сплита');
   });
 
-  it('сплит и цикл — один шаг: пикер, селект и сборка рядом', () => {
+  it('сплит и цикл — один шаг: пикер, шит и сборка рядом', () => {
     const { container } = render(<ArmAutoConstructor />);
     go('📚 Сплит и цикл');
     expect(container.querySelector("[data-arm='split-list']")).not.toBeNull();
     expect(container.querySelector("[data-arm='cycle-picker']")).not.toBeNull();
-    expect(screen.getByDisplayValue('— обычный план —')).toBeTruthy();
+    const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
+    expect(head).toBeTruthy();
+    if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
+    expect(screen.getByRole('button', { name: 'Цикл: — обычный план —' })).toBeTruthy();
     expect(screen.getByText('⚡ Собрать план')).toBeTruthy();
   });
 

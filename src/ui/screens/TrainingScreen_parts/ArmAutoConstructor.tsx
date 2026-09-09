@@ -42,6 +42,7 @@ import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 import './arm-design.css';
 import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { AdSwitch, AdSheetSelect } from './arm-design-system';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
 
@@ -102,9 +103,7 @@ function AdField({ label, children }: { label: React.ReactNode; children: React.
   });
   return <label className="ad-field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: '#fff' }}><span className="ad-fl">{label}</span>{styled}</label>;
 }
-function AdCheck({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: React.ReactNode }) {
-  return <label className="ad-check" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#fff', minHeight: 40, cursor: 'pointer' }}><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#00e68a' }} /><span>{label}</span></label>;
-}
+
 function AdChip({ active, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
   return <button className="ad-chip" data-active={!!active} aria-pressed={!!active} onClick={onClick} style={{ padding: '8px 12px', borderRadius: 999, fontSize: 11, fontWeight: !!active ? 800 : 500, cursor: 'pointer', minHeight: 38, border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)', background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: !!active ? '#06281c' : '#fff' }} {...rest}>{children}</button>;
 }
@@ -148,7 +147,7 @@ const GRIP_FOCI = [
   { id: 'support', label: 'Поддержка (RT/Axle)' },
   { id: 'pinch', label: 'Щипок (Saxon/Hub)' },
   { id: 'crush', label: 'Дробление (CoC)' },
-  { id: 'hub', label: 'Hub' },
+  { id: 'hub', label: 'Хаб' },
 ] as const;
 
 const STEP_DEFS: AdStepDef[] = [
@@ -722,7 +721,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <div className="ad-fl">Уровень</div>
                 <div className="ad-chips">
-                  {[{id:'beginner',label:'Новичок'},{id:'intermediate',label:'Средний'},{id:'advanced',label:'Продвинутый'},{id:'enhanced',label:'Enhanced'}].map(l=> <AdChip key={l.id} active={level===l.id} onClick={()=>setLevel(l.id)}>{l.label}</AdChip>)}
+                  {[{id:'beginner',label:'Новичок'},{id:'intermediate',label:'Средний'},{id:'advanced',label:'Продвинутый'},{id:'enhanced',label:'На курсе'}].map(l=> <AdChip key={l.id} active={level===l.id} onClick={()=>setLevel(l.id)}>{l.label}</AdChip>)}
                 </div>
               </div>
               <div>
@@ -767,7 +766,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
               ))}
             </div>
-            <AdCheck checked={specialization} onChange={setSpecialization} label="Специализация (блок 6 нед + баланс)" />
+            <AdSwitch checked={specialization} onChange={setSpecialization} label="Специализация (блок 6 нед + баланс)" />
             {specialization && <span className="ad-tip">{specPreview.rationale}</span>}
           </AdSec>
           {diagWeakPoints.length>0 && (
@@ -786,7 +785,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           )}
 
           <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете." collapsible defaultOpen={false} summary={summPed} status={showPed ? 'ok' : undefined}>
-            <AdCheck checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
+            <AdSwitch checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
               <>
               <div>
@@ -878,13 +877,13 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdField label="RT бенч, кг">
                 <input value={proBenchRt} onChange={e=>setProBenchRt(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
-              <AdField label="Wrist curl, lb">
+              <AdField label="Сгибание кисти, фунт">
                 <input value={proBenchWristLb} onChange={e=>setProBenchWristLb(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
-              <AdField label="Pron hold, с">
+              <AdField label="Пронация, с">
                 <input value={proBenchPron} onChange={e=>setProBenchPron(e.target.value)} placeholder="—" inputMode="numeric" />
               </AdField>
-              <AdField label="Side, кг">
+              <AdField label="Боковое, кг">
                 <input value={proBenchSide} onChange={e=>setProBenchSide(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
               <AdField label="sRPE (дневник)">
@@ -895,8 +894,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </AdField>
             </AdGrid>
             <div className="ad-row">
-              <AdCheck checked={proSupermatch} onChange={setProSupermatch} label="Суперматч best-of-5/6" />
-              <AdCheck checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
+              <AdSwitch checked={proSupermatch} onChange={setProSupermatch} label="Суперматч best-of-5/6" />
+              <AdSwitch checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
             </div>
             {(proBw || proAge) && (()=>{ try {
               const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any });
@@ -973,17 +972,22 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <div className="ad-fl">Рука оппонента</div>
                 <div className="ad-chips">
-                  {[{id:'unknown',label:'Неизвестно'},{id:'high',label:'High-hand'},{id:'low',label:'Low-hand'},{id:'neutral',label:'Нейтраль'}].map(o=> <AdChip key={o.id} active={topOppHand===o.id} onClick={()=>setTopOppHand(o.id)}>{o.label}</AdChip>)}
+                  {[{id:'unknown',label:'Неизвестно'},{id:'high',label:'Верхний'},{id:'low',label:'Нижний'},{id:'neutral',label:'Нейтраль'}].map(o=> <AdChip key={o.id} active={topOppHand===o.id} onClick={()=>setTopOppHand(o.id)}>{o.label}</AdChip>)}
                 </div>
               </div>
               <AdField label="Оппонент Δ, кг (+ тяжелее)">
                 <input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" inputMode="decimal" />
               </AdField>
-              <AdField label="Имплемент (лестница)">
-                <select value={topLadder} onChange={e=>setTopLadder(e.target.value)}>
-                  <option value="">—</option><option value="fat_gripz">Fat Gripz</option><option value="rolling_thunder">Rolling Thunder</option><option value="apollon_axle">Axle</option><option value="saxon_bar">Saxon</option><option value="pinch_block">Pinch Block</option><option value="hub">Hub</option><option value="coc_bullet">CoC Bullet</option>
-                </select>
-              </AdField>
+              <AdSheetSelect label="Имплемент (лестница)" value={topLadder} onChange={setTopLadder} hook="top-ladder" options={[
+                { id:'', label:'—' },
+                { id:'fat_gripz', label:'Fat Gripz', desc:'Накладки 50мм' },
+                { id:'rolling_thunder', label:'Rolling Thunder', desc:'Вращающаяся ручка 60мм' },
+                { id:'apollon_axle', label:'Axle', desc:'Толстый гриф 58мм' },
+                { id:'saxon_bar', label:'Saxon', desc:'Щипок 76мм' },
+                { id:'pinch_block', label:'Pinch Block', desc:'Блок щипок' },
+                { id:'hub', label:'Hub', desc:'Хаб IronMind' },
+                { id:'coc_bullet', label:'CoC Bullet', desc:'Эспандер + патрон' },
+              ]} />
               <AdField label="Результат (кг/с)">
                 <input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" inputMode="decimal" />
               </AdField>
@@ -999,16 +1003,20 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   {[{id:'local',label:'Локальный'},{id:'waf_worlds',label:'WAF Worlds'},{id:'east_vs_west',label:'East-vs-West'},{id:'super_series',label:'Super Series'}].map(o=> <AdChip key={o.id} active={topCalSeries===o.id} onClick={()=>setTopCalSeries(o.id)}>{o.label}</AdChip>)}
                 </div>
               </div>
-              <AdField label="Grip-RPE неделя">
-                <select aria-label="Grip-RPE неделя" value={topGripWeek} onChange={e=>setTopGripWeek(e.target.value)}>
-                  <option value="">Авто</option><option value="1">1 (объём)</option><option value="2">2 (объём)</option><option value="3">3 (интенс.)</option><option value="4">4 (делоад)</option>
-                </select>
-              </AdField>
-              <AdField label="Grip-RPE фаза">
-                <select value={topGripPhase} onChange={e=>setTopGripPhase(e.target.value)}>
-                  <option value="auto">Авто</option><option value="volume">Объём RPE7</option><option value="intensification">Интенс. RPE8</option><option value="peak">Пик RPE9</option><option value="deload">Делоад</option>
-                </select>
-              </AdField>
+              <AdSheetSelect label="Grip-RPE неделя" value={topGripWeek} onChange={setTopGripWeek} options={[
+                { id:'', label:'Авто' },
+                { id:'1', label:'1 (объём)' },
+                { id:'2', label:'2 (объём)' },
+                { id:'3', label:'3 (интенс.)' },
+                { id:'4', label:'4 (делоад)' },
+              ]} />
+              <AdSheetSelect label="Grip-RPE фаза" value={topGripPhase} onChange={setTopGripPhase} options={[
+                { id:'auto', label:'Авто' },
+                { id:'volume', label:'Объём RPE7' },
+                { id:'intensification', label:'Интенс. RPE8' },
+                { id:'peak', label:'Пик RPE9' },
+                { id:'deload', label:'Делоад' },
+              ]} />
               <AdField label="Тяж. хвата/нед (CNS)">
                 <input value={topHeavy} onChange={e=>setTopHeavy(e.target.value)} placeholder="—" inputMode="numeric" />
               </AdField>
@@ -1017,10 +1025,10 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </AdField>
             </AdGrid>
             <div className="ad-row">
-              <AdCheck checked={topRfd} onChange={setTopRfd} label="RFD speed-блок (5×3 RPE8)" />
-              <AdCheck checked={topSim} onChange={setTopSim} label="Contest-sim неделя" />
-              <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
-              <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
+              <AdSwitch checked={topRfd} onChange={setTopRfd} label="RFD speed-блок (5×3 RPE8)" />
+              <AdSwitch checked={topSim} onChange={setTopSim} label="Contest-sim неделя" />
+              <AdSwitch checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
+              <AdSwitch checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {
@@ -1119,26 +1127,28 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             )}
             <AdGrid cols="2">
-              <AdField label="Цикл">
-                <select value={cycId} onChange={e=>setCycId(e.target.value)}>
-                  <option value="">— обычный план —</option>
-                  {ARM_CYCLE_LIBRARY.map(c=> <option key={c.id} value={c.id}>{c.name} ({c.weeks}н)</option>)}
-                </select>
-              </AdField>
-              <AdField label="Медли (армлифтинг)">
-                <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)}>
-                  <option value="">—</option>
-                  {ARM_MEDLEYS.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </AdField>
+              <AdSheetSelect label="Цикл" value={cycId} onChange={setCycId} hook="cycle-select" options={[
+                { id:'', label:'— обычный план —', desc:'параметрический план без шаблона' },
+                ...ARM_CYCLE_LIBRARY.map(c=> ({ id: c.id, label: `${c.name} (${c.weeks}н)`, desc: `${c.daysPerWeek}×/нед · ${c.rpe}` })),
+              ]} />
+              <AdSheetSelect label="Медли (армлифтинг)" value={cycMedley} onChange={setCycMedley} options={[
+                { id:'', label:'—' },
+                ...ARM_MEDLEYS.map(m=> ({ id: m.id, label: m.name })),
+              ]} />
               <AdField label="Коррекция %/нед (СРЦ 0.5)">
                 <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
               </AdField>
-              <AdField label="CoC рабочий">
-                <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)}>
-                  <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
-                </select>
-              </AdField>
+              <AdSheetSelect label="CoC рабочий" value={cycCoc} onChange={setCycCoc} options={[
+                { id:'', label:'—' },
+                { id:'guide', label:'Guide', desc:'разминка' },
+                { id:'sport', label:'Sport', desc:'база' },
+                { id:'trainer', label:'Trainer', desc:'переходный' },
+                { id:'no1', label:'№1' },
+                { id:'no1_5', label:'№1.5' },
+                { id:'no2', label:'№2' },
+                { id:'no2_5', label:'№2.5' },
+                { id:'no3', label:'№3', desc:'элита' },
+              ]} />
               <div>
                 <div className="ad-fl">Pumpkin-рука (Larratt)</div>
                 <div className="ad-chips">
@@ -1147,34 +1157,36 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             </AdGrid>
             <div className="ad-row">
-              <AdCheck checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />
-              <AdCheck checked={cycFlat} onChange={setCycFlat} label="Flat pyramid (Bompa)" />
-              <AdCheck checked={cycBlood} onChange={setCycBlood} label="Bloodflow 100×" />
-              <AdCheck checked={cycNever} onChange={setCycNever} label="Never fail" />
-              <AdCheck checked={cycSingles} onChange={setCycSingles} label="Heavy singles 17–18" />
-              <AdCheck checked={cycBrzenk} onChange={setCycBrzenk} label="Brzenk 1+1" />
-              <AdCheck checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
-              {cycAkimov && <AdCheck checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
-              <AdCheck checked={cycFor} onChange={setCycFor} label="FOR-7 (adv+)" />
-              <AdCheck checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
+              <AdSwitch checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />
+              <AdSwitch checked={cycFlat} onChange={setCycFlat} label="Плоская пирамида (Бомпа)" />
+              <AdSwitch checked={cycBlood} onChange={setCycBlood} label="Приток крови 100×" />
+              <AdSwitch checked={cycNever} onChange={setCycNever} label="Без отказов" />
+              <AdSwitch checked={cycSingles} onChange={setCycSingles} label="Тяжёлые синглы 17–18" />
+              <AdSwitch checked={cycBrzenk} onChange={setCycBrzenk} label="Брзенк 1+1" />
+              <AdSwitch checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
+              {cycAkimov && <AdSwitch checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
+              <AdSwitch checked={cycFor} onChange={setCycFor} label="ФОР-7 (для продвинутых)" />
+              <AdSwitch checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
               {cycFor && (
-                <AdField label="FOR-домен">
-                  <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)}>
-                    <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
-                  </select>
-                </AdField>
+                <AdSheetSelect label="ФОР-домен" value={cycForSpec} onChange={setCycForSpec} options={[
+                  { id:'support', label:'Поддержка' },
+                  { id:'crush', label:'Дробление' },
+                  { id:'pinch', label:'Щипок' },
+                  { id:'open', label:'Открытый' },
+                  { id:'wrist', label:'Кисть' },
+                ]} />
               )}
             </div>
             {cycAxisOn && (
               <AdSec title="Ось кисть–локоть–плечо (что было):">
                 <div className="ad-row">
-                  <AdCheck checked={axTrunk} onChange={setAxTrunk} label="Скрут корпуса в атаку" />
-                  <AdCheck checked={axMisalign} onChange={setAxMisalign} label="Ось разорвана" />
-                  <AdCheck checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
-                  <AdCheck checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
-                  <AdCheck checked={axCold} onChange={setAxCold} label="Холод без разминки" />
-                  <AdCheck checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
-                  <AdCheck checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
+                  <AdSwitch checked={axTrunk} onChange={setAxTrunk} label="Скрут корпуса в атаку" />
+                  <AdSwitch checked={axMisalign} onChange={setAxMisalign} label="Ось разорвана" />
+                  <AdSwitch checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
+                  <AdSwitch checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
+                  <AdSwitch checked={axCold} onChange={setAxCold} label="Холод без разминки" />
+                  <AdSwitch checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
+                  <AdSwitch checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
                 </div>
               </AdSec>
             )}
@@ -1214,7 +1226,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                 <span className="ad-tag">{DISCIPLINES.find(d => d.id === discipline)?.label || discipline}</span>
                 <span className="ad-tag">{TECHNIQUES.find(t => t.id === technique)?.label || technique}</span>
-                <span className="ad-tag">{level === 'beginner' ? 'Новичок' : level === 'intermediate' ? 'Средний' : level === 'advanced' ? 'Продвинутый' : 'Enhanced'}</span>
+                <span className="ad-tag">{level === 'beginner' ? 'Новичок' : level === 'intermediate' ? 'Средний' : level === 'advanced' ? 'Продвинутый' : 'На курсе'}</span>
                 <span className="ad-tag">{GOALS.find(g => g.id === goal)?.label || goal}</span>
                 {weakPoints.length > 0 && <span className="ad-tag">🎯 {weakPoints.map(m => ARM_MUSCLE_RU[m] || m).join(' + ')}</span>}
                 {cycId ? <span className="ad-tag">📚 {ARM_CYCLE_LIBRARY.find(c => c.id === cycId)?.name || cycId}</span> : null}
@@ -1373,11 +1385,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 {discipline === 'armlifting' && (
                   <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)" hook="platform">
                     <AdGrid cols="2">
-                      <AdField label="Снаряд">
-                        <select value={proPlatImpl} onChange={e=>setProPlatImpl(e.target.value)}>
-                          {Object.entries(PLATFORM_WR).map(([id, r])=><option key={id} value={id}>{r.name}</option>)}
-                        </select>
-                      </AdField>
+                      <AdSheetSelect label="Снаряд" value={proPlatImpl} onChange={setProPlatImpl} options={
+                        Object.entries(PLATFORM_WR).map(([id, r])=> ({ id, label: (r as any).name }))
+                      } />
                       <AdField label="Цель, кг">
                         <input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" inputMode="decimal" />
                       </AdField>

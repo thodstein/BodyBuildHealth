@@ -224,6 +224,111 @@ export function AdCheck({
   );
 }
 
+export function AdSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className="ad-switch"
+      data-on={checked}
+      onClick={() => { buzz(); onChange(!checked); }}
+    >
+      <span className="ad-switch-track" aria-hidden>
+        <span className="ad-switch-thumb" />
+      </span>
+      <span className="ad-switch-label">{label}</span>
+    </button>
+  );
+}
+
+export type AdSheetOption = { id: string; label: string; desc?: string };
+
+export function AdSheetSelect({
+  label,
+  value,
+  options,
+  onChange,
+  hook,
+}: {
+  label: string;
+  value: string;
+  options: AdSheetOption[];
+  onChange: (v: string) => void;
+  hook?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const cur = options.find((o) => o.id === value);
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open ]);
+  return (
+    <div className="ad-sheet" {...(hook ? { 'data-arm': hook } : {})}>
+      <button
+        type="button"
+        className="ad-sheet-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`${label}: ${cur ? cur.label : '—'}`}
+        onClick={() => { buzz(); setOpen(true); }}
+      >
+        <span className="ad-fl">{label}</span>
+        <span className="ad-sheet-value">{cur ? cur.label : '—'}</span>
+        <span className="ad-sheet-chev" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div className="ad-sheet-backdrop" onClick={() => setOpen(false)}>
+          <div
+            className="ad-sheet-card"
+            role="dialog"
+            aria-label={label}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ad-sheet-handle" aria-hidden />
+            <div className="ad-sheet-title">{label}</div>
+            {options.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="ad-sheet-opt"
+                data-active={o.id === value}
+                aria-pressed={o.id === value}
+                onClick={() => { buzz(); onChange(o.id); setOpen(false); }}
+              >
+                <span className="ad-sheet-opt-tx">
+                  <span>{o.label}</span>
+                  {o.desc ? <span className="ad-sheet-desc">{o.desc}</span> : null}
+                </span>
+                {o.id === value ? (
+                  <span aria-hidden>
+                    ✓
+                  </span>
+                ) : null}
+              </button>
+            ))}
+            <AdBtn variant="ghost" block onClick={() => setOpen(false)}>
+              Готово
+            </AdBtn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdChip({
   active,
   tone,

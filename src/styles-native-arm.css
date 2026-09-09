@@ -815,6 +815,56 @@ html.app-native .train-arm.arm-apk .ad-empty .ad-btn-block {
   min-height: 48px !important;
 }
 
+/* Свитчи — press + focus + tabular */
+html.app-native .train-arm.arm-apk .ad-switch {
+  min-height: 52px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-switch:active .ad-switch-track {
+  transform: scale(0.93) !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-switch:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-switch-label {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Шиты — триггер 52px, опции 60px, press + focus */
+html.app-native .train-arm.arm-apk .ad-sheet-trigger {
+  min-height: 52px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-trigger:active {
+  transform: scale(0.99) !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-trigger:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-opt {
+  min-height: 60px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-opt:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-opt:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sheet-value {
+  font-variant-numeric: tabular-nums !important;
+}
+
 @media (max-width: 380px) {
   html.app-native .train-arm.arm-apk .ad-step-group-label {
     display: none !important;
@@ -834,5 +884,14 @@ html.app-native .train-arm.arm-apk .ad-empty .ad-btn-block {
   }
   html.app-native .train-arm.arm-apk .ad-steps .ad-step:active {
     transform: none !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-sheet-backdrop {
+    animation: none !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-sheet-card {
+    animation: none !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-switch-thumb {
+    transition: none !important;
   }
 }

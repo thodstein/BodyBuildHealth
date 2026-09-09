@@ -5,10 +5,17 @@
  * рендер пикера + фаз-полос, клик ставит цикл, повторный — сбрасывает.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { rankArmCycles } from '../../../../engines/arm/arm-cycle-selector.engine';
+
+function openCycleSheet() {
+  const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
+  if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
+  fireEvent.click(screen.getByRole('button', { name: /^Цикл:/ }));
+  return screen.getByRole('dialog', { name: 'Цикл' });
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -30,13 +37,13 @@ describe('Arm cycle picker', () => {
     }
   });
 
-  it('клик по карточке ставит цикл в селект и подсвечивает', () => {
+  it('клик по карточке ставит цикл в шит и подсвечивает', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
-    expect(screen.getByDisplayValue(`${top.name} (${top.weeks}н)`), 'select synced').toBeTruthy();
+    expect(screen.getByRole('button', { name: `Цикл: ${top.name} (${top.weeks}н)` }), 'sheet synced').toBeTruthy();
     const picker = container.querySelector("[data-arm='cycle-picker']")!;
     const active = Array.from(picker.querySelectorAll('.ad-split')).filter((el) =>
       el.getAttribute('data-active') === 'true',
@@ -52,14 +59,23 @@ describe('Arm cycle picker', () => {
     const btn = screen.getByRole('button', { name: `Цикл ${top.name}` });
     fireEvent.click(btn);
     fireEvent.click(btn);
-    expect(screen.getByDisplayValue('— обычный план —'), 'reset').toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Цикл: — обычный план —' }), 'reset').toBeTruthy();
   });
 
-  it('селект покрывает всю библиотеку (19), пикер — только топ-3', () => {
+  it('шит покрывает всю библиотеку (19), пикер — только топ-3', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
-    const sel = screen.getByDisplayValue('— обычный план —') as HTMLSelectElement;
-    expect(sel.options.length).toBe(20);
+    const dlg = openCycleSheet();
+    const opts = within(dlg).getAllByRole('button').filter((b) => b.textContent !== 'Готово');
+    expect(opts.length).toBe(20);
     expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(3);
+  });
+
+  it('выбор из шита ставит цикл ( Toproll )', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    const dlg = openCycleSheet();
+    fireEvent.click(within(dlg).getByText(/Toproll 6-week/));
+    expect(screen.getByRole('button', { name: /Цикл: Toproll 6-week/ }), 'sheet synced').toBeTruthy();
   });
 });

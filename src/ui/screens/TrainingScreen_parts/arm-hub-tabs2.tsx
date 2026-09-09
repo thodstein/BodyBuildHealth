@@ -8,7 +8,7 @@ import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { hasVideoSupport } from '../../../engines/arm/arm-motion-capture.engine';
 import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
-import { AdSec, AdGrid, AdField, AdChip, AdCheck, AdBtn, AdBanner } from './arm-design-system';
+import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 
 export function HubPressureTab({ H }: { H: any }) {
@@ -69,16 +69,19 @@ export function HubPressureTab({ H }: { H: any }) {
       </AdSec>
       <AdSec title="🥇 TOP: матчап + Table-IQ журнал" collapsible defaultOpen={false} summary={`Схваток: ${tiq.length}`}>
         <AdGrid cols="3">
-          <AdField label="Оппонент">
-            <select value={muState.opp} onChange={e=>{ const v={...muState, opp:e.target.value}; setMuState(v); saveMu(v); }}>
-              <option value="unknown">Неизвестен</option><option value="hook">Хук</option><option value="toproll">Топролл</option><option value="press">Пресс</option><option value="balanced">Универсал</option>
-            </select>
-          </AdField>
-          <AdField label="Рука">
-            <select value={muState.hand} onChange={e=>{ const v={...muState, hand:e.target.value}; setMuState(v); saveMu(v); }}>
-              <option value="unknown">—</option><option value="high">High</option><option value="low">Low</option><option value="neutral">Нейтраль</option>
-            </select>
-          </AdField>
+          <AdSheetSelect label="Оппонент" value={muState.opp} onChange={(v)=>{ const nv={...muState, opp:v}; setMuState(nv); saveMu(nv); }} options={[
+            { id:'unknown', label:'Неизвестен' },
+            { id:'hook', label:'Хук', desc:'давление через кулак' },
+            { id:'toproll', label:'Топролл', desc:'раскрытие кисти' },
+            { id:'press', label:'Пресс', desc:'жим плечом' },
+            { id:'balanced', label:'Универсал' },
+          ]} />
+          <AdSheetSelect label="Рука" value={muState.hand} onChange={(v)=>{ const nv={...muState, hand:v}; setMuState(nv); saveMu(nv); }} options={[
+            { id:'unknown', label:'—' },
+            { id:'high', label:'Верхний', desc:'high-hand' },
+            { id:'low', label:'Нижний', desc:'low-hand' },
+            { id:'neutral', label:'Нейтраль' },
+          ]} />
           <AdField label="Δ веса, кг">
             <input inputMode="decimal" value={muState.wd} onChange={e=>{ const v={...muState, wd:e.target.value}; setMuState(v); saveMu(v); }} placeholder="0" />
           </AdField>
@@ -101,9 +104,9 @@ export function HubPressureTab({ H }: { H: any }) {
           </AdField>
         </AdGrid>
         <div className="ad-row">
-          <AdCheck checked={tiqWin} onChange={setTiqWin} label="Победа" />
-          <AdCheck checked={tiqSlip} onChange={setTiqSlip} label="Срыв" />
-          <AdCheck checked={tiqStrap} onChange={setTiqStrap} label="Ремень" />
+          <AdSwitch checked={tiqWin} onChange={setTiqWin} label="Победа" />
+          <AdSwitch checked={tiqSlip} onChange={setTiqSlip} label="Срыв" />
+          <AdSwitch checked={tiqStrap} onChange={setTiqStrap} label="Ремень" />
           <AdBtn variant="dark" onClick={addTiqBout}>＋ Схватка</AdBtn>
           {tiq.length>0 && <AdBtn variant="dark" onClick={undoTiqBout}>↩ Отменить</AdBtn>}
           {tiq.length>0 && <AdBtn variant="dark" onClick={clearTiqBouts}>🗑 Очистить</AdBtn>}
@@ -169,16 +172,16 @@ export function HubStrengthTab({ H }: { H: any }) {
         </AdSec>
       </AdGrid>
       <AdGrid cols="auto">
-        <AdField label="Wrist curl lb">
+        <AdField label="Сгибание кисти, фунт">
           <input inputMode="decimal" value={state.wristCurlLb} onChange={e=>setState((s: any)=>({...s, wristCurlLb:e.target.value}))} placeholder="30" />
         </AdField>
-        <AdField label="Pron hold с">
+        <AdField label="Пронация, с">
           <input inputMode="numeric" value={state.pronHoldSec} onChange={e=>setState((s: any)=>({...s, pronHoldSec:e.target.value}))} placeholder="20" />
         </AdField>
-        <AdField label="Cup hold с">
+        <AdField label="Чаша, с">
           <input inputMode="numeric" value={state.cupHoldSec} onChange={e=>setState((s: any)=>({...s, cupHoldSec:e.target.value}))} placeholder="25" />
         </AdField>
-        <AdField label="CoC lvl">
+        <AdField label="CoC, ур.">
           <input inputMode="decimal" value={state.cocLevel} onChange={e=>setState((s: any)=>({...s, cocLevel:e.target.value}))} placeholder="1" />
         </AdField>
       </AdGrid>
@@ -302,18 +305,21 @@ export function HubRecoveryTab({ H }: { H: any }) {
       </AdSec>
       <AdSec title="🩹 Return-to-pull (после травмы)" collapsible defaultOpen={false} summary={rh.injury==='none' ? 'Скрининг' : rh.injury}>
         <div className="ad-row">
-          <AdField label="Травма">
-            <select aria-label="Травма для return-to-pull" value={rh.injury} onChange={(e) => setRh({ ...rh, injury: e.target.value })}>
-              <option value="none">—</option><option value="humerus">Перелом плеча</option><option value="ucl">UCL/связка локтя</option><option value="biceps">Бицепс</option><option value="elbow_tendon">Тендинопатия локтя</option><option value="wrist">Кисть/запястье</option>
-            </select>
-          </AdField>
+          <AdSheetSelect label="Травма для return-to-pull" value={rh.injury} onChange={(v) => setRh({ ...rh, injury: v })} options={[
+            { id:'none', label:'—', desc:'скрининг' },
+            { id:'humerus', label:'Перелом плеча' },
+            { id:'ucl', label:'UCL/связка локтя' },
+            { id:'biceps', label:'Бицепс' },
+            { id:'elbow_tendon', label:'Тендинопатия локтя' },
+            { id:'wrist', label:'Кисть/запястье' },
+          ]} />
           <AdField label="Недель с травмы">
             <input aria-label="Недель с травмы" inputMode="numeric" value={rh.weeks} onChange={(e) => setRh({ ...rh, weeks: e.target.value })} placeholder="0" />
           </AdField>
           <AdField label="Боль 0-10">
             <input aria-label="Боль при травме 0-10" inputMode="decimal" value={rh.pain} onChange={(e) => setRh({ ...rh, pain: e.target.value })} placeholder="0" />
           </AdField>
-          <AdCheck checked={rh.surg} onChange={(v) => setRh({ ...rh, surg: v })} label="Операция была" />
+          <AdSwitch checked={rh.surg} onChange={(v) => setRh({ ...rh, surg: v })} label="Операция была" />
         </div>
         {(()=>{ try {
           if (rh.injury==='none') return <div className="ad-muted">Скрининг, не диагноз: выбери травму — покажем фазу, допуски и критерии перехода.</div>;

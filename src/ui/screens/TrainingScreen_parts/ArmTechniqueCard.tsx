@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
-import { AdCard, AdChip, AdBtn } from './arm-design-system';
+import { AdCard, AdChip, AdBtn, AdSheetSelect } from './arm-design-system';
 
 const STORAGE_KEY = 'he_arm_technique_card_v1';
 
@@ -47,12 +47,12 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
         <div className="ad-sec-t">🎯 Диагностика слабых звеньев</div>
         <p className="ad-muted">Где проваливаешься за столом? Отметь — получишь слабые мышцы и упражнения. Cup/rising/pronation/supination → точный разбор.</p>
         <div className="ad-row">
-          <select value={technique} onChange={e => setTechnique(e.target.value)} aria-label="Техника">
-            <option value="balanced">Сбалансировано</option>
-            <option value="hook">Хук</option>
-            <option value="toproll">Топролл</option>
-            <option value="press">Пресс</option>
-          </select>
+          <AdSheetSelect label="Техника" value={technique} onChange={setTechnique} options={[
+            { id:'balanced', label:'Сбалансировано' },
+            { id:'hook', label:'Хук', desc:'давление через кулак' },
+            { id:'toproll', label:'Топролл', desc:'раскрытие кисти' },
+            { id:'press', label:'Пресс', desc:'жим плечом' },
+          ]} />
         </div>
         <div className="ad-chips">
           {[
