@@ -657,7 +657,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         icon="🤝"
         title="Арм-конструктор PRO"
         sub="Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard."
-        side={best ? (<div className="ad-hero-side"><div className="ad-hero-score" aria-hidden><b>{ranked[0]?.score ?? 0}</b><span>баллов</span></div><div className="ad-hero-name">{best.name}<span>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
+        side={best ? (<div className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>баллов</span></div><div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
       <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, overflowX: 'auto' as const, alignItems: 'center' }}>
@@ -927,7 +927,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           <div className="ad-muted">Рекомендация — {best?.name}.</div>
           {GRIP_GROUPS.map(g => (
-            <AdSec key={g.title} title={g.title} hook="grip-group">
+            <AdSec key={g.title} title={g.title} hook="grip-group" collapsible defaultOpen={false} summary={`${g.ids.length} снар.`}>
               <div className="ad-list">
                 {g.ids.map(id => {
                   const spec = GRIP_IMPLEMENTS[id];
