@@ -343,9 +343,9 @@ export const Stepper: React.FC<{ label?: string; value: number; min?: number; ma
 
 export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; disabled?: boolean; icon?: string }> = ({ active, onClick, children, disabled, icon }) => (
   <button
-    className="kit-chiptoggle"
+    className="kit-chiptoggle cb-chip"
     data-active={active}
-    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF }}
+    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF, minHeight: 40 }}
     onClick={onClick} disabled={disabled} aria-pressed={active}
   >
     {icon && <span style={{ fontSize: 12 }}>{icon}</span>}{children}
@@ -414,38 +414,38 @@ export const CombatPopupSelect: React.FC<{ label: string; value: string | undefi
   const sel = options.find(o => o.id === (value ?? ''));
   return (
     <>
-      <button onClick={() => setOpen(true)} style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
+      <button onClick={() => setOpen(true)} className="cb-pop-trig" style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
         <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
         <span style={{ fontSize: 15, color: '#BF5AF2', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 10, color: TEXT_3 }}>▾</span></span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
-            <div style={POP_HANDLE} />
+        <div className="cb-pop-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div onClick={e => e.stopPropagation()} className="cb-pop-sheet" style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
+            <div className="cb-pop-handle" style={POP_HANDLE} />
             <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
-              {sel?.desc && <span style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
+              <div className="cb-pop-title" style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
+              {sel?.desc && <span className="cb-pop-desc" style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
             </div>
-            <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="cb-pop-list" style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
               {options.map(o => {
                 const active = value === o.id;
                 return (
-                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{
+                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} className="cb-pop-opt" data-active={active ? 'true' : 'false'} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
                     fontFamily: SF, background: active ? 'rgba(175,82,222,0.12)' : 'transparent',
                     border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`,
                   }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 13, color: '#BF5AF2' }}>✓</span>}</span>
-                      {o.desc && <span style={{ fontSize: 12, color: active ? '#BF5AF2' : TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
+                      <span className="cb-pop-optlabel" style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 13, color: '#BF5AF2' }}>✓</span>}</span>
+                      {o.desc && <span className="cb-pop-optdesc" style={{ fontSize: 12, color: active ? '#BF5AF2' : TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
                     </span>
                   </button>
                 );
               })}
             </div>
-            {sel?.desc && <div style={{ margin: '0 8px', padding: '8px 12px', fontSize: 12, color: TEXT_2, background: 'rgba(175,82,222,0.08)', border: '0.5px solid rgba(175,82,222,0.12)', borderRadius: 8, fontFamily: SF, lineHeight: 1.4 }}>{sel.desc}</div>}
+            {sel?.desc && <div className="cb-pop-foot" style={{ margin: '0 8px', padding: '8px 12px', fontSize: 12, color: TEXT_2, background: 'rgba(175,82,222,0.08)', border: '0.5px solid rgba(175,82,222,0.12)', borderRadius: 8, fontFamily: SF, lineHeight: 1.4 }}>{sel.desc}</div>}
             <div style={{ padding: '8px 16px' }}>
-              <button onClick={() => setOpen(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
+              <button onClick={() => setOpen(false)} className="cb-pop-done" style={{ width: '100%', padding: '12px', minHeight: 48, borderRadius: 12, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -460,22 +460,22 @@ export const CombatPopupNumber: React.FC<{ label: string; value: number; min?: n
   React.useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
   return (
     <>
-      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn} aria-haspopup="dialog">
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} className="cb-pop-trig" style={popCardBtn} aria-haspopup="dialog">
         <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
         <span style={{ fontSize: 17, color: '#BF5AF2', fontWeight: 600, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
-          <div onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
-            <div style={POP_HANDLE} />
+        <div className="cb-pop-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div onClick={e => e.stopPropagation()} className="cb-pop-sheet" style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
+            <div className="cb-pop-handle" style={POP_HANDLE} />
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
-              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, height: 6, borderRadius: 999 }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
+              <div className="cb-pop-numtitle" style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
+              <input className="cb-pop-range" type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, height: 6, borderRadius: 999 }} />
+              <div className="cb-pop-scale" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
+                <input className="cb-pop-input" type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
                 {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
-                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>{'Готово'}</button>
+                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} className="cb-pop-ok" style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>{'Готово'}</button>
               </div>
             </div>
           </div>
