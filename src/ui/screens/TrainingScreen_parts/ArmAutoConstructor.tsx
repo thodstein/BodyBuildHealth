@@ -1211,6 +1211,14 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           {!builtPlan ? <AdEmpty icon="📋" title="План не собран — вернись в «Параметры»." sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
+              <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                <span className="ad-tag">{DISCIPLINES.find(d => d.id === discipline)?.label || discipline}</span>
+                <span className="ad-tag">{TECHNIQUES.find(t => t.id === technique)?.label || technique}</span>
+                <span className="ad-tag">{level === 'beginner' ? 'Новичок' : level === 'intermediate' ? 'Средний' : level === 'advanced' ? 'Продвинутый' : 'Enhanced'}</span>
+                <span className="ad-tag">{GOALS.find(g => g.id === goal)?.label || goal}</span>
+                {weakPoints.length > 0 && <span className="ad-tag">🎯 {weakPoints.map(m => ARM_MUSCLE_RU[m] || m).join(' + ')}</span>}
+                {cycId ? <span className="ad-tag">📚 {ARM_CYCLE_LIBRARY.find(c => c.id === cycId)?.name || cycId}</span> : null}
+              </div>
               {planDash && (
                 <div className="ad-stats" data-arm="plan-dash">
                   <div className="ad-stat"><div className="ad-stat-v">{planDash.weeks}</div><div className="ad-stat-l">Недель</div></div>
