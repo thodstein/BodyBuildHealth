@@ -24,7 +24,7 @@ function goQuality() {
   const c = render(<ArmAutoConstructor />);
   fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
   fireEvent.click(screen.getByText('⚡ Собрать план'));
-  fireEvent.click(screen.getByRole('button', { name: '📋 План и проверка' }));
+  fireEvent.click(screen.getByRole('button', { name: '🏋️ Веса и качество' }));
   return c.container;
 }
 

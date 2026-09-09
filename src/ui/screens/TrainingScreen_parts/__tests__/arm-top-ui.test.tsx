@@ -90,6 +90,7 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(screen.getByDisplayValue('70')).toBeTruthy();
     expect(screen.getByDisplayValue('85')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
+    fireEvent.click(screen.getByRole('button', { name: /TOP: матчап/ }));
     expect((screen.getByRole('checkbox', { name: /RFD speed-блок/ }) as HTMLInputElement).checked).toBe(true);
   });
 
@@ -99,18 +100,22 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     }));
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
+    fireEvent.click(screen.getByRole('button', { name: /TOP: матчап/ }));
     fireEvent.click(screen.getByLabelText(/С прошлого плана/));
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
     expect(document.body.textContent).toContain('Cross-meso');
   });
 
   it('sim-план: заметки недели видны в плане', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
+    fireEvent.click(screen.getByRole('button', { name: /TOP: матчап/ }));
     fireEvent.click(screen.getByLabelText(/Contest-sim неделя/));
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
     expect(document.body.textContent).toContain('Contest-sim');
   });
 
@@ -118,10 +123,12 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     render(<ArmAutoConstructor />);
     expect(document.body.textContent).not.toContain('FOR-домен');
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     fireEvent.click(screen.getByLabelText(/FOR-7/));
     expect(document.body.textContent).toContain('FOR-домен');
     fireEvent.change(screen.getByDisplayValue('Поддержка'), { target: { value: 'crush' } });
     fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
     expect(document.body.textContent).toContain('FOR-7');
   });
 
@@ -138,9 +145,11 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
   it('ось humerus-2026: флаги дают строку и предупреждение', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     fireEvent.click(screen.getByLabelText(/Ось humerus-2026/));
     fireEvent.click(screen.getByLabelText(/Скрут корпуса в атаку/));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
     // строка оси в rationale плана (предупреждение — в safetyWarnings шага качества)
     expect(document.body.textContent).toMatch(/Ось: риск guarded/);
   });
@@ -148,11 +157,13 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
   it('медли: ввод попыток даёт Медли-факт в плане', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     fireEvent.change(screen.getByLabelText(/Медли \(армлифтинг\)/), { target: { value: 'rt_saxon_hub' } });
     expect(document.body.textContent).toContain('Попытки медли');
     fireEvent.change(screen.getByLabelText('Попытка 1 кг'), { target: { value: '100' } });
     fireEvent.change(screen.getByLabelText('Попытка 2 кг'), { target: { value: '80' } });
     fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
     expect(document.body.textContent).toMatch(/Медли-факт/);
   });
 
@@ -166,6 +177,7 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
       const sel = screen.getByDisplayValue('— обычный план —') as HTMLSelectElement;
       fireEvent.change(sel, { target: { value: 'strengthlog_8' } });
       fireEvent.click(screen.getByText('⚡ Собрать план'));
+      fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
       fireEvent.click(screen.getByText('🖨 Печать'));
       expect(writes.length).toBe(1);
       expect(writes[0]).toContain('PRO-сводка тренера');

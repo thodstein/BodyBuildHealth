@@ -205,14 +205,16 @@ describe('APK arm pack', () => {
     expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
   });
 
-  it('весь конструктор: 5 шагов рендерятся без падений (TG)', () => {
+  it('весь конструктор: 7 шагов рендерятся без падений (TG)', () => {
     render(<ArmAutoConstructor />);
     const steps: Array<[string, RegExp]> = [
       ['🎛 Параметры', /Дисциплина/],
       ['🎯 Атлет', /Рабочие максимумы/],
       ['✊ Стол и хват', /Хват — диагностика/],
       ['📚 Сплит и цикл', /Выбор сплита/],
-      ['📋 План и проверка', /План не собран/],
+      ['📋 План', /План не собран/],
+      ['🏋️ Веса и качество', /План не собран/],
+      ['📤 Экспорт', /План не собран/],
     ];
     for (const [tab, marker] of steps) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
@@ -237,7 +239,7 @@ describe('APK arm pack', () => {
     };
     resetAppPlatformCache();
     const c = render(<ArmAutoConstructor />);
-    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План и проверка']) {
+    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План', '🏋️ Веса и качество', '📤 Экспорт']) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(c.container.querySelector('.train-arm')?.classList.contains('arm-apk'), tab).toBe(true);
     }
@@ -262,13 +264,15 @@ describe('APK arm pack', () => {
     expect(head.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('выдача: дашборд плана и обоснование после сборки', () => {
+  it('выдача: дашборд плана на шаге План, обоснование — на шаге Экспорт', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
-    for (const marker of ['Недель', 'Сессий', 'Стол', 'Делод/пик', '📖 Обоснование']) {
+    for (const marker of ['Недель', 'Сессий', 'Стол', 'Делод/пик']) {
       expect(document.body.textContent, marker).toContain(marker);
     }
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
+    expect(document.body.textContent).toContain('📖 Обоснование');
   });
 
   it('хаб: Table-IQ свернут, журнал работает без раскрытия', () => {
@@ -299,7 +303,7 @@ describe('APK arm pack', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
-    fireEvent.click(screen.getByRole('button', { name: '📋 План и проверка' }));
+    fireEvent.click(screen.getByRole('button', { name: '📋 План' }));
     const strip = container.querySelector("[data-arm='week-pills']");
     expect(strip, 'vol strip').not.toBeNull();
     const btns = Array.from(strip!.querySelectorAll('.ad-wpill'));

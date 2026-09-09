@@ -1,8 +1,9 @@
 /**
  * ArmAutoConstructor.tsx — PRO-конструктор армрестлинг/армлифтинг.
  * Изолирован, как BbAutoConstructor, но для arm-движка.
- * 6 шагов: params → grip → split → plan → quality → export.
- * Редизайн на arm-design-system; логика, строки и aria 1-в-1.
+ * 7 шагов в стиле ББ-авто (модерн): params → athlete → grip → split → plan → quality → export.
+ * Подача — training-ui токены (CARD/BTN/STEP_PILL) + группы ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА;
+ * DOM-контракты (классы .ad-*, data-arm хуки, строки, aria) 1-в-1.
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
@@ -37,11 +38,92 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
-import { AdRoot, AdHead, AdSteps, AdCard, AdSec, AdGrid, AdField, AdCheck, AdChip, AdBtn, AdBanner, AdEmpty, AdCta, type AdStepDef } from './arm-design-system';
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
+import './arm-design.css';
+import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { isNativeApp } from '../../../core/app-platform';
+import { ensureArmApkStyles } from './arm-apk-loader';
 
-type Step = 'params'|'athlete'|'grip'|'split'|'plan';
+/* ── BB-modern presentation primitives (Ad* DOM contracts kept 1-в-1:
+ * classes .ad-* + data-arm hooks + aria, только инлайн-стиль в токенах
+ * training-ui как в BbAutoConstructor) ── */
+type AdStepDef = { id: string; label: string };
+function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth?: number; children: React.ReactNode }) {
+  React.useEffect(() => { ensureArmApkStyles(); }, []);
+  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap` : `${rootClass} ad-wrap`} style={maxWidth ? { maxWidth, margin: '0 auto', padding: '0 10px 90px' } : undefined}>{children}</div>;
+}
+function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
+  return (
+    <div style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px' }}>
+      <div aria-hidden style={{ fontSize: 30, lineHeight: 1, width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h2 style={{ ...H, margin: 0 }}>{title}</h2>
+        {sub ? <p style={{ ...SMALL, margin: '4px 0 0', color: '#fff' }}>{sub}</p> : null}
+      </div>
+      {side ? <div style={{ flexShrink: 0 }}>{side}</div> : null}
+    </div>
+  );
+}
+function AdCard({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD }} {...rest}>{children}</div>;
+}
+function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn' }) {
+  const [open, setOpen] = React.useState(defaultOpen ?? true);
+  const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
+  if (!collapsible) {
+    return (
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', marginTop: 8 }}>
+        <div className="ad-sec-t" style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 6 }}>{dot}{title}</div>
+        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6 }}>{hint}</div> : null}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: open ? '10px 12px' : '0 12px', marginTop: 8 }}>
+      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '11px 0', cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, textAlign: 'left' }}>
+        <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
+        {dot}
+        <span className="ad-sec-t" style={{ flex: 1 }}>{title}</span>
+        {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: 'rgba(255,255,255,0.65)' }}>{summary}</span> : null}
+      </button>
+      {open ? <div className="ad-sec-body" data-collapsed={!open} style={{ paddingBottom: 10 }}>{hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6 }}>{hint}</div> : null}{children}</div> : <div className="ad-sec-body" data-collapsed={!open} style={{ display: 'none' }}>{children}</div>}
+    </div>
+  );
+}
+function AdGrid({ cols, children }: { cols: '2' | '3' | 'auto' | 'auto-sm'; children: React.ReactNode }) {
+  return <div className="ad-grid" data-cols={cols} style={{ display: 'grid', gap: 8, gridTemplateColumns: cols === '3' ? 'repeat(auto-fit, minmax(150px, 1fr))' : cols === '2' ? 'repeat(auto-fit, minmax(180px, 1fr))' : '1fr' }}>{children}</div>;
+}
+function AdField({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  const styled = React.Children.map(children, (ch) => {
+    if (React.isValidElement(ch) && (ch.type === 'input' || ch.type === 'select')) return React.cloneElement(ch as React.ReactElement<any>, { style: { ...(ch.props as any).style, ...IN, width: '100%' } });
+    return ch;
+  });
+  return <label className="ad-field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: '#fff' }}><span className="ad-fl">{label}</span>{styled}</label>;
+}
+function AdCheck({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: React.ReactNode }) {
+  return <label className="ad-check" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#fff', minHeight: 40, cursor: 'pointer' }}><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#00e68a' }} /><span>{label}</span></label>;
+}
+function AdChip({ active, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+  return <button className="ad-chip" data-active={!!active} aria-pressed={!!active} onClick={onClick} style={{ padding: '8px 12px', borderRadius: 999, fontSize: 11, fontWeight: !!active ? 800 : 500, cursor: 'pointer', minHeight: 38, border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)', background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: !!active ? '#06281c' : '#fff' }} {...rest}>{children}</button>;
+}
+function AdBtn({ variant = 'primary', block, hero, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'amber' | 'danger' | 'dark'; block?: boolean; hero?: boolean }) {
+  const st = variant === 'primary' ? BTN : BTN_GHOST;
+  return <button className={`ad-btn${block ? ' ad-btn-block' : ''}${hero ? ' ad-btn-hero' : ''}`} data-variant={variant} onClick={onClick} style={{ ...st, ...(block ? { width: '100%' } : {}), ...(hero ? { fontSize: 14, padding: '14px 16px' } : {}) }} {...rest}>{children}</button>;
+}
+function AdBanner({ tone = 'info', children, hook }: { tone?: 'info' | 'ok' | 'warn' | 'bad'; children: React.ReactNode; hook?: string }) {
+  const color = tone === 'ok' ? '#00e68a' : tone === 'warn' ? '#f59e0b' : tone === 'bad' ? '#ef4444' : '#60a5fa';
+  return <div className="ad-banner" data-tone={tone} {...(hook ? { 'data-arm': hook } : {})} style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: `${color}14`, border: `1px solid ${color}44`, borderLeft: `3px solid ${color}`, fontSize: 12, color: '#fff', lineHeight: 1.5 }}>{children}</div>;
+}
+function AdEmpty({ icon, title, sub, children }: { icon: string; title: string; sub?: string; children?: React.ReactNode }) {
+  return <div className="ad-empty" style={{ textAlign: 'center', padding: '28px 16px' }}><div className="ad-empty-ic" aria-hidden style={{ fontSize: 40 }}>{icon}</div><div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 8 }}>{title}</div>{sub ? <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>{sub}</p> : null}{children ? <div style={{ marginTop: 12 }}>{children}</div> : null}</div>;
+}
+function AdCta({ children }: { children: React.ReactNode }) {
+  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, position: 'sticky', bottom: 8, zIndex: 5 }}>{children}</div>;
+}
+
+type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export';
 
 const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
 const GOALS = [
@@ -74,7 +156,14 @@ const STEP_DEFS: AdStepDef[] = [
   { id: 'athlete', label: '🎯 Атлет' },
   { id: 'grip', label: '✊ Стол и хват' },
   { id: 'split', label: '📚 Сплит и цикл' },
-  { id: 'plan', label: '📋 План и проверка' },
+  { id: 'plan', label: '📋 План' },
+  { id: 'quality', label: '🏋️ Веса и качество' },
+  { id: 'export', label: '📤 Экспорт' },
+];
+const STEP_GROUPS: Array<{ name: string; ids: Step[] }> = [
+  { name: 'ПАРАМЕТРЫ', ids: ['params', 'athlete', 'grip', 'split'] },
+  { name: 'ПЛАН', ids: ['plan', 'quality'] },
+  { name: 'ВЫДАЧА', ids: ['export'] },
 ];
 
 const SPLIT_TAG_RU: Record<string, string> = {
@@ -571,7 +660,33 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         side={best ? (<div className="ad-hero-side"><div className="ad-hero-score" aria-hidden><b>{ranked[0]?.score ?? 0}</b><span>баллов</span></div><div className="ad-hero-name">{best.name}<span>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
-      <AdSteps steps={STEP_DEFS} active={step} onSelect={(id) => setStep(id as Step)} hook="steps" />
+      <div data-arm="steps" aria-label="Шаги" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, overflowX: 'auto' as const, alignItems: 'center' }}>
+        {STEP_GROUPS.map((g, gi) => (
+          <span key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <span aria-hidden style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}>{g.name}</span>
+            {g.ids.map((id) => {
+              const idx = STEP_DEFS.findIndex((s) => s.id === id);
+              const s = STEP_DEFS[idx];
+              const active = step === id;
+              return (
+                <button
+                  key={id}
+                  aria-label={s.label}
+                  aria-pressed={active}
+                  data-active={active}
+                  className="ad-step"
+                  onClick={() => setStep(id)}
+                  style={{ ...STEP_PILL(active), flexShrink: 0 }}
+                >
+                  <span className="ad-step-n" aria-hidden style={{ marginRight: 4, opacity: 0.8 }}>{idx + 1}</span>
+                  {s.label}
+                </button>
+              );
+            })}
+            {gi < STEP_GROUPS.length - 1 && <span aria-hidden style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', margin: '0 2px' }} />}
+          </span>
+        ))}
+      </div>
 
       {msg && <div className="ad-toast" data-arm="msg">{msg}</div>}
 
@@ -961,6 +1076,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           </AdSec>
           <AdCta>
             <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
+            {builtPlan && <AdBtn variant="ghost" block onClick={() => setStep('plan')}>Далее: План →</AdBtn>}
             <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
           </AdCta>
           <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
@@ -1130,41 +1246,21 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   </div>
                 </div>
               )}
-              <div className="ad-row">
-                <AdBtn variant="ghost" onClick={()=>{
-                  let diag: any = null;
-                  try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
-                  // fatigue/trend из force-history если есть
-                  try {
-                    const trials = loadForceTrials();
-                    const stats = buildWeeklyStats(trials, 12);
-                    const ft = fatigueTrend(stats);
-                    const tr = forceTrend(stats);
-                    if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
-                  } catch {}
-                  // R7: PRO-сводка в печать из inputSnapshot плана (пусто = блока нет)
-                  let proSummary: any = null;
-                  try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
-                  const w = window.open('', '_blank');
-                  if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
-                }}>🖨 Печать</AdBtn>
-                <AdBtn variant="ghost" onClick={()=>{
-                  const ics = buildArmIcs(builtPlan);
-                  const blob = new Blob([ics], { type:'text/calendar' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href=url; a.download='arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
-                }}>📅 .ics</AdBtn>
-              </div>
-              <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
-                <div data-arm="rationale">{builtPlan.rationale.map((r:string, i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
-              </AdSec>
+              <AdCta>
+                <AdBtn variant="primary" block hero onClick={() => setStep('quality')}>Далее: Проверка →</AdBtn>
+                <AdBtn variant="ghost" block onClick={() => setStep('split')}>← Назад</AdBtn>
+              </AdCta>
             </>
           )}
         </AdCard>
       )}
 
-      {step === 'plan' && builtPlan && (
+      {step === 'quality' && !builtPlan && (
+        <AdCard>
+          <AdEmpty icon="🏋️" title="План не собран — вернись в «Сплит и цикл»." sub="Собери план — здесь появятся гейты качества, тепловая карта и веса."><AdBtn variant="primary" block onClick={() => setStep('split')}>📚 К сплиту</AdBtn></AdEmpty>
+        </AdCard>
+      )}
+      {step === 'quality' && builtPlan && (
         <AdCard data-arm="quality-card">
             <>
               <AdSec title="📊 Качество">
@@ -1227,10 +1323,14 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdBanner tone="warn">
                 <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
               </AdBanner>
+              <AdCta>
+                <AdBtn variant="primary" block hero onClick={() => setStep('export')}>Далее: Экспорт →</AdBtn>
+                <AdBtn variant="ghost" block onClick={() => setStep('plan')}>← Назад</AdBtn>
+              </AdCta>
             </>
         </AdCard>
       )}
-      {step === 'plan' && builtPlan && (
+      {step === 'quality' && builtPlan && (
         <AdCard data-arm="weights-card">
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
               <>
@@ -1281,8 +1381,58 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   </AdSec>
                 )}
                 <AdBtn variant="primary" block onClick={handleBuild}>🔄 Пересобрать с весами</AdBtn>
+                <AdCta>
+                  <AdBtn variant="primary" block hero onClick={() => setStep('export')}>Далее: Экспорт →</AdBtn>
+                  <AdBtn variant="ghost" block onClick={() => setStep('plan')}>← Назад</AdBtn>
+                </AdCta>
               </>
           </AdSec>
+        </AdCard>
+      )}
+      {step === 'export' && (
+        <AdCard>
+          {!builtPlan ? <AdEmpty icon="📤" title="План не собран — вернись в «Параметры»." sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."><AdBtn variant="primary" block onClick={() => setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
+            <>
+              <div className="ad-sec-t">📤 Экспорт — {builtPlan.pattern.name}</div>
+              <div className="ad-row" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <AdBtn variant="ghost" onClick={() => {
+                  let diag: any = null;
+                  try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
+                  try {
+                    const trials = loadForceTrials();
+                    const stats = buildWeeklyStats(trials, 12);
+                    const ft = fatigueTrend(stats);
+                    const tr = forceTrend(stats);
+                    if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
+                  } catch {}
+                  let proSummary: any = null;
+                  try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
+                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
+                  const w = window.open('', '_blank');
+                  if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
+                }}>🖨 Печать</AdBtn>
+                <AdBtn variant="ghost" onClick={() => {
+                  const ics = buildArmIcs(builtPlan);
+                  const blob = new Blob([ics], { type: 'text/calendar' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
+                }}>📅 .ics</AdBtn>
+              </div>
+              <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
+                <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
+              </AdSec>
+              <AdSec title="📊 Сводка" collapsible defaultOpen={false} summary="фазы · объём">
+                <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
+                <div data-arm="report-lines">
+                  {builtPlan.report?.techniqueRationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}
+                  {builtPlan.report?.gripRationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}
+                </div>
+              </AdSec>
+              <AdCta>
+                <AdBtn variant="ghost" block onClick={() => setStep('quality')}>← Назад</AdBtn>
+              </AdCta>
+            </>
+          )}
         </AdCard>
       )}
     </AdRoot>

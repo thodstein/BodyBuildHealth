@@ -33,6 +33,7 @@ describe('Arm cycle picker', () => {
   it('клик по карточке ставит цикл в селект и подсвечивает', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
     expect(screen.getByDisplayValue(`${top.name} (${top.weeks}н)`), 'select synced').toBeTruthy();
@@ -46,6 +47,7 @@ describe('Arm cycle picker', () => {
   it('повторный клик сбрасывает в обычный план', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     const btn = screen.getByRole('button', { name: `Цикл ${top.name}` });
     fireEvent.click(btn);
