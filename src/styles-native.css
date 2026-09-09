@@ -12753,6 +12753,79 @@ html.app-native .manual-constructor .extra-deload:focus-visible {
   }
 }
 
+/* ─── 110. MANUAL VOLFIX/QUICK PRO — фикс объёма и мелкие тумблеры ───
+ * Хуки: NEW .editor-volfix; сущ. .manual-quick, .manual-prog-tools.
+ * Кнопки 44px + press/focus, tabular, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Быстрый фикс объёма: кнопки 44px ── */
+html.app-native .manual-constructor .editor-volfix {
+  border-radius: 16px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .editor-volfix button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-volfix button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-volfix button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Тогл быстрого старта и сброс фильтров: 44px ── */
+html.app-native .manual-constructor .manual-quick button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-quick button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-quick button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .manual-prog-tools button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-prog-tools button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-tools button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-volfix button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-quick button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-prog-tools button:active {
+    transform: none !important;
+  }
+}
+
 /* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
 html.app-native .nd-data-btn {
   min-height: 44px !important;

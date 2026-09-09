@@ -1321,7 +1321,7 @@ return (
               showToast('➖ ' + (GROUP_RU[muscle] ?? muscle) + ` → день ${targetIdx+1} · −1 сет`);
             };
             return (
-              <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${overs.length ? '#ef4444' : '#3b82f6'}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="editor-volfix" style={{ ...CARD, padding: 10, borderLeft: `3px solid ${overs.length ? '#ef4444' : '#3b82f6'}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: overs.length ? '#ef4444' : '#3b82f6' }}>{overs.length ? '⚠ Быстрый фикс объёма' : '⬇ Быстрый фикс объёма'} — 1 клик</div>
                 {lows.length > 0 && <><div style={{ fontSize: 10, color: DIM }}>Недобор до MEV:</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{lows.map(l => (<button key={l.muscle} onClick={() => addFor(l.muscle)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(59,130,246,0.3)', color: '#60a5fa' }}>+ {GROUP_RU[l.muscle] ?? l.muscle} ({l.avgSets}/{l.mev})</button>))}</div></>}
                 {overs.length > 0 && <><div style={{ fontSize: 10, color: DIM, marginTop: lows.length ? 4 : 0 }}>Перегруз &gt; MRV:</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{overs.map(o => (<button key={o.muscle} onClick={() => removeFor(o.muscle)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>− {GROUP_RU[o.muscle] ?? o.muscle} ({o.peakSets}/{o.mrv})</button>))}</div></>}

@@ -251,6 +251,19 @@ describe('Экстры: хуки §109 (CSV-кнопка)', () => {
   });
 });
 
+describe('Менеджер: квик-панель и сброс фильтров §110', () => {
+  it('manual-quick на месте; гиббериш в поиске → «Сбросить фильтры»', () => {
+    saveUserProgram(cloneFromLibrary(getAllPrograms()[0]), 'seed');
+    const { container, unmount } = render(<ProgramManagerPanelWithProvider />);
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    expect(container.querySelector('.manual-quick')).toBeInTheDocument();
+    const search = screen.getByPlaceholderText(/Поиск по названию/) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'несуществующий_запрос_12345' } });
+    expect(screen.getByText('Сбросить фильтры')).toBeInTheDocument();
+    unmount();
+  });
+});
+
 describe('ManualUI хуки для APK-слоя (§100)', () => {
   it('ManualHeader несёт manual-head, ManualStepper — manual-stepper', async () => {
     const { ManualHeader, ManualStepper } = await import('../ManualUI');
