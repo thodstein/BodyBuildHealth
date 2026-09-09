@@ -630,28 +630,28 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора — современно, стеклянные карточки ─── */}
       {page === 'planning' && (
         <div className="training-planning" style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:`radial-gradient(1100px 520px at 15% -10%, ${trainAlpha(TRAIN_ACCENT_VAR, '14')}, transparent 60%), radial-gradient(900px 460px at 92% 4%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(700px 380px at 60% 100%, rgba(236,72,153,0.08), transparent 60%), #0a0a0a`, overflow:'auto' }}>
-          <div style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'8px 10px', background:'rgba(10,10,12,0.75)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:8 }}>
-            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'5px 10px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff' }}>← На главную</button>
+          <div className="tp-head" style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'10px 12px', minHeight:56, background:'rgba(10,10,12,0.75)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:8 }}>
+            <button className="tp-back" onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'10px 14px', minHeight:44, borderRadius:12, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← На главную</button>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:-0.2, lineHeight:1, display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ display: 'inline-flex', color: TRAIN_ACCENT_VAR }}><NativeIcon name="layers" size={14} /></span> Планирование</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.60)', marginTop:1, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>6 конструкторов · один клик</div>
+              <div className="tp-title" style={{ fontSize:14, fontWeight:800, color:'#fff', letterSpacing:-0.2, lineHeight:1.2, display: 'flex', alignItems: 'center', gap: 7 }}><span className="tp-title-icon" style={{ display: 'inline-flex', color: TRAIN_ACCENT_VAR }}><NativeIcon name="layers" size={14} /></span> Планирование</div>
+              <div className="tp-sub" style={{ fontSize:11, color:'rgba(255,255,255,0.60)', marginTop:2, lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.length} конструкторов · один клик</div>
             </div>
-            <span style={{ fontSize:10, fontWeight:700, color:TRAIN_ACCENT_VAR, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, borderRadius:20, padding:'4px 9px', whiteSpace:'nowrap' }}>Шаг 2/3</span>
+            <span className="tp-step" data-step="2/3" style={{ fontSize:11, fontWeight:700, color:TRAIN_ACCENT_VAR, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, borderRadius:20, padding:'8px 12px', minHeight:32, display:'inline-flex', alignItems:'center', whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>Шаг 2/3</span>
           </div>
-          <div style={{ padding:'16px 14px calc(var(--nav-height) + env(safe-area-inset-bottom) + 28px)', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
-              <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '18')}`, color: TRAIN_ACCENT_VAR }}><NativeIcon name="zap" size={12} /></span>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.4, flex:1 }}>Тренировки → <b style={{ color: TRAIN_ACCENT_VAR }}>Планирование</b> → Конструктор · 6 направлений · один клик до сборки</div>
-              <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', whiteSpace:'nowrap' }}>{PLANNER_MODES.length} конструкторов</span>
+          <div className="tp-body" style={{ padding:'16px 14px calc(var(--nav-height) + env(safe-area-inset-bottom) + 28px)', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
+            <div className="tp-hint" style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
+              <span className="tp-hint-icon" style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '18')}`, color: TRAIN_ACCENT_VAR }}><NativeIcon name="zap" size={16} /></span>
+              <div className="tp-hint-text" style={{ fontSize:12, color:'rgba(255,255,255,0.72)', lineHeight:1.5, flex:1 }}>Тренировки → <b style={{ color: TRAIN_ACCENT_VAR }}>Планирование</b> → Конструктор · {PLANNER_MODES.length} направлений · один клик до сборки</div>
+              <span className="tp-hint-count" style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.55)', whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>{PLANNER_MODES.length} шт</span>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:10 }}>
+            <div className="tp-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:10 }}>
               {PLANNER_MODES.map(m => {
                 const ACC: Record<string,string> = { pl:'#a78bfa', bb:TRAIN_ACCENT_VAR, manual:'#3b82f6', cardio:'#ef4444', strength:'#f59e0b', combat:'#ec4899', arm:TRAIN_ACCENT_VAR };
                 const accent = ACC[m.id] ?? TRAIN_ACCENT_VAR;
                 const active = (planningTrack as string) === (m.id as string);
                 return (
-                  <button key={m.id} onClick={() => { hapticImpact('medium'); openConstructor(m.id as any); }} style={{
-                    position:'relative', display:'flex', flexDirection:'column', gap:10, padding:'16px 14px 14px', borderRadius:16, cursor:'pointer', textAlign:'left', overflow:'hidden',
+                  <button key={m.id} data-track={m.id} data-active={active ? 'true' : 'false'} onClick={() => { hapticImpact('medium'); openConstructor(m.id as any); }} className="tp-card" style={{
+                    position:'relative', display:'flex', flexDirection:'column', gap:10, padding:'16px 14px 14px', minHeight:120, borderRadius:18, cursor:'pointer', textAlign:'left', overflow:'hidden',
                     background: active ? `linear-gradient(135deg, ${trainAlpha(accent, '14')}, rgba(24,24,27,0.82))` : 'rgba(24,24,27,0.64)',
                     backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
                     border: active ? `1px solid ${trainAlpha(accent, '55')}` : '1px solid rgba(255,255,255,0.07)',
@@ -659,29 +659,29 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
                     boxShadow: active ? `0 10px 28px ${trainAlpha(accent, '1E')}, inset 0 1px 0 rgba(255,255,255,0.06)` : '0 4px 18px rgba(0,0,0,0.22)',
                     transition:'all 0.22s ease', transform: active ? 'translateY(-1px)' : 'none',
                   }}>
-                    <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg, ${accent}, transparent)`, opacity: active ? 1 : 0.85 }} />
-                    <div style={{ position:'absolute', top:-18, right:-18, width:86, height:86, borderRadius:86, background:`radial-gradient(circle, ${trainAlpha(accent, '18')}, transparent 70%)`, pointerEvents:'none' }} />
-                    <div style={{ display:'flex', alignItems:'center', gap:10, position:'relative' }}>
-                      <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${accent}, ${trainAlpha(accent, 'CC')})`, color: active ? '#000' : '#fff', fontWeight:800, boxShadow:`0 4px 16px ${trainAlpha(accent, '45')}`, border:`1px solid ${trainAlpha(accent, '66')}` }}><NativeIcon name={m.icon} size={22} /></div>
+                    <div className="tp-topglow" style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg, ${accent}, transparent)`, opacity: active ? 1 : 0.85 }} />
+                    <div className="tp-glow" style={{ position:'absolute', top:-18, right:-18, width:86, height:86, borderRadius:86, background:`radial-gradient(circle, ${trainAlpha(accent, '18')}, transparent 70%)`, pointerEvents:'none' }} />
+                    <div className="tp-row" style={{ display:'flex', alignItems:'center', gap:10, position:'relative' }}>
+                      <div className="tp-icon" style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${accent}, ${trainAlpha(accent, 'CC')})`, color: active ? '#000' : '#fff', fontWeight:800, boxShadow:`0 4px 16px ${trainAlpha(accent, '45')}`, border:`1px solid ${trainAlpha(accent, '66')}` }}><NativeIcon name={m.icon} size={22} /></div>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:14, fontWeight:900, color: active ? accent : '#fff', lineHeight:1.1, letterSpacing:-0.15 }}>{m.label}</div>
-                        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.52)', marginTop:2, letterSpacing:0.2, textTransform:'uppercase' }}>{m.id === 'pl' ? 'LMS • ПМ • пик' : m.id === 'bb' ? 'Сплиты • MEV/MRV • PED' : m.id === 'manual' ? 'Ручной • с нуля • 29 шаблонов' : m.id === 'cardio' ? 'Zone2 • HIIT • фазы' : m.id === 'strength' ? 'ТА • стронг • лог' : 'ММА • бокс • хват'}</div>
+                        <div className="tp-ttitle" style={{ fontSize:14, fontWeight:900, color: active ? accent : '#fff', lineHeight:1.2, letterSpacing:-0.15 }}>{m.label}</div>
+                        <div className="tp-meta" style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.52)', marginTop:3, letterSpacing:0.2, textTransform:'uppercase' }}>{m.id === 'pl' ? 'LMS • ПМ • пик' : m.id === 'bb' ? 'Сплиты • MEV/MRV • PED' : m.id === 'manual' ? 'Ручной • с нуля • 29 шаблонов' : m.id === 'cardio' ? 'Zone2 • HIIT • фазы' : m.id === 'strength' ? 'ТА • стронг • лог' : m.id === 'combat' ? 'ММА • бокс • хват' : 'Стол • хваты • tendon-cap'}</div>
                       </div>
-                      {active && <span style={{ fontSize:9, fontWeight:900, color:accent, background: trainAlpha(accent, '14'), border:`1px solid ${trainAlpha(accent, '33')}`, borderRadius:20, padding:'4px 8px', letterSpacing:0.3 }}>выбран</span>}
+                      {active && <span className="tp-badge" style={{ fontSize:10, fontWeight:900, color:accent, background: trainAlpha(accent, '14'), border:`1px solid ${trainAlpha(accent, '33')}`, borderRadius:20, padding:'6px 10px', minHeight:28, display:'inline-flex', alignItems:'center', letterSpacing:0.3, fontVariantNumeric:'tabular-nums' }}>выбран</span>}
                     </div>
-                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.70)', lineHeight:1.45, minHeight:34, position:'relative' }}>{m.hint}</div>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:2, position:'relative' }}>
-                      <span style={{ fontSize:11, fontWeight:800, color: accent, display:'flex', alignItems:'center', gap:6 }}>Открыть <span style={{ fontSize:12 }}>→</span></span>
-                      <span style={{ width:30, height:30, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: active ? accent : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.55)', border:`1px solid ${active ? accent : 'rgba(255,255,255,0.08)'}`, fontSize:13, fontWeight:800, transition:'all 0.2s' }}>→</span>
+                    <div className="tp-desc" style={{ fontSize:12, color:'rgba(255,255,255,0.70)', lineHeight:1.55, minHeight:36, position:'relative' }}>{m.hint}</div>
+                    <div className="tp-openrow" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:2, position:'relative' }}>
+                      <span className="tp-openlabel" style={{ fontSize:12, fontWeight:800, color: accent, display:'flex', alignItems:'center', gap:6 }}>Открыть <span style={{ fontSize:12 }}>→</span></span>
+                      <span className="tp-chev" style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background: active ? accent : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.55)', border:`1px solid ${active ? accent : 'rgba(255,255,255,0.08)'}`, fontSize:14, fontWeight:800, transition:'all 0.2s' }}>→</span>
                     </div>
                   </button>
                 );
               })}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center', fontSize:10, color:'rgba(255,255,255,0.38)', textAlign:'center', padding:'6px 0' }}>
-              <span style={{ width:6, height:6, borderRadius:6, background: trainAlpha(TRAIN_ACCENT_VAR, '55'), boxShadow: `0 0 8px ${trainAlpha(TRAIN_ACCENT_VAR, '45')}` }} />
+            <div className="tp-foot" style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center', fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center', padding:'8px 4px', lineHeight:1.5 }}>
+              <span className="tp-dot" style={{ width:6, height:6, borderRadius:6, background: trainAlpha(TRAIN_ACCENT_VAR, '55'), boxShadow: `0 0 8px ${trainAlpha(TRAIN_ACCENT_VAR, '45')}`, flexShrink:0 }} />
               Выбранный конструктор запомнится · Назад — «← На главную», вперёд — клик по карточке
-              <span style={{ width:6, height:6, borderRadius:6, background:'rgba(99,102,241,0.45)' }} />
+              <span className="tp-dot" style={{ width:6, height:6, borderRadius:6, background:'rgba(99,102,241,0.45)', flexShrink:0 }} />
             </div>
           </div>
         </div>
@@ -690,14 +690,14 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ─── CONSTRUCTOR WINDOW — уровень 3: сам конструктор (новое окно, 100% контента) ─── */}
       {page === 'constructor' && (
         <div className="training-constructor" style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
-          <div style={{ flexShrink:0, padding:'6px 8px', background: trainAlpha(TRAIN_ACCENT_VAR, '08'), borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:6 }}>
-            <button onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
+          <div className="tp-cbar" style={{ flexShrink:0, padding:'8px 10px', minHeight:56, background: trainAlpha(TRAIN_ACCENT_VAR, '08'), borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:8 }}>
+            <button className="tp-cback" onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'10px 14px', minHeight:44, borderRadius:12, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
             <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ fontSize:12, display: 'inline-flex', color: '#fff' }}><NativeIcon name={PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? 'layers'} size={12} /></span>
               <span style={{ fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</span>
             </div>
-            <span style={{ fontSize:10, fontWeight:700, color:TRAIN_ACCENT_VAR, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, borderRadius:20, padding:'3px 8px', flexShrink:0 }}>3/3</span>
-            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'4px 7px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
+            <span className="tp-cstep" style={{ fontSize:11, fontWeight:700, color:TRAIN_ACCENT_VAR, background: trainAlpha(TRAIN_ACCENT_VAR, '12'), border: `1px solid ${trainAlpha(TRAIN_ACCENT_VAR, '22')}`, borderRadius:20, padding:'8px 12px', minHeight:32, display:'inline-flex', alignItems:'center', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>3/3</span>
+            <button className="tp-cclose" onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'10px 12px', minHeight:44, minWidth:44, borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
           </div>
           <div style={{ flex:1, overflow:'auto', padding:'12px', paddingBottom:'calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)', WebkitOverflowScrolling:'touch' }}>
             {(planningTrack as string) === 'pl' && <PlannerPlAuto />}
