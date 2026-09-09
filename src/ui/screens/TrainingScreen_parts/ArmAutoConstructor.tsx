@@ -41,7 +41,7 @@ import { AdRoot, AdHead, AdSteps, AdCard, AdSec, AdGrid, AdField, AdCheck, AdChi
 import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 
-type Step = 'params'|'grip'|'split'|'plan'|'quality'|'weights';
+type Step = 'params'|'athlete'|'grip'|'split'|'plan';
 
 const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
 const GOALS = [
@@ -71,11 +71,10 @@ const GRIP_FOCI = [
 
 const STEP_DEFS: AdStepDef[] = [
   { id: 'params', label: '🎛 Параметры' },
-  { id: 'grip', label: '✊ Хват' },
-  { id: 'split', label: '🗓 Сплит' },
-  { id: 'plan', label: '📋 План' },
-  { id: 'quality', label: '📊 Качество' },
-  { id: 'weights', label: '🏋️ Веса' },
+  { id: 'athlete', label: '🎯 Атлет' },
+  { id: 'grip', label: '✊ Стол и хват' },
+  { id: 'split', label: '📚 Сплит и цикл' },
+  { id: 'plan', label: '📋 План и проверка' },
 ];
 
 const SPLIT_TAG_RU: Record<string, string> = {
@@ -625,6 +624,15 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             </AdSec>
           )}
 
+          <AdCta>
+            <AdBtn variant="primary" block hero onClick={()=>setStep('athlete')}>Далее: Атлет →</AdBtn>
+            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов)</div>
+          </AdCta>
+        </AdCard>
+      )}
+
+      {step === 'athlete' && (
+        <AdCard>
           <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
             <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
@@ -685,10 +693,6 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </>
             )}
           </AdSec>
-
-          <div>
-            <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
-          </div>
 
           <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm} status={Object.values(workMaxEdit).some(v=>v!=='') ? 'ok' : undefined}>
             <AdGrid cols="3">
@@ -792,6 +796,44 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             </div>
           </AdSec>
 
+          <AdCta>
+            <AdBtn variant="primary" block hero onClick={()=>setStep('grip')}>Далее: Стол и хват →</AdBtn>
+            <AdBtn variant="ghost" block onClick={()=>setStep('params')}>← Назад</AdBtn>
+          </AdCta>
+        </AdCard>
+      )}
+
+      {step === 'grip' && (
+        <AdCard>
+          <div>
+            <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
+          </div>
+
+          <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
+          <div className="ad-muted">Рекомендация — {best?.name}.</div>
+          {GRIP_GROUPS.map(g => (
+            <AdSec key={g.title} title={g.title} hook="grip-group">
+              <div className="ad-list">
+                {g.ids.map(id => {
+                  const spec = GRIP_IMPLEMENTS[id];
+                  if (!spec) return null;
+                  return (
+                    <div key={id} className="ad-sec ad-bio" data-valid="na" data-arm="grip-impl">
+                      <div className="ad-row">
+                        <span><b>{spec.name}</b></span>
+                        <span className="ad-tag ad-angle">⌀{spec.diameterMm}</span>
+                        {spec.rotating ? <span className="ad-tag">вращ.</span> : null}
+                        <span className="ad-tag">{spec.allowedGrips.join('/')}</span>
+                        {spec.strapsAllowed ? <span className="ad-tag">лямки ✓</span> : <span className="ad-tag">без лямок</span>}
+                      </div>
+                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((spec.diameterMm / 76) * 100))}%` }} /></div>
+                      <div className="ad-muted">{spec.description}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </AdSec>
+          ))}
           <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop} status={(topOpp!=='unknown' || topRfd || topSim || topContinuity || topGripAuto || topLadder || cycId) ? 'ok' : undefined}>
             <AdGrid cols="3">
               <div>
@@ -852,114 +894,6 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
               <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
-            <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
-              {rankedCycles.length > 0 && (
-                <div className="ad-list" data-arm="cycle-picker">
-                  {rankedCycles.map(({ cycle: c, score, reasons }) => (
-                    <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>setCycId(cycId===c.id ? '' : c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setCycId(cycId===c.id ? '' : c.id); }}>
-                      <div className="ad-split-top">
-                        <span className="ad-split-radio" aria-hidden />
-                        <span className="ad-split-name">{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
-                        <span className="ad-split-score">{score}</span>
-                      </div>
-                      <div className="ad-row" data-arm="cycle-chips">
-                        <span className="ad-tag">{c.rpe}</span>
-                        {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
-                        <span className="ad-tag">{c.level.map(l=>CYC_LEVEL_RU[l] || l).join('/')}</span>
-                      </div>
-                      <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
-                        {Array.from({ length: c.weeks }, (_, i) => {
-                          const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
-                          return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${CYC_PHASE_RU[ph] || ph}`}>{i + 1}</span>;
-                        })}
-                      </div>
-                      <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <AdGrid cols="2">
-                <AdField label="Цикл">
-                  <select value={cycId} onChange={e=>setCycId(e.target.value)}>
-                    <option value="">— обычный план —</option>
-                    {ARM_CYCLE_LIBRARY.map(c=> <option key={c.id} value={c.id}>{c.name} ({c.weeks}н)</option>)}
-                  </select>
-                </AdField>
-                <AdField label="Медли (армлифтинг)">
-                  <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)}>
-                    <option value="">—</option>
-                    {ARM_MEDLEYS.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                </AdField>
-                <AdField label="Коррекция %/нед (СРЦ 0.5)">
-                  <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
-                </AdField>
-                <AdField label="CoC рабочий">
-                  <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)}>
-                    <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
-                  </select>
-                </AdField>
-                <div>
-                  <div className="ad-fl">Pumpkin-рука (Larratt)</div>
-                  <div className="ad-chips">
-                    {[{id:'',label:'—'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id || 'none'} active={cycPumpkin===o.id} onClick={()=>setCycPumpkin(o.id)}>{o.label}</AdChip>)}
-                  </div>
-                </div>
-              </AdGrid>
-              <div className="ad-row">
-                <AdCheck checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />
-                <AdCheck checked={cycFlat} onChange={setCycFlat} label="Flat pyramid (Bompa)" />
-                <AdCheck checked={cycBlood} onChange={setCycBlood} label="Bloodflow 100×" />
-                <AdCheck checked={cycNever} onChange={setCycNever} label="Never fail" />
-                <AdCheck checked={cycSingles} onChange={setCycSingles} label="Heavy singles 17–18" />
-                <AdCheck checked={cycBrzenk} onChange={setCycBrzenk} label="Brzenk 1+1" />
-                <AdCheck checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
-                {cycAkimov && <AdCheck checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
-                <AdCheck checked={cycFor} onChange={setCycFor} label="FOR-7 (adv+)" />
-                <AdCheck checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
-                {cycFor && (
-                  <AdField label="FOR-домен">
-                    <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)}>
-                      <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
-                    </select>
-                  </AdField>
-                )}
-              </div>
-              {cycAxisOn && (
-                <AdSec title="Ось кисть–локоть–плечо (что было):">
-                  <div className="ad-row">
-                    <AdCheck checked={axTrunk} onChange={setAxTrunk} label="Скрут корпуса в атаку" />
-                    <AdCheck checked={axMisalign} onChange={setAxMisalign} label="Ось разорвана" />
-                    <AdCheck checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
-                    <AdCheck checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
-                    <AdCheck checked={axCold} onChange={setAxCold} label="Холод без разминки" />
-                    <AdCheck checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
-                    <AdCheck checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
-                  </div>
-                </AdSec>
-              )}
-              {cycMedley && (()=>{
-                let events: Array<{ implement: string }> = [];
-                try { events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>; } catch { events = []; }
-                if (!events.length) return null;
-                return (
-                  <AdSec title="Попытки медли (факт → сводка):">
-                    {events.map((ev, i)=>(
-                      <label key={i} className="ad-check">{ev.implement}
-                        <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" inputMode="decimal" />
-                        <input aria-label={`Попытка ${i + 1} удачна`} type="checkbox" checked={medAttOk[i] !== false} onChange={e=>setMedAttOk(prev=>prev.map((v, j)=>j===i?e.target.checked:v))} />
-                      </label>
-                    ))}
-                  </AdSec>
-                );
-              })()}
-              {cycId && (()=>{
-                try {
-                  const f = fitCycleToWeeks(cycId, weeks);
-                  return <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
-                } catch { return null; }
-              })()}
-            </AdSec>
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {
                 const mp = profileOpponent({ myTechnique: technique, oppStyle: topOpp, oppHand: topOppHand, weightDeltaKg: parseFloat(topWD) || 0, strapExpected: proStrap });
@@ -994,39 +928,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           </AdSec>
 
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
-            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+            <AdBtn variant="primary" block hero onClick={()=>setStep('split')}>Далее: Сплит и цикл →</AdBtn>
+            <AdBtn variant="ghost" block onClick={()=>setStep('athlete')}>← Назад</AdBtn>
           </AdCta>
-        </AdCard>
-      )}
-
-      {step === 'grip' && (
-        <AdCard>
-          <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
-          <div className="ad-muted">Рекомендация — {best?.name}.</div>
-          {GRIP_GROUPS.map(g => (
-            <AdSec key={g.title} title={g.title} hook="grip-group">
-              <div className="ad-list">
-                {g.ids.map(id => {
-                  const spec = GRIP_IMPLEMENTS[id];
-                  if (!spec) return null;
-                  return (
-                    <div key={id} className="ad-sec ad-bio" data-valid="na" data-arm="grip-impl">
-                      <div className="ad-row">
-                        <span><b>{spec.name}</b></span>
-                        <span className="ad-tag ad-angle">⌀{spec.diameterMm}</span>
-                        {spec.rotating ? <span className="ad-tag">вращ.</span> : null}
-                        <span className="ad-tag">{spec.allowedGrips.join('/')}</span>
-                        {spec.strapsAllowed ? <span className="ad-tag">лямки ✓</span> : <span className="ad-tag">без лямок</span>}
-                      </div>
-                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((spec.diameterMm / 76) * 100))}%` }} /></div>
-                      <div className="ad-muted">{spec.description}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </AdSec>
-          ))}
         </AdCard>
       )}
 
@@ -1056,7 +960,119 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             </div>
           </AdSec>
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать с выбранным сплитом</AdBtn>
+            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
+            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+          </AdCta>
+          <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
+            {rankedCycles.length > 0 && (
+              <div className="ad-list" data-arm="cycle-picker">
+                {rankedCycles.map(({ cycle: c, score, reasons }) => (
+                  <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>setCycId(cycId===c.id ? '' : c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setCycId(cycId===c.id ? '' : c.id); }}>
+                    <div className="ad-split-top">
+                      <span className="ad-split-radio" aria-hidden />
+                      <span className="ad-split-name">{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
+                      <span className="ad-split-score">{score}</span>
+                    </div>
+                    <div className="ad-row" data-arm="cycle-chips">
+                      <span className="ad-tag">{c.rpe}</span>
+                      {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
+                      <span className="ad-tag">{c.level.map(l=>CYC_LEVEL_RU[l] || l).join('/')}</span>
+                    </div>
+                    <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
+                      {Array.from({ length: c.weeks }, (_, i) => {
+                        const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
+                        return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${CYC_PHASE_RU[ph] || ph}`}>{i + 1}</span>;
+                      })}
+                    </div>
+                    <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <AdGrid cols="2">
+              <AdField label="Цикл">
+                <select value={cycId} onChange={e=>setCycId(e.target.value)}>
+                  <option value="">— обычный план —</option>
+                  {ARM_CYCLE_LIBRARY.map(c=> <option key={c.id} value={c.id}>{c.name} ({c.weeks}н)</option>)}
+                </select>
+              </AdField>
+              <AdField label="Медли (армлифтинг)">
+                <select value={cycMedley} onChange={e=>setCycMedley(e.target.value)}>
+                  <option value="">—</option>
+                  {ARM_MEDLEYS.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </AdField>
+              <AdField label="Коррекция %/нед (СРЦ 0.5)">
+                <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
+              </AdField>
+              <AdField label="CoC рабочий">
+                <select value={cycCoc} onChange={e=>setCycCoc(e.target.value)}>
+                  <option value="">—</option><option value="guide">Guide</option><option value="sport">Sport</option><option value="trainer">Trainer</option><option value="no1">№1</option><option value="no1_5">№1.5</option><option value="no2">№2</option><option value="no2_5">№2.5</option><option value="no3">№3</option>
+                </select>
+              </AdField>
+              <div>
+                <div className="ad-fl">Pumpkin-рука (Larratt)</div>
+                <div className="ad-chips">
+                  {[{id:'',label:'—'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id || 'none'} active={cycPumpkin===o.id} onClick={()=>setCycPumpkin(o.id)}>{o.label}</AdChip>)}
+                </div>
+              </div>
+            </AdGrid>
+            <div className="ad-row">
+              <AdCheck checked={cycConsent} onChange={setCycConsent} label="Согласен на растяжение/сжатие цикла" />
+              <AdCheck checked={cycFlat} onChange={setCycFlat} label="Flat pyramid (Bompa)" />
+              <AdCheck checked={cycBlood} onChange={setCycBlood} label="Bloodflow 100×" />
+              <AdCheck checked={cycNever} onChange={setCycNever} label="Never fail" />
+              <AdCheck checked={cycSingles} onChange={setCycSingles} label="Heavy singles 17–18" />
+              <AdCheck checked={cycBrzenk} onChange={setCycBrzenk} label="Brzenk 1+1" />
+              <AdCheck checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
+              {cycAkimov && <AdCheck checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
+              <AdCheck checked={cycFor} onChange={setCycFor} label="FOR-7 (adv+)" />
+              <AdCheck checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
+              {cycFor && (
+                <AdField label="FOR-домен">
+                  <select value={cycForSpec} onChange={e=>setCycForSpec(e.target.value)}>
+                    <option value="support">Поддержка</option><option value="crush">Дробление</option><option value="pinch">Щипок</option><option value="open">Открытый</option><option value="wrist">Кисть</option>
+                  </select>
+                </AdField>
+              )}
+            </div>
+            {cycAxisOn && (
+              <AdSec title="Ось кисть–локоть–плечо (что было):">
+                <div className="ad-row">
+                  <AdCheck checked={axTrunk} onChange={setAxTrunk} label="Скрут корпуса в атаку" />
+                  <AdCheck checked={axMisalign} onChange={setAxMisalign} label="Ось разорвана" />
+                  <AdCheck checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
+                  <AdCheck checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
+                  <AdCheck checked={axCold} onChange={setAxCold} label="Холод без разминки" />
+                  <AdCheck checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
+                  <AdCheck checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
+                </div>
+              </AdSec>
+            )}
+            {cycMedley && (()=>{
+              let events: Array<{ implement: string }> = [];
+              try { events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>; } catch { events = []; }
+              if (!events.length) return null;
+              return (
+                <AdSec title="Попытки медли (факт → сводка):">
+                  {events.map((ev, i)=>(
+                    <label key={i} className="ad-check">{ev.implement}
+                      <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" inputMode="decimal" />
+                      <input aria-label={`Попытка ${i + 1} удачна`} type="checkbox" checked={medAttOk[i] !== false} onChange={e=>setMedAttOk(prev=>prev.map((v, j)=>j===i?e.target.checked:v))} />
+                    </label>
+                  ))}
+                </AdSec>
+              );
+            })()}
+            {cycId && (()=>{
+              try {
+                const f = fitCycleToWeeks(cycId, weeks);
+                return <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
+              } catch { return null; }
+            })()}
+          </AdSec>
+          <AdCta>
+            <AdBtn variant="ghost" block onClick={()=>setStep('grip')}>← Назад</AdBtn>
           </AdCta>
         </AdCard>
       )}
@@ -1148,9 +1164,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         </AdCard>
       )}
 
-      {step === 'quality' && (
-        <AdCard>
-          {!builtPlan ? <AdEmpty icon="📊" title="Сначала собери план." sub="Качество, MRV, humerus/UCL/shoulder/tendon-гейты и тепловая карта появятся после сборки."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
+      {step === 'plan' && builtPlan && (
+        <AdCard data-arm="quality-card">
             <>
               <AdSec title="📊 Качество">
                 <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
@@ -1213,14 +1228,11 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
               </AdBanner>
             </>
-          )}
         </AdCard>
       )}
-
-      {step === 'weights' && (
-        <AdCard>
+      {step === 'plan' && builtPlan && (
+        <AdCard data-arm="weights-card">
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
-            {!builtPlan ? <AdEmpty icon="🏋️" title="Сначала собери план в «Параметры»." sub="Веса считаются от рабочих максимумов: тяж 82%, техника 60%, памп 68%."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
               <>
                 <div className="ad-stats">
                   {Object.entries(workMax).map(([k,v])=> (
@@ -1270,7 +1282,6 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 )}
                 <AdBtn variant="primary" block onClick={handleBuild}>🔄 Пересобрать с весами</AdBtn>
               </>
-            )}
           </AdSec>
         </AdCard>
       )}

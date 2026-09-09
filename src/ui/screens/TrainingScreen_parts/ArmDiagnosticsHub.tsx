@@ -1135,11 +1135,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
         <div key={tab} className="ad-tabpanel" data-arm="hub-tabpanel">
           {tab==='grip' && <HubGripTab H={H} />}
 
+          {tab==='strength' && <HubStrengthTab H={H} />}
+
           {tab==='wrist' && <HubWristTab H={H} />}
 
           {tab==='pressure' && <HubPressureTab H={H} />}
-
-          {tab==='strength' && <HubStrengthTab H={H} />}
 
           {tab==='recovery' && <HubRecoveryTab H={H} />}
         </div>

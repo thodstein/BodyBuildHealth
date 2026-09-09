@@ -20,7 +20,7 @@ function okDots(container: HTMLElement): number {
 describe('Arm grip guide', () => {
   it('шаг хвата: 3 группы и 8 снарядов с диаметрами', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '✊ Хват' }));
+    fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
     expect(document.body.textContent).toContain('Хват — диагностика');
     for (const g of ['Support', 'Pinch', 'Crush']) {
       expect(document.body.textContent, g).toContain(g);
@@ -34,6 +34,7 @@ describe('Arm grip guide', () => {
 
   it('PED-точка зажигается по чекбоксу', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
     const before = okDots(container);
     fireEvent.click(screen.getByLabelText(/💉 На курсе \(PED\)/));
     expect(okDots(container)).toBe(before + 1);
@@ -41,12 +42,14 @@ describe('Arm grip guide', () => {
 
   it('TOP-точка зажигается по RFD, цикл — по подборщику', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
     fireEvent.click(screen.getByLabelText(/RFD speed-блок/));
     expect(okDots(container)).toBeGreaterThan(0);
   });
 
   it('слабая зона зажигает свою точку', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
     const before = okDots(container);
     fireEvent.click(screen.getByRole('button', { name: 'Пронаторы' }));
     expect(okDots(container)).toBe(before + 1);

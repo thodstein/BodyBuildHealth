@@ -19,6 +19,7 @@ const BASE = { discipline: 'armwrestling', level: 'intermediate', goal: 'strengt
 describe('Arm cycle picker', () => {
   it('показывает топ-3 с фаз-полосами недель', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const picker = container.querySelector("[data-arm='cycle-picker']");
     expect(picker, 'picker').not.toBeNull();
     expect(picker!.querySelectorAll('.ad-split').length).toBe(3);
@@ -31,6 +32,7 @@ describe('Arm cycle picker', () => {
 
   it('клик по карточке ставит цикл в селект и подсвечивает', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
     expect(screen.getByDisplayValue(`${top.name} (${top.weeks}н)`), 'select synced').toBeTruthy();
@@ -43,6 +45,7 @@ describe('Arm cycle picker', () => {
 
   it('повторный клик сбрасывает в обычный план', () => {
     render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     const btn = screen.getByRole('button', { name: `Цикл ${top.name}` });
     fireEvent.click(btn);
@@ -52,6 +55,7 @@ describe('Arm cycle picker', () => {
 
   it('селект покрывает всю библиотеку (19), пикер — только топ-3', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const sel = screen.getByDisplayValue('— обычный план —') as HTMLSelectElement;
     expect(sel.options.length).toBe(20);
     expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(3);

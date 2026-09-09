@@ -16,14 +16,15 @@ beforeEach(() => {
 
 function goSplit() {
   const c = render(<ArmAutoConstructor />);
-  fireEvent.click(screen.getByRole('button', { name: '🗓 Сплит' }));
+  fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
   return c.container;
 }
 
 function goQuality() {
   const c = render(<ArmAutoConstructor />);
+  fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
   fireEvent.click(screen.getByText('⚡ Собрать план'));
-  fireEvent.click(screen.getByRole('button', { name: '📊 Качество' }));
+  fireEvent.click(screen.getByRole('button', { name: '📋 План и проверка' }));
   return c.container;
 }
 

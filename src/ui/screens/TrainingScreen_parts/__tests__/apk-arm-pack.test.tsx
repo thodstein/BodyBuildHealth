@@ -205,15 +205,14 @@ describe('APK arm pack', () => {
     expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
   });
 
-  it('весь конструктор: 6 шагов рендерятся без падений (TG)', () => {
+  it('весь конструктор: 5 шагов рендерятся без падений (TG)', () => {
     render(<ArmAutoConstructor />);
     const steps: Array<[string, RegExp]> = [
-      ['🎛 Параметры', /Рабочие максимумы/],
-      ['✊ Хват', /Хват — диагностика/],
-      ['🗓 Сплит', /Выбор сплита/],
-      ['📋 План', /План не собран/],
-      ['📊 Качество', /Сначала собери план/],
-      ['🏋️ Веса', /Веса — детали/],
+      ['🎛 Параметры', /Дисциплина/],
+      ['🎯 Атлет', /Рабочие максимумы/],
+      ['✊ Стол и хват', /Хват — диагностика/],
+      ['📚 Сплит и цикл', /Выбор сплита/],
+      ['📋 План и проверка', /План не собран/],
     ];
     for (const [tab, marker] of steps) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
@@ -238,7 +237,7 @@ describe('APK arm pack', () => {
     };
     resetAppPlatformCache();
     const c = render(<ArmAutoConstructor />);
-    for (const tab of ['🎛 Параметры', '✊ Хват', '🗓 Сплит', '📋 План', '📊 Качество', '🏋️ Веса']) {
+    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План и проверка']) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(c.container.querySelector('.train-arm')?.classList.contains('arm-apk'), tab).toBe(true);
     }
@@ -253,6 +252,7 @@ describe('APK arm pack', () => {
 
   it('аккордеоны: PRO свернут с саммари, раскрывается по тапу', () => {
     render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
     const head = screen.getByRole('button', { name: /PRO: старт WAF/ });
     expect(head.getAttribute('aria-expanded')).toBe('false');
     expect(head.textContent).toContain('без даты');
@@ -264,6 +264,7 @@ describe('APK arm pack', () => {
 
   it('выдача: дашборд плана и обоснование после сборки', () => {
     render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     for (const marker of ['Недель', 'Сессий', 'Стол', 'Делод/пик', '📖 Обоснование']) {
       expect(document.body.textContent, marker).toContain(marker);
@@ -296,8 +297,9 @@ describe('APK arm pack', () => {
 
   it('выдача: полоса объёма — 8 недель с фазами, клик переключает', () => {
     const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
-    fireEvent.click(screen.getByRole('button', { name: '📋 План' }));
+    fireEvent.click(screen.getByRole('button', { name: '📋 План и проверка' }));
     const strip = container.querySelector("[data-arm='week-pills']");
     expect(strip, 'vol strip').not.toBeNull();
     const btns = Array.from(strip!.querySelectorAll('.ad-wpill'));
