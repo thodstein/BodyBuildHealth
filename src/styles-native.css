@@ -10986,3 +10986,36 @@ html.app-native .tp-tabs-pill:focus-visible {
     transform: none !important;
   }
 }
+
+/* 94. PROFILE DIARIES PRO — shared-слой страниц дневников (топ-АПК).
+ * Только APK (html.app-native). TG/web — через инлайн-токены diary-page-styles.
+ * Хуки: .diary-header (.diary-header-btn/[role='menuitem']), .diary-card,
+ * .diary-input/.diary-select, .diary-scrollbar. Press 0.94-0.97,
+ * focus-visible, tabular-цифры, 380px, reduced-motion. */
+html.app-native .diary-header [role='menuitem']:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .diary-header [role='menuitem']:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: -2px !important;
+}
+html.app-native .diary-card {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .diary-input {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .diary-select {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .diary-header {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .diary-header [role='menuitem']:active {
+    transform: none !important;
+  }
+}

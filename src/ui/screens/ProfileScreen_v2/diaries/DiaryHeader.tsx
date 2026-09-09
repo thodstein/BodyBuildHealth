@@ -85,9 +85,9 @@ export const DiaryHeader: React.FC<{
       <button
         className="diary-header-btn"
         style={{
-          minHeight: 40,
-          padding: '8px 14px',
-          borderRadius: 12,
+          minHeight: 44,
+          padding: '9px 15px',
+          borderRadius: 13,
           border: '1px solid rgba(255,255,255,0.14)',
           background: 'rgba(255,255,255,0.07)',
           backdropFilter: 'blur(10px)',
@@ -132,12 +132,12 @@ export const DiaryHeader: React.FC<{
       <div style={{ flex: 1, minWidth: 12 }} />
       {extra}
 
-      <button className="diary-header-btn" style={{ ...btnPrimary(accent), minHeight: 40, boxShadow: `0 4px 18px ${withAlpha(accent, '32')}, inset 0 1px 0 rgba(255,255,255,0.15)` }} onClick={onAdd}>
+      <button className="diary-header-btn" style={{ ...btnPrimary(accent), minHeight: 44, boxShadow: `0 6px 20px ${withAlpha(accent, '35')}, inset 0 1px 0 rgba(255,255,255,0.15)` }} onClick={onAdd}>
         {addLabel}
       </button>
 
       {onToday && (
-        <button className="diary-header-btn" style={{ ...btnBase(accent), minHeight: 40 }} onClick={onToday}>
+        <button className="diary-header-btn" style={{ ...btnBase(accent), minHeight: 44 }} onClick={onToday}>
           {todayLabel}
         </button>
       )}
@@ -145,7 +145,7 @@ export const DiaryHeader: React.FC<{
       {undoActive && onUndo && (
         <button
           className="diary-header-btn"
-          style={{ ...btnBase(accent), minHeight: 40, borderColor: `${withAlpha(accent, '55')}`, color: accent, background: `${withAlpha(accent, '10')}`, fontWeight: 700 }}
+          style={{ ...btnBase(accent), minHeight: 44, borderColor: `${withAlpha(accent, '55')}`, color: accent, background: `${withAlpha(accent, '10')}`, fontWeight: 700 }}
           onClick={onUndo}
         >
           {undoLabel}
@@ -155,7 +155,7 @@ export const DiaryHeader: React.FC<{
       <div style={{ position: 'relative', marginLeft: 2 }}>
         <button
           className="diary-header-btn"
-          style={{ ...btnBase(accent), minHeight: 40, padding: '8px 12px' }}
+          style={{ ...btnBase(accent), minHeight: 44, padding: '9px 14px' }}
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
@@ -190,12 +190,12 @@ export const DiaryHeader: React.FC<{
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 10.5,
                   fontWeight: 800,
-                  color: 'rgba(255,255,255,0.38)',
+                  color: 'rgba(255,255,255,0.42)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.7px',
-                  padding: '7px 10px 4px',
+                  letterSpacing: '0.8px',
+                  padding: '8px 11px 5px',
                 }}
               >
                 {exportTitle}
