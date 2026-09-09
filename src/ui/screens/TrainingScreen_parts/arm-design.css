@@ -1282,6 +1282,11 @@
   background: var(--ad-green);
 }
 
+:is(.train-arm, .train-armdiag) .ad-finding[data-level='info']::before {
+  background: var(--ad-dim);
+  box-shadow: none;
+}
+
 /* ─── PRO ХАБ: enter-переход таб-панели ────────────────────────────── */
 :is(.train-armdiag) .ad-tabpanel {
   animation: adTabIn 0.3s cubic-bezier(0.22, 0.68, 0, 1);

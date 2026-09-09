@@ -1141,7 +1141,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 }}>📅 .ics</AdBtn>
               </div>
               <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
-                <div className="ad-muted">{builtPlan.rationale.map((r:string, i:number)=><div key={i}>• {r}</div>)}</div>
+                <div data-arm="rationale">{builtPlan.rationale.map((r:string, i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
               </AdSec>
             </>
           )}
@@ -1201,9 +1201,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     {builtPlan.validation.valid && <AdBanner tone="ok">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</AdBanner>}
                   </div>
                 )}
-                <div className="ad-muted">
-                  {builtPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
-                  {builtPlan.report?.gripRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
+                <div data-arm="report-lines">
+                  {builtPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}
+                  {builtPlan.report?.gripRationale.map((r:string,i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}
                 </div>
               </AdSec>
               <div>
