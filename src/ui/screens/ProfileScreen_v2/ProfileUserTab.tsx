@@ -56,29 +56,29 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
 
   return (
     <div className="pf-user">
-      {/* Sticky quick-jump */}
+      {/* Sticky quick-jump — сегментированная лента */}
       <div
         className="profile-jump pf-jump"
         style={{
           position: 'sticky',
-          top: 0,
+          top: -12,
           zIndex: 10,
-          background: 'rgba(24,24,27,0.92)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          padding: '8px 0',
-          marginBottom: 12,
-          borderBottom: `1px solid ${colors.border}`,
+          background: 'rgba(14,14,16,0.88)',
+          backdropFilter: 'blur(20px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+          padding: '10px 12px 10px',
+          margin: '-12px -12px 12px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         <div
           className="profile-jump-row"
           style={{
             display: 'flex',
-            gap: 6,
+            gap: 8,
             overflowX: 'auto',
             scrollbarWidth: 'none',
-            padding: '0 4px',
+            padding: '2px',
           }}
         >
           {JUMP_LINKS.map(link => {
@@ -95,23 +95,24 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
                 className="profile-jump-link pf-jump-link"
                 style={{
                   flexShrink: 0,
-                  padding: '6px 12px',
-                  borderRadius: 16,
-                  fontSize: 11,
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  fontSize: 12,
                   fontWeight: active ? 800 : 600,
-                  border: `1px solid ${withAlpha(c, '55')}`,
-                  background: `${withAlpha(c, active ? '30' : '12')}`,
-                  color: c,
+                  border: `1px solid ${active ? c : 'rgba(255,255,255,0.10)'}`,
+                  background: active ? `linear-gradient(135deg, ${withAlpha(c, '30')}, ${withAlpha(c, '12')})` : 'rgba(255,255,255,0.04)',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.65)',
                   cursor: 'pointer',
                   minHeight: 40,
                   whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 5,
-                  transition: 'all 0.15s',
+                  gap: 6,
+                  transition: 'all 0.2s',
+                  boxShadow: active ? `0 4px 16px ${withAlpha(c, '30')}, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
                 }}
               >
-                <span aria-hidden="true" style={{ display:'inline-flex', color:c }}><NativeIcon name={link.icon} size={12} /></span>
+                <span aria-hidden="true" style={{ display:'inline-flex', color: active ? c : 'rgba(255,255,255,0.5)' }}><NativeIcon name={link.icon} size={13} /></span>
                 {link.label}
               </button>
             );
@@ -119,30 +120,32 @@ export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
         </div>
       </div>
 
-      <div className="pf-toggle-all" style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+      <div className="pf-toggle-all" style={{ display: 'flex', gap: 8, marginBottom: 12, padding: 4, borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <button
           type="button"
           onClick={() => toggleAll(true)}
           className="pf-toggle-btn"
           style={{
-            flex: 1, minHeight: 40, borderRadius: 12, cursor: 'pointer',
-            fontSize: 12, fontWeight: 700, color: colors.primary,
-            background: colors.primaryDim, border: `1px solid ${colors.border}`,
+            flex: 1, minHeight: 44, borderRadius: 12, cursor: 'pointer',
+            fontSize: 12.5, fontWeight: 800, color: '#06231a',
+            background: 'linear-gradient(135deg, var(--profile-accent, #34d399), #22c55e)',
+            border: '1px solid transparent',
+            boxShadow: '0 4px 14px rgba(52,211,153,0.3), inset 0 1px 0 rgba(255,255,255,0.35)',
           }}
-        >Развернуть все</button>
+        >⤢ Развернуть все</button>
         <button
           type="button"
           onClick={() => toggleAll(false)}
           className="pf-toggle-btn"
           style={{
-            flex: 1, minHeight: 40, borderRadius: 12, cursor: 'pointer',
-            fontSize: 12, fontWeight: 700, color: colors.textMuted,
-            background: 'transparent', border: `1px solid ${colors.border}`,
+            flex: 1, minHeight: 44, borderRadius: 12, cursor: 'pointer',
+            fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.75)',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
           }}
-        >Свернуть</button>
+        >⤡ Свернуть</button>
       </div>
 
-      <div className="profile-user-sections pf-sections" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="profile-user-sections pf-sections" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <UserPersonalSection />
         <UserHealthSection />
         <UserDietSection />

@@ -61,10 +61,10 @@ describe('Profile §83 — quick-jump и аккордеоны', () => {
 
   it('«Развернуть все» открывает аккордеоны (data-open)', () => {
     const { container, getByText } = render(<ProfileUserTab />);
-    fireEvent.click(getByText('Развернуть все'));
+    fireEvent.click(getByText(/Развернуть все/));
     const opened = container.querySelectorAll('.pf-acc[data-open="true"]');
     expect(opened.length).toBeGreaterThan(1);
-    fireEvent.click(getByText('Свернуть'));
+    fireEvent.click(getByText(/Свернуть/));
     expect(container.querySelectorAll('.pf-acc[data-open="true"]').length).toBe(0);
   });
 

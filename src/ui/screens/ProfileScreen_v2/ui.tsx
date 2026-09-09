@@ -110,12 +110,12 @@ export const staggerDelay = (index: number, base = 0.08): React.CSSProperties =>
 });
 
 export const glassCard: React.CSSProperties = {
-  background: c.glass,
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  borderRadius: 18,
-  border: `1px solid ${c.glassBorder}`,
-  boxShadow: `0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 ${c.glassHighlight}`,
+  background: 'linear-gradient(180deg, rgba(30,30,34,0.85), rgba(18,18,21,0.9))',
+  backdropFilter: 'blur(20px) saturate(160%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,0.09)',
+  boxShadow: '0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)',
   padding: 20,
   marginBottom: 14,
   animation: animations.slideUp,
@@ -316,15 +316,15 @@ export const tabCard: React.CSSProperties = {
 };
 
 export const inputBase: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: `1px solid ${colors.border}`,
-  borderRadius: 8,
-  padding: '8px 10px',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.10)',
+  borderRadius: 13,
+  padding: '10px 12px',
   color: colors.text,
-  fontSize: 14,
+  fontSize: 16,
   outline: 'none',
-  transition: 'border-color 0.15s',
-  minHeight: 36,
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+  minHeight: 44,
 };
 
 export const inputStyle: React.CSSProperties = {
@@ -345,12 +345,12 @@ export const selectStyle: React.CSSProperties = {
 };
 
 export const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: '#ffffff',
+  fontSize: 10.5,
+  fontWeight: 800,
+  color: 'rgba(255,255,255,0.6)',
   textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: 4,
+  letterSpacing: '0.8px',
+  marginBottom: 6,
   display: 'block',
 };
 
@@ -359,14 +359,17 @@ export const labelStyle: React.CSSProperties = {
 export const GroupHeader: React.FC<{ icon: React.ReactNode; title: string; color?: string; style?: React.CSSProperties }> = ({ icon, title, color, style }) => {
   const c = color || colors.text;
   return (
-    <div className="profile-grouphead" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, ...style }}>
+    <div className="profile-grouphead" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, ...style }}>
       <span aria-hidden="true" style={{
-        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+        width: 32, height: 32, borderRadius: 11, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: c,
-        background: `${withAlpha(c, '1f')}`, border: `1px solid ${withAlpha(c, '40')}`,
+        color: '#fff',
+        background: `linear-gradient(135deg, ${withAlpha(c, '3d')}, ${withAlpha(c, '1a')})`,
+        border: `1px solid ${withAlpha(c, '40')}`,
+        boxShadow: `0 4px 12px ${withAlpha(c, '26')}, inset 0 1px 0 rgba(255,255,255,0.15)`,
       }}>{icon}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: c, letterSpacing: 0.2 }}>{title}</span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.1px' }}>{title}</span>
+      <span aria-hidden="true" style={{ flex:1, height:1, background:'linear-gradient(90deg, rgba(255,255,255,0.12), transparent)', borderRadius:1, marginLeft:2 }} />
     </div>
   );
 };
@@ -478,18 +481,19 @@ export const BoolChip: React.FC<{
       onClick={() => onChange(!checked)}
       className="profile-boolchip"
       data-active={checked}
+      aria-pressed={checked}
       style={{
-        padding: '6px 12px',
-        borderRadius: 14,
-        fontSize: 12,
-        fontWeight: 600,
+        padding: '8px 15px',
+        borderRadius: 999,
+        fontSize: 12.5,
+        fontWeight: checked ? 800 : 600,
         cursor: 'pointer',
-        border: `1px solid ${checked ? c : colors.border}`,
-        background: checked ? `${withAlpha(c, '22')}` : 'transparent',
-        color: checked ? c : colors.textMuted,
-        transition: 'all 0.15s',
-        minHeight: 34,
-        boxShadow: checked ? `0 2px 10px ${withAlpha(c, '22')}` : 'none',
+        border: `1px solid ${checked ? c : 'rgba(255,255,255,0.10)'}`,
+        background: checked ? `linear-gradient(135deg, ${withAlpha(c, '30')}, ${withAlpha(c, '12')})` : 'rgba(255,255,255,0.04)',
+        color: checked ? '#fff' : 'rgba(255,255,255,0.65)',
+        transition: 'all 0.2s',
+        minHeight: 40,
+        boxShadow: checked ? `0 4px 14px ${withAlpha(c, '28')}, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
       }}
     >
       {checked ? '✓ ' : ''}{label}
@@ -601,19 +605,29 @@ export const AccordionSection: React.FC<{
       className="profile-accordion pf-acc"
       data-open={open}
       style={{
-        ...glassCard,
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        background: open
+          ? 'linear-gradient(180deg, rgba(32,32,37,0.92), rgba(18,18,21,0.94))'
+          : 'linear-gradient(180deg, rgba(26,26,30,0.85), rgba(18,18,21,0.9))',
+        backdropFilter: 'blur(20px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+        borderRadius: 20,
+        border: `1px solid ${open ? withAlpha(c, '30') : 'rgba(255,255,255,0.09)'}`,
+        boxShadow: open
+          ? `0 14px 36px rgba(0,0,0,0.4), 0 0 0 1px ${withAlpha(c, '12')}, inset 0 1px 0 rgba(255,255,255,0.08)`
+          : '0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
         padding: 0,
         overflow: 'hidden',
-        scrollMarginTop: 70, // для smooth scroll с учётом sticky quick-jump
+        scrollMarginTop: 120, // для smooth scroll с учётом sticky quick-jump
         position: 'relative',
+        transition: 'border-color 0.25s, box-shadow 0.25s',
+        animation: animations.slideUp,
       }}
     >
       {/* Акцентная полоса сверху в цвет секции */}
       <div aria-hidden="true" style={{
         height: 3, width: '100%',
-        background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '26')} 55%, transparent)`,
+        background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '30')} 55%, transparent)`,
+        opacity: open ? 1 : 0.55,
       }} />
       <button
         type="button"
@@ -624,52 +638,54 @@ export const AccordionSection: React.FC<{
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-          padding: 14,
+          gap: 13,
+          padding: '14px 15px',
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
           textAlign: 'left',
           color: colors.text,
-          minHeight: 60,
+          minHeight: 68,
         }}
       >
         {icon && (
           <span aria-hidden="true" style={{
-            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            width: 48, height: 48, borderRadius: 15, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: c,
-            background: `${withAlpha(c, '22')}`, border: `1px solid ${withAlpha(c, '44')}`,
-            boxShadow: `inset 0 0 14px ${withAlpha(c, '1a')}`,
+            color: '#fff',
+            background: `linear-gradient(135deg, ${withAlpha(c, '45')}, ${withAlpha(c, '18')})`,
+            border: `1px solid ${withAlpha(c, '45')}`,
+            boxShadow: `0 6px 18px ${withAlpha(c, '30')}, inset 0 1px 0 rgba(255,255,255,0.2)`,
           }}>{icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: c, letterSpacing: -0.2 }}>{title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap:'wrap' }}>
+            <span style={{ fontSize: 15.5, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>{title}</span>
             {badge && (
               <span style={{
-                fontSize: 10, fontWeight: 700, color: c, background: `${withAlpha(c, '22')}`,
-                padding: '2px 8px', borderRadius: 8, border: `1px solid ${withAlpha(c, '33')}`,
-                whiteSpace: 'nowrap',
+                fontSize: 10, fontWeight: 800, color: c, background: `${withAlpha(c, '18')}`,
+                padding: '3px 9px', borderRadius: 999, border: `1px solid ${withAlpha(c, '35')}`,
+                whiteSpace: 'nowrap', letterSpacing:'0.2px',
               }}>{badge}</span>
             )}
           </div>
-          {subtitle && <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
+          {subtitle && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight:1.4 }}>{subtitle}</div>}
         </div>
         <span style={{
-          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          width: 32, height: 32, borderRadius: 11, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: open ? `${withAlpha(c, '22')}` : 'rgba(255,255,255,0.05)',
-          fontSize: 13, color: open ? c : colors.textMuted,
-          transition: 'transform 0.2s',
+          background: open ? `linear-gradient(135deg, ${withAlpha(c, '30')}, ${withAlpha(c, '12')})` : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${open ? withAlpha(c, '40') : 'rgba(255,255,255,0.10)'}`,
+          fontSize: 14, color: open ? '#fff' : colors.textMuted,
+          transition: 'transform 0.25s',
           transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
         }}>▾</span>
       </button>
       {open && (
         <div className="profile-section-body" style={{
-          padding: '0 16px 16px 16px',
-          borderTop: `1px solid ${colors.border}`,
-          paddingTop: 16,
+          padding: '0 15px 17px 15px',
+          borderTop: '1px solid rgba(255,255,255,0.07)',
+          paddingTop: 15,
         }}>
           {children}
         </div>
@@ -687,15 +703,15 @@ export const Field: React.FC<{
   fullWidth?: boolean;
   style?: React.CSSProperties;
 }> = ({ label, hint, children, fullWidth, style }) => (
-  <div className="profile-field" style={{ marginBottom: 12, ...(fullWidth ? { gridColumn: '1 / -1' } : {}), ...style }}>
+  <div className="profile-field" style={{ marginBottom: 13, ...(fullWidth ? { gridColumn: '1 / -1' } : {}), ...style }}>
     <label style={labelStyle}>{label}</label>
     {children}
-    {hint && <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 4 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.45)', marginTop: 5, lineHeight:1.4 }}>{hint}</div>}
   </div>
 );
 
-export const FieldRow: React.FC<{ children: React.ReactNode; cols?: number; gap?: number; style?: React.CSSProperties }> = ({ children, cols = 2, gap = 12, style }) => (
-  <div className="profile-fieldrow" style={{
+export const FieldRow: React.FC<{ children: React.ReactNode; cols?: number; gap?: number; style?: React.CSSProperties }> = ({ children, cols = 2, gap = 10, style }) => (
+  <div className="profile-fieldrow" data-cols={cols} style={{
     display: 'grid',
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
     gap,
@@ -839,42 +855,46 @@ export const PopupValueEditor: React.FC<{
         aria-label={`${label}: ${displayValue()}`}
         style={{
           position: 'relative',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: 12,
-          border: `1px solid ${hasValue ? `${withAlpha(c, '44')}` : colors.border}`,
-          boxShadow: hasValue ? `0 2px 14px ${withAlpha(c, '14')}` : 'none',
-          padding: '10px 34px 10px 12px',
+          background: hasValue
+            ? `linear-gradient(180deg, ${withAlpha(c, '14')}, rgba(255,255,255,0.03))`
+            : 'rgba(255,255,255,0.04)',
+          borderRadius: 15,
+          border: `1px solid ${hasValue ? `${withAlpha(c, '40')}` : 'rgba(255,255,255,0.09)'}`,
+          boxShadow: hasValue ? `0 4px 16px ${withAlpha(c, '12')}, inset 0 1px 0 rgba(255,255,255,0.07)` : 'inset 0 1px 0 rgba(255,255,255,0.05)',
+          padding: '10px 38px 10px 13px',
           cursor: 'pointer',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
           justifyContent: 'center',
-          gap: 3,
+          gap: 4,
           width: '100%',
           textAlign: 'left',
           color: colors.text,
-          minHeight: 58,
-          transition: 'all 0.15s',
+          minHeight: 64,
+          transition: 'all 0.2s',
         }}
       >
         <span style={{
-          fontSize: 10, fontWeight: 600, color: colors.textMuted, letterSpacing: 0.3,
+          fontSize: 9.5, fontWeight: 800, color: hasValue ? withAlpha(c, 'dd') as string : 'rgba(255,255,255,0.5)', letterSpacing: '0.7px', textTransform:'uppercase',
           whiteSpace: 'normal', overflow: 'hidden', display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', maxWidth: '100%', lineHeight: 1.3,
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', maxWidth: '100%', lineHeight: 1.35,
         }}>{label}</span>
         <span style={{
-          fontSize: 15, fontWeight: 700, color: hasValue ? c : colors.textSubtle,
+          fontSize: 16, fontWeight: 800, color: hasValue ? '#fff' : 'rgba(255,255,255,0.3)',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+          letterSpacing:'-0.2px', fontVariantNumeric:'tabular-nums',
         }}>
           {displayValue()}
         </span>
         <span aria-hidden="true" style={{
-          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+          position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)',
+          width: 26, height: 26, borderRadius: 9, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hasValue ? `${withAlpha(c, '22')}` : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${hasValue ? `${withAlpha(c, '44')}` : colors.border}`,
-          color: hasValue ? c : colors.textSubtle, fontSize: 9,
+          background: hasValue ? `linear-gradient(135deg, ${withAlpha(c, '30')}, ${withAlpha(c, '12')})` : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${hasValue ? `${withAlpha(c, '45')}` : 'rgba(255,255,255,0.10)'}`,
+          color: hasValue ? '#fff' : colors.textSubtle, fontSize: 10,
+          boxShadow: hasValue ? `0 2px 8px ${withAlpha(c, '25')}` : 'none',
         }}>✎</span>
       </button>
 

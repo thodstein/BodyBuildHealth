@@ -93,10 +93,11 @@ export const UserPersonalSection: React.FC = React.memo(function UserPersonalSec
         />
       </FieldRow>
 
-      <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 0' }} />
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, marginBottom: 8, letterSpacing: 0.5 }}>📐 Антропометрия для техники (жим/присед/тяга)</div>
-      <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Размах рук → ширина хвата в жиме, длина бедра → постановка в приседе/тяге. Используется в мастере «Жим — единый инструмент» (блок геометрии) + подсказки хвата/локтей.</div>
+      <div style={{ borderRadius: 16, padding: 13, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 3, letterSpacing: '-0.1px' }}>📐 Антропометрия для техники</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 11, lineHeight: 1.45 }}>Размах рук → ширина хвата в жиме, длина бедра → постановка в приседе/тяге. Используется в мастере «Жим — единый инструмент».</div>
       <FieldRow cols={4}>
         <PopupValueEditor
           label="Размах рук"
@@ -162,13 +163,15 @@ export const UserPersonalSection: React.FC = React.memo(function UserPersonalSec
         />
       </FieldRow>
       {typeof personal.armSpanCm === 'number' && typeof personal.height === 'number' && personal.height>0 && (
-        <div style={{ marginTop:8, padding:'6px 10px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.2)', fontSize:10, color:'#a78bfa' }}>
-          {personal.armSpanCm - personal.height > 5 ? `🦴 Длинные руки +${Math.round(personal.armSpanCm-personal.height)}см → рекомендуем узкий хват (1.0×) + tucked локти` : personal.armSpanCm - personal.height < -5 ? `🦴 Короткие руки ${Math.round(personal.armSpanCm-personal.height)}см → шире хват + flared` : '🦴 Пропорциональные — баланс 45-60°'}
+        <div style={{ marginTop:10, padding:'10px 12px', borderRadius:12, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.25)', fontSize:11.5, color:'#c4b5fd', lineHeight:1.45 }}>
+          {personal.armSpanCm - personal.height > 5 ? `🦴 Длинные руки +${Math.round(personal.armSpanCm-personal.height)} см → рекомендуем узкий хват (1.0×) + прижатые локти` : personal.armSpanCm - personal.height < -5 ? `🦴 Короткие руки ${Math.round(personal.armSpanCm-personal.height)} см → шире хват + разведённые локти` : '🦴 Пропорциональное сложение — баланс 45–60°'}
         </div>
       )}
+      </div>
 
-      <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 0' }} />
 
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 10, letterSpacing: '-0.1px' }}>📇 Контакты</div>
       <FieldRow cols={3}>
         <PopupValueEditor
           label="Электронная почта"
@@ -195,17 +198,18 @@ export const UserPersonalSection: React.FC = React.memo(function UserPersonalSec
 
       {personal.weight && personal.height && personal.weight > 0 && personal.height > 0 && (
         <div style={{
-          marginTop: 12, padding: 14, borderRadius: 12,
-          background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.03))',
-          border: `1px solid ${colors.primaryDim}`,
+          marginTop: 14, padding: 15, borderRadius: 18,
+          background: 'linear-gradient(135deg, rgba(52,211,153,0.14), rgba(34,197,94,0.05))',
+          border: '1px solid rgba(52,211,153,0.25)',
+          boxShadow: '0 8px 24px rgba(52,211,153,0.12), inset 0 1px 0 rgba(255,255,255,0.08)',
         }}>
           <div style={{
-            fontSize: 11, fontWeight: 700, color: colors.primary, marginBottom: 8, letterSpacing: 0.5,
+            fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 10, letterSpacing: '-0.1px',
           }}>📊 Композиция тела</div>
-          <div style={{ display: 'flex', gap: 20, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span>ИМТ</span>
-              <b style={{ color: colors.primary, fontSize: 15 }}>{((personal.weight / Math.pow(personal.height / 100, 2))).toFixed(1)}</b>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ flex:'1 1 90px', textAlign:'center', padding:'10px 8px', borderRadius:13, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ display:'block', fontSize:9, fontWeight:800, letterSpacing:'0.8px', color:'rgba(255,255,255,0.55)', marginBottom:3 }}>ИМТ</span>
+              <b style={{ color: '#34d399', fontSize: 17, fontVariantNumeric:'tabular-nums' }}>{((personal.weight / Math.pow(personal.height / 100, 2))).toFixed(1)}</b>
             </span>
             {(() => {
               // Тощая масса = LBM — формула Mattila et al. 2001
@@ -215,13 +219,13 @@ export const UserPersonalSection: React.FC = React.memo(function UserPersonalSec
               const ffmi = lbm / Math.pow(personal.height / 100, 2);
               return (
                 <>
-                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                    <span>Тощая масса</span>
-                    <b style={{ color: colors.primary, fontSize: 15 }}>{lbm.toFixed(1)} кг</b>
+                  <span style={{ flex:'1 1 90px', textAlign:'center', padding:'10px 8px', borderRadius:13, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    <span style={{ display:'block', fontSize:9, fontWeight:800, letterSpacing:'0.8px', color:'rgba(255,255,255,0.55)', marginBottom:3 }}>ТОЩАЯ МАССА</span>
+                    <b style={{ color: '#34d399', fontSize: 17, fontVariantNumeric:'tabular-nums' }}>{lbm.toFixed(1)} кг</b>
                   </span>
-                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                    <span>FFMI</span>
-                    <b style={{ color: colors.primary, fontSize: 15 }}>{ffmi.toFixed(1)}</b>
+                  <span style={{ flex:'1 1 90px', textAlign:'center', padding:'10px 8px', borderRadius:13, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    <span style={{ display:'block', fontSize:9, fontWeight:800, letterSpacing:'0.8px', color:'rgba(255,255,255,0.55)', marginBottom:3 }}>FFMI</span>
+                    <b style={{ color: '#34d399', fontSize: 17, fontVariantNumeric:'tabular-nums' }}>{ffmi.toFixed(1)}</b>
                   </span>
                 </>
               );

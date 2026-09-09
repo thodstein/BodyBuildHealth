@@ -108,11 +108,12 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
   return (
     <div className="profile-inner pf-inner" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 120px)', minHeight: 0 }}>
-      {/* Sticky-хедер вкладки — в стиле NutritionScreen */}
+      {/* Sticky-хедер вкладки — современный APK */}
       <div className="profile-head pf-head" style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
-        background: '#18181b',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', flexShrink: 0,
+        background: 'rgba(16,16,18,0.85)',
+        backdropFilter: 'blur(20px) saturate(160%)', WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         position: 'sticky', top: 0, zIndex: 20,
       }}>
         <button
@@ -120,23 +121,26 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
           aria-label="Назад к hero"
           className="pf-head-back"
           style={{
-            padding: '4px 8px', cursor: 'pointer', fontSize: 20, color: '#ffffff',
-            border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: 44, minWidth: 44,
+            padding: 0, cursor: 'pointer', fontSize: 17, color: '#fff',
+            border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 44, minWidth: 44, borderRadius: 13,
           }}
         >←</button>
-        <span aria-hidden="true" style={{ display: 'inline-flex', color: meta.color }}><NativeIcon name={meta.icon} size={18} /></span>
-        <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>
-          {meta.title}
+        <span aria-hidden="true" style={{ width:36, height:36, borderRadius:12, display:'inline-flex', alignItems:'center', justifyContent:'center', color:meta.color, background:`linear-gradient(135deg, ${meta.color}2e, ${meta.color}0d)`, border:`1px solid ${meta.color}44`, flexShrink:0 }}><NativeIcon name={meta.icon} size={18} /></span>
+        <div style={{ flex: 1, minWidth:0 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3, lineHeight:1.15 }}>
+            {meta.title}
+          </div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:600, letterSpacing:'0.4px', marginTop:1 }}>АВТО-СОХРАНЕНИЕ ВКЛЮЧЕНО</div>
         </div>
-        <span className="pf-autosave" style={{ fontSize: 9, color: '#ffffff' }}>авто-сохранение</span>
         <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
       </div>
       {/* Поднавигация по разделам профиля — без возврата в hero */}
       <div className="pf-subnav" role="navigation" aria-label="Разделы профиля" style={{
-        display: 'flex', gap: 6, padding: '8px 12px', flexShrink: 0,
+        display: 'flex', gap: 8, padding: '10px 12px', flexShrink: 0,
         overflowX: 'auto', scrollbarWidth: 'none',
-        background: '#18181b', borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(16,16,18,0.85)', borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         {tabs.map(t => {
           const m = TAB_META[t];
@@ -151,16 +155,17 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
               data-active={active}
               className="pf-subnav-btn"
               style={{
-                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
-                fontSize: 12, fontWeight: 700, minHeight: 40, whiteSpace: 'nowrap',
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '8px 15px', borderRadius: 999, cursor: 'pointer',
+                fontSize: 12.5, fontWeight: 800, minHeight: 44, whiteSpace: 'nowrap',
                 border: `1px solid ${active ? m.color : 'rgba(255,255,255,0.10)'}`,
-                background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: active ? m.color : '#fff',
+                background: active ? `linear-gradient(135deg, ${m.color}30, ${m.color}12)` : 'rgba(255,255,255,0.04)',
+                color: active ? '#fff' : 'rgba(255,255,255,0.7)',
+                boxShadow: active ? `0 4px 16px ${m.color}33, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
               }}
             >
-              <span aria-hidden="true" style={{ display: 'inline-flex', color: active ? m.color : '#fff' }}>
-                <NativeIcon name={m.icon} size={13} />
+              <span aria-hidden="true" style={{ display: 'inline-flex', color: active ? m.color : 'rgba(255,255,255,0.6)' }}>
+                <NativeIcon name={m.icon} size={14} />
               </span>
               {m.title}
             </button>
@@ -175,10 +180,11 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         minHeight: 0,
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: '0 8px 80px',
+        padding: '12px 12px 96px',
         scrollbarWidth: 'thin',
         scrollbarColor: `${colors.border} transparent`,
         WebkitOverflowScrolling: 'touch',
+        background: 'radial-gradient(120% 40% at 50% 0%, rgba(52,211,153,0.06), transparent 70%)',
       }}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
@@ -204,15 +210,15 @@ const UndoButton: React.FC<{ undoAvailable: boolean; setUndoAvailable: (v: boole
         title="Отменить (Ctrl+Z)"
         className="pf-undo"
         style={{
-          background: 'rgba(59,130,246,0.12)',
-          border: '1px solid rgba(59,130,246,0.3)',
-          color: colors.blue,
-          padding: '6px 12px',
-          borderRadius: 8,
+          background: 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(59,130,246,0.10))',
+          border: '1px solid rgba(59,130,246,0.4)',
+          color: '#fff',
+          padding: '8px 14px',
+          borderRadius: 12,
           fontSize: 12,
-          fontWeight: 600,
+          fontWeight: 800,
           cursor: 'pointer',
-          minHeight: 40,
+          minHeight: 44,
           flexShrink: 0,
         }}
       >↩ Отменить</button>
