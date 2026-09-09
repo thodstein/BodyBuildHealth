@@ -369,7 +369,7 @@ export const CombatConstructor: React.FC = () => {
   );
 
   return (
-    <div className="combat-constructor" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 860, margin: '0 auto' }}>
+    <div className="combat-constructor" data-step={step} style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 860, margin: '0 auto' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:rgba(255,255,255,0.08); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
@@ -377,24 +377,24 @@ export const CombatConstructor: React.FC = () => {
       `}</style>
 
       {/* HERO */}
-      <div style={CARD_HERO}>
+      <div className="cb-hero" style={CARD_HERO}>
         <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)', filter: 'blur(2px)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -30, left: 50, width: 220, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.10), transparent 70%)', filter: 'blur(2px)', pointerEvents: 'none' }} />
         <div style={ROW}>
-          <span style={{
+          <span className="cb-hero-icon" style={{
             width: 44, height: 44, borderRadius: 13, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 20, boxShadow: '0 6px 18px rgba(168,85,247,0.32), inset 0 1px 0 rgba(255,255,255,0.22)', flexShrink: 0,
           }}>🥊</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>Единоборства — PRO силовая</div>
-            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.35, marginTop: 2 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
+            <div className="cb-hero-title" style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>Единоборства — PRO силовая</div>
+            <div className="cb-hero-sub" style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.35, marginTop: 2 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
           </div>
-          <Badge color="#fff" bg="linear-gradient(135deg, rgba(168,85,247,0.28), rgba(236,72,153,0.22))" border="rgba(255,255,255,0.14)">{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
+          <span className="cb-hero-step"><Badge color="#fff" bg="linear-gradient(135deg, rgba(168,85,247,0.28), rgba(236,72,153,0.22))" border="rgba(255,255,255,0.14)">{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge></span>
         </div>
 
-        <ProgressBar value={stepIndex} max={4} color={ACCENT} height={8} />
+        <div className="cb-progress"><ProgressBar value={stepIndex} max={4} color={ACCENT} height={8} /></div>
 
-        <SectionNav
+        <div className="cb-steps"><SectionNav
           activeId={step}
           onSelect={(id) => setStep(id as Step)}
           items={[
@@ -403,9 +403,9 @@ export const CombatConstructor: React.FC = () => {
             { id: 'split', label: '🧩 Сплит' },
             { id: 'plan', label: '📋 План' },
           ]}
-        />
+        /></div>
 
-        <div style={{ ...ROW, justifyContent: 'space-between', gap: 8 }}>
+        <div className="cb-status" style={{ ...ROW, justifyContent: 'space-between', gap: 8 }}>
           <div style={ROW}>
             {plan && <Badge color="#fff" bg="rgba(168,85,247,0.16)" border="rgba(168,85,247,0.30)" icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)" icon="🥋">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
@@ -420,7 +420,7 @@ export const CombatConstructor: React.FC = () => {
             )}
           </div>
           {msg && (
-            <span style={{
+            <span className="cb-msg" style={{
               fontSize: 11.5, fontWeight: 750, color: '#fff', background: 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.14))',
               border: '1px solid rgba(255,255,255,0.10)', padding: '6px 12px', borderRadius: 20, backdropFilter: 'blur(8px)',
               boxShadow: '0 4px 16px rgba(0,0,0,0.18)', animation: 'fadeInUp 0.22s ease',
@@ -430,7 +430,7 @@ export const CombatConstructor: React.FC = () => {
       </div>
 
       {step === 'params' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="params" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Дисциплина + Цель */}
           <SectionCard icon="🎯" title="Дисциплина и цель" subtitle="Подбирает акценты: шея/хват/ротация">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -712,14 +712,14 @@ export const CombatConstructor: React.FC = () => {
           </SectionCard>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={pullFromProfile} style={{ ...BTN, flex: 1, background: 'rgba(255,255,255,0.05)' }}>⟡ Подтянуть из профиля</button>
-            <button onClick={() => setStep('outside')} style={{ ...BTN_PRIMARY, flex: 1.2 }}>Далее → Вне зала</button>
+            <button onClick={pullFromProfile} className="cb-profile" style={{ ...BTN, flex: 1, background: 'rgba(255,255,255,0.05)' }}>⟡ Подтянуть из профиля</button>
+            <button onClick={() => setStep('outside')} className="cb-next" style={{ ...BTN_PRIMARY, flex: 1.2 }}>Далее → Вне зала</button>
           </div>
         </div>
       )}
 
       {step === 'outside' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="outside" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionCard icon="🥋" title="Вне зала — спарринг декомпозиция" subtitle="Hard RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× зал сохраняет 1× Zone2 30′ (77% aerobic — Boxing Science)" accent>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#fff', fontWeight: 800, background: outsideEnabled ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 12, border: `1px solid ${outsideEnabled ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
               <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#a855f7' }} />
@@ -797,12 +797,12 @@ export const CombatConstructor: React.FC = () => {
             </label>
           </SectionCard>
 
-          <button onClick={() => setStep('split')} style={{ ...BTN_PRIMARY, width: '100%' }}>Далее → Сплит</button>
+          <button onClick={() => setStep('split')} className="cb-next" style={{ ...BTN_PRIMARY, width: '100%' }}>Далее → Сплит</button>
         </div>
       )}
 
       {step === 'split' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="split" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ ...CARD, padding: 14, gap: 10 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>✨</span>
@@ -821,6 +821,8 @@ export const CombatConstructor: React.FC = () => {
                 <button
                   key={p.id}
                   onClick={() => setPatternId(p.id)}
+                  className="cb-split-card"
+                  data-active={active ? 'true' : 'false'}
                   style={{
                     textAlign: 'left', padding: 14, borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
                     background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.16), rgba(236,72,153,0.10))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
@@ -831,11 +833,11 @@ export const CombatConstructor: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, fontWeight: 900, color: active ? '#fff' : 'rgba(255,255,255,0.92)' }}>{p.name}</span>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : 'rgba(255,255,255,0.42)', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
+                    <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : 'rgba(255,255,255,0.42)', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.62)', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
-                  {active && <div style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => s.sessionTag).join(', ')}</div>}
+                  <div className="cb-split-preview" style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
+                  {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => s.sessionTag).join(', ')}</div>}
                 </button>
               );
             })}
@@ -843,7 +845,7 @@ export const CombatConstructor: React.FC = () => {
 
           <InfoBanner>ATR 5/3/2: 10 нед → 5 накопление 6-10/RIR2-3 → 3 трансформация 3-6/RIR1-2 → 2 реализация тапер. Conjugate — ротация макс/динам/повтор. Linear — ОФП/сила/тапер.</InfoBanner>
 
-          <button onClick={build} style={{ ...BTN_PRIMARY, width: '100%', padding: '14px 16px', fontSize: 13, borderRadius: 14 }}>
+          <button onClick={build} className="cb-build" style={{ ...BTN_PRIMARY, width: '100%', padding: '14px 16px', fontSize: 13, borderRadius: 14 }}>
             ✦ Собрать PRO-план {patternId ? `· ${patternId}` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}
           </button>
         </div>
@@ -883,7 +885,7 @@ export const CombatConstructor: React.FC = () => {
         />
       )}
       {step === 'plan' && !plan && (
-        <div style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
+        <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
           <span style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📋</span>
           <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>План ещё не собран</div>
           <div style={{ fontSize: 12, color: TEXT_3, maxWidth: 320 }}>Вернитесь к параметрам, выберите сплит и нажмите «Собрать PRO-план». Годовой ATR можно построить и без плана.</div>
