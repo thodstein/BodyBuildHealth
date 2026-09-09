@@ -969,8 +969,8 @@ export const DiaryModalShell: React.FC<{
                 {icon}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color, letterSpacing: -0.3 }}>{title}</div>
-                {subtitle && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 3 }}>{subtitle}</div>}
+                <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', letterSpacing: -0.3 }}>{title}</div>
+                {subtitle && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.45 }}>{subtitle}</div>}
               </div>
               {spark && <Sparkline data={spark.data} color={spark.color || color} />}
               {stale && staleColor && (
@@ -1001,21 +1001,26 @@ export const DiaryModalShell: React.FC<{
                   border: `1px solid ${colors.borderHover}`,
                   color: colors.textMuted,
                   cursor: 'pointer',
-                  fontSize: 16,
+                  fontSize: 15,
                   lineHeight: 1,
-                  width: 38,
-                  height: 38,
-                  borderRadius: 12,
+                  width: 44,
+                  height: 44,
+                  minWidth: 44,
+                  minHeight: 44,
+                  borderRadius: 14,
                   flexShrink: 0,
-                  transition: 'background 0.15s, color 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s, color 0.15s, transform 0.15s',
                 }}
               >
                 ✕
               </button>
             </div>
-            <div className="dm-body" style={{ padding: 18, overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
+            <div className="dm-body" style={{ padding: '20px 20px 8px', overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
             {footer ?? (
-              <div style={{ display: 'flex', gap: 10, padding: '16px 20px 20px', borderTop: `1px solid ${withAlpha(color, '24')}`, flexShrink: 0, background: 'rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '14px 20px 20px', borderTop: `1px solid ${withAlpha(color, '24')}`, flexShrink: 0, background: 'rgba(0,0,0,0.22)' }}>
                 {fill && fill.total > 0 && (
                   <div
                     title={`Заполнено ${fill.current}/${fill.total}`}
