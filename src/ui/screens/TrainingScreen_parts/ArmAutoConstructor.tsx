@@ -176,6 +176,19 @@ function shortSplitTag(tag?: string): string {
   return SPLIT_TAG_RU[tag] || tag;
 }
 
+/* Светофор фаз и RIR — та же палитра, что в печати (arm-export engine) */
+const PHASE_DOT: Record<string, string> = {
+  accumulation: '#22c55e',
+  intensification: '#f59e0b',
+  deload: '#60a5fa',
+  peaking: '#ef4444',
+};
+function rirTint(rir: any): React.CSSProperties {
+  const n = Number(rir);
+  const c = !(n >= 0) ? undefined : n <= 1 ? '#ef4444' : n <= 2 ? '#f59e0b' : '#22c55e';
+  return c ? { borderColor: `${c}88`, color: c, fontVariantNumeric: 'tabular-nums' as const } : { fontVariantNumeric: 'tabular-nums' as const };
+}
+
 type GateKey = 'humerus' | 'ucl' | 'shoulder' | 'tendon' | 'table' | 'volume' | 'cycle' | 'antagonist' | 'other';
 
 const GATE_META: Record<GateKey, { title: string }> = {
@@ -1220,7 +1233,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
               {curWeek && (
                 <div>
-                  <h4 className="ad-sec-t">Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                  <h4 className="ad-sec-t"><span aria-hidden style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 99, background: PHASE_DOT[curWeek.phase] || '#94a3b8', marginRight: 6, verticalAlign: '1px' }} />Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
                   {curWeek.sessions.map((sess:any, si:number)=> (
@@ -1231,7 +1244,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         <div key={ei} className="ad-ex">
                           <div className="ad-ex-top">
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl"><b>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag">RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
+                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
                           </div>
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
