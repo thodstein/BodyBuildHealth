@@ -193,10 +193,10 @@ export const BPChart = forwardRef<SVGSVGElement, BPChartProps>(({
             key={key}
             onClick={() => toggleSeries(key)}
             style={{
-              padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+              padding: '6px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', minHeight: 32,
               border: visibleSeries.has(key) ? `1.5px solid ${SERIES_COLORS[key]}` : '1px solid #444',
               background: visibleSeries.has(key) ? `${SERIES_COLORS[key]}22` : '#18181b',
-              color: visibleSeries.has(key) ? SERIES_COLORS[key] : '#666',
+              color: visibleSeries.has(key) ? '#fff' : '#888',
               fontFamily: 'inherit',
             }}
           >
@@ -303,11 +303,12 @@ export const BPChart = forwardRef<SVGSVGElement, BPChartProps>(({
           style={{
             position: 'fixed',
             left: tooltip.x + 16, top: tooltip.y - 10,
-            background: '#18181b', border: '1px solid #444', borderRadius: 8,
-            padding: '8px 12px', fontSize: 12, color: '#eee',
+            background: '#18181b', border: '1px solid #555', borderRadius: 14,
+            padding: '10px 14px', fontSize: 12.5, color: '#eee',
             pointerEvents: 'none', zIndex: 2200,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.55)',
             whiteSpace: 'nowrap',
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4 }}>{tooltip.date}</div>
@@ -319,7 +320,7 @@ export const BPChart = forwardRef<SVGSVGElement, BPChartProps>(({
         </div>
       )}
 
-      <div style={{ fontSize: 10, color: '#ffffff', marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 6, lineHeight: 1.5 }}>
         Клик по линиям легенды скрывает/показывает серии. Наведите на график для деталей.
       </div>
     </div>

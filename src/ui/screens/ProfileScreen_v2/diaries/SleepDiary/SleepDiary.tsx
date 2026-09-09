@@ -85,79 +85,82 @@ const defaultGoals: SleepGoals = {
 /* ── Общие стили — премиум апгрейд (стекло + глубина) ─────────────── */
 
 const btnBase: React.CSSProperties = {
-  minHeight: 40,
-  padding: '9px 14px',
-  borderRadius: 12,
-  border: `1px solid rgba(255,255,255,0.10)`,
+  minHeight: 44,
+  padding: '10px 17px',
+  borderRadius: 14,
+  border: `1px solid rgba(255,255,255,0.11)`,
   background: 'rgba(255,255,255,0.06)',
   backdropFilter: 'blur(12px) saturate(140%)',
   WebkitBackdropFilter: 'blur(12px) saturate(140%)',
-  color: colors.text,
+  color: '#fff',
   cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: 13.5,
+  fontWeight: 700,
   fontFamily: 'inherit',
   transition: 'all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)',
   whiteSpace: 'nowrap',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
-  boxShadow: '0 2px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
+  gap: 7,
+  boxShadow: '0 4px 14px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
 };
 const btnPrimary: React.CSSProperties = {
   ...btnBase,
-  background: ACCENT,
-  border: `1px solid ${ACCENT}`,
+  background: `linear-gradient(135deg, ${ACCENT}, rgba(167,139,250,0.72))`,
+  border: `1px solid rgba(167,139,250,0.65)`,
   color: '#0a0a0f',
-  fontWeight: 700,
-  boxShadow: '0 4px 18px rgba(167,139,250,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
+  fontWeight: 800,
+  boxShadow: '0 6px 22px rgba(167,139,250,0.35), inset 0 1px 0 rgba(255,255,255,0.22)',
 };
-const btnGhost: React.CSSProperties = { ...btnBase, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' };
+const btnGhost: React.CSSProperties = { ...btnBase, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' };
 const menuItem: React.CSSProperties = {
   ...btnGhost,
   justifyContent: 'flex-start',
   width: '100%',
-  minHeight: 38,
-  padding: '8px 12px',
+  minHeight: 44,
+  padding: '10px 13px',
   border: 'none',
-  borderRadius: 10,
-  fontSize: 13,
-  fontWeight: 500,
+  borderRadius: 12,
+  fontSize: 13.5,
+  fontWeight: 600,
   background: 'transparent',
   boxShadow: 'none',
 };
 const chip: React.CSSProperties = {
-  minHeight: 32,
-  padding: '6px 13px',
+  minHeight: 40,
+  padding: '8px 15px',
   borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 600,
+  fontSize: 12.5,
+  fontWeight: 700,
   cursor: 'pointer',
-  border: `1px solid rgba(255,255,255,0.10)`,
+  border: `1px solid rgba(255,255,255,0.11)`,
   background: 'rgba(255,255,255,0.05)',
   backdropFilter: 'blur(10px)',
-  color: colors.textMuted,
+  color: 'rgba(255,255,255,0.65)',
   fontFamily: 'inherit',
   transition: 'all 0.18s ease',
+  whiteSpace: 'nowrap',
+  display: 'inline-flex',
+  alignItems: 'center',
 };
 const chipActive: React.CSSProperties = {
   ...chip,
-  borderColor: 'rgba(167,139,250,0.55)',
-  background: 'linear-gradient(135deg, rgba(167,139,250,0.18), rgba(167,139,250,0.08))',
-  color: ACCENT,
-  boxShadow: '0 2px 12px rgba(167,139,250,0.18), inset 0 1px 0 rgba(167,139,250,0.18)',
-  fontWeight: 700,
+  borderColor: 'rgba(167,139,250,0.6)',
+  background: 'linear-gradient(135deg, rgba(167,139,250,0.26), rgba(167,139,250,0.10))',
+  color: '#fff',
+  boxShadow: '0 4px 16px rgba(167,139,250,0.25), inset 0 1px 0 rgba(255,255,255,0.12)',
+  fontWeight: 800,
 };
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div
     style={{
-      fontSize: 11,
-      fontWeight: 700,
-      color: ACCENT,
+      fontSize: 12,
+      fontWeight: 800,
+      color: '#fff',
       textTransform: 'uppercase',
-      letterSpacing: '0.6px',
-      marginBottom: 10,
+      letterSpacing: '0.9px',
+      marginBottom: 11,
     }}
   >
     {children}
@@ -349,10 +352,10 @@ const SleepForm: React.FC<{
             </label>
             {numField('Часы сна', 'hours', { min: '0', max: '24', step: '0.5' })}
             {numField('Пробуждений', 'awakenings', { min: '0' })}
-            <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>
+            <label style={{ display: 'grid', gap: 6, fontSize: 12, color: '#fff', fontWeight: 700 }}>
               Качество
-              <div style={{ minHeight: 38, display: 'flex', alignItems: 'center', padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}` }}>
-                <Stars value={Number(draft.quality) || 0} onChange={(v) => set('quality', v)} size={26} />
+              <div style={{ minHeight: 48, display: 'flex', alignItems: 'center', padding: '0 14px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.11)' }}>
+                <Stars value={Number(draft.quality) || 0} onChange={(v) => set('quality', v)} size={28} />
               </div>
             </label>
           </div>
@@ -372,7 +375,7 @@ const SleepForm: React.FC<{
           <SectionTitle>Факторы</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
             {numField('Экран перед сном, мин', 'screenTime', { min: '0' })}
-            <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>
+            <label style={{ display: 'grid', gap: 6, fontSize: 12, color: '#fff', fontWeight: 700 }}>
               Время тренировки
               <input
                 style={{ ...inputStyle, width: '100%' }}
@@ -400,7 +403,7 @@ const SleepForm: React.FC<{
           </div>
         </div>
 
-        <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>
+        <label style={{ display: 'grid', gap: 6, fontSize: 12, color: '#fff', fontWeight: 700 }}>
           Заметки
           <textarea
             style={{ ...inputStyle, width: '100%', minHeight: 80, resize: 'vertical' }}
@@ -413,13 +416,14 @@ const SleepForm: React.FC<{
           <div
             role="alert"
             style={{
-              padding: '9px 12px',
-              borderRadius: 8,
-              background: colors.dangerDim,
+              padding: '11px 14px',
+              borderRadius: 14,
+              background: 'linear-gradient(135deg, rgba(239,68,68,0.16), rgba(239,68,68,0.06))',
               border: '1px solid rgba(239,68,68,0.4)',
               color: '#fca5a5',
-              fontSize: 12,
-              fontWeight: 600,
+              fontSize: 12.5,
+              fontWeight: 700,
+              lineHeight: 1.5,
             }}
           >
             ⚠️ {error}
@@ -500,11 +504,11 @@ const StatCard: React.FC<{ icon: NativeIconName; label: string; value: string; c
       }}
     />
     <div style={{ color, position: 'relative' }}><NativeIcon name={icon} size={16} /></div>
-    <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>
+    <small style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', position: 'relative' }}>
       {label}
     </small>
-    <strong style={{ fontSize: 21, fontWeight: 800, color, lineHeight: 1.1, letterSpacing: '-0.3px', position: 'relative' }}>{value}</strong>
-    {hint && <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', position: 'relative' }}>{hint}</small>}
+    <strong style={{ fontSize: 23, fontWeight: 800, color, lineHeight: 1.1, letterSpacing: '-0.3px', position: 'relative', fontVariantNumeric: 'tabular-nums' }}>{value}</strong>
+    {hint && <small style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', position: 'relative', lineHeight: 1.4 }}>{hint}</small>}
   </div>
 );
 
@@ -850,7 +854,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
           <div style={{ flex: 1 }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
-              style={{ ...inputStyle, width: 200, minHeight: 38, paddingRight: query ? 30 : undefined }}
+              style={{ ...inputStyle, width: 200, minHeight: 44, fontSize: 16, paddingRight: query ? 36 : undefined }}
               placeholder="🔍 Поиск"
               value={query}
               onChange={(e) => {
@@ -864,14 +868,16 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                 aria-label="Очистить поиск"
                 style={{
                   position: 'absolute',
-                  right: 6,
+                  right: 7,
                   background: 'rgba(255,255,255,0.08)',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 6,
+                  borderRadius: 10,
                   color: colors.textMuted,
                   cursor: 'pointer',
-                  width: 22,
-                  height: 22,
+                  width: 30,
+                  height: 30,
+                  minWidth: 30,
+                  minHeight: 30,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1225,27 +1231,27 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         {/* Недели */}
         {weeks.length > 0 && (
           <section style={{ ...glassCard, marginBottom: 12 }}>
-            <b style={{ display: 'block', marginBottom: 10 }}>📅 Средние по неделям</b>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <b style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>📅 Средние по неделям</b>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {weeks.slice(-8).map((w) => {
                 const ok = w.mean >= goals.targetHours;
                 return (
                   <div key={w.weekStart} style={{ minWidth: 120, flex: '1 1 120px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: colors.textSubtle, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textSubtle, marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
                       <span>{w.weekStart.slice(5)}</span>
                       <span>{w.count} дн.</span>
                     </div>
-                    <div style={{ height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                    <div style={{ height: 10, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
                       <div
                         style={{
                           height: '100%',
                           width: `${Math.min(100, (w.mean / Math.max(0.1, goals.targetHours)) * 100)}%`,
-                          borderRadius: 5,
-                          background: ok ? '#34d399' : w.mean < 6 ? '#f87171' : '#fbbf24',
+                          borderRadius: 99,
+                          background: ok ? 'linear-gradient(90deg,#34d399,#4ade80)' : w.mean < 6 ? 'linear-gradient(90deg,#f87171,#ef4444)' : 'linear-gradient(90deg,#fbbf24,#f59e0b)',
                         }}
                       />
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: ok ? '#34d399' : '#fbbf24', marginTop: 3 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: ok ? '#34d399' : '#fbbf24', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
                       {w.mean.toFixed(1)} ч
                     </div>
                   </div>
@@ -1258,25 +1264,25 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         {/* Календарь-хитмап */}
         {calendar.some((c) => c.hours !== null) && (
           <section id="sleep-calendar" style={{ ...glassCard, marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <b>🗓 Календарь сна (60 дней)</b>
-              <div style={{ display: 'flex', gap: 6, fontSize: 10, color: colors.textSubtle, alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <b style={{ fontSize: 14 }}>🗓 Календарь сна (60 дней)</b>
+              <div style={{ display: 'flex', gap: 6, fontSize: 11, color: colors.textSubtle, alignItems: 'center' }}>
                 <span>нет</span>
                 {(['bad', 'low', 'good', 'great', 'high'] as const).map((l) => (
-                  <span key={l} title={l} style={{ width: 12, height: 12, borderRadius: 3, background: cellColor[l], display: 'inline-block' }} />
+                  <span key={l} title={l} style={{ width: 14, height: 14, borderRadius: 4, background: cellColor[l], display: 'inline-block' }} />
                 ))}
               </div>
             </div>
             <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 24px)', gap: 5, width: 'max-content' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 28px)', gap: 6, width: 'max-content' }}>
                 {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, i) => (
                   <div
                     key={d}
                     style={{
-                      fontSize: 9,
-                      fontWeight: 700,
+                      fontSize: 10,
+                      fontWeight: 800,
                       textAlign: 'center',
-                      color: i >= 5 ? 'rgba(167,139,250,0.8)' : colors.textSubtle,
+                      color: i >= 5 ? 'rgba(167,139,250,0.9)' : colors.textSubtle,
                     }}
                   >
                     {d}
@@ -1290,16 +1296,17 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                         key={`${wi}-${di}`}
                         className="sleep-heat"
                         style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 6,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
                           background: cellColor[level],
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 9,
-                          color: c.hours !== null && (level === 'bad' || level === 'low' || level === 'high') ? '#fff' : 'rgba(255,255,255,0.5)',
-                          fontWeight: 700,
+                          fontSize: 10,
+                          color: c.hours !== null && (level === 'bad' || level === 'low' || level === 'high') ? '#fff' : 'rgba(255,255,255,0.55)',
+                          fontWeight: 800,
+                          fontVariantNumeric: 'tabular-nums',
                         }}
                         title={c.hours !== null ? `${c.date}: ${c.hours.toFixed(1)} ч · качество ${c.quality ?? '—'}/5` : c.date}
                       >
@@ -1363,25 +1370,26 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                     border: d.count ? `1px solid ${colors.border}` : '1px solid transparent',
                   }}
                 >
-                  <div style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 700 }}>{d.dayName}</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: d.avgHours === null ? colors.textSubtle : d.avgHours >= goals.targetHours ? '#34d399' : d.avgHours >= 6 ? '#fbbf24' : '#f87171' }}>
+                  <div style={{ fontSize: 11, color: colors.textSubtle, fontWeight: 800, letterSpacing: '0.4px' }}>{d.dayName}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: d.avgHours === null ? colors.textSubtle : d.avgHours >= goals.targetHours ? '#34d399' : d.avgHours >= 6 ? '#fbbf24' : '#f87171', fontVariantNumeric: 'tabular-nums' }}>
                     {d.avgHours === null ? '—' : `${d.avgHours.toFixed(1)}ч`}
                   </div>
-                  <div style={{ fontSize: 10, color: d.avgQuality === null ? colors.textSubtle : d.avgQuality >= 4 ? '#34d399' : d.avgQuality >= 3 ? '#fbbf24' : '#f87171' }}>
+                  <div style={{ fontSize: 11, color: d.avgQuality === null ? colors.textSubtle : d.avgQuality >= 4 ? '#34d399' : d.avgQuality >= 3 ? '#fbbf24' : '#f87171' }}>
                     {d.avgQuality === null ? '' : `★${d.avgQuality.toFixed(1)}`}
                   </div>
                   {d.avgHours !== null && (
-                    <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 4 }}>
+                    <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 5 }}>
                       <div
                         style={{
                           height: '100%',
                           width: `${Math.min(100, (d.avgHours / Math.max(0.1, goals.targetHours)) * 100)}%`,
-                          background: d.avgHours >= goals.targetHours ? '#34d399' : d.avgHours >= 6 ? '#fbbf24' : '#f87171',
+                          borderRadius: 99,
+                          background: d.avgHours >= goals.targetHours ? 'linear-gradient(90deg,#34d399,#4ade80)' : d.avgHours >= 6 ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#f87171,#ef4444)',
                         }}
                       />
                     </div>
                   )}
-                  {d.count > 0 && <div style={{ fontSize: 9, color: colors.textSubtle, marginTop: 3 }}>{d.count} дн.</div>}
+                  {d.count > 0 && <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{d.count} дн.</div>}
                 </div>
               ))}
             </div>
@@ -1402,10 +1410,10 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         <section id="sleep-insights" style={{ ...glassCard, marginBottom: 12 }}>
           {(hygiene.length || recommendations.length || ped.length) > 0 ? (
             <>
-              <b style={{ display: 'block', marginBottom: 8 }}>🧠 Инсайты и рекомендации</b>
+              <b style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>🧠 Инсайты и рекомендации</b>
               {hygiene.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '6px 0 2px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '8px 0 4px' }}>
                   Гигиена сна
                 </div>
                 {hygiene.map((x, i) => (
@@ -1418,7 +1426,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             )}
             {recommendations.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '6px 0 2px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '8px 0 4px' }}>
                   Корреляции
                 </div>
                 {recommendations.map((x, i) => (
@@ -1431,7 +1439,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             )}
             {ped.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '6px 0 2px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '8px 0 4px' }}>
                   Влияние добавок
                 </div>
                 {ped.map((x, i) => (
@@ -1528,12 +1536,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                       {r.notes || '—'}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button style={{ ...btnBase, minHeight: 32, padding: '4px 9px' }} onClick={() => openSleepForm(r, true)}>
+                      <button style={{ ...btnBase, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={() => openSleepForm(r, true)} aria-label="Редактировать запись">
                         ✏️
                       </button>{' '}
                       <button
-                        style={{ ...btnBase, minHeight: 32, padding: '4px 9px', color: '#f87171' }}
+                        style={{ ...btnBase, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#f87171' }}
                         onClick={() => commit(rows.filter((x) => x.date !== r.date))}
+                        aria-label="Удалить запись"
                       >
                         🗑
                       </button>

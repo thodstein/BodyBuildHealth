@@ -85,13 +85,13 @@ type BPForm = {
 
 const ACCENT = '#ef4444';
 
-const btn: React.CSSProperties = { ...btnBase(ACCENT), minHeight: 40, boxShadow: '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)' };
+const btn: React.CSSProperties = { ...btnBase(ACCENT), minHeight: 44, boxShadow: '0 4px 14px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.06)' };
 const input: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)',
+  width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.11)', background: 'rgba(255,255,255,0.06)',
   backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-  color: colors.text, fontSize: 14, outline: 'none', minHeight: 40,
-  fontFamily: 'inherit', transition: 'border-color 0.15s, background 0.15s',
+  color: colors.text, fontSize: 16, outline: 'none', minHeight: 48,
+  fontFamily: 'inherit', transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
 };
 const tintCard = (bg: string, border: string): React.CSSProperties => ({
   padding: 15,
@@ -489,10 +489,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             <div
               key={alert.id}
               style={{
-                padding: 12, borderRadius: 8, marginBottom: 8,
+                padding: 14, borderRadius: 14, marginBottom: 10,
                 border: `1px solid ${alert.severity === 'critical' ? '#b91c1c' : alert.severity === 'warning' ? '#f59e0b' : '#3b82f6'}`,
-                background: `${alert.severity === 'critical' ? 'rgba(185,28,28,.1)' : alert.severity === 'warning' ? 'rgba(245,158,11,.1)' : 'rgba(59,130,246,.1)'}`,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: `${alert.severity === 'critical' ? 'rgba(185,28,28,.14)' : alert.severity === 'warning' ? 'rgba(245,158,11,.13)' : 'rgba(59,130,246,.13)'}`,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
               }}
             >
               <div>
@@ -500,8 +501,9 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 <div style={{ fontSize: 13, marginTop: 4 }}>{alert.message}</div>
               </div>
               <button
-                style={{ ...btn, padding: '4px 8px', fontSize: 12 }}
+                style={{ ...btn, padding: '6px 10px', minHeight: 40, minWidth: 40, fontSize: 13 }}
                 onClick={() => dismissAlert(alert.id)}
+                aria-label="Закрыть предупреждение"
               >
                 ✕
               </button>
@@ -520,10 +522,10 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
           ))}
           <div style={{ flex: 1 }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input style={{ ...input, width: 180, paddingRight: query ? 30 : undefined }} placeholder="🔍 Поиск" value={query}
+            <input style={{ ...input, width: 180, paddingRight: query ? 38 : undefined }} placeholder="🔍 Поиск" value={query}
               onChange={e => { setQuery(e.target.value); setPage(1); }} />
             {query && (
-              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
             )}
           </div>
           <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>↕ Дата</button>
@@ -570,8 +572,8 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 }}
               >
                 <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(380px 90px at 14% 0%, ${typeof color === 'string' ? `${color}14` : 'transparent'}, transparent 62%)`, pointerEvents: 'none' }} />
-                <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>{String(l)}</small>
-                <strong style={{ display: 'block', fontSize: 20, fontWeight: 800, letterSpacing: '-0.3px', color: typeof color === 'string' ? color : '#fff', position: 'relative', marginTop: 2 }}>{content}</strong>
+                <small style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', position: 'relative' }}>{String(l)}</small>
+                <strong style={{ display: 'block', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px', color: typeof color === 'string' ? color : '#fff', position: 'relative', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{content}</strong>
               </div>
             );
           })}
@@ -781,19 +783,19 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 </div>
               </div>
               {homeAdherence.days.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(76px,1fr))', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, marginTop: 10 }}>
                   {homeAdherence.days.map(day => (
-                    <div key={day.date} style={{ padding: 8, borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: `1px solid ${day.morning && day.evening ? 'rgba(34,197,94,.35)' : day.readings.length ? 'rgba(245,158,11,.3)' : 'rgba(255,255,255,0.08)'}` }}>
-                      <small style={{ display: 'block', fontSize: 9, color: colors.textMuted }}>{day.date.slice(5)}</small>
-                      <strong style={{ display: 'block', fontSize: 12 }}>{day.dailyAvgS ? `${day.dailyAvgS}/${day.dailyAvgD}` : '—'}</strong>
-                      <small style={{ fontSize: 9, color: day.morning && day.evening ? '#22c55e' : day.readings.length ? '#f59e0b' : colors.textMuted }}>
+                    <div key={day.date} style={{ padding: 10, borderRadius: 12, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: `1px solid ${day.morning && day.evening ? 'rgba(34,197,94,.4)' : day.readings.length ? 'rgba(245,158,11,.35)' : 'rgba(255,255,255,0.09)'}` }}>
+                      <small style={{ display: 'block', fontSize: 10.5, color: colors.textMuted, fontVariantNumeric: 'tabular-nums' }}>{day.date.slice(5)}</small>
+                      <strong style={{ display: 'block', fontSize: 13.5, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{day.dailyAvgS ? `${day.dailyAvgS}/${day.dailyAvgD}` : '—'}</strong>
+                      <small style={{ fontSize: 10.5, color: day.morning && day.evening ? '#22c55e' : day.readings.length ? '#f59e0b' : colors.textMuted }}>
                         {day.morning && day.evening ? '✓✓' : day.morning ? '☀' : day.evening ? '🌆' : '·'}
                       </small>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 10, lineHeight: 1.5 }}>
                 ESC/ISH: 2–3 замера утром и вечером в течение ≥7 дней (1-й день отбрасывается). Домашние пороги ниже кабинетных — см. ниже.
               </div>
             </section>
@@ -857,9 +859,9 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               {orthoPairs.length > 0 ? (
                 <>
                   {orthoPairs.slice(0, 5).map(pair => (
-                    <div key={pair.date} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', marginBottom: 6, borderLeft: `3px solid ${pair.isOrthostatic ? '#ef4444' : '#22c55e'}` }}>
+                    <div key={pair.date} style={{ padding: '10px 13px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', marginBottom: 8, borderLeft: `3px solid ${pair.isOrthostatic ? '#ef4444' : '#22c55e'}`, fontVariantNumeric: 'tabular-nums' }}>
                       <b>{pair.date}</b> · сидя {pair.sitting.systolic}/{pair.sitting.diastolic} → стоя {pair.standing.systolic}/{pair.standing.diastolic}
-                      <div style={{ fontSize: 12, color: pair.isOrthostatic ? '#ef4444' : colors.textMuted }}>
+                      <div style={{ fontSize: 12, color: pair.isOrthostatic ? '#ef4444' : colors.textMuted, marginTop: 2 }}>
                         Δ систолы {pair.dropS > 0 ? '−' : '+'}{Math.abs(pair.dropS)} мм рт.ст. · Δ диастолы {pair.dropD > 0 ? '−' : '+'}{Math.abs(pair.dropD)} мм рт.ст.
                         {pair.isOrthostatic ? ' — ортостатическая гипотензия!' : ' — в пределах нормы'}
                       </div>
@@ -878,10 +880,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                     <span style={{
-                      padding: '4px 10px', borderRadius: 8, fontWeight: 800, fontSize: 13,
-                      background: cardioRisk.level === 'high' ? 'rgba(239,68,68,.18)' : cardioRisk.level === 'moderate' ? 'rgba(245,158,11,.18)' : 'rgba(34,197,94,.18)',
-                      color: cardioRisk.level === 'high' ? '#ef4444' : cardioRisk.level === 'moderate' ? '#f59e0b' : '#22c55e',
-                      border: `1px solid ${cardioRisk.level === 'high' ? '#ef4444' : cardioRisk.level === 'moderate' ? '#f59e0b' : '#22c55e'}44`,
+                      padding: '5px 12px', borderRadius: 999, fontWeight: 800, fontSize: 13,
+                      background: cardioRisk.level === 'high' ? 'rgba(239,68,68,.2)' : cardioRisk.level === 'moderate' ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)',
+                      color: '#fff',
+                      border: `1px solid ${cardioRisk.level === 'high' ? '#ef444466' : cardioRisk.level === 'moderate' ? '#f59e0b66' : '#22c55e66'}`,
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
                     }}>
                       {cardioRisk.level === 'high' ? 'Выше среднего' : cardioRisk.level === 'moderate' ? 'Умеренный' : 'Низкий'}
                     </span>
@@ -889,18 +892,18 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                   </div>
                   <div style={{ marginTop: 8 }}>
                     {cardioRisk.factors.map((f, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 8px', borderRadius: 6, background: f.active ? 'rgba(239,68,68,.07)' : 'rgba(255,255,255,0.02)', marginBottom: 3 }}>
-                        <span style={{ color: f.active ? '#ef4444' : colors.textMuted }}>{f.label}</span>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, background: f.active ? 'rgba(239,68,68,.09)' : 'rgba(255,255,255,0.02)', border: `1px solid ${f.active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`, marginBottom: 5 }}>
+                        <span style={{ color: f.active ? '#fca5a5' : colors.textMuted }}>{f.label}</span>
                         <span>{f.active ? '⚠' : '✓'}</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 8, fontStyle: 'italic' }}>{cardioRisk.summary}</div>
+                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>{cardioRisk.summary}</div>
                 </>
               ) : (
                 <div>Добавьте записи для оценки.</div>
               )}
-              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 10, lineHeight: 1.5 }}>
                 Оценочный профиль на основе дневника — НЕ диагноз и не заменяет консультацию врача.
               </div>
             </section>
@@ -924,12 +927,13 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                   const bg = getBpClassificationColor(cls);
                   return (
                     <div key={key} style={{
-                      padding: 10, borderRadius: 8, textAlign: 'center',
-                      background: `${bg}18`, border: `1px solid ${bg}44`,
+                      padding: 12, borderRadius: 14, textAlign: 'center',
+                      background: `linear-gradient(180deg, ${bg}1f, ${bg}08)`, border: `1px solid ${bg}45`,
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
                     }}>
-                      <div style={{ fontSize: 12, color: '#ffffff' }}>{label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: bg }}>{g.avgS}/{g.avgD}</div>
-                      <div style={{ fontSize: 11, color: '#ffffff' }}>{g.count} изм.</div>
+                      <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 700 }}>{label}</div>
+                      <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{g.avgS}/{g.avgD}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{g.count} изм.</div>
                     </div>
                   );
                 })}
@@ -948,7 +952,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <div>Диастола: <b>{trendDiastolic.trend === 'rising' ? '📈 рост' : trendDiastolic.trend === 'falling' ? '📉 снижение' : '➡️ стабильно'}</b> ({trendDiastolic.slope > 0 ? '+' : ''}{trendDiastolic.slope.toFixed(1)} в день)</div>
               <div>R² (достоверность): систола {trendSystolic.r2.toFixed(2)}, диастола {trendDiastolic.r2.toFixed(2)}</div>
               {trendSystolic.r2 > 0.5 && (
-                <div style={{ marginTop: 8, padding: 8, background: 'rgba(59,130,246,.1)', borderRadius: 6 }}>
+                <div style={{ marginTop: 10, padding: 12, background: 'linear-gradient(135deg, rgba(59,130,246,.14), rgba(59,130,246,.05))', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 14, fontVariantNumeric: 'tabular-nums' }}>
                   <div>Прогноз через 7 дней: <b>{trendSystolic.prediction7d}/{trendDiastolic.prediction7d}</b></div>
                   <div>Прогноз через 14 дней: <b>{trendSystolic.prediction14d}/{trendDiastolic.prediction14d}</b></div>
                   {(trendSystolic.prediction14d >= 140 || trendDiastolic.prediction14d >= 90) && (
@@ -1062,7 +1066,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                   }
                   return null;
                 })()}
-                <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>ESC/ISH: 2-3 замера подряд с интервалом 1-2 мин, в анализ идёт среднее.</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.5 }}>ESC/ISH: 2-3 замера подряд с интервалом 1-2 мин, в анализ идёт среднее.</div>
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
@@ -1092,12 +1096,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <input type="checkbox" checked={!!draft.medicationTaken} onChange={e => setDraft({ ...draft, medicationTaken: e.target.checked })} />{' '}
               Лекарство принято
             </label>
-            <div style={{ display: 'block', marginTop: 8 }}>
-              <div style={{ marginBottom: 6 }}>Симптомы</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'block', marginTop: 10 }}>
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: '#fff' }}>Симптомы</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {BP_SYMPTOMS.map(symptom => {
                   const active = draft.selectedSymptoms.includes(symptom);
-                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(239,68,68,.2)' : 'rgba(255,255,255,0.05)', color: active ? '#ef4444' : '#ffffff', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
+                  return <button key={symptom} type="button" aria-pressed={active} style={{ minHeight: 40, padding: '8px 15px', borderRadius: 999, fontSize: 12.5, fontWeight: active ? 800 : 600, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'linear-gradient(135deg, rgba(239,68,68,.28), rgba(239,68,68,.1))' : 'rgba(255,255,255,0.05)', color: active ? '#fff' : '#ffffff', cursor: 'pointer', boxShadow: active ? '0 4px 14px rgba(239,68,68,0.25)' : 'none' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
                 })}
               </div>
             </div>
