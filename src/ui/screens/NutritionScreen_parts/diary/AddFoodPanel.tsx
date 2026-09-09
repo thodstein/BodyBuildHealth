@@ -311,7 +311,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
             <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>История:</span>
             {history.map(h=>(
-              <button key={h} onClick={()=>onFoodSearchChange(h)} className="nd-hist" style={{ padding:'8px 12px', borderRadius:8, fontSize:11, minHeight:40, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>{h}</button>
+              <button key={h} onClick={()=>onFoodSearchChange(h)} className="nd-hist" style={{ padding:'10px 14px', borderRadius:8, fontSize:12, minHeight:44, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>{h}</button>
             ))}
             <button onClick={()=>{ setHistory([]); try{localStorage.removeItem('he_search_history');}catch{} }} style={{ fontSize:9, color:'rgba(255,255,255,0.3)', background:'none', border:'none', cursor:'pointer' }}>✕</button>
           </div>
@@ -548,7 +548,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         <div className="nd-queue" style={{ padding: 14, borderRadius: 16, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, color: '#00e68a', fontWeight: 700 }}>📋 На очереди ({parsedItems.length})</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{mealType || 'Приём пищи'}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.15)' }}>{mealType || 'Приём пищи'}</span>
           </div>
           
           {parsedItems.map((item, i) => {
@@ -640,7 +640,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 9 }}>
+                <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 10 }}>
                   <span style={{ color: '#00e68a', fontWeight: 700 }}>{kcal} ккал</span>
                   <span style={{ color: '#60a5fa' }}>Б {p}г</span>
                   <span style={{ color: '#fbbf24' }}>Ж {f}г</span>

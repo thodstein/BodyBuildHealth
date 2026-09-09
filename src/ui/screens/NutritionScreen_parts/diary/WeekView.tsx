@@ -54,6 +54,12 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
   const avgC = weeklyTotals.days > 0 ? Math.round(weeklyTotals.c / weeklyTotals.days * 10) / 10 : 0;
 
   const today = formatDate(new Date());
+  const shiftWeek = (dir: number) => {
+    const d = parseDateOnly(selectedDate);
+    d.setDate(d.getDate() + dir * 7);
+    onSelectDate?.(formatDate(d));
+  };
+  const isThisWeek = weekDays.includes(today);
   const weekRangeLabel = (() => {
     try {
       const a = parseDateOnly(weekDays[0]); const b = parseDateOnly(weekDays[6]);
@@ -74,6 +80,11 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{weekRangeLabel} • {weeklyTotals.days}/7 дн заполнено</div>
           </div>
           <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>{weeklyTotals.days ? `${Math.round(weeklyTotals.days/7*100)}%` : '0%'}</span>
+        </div>
+        <div className="nd-weeknav" style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button onClick={() => shiftWeek(-1)} aria-label="Пред. неделя" className="nd-week-nav" style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>‹ <span style={{ fontSize: 10, fontWeight: 600 }}>Пред</span></button>
+          <button onClick={() => onSelectDate?.(today)} aria-label="Эта неделя" className="nd-week-nav" disabled={isThisWeek} style={{ flex: 1, height: 44, borderRadius: 12, cursor: isThisWeek ? 'default' : 'pointer', fontSize: 10, fontWeight: 800, border: isThisWeek ? '1.5px solid #00e68a' : '1px solid rgba(0,230,138,0.18)', background: isThisWeek ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(0,230,138,0.08)', color: isThisWeek ? '#000' : '#00e68a', opacity: isThisWeek ? 1 : 0.9 }}>Сегодня</button>
+          <button onClick={() => shiftWeek(1)} aria-label="След. неделя" className="nd-week-nav" style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>След</span> ›</button>
         </div>
         <div className="nd-weekstats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {[
@@ -102,6 +113,11 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
           <span style={{ marginLeft:'auto', fontSize: 11, color: '#00e68a', fontWeight: 800 }}>∑ {Math.round(weeklyTotals.kcal)} ккал</span>
           <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>• ср {avgKcal}</span>
         </div>
+        {weeklyTotals.days === 0 && (
+          <div className="nd-weekempty" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px dashed rgba(0,230,138,0.18)', fontSize: 11, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.5 }}>
+            📭 Неделя пуста — записывай приёмы во вкладке ➕, итоги соберутся сами
+          </div>
+        )}
       </div>
 
       {/* Day-by-day breakdown — enhanced */}
@@ -151,6 +167,9 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
                       <span style={{ fontSize: 10, color: isOver ? '#ef4444' : isGood ? '#00e68a' : 'rgba(255,255,255,0.45)', fontWeight: 700, minWidth: 36, textAlign: 'right', padding:'2px 6px', borderRadius:999, background: isOver ? 'rgba(239,68,68,0.10)' : isGood ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.04)', border:`1px solid ${isOver ? 'rgba(239,68,68,0.15)' : isGood ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.06)'}` }}>
                         {pct}%
                       </span>
+                    )}
+                    {onSelectDate && (
+                      <span aria-hidden className="nd-daychev" style={{ fontSize: 16, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.25)', fontWeight: 700, lineHeight: 1 }}>›</span>
                     )}
                   </div>
                 </div>

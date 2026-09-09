@@ -210,6 +210,21 @@ describe('nutrition-diary-pro hooks', () => {
     expect(container.querySelectorAll('.nd-dayrow')).toHaveLength(7);
   });
 
+  it('WeekView: навигация ±7 локальных дней + шевроны + пустая подсказка', () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <WeekView diaryData={{}} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-09-09" onSelectDate={onSelect} />
+    );
+    expect(container.querySelector('.nd-weeknav')).not.toBeNull();
+    expect(container.querySelector('.nd-weekempty')).not.toBeNull();
+    expect(container.querySelectorAll('.nd-daychev')).toHaveLength(7);
+    fireEvent.click(screen.getByLabelText('Пред. неделя'));
+    expect(onSelect).toHaveBeenCalledWith('2026-09-02');
+    fireEvent.click(screen.getByLabelText('След. неделя'));
+    expect(onSelect).toHaveBeenCalledWith('2026-09-16');
+  });
+
   it('FrequentFoodsPanel: хуки ленты и чипов', () => {
     (useFrequentFoods as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       { name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27, qty: 100 },
