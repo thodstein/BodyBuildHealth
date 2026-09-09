@@ -440,6 +440,44 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     return FOCUS_LABELS[k] || k;
   };
 
+  // ── Опции подфильтров без гарантированно-пустых значений ──
+  // (чип, который в текущем разделе не может ничего дать — напр. «Выносливость»,
+  // «2 дн/нед», «13+ нед» в ТА·Стронг, где таких циклов нет в данных, — прячем,
+  // иначе пользователь получает «Ничего не найдено» без своей вины)
+  const periodOpts = React.useMemo(
+    () => (cat === 'strong' ? PERIODS.filter(p => SS_CYCLES.some(c => matchSSPeriod(c, p))) : PERIODS),
+    [cat],
+  );
+  const freqOpts = React.useMemo(() => {
+    if (cat === 'strong') return CYCLE_FREQ_OPTS.filter(f => SS_CYCLES.some(c => String(c.meta.sessionsPerWeek) === f));
+    if (cat === 'arm') return CYCLE_FREQ_OPTS.filter(f => ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === f));
+    return CYCLE_FREQ_OPTS;
+  }, [cat]);
+  const weeksOpts = React.useMemo(() => {
+    const keys = Object.keys(WEEKS_LABELS);
+    if (cat === 'strong') return keys.filter(w => SS_CYCLES.some(c => weeksBucket(c.meta.weeks) === w));
+    if (cat === 'arm') return keys.filter(w => ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === w));
+    return keys;
+  }, [cat]);
+
+  // ── Смена раздела: сбрасываем несочетаемые остатки прошлого раздела ──
+  // (period/freq/weeks/author персистят в стейте; без клампа переход
+  // «Все + Выносливость» → «ТА·Стронг» давал гарантированное пусто)
+  const switchCat = (id: CatFilter) => {
+    setCat(id);
+    setFocus('all');
+    if (id === 'strong') {
+      if (period !== 'all' && !SS_CYCLES.some(c => matchSSPeriod(c, period))) setPeriod('all');
+      if (freq !== 'all' && !SS_CYCLES.some(c => String(c.meta.sessionsPerWeek) === freq)) setFreq('all');
+      if (weeks !== 'all' && !SS_CYCLES.some(c => weeksBucket(c.meta.weeks) === weeks)) setWeeks('all');
+      setAuthor('all');
+    } else if (id === 'arm') {
+      if (freq !== 'all' && !ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === freq)) setFreq('all');
+      if (weeks !== 'all' && !ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === weeks)) setWeeks('all');
+      setAuthor('all');
+    }
+  };
+
   return (
     <div className="train-cycles lib-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов: ПЛ и ББ ({LMS_CYCLES.length}), армрестлинг и армлифтинг ({ARM_CYCLE_LIBRARY.length}), тяжёлая атлетика и стронг ({SS_CYCLES.length}). Выберите тип, уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
@@ -453,7 +491,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           { id: 'arm' as CatFilter, label: 'Арм', icon: '💪' },
           { id: 'strong' as CatFilter, label: 'ТА·Стронг', icon: '🏋️' },
         ]).map(s => (
-          <button key={s.id} data-active={cat === s.id ? 'true' : 'false'} aria-pressed={cat === s.id} onClick={() => { setCat(s.id); setFocus('all'); }} style={{
+          <button key={s.id} data-active={cat === s.id ? 'true' : 'false'} aria-pressed={cat === s.id} onClick={() => switchCat(s.id)} style={{
             flex: 1, padding: '8px 4px', borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: cat === s.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
             background: cat === s.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: cat === s.id ? 'var(--accent)' : '#fff',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
@@ -501,7 +539,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Период</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={period === 'all'} onClick={() => setPeriod('all')} />
-              {PERIODS.map(p2 => (
+              {periodOpts.map(p2 => (
                 <Chip key={p2} label={PERIOD_LABELS[p2]} active={period === p2} onClick={() => setPeriod(period === p2 ? 'all' : p2)} />
               ))}
             </div>
@@ -511,7 +549,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Длительность</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={weeks === 'all'} onClick={() => setWeeks('all')} />
-              {Object.keys(WEEKS_LABELS).map(w => (
+              {weeksOpts.map(w => (
                 <Chip key={w} label={WEEKS_LABELS[w]} active={weeks === w} onClick={() => setWeeks(weeks === w ? 'all' : w)} />
               ))}
             </div>
@@ -523,7 +561,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={freq === 'all'} onClick={() => setFreq('all')} />
-              {CYCLE_FREQ_OPTS.map(f => (
+              {freqOpts.map(f => (
                 <Chip key={f} label={`${f} дн/нед`} active={freq === f} onClick={() => setFreq(freq === f ? 'all' : f)} />
               ))}
             </div>

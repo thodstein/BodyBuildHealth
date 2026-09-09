@@ -3772,3 +3772,12 @@ html.app-native {
 .manual-constructor--editor .editor-bottomnav {
   bottom: var(--tabbar-lift) !important;
 }
+
+/* Библиотека циклов: 139 карточек в одном списке. content-visibility пропускает
+ * layout/paint внеэкранных карточек (мобайл/WebView перестаёт заикаться),
+ * contain-intrinsic-size держит высоту скролла. Чистый перф-хинт: визуал 1-в-1,
+ * DOM/поиск/скролл-к-якорям не меняются. */
+.lib-cycles .pl-expandcard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
+}
