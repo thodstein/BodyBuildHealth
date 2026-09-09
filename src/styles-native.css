@@ -9486,3 +9486,413 @@ html.app-native .training-constructor .tp-cicon:focus-visible {
     box-shadow: none !important;
   }
 }
+/* --- 89. NUTRITION DIARY PRO: top-APK feed --- */
+html.app-native .nd-root {
+  gap: 10px !important;
+}
+html.app-native .nd-tabs {
+  position: sticky !important;
+  top: calc(max(env(safe-area-inset-top, 0px), 24px) + 56px) !important;
+  z-index: 19 !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x proximity !important;
+  scrollbar-width: none !important;
+}
+html.app-native .nd-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .nd-tab {
+  min-height: 56px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-tab[data-active="true"] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .nd-tab:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-tab:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-week {
+  border-radius: 20px !important;
+}
+html.app-native .nd-weekdays {
+  overflow-x: auto !important;
+  scroll-snap-type: x proximity !important;
+  scrollbar-width: none !important;
+  margin: 0 -4px !important;
+  padding: 2px 4px 6px !important;
+}
+html.app-native .nd-weekdays::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .nd-weekday {
+  min-width: 44px !important;
+  min-height: 84px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-weekday:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .nd-weekday:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-week-nav {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-week-nav:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-macros {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+html.app-native .nd-macro {
+  border-radius: 18px !important;
+  padding: 12px 10px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-macro-remain {
+  border-radius: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-search-input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+html.app-native .nd-search-clear {
+  min-width: 44px !important;
+  min-height: 48px !important;
+}
+html.app-native .nd-results {
+  overscroll-behavior: contain !important;
+}
+html.app-native .nd-result {
+  min-height: 56px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-result:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .nd-mealchips {
+  scrollbar-width: none !important;
+  scroll-snap-type: x proximity !important;
+  margin: 0 -2px !important;
+  padding: 2px 2px 6px !important;
+}
+html.app-native .nd-mealchips::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .nd-mealchip {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+}
+html.app-native .nd-mealchip:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .nd-mealchip:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-mealchip[data-active="true"] {
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.3) !important;
+}
+html.app-native .nd-custommeal-input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-custommeal-add {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-quickactions {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+html.app-native .nd-queue {
+  border-radius: 20px !important;
+}
+html.app-native .nd-queueitem {
+  border-radius: 14px !important;
+}
+html.app-native .nd-qtybtn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-qtybtn:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-ocr-text {
+  min-height: 88px !important;
+  font-size: 16px !important;
+}
+html.app-native .nd-mealcard {
+  border-radius: 20px !important;
+}
+html.app-native .nd-mealitem {
+  min-height: 52px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-itemedit {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-itemdel {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-itemedit:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-itemdel:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-mealbtn {
+  min-height: 44px !important;
+}
+html.app-native .nd-mealbtn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-dayactions {
+  position: sticky !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+  z-index: 18 !important;
+  padding: 8px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg, rgba(5, 11, 22, 0.96), rgba(5, 11, 22, 0.82)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+html.app-native .nd-daybtn {
+  min-height: 44px !important;
+}
+html.app-native .nd-daybtn:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-dayrow {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-dayrow:active {
+  transform: translateY(-1px) !important;
+}
+html.app-native .nd-dayrow:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-weeksum {
+  border-radius: 20px !important;
+}
+html.app-native .nd-freq {
+  border-radius: 20px !important;
+}
+html.app-native .nd-dayempty {
+  border-radius: 20px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-tabs {
+    top: calc(max(env(safe-area-inset-top, 0px), 24px) + 52px) !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .nd-weekday {
+    min-height: 78px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .nd-macros {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-tab {
+    box-shadow: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-mealchip {
+    box-shadow: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-dayrow {
+    transform: none !important;
+  }
+}
+
+/* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
+ * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.
+ * Хуки: .pf-hero (.pf-hero-profile/.pf-hero-glass/.pf-hero-nav/.pf-hero-card/
+ * .pf-hero-cta/.pf-hero-body), .pf-inner (.pf-head/.pf-head-back/.pf-subnav/
+ * .pf-subnav-btn/.pf-undo), .pf-user (.pf-jump/.pf-jump-link/.pf-toggle-all/
+ * .pf-toggle-btn/.pf-sections/.pf-acc/.pf-acc-btn), .profile-pve-btn,
+ * .profile-boolchip, .profile-fieldrow, .profile-grouphead, .profile-field.
+ * Стекло 18-20px, акцент-glow активных, press 0.94-0.98, focus-visible,
+ * tabular-цифры, snap-ленты, 380px-компакт, reduced-motion. */
+html.app-native .pf-hero-profile {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-hero-glass {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .pf-hero-card {
+  min-height: 72px !important;
+}
+html.app-native .pf-hero-card:active {
+  transform: scale(0.98) !important;
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+}
+html.app-native .pf-hero-cta {
+  min-height: 52px !important;
+}
+html.app-native .pf-hero-cta:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .pf-head {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+html.app-native .pf-head-back:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .pf-subnav {
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native .pf-subnav::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .pf-subnav-btn {
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-subnav-btn:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-subnav-btn[data-active='true'] {
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.25) !important;
+}
+html.app-native .pf-jump {
+  scrollbar-width: none !important;
+}
+html.app-native .pf-jump .profile-jump-row {
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native .pf-jump .profile-jump-row::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .pf-jump-link {
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-jump-link:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-jump-link[data-active='true'] {
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.22) !important;
+}
+html.app-native .pf-toggle-all {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-toggle-btn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .pf-acc {
+  border-radius: 20px !important;
+}
+html.app-native .pf-acc[data-open='true'] {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .pf-acc-btn {
+  min-height: 68px !important;
+}
+html.app-native .pf-acc-btn:active {
+  transform: scale(0.99) !important;
+}
+html.app-native .profile-pve-btn {
+  min-height: 64px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .profile-pve-btn:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .profile-boolchip {
+  min-height: 40px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .profile-boolchip:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .profile-fieldrow[data-cols='3'] {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+}
+html.app-native .profile-fieldrow[data-cols='4'] {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+}
+html.app-native .profile-grouphead {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .profile-field {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .pf-hero-card:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-hero-cta:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-acc-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: -2px !important;
+}
+html.app-native .profile-pve-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .profile-boolchip:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .pf-hero-body {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .profile-fieldrow[data-cols='2'] {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .pf-acc-btn {
+    min-height: 64px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-hero-card:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .pf-jump-link:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .profile-pve-btn:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .profile-boolchip:active {
+    transform: none !important;
+  }
+}

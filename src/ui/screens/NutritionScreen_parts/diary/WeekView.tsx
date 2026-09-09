@@ -64,9 +64,9 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
   })();
 
   return (
-    <div className="nut-weekview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="nut-weekview nd-weekview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Weekly summary — enhanced */}
-      <div style={{ padding: 16, borderRadius: 18, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 6px 24px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' }}>
+      <div className="nd-weeksum" style={{ padding: 16, borderRadius: 18, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 6px 24px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom: 12 }}>
           <span style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#00e68a,#00c8a0)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, boxShadow:'0 2px 8px rgba(0,230,138,0.25)' }}>📊</span>
           <div>
@@ -121,7 +121,8 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
             const isGood = pct>=85 && pct<=105;
             const isSelected = d.date === selectedDate;
             return (
-              <div key={d.date} onClick={() => onSelectDate?.(d.date)} role="button" tabIndex={0} onKeyDown={e=>{ if(e.key==='Enter') onSelectDate?.(d.date); }}
+              <div key={d.date} onClick={() => onSelectDate?.(d.date)} role="button" tabIndex={0} onKeyDown={e=>{ if(e.key==='Enter' || e.key===' ') onSelectDate?.(d.date); }}
+                data-selected={isSelected} data-today={isToday} className="nd-dayrow" aria-pressed={isSelected}
                 style={{ 
                 padding: '12px', borderRadius: 14, cursor: onSelectDate ? 'pointer' : 'default',
                 background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.08))' : isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))' : isEmpty ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',

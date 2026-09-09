@@ -27,7 +27,7 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
 
   if (!hasData) {
     return (
-      <div className="day-empty nut-daymeals-empty" style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
+      <div className="day-empty nut-daymeals-empty nd-dayempty" style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
         {isNativeApp() ? (
           <NativeEmptyArt kind="plate" />
         ) : (
@@ -51,21 +51,21 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
   }
 
   return (
-    <div className="nut-daymeals">
+    <div className="nut-daymeals nd-daymeals">
       {/* Actions bar */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        <button onClick={onImportFromPlan} aria-label="Импорт из плана"
-          style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)',
-            background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontSize: 10, fontWeight: 600, cursor: 'pointer', minHeight: 36 }}>
+      <div className="nd-dayactions" style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <button onClick={onImportFromPlan} aria-label="Импорт из плана" className="nd-daybtn"
+          style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)',
+            background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
           📥 Из плана
         </button>
-        <button onClick={onFillMicros} aria-label="Дорисовать микронутриенты"
-          style={{ flex: 1, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.2)', background: 'rgba(34,197,94,0.06)', color: '#86efac', fontSize: 10, fontWeight: 600, cursor: 'pointer', minHeight: 36 }}>
+        <button onClick={onFillMicros} aria-label="Дорисовать микронутриенты" className="nd-daybtn"
+          style={{ flex: 1, padding: '10px 10px', borderRadius: 12, border: '1px solid rgba(34,197,94,0.2)', background: 'rgba(34,197,94,0.06)', color: '#86efac', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
           ✨ Микро
         </button>
-        <button onClick={onClearDay} aria-label="Очистить день"
-          style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)',
-            background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontSize: 10, fontWeight: 600, cursor: 'pointer', minHeight: 36 }}>
+        <button onClick={onClearDay} aria-label="Очистить день" className="nd-daybtn"
+          style={{ padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.2)',
+            background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
           🗑 Очистить
         </button>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>

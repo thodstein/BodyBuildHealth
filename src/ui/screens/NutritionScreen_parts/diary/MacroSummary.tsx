@@ -21,12 +21,12 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
   const r=14; const circ=2*Math.PI*r; const dash = circ * kcalPct/100;
   return (
     <>
-    <div className="nut-macrosum" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+    <div className="nut-macrosum nd-macros" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
       {items.map(m => {
         const pct = m.t > 0 ? Math.min(100, Math.round(m.v / m.t * 100)) : 0;
         const isOver = pct > 100;
         return (
-          <div key={m.l} style={{ 
+          <div key={m.l} data-over={isOver} className="nd-macro" style={{ 
           padding: '10px 8px', borderRadius: 14, background: m.bg, 
           border: `1px solid ${isOver ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`, 
           display: 'flex', flexDirection: 'column', gap: 4, minHeight: 56,
@@ -48,7 +48,7 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
         );
       })}
     </div>
-    <div style={{ marginTop:6, padding:'6px 10px', borderRadius:10, background: isOverKcal ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.06)', border:`1px solid ${isOverKcal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.12)'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+    <div className="nd-macro-remain" data-over={isOverKcal} style={{ marginTop:6, padding:'8px 12px', borderRadius:12, background: isOverKcal ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.06)', border:`1px solid ${isOverKcal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.12)'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
       <div style={{ display:'flex', flexDirection:'column' }}>
         <span style={{ fontSize:10, color: isOverKcal ? '#ef4444' : '#00e68a', fontWeight:700 }}>{isOverKcal ? `Перебор ${Math.abs(remainingKcal)} ккал` : `Осталось ${remainingKcal} ккал`}</span>
         <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{isOverKcal ? '˃ цель' : `${Math.round(remainingKcal/t.kcal*100)}% от цели`}</span>

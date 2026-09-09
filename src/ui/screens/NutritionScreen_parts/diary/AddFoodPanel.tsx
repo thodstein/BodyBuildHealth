@@ -194,22 +194,23 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="nd-add" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Search */}
-      <div style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
+      <div className="nd-search" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)} 
+          <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)}
             aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)" autoFocus
-            style={{ flex:1, padding: '12px 14px', borderRadius: 12, background: '#202023', 
-              border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 14, boxSizing: 'border-box', 
-              outline: 'none', minHeight: 44 }} />
-          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" style={{ width:36, height:36, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>}
+            className="nd-search-input"
+            style={{ flex:1, padding: '12px 14px', borderRadius: 12, background: '#202023',
+              border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, boxSizing: 'border-box',
+              outline: 'none', minHeight: 48 }} />
+          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" className="nd-search-clear" style={{ width:44, height:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>}
         </div>
         
         {foodSearchResults.length > 0 && (
-          <div style={{ maxHeight: 240, overflowY: 'auto', marginTop: 8, borderRadius: 10, background: '#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
+          <div className="nd-results" style={{ maxHeight: 320, overflowY: 'auto', marginTop: 8, borderRadius: 10, background: '#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
             {foodSearchResults.map(f => (
-              <div key={f.id} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, transition:'background 0.12s', borderRadius:8, margin:'2px 4px', background:'rgba(255,255,255,0.01)' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(0,230,138,0.06)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.01)'}>
+              <div key={f.id} className="nd-result" style={{ padding: '10px 12px', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 56, transition:'background 0.12s', borderRadius:8, margin:'2px 4px', background:'rgba(255,255,255,0.01)' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(0,230,138,0.06)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.01)'}>
                 <div onClick={() => onAddFoodFromDB(f)} role="button" aria-label={`Добавить ${f.name}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex:1, cursor:'pointer' }}>
                   <span style={{ fontSize: 16, width:20, textAlign:'center' }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
                   <span style={{ fontWeight: 600, flex:1, lineHeight:1.2 }}>{f.name}</span>
@@ -316,20 +317,20 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </div>
         )}
 
-        {/* Meal type selector — premium */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+        {/* Meal type selector — лента приёмов: в TG скролл, в APK snap+пилюли 44px (§89) */}
+        <div className="nd-mealchips" style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', marginTop: 10, paddingBottom: 4 }}>
           {allMealTypes.map(mt => {
             const isActive = mealType === mt;
             const icon = mt.toLowerCase().includes('завтрак') ? '🌅' : mt.toLowerCase().includes('обед') ? '☀️' : mt.toLowerCase().includes('ужин') ? '🌙' : mt.toLowerCase().includes('перекус') ? '🍿' : mt.toLowerCase().includes('трениров') ? '💪' : '🍽';
             return (
-            <button key={mt} onClick={() => onMealTypeChange(isActive ? '' : mt)} 
-              aria-label={`Приём: ${mt}`}
-              style={{ padding: '7px 12px', borderRadius: 999, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:6,
+            <button key={mt} onClick={() => onMealTypeChange(isActive ? '' : mt)}
+              aria-label={`Приём: ${mt}`} aria-pressed={isActive} data-active={isActive} className="nd-mealchip"
+              style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:6, flexShrink: 0,
                 background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                 border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
                 color: isActive ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: isActive ? 700 : 500,
-                minHeight: 34, transition: 'all 0.15s', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>
-              <span style={{ fontSize:11 }}>{icon}</span> {mt}
+                minHeight: 44, transition: 'all 0.15s', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>
+              <span style={{ fontSize:12 }}>{icon}</span> {mt}
             </button>
           )})}
         </div>
@@ -337,13 +338,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           <input value={customMealInput} onChange={e => onCustomMealInputChange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onAddCustomMeal(); }}
             placeholder="Новый тип приёма пищи" aria-label="Новый тип приёма пищи"
-            style={{ flex: 1, padding: '7px 10px', borderRadius: 9, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, minHeight: 36 }} />
-          <button onClick={onAddCustomMeal} aria-label="Добавить тип приёма пищи"
-            style={{ padding: '7px 10px', borderRadius: 9, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, minHeight: 36 }}>＋</button>
+            className="nd-custommeal-input"
+            style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, minHeight: 44 }} />
+          <button onClick={onAddCustomMeal} aria-label="Добавить тип приёма пищи" className="nd-custommeal-add"
+            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, minHeight: 44, minWidth: 44 }}>＋</button>
         </div>
 
         {/* Quick actions — modern */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
+        <div className="nd-quickactions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
           <button type="button" onClick={onShowBarcode} aria-label="Штрих-код"
             style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
               background: showBarcode ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)',
@@ -526,10 +528,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               ✕
             </button>
           </div>
-          <textarea aria-label="Текст для распознавания" value={ocrText} onChange={e => onOcrTextChange(e.target.value)} 
+          <textarea aria-label="Текст для распознавания" value={ocrText} onChange={e => onOcrTextChange(e.target.value)}
             placeholder="Курица 200 г 330 ккал Б:35 Ж:7 У:0"
-            style={{ width: '100%', minHeight: 80, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
-              background: '#202023', color: '#fff', fontSize: 12, resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
+            className="nd-ocr-text"
+            style={{ width: '100%', minHeight: 88, padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)',
+              background: '#202023', color: '#fff', fontSize: 16, resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
           <button onClick={onOcrSubmit} aria-label="Распознать"
             style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, 
@@ -542,7 +545,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
       {/* Parsed items queue */}
       {parsedItems.length > 0 && (
-        <div style={{ padding: 14, borderRadius: 16, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
+        <div className="nd-queue" style={{ padding: 14, borderRadius: 16, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, color: '#00e68a', fontWeight: 700 }}>📋 На очереди ({parsedItems.length})</span>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{mealType || 'Приём пищи'}</span>
@@ -558,7 +561,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             const isEditing = editingIdx === i;
             
             return (
-              <div key={i} style={{ padding: '10px 12px', borderRadius: 12, background: isEditing ? 'rgba(245,158,11,0.06)' : '#202023', border: `1px solid ${isEditing ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
+              <div key={i} className="nd-queueitem" style={{ padding: '10px 12px', borderRadius: 12, background: isEditing ? 'rgba(245,158,11,0.06)' : '#202023', border: `1px solid ${isEditing ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
                 {isEditing ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Название"
@@ -607,17 +610,19 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         </button>
                       </div>
                     </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="nd-qtyrow" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#18181b', borderRadius: 10, padding: '2px 4px' }}>
                     <button onClick={() => onUpdateParsedItemQty(i, Math.max(10, q - 10))} aria-label="Уменьшить"
-                      style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.06)',
-                        color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      className="nd-qtybtn"
+                      style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
+                        color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       −
                     </button>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', width: 48, textAlign: 'center' }}>{q}г</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', width: 52, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{q}г</span>
                     <button onClick={() => onUpdateParsedItemQty(i, Math.min(1000, q + 10))} aria-label="Увеличить"
-                      style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.06)',
-                        color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      className="nd-qtybtn"
+                      style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
+                        color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       +
                     </button>
                   </div>

@@ -602,7 +602,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [diaryData, selectedDate, dayTotals, showToast]);
 
   return (
-    <div className="food-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="food-diary nd-root" data-tab={tab} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
         <div className="nut-diary-toast" style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 999,
           padding: '10px 24px', borderRadius: 14, background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
@@ -630,14 +630,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 
-      {/* Tab bar — улучшенный: крупнее и красивее */}
-      <div style={{ display:'flex', gap:8, padding:8, borderRadius:16, background:'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', boxShadow:'0 4px 20px rgba(0,0,0,0.15)' }}>
+      {/* Tab bar — сегменты дневника: липкая лента в APK (§89), в TG — те же инлайны */}
+      <div className="nd-tabs" role="tablist" aria-label="Разделы дневника" style={{ display:'flex', gap:8, padding:8, borderRadius:16, background:'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', boxShadow:'0 4px 20px rgba(0,0,0,0.15)' }}>
         {([
           { key: 'add', label: 'Добавить', icon:'➕', badge: parsedItems.length>0 ? parsedItems.length : null, color:'#00e68a', desc:'поиск' },
           { key: 'day', label: 'День', icon:'📋', badge: Object.values(dayMeals).flat().length || null, color:'#60a5fa', desc:'приёмы' },
           { key: 'week', label: 'Неделя', icon:'📊', badge: Object.keys(diaryData).length || null, color:'#a78bfa', desc:'итоги' },
         ] as const).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key as any)} aria-label={t.label} style={{
+          <button key={t.key} role="tab" aria-selected={tab === t.key} aria-label={t.label} data-active={tab === t.key} className="nd-tab" onClick={() => setTab(t.key as any)} style={{
             flex: 1, padding:'14px 10px', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight: tab === t.key ? 800 : 600, position:'relative', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
             border: tab === t.key ? `1.5px solid ${t.color}` : '1px solid rgba(255,255,255,0.06)',
             background: tab === t.key ? `linear-gradient(135deg, ${t.color}18, ${t.color}0d)` : '#202023',
@@ -653,7 +653,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       </div>
 
       {/* Macro summary — modern card */}
-      <div style={{ ...modernCardBg, padding:12, border:'1px solid rgba(0,230,138,0.10)' }}>
+      <div className="nd-macros-card" style={{ ...modernCardBg, padding:12, border:'1px solid rgba(0,230,138,0.10)' }}>
         <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
           <span style={{ width:22, height:22, borderRadius:8, background:'rgba(0,230,138,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>📊</span> КБЖУ за день
           <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: dayTotals.kcal > (targets?.kcal||2500) ? 'rgba(239,68,68,0.10)' : 'rgba(0,230,138,0.08)', color: dayTotals.kcal > (targets?.kcal||2500) ? '#ef4444' : '#00e68a', border:`1px solid ${dayTotals.kcal > (targets?.kcal||2500) ? 'rgba(239,68,68,0.15)' : 'rgba(0,230,138,0.12)'}` }}>{Math.round(dayTotals.kcal)}/{targets?.kcal||2500} ккал</span>

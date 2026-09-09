@@ -26,8 +26,8 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
   })();
 
   return (
-    <div className="nut-mealcard" style={{ 
-      marginBottom: 10, borderRadius: 16, background: '#18181b', 
+    <div className="nut-mealcard nd-mealcard" style={{
+      marginBottom: 10, borderRadius: 16, background: '#18181b',
       border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden',
       boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
     }}>
@@ -54,12 +54,12 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
         </div>
       </div>
       
-      <div style={{ padding: '4px 8px 8px' }}>
+      <div className="nd-mealitems" style={{ padding: '4px 8px 8px' }}>
         {items.map((item: any, idx: number) => (
-          <div key={idx} style={{ 
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '8px 6px', fontSize: 10, color: 'rgba(255,255,255,0.8)', 
-            borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: 44,
+          <div key={idx} className="nd-mealitem" style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 6px', fontSize: 12, color: 'rgba(255,255,255,0.8)',
+            borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: 52,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -74,14 +74,14 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
                 {Math.round(item.kcal || 0)} ккал
               </span>
-              <button onClick={() => onEditItem(mealName, idx, item)} aria-label="Изменить" 
-                style={{ padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', 
-                background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 11, minWidth: 32, minHeight: 32 }}>
+              <button onClick={() => onEditItem(mealName, idx, item)} aria-label="Изменить" className="nd-itemedit"
+                style={{ padding: '6px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 12, minWidth: 44, minHeight: 44 }}>
                 ✎
               </button>
-              <button onClick={() => onDeleteItem(mealName, idx)} aria-label="Удалить"
-                style={{ padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 11, minWidth: 32, minHeight: 32 }}>
+              <button onClick={() => onDeleteItem(mealName, idx)} aria-label="Удалить" className="nd-itemdel"
+                style={{ padding: '6px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, minWidth: 44, minHeight: 44 }}>
                 ✕
               </button>
             </div>
@@ -89,15 +89,15 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
         ))}
       </div>
       
-      <div style={{ display: 'flex', gap: 6, padding: '0 8px 8px' }}>
-        <button onClick={() => onCopyMeal(mealName)} aria-label="Копировать приём"
-          style={{ flex: 1, padding: '8px', borderRadius: 10, border: '1px solid rgba(139,92,246,0.2)', 
-          background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontSize: 10, fontWeight: 600, cursor: 'pointer', minHeight: 36 }}>
+      <div className="nd-mealfoot" style={{ display: 'flex', gap: 6, padding: '0 8px 8px' }}>
+        <button onClick={() => onCopyMeal(mealName)} aria-label="Копировать приём" className="nd-mealbtn"
+          style={{ flex: 1, padding: '10px', borderRadius: 12, border: '1px solid rgba(139,92,246,0.2)',
+          background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
           📋 Копировать
         </button>
-        <button onClick={() => onSavePreset(mealName, items)} aria-label="Сохранить пресет"
-          style={{ flex: 1, padding: '8px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)',
-          background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, fontWeight: 600, cursor: 'pointer', minHeight: 36 }}>
+        <button onClick={() => onSavePreset(mealName, items)} aria-label="Сохранить пресет" className="nd-mealbtn"
+          style={{ flex: 1, padding: '10px', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)',
+          background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
           💾 Пресет
         </button>
       </div>

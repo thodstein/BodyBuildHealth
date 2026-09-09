@@ -33,11 +33,11 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
   })();
   
   return (
-    <div className="nut-weekday" style={{ padding: 14, borderRadius: 18, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 6px 24px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+    <div className="nut-weekday nd-week" style={{ padding: 14, borderRadius: 18, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 6px 24px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' }}>
+      <div className="nd-week-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <button onClick={()=>shiftWeek(-1)} aria-label="Пред. неделя" style={{ width:32, height:32, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>‹</button>
-          <button onClick={()=>shiftWeek(1)} aria-label="След. неделя" style={{ width:32, height:32, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
+          <button onClick={()=>shiftWeek(-1)} aria-label="Пред. неделя" className="nd-week-nav" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>‹</button>
+          <button onClick={()=>shiftWeek(1)} aria-label="След. неделя" className="nd-week-nav" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
           <div style={{ marginLeft:4 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:7, height:7, borderRadius:4, background:'#00e68a', boxShadow:'0 0 8px #00e68a80' }} />{weekLabel}</div>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:1 }}>{weekKcalTotal.days}/7 дн • ∑ {weekKcalTotal.total} ккал</div>
@@ -45,7 +45,7 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
         </div>
         <button onClick={()=>onSelectDate(today)} aria-label="Сегодня" style={{ padding:'7px 12px', borderRadius:10, border:selectedDate===today?'1.5px solid #00e68a':'1px solid rgba(0,230,138,0.18)', background: selectedDate===today ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(0,230,138,0.08)', color: selectedDate===today ? '#000' : '#00e68a', fontSize:10, fontWeight:800, cursor:'pointer', boxShadow: selectedDate===today ? '0 2px 10px rgba(0,230,138,0.25)' : 'none' }}>Сегодня</button>
       </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+      <div className="nd-weekdays" style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
         {weekDays.map((ds, i) => {
           const isToday = ds === today;
           const isSelected = ds === selectedDate;
@@ -66,8 +66,11 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
           const pct = Math.min(100, Math.round(dayKcal / 25));
           
           return (
-            <div key={i} onClick={() => onSelectDate(ds)} role="button" tabIndex={0} 
-              onKeyDown={e=>{ if(e.key==='Enter') onSelectDate(ds); }}
+            <div key={i} onClick={() => onSelectDate(ds)} role="button" tabIndex={0}
+              onKeyDown={e=>{ if(e.key==='Enter' || e.key===' ') onSelectDate(ds); }}
+              data-selected={isSelected} data-today={isToday} data-has={hasData}
+              className="nd-weekday"
+              aria-pressed={isSelected}
               aria-label={`${dayName} ${dayNum}${hasData ? ` ${dayKcal} ккал` : ''}`}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 2px 8px', borderRadius: 14, cursor: 'pointer',
