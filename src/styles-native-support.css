@@ -176,3 +176,702 @@ html.app-native .train-sup.sup-apk .sup-modals {
 html.app-native:has(.train-sup.sup-apk) .native-fab-wrap {
   bottom: calc(var(--nav-height) + 76px + env(safe-area-inset-bottom, 0px)) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §13. INFO PRO — «Общая информация» как современное PRO-приложение.
+ * Каталог + Расчёты 5-в-1 + Пептиды + Исследования + Стеки + Избранное.
+ * Только native-усиления поверх support-design.css: safe-area, стекло,
+ * glow активного, тапы 48-52px, snap-ленты, press, focus, tabular-цифры.
+ * TG/web — байт-в-байт (каждый селектор — с html.app-native).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 13.1. INFO-ТОПБАР: шторка + лента пилюль ───────────────────── */
+html.app-native .train-sup.sup-apk [data-sup='topbar'] {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='pills'] {
+  scroll-snap-type: x mandatory !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='pills'] .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='pills']::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* ─── 13.2. INFO-КОНТЕНТ: воздух снизу над суббаром ──────────────── */
+html.app-native .train-sup.sup-apk [data-sup='content'] {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='catalog'] {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='calc'] {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='research'] {
+  border-radius: 18px !important;
+}
+
+/* ─── 13.3. КАТАЛОГ: hero-поиск 52px без iOS-зума ───────────────── */
+html.app-native .train-sup.sup-apk .sup-catalogview input[placeholder*='Поиск'] {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+  background: rgba(6, 13, 29, 0.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='catalog'] input[placeholder*='Поиск'] {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+/* счётчик «Всего/Найдено» — читаемый, tabular */
+html.app-native .train-sup.sup-apk .sup-catalogview > div:first-child {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 13.4. КАТАЛОГ: саб-табы лентой со snap ────────────────────── */
+html.app-native .train-sup.sup-apk .sup-catalogview > div > button.support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+/* ─── 13.5. КАТАЛОГ: группы — стекло 56px с press ───────────────── */
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='border-radius: 10'] {
+  border-radius: 16px !important;
+  background: rgba(18, 22, 34, 0.62) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 9px 12px'] {
+  min-height: 56px !important;
+  padding: 12px 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 8px 10px'] {
+  min-height: 56px !important;
+  padding: 12px 14px !important;
+}
+
+/* ─── 13.6. КАТАЛОГ: строки веществ 56px + чипы 11px ────────────── */
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 7px 12px 7px 16px'] {
+  min-height: 56px !important;
+  padding: 12px 14px 12px 16px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 6px 10px 6px 18px'] {
+  min-height: 56px !important;
+  padding: 12px 14px 12px 16px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalogview span[style*='font-size: 8'] {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  line-height: 1.4 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalogview span[style*='font-size: 7'] {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  line-height: 1.4 !important;
+}
+
+/* кнопки строки («+ Мой стек», звезда, пилюля) — тапы 44px */
+html.app-native .train-sup.sup-apk .sup-catalogview button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* раскрытая деталь вещества — стеклянный шит */
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='background: rgba(0, 0, 0, 0.15)'] {
+  background: rgba(10, 14, 26, 0.66) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  border-radius: 0 0 16px 16px !important;
+}
+
+/* тост каталога — над суббаром и глобальным навбаром */
+html.app-native .train-sup.sup-apk .sup-catalog-toast {
+  bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ─── 13.7. РАСЧЁТЫ 5-в-1: шапка-хаб стеклом ────────────────────── */
+html.app-native .train-sup.sup-apk .sup-calctools {
+  gap: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-calctools > div:first-child {
+  border-radius: 18px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(16px) saturate(150%) !important;
+}
+
+/* режимные карточки — тапы 96px, актив светится */
+html.app-native .train-sup.sup-apk .sup-calctools [role='button'][data-active='true'] {
+  box-shadow: 0 0 0 3px var(--sup-ring), 0 12px 32px var(--sup-glow) !important;
+  transform: translateY(-1px) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-calctools [role='button'] {
+  min-height: 96px !important;
+  border-radius: 16px !important;
+}
+
+/* липкая лента режимов — под fixed-шапкой, blur + snap */
+html.app-native .train-sup.sup-apk .sup-calctools [style*='position: sticky'] {
+  top: 140px !important;
+  z-index: 40 !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-calctools [style*='position: sticky'] .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+/* тело активного расчёта — стекло */
+html.app-native .train-sup.sup-apk .sup-calctools > div:last-child {
+  border-radius: 18px !important;
+}
+
+/* ─── 13.8. РАСЧЁТЫ: поля 52px/16px, кнопки 52px, таблицы в скролле */
+html.app-native .train-sup.sup-apk .sup-bio input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy select {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-timing table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+/* ─── 13.9. ПЕПТИДЫ: шапка + сетки + поля ───────────────────────── */
+html.app-native .train-sup.sup-apk .sup-pepcalc .support-pill {
+  min-height: 48px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc select {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc button {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── 13.10. ИССЛЕДОВАНИЯ: лента источников + поиск + карточки ──── */
+html.app-native .train-sup.sup-apk .sup-research .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research .card {
+  border-radius: 18px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── 13.11. СТЕКИ + ИЗБРАННОЕ: карточки и таблицы ──────────────── */
+html.app-native .train-sup.sup-apk .sup-stacks input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-stacks button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav table {
+  display: block !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+/* ─── 13.12. ОЩУЩЕНИЯ: press + focus + tabular ──────────────────── */
+html.app-native .train-sup.sup-apk [data-sup='catalog'] button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='calc'] button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='research'] button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='catalog'] button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='calc'] button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='research'] button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='catalog'] input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 1px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='calc'] input:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 1px !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='catalog'] {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-sup.sup-apk [data-sup='calc'] {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 13.13. КОМПАКТ 380px: сетки в 1 колонку, ленты не рвут ────── */
+@media (max-width: 380px) {
+  html.app-native .train-sup.sup-apk .sup-calctools [role='button'] {
+    min-height: 88px !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-catalogview button {
+    min-height: 48px !important;
+  }
+  html.app-native .train-sup.sup-apk [data-sup='pills'] .support-pill {
+    min-height: 48px !important;
+  }
+}
+
+/* ─── 13.14. REDUCED MOTION ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk [data-sup='catalog'] button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk [data-sup='calc'] button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk [data-sup='research'] button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-calctools [role='button'][data-active='true'] {
+    transform: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §14. INFO ROUND-2 — читаемость микродоз + плоский скролл пептидов.
+ * Добивка §13: в калькуляторах дозы/био/синергии инлайны 6-9px
+ * нечитаемы на телефоне; у пептидов вложенный 100vh-скролл прячет
+ * контент за суббаром; 2-колоночные сетки доз жмут PopupSelect.
+ * Только native (каждый селектор — с html.app-native, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 14.1. МИКРОШРИФТЫ 6px → 11px (дозы/био/синергия/тайминг) ───── */
+html.app-native .train-sup.sup-apk .sup-effdose [style*='font-size: 6'],
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 6'],
+html.app-native .train-sup.sup-apk .sup-synergy [style*='font-size: 6'],
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 6'],
+html.app-native .train-sup.sup-apk .sup-analog [style*='font-size: 6'],
+html.app-native .train-sup.sup-apk .sup-pepcalc [style*='font-size: 6'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+/* ─── 14.2. МИКРОШРИФТЫ 7px → 11px ──────────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-effdose [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-synergy [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-analog [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-pepcalc [style*='font-size: 7'],
+html.app-native .train-sup.sup-apk .sup-research [style*='font-size: 7'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  padding: 3px 7px !important;
+}
+
+/* ─── 14.3. МИКРОШРИФТЫ 8-9px → 12px (описания/статусы) ─────────── */
+html.app-native .train-sup.sup-apk .sup-effdose [style*='font-size: 8'],
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 8'],
+html.app-native .train-sup.sup-apk .sup-synergy [style*='font-size: 8'],
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 8'],
+html.app-native .train-sup.sup-apk .sup-analog [style*='font-size: 8'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose [style*='font-size: 9'],
+html.app-native .train-sup.sup-apk .sup-bio [style*='font-size: 9'],
+html.app-native .train-sup.sup-apk .sup-synergy [style*='font-size: 9'],
+html.app-native .train-sup.sup-apk .sup-timing [style*='font-size: 9'],
+html.app-native .train-sup.sup-apk .sup-analog [style*='font-size: 9'],
+html.app-native .train-sup.sup-apk .sup-pepcalc [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* ─── 14.4. ПЕПТИДЫ: плоский скролл вместо 100vh-колодца ────────── */
+html.app-native .train-sup.sup-apk .sup-pepcalc {
+  height: auto !important;
+  min-height: 0 !important;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc [style*='overflow-y'] {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* пилюли пептидов — лента со snap, тапы 48px */
+html.app-native .train-sup.sup-apk .sup-pepcalc .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+/* ─── 14.5. ДОЗЫ 2-КОЛОНКИ → 1 КОЛОНКА НА ТЕЛЕФОНЕ ──────────────── */
+@media (max-width: 480px) {
+  html.app-native .train-sup.sup-apk .sup-effdose [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-pepcalc [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-synergy [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-timing [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-analog [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── 14.6. КАРТОЧКИ ДОЗ: стекло 18px + tabular-цифры ───────────── */
+html.app-native .train-sup.sup-apk .sup-effdose > div {
+  border-radius: 18px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 14.7. КАТАЛОГ-ДЕТАЛЬ: формы и взаимодействия читаемы ──────── */
+html.app-native .train-sup.sup-apk .sup-catalogview [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-catalog [style*='font-size: 8'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  padding: 3px 7px !important;
+}
+
+/* ─── 14.8. PRESS + FOCUS НА НОВЫХ ЗОНАХ ────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-effdose button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-effdose button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-pepcalc button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-bio button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-synergy button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── 14.9. REDUCED MOTION НА НОВЫХ ЗОНАХ ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk .sup-effdose button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-pepcalc button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-bio button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-synergy button:active {
+    transform: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §15. INFO ROUND-3 — аналоги/стеки/избранное/исследования.
+ * Остатки Инфо: поиск аналогов 13px (iOS-зум), сохранение стека 10px,
+ * пилюли избранного 10px, пустые состояния, карточки результатов.
+ * Только native (каждый селектор — с html.app-native, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 15.1. АНАЛОГИ: поиск 52px/16px без зума ───────────────────── */
+html.app-native .train-sup.sup-apk .sup-analog input {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 15.2. СТЕКИ: сохранение и строки ──────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-stacks input[placeholder*='Название'] {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-stacks .card {
+  border-radius: 18px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-stacks [style*='font-size: 8'] {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-stacks button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── 15.3. ИЗБРАННОЕ: лента 48px + поиск 52px + строки ─────────── */
+html.app-native .train-sup.sup-apk .sup-fav .support-pill {
+  min-height: 48px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav input[placeholder*='Поиск'] {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav [style*='font-size: 9'] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── 15.4. ИССЛЕДОВАНИЯ: карточки выдачи ───────────────────────── */
+html.app-native .train-sup.sup-apk .sup-research {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-research button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-analog button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-stacks button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-sup.sup-apk .sup-fav button:active {
+  transform: scale(0.97) !important;
+}
+
+/* ─── 15.5. REDUCED MOTION ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk .sup-research button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-analog button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-stacks button:active {
+    transform: none !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-fav button:active {
+    transform: none !important;
+  }
+}
