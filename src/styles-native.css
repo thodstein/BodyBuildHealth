@@ -11019,3 +11019,73 @@ html.app-native .diary-select {
     transform: none !important;
   }
 }
+
+/* ─── 96. TRAINING WRAP PRO — шапки ПЛ/ББ-обёрток ───
+ * Хуки: .tp-wrap-pl/.tp-wrap-bb (.hub-pl/.hub-bb + .hub-head.tp-wrap-head/
+ * .tp-wrap-icon/.tp-wrap-title/.tp-wrap-sub).
+ * Стекло 16px с верхней кромкой, иконка 40px с glow, заголовок 14px,
+ * подпись 11px/1.5, цифры tabular. Только APK: TG/web — как было. */
+html.app-native .tp-wrap-pl .tp-wrap-head {
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  min-height: 56px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .tp-wrap-bb .tp-wrap-head {
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  min-height: 56px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .tp-wrap-pl .tp-wrap-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.4) !important;
+}
+html.app-native .tp-wrap-bb .tp-wrap-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.4) !important;
+}
+html.app-native .tp-wrap-pl .tp-wrap-title {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+html.app-native .tp-wrap-bb .tp-wrap-title {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+html.app-native .tp-wrap-pl .tp-wrap-sub {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .tp-wrap-bb .tp-wrap-sub {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+html.app-native .tp-wrap-pl {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-wrap-bb {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .tp-wrap-pl .tp-wrap-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .tp-wrap-bb .tp-wrap-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
