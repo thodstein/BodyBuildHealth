@@ -12951,6 +12951,67 @@ html.app-native .manual-constructor .cyc-tpl-apply:focus-visible {
   }
 }
 
+/* ─── 113. MANUAL EXLAB MODAL PRO — модалка лаборатории из конструктора ───
+ * Модалка общая (таб библиотеки/тулзы), контент НЕ тронут: вся доводка —
+ * CSS под корнем пикера (.train-exlabpicker-modal = только вызовы пикера),
+ * TG/web — байт-в-байт как было.
+ * Хуки: NEW .manual-exlab-modal/.manual-exlab-sheet (ExerciseLabPicker).
+ * Оверлей с safe-area, шит 20px, кнопки 44px + press/focus, инпуты 44/16,
+ * 380px, reduced-motion. */
+
+/* ── Оверлей и шит: safe-area + радиус ── */
+html.app-native .train-exlabpicker-modal.manual-exlab-modal {
+  padding: 12px 12px calc(12px + max(env(safe-area-inset-bottom, 0px), 28px)) !important;
+}
+
+html.app-native .train-exlabpicker-modal .manual-exlab-sheet {
+  border-radius: 20px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
+  max-height: calc(90vh - max(env(safe-area-inset-bottom, 0px), 28px)) !important;
+}
+
+/* ── Все кнопки модалки: 44px тач ── */
+html.app-native .train-exlabpicker-modal button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-exlabpicker-modal button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-exlabpicker-modal button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Инпуты/селекты модалки: 44px/16px без iOS-зума ── */
+html.app-native .train-exlabpicker-modal input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .train-exlabpicker-modal select {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .train-exlabpicker-modal .manual-exlab-sheet {
+    max-width: 100% !important;
+    border-radius: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-exlabpicker-modal button:active {
+    transform: none !important;
+  }
+}
+
 /* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
 html.app-native .nd-data-btn {
   min-height: 44px !important;

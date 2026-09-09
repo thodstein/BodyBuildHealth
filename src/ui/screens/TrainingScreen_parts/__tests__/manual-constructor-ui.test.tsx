@@ -12,6 +12,7 @@ import { ManualProgramWizard } from '../ManualProgramWizard';
 import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
 import { HybridPlanPanel } from '../HybridPlanPanel';
+import { ExerciseLabPicker } from '../ExerciseLabPicker';
 import { PlanSummaryTable } from '../editor-panels/summary';
 import { ProgramMetricsCSV } from '../ProgramExtras';
 
@@ -272,6 +273,18 @@ describe('Менеджер: квик-панель и сброс фильтров
     fireEvent.change(search, { target: { value: 'несуществующий_запрос_12345' } });
     expect(screen.getByText('Сбросить фильтры')).toBeInTheDocument();
     unmount();
+  });
+});
+
+describe('Пикер лаборатории: модалка §113', () => {
+  it('клик по триггеру открывает модалку с хуками', () => {
+    render(<ExerciseLabPicker value="" muscle="chest" onSelect={() => {}} />);
+    expect(document.body.querySelector('.manual-exlab-modal')).toBeNull();
+    fireEvent.click(screen.getByText(/Выбрать из лаборатории/));
+    const modal = document.body.querySelector('.manual-exlab-modal') as HTMLElement;
+    expect(modal).toBeInTheDocument();
+    expect(modal.querySelector('.manual-exlab-sheet')).toBeInTheDocument();
+    expect(modal.querySelector('.train-exlabmerged')).toBeInTheDocument();
   });
 });
 

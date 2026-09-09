@@ -59,8 +59,8 @@ export const ExerciseLabPicker: React.FC<{
       </button>
       
       {open && ReactDOM.createPortal(
-        <div 
-          className="train-exlabpicker-modal"
+        <div
+          className="train-exlabpicker-modal manual-exlab-modal"
           style={{ 
             position: 'fixed', 
             inset: 0, 
@@ -72,14 +72,15 @@ export const ExerciseLabPicker: React.FC<{
             padding: 12
           }}
         >
-          <div 
-            style={{ 
-              background: '#18181b', 
-              borderRadius: 16, 
+          <div
+            className="manual-exlab-sheet"
+            style={{
+              background: '#18181b',
+              borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.1)',
-              maxWidth: 900, 
-              width: '100%', 
-              maxHeight: '90vh', 
+              maxWidth: 900,
+              width: '100%',
+              maxHeight: '90vh',
               overflow: 'auto',
               boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
             }}
