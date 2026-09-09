@@ -1092,7 +1092,7 @@ export function ArmAutoConstructor() {
                   } catch { return '—'; }
                 })()}</div>
                 {discipline === 'armlifting' && (
-                  <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)">
+                  <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)" hook="platform">
                     <AdGrid cols="2">
                       <AdField label="Снаряд">
                         <select value={proPlatImpl} onChange={e=>setProPlatImpl(e.target.value)}>
@@ -1109,9 +1109,16 @@ export function ArmAutoConstructor() {
                       const att = planAttempts(t);
                       const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
                       const pct = Math.round((t / wr) * 1000) / 10;
-                      return (<><div className="ad-stats">{att.map((a: number, i: number) => (
-                        <div key={i} className="ad-stat"><div className="ad-stat-v">{a} кг</div><div className="ad-stat-l">Попытка {i + 1}</div></div>
-                      ))}</div>{`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR${pct >= 90 ? ' — элита' : pct >= 70 ? ' — соревновательный уровень' : ' — база'}. Правило помоста: промах = выбыл, только DOH, без лямок.`}</>);
+                      const lvl = pct >= 90 ? 'элита' : pct >= 70 ? 'соревновательный уровень' : 'база';
+                      return (<><div className="ad-hero-side" data-arm="platform-wr">
+                        <div className="ad-hero-score" aria-hidden><b>{pct}%</b><span>WR</span></div>
+                        <div className="ad-hero-name">цель {t} кг · WR {wr} кг<span>{lvl} · опенер {att[0]} кг</span></div>
+                        <span className="ad-tag" data-sev={pct >= 90 ? 'ok' : pct >= 70 ? 'warn' : 'bad'}>{lvl}</span>
+                      </div>
+                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, pct)}%` }} /></div>
+                      <div className="ad-stats">{att.map((a: number, i: number) => (
+                        <div key={i} className="ad-stat"><div className="ad-stat-v">{a} кг</div><div className="ad-stat-l">Попытка {i + 1}</div><div className="ad-stat-s">{[90, 96, 102][i]}%</div></div>
+                      ))}</div>{`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR — ${lvl}. Правило помоста: промах = выбыл, только DOH, без лямок.`}</>);
                     })()}</div>
                   </AdSec>
                 )}

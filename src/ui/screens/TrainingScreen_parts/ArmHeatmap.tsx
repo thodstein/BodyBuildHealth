@@ -42,9 +42,9 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
 
   if (!data) return null;
   const { weeks, grid, lmByMuscle } = data;
-  const cellW = 22;
-  const cellH = 20;
-  const labelW = 110;
+  const cellW = 28;
+  const cellH = 24;
+  const labelW = 124;
   const svgW = labelW + cellW * weeks + 4;
   const svgH = cellH * ARM_MUSCLES.length + 16;
 
@@ -61,8 +61,14 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
       <AdCard>
         <div className="ad-sec-t">🔥 Тепловая карта — арм</div>
         <div className="ad-muted">{weeks} нед × {ARM_MUSCLES.length} групп</div>
+        <div className="ad-row" data-arm="heat-legend">
+          <span className="ad-tag" data-hm="low">ниже MEV</span>
+          <span className="ad-tag" data-hm="mev">MEV→MAV</span>
+          <span className="ad-tag" data-hm="mav">MAV→MRV</span>
+          <span className="ad-tag" data-hm="over">выше MRV</span>
+        </div>
         <div className="ad-muted">
-          🟦 ниже MEV · 🟩 MEV→MAV · 🟧 MAV→MRV · 🟥 выше MRV. Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
+          Клик — детали. Side_pressure MRV низкий (humerus). Tendon 12/16/18/22.
         </div>
         <div className="ad-heat">
           <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} role="img" aria-label="Тепловая карта объёма">

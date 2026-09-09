@@ -592,9 +592,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         <div className="training-hero" style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <HeroImg webp="/training-hero.webp" src="/training-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)' }}>
-            <h1 className="training-hero-title" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
-            <p className="training-hero-sub" style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+          <div className="tp-herobody" style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)' }}>
+            <h1 className="training-hero-title tp-herotitle" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
+            <p className="training-hero-sub tp-herosub" style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
             {isNativeApp() && <TrainingHeroStats />}
@@ -604,21 +604,21 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
                 return (
                 <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} className="training-hero-zone native-fade-up" data-zone={z} style={{
                   animationDelay: `${zi * 55}ms`,
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-                  background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff',
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', minHeight: 72, borderRadius: 16, cursor: 'pointer', textAlign: 'left', width: '100%',
+                  background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${group.color}`, color: '#fff',
                   transition: 'all 0.2s',
                 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    background: trainAlpha(group.color, '18'), color: group.color,
+                  <div className="tp-hicon" style={{
+                    width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    background: trainAlpha(group.color, '18'), color: group.color, boxShadow: `0 0 16px ${trainAlpha(group.color, '30')}`,
                   }}>
-                    <NativeIcon name={group.icon} size={20} />
+                    <NativeIcon name={group.icon} size={22} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
-                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>{group.subtitle}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tp-htitle" style={{ fontSize: 14, fontWeight: 800, marginBottom: 2, color: group.color, lineHeight: 1.2 }}>{group.title}</div>
+                    <div className="tp-hsub" style={{ fontSize: 11, color: '#fff', lineHeight: 1.45 }}>{group.subtitle}</div>
                   </div>
-                  <span style={{ color: group.color, fontSize: 16, opacity: 0.6 }}>→</span>
+                  <span className="tp-hchev" style={{ width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: group.color, fontSize: 15, fontWeight: 800 }}>→</span>
                 </button>
                 );
               })}

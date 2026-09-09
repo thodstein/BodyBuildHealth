@@ -1282,19 +1282,44 @@
 }
 
 /* ─── PRO ТАБЫ: force/vbt/видео/группы/журналы ─────────────────────── */
-:is(.train-armdiag) .ad-tag[data-sev='ok'] {
+:is(.train-arm, .train-armdiag) .ad-tag[data-sev='ok'] {
   border-color: rgba(34, 197, 94, 0.45);
   color: #4ade80;
   background: rgba(34, 197, 94, 0.1);
 }
 
-:is(.train-armdiag) .ad-tag[data-sev='warn'] {
+:is(.train-arm, .train-armdiag) .ad-tag[data-sev='warn'] {
   border-color: rgba(245, 158, 11, 0.45);
   color: var(--ad-amber);
   background: rgba(245, 158, 11, 0.1);
 }
 
-:is(.train-armdiag) .ad-tag[data-sev='bad'] {
+:is(.train-arm, .train-armdiag) .ad-tag[data-sev='bad'] {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ─── PRO: heatmap-легенда ───────────────────────────────────────── */
+:is(.train-armheatmap) .ad-tag[data-hm='low'] {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #93c5fd;
+  background: rgba(96, 165, 250, 0.1);
+}
+
+:is(.train-armheatmap) .ad-tag[data-hm='mev'] {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+:is(.train-armheatmap) .ad-tag[data-hm='mav'] {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+:is(.train-armheatmap) .ad-tag[data-hm='over'] {
   border-color: rgba(239, 68, 68, 0.5);
   color: #fca5a5;
   background: rgba(239, 68, 68, 0.12);
