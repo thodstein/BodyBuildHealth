@@ -1010,25 +1010,25 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           {/* Allergens */}
           {fullReport.allergenWarnings.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🚫 Аллергены</div>
-            {fullReport.allergenWarnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)' }}>• {w.food}: {w.allergens.join(', ')}</div>)}
+            {fullReport.allergenWarnings.map((w, i) => <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>• {w.food}: {w.allergens.join(', ')}</div>)}
           </div>}
 
           {/* Recommendations */}
           {fullReport.recommendations.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:4 }}>💡 Рекомендации</div>
-            {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>• {r}</div>)}
+            {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>• {r}</div>)}
           </div>}
           {/* Edit/Save buttons */}
-          <div style={{ display:'flex', gap:4, marginTop:4 }}>
-            <button onClick={() => { if (reportEditMode) { try { localStorage.setItem('he_nutrition_report_current', reportEditText); } catch {} }; setReportEditMode(!reportEditMode); }} style={{ flex:1, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background: reportEditMode ? 'rgba(96,165,250,0.15)' : 'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:9, fontWeight:600 }}>
+          <div style={{ display:'flex', gap:6, marginTop:4 }}>
+            <button onClick={() => { if (reportEditMode) { try { localStorage.setItem('he_nutrition_report_current', reportEditText); } catch {} }; setReportEditMode(!reportEditMode); }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', minHeight:44, border:'1px solid rgba(96,165,250,0.3)', background: reportEditMode ? 'rgba(96,165,250,0.15)' : 'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>
               {reportEditMode ? '💾 Сохранить правки' : '✏️ Редактировать отчёт'}
             </button>
-            <button onClick={() => { try { const edited = reportEditMode ? JSON.parse(reportEditText) : fullReport; saveReportToArchive(edited); } catch(e) { alert('Ошибка сохранения: ' + e); } }} style={{ flex:1, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:9, fontWeight:600 }}>
+            <button onClick={() => { try { const edited = reportEditMode ? JSON.parse(reportEditText) : fullReport; saveReportToArchive(edited); } catch(e) { alert('Ошибка сохранения: ' + e); } }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', minHeight:44, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:11, fontWeight:700 }}>
               📥 Сохранить в архив
             </button>
           </div>
           {reportEditMode && (
-            <textarea value={reportEditText} onChange={e => setReportEditText(e.target.value)} style={{ width:'100%', height:200, padding:8, borderRadius:8, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, fontFamily:'monospace', marginTop:4, boxSizing:'border-box' }} />
+            <textarea value={reportEditText} onChange={e => setReportEditText(e.target.value)} style={{ width:'100%', height:200, padding:10, borderRadius:10, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:11, fontFamily:'monospace', marginTop:6, boxSizing:'border-box' }} />
           )}
         </div>
       )}
@@ -1042,18 +1042,18 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       ) : (
         <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
           {archiveReports.map((rep, idx) => (
-            <div key={idx} style={{ padding:'6px 10px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}
+            <div key={idx} style={{ padding:'10px 12px', borderRadius:12, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}
               onClick={() => { setFullReport(rep); setReportSubTab('full'); }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:10, fontWeight:600, color:'#fff' }}>Отчёт от {rep.generatedAt?.slice(0,10) || 'N/A'}</span>
+                <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>Отчёт от {rep.generatedAt?.slice(0,10) || 'N/A'}</span>
                 <span style={{ fontSize:12, fontWeight:800, color: rep.overallGrade === 'A' ? '#00e68a' : rep.overallGrade === 'B' ? '#8b5cf6' : rep.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{rep.overallGrade}</span>
               </div>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.9)', marginTop:2 }}>{rep.overallGradeLabel} · КБЖУ {rep.kbjuPct.kcal}% · {rep.microDeficiencies.length} дефицитов</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', marginTop:2 }}>{rep.overallGradeLabel} · КБЖУ {rep.kbjuPct.kcal}% · {rep.microDeficiencies.length} дефицитов</div>
             </div>
           ))}
         </div>
       )}
-      {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); localStorage.removeItem('he_nutrition_report_current'); localStorage.removeItem('he_profile_nutrition_reports'); }} style={{ marginTop:6, padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
+      {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); localStorage.removeItem('he_nutrition_report_current'); localStorage.removeItem('he_profile_nutrition_reports'); }} style={{ marginTop:8, width:'100%', padding:'10px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', minHeight:44, border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
     </div>)}
 
     {reportSubTab === 'overview' && (<div style={{ padding:14, ...modernCardBg }}>
