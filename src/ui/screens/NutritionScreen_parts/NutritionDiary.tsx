@@ -7,7 +7,7 @@ import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
 import { formatDate, parseDateOnly } from '../../../core/utils/date-utils';
 import { type DiaryItem } from './types';
 import { aggregateDiaryMicros } from './diary-storage';
-import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo, onDiaryChangeV2 } from './diary-storage-v2';
+import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo, onDiaryChangeV2, readJSONArr } from './diary-storage-v2';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
@@ -64,11 +64,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [editQty, setEditQty] = useState(100);
   const [copySource, setCopySource] = useState<string | null>(null);
   const [copiedDay, setCopiedDay] = useState<string | null>(null);
-  const [dayPresets, setDayPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_day_presets') || '[]'); } catch { return []; } });
+  const [dayPresets, setDayPresets] = useState<any[]>(() => readJSONArr<any>('he_day_presets'));
   const [toast, setToast] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [customMeals, setCustomMeals] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []; } catch { return []; } });
-  const [mealPresets, setMealPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_meal_presets') || '[]'); } catch { return []; } });
+  const [mealPresets, setMealPresets] = useState<any[]>(() => readJSONArr<any>('he_meal_presets'));
   const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
   const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
   const [mealMood, setMealMood] = useState<Record<string, { satiety: number; enjoyment: number; note: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_meal_mood') || '{}'); } catch { return {}; } });
@@ -179,11 +179,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     } catch { return null; }
   }, [dayMeals, refreshKey]);
 
-  const favoriteFoods = useMemo(() => { 
-    try { 
-      const favs: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); 
-      return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB; 
-    } catch { return []; } 
+  const favoriteFoods = useMemo(() => {
+    const favs = readJSONArr<string>('he_food_favs');
+    return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB;
   }, [refreshKey]);
 
   const recentFoods = useRecentFoods(diaryData as any, 10);
@@ -192,10 +190,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const addFoodFromDB = useCallback((food: FoodItemLike) => {
     setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category || 'other' }]);
     setFoodSearch('');
-    try { 
-      const favs = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); 
-      const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12); 
-      localStorage.setItem('he_food_favs', JSON.stringify(updated)); 
+    try {
+      const favs = readJSONArr<string>('he_food_favs');
+      const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12);
+      localStorage.setItem('he_food_favs', JSON.stringify(updated));
       setRefreshKey(k => k + 1);
     } catch {}
   }, []);

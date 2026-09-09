@@ -12,6 +12,7 @@ import {
   exportDiaryJSON,
   importDiaryJSON,
   exportDiaryCSV,
+  readJSONArr,
   getStorageInfo,
   onDiaryChangeV2,
   StorageQuotaError,
@@ -226,6 +227,32 @@ describe('diary-storage-v2', () => {
       expect(csv).toContain(`"'-минус"`);
       expect(csv).toContain(`"'@магазин"`);
       expect(csv).not.toContain(`,"+бонус"`);
+    });
+  });
+
+  describe('readJSONArr', () => {
+    it('should return [] for missing key', () => {
+      expect(readJSONArr('nope')).toEqual([]);
+    });
+
+    it('should return [] for scalar garbage instead of crashing .map', () => {
+      localStorageMock.setItem('he_day_presets', '"oops"');
+      expect(readJSONArr('he_day_presets')).toEqual([]);
+    });
+
+    it('should return [] for object garbage', () => {
+      localStorageMock.setItem('he_meal_presets', '{"a":1}');
+      expect(readJSONArr('he_meal_presets')).toEqual([]);
+    });
+
+    it('should return [] for broken JSON', () => {
+      localStorageMock.setItem('he_food_favs', '{oops');
+      expect(readJSONArr('he_food_favs')).toEqual([]);
+    });
+
+    it('should pass valid arrays through', () => {
+      localStorageMock.setItem('he_food_favs', '["a","b"]');
+      expect(readJSONArr<string>('he_food_favs')).toEqual(['a', 'b']);
     });
   });
 

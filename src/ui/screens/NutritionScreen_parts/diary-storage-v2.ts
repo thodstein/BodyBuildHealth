@@ -265,6 +265,20 @@ export function exportDiaryCSV(): string {
   return rows.join('\n');
 }
 
+/**
+ * Безопасное чтение массива из localStorage.
+ * Битый скаляр/объект прошлых версий ронял `.map/.filter` в рендере
+ * (тот же класс, что чинился в планировщике): вместо краха — [].
+ */
+export function readJSONArr<T>(key: string): T[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? (value as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 // Storage event listener
 export function onDiaryChangeV2(callback: (data: DiaryData) => void): () => void {
   diaryListeners.add(callback);
