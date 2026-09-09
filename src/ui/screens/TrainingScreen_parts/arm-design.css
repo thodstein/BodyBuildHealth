@@ -129,7 +129,8 @@
 :is(.train-arm, .train-armdiag) .ad-hero-side {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -888,8 +889,10 @@
 :is(.train-arm) .ad-ex-top {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px 10px;
   align-items: baseline;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 :is(.train-arm) .ad-ex-nm {
@@ -897,6 +900,8 @@
   font-weight: 600;
   line-height: 1.45;
   min-width: 0;
+  flex: 1 1 180px;
+  overflow-wrap: break-word;
 }
 
 :is(.train-arm) .ad-ex-nm > span {
@@ -934,6 +939,8 @@
   overflow-x: auto;
   scrollbar-width: none;
   border-radius: var(--ad-r-sm);
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 :is(.train-armheatmap) .ad-heat::-webkit-scrollbar {
@@ -1573,7 +1580,9 @@
 :is(.train-arm) .ad-split-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 :is(.train-arm) .ad-split-radio {
