@@ -11724,3 +11724,147 @@ html.app-native .manual-constructor table {
     transform: none !important;
   }
 }
+
+/* ─── 101. MANUAL MANAGER PRO-2 — список, загрузка, онбординг, финал ───
+ * Хуки: .manual-load (.manual-load-card), .manual-onboard
+ * (.manual-onboard-card), .manual-quick, .manual-actions, .manual-prog-list
+ * (.manual-prog-tools, .manual-prog-row[data-dir], .manual-prog-ico),
+ * .manual-final, .manual-compare.
+ * Карточки 64-72px, CTA 48-52px, поиск 48px/16px, press 0.97-0.98,
+ * focus-visible лайм, tabular-цифры, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Загрузка из библиотеки: карточки 72px с press ── */
+html.app-native .manual-constructor .manual-load-card {
+  min-height: 72px !important;
+  border-radius: 16px !important;
+}
+
+html.app-native .manual-constructor .manual-load-card:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .manual-load-card:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Онбординг: стекло + CTA 48px ── */
+html.app-native .manual-constructor .manual-onboard {
+  border-radius: 18px !important;
+}
+
+html.app-native .manual-constructor .manual-onboard-card {
+  border-radius: 14px !important;
+}
+
+html.app-native .manual-constructor .manual-onboard button {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+}
+
+/* ── Быстрый старт и действия: CTA 48-52px ── */
+html.app-native .manual-constructor .manual-actions button {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+html.app-native .manual-constructor .manual-actions button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .manual-actions button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Список программ: стекло, поиск 48/16, строки с кромкой трека ── */
+html.app-native .manual-constructor .manual-prog-list {
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-tools input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row {
+  border-radius: 16px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row[data-dir='bb'] {
+  border-left: 3px solid rgba(0, 230, 138, 0.55) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row[data-dir='pl'] {
+  border-left: 3px solid rgba(167, 139, 250, 0.55) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row[data-dir='hybrid'] {
+  border-left: 3px solid rgba(59, 130, 246, 0.55) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row button:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .manual-constructor .manual-prog-row button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .manual-prog-ico {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+/* ── Финал и сравнение: стекло + tabular ── */
+html.app-native .manual-constructor.manual-final {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .manual-compare {
+  border-radius: 18px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .manual-compare button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .manual-prog-row {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-load-card:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-actions button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .manual-prog-row button:active {
+    transform: none !important;
+  }
+}

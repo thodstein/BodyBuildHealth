@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { buildProgramIcs } from '../ManualExport';
 import { ManualLibraryGallery } from '../ManualLibraryGallery';
+import { ProgramManagerPanelWithProvider } from '../ProgramManagerPanel';
 import { getAllPrograms } from '../../../../engines/complete-program-library.engine';
 import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import type { UserProgram } from '../../../../engines/user-program/user-program.types';
 import { suggestExercisesForGroup } from '../../../../engines/manual-constructor';
+import { saveUserProgram, cloneFromLibrary } from '../../../../engines/user-program/program-store';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -92,6 +94,30 @@ describe('suggestExercisesForGroup интеллигентный подбор', (
     const exs = suggestExercisesForGroup('back', 'intermediate', 6, ['barbell'], [], ['back'], true, [], []);
     // при avoidAxialLoad — осевые исключены, но что-то остаётся
     expect(exs.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Менеджер: хуки §101 и честные счётчики библиотеки', () => {
+  it('непустой список: хуки §101 на месте', () => {
+    // сидим валидный клон, иначе менеджер показывает empty-ветку
+    saveUserProgram(cloneFromLibrary(getAllPrograms()[0]), 'seed');
+    const { container, unmount } = render(<ProgramManagerPanelWithProvider />);
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    expect(container.querySelector('.manual-prog-list')).toBeInTheDocument();
+    expect(container.querySelector('.manual-prog-tools')).toBeInTheDocument();
+    expect(container.querySelector('.manual-actions')).toBeInTheDocument();
+    expect(container.querySelector('.manual-prog-row')).toBeInTheDocument();
+    unmount();
+  });
+  it('empty-ветка: карточки загрузки + честные счётчики', () => {
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    try { localStorage.removeItem('he_manual_onboarding_done'); } catch { /* ignore */ }
+    const { container } = render(<ProgramManagerPanelWithProvider />);
+    expect(container.querySelector('.manual-onboard')).toBeInTheDocument();
+    expect(container.querySelectorAll('.manual-load-card').length).toBe(2);
+    // честные счётчики вместо захардкоженных «29 программ» / «66 циклов»
+    expect(screen.getByText(/программ · клон/)).toBeInTheDocument();
+    expect(screen.getByText(/ПЛ-циклов · immutable/)).toBeInTheDocument();
   });
 });
 

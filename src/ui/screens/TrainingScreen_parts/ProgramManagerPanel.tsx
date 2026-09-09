@@ -604,7 +604,7 @@ export const ProgramManagerPanel: React.FC = () => {
     const overMrv = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'exceeding_mrv').length;
     const belowMev = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'below_mev').length;
     return (
-      <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="manual-constructor manual-final" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/* Сводка программы */}
         <div style={{ ...CARD, padding: 12, borderLeft: `3px solid ${DIR_COLOR[dir]}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
@@ -892,15 +892,15 @@ export const ProgramManagerPanel: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <ManualHeader
           title="✋ Ручной конструктор программ"
-          subtitle="Соберите программу с нуля, клонируйте из библиотеки 29 шаблонов или подключите LMS-цикл 66 — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля."
+          subtitle={`Соберите программу с нуля, клонируйте из библиотеки ${allLibraryPrograms.length} шаблонов или подключите LMS-цикл ${plCycles.length} — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля.`}
           progress={{ current: 1, total: 3, label: 'Выбор' }}
-          chips={[{ label: '29 шаблонов', color: '#00e68a' }, { label: '66 циклов', color: '#a78bfa' }]}
+          chips={[{ label: `${allLibraryPrograms.length} шаблонов`, color: '#00e68a' }, { label: `${plCycles.length} циклов`, color: '#a78bfa' }]}
         />
         {renderMstepNav()}
 
         {/* Онбординг — красивый тур 3 шага (ManualUI) */}
         {onboardingOpen && (
-          <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="manual-onboard" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16 }}>👋</span>
               <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>Как работает ручной конструктор</span>
@@ -908,11 +908,11 @@ export const ProgramManagerPanel: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
               {[
-                { n: '1', icon: '📚', title: 'Выбор', desc: 'Библиотека 29 + 66 циклов, фильтры, ⭐ рекомендовано, 1-клик' },
+                { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${plCycles.length} циклов, фильтры, ⭐ рекомендовано, 1-клик` },
                 { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество, пикер с поиском' },
                 { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, проверка MRV, 📅 ICS / 📤 JSON / 🖨 PDF' },
               ].map(s => (
-                <div key={s.n} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'center' }}>
+              <div key={s.n} className="manual-onboard-card" style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'center' }}>
                   <div style={{ width: 28, height: 28, borderRadius: 14, background: '#00e68a', color: '#06281c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, margin: '0 auto' }}>{s.n}</div>
                   <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{s.icon} {s.title}</div>
                   <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>{s.desc}</div>
@@ -988,14 +988,14 @@ export const ProgramManagerPanel: React.FC = () => {
           );
         })()}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="manual-load" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки — карточки</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(0,230,138,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('bb')}>
-              <span style={{ fontSize: 16 }}>🔍</span><span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>Библиотека</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>29 программ · клон</span>
+            <button className="manual-load-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(0,230,138,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('bb')}>
+              <span style={{ fontSize: 16 }}>🔍</span><span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>Библиотека</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{allLibraryPrograms.length} программ · клон</span>
             </button>
-            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(167,139,250,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(167,139,250,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('pl')}>
-              <span style={{ fontSize: 16 }}>📥</span><span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>LMS-цикл</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>66 циклов · immutable</span>
+            <button className="manual-load-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(167,139,250,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(167,139,250,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('pl')}>
+              <span style={{ fontSize: 16 }}>📥</span><span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>LMS-цикл</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{plCycles.length} ПЛ-циклов · immutable</span>
             </button>
           </div>
         </div>
@@ -1027,7 +1027,7 @@ export const ProgramManagerPanel: React.FC = () => {
 
       {/* Онбординг — тур 3 шага (красивый) */}
       {onboardingOpen && (
-        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="manual-onboard" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>👋</span>
             <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>Как работает ручной конструктор</span>
@@ -1035,7 +1035,7 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
             {[
-              { n: '1', icon: '📚', title: 'Выбор', desc: 'Библиотека 29 + 66 циклов, ⭐ рекомендовано' },
+              { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${plCycles.length} циклов, ⭐ рекомендовано` },
               { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество' },
               { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, ICS / JSON / PDF' },
             ].map(s => (
@@ -1057,7 +1057,7 @@ export const ProgramManagerPanel: React.FC = () => {
       </div>
 
       {/* 🚀 Быстрый старт — всегда видим и в непустом списке, свёртываемый (1 клик до качества) */}
-      <div style={{ ...CARD, padding: quickTplCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #00e68a' }}>
+      <div className="manual-quick" style={{ ...CARD, padding: quickTplCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #00e68a' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', flex: 1 }}>🚀 Быстрый старт — 1 клик до качественной программы</span>
           <span style={{ fontSize: 10, color: DIM, display: quickTplCollapsed ? 'none' : 'inline' }}>{QUICK_TEMPLATES.length} шаблонов</span>
@@ -1087,7 +1087,7 @@ export const ProgramManagerPanel: React.FC = () => {
       </div>
 
       {/* Actions — P2.9: иерархия кнопок (Создать / Загрузить) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="manual-actions" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => startCreate('bb')}>🆕 ББ</button>
           <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => startCreate('pl')}>🆕 ПЛ</button>
@@ -1100,7 +1100,7 @@ export const ProgramManagerPanel: React.FC = () => {
       </div>
 
       {/* Saved list */}
-      <div className="constructor-surface" style={{ ...CARD, padding: 10 }}>
+      <div className="constructor-surface manual-prog-list" style={{ ...CARD, padding: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: DIM_STRONG, textTransform: 'uppercase', flex: 1 }}>
             Сохранённые ({filteredPrograms().length}{filteredPrograms().length !== programs.length ? ` из ${programs.length}` : ''})
@@ -1143,7 +1143,7 @@ export const ProgramManagerPanel: React.FC = () => {
           </label>
         </div>
         {/* P2.6: поиск + фильтр по direction + сортировка — добавлена кнопка сброса */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="manual-prog-tools" style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 2, minWidth: 100, display: 'flex', alignItems: 'center' }}>
             <input
               type="text" placeholder="🔍 Поиск по названию..." value={search}
@@ -1206,8 +1206,8 @@ export const ProgramManagerPanel: React.FC = () => {
           const chip: React.CSSProperties = { padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#fff', whiteSpace: 'nowrap' };
           const iconBtn: React.CSSProperties = { ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minWidth: 36, minHeight: 36, lineHeight: 1 };
           return (
-            <div key={p.meta.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, background: dc + '1a', border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            <div key={p.meta.id} className="manual-prog-row" data-dir={p.meta.direction} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
+              <div className="manual-prog-ico" style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, background: dc + '1a', border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                 {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : '⚡'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1315,7 +1315,7 @@ export const ProgramManagerPanel: React.FC = () => {
         const sb = stats(b);
         const allMuscles = Array.from(new Set([...Object.keys(sa), ...Object.keys(sb)])).slice(0, 10);
         return (
-          <div className="constructor-surface constructor-surface--warning" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+          <div className="constructor-surface constructor-surface--warning manual-compare" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>⚖ Сравнение</span>
               <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => setCompareIds([])}>✕ Закрыть</button>
