@@ -168,7 +168,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
             placeholder="Имя"
           />
         </FieldRow>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
           <BoolChip
             label="Уведомления"
             checked={system.notificationsEnabled}
@@ -190,16 +190,16 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
         icon={<NativeIcon name="inbox" size={20} />}
         color={colors.primary}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-          <button onClick={handleExport} style={{
-            ...btnStyle, borderColor: colors.primary, color: colors.primary, background: colors.primaryDim,
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="share" size={13} /></span>Экспорт в файл</button>
-          <button onClick={handleImport} style={{
-            ...btnStyle, borderColor: colors.blue, color: colors.blue, background: colors.blueDim,
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="inbox" size={13} /></span>Импорт из файла</button>
-          <button onClick={handleCopy} style={{
-            ...btnStyle, borderColor: colors.purple, color: colors.purple, background: colors.purpleDim,
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="file" size={13} /></span>Копировать в буфер</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+          <button onClick={handleExport} className="pf-set-btn" style={{
+            ...btnStyle, borderColor: 'rgba(52,211,153,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(52,211,153,0.22), rgba(52,211,153,0.07))',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(52,211,153,0.18)', border:'1px solid rgba(52,211,153,0.35)', flexShrink:0 }}><NativeIcon name="share" size={14} /></span>Экспорт в файл</button>
+          <button onClick={handleImport} className="pf-set-btn" style={{
+            ...btnStyle, borderColor: 'rgba(59,130,246,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(59,130,246,0.07))',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', border:'1px solid rgba(59,130,246,0.35)', flexShrink:0 }}><NativeIcon name="inbox" size={14} /></span>Импорт из файла</button>
+          <button onClick={handleCopy} className="pf-set-btn" style={{
+            ...btnStyle, borderColor: 'rgba(139,92,246,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.07))',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', border:'1px solid rgba(139,92,246,0.35)', flexShrink:0 }}><NativeIcon name="file" size={14} /></span>Копировать в буфер</button>
         </div>
       </AccordionSection>
 
@@ -209,19 +209,19 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
         icon={<NativeIcon name="trash" size={20} />}
         color={colors.danger}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-          <button onClick={handleClearDiaries} style={{
-            ...btnStyle, borderColor: colors.warning, color: colors.warning, background: colors.warningDim,
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="trash" size={13} /></span>Очистить дневники</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+          <button onClick={handleClearDiaries} className="pf-set-btn" style={{
+            ...btnStyle, borderColor: 'rgba(245,158,11,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(245,158,11,0.06))',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.35)', flexShrink:0 }}><NativeIcon name="trash" size={14} /></span>Очистить дневники</button>
           <button onClick={() => {
             clearSnapshots();
             alert('✅ Снимки истории очищены');
-          }} style={{
-            ...btnStyle, borderColor: colors.textMuted, color: colors.textMuted, background: 'transparent',
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="clock" size={13} /></span>Очистить историю</button>
-          <button onClick={handleReset} style={{
-            ...btnStyle, borderColor: colors.danger, color: colors.danger, background: colors.dangerDim,
-          }}><span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="alertTriangle" size={13} /></span>Сбросить профиль</button>
+          }} className="pf-set-btn" style={{
+            ...btnStyle, borderColor: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.04)',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', flexShrink:0 }}><NativeIcon name="clock" size={14} /></span>Очистить историю</button>
+          <button onClick={handleReset} className="pf-set-btn pf-set-danger" style={{
+            ...btnStyle, borderColor: 'rgba(239,68,68,0.45)', color: '#fff', background: 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(239,68,68,0.07))',
+          }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.16)', border:'1px solid rgba(239,68,68,0.4)', flexShrink:0 }}><NativeIcon name="alertTriangle" size={14} /></span>Сбросить профиль</button>
         </div>
       </AccordionSection>
 
@@ -248,12 +248,17 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
 };
 
 const btnStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  borderRadius: 10,
-  fontSize: 13,
-  fontWeight: 600,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  padding: '12px 15px',
+  borderRadius: 16,
+  fontSize: 13.5,
+  fontWeight: 800,
   cursor: 'pointer',
   border: '1px solid',
-  minHeight: 44,
-  transition: 'all 0.15s',
+  minHeight: 56,
+  transition: 'all 0.2s',
+  textAlign: 'left',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
 };

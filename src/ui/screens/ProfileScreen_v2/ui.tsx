@@ -921,32 +921,33 @@ export const PopupValueEditor: React.FC<{
             role="presentation"
             className="pf-pve-sheet"
             style={{
-              width: 'min(420px, 100vw)',
-              maxHeight: '82vh',
+              width: 'min(440px, 100vw)',
+              maxHeight: '84vh',
               display: 'flex', flexDirection: 'column',
-              background: 'linear-gradient(180deg, #202026, #16161a)',
-              border: `1px solid ${withAlpha(c, '2e')}`, borderBottom: 'none',
-              borderRadius: '22px 22px 0 0',
-              boxShadow: '0 -12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+              background: 'linear-gradient(180deg, #24242b, #141418)',
+              border: `1px solid ${withAlpha(c, '35')}`, borderBottom: 'none',
+              borderRadius: '24px 24px 0 0',
+              boxShadow: '0 -16px 56px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)',
               animation: 'pve-sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
               overflow: 'hidden',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '26')} 70%, transparent)` }} />
-            <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.16)' }} />
+            <div aria-hidden="true" style={{ height: 4, background: `linear-gradient(90deg, ${c}, ${withAlpha(c, '30')} 70%, transparent)` }} />
+            <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', paddingTop: 9 }}>
+              <div style={{ width: 44, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.18)' }} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px 8px' }}>
               <span aria-hidden="true" style={{
-                width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+                width: 42, height: 42, borderRadius: 14, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `linear-gradient(135deg, ${withAlpha(c, '2e')}, ${withAlpha(c, '14')})`,
-                border: `1px solid ${withAlpha(c, '44')}`, fontSize: 15, color: c,
+                background: `linear-gradient(135deg, ${withAlpha(c, '35')}, ${withAlpha(c, '15')})`,
+                border: `1px solid ${withAlpha(c, '50')}`, fontSize: 17, color: '#fff',
+                boxShadow: `0 4px 14px ${withAlpha(c, '30')}, inset 0 1px 0 rgba(255,255,255,0.15)`,
               }}>{type === 'select' ? '✓' : type === 'number' ? '#' : '✎'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: colors.text, letterSpacing: -0.2 }}>{label}</div>
-                <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: colors.text, letterSpacing: -0.2 }}>{label}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
                   {type === 'select'
                     ? 'Выберите значение'
                     : type === 'number'
@@ -1016,12 +1017,12 @@ export const PopupValueEditor: React.FC<{
                       className="pf-pve-opt"
                       data-sel={sel}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-                        padding: '10px 12px', borderRadius: 12, cursor: 'pointer', marginBottom: 6,
-                        background: sel ? `linear-gradient(135deg, ${withAlpha(c, '22')}, ${withAlpha(c, '0d')})` : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${sel ? `${withAlpha(c, '55')}` : colors.border}`,
-                        boxShadow: sel ? `0 2px 12px ${withAlpha(c, '1f')}` : 'none',
-                        transition: 'all 0.15s', color: colors.text, minHeight: 46,
+                        display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
+                        padding: '11px 13px', borderRadius: 14, cursor: 'pointer', marginBottom: 7,
+                        background: sel ? `linear-gradient(135deg, ${withAlpha(c, '26')}, ${withAlpha(c, '10')})` : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${sel ? `${withAlpha(c, '60')}` : 'rgba(255,255,255,0.09)'}`,
+                        boxShadow: sel ? `0 4px 16px ${withAlpha(c, '22')}, inset 0 1px 0 rgba(255,255,255,0.08)` : 'none',
+                        transition: 'all 0.15s', color: colors.text, minHeight: 52,
                         animation: 'pve-row-in 0.22s ease both',
                         animationDelay: `${Math.min(i * 18, 216)}ms`,
                       }}
@@ -1081,8 +1082,9 @@ export const PopupValueEditor: React.FC<{
                     }}
                   >−</button>
                   <div key={liveNumber ?? 'empty'} style={{
-                    minWidth: 140, textAlign: 'center', fontSize: 34, fontWeight: 900,
-                    color: c, letterSpacing: -1, lineHeight: 1.1,
+                    minWidth: 150, textAlign: 'center', fontSize: 38, fontWeight: 900,
+                    color: '#fff', letterSpacing: -1, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
+                    textShadow: `0 0 24px ${withAlpha(c, '50')}`,
                     animation: 'pve-value-pop 0.18s ease',
                   }}>
                     {liveNumber ?? '—'}
