@@ -1905,7 +1905,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
           )}
         </div>
 
-        <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="editor-pl-overlay" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Оверлей пользователя</div>
 
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2010,7 +2010,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               const newDay = { name: t.name, dayOfWeek: firstFreeTrainingDay(w0.days as any), exercises: t.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) };
               const weeks = (bodyRef.current.customWeeks ?? []).map((w, wi) => wi === 0 ? { ...w, days: [...w.days, newDay as any] } : w);
               set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
-            }} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.25)', color: '#a78bfa' }}>{t.icon} {t.label}</button>
+            }} className="editor-pl-day-tpl" style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.25)', color: '#a78bfa' }}>{t.icon} {t.label}</button>
           ))}
         </div>
         {(() => {

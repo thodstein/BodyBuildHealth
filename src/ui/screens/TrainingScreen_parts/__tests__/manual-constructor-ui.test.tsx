@@ -9,6 +9,8 @@ import type { UserProgram } from '../../../../engines/user-program/user-program.
 import { suggestExercisesForGroup } from '../../../../engines/manual-constructor';
 import { saveUserProgram, cloneFromLibrary } from '../../../../engines/user-program/program-store';
 import { ManualProgramWizard } from '../ManualProgramWizard';
+import { PLEditor } from '../ProgramEditorComponents';
+import { ConfirmDialogProvider } from '../ConfirmDialog';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -172,6 +174,29 @@ describe('Визард: хуки §104 по шагам', () => {
   it('шаг 3 (ПЛ): preview без тяжёлой сборки', async () => {
     const { container } = render(<ManualProgramWizard {...wizProps} step={3} direction="pl" />);
     expect(container.querySelector('.manual-wiz-preview')).toBeInTheDocument();
+  });
+});
+
+describe('ПЛ-редактор: хуки §106 (custom-путь, 2 недели)', () => {
+  it('навигация + шаблоны дней на месте', () => {
+    const mkDay = (n: string) => ({ name: n, dayOfWeek: 0, exercises: [] });
+    const body = {
+      direction: 'pl', sourceCycleId: null,
+      customWeeks: [
+        { week: 1, phase: 'accumulation', deload: false, days: [mkDay('День 1')] },
+        { week: 2, phase: 'accumulation', deload: false, days: [mkDay('День 1')] },
+      ],
+      schedule: [], weakPoints: [], notes: '', workMax: {},
+    } as any;
+    const { container } = render(
+      <ConfirmDialogProvider>
+        <PLEditor body={body} onChange={() => {}} />
+      </ConfirmDialogProvider>,
+    );
+    expect(container.querySelector('.editor-week-bulk-actions')).toBeInTheDocument();
+    expect(container.querySelector('.editor-week-jump')).toBeInTheDocument();
+    expect(container.querySelector('.editor-pl-day-tpl')).toBeInTheDocument();
+    expect(container.querySelector('.editor-fill-empty')).toBeInTheDocument();
   });
 });
 

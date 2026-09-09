@@ -12364,3 +12364,113 @@ html.app-native .manual-constructor .editor-fill-empty:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 106. MANUAL PL PRO — ПЛ-редактор и навигация по неделям ───
+ * Хуки: .editor-week-bulk-actions/.editor-week-jump (есть в styles.css),
+ * NEW .editor-pl-day-tpl, .editor-pl-overlay.
+ * Кнопки/дни 44px, селекты/инпуты 44px/16px без iOS-зума, press + focus,
+ * tabular, 380px, reduced-motion. Только APK: TG/web — байт-в-байт. */
+
+/* ── Навигация по неделям: кнопки 44px, селект 44/16 ── */
+html.app-native .manual-constructor .editor-week-bulk-actions {
+  border-radius: 14px !important;
+}
+
+html.app-native .manual-constructor .editor-week-bulk-actions button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .editor-week-bulk-actions button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-week-bulk-actions button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .editor-week-jump select {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Шаблоны ПЛ-дней: 44px + press/focus ── */
+html.app-native .manual-constructor .editor-pl-day-tpl {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-pl-day-tpl:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-pl-day-tpl:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Оверлей ПЛ: инпуты 44/16, кнопки 44px ── */
+html.app-native .manual-constructor .editor-pl-overlay {
+  border-radius: 18px !important;
+}
+
+html.app-native .manual-constructor .editor-pl-overlay input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-pl-overlay textarea {
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-pl-overlay button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-pl-overlay button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-pl-overlay button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-week-bulk-actions {
+    align-items: stretch !important;
+  }
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-week-bulk-actions button {
+    flex: 1 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-week-bulk-actions button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-pl-day-tpl:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-pl-overlay button:active {
+    transform: none !important;
+  }
+}
