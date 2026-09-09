@@ -713,6 +713,18 @@ html.app-native .train-arm.arm-apk .ad-finding {
   font-variant-numeric: tabular-nums !important;
 }
 
+html.app-native .train-arm.arm-apk .ad-dot[data-s='ok'] {
+  box-shadow: 0 0 12px var(--arm-glow) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-dot[data-s='ok'] {
+  box-shadow: 0 0 12px rgba(48, 209, 88, 0.6) !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='grip-impl'] {
+  scroll-snap-align: start !important;
+}
+
 html.app-native .train-arm.arm-apk .ad-ph {
   min-width: 30px !important;
   height: 30px !important;

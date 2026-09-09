@@ -27,6 +27,7 @@ import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
 import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
+import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-grip.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
@@ -554,6 +555,12 @@ export function ArmAutoConstructor() {
   }, [discipline, level, goal, weeks, daysPerWeek, gripFocus]);
   const CYC_LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Enhanced' };
   const CYC_PHASE_RU: Record<string, string> = { accumulation: 'накопление', intensification: 'интенсификация', deload: 'делод', peaking: 'пик' };
+
+const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
+  { title: '✊ Support — удержание', ids: ['rolling_thunder', 'apollon_axle', 'farmer_handles', 'fat_gripz'] },
+  { title: '🤏 Pinch — щипок', ids: ['saxon_bar', 'pinch_block', 'hub'] },
+  { title: '🗜 Crush — дробление', ids: ['coc_bullet'] },
+];
   const summFocus = (()=>{ try { return GRIP_FOCI.find(g=>g.id===gripFocus)?.label || gripFocus; } catch { return gripFocus; } })();
 
   return (
@@ -618,7 +625,7 @@ export function ArmAutoConstructor() {
             </AdSec>
           )}
 
-          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak}>
+          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
             <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
@@ -642,7 +649,7 @@ export function ArmAutoConstructor() {
             </AdBanner>
           )}
 
-          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете." collapsible defaultOpen={false} summary={summPed}>
+          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете." collapsible defaultOpen={false} summary={summPed} status={showPed ? 'ok' : undefined}>
             <AdCheck checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
               <>
@@ -683,7 +690,7 @@ export function ArmAutoConstructor() {
             <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           </div>
 
-          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm}>
+          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm} status={Object.values(workMaxEdit).some(v=>v!=='') ? 'ok' : undefined}>
             <AdGrid cols="3">
               {[
                 ['wrist_flexors','Кисть (кг)'],
@@ -701,7 +708,7 @@ export function ArmAutoConstructor() {
             </AdGrid>
           </AdSec>
 
-          <AdSec title="🏆 PRO: старт WAF" hint="Руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro}>
+          <AdSec title="🏆 PRO: старт WAF" hint="Руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro} status={(proBw || proAge || proDate || proLeft || proRight) ? 'ok' : undefined}>
             <AdGrid cols="3">
               <AdField label="Вес, кг">
                 <input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
@@ -785,7 +792,7 @@ export function ArmAutoConstructor() {
             </div>
           </AdSec>
 
-          <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop}>
+          <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop} status={(topOpp!=='unknown' || topRfd || topSim || topContinuity || topGripAuto || topLadder || cycId) ? 'ok' : undefined}>
             <AdGrid cols="3">
               <div>
                 <div className="ad-fl">Стиль оппонента</div>
@@ -845,7 +852,7 @@ export function ArmAutoConstructor() {
               <AdCheck checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
               <AdCheck checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
-            <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc}>
+            <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
               {rankedCycles.length > 0 && (
                 <div className="ad-list" data-arm="cycle-picker">
                   {rankedCycles.map(({ cycle: c, score, reasons }) => (
@@ -996,9 +1003,30 @@ export function ArmAutoConstructor() {
       {step === 'grip' && (
         <AdCard>
           <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
-          <div className="ad-muted">
-            <b>Хват-типы (StrongShop / IronMind):</b> support (Rolling Thunder 60мм вращающаяся, Axle 58мм DOH) · pinch (Saxon 3&quot; / Hub) · crush (CoC). Рекомендация — {best?.name}.
-          </div>
+          <div className="ad-muted">Рекомендация — {best?.name}.</div>
+          {GRIP_GROUPS.map(g => (
+            <AdSec key={g.title} title={g.title} hook="grip-group">
+              <div className="ad-list">
+                {g.ids.map(id => {
+                  const spec = GRIP_IMPLEMENTS[id];
+                  if (!spec) return null;
+                  return (
+                    <div key={id} className="ad-sec ad-bio" data-valid="na" data-arm="grip-impl">
+                      <div className="ad-row">
+                        <span><b>{spec.name}</b></span>
+                        <span className="ad-tag ad-angle">⌀{spec.diameterMm}</span>
+                        {spec.rotating ? <span className="ad-tag">вращ.</span> : null}
+                        <span className="ad-tag">{spec.allowedGrips.join('/')}</span>
+                        {spec.strapsAllowed ? <span className="ad-tag">лямки ✓</span> : <span className="ad-tag">без лямок</span>}
+                      </div>
+                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((spec.diameterMm / 76) * 100))}%` }} /></div>
+                      <div className="ad-muted">{spec.description}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </AdSec>
+          ))}
         </AdCard>
       )}
 

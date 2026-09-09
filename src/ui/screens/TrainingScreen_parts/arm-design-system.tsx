@@ -131,6 +131,7 @@ export function AdSec({
   collapsible,
   defaultOpen,
   summary,
+  status,
 }: {
   title: React.ReactNode;
   hint?: React.ReactNode;
@@ -139,12 +140,14 @@ export function AdSec({
   collapsible?: boolean;
   defaultOpen?: boolean;
   summary?: React.ReactNode;
+  status?: 'ok' | 'warn';
 }) {
   const [open, setOpen] = React.useState(defaultOpen ?? true);
+  const dot = status ? <span className="ad-dot" data-s={status} aria-hidden /> : null;
   if (!collapsible) {
     return (
       <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})}>
-        <div className="ad-sec-t">{title}</div>
+        <div className="ad-sec-t">{dot}{title}</div>
         {hint ? <div className="ad-sec-hint">{hint}</div> : null}
         {children}
       </div>
@@ -161,6 +164,7 @@ export function AdSec({
         <span className="ad-sec-chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
+        {dot}
         <span className="ad-sec-t">{title}</span>
         {!open && summary ? <span className="ad-sec-sum">{summary}</span> : null}
       </button>

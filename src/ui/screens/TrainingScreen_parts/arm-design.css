@@ -1498,6 +1498,38 @@
   scroll-snap-align: start;
 }
 
+/* ─── PRO: статус-точки секций ───────────────────────────────────── */
+:is(.train-arm, .train-armdiag) .ad-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 99px;
+  background: var(--ad-edge2);
+}
+
+:is(.train-arm, .train-armdiag) .ad-dot[data-s='ok'] {
+  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
+  box-shadow: 0 0 10px rgba(0, 230, 138, 0.7);
+}
+
+:is(.train-arm, .train-armdiag) .ad-dot[data-s='warn'] {
+  background: linear-gradient(135deg, var(--ad-amber), #f97316);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+}
+
+:is(.train-arm, .train-armdiag) .ad-sec-t .ad-dot {
+  margin-right: 2px;
+}
+
+/* ─── PRO: справочник снарядов хвата ─────────────────────────────── */
+:is(.train-arm) [data-arm='grip-impl'] .ad-row {
+  row-gap: 6px;
+}
+
+:is(.train-arm) [data-arm='grip-impl'] .ad-volbar {
+  margin: 8px 0 6px;
+}
+
 /* ─── Фокус с клавиатуры ─────────────────────────────────────────── */
 :is(.train-arm, .train-armdiag) .ad-btn:focus-visible,
 :is(.train-arm, .train-armdiag) .ad-chip:focus-visible,
