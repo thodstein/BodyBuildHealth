@@ -12038,3 +12038,137 @@ html.app-native .manual-constructor .editor-action-card:active {
     transform: none !important;
   }
 }
+
+/* ─── 103. MANUAL EXERCISE/SETS PRO — строки упражнений и подходов ───
+ * Хуки: .bb-block-list, .bb-block-row.editor-exercise-card
+ * (.is-expanded/.is-empty/.is-superset), .editor-exercise-heading/title/
+ * kicker/status, .editor-sets-heading, .bb-set-editor (.editor-set-index),
+ * .editor-empty-exercises, .bb-block-expand.
+ * Кнопки рядов 44px (микро-степперы 28px), инпуты 44px/16px без iOS-зума,
+ * статусы/счётчики tabular, press + focus-visible, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Карточка упражнения: радиус 16, заголовок 13px, статус tabular ── */
+html.app-native .manual-constructor .editor-exercise-card {
+  border-radius: 16px !important;
+}
+
+html.app-native .manual-constructor .editor-exercise-title {
+  font-size: 13px !important;
+}
+
+html.app-native .manual-constructor .editor-exercise-status {
+  font-variant-numeric: tabular-nums !important;
+  font-size: 11px !important;
+  border-radius: 20px !important;
+  padding: 3px 9px !important;
+}
+
+/* ── Кнопки ряда: 44px тач, микро-степперы 28px ── */
+html.app-native .manual-constructor .bb-block-row button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .bb-block-row button:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .manual-constructor .bb-block-row button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .bb-block-expand {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+html.app-native .manual-constructor .bb-block-list input[type='checkbox'] {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* ── Шапка сетов: селект и счётчик 44px, tabular ── */
+html.app-native .manual-constructor .editor-sets-heading select {
+  min-height: 44px !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-sets-heading button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-sets-heading span {
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ── Строки сетов: инпуты 44/16, степперы 28px, скролл ── */
+html.app-native .manual-constructor .bb-set-editor {
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .bb-set-editor::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .manual-constructor .bb-set-editor input {
+  font-size: 16px !important;
+  border-radius: 10px !important;
+}
+
+html.app-native .manual-constructor .bb-set-editor button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+}
+
+html.app-native .manual-constructor .editor-set-index {
+  font-variant-numeric: tabular-nums !important;
+  font-size: 12px !important;
+}
+
+/* ── Микро-степперы сета (±1/±2.5, инлайн 16-18px): компакт 32px ── */
+html.app-native .manual-constructor .bb-set-editor button[style*='width:18'] {
+  min-width: 32px !important;
+  min-height: 32px !important;
+}
+
+html.app-native .manual-constructor .bb-set-editor button[style*='width:16'] {
+  min-width: 32px !important;
+  min-height: 32px !important;
+}
+
+/* ── Пустое состояние дня: поиск 44/16, кнопки 48px ── */
+html.app-native .manual-constructor .editor-empty-exercises input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-empty-exercises button {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-exercise-heading {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .bb-block-row button:active {
+    transform: none !important;
+  }
+}

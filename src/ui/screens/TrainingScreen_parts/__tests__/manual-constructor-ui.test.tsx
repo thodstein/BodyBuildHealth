@@ -139,6 +139,11 @@ describe('Редактор: хуки недель/сессий §102', () => {
     expect(container.querySelector('.editor-session-card')).toBeInTheDocument();
     expect(container.querySelector('.editor-session-actions')).toBeInTheDocument();
     expect(container.querySelector('.editor-session-fields')).toBeInTheDocument();
+    // §103: строки упражнений и редактор сетов
+    expect(container.querySelector('.editor-exercise-card')).toBeInTheDocument();
+    expect(container.querySelector('.editor-exercise-heading')).toBeInTheDocument();
+    expect(container.querySelector('.bb-set-editor')).toBeInTheDocument();
+    expect(container.querySelector('.editor-sets-heading')).toBeInTheDocument();
   }, 60000);
 });
 
