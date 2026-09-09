@@ -94,3 +94,16 @@ describe('suggestExercisesForGroup интеллигентный подбор', (
     expect(exs.length).toBeGreaterThan(0);
   });
 });
+
+describe('ManualUI хуки для APK-слоя (§100)', () => {
+  it('ManualHeader несёт manual-head, ManualStepper — manual-stepper', async () => {
+    const { ManualHeader, ManualStepper } = await import('../ManualUI');
+    const { container: h } = render(<ManualHeader title="Тест" subtitle="подпись" />);
+    expect(h.querySelector('.manual-head')).toBeInTheDocument();
+    const { container: s } = render(
+      <ManualStepper steps={[{ id: 'a', label: 'Шаг A' }, { id: 'b', label: 'Шаг B' }]} active="a" onChange={() => {}} />,
+    );
+    expect(s.querySelector('.manual-stepper')).toBeInTheDocument();
+    expect(s.querySelector('.manual-stepper button')).toBeInTheDocument();
+  });
+});

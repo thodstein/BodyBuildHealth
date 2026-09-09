@@ -7,7 +7,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { ManualLibraryGallery } from '../ManualLibraryGallery';
+import {
+  ManualLibraryGallery, plCycleMatchesLevel, proCycleMatchesLevel, matchesDays,
+} from '../ManualLibraryGallery';
 import { getAllPrograms } from '../../../../engines/complete-program-library.engine';
 import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import { ARM_CYCLE_LIBRARY } from '../../../../engines/arm/arm-cycle-library.engine';
@@ -92,5 +94,53 @@ describe('Ручная библиотека: арм + ТА/стронг', () => 
     fireEvent.click(screen.getByRole('tab', { name: /Арм \(/ }));
     fireEvent.change(screen.getByPlaceholderText(/Поиск по названию/), { target: { value: 'несуществующий_запрос_12345' } });
     expect(screen.getByText(/Ничего не найдено/)).toBeInTheDocument();
+  });
+});
+
+describe('Ручная библиотека: маппинг фильтров (все циклы достижимы)', () => {
+  it('plCycleMatchesLevel: шкала LMS целиком покрыта', () => {
+    expect(plCycleMatchesLevel('novice', 'beginner')).toBe(true);
+    expect(plCycleMatchesLevel('intermediate', 'intermediate')).toBe(true);
+    expect(plCycleMatchesLevel('II-KMS', 'intermediate')).toBe(true);
+    for (const l of ['KMS-MS', 'MS-MSMK', 'KMS-MSMK', 'II-MS']) expect(plCycleMatchesLevel(l, 'advanced')).toBe(true);
+    expect(plCycleMatchesLevel('novice', 'advanced')).toBe(false);
+    expect(plCycleMatchesLevel('MS-MSMK', 'beginner')).toBe(false);
+  });
+
+  it('уровень Новичок/Опытный больше не даёт 0 ПЛ-циклов', () => {
+    const beg = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'beginner'));
+    const adv = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'advanced'));
+    expect(beg.length).toBe(9);
+    expect(adv.length).toBe(59);
+    expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
+  });
+
+  it('proCycleMatchesLevel: advanced забирает enhanced', () => {
+    expect(proCycleMatchesLevel(['enhanced'], 'advanced')).toBe(true);
+    expect(proCycleMatchesLevel(['beginner'], 'advanced')).toBe(false);
+    expect(proCycleMatchesLevel(['beginner'], 'beginner')).toBe(true);
+  });
+
+  it('matchesDays: 2д и 7+ покрывают края раскладки', () => {
+    expect(LMS_CYCLES.filter(c => matchesDays(c.meta.sessionsPerWeek, '2')).length).toBe(12);
+    expect(LMS_CYCLES.filter(c => matchesDays(c.meta.sessionsPerWeek, '7plus')).length).toBe(1);
+    expect(matchesDays(3, '3')).toBe(true);
+    expect(matchesDays(4, '3')).toBe(false);
+  });
+
+  it('фильтр уровня в UI: таб ПЛ + Новичок показывает novice-циклы', () => {
+    render(
+      <ManualLibraryGallery
+        bbPrograms={[]}
+        plCycles={LMS_CYCLES as any}
+        onSelectBB={() => {}}
+        onSelectPL={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /ПЛ \(/ }));
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: 'beginner' } });
+    // 9 novice-циклов: таб-счётчик и карточки
+    expect(screen.getByRole('tab', { name: /ПЛ \(9\)/ })).toBeInTheDocument();
   });
 });

@@ -54,11 +54,39 @@ const GOAL_OPTS_BB: Array<{ id: string; label: string }> = [
 
 const DAYS_OPTS = [
   { id: 'all', label: 'Любые дни' },
+  { id: '2', label: '2д/нед' },
   { id: '3', label: '3д/нед' },
   { id: '4', label: '4д/нед' },
   { id: '5', label: '5д/нед' },
   { id: '6', label: '6д/нед' },
+  { id: '7plus', label: '7+ д/нед' },
 ];
+
+/**
+ * Маппинг фильтра уровней галереи на шкалу LMS-циклов
+ * (novice/II-KMS/KMS-MS/MS-MSMK/KMS-MSMK/II-MS/intermediate):
+ * без него «Новичок»/«Опытный» давали 0 совпадений и ПЛ-циклы «терялись».
+ */
+const LMS_LEVEL_MAP: Record<string, string[]> = {
+  beginner: ['novice', 'beginner'],
+  intermediate: ['intermediate', 'II-KMS'],
+  advanced: ['KMS-MS', 'MS-MSMK', 'KMS-MSMK', 'II-MS', 'advanced', 'enhanced'],
+};
+export function plCycleMatchesLevel(metaLevel: string, filter: string): boolean {
+  if (filter === 'all') return true;
+  return (LMS_LEVEL_MAP[filter] ?? [filter]).includes(String(metaLevel));
+}
+/** Уровни арм/SS-шкалы (beginner/intermediate/advanced/enhanced): advanced забирает и enhanced. */
+export function proCycleMatchesLevel(levels: string[], filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'advanced') return levels.includes('advanced') || levels.includes('enhanced');
+  return levels.includes(filter);
+}
+export function matchesDays(value: number, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === '7plus') return value >= 7;
+  return String(value) === filter;
+}
 
 function favKeyBB(id: string) { return `fav_bb_${id}`; }
 
@@ -130,9 +158,9 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
       const q = search.toLowerCase().trim();
       arr = arr.filter(p => (p.name + ' ' + p.description + ' ' + p.author + ' ' + p.type).toLowerCase().includes(q));
     }
-    if (level !== 'all') arr = arr.filter(p => p.level === level);
+    if (level !== 'all') arr = arr.filter(p => proCycleMatchesLevel([p.level], level));
     if (goal !== 'all') arr = arr.filter(p => p.goal === goal || (p as any).direction === goal);
-    if (days !== 'all') arr = arr.filter(p => String(p.daysPerWeek) === days);
+    arr = arr.filter(p => matchesDays(p.daysPerWeek, days));
     if (favOnly) arr = arr.filter(p => bbFavs.includes(p.id));
     return arr;
   }, [bbPrograms, search, level, goal, days, favOnly, bbFavs]);
@@ -143,8 +171,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
       const q = search.toLowerCase().trim();
       arr = arr.filter((c: any) => (c.meta.title + ' ' + c.meta.id + ' ' + (c.meta.description || '')).toLowerCase().includes(q));
     }
-    if (level !== 'all') arr = arr.filter((c: any) => c.meta.level === level);
-    if (days !== 'all') arr = arr.filter((c: any) => String(c.meta.sessionsPerWeek) === days);
+    if (level !== 'all') arr = arr.filter((c: any) => plCycleMatchesLevel(c.meta.level, level));
+    arr = arr.filter((c: any) => matchesDays(c.meta.sessionsPerWeek, days));
     if (favOnly) arr = arr.filter((c: any) => plFavs.includes(c.meta.id));
     if (tab === 'pl' && goal !== 'all') arr = arr.filter((c: any) => plCycleMatchesGoal(c.meta.period, goal));
     return arr as SRCycleTemplate[];
@@ -154,8 +182,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
     const q = search.trim().toLowerCase();
     return (armCycles as ArmCycleTemplate[]).filter(c => {
       if (favOnly && !plFavs.includes(`arm:${c.id}`)) return false;
-      if (level !== 'all' && !c.level.includes(level as ArmCycleTemplate['level'][number])) return false;
-      if (days !== 'all' && String(c.daysPerWeek) !== days) return false;
+      if (!proCycleMatchesLevel([...c.level], level)) return false;
+      if (!matchesDays(c.daysPerWeek, days)) return false;
       if (q && !(`${c.name || ''} ${c.note || ''} ${c.rpe || ''}`.toLowerCase().includes(q))) return false;
       return true;
     });
@@ -166,8 +194,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
     return (ssCycles as SSCycleTemplate[]).filter(c => {
       const m = c.meta;
       if (favOnly && !plFavs.includes(`ss:${m.id}`)) return false;
-      if (level !== 'all' && !m.level.includes(level as SSCycleTemplate['meta']['level'][number])) return false;
-      if (days !== 'all' && String(m.sessionsPerWeek) !== days) return false;
+      if (!proCycleMatchesLevel([...m.level], level)) return false;
+      if (!matchesDays(m.sessionsPerWeek, days)) return false;
       if (q && !(`${m.title || ''} ${m.description || ''} ${m.howItWorks || ''}`.toLowerCase().includes(q))) return false;
       return true;
     });

@@ -160,7 +160,7 @@ export const ManualHeader: React.FC<{
 }> = ({ title, subtitle, chips, progress }) => {
   const pct = progress ? Math.round((progress.current / Math.max(1, progress.total)) * 100) : 0;
   return (
-    <div style={{ ...CARD_ACCENT, padding: '12px 14px', gap: 8, display: 'flex', flexDirection: 'column' }}>
+    <div className="manual-head" style={{ ...CARD_ACCENT, padding: '12px 14px', gap: 8, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: -0.3, lineHeight: 1.15 }}>{title}</span>
         {progress && <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT, background: 'rgba(0,230,138,0.14)', border: `1px solid ${ACCENT_BORDER}`, borderRadius: 20, padding: '3px 9px', letterSpacing: 0.1 }}>Шаг {progress.current} из {progress.total}{progress.label ? ` · ${progress.label}` : ''}</span>}
@@ -186,7 +186,7 @@ export const ManualStepper: React.FC<{
 }> = ({ steps, active, onChange, disabledIds }) => {
   const activeIdx = steps.findIndex(s => s.id === active);
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div className="manual-stepper" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {steps.map((s, idx) => {
         const isActive = s.id === active;
         const disabled = disabledIds?.has(s.id);

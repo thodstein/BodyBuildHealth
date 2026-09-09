@@ -11564,3 +11564,163 @@ html.app-native .lib-manlib .lib-seg button {
     transform: none !important;
   }
 }
+
+/* ─── 100. MANUAL MANAGER/EDITOR PRO — менеджер, редактор и визард топ-уровня ───
+ * Корни: .manual-constructor (.manual-constructor--editor), шапка
+ * .manual-head, степпер .manual-stepper, топбар .editor-topbar-shell
+ * (.editor-topbar), чипы .editor-chip, ячейки расписания
+ * .editor-schedule-cell, поверхности .constructor-surface (.editor-meta-card),
+ * нижняя навигация .editor-bottomnav.
+ * Тач 44px (инпуты 44px/16px без iOS-зума), липкие топбар/низ над пилюлей,
+ * press 0.97-0.98, focus-visible лайм, tabular-цифры, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Шапка и степпер: дыхание, лента 44px со snap ── */
+html.app-native .manual-constructor .manual-head {
+  border-radius: 18px !important;
+}
+
+html.app-native .manual-constructor .manual-stepper {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+  padding-bottom: 2px !important;
+}
+
+html.app-native .manual-constructor .manual-stepper::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .manual-constructor .manual-stepper button {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  font-size: 12px !important;
+}
+
+/* ── Топбар редактора: липкое стекло 18px, кнопки/инпуты 44px ── */
+html.app-native .manual-constructor .editor-topbar-shell {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+}
+
+html.app-native .manual-constructor .editor-topbar button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-topbar-shell button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-topbar-shell input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Чипы шаблонов и ячейки расписания: press + focus, тач 44-48px ── */
+html.app-native .manual-constructor .editor-chip {
+  border-radius: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .manual-constructor .editor-chip:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .editor-chip:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .editor-schedule-cell {
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-schedule-cell:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .editor-schedule-cell:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: -2px !important;
+}
+
+/* ── Поверхности (визард/мета): стекло 18px, кнопки 44px ── */
+html.app-native .manual-constructor .constructor-surface {
+  border-radius: 18px !important;
+}
+
+html.app-native .manual-constructor .constructor-surface button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .constructor-surface button:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .constructor-surface input {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .constructor-surface select {
+  min-height: 44px !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Низ редактора: выше пилюли + safe-area, кнопки 44px ── */
+html.app-native .manual-constructor .editor-bottomnav {
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+  border-radius: 16px !important;
+}
+
+html.app-native .manual-constructor .editor-bottomnav button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+/* ── Таблицы плана: скролл + читаемые цифры ── */
+html.app-native .manual-constructor table {
+  font-variant-numeric: tabular-nums !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-topbar {
+    gap: 6px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  html.app-native .manual-constructor .editor-chip {
+    min-height: 64px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-chip:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-schedule-cell:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .constructor-surface button:active {
+    transform: none !important;
+  }
+}
