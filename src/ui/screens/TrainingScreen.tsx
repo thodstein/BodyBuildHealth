@@ -716,37 +716,37 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── TAB VIEW HEADER — ультракомпактный ─── */}
       {page === 'tabs' && (
-        <div className="training-tabs-head" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 30 }}>
-          <button onClick={() => { setPage('hero'); setZone(null); }} style={{
-            padding: '3px 7px', cursor: 'pointer', fontSize: 11,
-            color: '#fff', border: 'none', background: 'transparent',
-            display: 'flex', alignItems: 'center', gap: 3,
-            fontWeight: 600, whiteSpace: 'nowrap',
+        <div className="training-tabs-head tp-tabs-head" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 56 }}>
+          <button className="tp-tabs-back" onClick={() => { setPage('hero'); setZone(null); }} style={{
+            padding: '10px 14px', minHeight: 44, borderRadius: 12, cursor: 'pointer', fontSize: 12,
+            color: '#fff', border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontWeight: 700, whiteSpace: 'nowrap',
           }}>← На главную</button>
           {zone && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: ZONES[zone].color, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'visible' }}>{ZONES[zone].title}</span>
+            <span className="tp-tabs-zone" style={{ fontSize: 12, fontWeight: 800, color: ZONES[zone].color, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ZONES[zone].title}</span>
           )}
         </div>
       )}
 
       {page === 'tabs' && (
-      <div style={{ padding: '0 4px' }}>
+      <div className="tp-tabs-body" style={{ padding: '0 4px' }}>
       {zone && (
-        <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
+        <h2 className="tp-tabs-title" style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
       )}
 
       {zone && zone !== 'planner' && (() => {
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
-            <div style={{ marginBottom: 10, display:'flex', flexDirection:'column', gap:8 }}>
+            <div className="tp-tabs-cats" style={{ marginBottom: 10, display:'flex', flexDirection:'column', gap:8 }}>
               {cats.map(cat => (
-                <div key={cat.label} className="training-subnav-card" style={{ background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom:6, display:'flex', alignItems:'center', gap:6, letterSpacing:0.3, textTransform:'uppercase' as any }}><span style={{ width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}><NativeIcon name={cat.icon} size={11} /></span> {cat.label}</div>
-                  <div className="training-subnav" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div key={cat.label} className="training-subnav-card tp-tabs-cat" style={{ background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:14, padding:'10px 12px' }}>
+                  <div className="tp-tabs-catlabel" style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom:8, display:'flex', alignItems:'center', gap:8, letterSpacing:0.3, textTransform:'uppercase' as any }}><span className="tp-tabs-caticon" style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}><NativeIcon name={cat.icon} size={13} /></span> {cat.label}</div>
+                  <div className="training-subnav" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
-                      <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                        padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                      <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} data-active={tab === k ? 'true' : 'false'} className="tp-tabs-pill" style={{
+                        padding: '10px 14px', minHeight: 44, borderRadius: 13, fontSize: 12, fontWeight: 700,
                         background: tab === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
                         color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
                         transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word', boxShadow: tab === k ? `0 2px 8px ${trainAlpha(TRAIN_ACCENT_VAR, '25')}` : 'none',
@@ -759,10 +759,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           );
         }
         return (
-          <div className="training-subnav training-subnav-card" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
+          <div className="training-subnav training-subnav-card tp-tabs-flat" style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:14, padding:'10px 12px' }}>
             {ZONES[zone].tabs.map(k => (
-              <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+              <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} data-active={tab === k ? 'true' : 'false'} className="tp-tabs-pill" style={{
+                padding: '10px 14px', minHeight: 44, borderRadius: 13, fontSize: 12, fontWeight: 700,
                 background: tab === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
                 color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
                 transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word', boxShadow: tab === k ? `0 2px 8px ${trainAlpha(TRAIN_ACCENT_VAR, '25')}` : 'none',
@@ -774,14 +774,14 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* Readiness card — only on training tabs, compact for mobile */}
       {readiness && zone === 'training' && (
-        <div className="card" style={{ marginBottom: 6, padding: '8px 10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <h4 style={{ margin: 0, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="chart" size={11} /> Готовность к тренировке</h4>
-            <span style={{ fontSize: 10, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 40 ? '#eab308' : '#ef4444', fontWeight: 700 }}>
+        <div className="card tp-readiness" style={{ marginBottom: 6, padding: '12px 14px', borderRadius: 16 }}>
+          <div className="tp-readiness-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h4 style={{ margin: 0, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}><NativeIcon name="chart" size={13} /> Готовность к тренировке</h4>
+            <span className="tp-readiness-val" style={{ fontSize: 13, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 40 ? '#eab308' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
               {Math.round(readiness.recovery)}%
             </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          <div className="tp-readiness-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
               { label: 'Восст.', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
               { label: 'Питание', value: readiness.nutrition ?? 50, color: (readiness.nutrition ?? 50) >= 70 ? '#22c55e' : '#eab308' },
@@ -789,16 +789,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
               { label: 'Поддержка', value: readiness.support ?? 50, color: (readiness.support ?? 50) >= 70 ? '#22c55e' : '#eab308' },
               { label: 'Усталость', value: 100 - (readiness.fatigue ?? 50), color: (readiness.fatigue ?? 50) < 40 ? '#22c55e' : '#ef4444' },
             ].map(item => (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, color: '#fff', minWidth: 38, whiteSpace:'normal' }}>{item.label}</span>
-                <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, Math.max(0, item.value))}%`, height: '100%', background: item.color, borderRadius: 3 }} />
+              <div key={item.label} className="tp-readiness-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: '#fff', minWidth: 52, whiteSpace:'normal' }}>{item.label}</span>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, item.value))}%`, height: '100%', background: item.color, borderRadius: 4 }} />
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: item.color, minWidth: 22, textAlign: 'right' }}>{Math.round(item.value)}%</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: item.color, minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(item.value)}%</span>
               </div>
             ))}
           </div>
-          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}><span style={{ color: '#fff', minWidth: 38 }}>Нагрузка</span><div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 3 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:11 }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
+          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div className="tp-readiness-acwr" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}><span style={{ color: '#fff', minWidth: 52 }}>Нагрузка</span><div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 4 }} /></div><span style={{ fontWeight: 800, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:12, fontVariantNumeric: 'tabular-nums' }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
         </div>
       )}
 
