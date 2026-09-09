@@ -165,29 +165,59 @@ export const SectionCard: React.FC<{
   strong?: boolean;
   hint?: string;
   children: React.ReactNode;
-}> = ({ id, title, subtitle, icon, right, accent, strong, hint, children }) => (
-  <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
-    {title != null && (
-      <div style={{ ...ROW, marginBottom: 4 }}>
-        {icon && (
-          <span style={{
-            width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: strong ? ACCENT_GRAD_STRONG : accent ? ACCENT_GRAD : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
-            fontSize: 17, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
-            boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : accent ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
-          }}>{icon}</span>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 17, fontFamily: SF, lineHeight: 1.2 }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 13, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
-        </div>
-        {right}
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  summary?: React.ReactNode;
+  status?: 'ok' | 'warn';
+}> = ({ id, title, subtitle, icon, right, accent, strong, hint, children, collapsible, defaultOpen, summary, status }) => {
+  const [open, setOpen] = React.useState(defaultOpen ?? true);
+  const dot = status ? (
+    <span className="ss-sec-dot" data-s={status} aria-hidden style={{
+      width: 8, height: 8, borderRadius: 99, flexShrink: 0,
+      background: status === 'ok' ? 'linear-gradient(135deg, #00e68a, #10b981)' : 'linear-gradient(135deg, #f59e0b, #f97316)',
+      boxShadow: status === 'ok' ? '0 0 10px rgba(0,230,138,0.7)' : '0 0 10px rgba(245,158,11,0.7)',
+    }} />
+  ) : null;
+  const head = title != null ? (
+    <div style={{ ...ROW, marginBottom: collapsible ? 0 : 4 }}>
+      {icon && (
+        <span style={{
+          width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: strong ? ACCENT_GRAD_STRONG : accent ? ACCENT_GRAD : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
+          fontSize: 17, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
+          boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : accent ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
+        }}>{icon}</span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 17, fontFamily: SF, lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>{dot}{title}</div>
+        {(!collapsible || open) && subtitle && <div style={{ fontSize: 13, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
+        {collapsible && !open && summary != null && <div className="ss-sec-sum" style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>{summary}</div>}
       </div>
-    )}
-    {children}
-    {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
-  </div>
-);
+      {collapsible && (
+        <span className="ss-sec-chev" data-open={open} aria-hidden style={{
+          width: 28, height: 28, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, fontSize: 13,
+          flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease',
+        }}>▾</span>
+      )}
+      {!collapsible && right}
+    </div>
+  ) : null;
+  return (
+    <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
+      {collapsible ? (
+        <button type="button" className="ss-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left', minHeight: 52, display: 'block', fontFamily: SF, WebkitTapHighlightColor: 'transparent' }}>{head}</button>
+      ) : head}
+      <div className="ss-sec-body" data-open={open} style={collapsible ? { display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease' } : undefined}>
+        <div style={collapsible ? { minHeight: 0, overflow: 'hidden' } : undefined}>
+          {children}
+          {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
+        </div>
+      </div>
+      {!collapsible && hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
+    </div>
+  );
+};
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
   <div className="kit-stat" style={{
     flex: '1 1 120px', padding: '14px', borderRadius: 16,
@@ -296,14 +326,17 @@ export const EQUIP_RU: Record<string, string> = { barbell: 'Штанга', dumbb
 export const MOBILITY_RU: Record<string, string> = { shoulder: 'Плечо', hip: 'Таз', knee: 'Колено', ankle: 'Голеностоп', wrist: 'Запястье', lower_back: 'Поясница', neck: 'Шея' };
 export const SESSION_TAG_RU: Record<string, string> = { snatch_day: 'Рывок', clean_day: 'Толчок', strength_day: 'Сила', technique_day: 'Техника', pull_day: 'Тяги', accessory_day: 'Подсобка', overhead_day: 'Жим', deadlift_day: 'Тяга', event_day: 'Ивенты', squat_day: 'Присед', oly_day: 'Олимпийка' };
 
-export const SectionNav: React.FC<{ items: { id: string; label: string }[]; activeId?: string; onSelect?: (id: string) => void }> = ({ items, activeId, onSelect }) => {
+export const SectionNav: React.FC<{ items: { id: string; label: string }[]; activeId?: string; onSelect?: (id: string) => void; numbered?: boolean; dividersAfter?: string[] }> = ({ items, activeId, onSelect, numbered, dividersAfter }) => {
   const goTo = (id: string) => { if (onSelect) { onSelect(id); return; } const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   return (
-    <div style={{ display: 'flex', gap: 6, padding: 6, background: 'rgba(58,58,60,0.72)', borderRadius: 16, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'none' }}>
-      {items.map(n => {
+    <div style={{ display: 'flex', gap: 6, padding: 6, background: 'rgba(58,58,60,0.72)', borderRadius: 16, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'none', alignItems: 'center' }}>
+      {items.map((n, i) => {
         const active = activeId ? activeId === n.id : false;
         return (
-          <button key={n.id} onClick={() => goTo(n.id)} aria-pressed={active} style={{ padding: '10px 16px', borderRadius: 11, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: SF, border: 'none', background: active ? '#fff' : 'transparent', color: active ? '#000' : TEXT_2, boxShadow: active ? '0 2px 8px rgba(0,0,0,0.22)' : 'none', transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap', flexShrink: 0, minHeight: 44 }}>{n.label}</button>
+          <React.Fragment key={n.id}>
+            <button onClick={() => goTo(n.id)} aria-pressed={active} aria-label={numbered ? `${i + 1}. ${n.label}` : n.label} style={{ padding: '10px 16px', borderRadius: 11, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: SF, border: 'none', background: active ? '#fff' : 'transparent', color: active ? '#000' : TEXT_2, boxShadow: active ? '0 2px 8px rgba(0,0,0,0.22)' : 'none', transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap', flexShrink: 0, minHeight: 44, fontVariantNumeric: 'tabular-nums' }}>{numbered ? `${i + 1} ${n.label}` : n.label}</button>
+            {dividersAfter && dividersAfter.includes(n.id) && i < items.length - 1 && <span aria-hidden style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.14), transparent)', flexShrink: 0, margin: '0 2px' }} />}
+          </React.Fragment>
         );
       })}
     </div>

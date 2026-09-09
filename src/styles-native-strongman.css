@@ -498,6 +498,71 @@ html.app-native .train-strong.ss-apk [data-ss='week']:nth-child(n+5) {
     min-height: 48px !important;
     font-size: 13px !important;
   }
+  html.app-native .train-strong.ss-apk .ss-sec-head {
+    min-height: 48px !important;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] {
+    flex-direction: column !important;
+  }
+  html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] button {
+    width: 100% !important;
+  }
+}
+
+/* ─── 21. АККОРДЕОНЫ СЕКЦИЙ (BB-стиль) — шапка 52px, шеврон, саммари ── */
+html.app-native .train-strong.ss-apk .ss-sec-head {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-head:active {
+  transform: scale(0.99) !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-head:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-chev {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-chev[data-open='true'] {
+  box-shadow: 0 0 12px var(--ss-glow) !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-sum {
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-dot[data-s='ok'] {
+  box-shadow: 0 0 12px var(--ss-glow) !important;
+}
+
+html.app-native .train-strong.ss-apk .ss-sec-dot[data-s='warn'] {
+  box-shadow: 0 0 12px rgba(var(--ss-amber-rgb), 0.55) !important;
+}
+
+/* ─── 22. ВИЗАРД-НАВИГАЦИЯ — ряд Далее/Назад, press + focus ─────────── */
+html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] {
+  margin-top: 4px !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] button {
+  min-height: 52px !important;
+  border-radius: 14px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] button:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .train-strong.ss-apk [data-ss='wizard-nav'] button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.9) !important;
+  outline-offset: 2px !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

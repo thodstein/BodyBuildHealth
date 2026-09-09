@@ -31,7 +31,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
-import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, ruLabel } from './StrengthUI';
+import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
@@ -402,7 +402,7 @@ export const StrengthSportConstructor: React.FC = () => {
           <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
         </div>
         <ProgressBar value={stepIndex} max={4} color={modeColor} height={8} />
-        <div data-ss="steps"><SectionNav activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} /></div>
+        <div data-ss="steps"><SectionNav numbered dividersAfter={['split']} activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} /></div>
         <div style={{ ...ROW, justifyContent:'space-between', gap: 8 }}>
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
@@ -417,7 +417,7 @@ export const StrengthSportConstructor: React.FC = () => {
       {/* Mobile lazy: только активный шаг монтируется (step==='params' &&) — 1/4 DOM, 60% меньше памяти на мобильном, как CardioUI */}
       {step === 'params' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны">
+          <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны" summary={`${ruLabel(MODE_RU, mode)} · ${ruLabel(GOAL_RU, goal)} · ${ruLabel(LEVEL_RU, level)} · ${weeks}н × ${days}дн`}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <StrengthPopupSelect label="Режим" value={mode} onChange={v=> setMode(v as any)} strong={mode==='strongman'} options={[
                 { id:'weightlifting', label:'🏋️ ТА', desc:'рывок/толчок/присед' },
@@ -457,7 +457,7 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard icon="👤" title="Атлет" subtitle="Подсветка ключевых метрик">
+          <SectionCard icon="👤" title="Атлет" subtitle="Подсветка ключевых метрик" collapsible defaultOpen={false} summary={`${sex === 'male' ? 'М' : 'Ж'} · ${bodyweight}кг · ${age}л${acwr ? ` · ACWR ${acwr.ratio}` : ''}${competitionDate ? ' · 🏁' : ''}`} status={competitionDate ? 'ok' : undefined}>
             <GroupHeading icon="⚖️" text="Профиль" desc="Вес, возраст и дата пика — базис для % и SINCLAIR" />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10 }}>
               <StrengthPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} />
@@ -483,7 +483,7 @@ export const StrengthSportConstructor: React.FC = () => {
             })()}
           </SectionCard>
 
-          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026) + EWMA 7/14д" accent>
+          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026) + EWMA 7/14д" accent collapsible defaultOpen={false} summary={`потеря ${velocityLoss}% · ${(['snatch','clean','squat'] as const).filter(l => ((vbtPerLift as any)[l]?.best || 0) > 0).length}/3 лифта`} status={(velocityLoss > 0 || (['snatch','clean','squat'] as const).some(l => ((vbtPerLift as any)[l]?.best || 0) > 0)) ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8 }}>
               {(['snatch','clean','squat'] as const).map(lift => {
                 const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
@@ -510,7 +510,7 @@ export const StrengthSportConstructor: React.FC = () => {
             )}
            </SectionCard>
 
-           <SectionCard icon="📈" title="LVP калибровка" subtitle="Индивидуальный профиль скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent>
+           <SectionCard icon="📈" title="LVP калибровка" subtitle="Индивидуальный профиль скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent collapsible defaultOpen={false} summary={lvpResult ? `${lvpLift} · r² ${lvpResult.r2}` : 'не калиброван'} status={lvpResult ? 'ok' : undefined}>
              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                <StrengthPopupSelect label="Лифт" value={lvpLift} onChange={v=> setLvpLift(v)} options={[{id:'snatch',label:'🏋️ Рывок'},{id:'clean',label:'🏋️ Толчок'},{id:'squat',label:'🦵 Присед'},{id:'deadlift',label:'🏋️ Тяга'},{id:'yoke_walk',label:'🚜 Йок'},{id:'farmers_walk',label:'🚜 Фермер'}]} />
                <div style={{ display:'flex', alignItems:'flex-end', gap:6 }}>
@@ -535,7 +535,7 @@ export const StrengthSportConstructor: React.FC = () => {
              <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (PLOS Wood 2026: individual калибровка обязательна).</div>
            </SectionCard>
 
-           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса">
+           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={`${methodology === 'compound_first' ? 'База первой' : methodology === 'pre_exhaust' ? 'Предутомление' : 'Постутомление'} · ${dupMode === 'off' ? 'DUP выкл' : dupMode === 'heavy_light' ? 'Тяж/лёг' : 'Волна'} · ${intensityTech === 'none' ? 'чисто' : 'кластер'}`} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
               <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
@@ -543,7 +543,7 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · стронг — ниже">
+          <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · стронг — ниже" collapsible defaultOpen={false} summary={`${(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).filter(k => ((workMax as any)[k] || 0) > 0).length}/6 ПМ${weakPoints.length ? ` · слабые ${weakPoints.length}` : ''}`} status={(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).some(k => ((workMax as any)[k] || 0) > 0) ? 'ok' : undefined}>
             <GroupHeading icon="🏋️" text="Олимпийка · база зала" desc="ПМ для % зон и SINCLAIR/Robi" />
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
               {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
@@ -631,7 +631,7 @@ export const StrengthSportConstructor: React.FC = () => {
             )}
           </SectionCard>
 
-          <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп">
+          <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп" collapsible defaultOpen={false} summary={injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'всё доступно'} status={injuries.length ? 'warn' : (equipment.length || mobility.length) ? 'ok' : undefined}>
             <GroupHeading icon="🏋️" text="Доступное оборудование" desc="Пусто — доступно всё; выбор фильтрует пул" />
             <Field label="Оборудование">
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -660,7 +660,7 @@ export const StrengthSportConstructor: React.FC = () => {
             </Field>
           </SectionCard>
 
-          <div style={{ display:'flex', gap:8 }}>
+          <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
             <button onClick={pullFromProfile} style={{ ...BTN, flex:1, background:'rgba(255,255,255,0.05)' }}>⟡ Из профиля</button>
             <button onClick={() => setStep('outside')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.2 }}>Далее → Вне зала</button>
           </div>
@@ -684,8 +684,11 @@ export const StrengthSportConstructor: React.FC = () => {
                 <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : outsideMetrics?.interference === 'medium' ? 'info' : 'ok'}>{outsideMetrics ? <span><Highlight color={outsideMetrics.interference==='high'?'#ff9f0a':'#30d158'}>{outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{outsideMetrics.volumeMultiplier}</Highlight> ({outsideMetrics.interference})</span> : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
               </>
             )}
-            <button onClick={() => setStep('split')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', borderRadius: 12 }}>Далее → Сплит</button>
           </SectionCard>
+          <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
+            <button onClick={() => setStep('params')} style={{ ...BTN, flex:1 }}>← Назад</button>
+            <button onClick={() => setStep('split')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:2 }}>Далее → Сплит</button>
+          </div>
           {diaryLoad != null && (
             <InfoBanner tone={diaryLoad>30?'warn':'info'}>Дневник: нагрузка 7д ≈ <Highlight color={diaryLoad>30?'#ff9f0a':'#30d158'}>{diaryLoad}</Highlight> {diaryLoad>30?'— высоко, лёгкую неделю?':'— норма'} {acwr && <span>· ACWR <Highlight>{acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)}</span>}</InfoBanner>
           )}
@@ -798,6 +801,9 @@ export const StrengthSportConstructor: React.FC = () => {
           )}
           <button data-ss="build" onClick={build} disabled={building} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'18px 22px', fontSize:17, borderRadius:18, opacity: building?0.6:1 }}>✦ Собрать план {cycleId ? `· 📚 ${cycleId} (${cycleMode==='faithful'?'дословно':'adapt'})` : patternId ? `· ${patternId}` : ''}</button>
           {building && <div role="status" style={{ fontSize:13, fontWeight:700, color:TEXT_2, textAlign:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>⏳ {buildStage}</div>}
+          <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
+            <button onClick={() => setStep('outside')} style={{ ...BTN, flex:1 }}>← Назад</button>
+          </div>
         </div>
       )}
 
