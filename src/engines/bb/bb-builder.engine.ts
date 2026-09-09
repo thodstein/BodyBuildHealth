@@ -40,6 +40,7 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
+import { isPoolAllowed } from './bb-exercise-levels.engine';
 import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
@@ -1403,6 +1404,8 @@ export interface BuildExercisePoolOpts {
  *  BB-фильтр + _score (BB-приоритет) + generic-блэклист. */
 export function buildExercisePool(muscle: string, role: string, opts: BuildExercisePoolOpts): any[] {
   const tag = (opts.sessionTag || '').toLowerCase();
+  // Гейт уровней — в swap-backstop финализатора (пул НЕ трогаем: удаление
+  // из пула сдвигало offsets/ротацию и рвало настроенные объёмы).
   let pool = EXERCISE_CATALOG.filter((ex: any) => {
     const tm = trueMuscleOf(ex);
     if (tm === null || !opts.roleMuscles.includes(tm)) return false;
@@ -4619,6 +4622,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
               const freshIso = optMatches.find(ex => { const p = derivePattern(ex); return p === 'unknown' || !optAvoid.includes(p); });
               if (freshIso) iso = freshIso;
             } catch { /* одно упражнение не ломает день */ }
+          }
+          // Гейт уровней (пост-финализаторный проход — swap уже отработал):
+          // только не-hard; нечего безопасного — скип (добивка опциональна).
+          if (iso && !isPoolAllowed(level, iso)) {
+            const levelIso: any = optMatches.find(ex => isPoolAllowed(level, ex));
+            if (!levelIso) break;
+            iso = levelIso;
           }
           if (!iso) break;
           const wm = workMax[cw] || defaultWorkMax(cw);

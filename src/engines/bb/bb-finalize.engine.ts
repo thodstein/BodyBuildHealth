@@ -24,6 +24,7 @@ import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
+import { isHardAdvanced, swapExerciseForLevel } from './bb-exercise-levels.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { buildBBPlanReport } from './bb-report.engine';
@@ -2874,6 +2875,58 @@ function enrichExerciseRationale(plan: BBPlan): void {
 }
 
 /**
+ * Гейт уровней — backstop поверх всех добавляющих проходов: движения
+ * HARD-списка (присед/становая/гудморнинг/пистолетик/плио/взвешенные скиллы)
+ * меняются на регрессию той же мышцы (объём цел — только имя/вес).
+ * Intermediate-движения разрешены всем по ACSM 2009 — гейтим только hard.
+ * Явный источник (preserveSource/faithful) не трогаем.
+ * Advanced/enhanced/неизвестный уровень — без гейта (как пул).
+ */
+function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
+  const lvl = String((options as any)?.level || '').toLowerCase();
+  if (lvl !== 'beginner' && lvl !== 'intermediate') return;
+  if ((options as any)?.preserveSource) return;
+  for (const week of plan.weeks) {
+    for (const session of week.sessions) {
+      const used = new Set(session.exercises.map((e: any) => e.name));
+      for (const ex of session.exercises) {
+        if ((ex as any).warmupActivator) continue;
+        const cat = EXERCISE_CATALOG.find((c: any) => c.name === (ex as any).name || c.id === (ex as any).exerciseName);
+        if (!isHardAdvanced({ id: (cat as any)?.id || (ex as any).exerciseName, name: (ex as any).name })) continue;
+        const swapped = swapExerciseForLevel(
+          { id: (cat as any)?.id || (ex as any).exerciseName, name: (ex as any).name },
+          lvl,
+          (c: any) => { try { return trueMuscleOf(c); } catch { return null; } },
+          EXERCISE_CATALOG as any,
+          {
+            equipment: options.equipment,
+            excludedExercises: options.excludedExercises,
+            usedNames: used,
+            mobilityRestrictions: options.mobilityRestrictions,
+            avoidAxialLoad: options.avoidAxialLoad,
+            trueMuscle: (ex as any).muscle,
+          } as any,
+        );
+        if (!swapped) continue;
+        const oldName = (ex as any).name;
+        (ex as any).name = swapped.name;
+        (ex as any).exerciseName = swapped.name;
+        if (Array.isArray((ex as any).workSets)) {
+          (ex as any).workSets = (ex as any).workSets.map((s: any) => ({ ...s, weight: Math.round((s.weight || 0) * swapped.loadRatio * 10) / 10 }));
+        }
+        used.add(swapped.name);
+        // Своп рвёт supersetWith-ссылки (указывали на старое имя) — чиним
+        // в той же сессии, иначе висячие пары (ловит matrix-extended).
+        for (const other of session.exercises) {
+          if ((other as any).supersetWith === oldName) (other as any).supersetWith = swapped.name;
+        }
+        (ex as any).rationale = [String((ex as any).rationale || ''), `Замена по уровню (${lvl}): «${oldName}» → «${swapped.name}»`].filter(Boolean).join(' | ');
+      }
+    }
+  }
+}
+
+/**
  * Общий последний проход для generic, проф-циклов и библиотечных программ.
  * Не меняет объём и не добавляет упражнения: только приводит форму результата
  * к единому BBPlan-контракту и восстанавливает тренерский порядок там, где
@@ -4438,6 +4491,14 @@ for (const week of next.weeks) {
       ensureArmHeadCoverage(session, week, options);
     }
   }
+  // Гейт уровней (backstop): всё добавленное выше, что выше уровня атлета,
+  // меняется на регрессию той же мышцы (объём цел — только имя/вес).
+  // Позиция — после повторной гарантии головок (она последняя меняет имена;
+  // дальше только разминка, которую гейт пропускает). Faithful/advanced+ —
+  // внутри скип. weeklyVolume/volumeTargets посчитаны по мышцам — своп имён
+  // их не меняет; в rationale дописывается честная пометка о замене.
+  enforceExerciseLevels(next, options);
+  syncBBPlanSetShape(next);
   // Разминочное упражнение на целевую группу — в самом конце, после всех
   // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.
   // По ТЗ: разминочное — ВСЕГДА первое в дне.
