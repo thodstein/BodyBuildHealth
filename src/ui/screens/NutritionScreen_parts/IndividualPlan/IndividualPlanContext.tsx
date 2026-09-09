@@ -21,6 +21,7 @@ import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks
 import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
+import { loadVarietyLedger, saveVarietyLedger, LEDGER_WEEK_FAMILIES_CAP } from "./planner-variety-ledger";
 // P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
 import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
@@ -124,6 +125,7 @@ export interface PlanCtx {
   dayTargetsBreakdown: string[];
   carbCapClipped: boolean;
   carbCapGPerKg: number;
+  rawCarbsForCap: number;
   kbjuMode: string; setKbjuMode: (v: any) => void;
   switchKbjuMode: (mode: any) => void;
   manualKcal: number | null; setManualKcal: (v: any) => void;
@@ -137,6 +139,10 @@ export interface PlanCtx {
   variety: string; setVariety: (v: any) => void;
   diaryAdaptation: boolean; setDiaryAdaptation: (v: boolean) => void;
   varietyStrictness: 'soft' | 'strict'; setVarietyStrictness: (v: 'soft' | 'strict') => void;
+  /** P1-6 (HV-стиль 800-1500У/500Б): real = дефолт (байт-в-байт). */
+  hvStyle: 'real' | 'practical' | 'mixed'; setHvStyle: (v: 'real' | 'practical' | 'mixed') => void;
+  /** P1-9: «Снять потолок» — явный оверрайд диетологического потолка углей г/кг. */
+  carbCapOverride: boolean; setCarbCapOverride: (v: boolean) => void;
   /** v6: единое разнообразие (low/medium/high = variety+strictness) */
   varietyLevel: VarietyLevel; setVarietyLevel: (v: VarietyLevel) => void;
   wakeTime: string; setWakeTime: (v: string) => void;
@@ -983,6 +989,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const effectiveF = bbApplied.fats;
   const effectiveC = bbApplied.carbs;
   const _rawCForCap = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
+  // P1-9: «Снять потолок» — явный оверрайд (читается из стореджа напрямую: блок
+  // вычисляется до useState-объявлений, замыкание перегенерируется на каждый рендер).
+  const _capOverride = (() => { try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; } })();
   const carbCapGPerKg = (() => {
     try {
       const vol = trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60);
@@ -990,7 +999,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch { return 5; }
   })();
   const carbCapClipped = (() => {
-    try { return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
+    try { if (_capOverride) return false; return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
   })();
   // Kcal из чистой логики (Atwater-консистентно + целевой калораж ББ-плана в пределах 15%).
   const effectiveKcal = bbApplied.kcal;
@@ -1219,6 +1228,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'strict';
   });
   useEffect(() => { try { updateSection('nutrition', { varietyStrictness: varietyStrictness === 'soft' ? 'low' : 'high' }); } catch {} }, [varietyStrictness]);
+  // P1-6 (HV-стиль): real/practical/mixed — как закрывать 800-1500У (персист отдельным ключом).
+  const [hvStyle, setHvStyle] = useState<'real' | 'practical' | 'mixed'>(() => {
+    try { const v = localStorage.getItem('he_planner_hv_style'); if (v === 'practical' || v === 'mixed' || v === 'real') return v; } catch {}
+    return 'real';
+  });
+  useEffect(() => { try { localStorage.setItem('he_planner_hv_style', hvStyle); } catch {} }, [hvStyle]);
+  // P1-9: «Снять потолок» — явный оверрайд диетологического потолка углей г/кг
+  // (движок получает carbCapGPerKg: 0 = «без потолка»; UI-warning скрывается).
+  const [carbCapOverride, setCarbCapOverrideState] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; }
+  });
+  const setCarbCapOverride = (v: boolean) => {
+    setCarbCapOverrideState(v);
+    try { localStorage.setItem('he_planner_cap_override', v ? '1' : '0'); } catch {}
+  };
   // v6: единое разнообразие (variety + varietyStrictness → varietyLevel). Храним в _pf.varietyLevel,
   // мигрируем из старых _pf.variety / _pf.varietyStrictness / he_variety_strictness.
   const [varietyLevel, setVarietyLevelRaw] = useState<VarietyLevel>(() => {
@@ -1408,7 +1432,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [showSuppPicker, setShowSuppPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
   const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
-  const [v2Phase, setV2Phase] = useState('LEAN_MASS');
+  // FIX persist-audit (B6): фаза v2-скоринга не сохранялась — сбрасывалась на «Набор»
+  const [v2Phase, setV2Phase] = useState(() => {
+    try { const v = localStorage.getItem('he_planner_v2_phase'); if (typeof v === 'string' && v.length > 0) return v; } catch {}
+    return 'LEAN_MASS';
+  });
+  useEffect(() => { try { localStorage.setItem('he_planner_v2_phase', v2Phase); } catch {} }, [v2Phase]);
   const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   const [histamineSensitive, setHistamineSensitive] = useState(() => {
@@ -2873,13 +2902,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // D (Эпик D): сквозной леджер разнообразия для серии генераций месяца —
   // recent-продукты, окно последних 2 дней и использованные рецепты НЕ сбрасываются
   // при переходе между неделями месяца (weekIndex-defined вызовы).
-  const varietyLedgerRef = useRef<{ foods: Set<string>; recipes: Set<string>; recent: string[][] }>({ foods: new Set(), recipes: new Set(), recent: [] });
+  // P1-1/P1-4 (план разнообразия): + weekFamilies (ротация «одна крупа ≤2 дней
+  // недели»), персист he_planner_variety_ledger_v1 — переживает «Перегенерировать».
+  const varietyLedgerRef = useRef<{ foods: Set<string>; recipes: Set<string>; recent: string[][]; weekFamilies: string[][] }>({ foods: new Set(), recipes: new Set(), recent: [], weekFamilies: [] });
   // Эпик-хвост (детерминизм): seeded-счётчик соли генерации (персист, инкремент на вызов).
   const genSaltRef = useRef<number>(0);
   useEffect(() => {
     try {
       const v = parseInt(localStorage.getItem('he_planner_gen_salt') || '0');
       if (Number.isFinite(v) && v >= 0) genSaltRef.current = v;
+    } catch {}
+    // P1-1/P1-4: восстановление ledger разнообразия с прошлого запуска/перегенерации.
+    try {
+      const l = loadVarietyLedger();
+      l.foods.forEach(id => varietyLedgerRef.current.foods.add(id));
+      l.recipes.forEach(r => varietyLedgerRef.current.recipes.add(r));
+      varietyLedgerRef.current.recent = l.recent;
+      varietyLedgerRef.current.weekFamilies = l.weekFamilies;
     } catch {}
   }, []);
   // Эпик 4: микро/DIAAS-контур между днями (дефициты вчера → prefer-источники сегодня).
@@ -3035,10 +3074,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // D (Эпик D): сквозной ledger разнообразия — месяц НЕ сбрасывает «недавние»
         // продукты/рецепты между неделями (раньше каждая generatePlan(7, w) начинала
         // с пустого recentFoodIds/_usedRecipeNames → recipes повторялись week-to-week).
-        // Леджер живёт на время серии генераций месяца; обычная генерация стартует чистым.
-        const _ledger = weekIndex !== undefined
-          ? varietyLedgerRef.current
-          : (varietyLedgerRef.current = { foods: new Set<string>(), recipes: new Set<string>(), recent: [] });
+        // P1-1/P1-4 (план NUTRITION-VARIETY-PLAN): леджер теперь ПЕРЕЖИВАЕТ и обычные
+        // перегенерации (персист he_planner_variety_ledger_v1, капы foods 60 / recipes 30 /
+        // recent 2 дня / weekFamilies 7 дней) — «Перегенерировать» больше не даёт тот же
+        // план. Мягкая деприоритизация с fresh-гейтами — гарантии (квоты/капы) не меняются.
+        const _ledger = varietyLedgerRef.current;
         const recentFoodIds = _ledger.foods;
        // B5 (междневная ротация): семейства гарниров предыдущих дней текущей генерации —
        // движок деприоритизирует «рис в каждый день», если есть ≥2 свежих альтернатив.
@@ -3051,6 +3091,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        };
        if (days >= 3 && dayPlan) { collectFoods(dayPlan); collectFamilies(dayPlan); }
        if (days >= 7 && threeDayPlan) { collectFoods(threeDayPlan); collectFamilies(threeDayPlan); }
+       // P0-7 (разнообразие): при недельной перегенерации recents читались только из
+       // 3дн-плана — weekPlan (прошлая неделя) игнорировался, и новая неделя стартовала
+       // «с чистой памятью», повторяя набор прошлой недели. Мягкая деприоритизация.
+       if (days >= 7 && weekPlan) { collectFoods(weekPlan as any); collectFamilies(weekPlan as any); }
        if ((dietPrefs || []).includes('vegetarian')) {
          Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
        }
@@ -3108,7 +3152,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // recentFoodIds (existing) accumulates ALL prior days; hardWindow holds the last 2
       // for the stricter hard-exclusion (adjacent days don't repeat products).
       // D (Эпик D): в месяце окно сшивается с прошлой неделей (стык недель не повторяет стейплы).
-      const hardWindow: string[][] = weekIndex !== undefined && varietyLedgerRef.current.recent.length > 0
+      // P1-1: леджер теперь персистится — окно последних 2 дней живёт и между перегенерациями.
+      const hardWindow: string[][] = varietyLedgerRef.current.recent.length > 0
         ? [...varietyLedgerRef.current.recent]
         : [];
       const collectDayFoods = (day: any): string[] => {
@@ -3274,6 +3319,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
           recentStapleFamilies: offset > 0 ? recentStapleFamilies : undefined,
+          // P1-3: недельная ротация «одна крупа ≤2 дней недели» — из ledger weekFamilies.
+          weekStapleFamilies: (() => {
+            const _wf = varietyLedgerRef.current.weekFamilies;
+            if (!_wf || _wf.length === 0) return undefined;
+            const m: Record<string, number> = {};
+            for (const day of _wf) for (const fam of day) m[fam] = (m[fam] || 0) + 1;
+            return Object.keys(m).length > 0 ? m : undefined;
+          })(),
+          // P1-6: стиль HV (real — дефолт, поведение байт-в-байт).
+          hvStyle,
           specialMealOverride: _specialMealOverrides.length > 0 ? _specialMealOverrides : undefined,
           hardRecentIds: new Set(hardWindow.flat()),
           varietyStrictness,
@@ -3283,6 +3338,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           dayOffset: offset, cyclePhase: phase as any,
           randomSalt: planRandomSalt,
           variety: plannerModeRef.current === 'minimal' ? 'minimal' : plannerModeRef.current === 'simple' ? 'medium' : variety,
+          // P1-9: «Снять потолок» — 0 = явный «без потолка» в движке; без оверрайда
+          // движок использует свой дефолт (байт-в-байт, как раньше).
+          carbCapGPerKg: _capOverride ? 0 : undefined,
           wakeTime, lunchTime, dinnerTime, bedTime,
           // Хвост-3: floor/MPS-модификаторы стиля питания теперь из ЕДИНОГО источника
           // (planTypeFloorMods в planner-day-targets) — движок сам выводит их из planType.
@@ -3419,6 +3477,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // C2/C5 (Эпик C): peri-рецепты только в трен-день; субротация доборов по seed дня.
             trainDay: isTrainDay(offset),
             seed: planRandomSalt + offset,
+            // P1-5/P1-6: строгость разнообразия и стиль HV в рецепт-путь.
+            varietyStrictness,
+            hvStyle,
             // v3 portable: гейт добивок рецептурного пути в рабочее окно.
             portableMode: input.portableMode,
             isWorkDay: input.isWorkDay,
@@ -3472,6 +3533,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (hardWindow.length > 2) hardWindow.shift();
         // D (Эпик D): леджер хранит окно последних 2 дней — стык недель месяца не повторяет стейплы.
         varietyLedgerRef.current.recent = hardWindow.slice();
+        // P1-3: семейства дня → недельный ledger («одна крупа ≤2 дней недели»,
+        // гейт weekStapleFamilies в движке). P1-1/P1-4: весь леджер персистится.
+        try {
+          const _dayFams = Array.from(new Set(_dayFoodIds.map((id: string) => stapleFamilyOf(id)).filter(Boolean) as string[]));
+          varietyLedgerRef.current.weekFamilies = [...varietyLedgerRef.current.weekFamilies, _dayFams].slice(-LEDGER_WEEK_FAMILIES_CAP);
+          saveVarietyLedger({
+            foods: Array.from(varietyLedgerRef.current.foods),
+            recipes: Array.from(varietyLedgerRef.current.recipes),
+            recent: varietyLedgerRef.current.recent,
+            weekFamilies: varietyLedgerRef.current.weekFamilies,
+          });
+        } catch {}
         return {
           meals, totals: _finalDayTotals
             ? { kcal: _finalDayTotals.kcal, p: _finalDayTotals.p, f: _finalDayTotals.f, c: _finalDayTotals.c, fiber: _finalDayTotals.fiber || 0 }
@@ -3845,11 +3918,11 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     trainStart, setTrainStart, trainEnd, setTrainEnd, linkToTraining, setLinkToTraining,
     trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern, isTrainDay,
     injectDrugTypes, calcTargets, profileTargets,
-    effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown, carbCapClipped, carbCapGPerKg,
+    effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown, carbCapClipped, carbCapGPerKg, rawCarbsForCap: _rawCForCap,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, proteinPreset, setProteinPreset,
-    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, setBBPrepConfig, applyBBPeakToPlan, applyCombatNutrition, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, setBBPrepConfig, applyBBPeakToPlan, applyCombatNutrition, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     morningTrainLoad, setMorningTrainLoad,
@@ -3921,7 +3994,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, weightMode, setWeightMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, weightMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);

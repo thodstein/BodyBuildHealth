@@ -13,6 +13,48 @@ import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
+
+/**
+ * FIX audit (C1): «Заполнить анализы» дублировалась в двух карточках (~30 строк копии).
+ * Единая чистая функция: v2Labs-мапа кодов → поля (POTASSIUM/SODIUM/MAGNESIUM
+ * НЕ импортируются — это дневные цели электролитов, не сыворотка).
+ */
+function importLabsToV2(labs: any[], v2Labs: Record<string, string>): Record<string, string> {
+  const newLabs: Record<string, string> = { ...v2Labs };
+  const codeMap: Record<string, string> = {
+    ALT: 'alt', AST: 'ast', GGT: 'ggt', LDL: 'ldl', HDL: 'hdl',
+    TRIGLYCERIDES: 'triglycerides', CRP: 'crp', CREATININE: 'creatinine',
+    HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
+    ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
+    TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
+    TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
+    LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin', BILIRUBIN: 'bilirubin',
+    CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
+    INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
+    VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob',
+  };
+  (labs || []).forEach((lp: any) => {
+    const field = codeMap[String(lp?.code || '').toUpperCase()];
+    if (field && lp?.value !== undefined && lp?.value !== null) {
+      newLabs[field] = String(Math.round(lp.value * 100) / 100);
+    }
+  });
+  return newLabs;
+}
+
+/**
+ * FIX audit (B3): «Добавить инъекцию» резолвил T½ по PHARMA_DB[name], а name —
+ * русская метка типа («инсулин», «ГР»), ключи PHARMA_DB — канонические EN id.
+ * Итог: полураспад всегда 24ч → бейдж «T½ 24ч» в Results врачал, авто-эстер
+ * инсулина был мёртв. Мапа метка → канонический id (фолбэк — прежний дефолт 24ч).
+ */
+const INJ_LABEL_TO_PHARMA: Record<string, string> = {
+  'инсулин': 'ins_short', 'ГР': 'hgh', 'ИФР-1': 'igf1_lr3', 'MGF': 'mgf',
+  'IGF-1 DES': 'igf1_des', 'IGF-1 LR3': 'igf1_lr3', 'HCG': 'hcg',
+  'GHRP': 'ghrp6', 'CJC': 'cjc1295', 'BPC-157': 'bpc157', 'TB-500': 'tb500',
+  'меланотан': 'melanotan2', 'семаглутид': 'semaglutide', 'тирзепатид': 'tirzepatide',
+  'пептид': 'bpc157', 'ААС': 'testosterone_enanthate',
+};
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
 import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHASE_RU } from './planner-cycle-calendar';
 import { computeEnergyAvailability } from './planner-female-cycle';
@@ -81,8 +123,8 @@ export const IndividualPlanSettings: React.FC = () => {
     intraWorkoutEnabled, setIntraWorkoutEnabled,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
     sleepHours, setSleepHours, sleepQuality, setSleepQuality,
-    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
-    weightAdaptMode, setWeightAdaptMode, weightLogWeek, setWeightLogWeek,
+    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
+    weightAdaptMode, setWeightAdaptMode,
     expectedLossKgWeek, setExpectedLossKgWeek,
     showWeightAdaptModal, setShowWeightAdaptModal,
     weightLogEntries, setWeightLogEntries,
@@ -96,17 +138,17 @@ export const IndividualPlanSettings: React.FC = () => {
     injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
     injectDrugTypes,
     calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown,
-    carbCapClipped, carbCapGPerKg,
+    carbCapClipped, carbCapGPerKg, rawCarbsForCap,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     budget, setBudget, proteinPreset, setProteinPreset,
-    diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel,
+    diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride,
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
     workFood, setWorkFood, mealsCount, setMealsCount,
     morningTrainLoad, setMorningTrainLoad,
     allergens, toggleAllergen,
-    healthIssues, setHealthIssues, toggleHealthIssue,
+    healthIssues, toggleHealthIssue,
     eveningLowCarb, setEveningLowCarb, nightCarbs, setNightCarbs,
     addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
     planType, setPlanType,
@@ -189,11 +231,8 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
     try { const v = JSON.parse(localStorage.getItem('he_special_meals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
   });
-  const [showSexPicker, setShowSexPicker] = useState(false);
-  const [showTrainTypePicker, setShowTrainTypePicker] = useState(false);
-  const [showIntensityPicker, setShowIntensityPicker] = useState(false);
-  const [showActivityPicker, setShowActivityPicker] = useState(false);
-  const [showCyclePicker, setShowCyclePicker] = useState(false);
+  // FIX audit (dead-code): 5 picker-состояний удалены — заменены PopupSelect,
+  // их сеттеры никогда не вызывались.
   const [showWorkFoodPicker, setShowWorkFoodPicker] = useState(false);
   const pickerBtn = (label: string, opts: {value:string,label:string}[], cur: string, setShow: (v:boolean)=>void) => (
     <div onClick={() => setShow(true)} style={{...selectStyle, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', minHeight:32, boxSizing:'border-box'}}>
@@ -244,7 +283,7 @@ export const IndividualPlanSettings: React.FC = () => {
     window.addEventListener('storage', h); window.addEventListener('he-hematology-advice', h as any);
     return ()=>{ window.removeEventListener('storage', h); window.removeEventListener('he-hematology-advice', h as any); };
   }, []);
-  const settingsSection = 'all';
+  // FIX audit (dead-code): переменная settingsSection ('all') удалена — нигде не читалась.
   const persistPlannerValue = (key: string, value: unknown) => {
     try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
   };
@@ -329,7 +368,10 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
           {carbCapClipped && (
             <div style={{ fontSize:9, color:'#fbbf24', padding:'6px 8px', marginBottom:7, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:8, lineHeight:1.5 }}>
-              ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Снять ограничение можно в ручном режиме КБЖУ.
+              ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Кнопка ниже снимает ограничение (P1-9, план NUTRITION-VARIETY-PLAN).
+              {/* P1-9 (план NUTRITION-VARIETY-PLAN §3.1): явный чекпоинт достижимости
+                  800-1500У — вместо пассивного warning'а кнопка «Снять потолок» */}
+              <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — цель 800–1500У теперь достижима (ручной контроль)', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок (цель {Math.round(rawCarbsForCap / Math.max(1, weight))} г/кг &gt; потолка)</button>
             </div>
           )}
           {Array.isArray(dayTargetsBreakdown) && dayTargetsBreakdown.length > 0 && (
@@ -367,7 +409,7 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
           )}
           {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
-          <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
+          <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
         </GlassCard>
         <GlassCard title="Режим планировщика" icon="🧬" color="#60a5fa">
           <button onClick={() => setPlannerMode('simple')} style={{ width:'100%', padding:9, borderRadius:8, cursor:'pointer', background:'#202023', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa', fontSize:10, fontWeight:700 }}>🍽 Перейти в простой режим</button>
@@ -397,7 +439,7 @@ export const IndividualPlanSettings: React.FC = () => {
             }}
           >📋 Автозаполнение из профиля</button>
           <button
-            onClick={() => { saveToProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('✓ Сохранено в профиль', 'success'); else alert('✓ Сохранено в профиль'); }}
+            onClick={() => { saveToProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('✓ Сохранено в профиль', 'success'); }}
             style={{
               flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
               background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)',
@@ -504,46 +546,18 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
           <PopupNumber label="📏 Рост (см)" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
-          <PopupNumber label="🎂 Возраст" value={age} min={10} max={120} suffix="лет" onChange={setAge} />
+          <PopupNumber label="🎂 Возраст" value={age} min={14} max={120} suffix="лет" onChange={setAge} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupSelect label="🧑 Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
           <PopupNumber label="🚶 Шагов/день" value={dailySteps} min={0} max={50000} step={500} suffix="шаг" onChange={setDailySteps} />
         </div>
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-          {/* E7-fix: дубль «Заполнить из профиля» читал несуществующие поля (baselineSleepHours
-              и т.п. — фактически no-op). Теперь единый ctx.autofillFromProfile с честными путями. */}
-          <button onClick={() => { autofillFromProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('📋 Данные из профиля загружены', 'success'); }} style={{
-            flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
-            background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
-          }}>👤 Заполнить из профиля</button>
+          {/* Чистка-2026 (C2): дубль «Заполнить из профиля» удалён — синк живёт в
+              верхней карточке «Синхронизация с Профилем» (аутфилл/сохранить). */}
           <button onClick={() => {
-            const labPoints = labs || [];
-            if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
-            const newLabs: Record<string, string> = { ...v2Labs };
-            const codeMap: Record<string, string> = {
-              ALT: 'alt', AST: 'ast', GGT: 'ggt', LDL: 'ldl', HDL: 'hdl',
-              TRIGLYCERIDES: 'triglycerides', CRP: 'crp', CREATININE: 'creatinine',
-              HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
-              ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
-              TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
-              TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
-              LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin', BILIRUBIN: 'bilirubin',
-              CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
-              INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
-              VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob',
-              // ВАЖНО (units-fix): POTASSIUM/SODIUM/MAGNESIUM НЕ импортируем — эти ключи
-              // в v2Labs означают ДНЕВНЫЕ пищевые цели электролитов (мг), а не сывороточные
-              // концентрации (ммоль/л). Импорт сыворотки сюда искажал карточку «Электролиты»
-              // и давал ложные гиперкалиемию/гипернатриемию в диетической коррекции.
-            };
-            labPoints.forEach(lp => {
-              const field = codeMap[String(lp.code || '').toUpperCase()];
-              if (field && lp.value !== undefined && lp.value !== null) {
-                newLabs[field] = String(Math.round(lp.value * 100) / 100);
-              }
-            });
-            setV2Labs(newLabs);
+            if ((labs || []).length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
+            setV2Labs(importLabsToV2(labs || [], v2Labs));
           }} style={{
             flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
             background: (labs || []).length > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
@@ -644,16 +658,6 @@ export const IndividualPlanSettings: React.FC = () => {
                ? `● Активен: шоу ${bbPrepConfig.showDate} · ${bbPrepConfig.category} · тапер ${bbPrepConfig.weeksOut} нед. Настройка — во вкладке «🏁 Тапер ББ».`
                : 'Пикинг к шоу настраивается во вкладке «🏁 Тапер ББ» (полный редактор).'}
            </div>
-           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setPlanTab('peak')}
-                style={{
-                  flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
-                }}
-              >
-                ⚙ Настроить во вкладке «Тапер ББ»
-              </button>
              {bbPrepConfig ? (
                <button
                  onClick={() => applyBBPeakToPlan(null)}
@@ -665,6 +669,8 @@ export const IndividualPlanSettings: React.FC = () => {
                  ✕ Отключить тапер
                </button>
              ) : (
+               /* Чистка-2026 (C4): было две кнопки в одну вкладку — «⚙ Настроить» и
+                  «🏁 Включить тапер» дублировали setPlanTab('peak'). Оставлена одна. */
                <button
                  onClick={() => setPlanTab('peak')}
                  style={{
@@ -672,10 +678,9 @@ export const IndividualPlanSettings: React.FC = () => {
                    background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.35)', color: '#22c55e',
                  }}
                >
-                 🏁 Включить тапер (пикинг к шоу)
+                 🏁 Настроить тапер (пикинг к шоу)
                </button>
              )}
-           </div>
         </GlassCard>
       )}
 
@@ -715,29 +720,9 @@ export const IndividualPlanSettings: React.FC = () => {
           <div style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Лабораторные (v2)</div>
             <button onClick={() => {
-              const labPoints = labs || [];
-if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
-              const newLabs: Record<string, string> = { ...v2Labs };
-              const codeMap: Record<string, string> = {
-                ALT: 'alt', AST: 'ast', GGT: 'ggt', LDL: 'ldl', HDL: 'hdl',
-                TRIGLYCERIDES: 'triglycerides', CRP: 'crp', CREATININE: 'creatinine',
-                HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
-                ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
-                TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
-                TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
-                LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin', BILIRUBIN: 'bilirubin',
-                CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
-                INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
-                VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob',
-                // POTASSIUM/SODIUM/MAGNESIUM — НЕ импортируем (пищевые цели в мг, не сыворотка).
-              };
-              labPoints.forEach(lp => {
-                const field = codeMap[String(lp.code || '').toUpperCase()];
-                if (field && lp.value !== undefined && lp.value !== null) {
-                  newLabs[field] = String(Math.round(lp.value * 100) / 100);
-                }
-              });
-              setV2Labs(newLabs);
+              // FIX audit (C1): единый helper (дубль ~30 строк удалён)
+              if ((labs || []).length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
+              setV2Labs(importLabsToV2(labs || [], v2Labs));
               setErrorMsg(null);
             }} style={{
               width: '100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
@@ -931,7 +916,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                   if (!name) return;
                   // FIX input-audit: доза должна быть > 0 (0/отрицательная давала «На 0г углеводов»)
                   if (!Number.isFinite(injDose) || injDose <= 0) { setErrorMsg('Укажите дозу больше 0'); return; }
-                  const sub = PHARMA_DB[name]; const hl = sub?.pk?.halfLifeHours || 24;
+                  // FIX audit (B3): метка типа → канонический id PHARMA_DB (см. INJ_LABEL_TO_PHARMA)
+                  const sub = PHARMA_DB[INJ_LABEL_TO_PHARMA[name] || '']; const hl = sub?.pk?.halfLifeHours || 24;
                   let dt = injType, de = injEster;
                   if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
                   let autoTime = +injTime.split(':')[0] * 60 + +injTime.split(':')[1] > 0 ? injTime : '08:00';
@@ -1158,10 +1144,12 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.</div>
               </div>
             )}
-            {/* Синхронизация с профилем — только по кнопке */}
+            {/* Синхронизация с профилем — только по кнопке. FIX audit (C3): заголовки
+                обещали синк «графика тренировок», а вызывался полный синк профиля —
+                переименованы честно (тот же ctx.autofillFromProfile/saveToProfile). */}
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Загрузить график тренировок из Профиля">📋 Из профиля</button>
-              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Сохранить график тренировок в Профиль">💾 Сохранить в профиль</button>
+              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Полный автозаполнение всех полей планировщика из Профиля">📋 Из профиля (весь профиль)</button>
+              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Полное сохранение всех полей планировщика в Профиль">💾 Сохранить (весь профиль)</button>
             </div>
           </>
         )}
@@ -1376,7 +1364,9 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.</div>
                 {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
-                <button onClick={() => setKbjuMode('manual')} style={greenBtn}>✓ Применить</button>
+                {/* FIX audit (B1): кнопка «✓ Применить» была no-op (setKbjuMode('manual') внутри
+                    уже-manual ветки) — значения сохраняются автоматически (авто-сейв контекста) */}
+                <div style={greenBtn}>✓ Введённые значения применяются автоматически</div>
               </>;
             })()}
           </div>
@@ -1385,51 +1375,38 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       )}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Скользящие графики" icon="📊" color="#00e68a">
+      <GlassCard title="Целевое КБЖУ" icon="📊" color="#00e68a">
         {(() => {
-          // D-22: nutrMult already folded into effective* — do NOT multiply again.
+          // FIX audit (B2): «Скользящие графики» показывали «Факт» как ХАРДКОД-мок
+          // (×0.87 цели) с подписью «среднее потребление за последние дни» — ложь.
+          // Фактический разбор — в Дневнике питания; здесь остаётся честная цель.
           const tKcal = kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal);
           const tP = kbjuMode !== 'manual' ? effectiveP : (manualP ?? effectiveP);
           const tF = kbjuMode !== 'manual' ? effectiveF : (manualF ?? effectiveF);
           const tC = kbjuMode !== 'manual' ? effectiveC : (manualC ?? effectiveC);
-          const mockActual = { kcal: Math.round(tKcal * 0.87), p: Math.round(tP * 0.92), f: Math.round(tF * 0.78), c: Math.round(tC * 0.83) };
           const items = [
-            { label:'Калории', target:tKcal, actual:mockActual.kcal, unit:'ккал', color:'#00e68a' },
-            { label:'Белки', target:tP, actual:mockActual.p, unit:'г', color:'#3b82f6' },
-            { label:'Жиры', target:tF, actual:mockActual.f, unit:'г', color:'#f59e0b' },
-            { label:'Углеводы', target:tC, actual:mockActual.c, unit:'г', color:'#f97316' },
+            { label:'Калории', target:tKcal, unit:'ккал', color:'#00e68a' },
+            { label:'Белки', target:tP, unit:'г', color:'#3b82f6' },
+            { label:'Жиры', target:tF, unit:'г', color:'#f59e0b' },
+            { label:'Углеводы', target:tC, unit:'г', color:'#f97316' },
           ];
           return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', marginBottom:4, lineHeight:1.6, padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <div>🎯 Цель — рассчитанная норма КБЖУ</div>
-              <div>📊 Факт — среднее потребление за последние дни</div>
+              <div>🎯 Цель — рассчитанная норма КБЖУ на день</div>
+              <div style={{ color:'rgba(255,255,255,0.5)' }}>Факт по дням — в «📓 Дневнике питания»</div>
             </div>
-            {items.map(m => {
-              const pct = m.target > 0 ? Math.min(100, Math.round(m.actual / m.target * 100)) : 0;
-              return (
-                <div key={m.label} style={{ marginBottom:4 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:m.color, marginBottom:3 }}>{m.label}</div>
-                   <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
-                    <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)', minWidth:38, whiteSpace:'nowrap' }}>🎯 Цель</span>
-                    <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative' }}>
-                      <div style={{ height:'100%', width:'100%', borderRadius:3, background:m.color, opacity:0.15 }} />
-                    </div>
-                    <span style={{ fontSize:10, fontWeight:600, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.target} <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)' }}>{m.unit}</span></span>
+            {items.map(m => (
+              <div key={m.label} style={{ marginBottom:4 }}>
+                <div style={{ fontSize:9, fontWeight:600, color:m.color, marginBottom:3 }}>{m.label}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)', minWidth:38, whiteSpace:'nowrap' }}>🎯 Цель</span>
+                  <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative' }}>
+                    <div style={{ height:'100%', width:'100%', borderRadius:3, background:m.color, opacity:0.15 }} />
                   </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                    <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)', minWidth:38, whiteSpace:'nowrap' }}>📊 Факт</span>
-                    <div style={{ flex:1, height:8, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative', overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${pct}%`, borderRadius:3, background:m.color, opacity:0.6, transition:'width 0.3s' }} />
-                    </div>
-                    <span style={{ fontSize:10, fontWeight:700, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.actual} · {pct}%</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:1, paddingLeft:44 }}>
-                    <span>норма</span>
-                    <span>факт ({pct}%)</span>
-                  </div>
+                  <span style={{ fontSize:10, fontWeight:600, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.target} <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)' }}>{m.unit}</span></span>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>;
         })()}
       </GlassCard>
@@ -1498,6 +1475,27 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               background: varietyStrictness === id ? 'rgba(139,92,246,0.14)' : '#202023',
               border: varietyStrictness === id ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
               color: varietyStrictness === id ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+            </button>
+          ))}
+        </div>
+        {/* P1-6 (HV-экстремумы 800-1500У/500Б, план NUTRITION-VARIETY-PLAN §3.1):
+            стиль закрытия высокоуглеводных целей. real = как раньше (байт-в-байт);
+            practical/mixed расширяют топапы плотными носителями (крем/хлопья/сухофрукты). */}
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', margin: '8px 0 4px' }}>⚡ Стиль High-Volume (800–1500 г углей)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+          {([
+            ['real', '🍳 Реальная еда', 'Как сейчас: цельная еда в основных приёмах'],
+            ['practical', '⚡ Практичный', 'Плотные топапы (крем/хлопья/сухофрукты) — без 3 кг каши'],
+            ['mixed', '🔀 Смешанный', 'Реальная еда в основных + практичная в перекусах'],
+          ] as ['real' | 'practical' | 'mixed', string, string][]).map(([id, label, desc]) => (
+            <button key={id} onClick={() => setHvStyle(id)} style={{
+              padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+              background: hvStyle === id ? 'rgba(34,197,94,0.14)' : '#202023',
+              border: hvStyle === id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+              color: hvStyle === id ? '#86efac' : 'rgba(255,255,255,0.7)',
             }}>
               <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
@@ -1773,8 +1771,13 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
 
         <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
         <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
+          {/* FIX audit (C5): «Гистамин» = синхронизированный алиас histamineSensitive
+              (раньше чип включал гейт, а v2-карточка показывала «не чувствителен») */}
           {([['lowFODMAP','Фодмап'],['lowHistamine','Гистамин'],['lowOxalate','Оксалаты']] as [string,string][]).map(([key,label]) => (
-            <button key={key} onClick={() => setIntolerances((prev:any) => ({ ...prev, [key]: !prev[key] }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:600, background: (intolerances as any)[key]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)', border: (intolerances as any)[key]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)', color: (intolerances as any)[key]?'#ef4444':'rgba(255,255,255,0.7)' }}>{(intolerances as any)[key]?'✅ ':''}{label}</button>
+            <button key={key} onClick={() => {
+              if (key === 'lowHistamine' && typeof setHistamineSensitive === 'function') { setHistamineSensitive(!(intolerances as any)[key]); return; }
+              setIntolerances((prev:any) => ({ ...prev, [key]: !prev[key] }));
+            }} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:600, background: (intolerances as any)[key]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)', border: (intolerances as any)[key]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)', color: (intolerances as any)[key]?'#ef4444':'rgba(255,255,255,0.7)' }}>{(intolerances as any)[key]?'✅ ':''}{label}</button>
           ))}
         </div>
 
@@ -2138,6 +2141,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         {carbPeriodization !== 'none' && carbCapClipped && (
           <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 8, color: '#fbbf24', lineHeight: 1.5 }}>
             ⚠ Диетологический потолок углеводов {carbCapGPerKg} г/кг ограничивает режим «{CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.label}» — цели тренировочных дней могут не дотягиваться до волны. Потолок задаётся стилем питания (кето/высоко-углеводный); снять — в ручном КБЖУ.
+            {/* P1-9: явный чекпоинт «Снять потолок» (дубль кнопки из карточки КБЖУ — тот же оверрайд) */}
+            <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — периодизация больше не режется', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:8, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок</button>
           </div>
         )}
         {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
@@ -2319,27 +2324,15 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
                 Разрешает один приём пищи с десертом/сладким в выбранные дни. Помогает соблюдать диету без срывов.
               </div>
-              <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                {(() => DAY_LABELS.map((label, idx) => {
-                  const sel = idx < cravingDays;
-                  return (
-                    <button key={idx} onClick={() => {
-                      if (sel) setCravingDays(Math.max(1, cravingDays - 1));
-                      else setCravingDays(Math.min(7, cravingDays + 1));
-                    }} style={{
-                      width:36, height:36, borderRadius:'50%', cursor:'pointer',
-                      border: sel ? '2px solid #ef4444' : '2px solid #3f3f46',
-                      background: sel ? 'rgba(239,68,68,0.2)' : '#202023',
-                      color: sel ? '#ef4444' : 'rgba(255,255,255,0.85)',
-                      fontSize:10, fontWeight: sel ? 800 : 500,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      transition:'all 0.15s',
-                    }}>{label}</button>
-                  );
-                }))()}
+              {/* FIX button-audit (B7): круги дней выглядели как выбор конкретных дней,
+                  а движок получает только ЧИСЛО дней — честный счётчик вместо кругов */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                <button onClick={() => setCravingDays(Math.max(1, cravingDays - 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>−</button>
+                <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', minWidth:22, textAlign:'center' }}>{cravingDays}</div>
+                <button onClick={() => setCravingDays(Math.min(7, cravingDays + 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>＋</button>
               </div>
               <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
-                {cravingDays} {cravingDays === 1 ? 'день' : 'дней'} с десертом
+                {cravingDays} {cravingDays === 1 ? 'день' : 'дней'} с десертом в неделю
               </div>
             </>
           )}
@@ -2367,27 +2360,14 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
                 День с минимальной готовкой — протеиновый коктейль, творог, хлопья. Снижает нагрузку, когда нет сил или времени.
               </div>
-              <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                {(() => DAY_LABELS.map((label, idx) => {
-                  const sel = idx < lazyDayDays;
-                  return (
-                    <button key={idx} onClick={() => {
-                      if (sel) setLazyDayDays(Math.max(1, lazyDayDays - 1));
-                      else setLazyDayDays(Math.min(7, lazyDayDays + 1));
-                    }} style={{
-                      width:36, height:36, borderRadius:'50%', cursor:'pointer',
-                      border: sel ? '2px solid #f59e0b' : '2px solid #3f3f46',
-                      background: sel ? 'rgba(245,158,11,0.2)' : '#202023',
-                      color: sel ? '#f59e0b' : 'rgba(255,255,255,0.85)',
-                      fontSize:10, fontWeight: sel ? 800 : 500,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      transition:'all 0.15s',
-                    }}>{label}</button>
-                  );
-                }))()}
+              {/* FIX button-audit (B7): счётчик вместо кругов (движок получает число дней) */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                <button onClick={() => setLazyDayDays(Math.max(1, lazyDayDays - 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>−</button>
+                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b', minWidth:22, textAlign:'center' }}>{lazyDayDays}</div>
+                <button onClick={() => setLazyDayDays(Math.min(7, lazyDayDays + 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>＋</button>
               </div>
               <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
-                {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} без готовки
+                {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} без готовки в неделю
               </div>
             </>
           )}
@@ -2401,7 +2381,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ fontSize:14 }}>🍽️</span>
               <div>
-                <div style={{ fontSize:10, fontWeight:700, color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)' }}>Спецприём</div>
+                <div style={{ fontSize:10, fontWeight:700, color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)' }}>Постоянный спецприём (шаблон)</div>
                 {specialMealMode ? (
                   <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>
                     {specialMealGoalLabel} · {specialMealTimingLabel} · {specialMealProteinG + specialMealFatG + specialMealCarbsG}г · ∑ {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал
@@ -2582,7 +2562,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                     const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
                     for (let i = 0; i < p.slots; i++) {
                       const d = new Date(); d.setDate(d.getDate() - (p.slots - 1 - i) * step);
-                      const ds = d.toISOString().split('T')[0];
+                      {/* FIX UTC-audit (B4): локальная дата, не UTC (около полуночи UTC+ съезжала на день) */}
+                      const ds = _toLocalIso(d);
                       entries.push({ date: ds, weight: byDate.has(ds) ? byDate.get(ds) as number : lastWeight });
                     }
                     setWeightLogEntries(entries);
@@ -2643,7 +2624,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 const _rawLast = weightLogEntries.length > 0 ? new Date(weightLogEntries[weightLogEntries.length - 1].date) : null;
                 const lastDate = (_rawLast && Number.isFinite(_rawLast.getTime())) ? _rawLast : new Date();
                 const nextDate = new Date(lastDate); nextDate.setDate(nextDate.getDate() + 1);
-                setWeightLogEntries([...weightLogEntries, { date: nextDate.toISOString().split('T')[0], weight: weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80 }]);
+                // FIX UTC-audit (B4): toISOString уводил дату на день назад около полуночи (UTC+)
+                setWeightLogEntries([...weightLogEntries, { date: _toLocalIso(nextDate), weight: weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80 }]);
               }} style={{
                 width:'100%', padding:'8px', borderRadius:9, cursor:'pointer', fontSize:9, fontWeight:600, marginBottom:12,
                 background:'rgba(167,139,250,0.05)', border:'1.5px dashed rgba(167,139,250,0.2)', color:'#a78bfa',
@@ -2710,7 +2692,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">
         <button onClick={() => {
           setSpecialMealType('cheat_meal');
-          setSpecialMealDate(new Date().toISOString().split('T')[0]);
+          // FIX UTC-audit (B4): локальная дата, не UTC
+          setSpecialMealDate(_toLocalIso(new Date()));
           setSpecialMealNotes('');
           setShowSpecialMealPopup(true);
         }} style={{

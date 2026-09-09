@@ -40,6 +40,7 @@ import {
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
   familyMealCap, familyMealUses, isCreamId, creamMealCap, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
   isCannedFoodId, CANNED_SUBSTITUTE, isFlakeId, isMeatProteinId, mealHasMeatProtein,
+  isSauceCondimentFood,
   dayTargetScale, quotaMealCap,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
@@ -119,6 +120,14 @@ export interface MealPlanInput {
   recentFoodIds?: Set<string>;
   /** B5: семейства гарниров (oats/rice/…), использованные в предыдущих днях — ротация. */
   recentStapleFamilies?: Set<string>;
+  /** P1-3 (план разнообразия): семейство → число дней недели, где оно уже было
+   *  (ledger weekFamilies). Семейство с ≥2 днями недели деприоритизируется
+   *  (fresh-гейт ≥2 не даёт голода). undefined = legacy (гейт неактивен). */
+  weekStapleFamilies?: Record<string, number>;
+  /** P1-6 (HV-экстремумы 800-1500У/500Б): стиль HV-рациона. 'real' (дефолт) =
+   *  текущее поведение байт-в-байт; 'practical'/'mixed' — шире топапы плотными
+   *  носителями (крем/хлопья/сухофрукты) без 3 кг каши. */
+  hvStyle?: 'real' | 'practical' | 'mixed';
   /** E6: замены приёмов спец-приёмами (календарь/конфиг). */
   specialMealOverride?: { targetLabel: string; kind: 'cheat' | 'refeed' | 'fast' | 'custom'; p?: number; c?: number; f?: number }[];
   // Smart 7-day variety: foods used in the last 1-2 days — HARD-excluded (stricter than
@@ -444,6 +453,9 @@ export function isConcentrateFood(food: FoodItem): boolean {
  * политику подъёма/замены см. applyRealisticFloors.
  */
 export function realisticFloorG(food: FoodItem, role: MealItem['role'], isSnack: boolean, weightKg: number = 80): number {
+  // P0-2 (соусы): приправа не имеет «реалистичного пола» — соевый соус 15 г легален,
+  // а «пол белка 80-110 г» надувал его до 80/151 г (жалоба пользователя).
+  if (isSauceCondimentFood(food)) return 0;
   const cat = food.category;
   const weightScale = Math.max(1, Math.min(1.6, weightKg / 80));
   if (role === 'protein') {
@@ -475,6 +487,9 @@ export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budget
   for (const it of out) {
     const food = FOOD_DB.find(f => f.id === it.id);
     if (!food) continue;
+    // P0-2 (соусы): guard независимо от роли — legacy-планы/ручные правки могли
+    // сохранить role 'protein' у соуса; полы его не трогают в любом случае.
+    if (isSauceCondimentFood(food)) continue;
     const role: MealItem['role'] = it.role || 'protein';
     let fl = realisticFloorG(food, role, isSnack, weightKg);
     // Recipe-путь (мягкий режим): ядро рецепта не должно разъезжаться с шапкой >+20% —
@@ -1125,17 +1140,23 @@ function foodPassesCtxAllergens(f: { id: string }): boolean {
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
   if (arr.length === 1) return arr[0];
-  const weights = arr.map((f, i) => {
-    const score = (f as any).bb_quality_score ?? 5;
-    let w = _pickCtx.qualityMode === 'full' ? Math.max(0.5, Math.pow(score, 1.5)) : 1;
-    // A: taste profile boost — foods matching user's taste preferences get higher weight
-    if (_pickCtx.tasteProfile) { const ts = tasteMatchScore(f, _pickCtx.tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
-    // B: deprioritize frequently-replaced foods
-    if (_pickCtx.deprioritizedIds && _pickCtx.deprioritizedIds.has((f as any).id)) w *= 0.3;
-    // C: category-preferred boost
-    if (_pickCtx.categoryPref && isPreferredCategory(f, _pickCtx.categoryPref)) w *= 1.5;
-    return w;
-  });
+    const weights = arr.map((f, i) => {
+      const score = (f as any).bb_quality_score ?? 5;
+      let w = _pickCtx.qualityMode === 'full' ? Math.max(0.5, Math.pow(score, 1.5)) : 1;
+      // A: taste profile boost — foods matching user's taste preferences get higher weight
+      if (_pickCtx.tasteProfile) { const ts = tasteMatchScore(f, _pickCtx.tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
+      // B: deprioritize frequently-replaced foods
+      if (_pickCtx.deprioritizedIds && _pickCtx.deprioritizedIds.has((f as any).id)) w *= 0.3;
+      // C: category-preferred boost
+      if (_pickCtx.categoryPref && isPreferredCategory(f, _pickCtx.categoryPref)) w *= 1.5;
+      // P2-5 (план разнообразия): семейство вчерашнего дня — мягкий штраф ×0.55
+      // (вес, не фильтр: fresh-гейты и квоты не меняются, гарантии целы).
+      if ((_pickCtx as any).recentFamPenalty && (_pickCtx as any).recentFamPenalty.size > 0) {
+        const _pf = stapleFamilyOf((f as any).id || '');
+        if (_pf && (_pickCtx as any).recentFamPenalty.has(_pf)) w *= 0.55;
+      }
+      return w;
+    });
   const total = weights.reduce((s, w) => s + w, 0);
   let r = seededRandom(seed) * total;
   for (let i = 0; i < arr.length; i++) {
@@ -1359,7 +1380,10 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 }
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
-function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string>; portableMode?: boolean }) {
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string>; portableMode?: boolean; saltSeed?: number }) {
+  // P0-5 ОТЗВАН: соляной сид variety-трима ломал калиброванные гарантии (яйцо-квота
+  // 325>298 при соли 2, HV-сходимость). Параметр saltSeed оставлен в сигнатуре для
+  // P1-роунда (ledger-разнообразие) — по умолчанию 0 = поведение байт-в-байт.
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
   // D-28+1: «еда на работе» теперь per-meal (окно смены), а не глобально basePool.
@@ -3010,6 +3034,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.dayCarbUses = new Map();
   _pickCtx.dayCarbFamilyUses = new Map();
   (_pickCtx as any).dayCreamMeals = 0;
+  // P2-5 (план разнообразия): continuous-штраф семействам вчерашнего дня в pickWeighted
+  // (бинарный fresh-фильтр buildWholeMeal остаётся как раньше — это мягкий вес ×0.55).
+  (_pickCtx as any).recentFamPenalty = input.recentStapleFamilies && input.recentStapleFamilies.size > 0 ? input.recentStapleFamilies : undefined;
+  // P1-6 (HV-экстремумы): стиль HV-рациона — 'real' (дефолт) = поведение байт-в-байт.
+  (_pickCtx as any).hvStyle = input.hvStyle ?? 'real';
   // P1a: якоря дня 2+2 — ротация по дню (внутри дня coherence, между днями rotation через
   // recentFoodIds/hardRecentIds чейнинг контекста). Фильтр доступности/исключений здесь;
   // пересечение с пулом приёма — в точке пика (фолбэк — обычная селекция).
@@ -3033,6 +3062,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _rot2 = (pool: string[]): string[] => {
       const live = pool.filter(_anchOk);
       if (live.length === 0) return [];
+      // P1 (план разнообразия): соляной сдвиг якорей здесь ОТОЗВАН — якоря входят в
+      // калиброванные гарантии (неделя: красное ≤3/7, HV-сходимость, яйцо-квоты);
+      // ротация перегенераций делается ledger-механизмом recents (soft, с fresh-гейтами).
       const start = (Math.abs(Math.round(input.dayOffset || 0)) * 2) % live.length;
       const pair = [live[start % live.length], live[(start + 1) % live.length]].filter((v, i, a) => a.indexOf(v) === i);
       // Разные семейства: рис+крем парой не ходят (иначе оба primary-обеда рисовые).
@@ -3056,6 +3088,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   let tLunch = input.lunchTime || '12:30';
   let tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
+  // P1-3 (план разнообразия): недельный гейт «одна крупа ≤2 дней недели» —
+  // семейства с ≥2 днями в ledger-week добавляются к бану recent-семейств
+  // (fresh-гейт ≥2 в buildWholeMeal не даёт голода). undefined = legacy бит-в-байт.
+  const _weekFamBan: Set<string> | undefined = input.weekStapleFamilies && Object.keys(input.weekStapleFamilies).length > 0
+    ? new Set<string>([
+        ...(input.recentStapleFamilies || []),
+        ...Object.entries(input.weekStapleFamilies).filter(([, n]) => (Number(n) || 0) >= 2).map(([f]) => f),
+      ])
+    : input.recentStapleFamilies;
   // Работа: если isWorkDay, сдвигаем обед в середину смены, ужин — через 30м после конца смены
   if (input.isWorkDay && Number.isFinite(input.workStartMin) && Number.isFinite(input.workEndMin)) {
     const ws = input.workStartMin as number, we = input.workEndMin as number;
@@ -3690,7 +3731,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     quotaBlockedIds: blockedIdsForNextMeal(quota, 'breakfast'),
-    recentFamilies: input.recentStapleFamilies,
+    recentFamilies: _weekFamBan,
     mealPreferredIds: input.preferredByMeal?.['Завтрак'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.breakfast.p,
@@ -3742,7 +3783,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const lunch = buildWholeMeal({
     label: 'Обед', time: tLunch, type: 'lunch', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     quotaBlockedIds: blockedIdsForNextMeal(quota, 'lunch'),
-    recentFamilies: input.recentStapleFamilies,
+    recentFamilies: _weekFamBan,
     mealPreferredIds: input.preferredByMeal?.['Обед'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.lunch.p,
@@ -3770,7 +3811,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const snack = buildWholeMeal({
       label: 'Полдник', time: _snackTimeOf('snack'), type: 'snack', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
       quotaBlockedIds: blockedIdsForNextMeal(quota, 'snack'),
-      recentFamilies: input.recentStapleFamilies,
+      recentFamilies: _weekFamBan,
       mealPreferredIds: input.preferredByMeal?.['Полдник'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.snack.p,
@@ -3886,7 +3927,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const dinner = buildWholeMeal({
     label: 'Ужин', time: tDinner, type: 'dinner', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     quotaBlockedIds: blockedIdsForNextMeal(quota, 'dinner'),
-    recentFamilies: input.recentStapleFamilies,
+    recentFamilies: _weekFamBan,
     mealPreferredIds: input.preferredByMeal?.['Ужин'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.dinner.p,
@@ -5774,13 +5815,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
-      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0 });
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle });
       // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
       // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
       // Если первый прогон плох — повторяем без lbmKg и берём лучший
       // (монотонно, цена только плохим дням).
       if (_corr.deviationPct > 8 && input.lbmKg) {
-        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0 });
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle });
         if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
           _corr = _corrNoLbm;
           notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);

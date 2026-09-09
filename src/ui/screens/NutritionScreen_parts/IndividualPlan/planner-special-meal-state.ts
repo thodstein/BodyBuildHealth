@@ -74,14 +74,32 @@ export interface PlannerSpecialMealState {
 }
 
 export function usePlannerSpecialMealState(d: PlannerSpecialMealStateDeps): PlannerSpecialMealState {
-  const [specialMealMode, setSpecialMealMode] = useState(false);
-  const [specialMealGoal, setSpecialMealGoal] = useState('custom');
-  const [specialMealProteinG, setSpecialMealProteinG] = useState(40);
-  const [specialMealFatG, setSpecialMealFatG] = useState(15);
-  const [specialMealCarbsG, setSpecialMealCarbsG] = useState(50);
-  const [specialMealTiming, setSpecialMealTiming] = useState('snack');
-  const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(false);
-  const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState('Ужин');
+  // FIX persist-audit (B5): конфиг спец-приёма не сохранялся — после перезагрузки
+  // сбрасывался на дефолт (соседний календарь «➕ Спецприём» персистится в he_special_meals).
+  const _loadCfg = <T,>(key: string, fallback: T): T => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_planner_special_cfg') || 'null');
+      if (raw && typeof raw === 'object' && raw[key] !== undefined && raw[key] !== null) return raw[key] as T;
+    } catch {}
+    return fallback;
+  };
+  const [specialMealMode, setSpecialMealMode] = useState(() => _loadCfg<boolean>('mode', false));
+  const [specialMealGoal, setSpecialMealGoal] = useState(() => _loadCfg<string>('goal', 'custom'));
+  const [specialMealProteinG, setSpecialMealProteinG] = useState(() => _loadCfg<number>('proteinG', 40));
+  const [specialMealFatG, setSpecialMealFatG] = useState(() => _loadCfg<number>('fatG', 15));
+  const [specialMealCarbsG, setSpecialMealCarbsG] = useState(() => _loadCfg<number>('carbsG', 50));
+  const [specialMealTiming, setSpecialMealTiming] = useState(() => _loadCfg<string>('timing', 'snack'));
+  const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(() => _loadCfg<boolean>('replaceMode', false));
+  const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState(() => _loadCfg<string>('replaceTarget', 'Ужин'));
+  useEffect(() => {
+    try {
+      localStorage.setItem('he_planner_special_cfg', JSON.stringify({
+        mode: specialMealMode, goal: specialMealGoal, proteinG: specialMealProteinG,
+        fatG: specialMealFatG, carbsG: specialMealCarbsG, timing: specialMealTiming,
+        replaceMode: specialMealReplaceMode, replaceTarget: specialMealReplaceTarget,
+      }));
+    } catch {}
+  }, [specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget]);
   const [cheatMealPlan, setCheatMealPlan] = useState<any>(null);
   const [carbloadPlan, setCarbloadPlan] = useState<any>(null);
   const [butchPlan, setButchPlan] = useState<any>(null);

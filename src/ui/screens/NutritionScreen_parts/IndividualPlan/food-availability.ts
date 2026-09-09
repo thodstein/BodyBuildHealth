@@ -272,6 +272,22 @@ export function isCannedFoodId(id: string): boolean {
 }
 
 /**
+ * Соусы/приправы (sauce_*, mayo*, ketchup*) — приправа, а не белковая/углеводная база.
+ * Причина: категория 'other' у соусов раньше валилась в роль 'protein'
+ * (recipe-engine.roleForFood) → applyRealisticFloors поднимал соевый соус 15 г до
+ * 80 г «белкового пола». Имя-матч ограничен категорией 'other' и исключает готовые
+ * блюда (префиксы ru-, int-, snack-, drink-), у которых «майонез» упомянут в описании.
+ */
+export function isSauceCondimentFood(f: { id?: string; name?: string; category?: string }): boolean {
+  const id = (f.id || '').toLowerCase();
+  if (/^(sauce_|mayo_|mayonnaise|ketchup)/.test(id)) return true;
+  if (/^(ru_|int_|snack_|drink_)/.test(id)) return false;
+  if (f.category !== 'other') return false;
+  const name = (f.name || '').toLowerCase();
+  return /соус|сальса|майонез|кетчуп|горчиц|терияк|срирач|кочхуджан|васаби|уксус|sauce|salsa|mayo|ketchup|mustard|vinegar|sriracha|wasabi/.test(name);
+}
+
+/**
  * Замена консервов свежими 1-в-1 С СОХРАНЕНИЕМ ПОЗИЦИИ в пуле (не удаление!).
  * Простое выкидывание id сдвигает индексы seeded-пиков и ломает сходимость
  * несвязанных сценариев (доказано: D-24 −33% от бана). Дубль свежего id в пуле —
@@ -331,6 +347,20 @@ export function quotaMealCap(base: number, targetScale: number, max: number): nu
   const ts = Math.max(1, Math.min(1.6, Number(targetScale) || 1));
   const step = ts >= 1.5 ? 2 : ts >= 1.3 ? 1 : 0;
   return Math.min(max, base + step);
+}
+
+/**
+ * P1-6/P1-7 (HV-экстремумы 800-1500У/500Б, план разнообразия §3.1): стиль HV.
+ * 'real' (дефолт) = поведение байт-в-байт; 'practical'/'mixed' расширяют топап-пулы
+ * плотными носителями (крем/хлопья/сухофрукты/банан) — 1500У без 3 кг каши.
+ * Квоты/капы НЕ меняются — расширяется только выбор легальных кандидатов.
+ */
+export type HvStyle = 'real' | 'practical' | 'mixed';
+export const HV_PRACTICAL_CARB_IDS: readonly string[] = [
+  'cream_of_rice', 'corn_flakes', 'rice_basmati', 'bread_white', 'banana', 'dates', 'raisins', 'dried_apricots',
+];
+export function hvStyleWidensTopups(hvStyle: string | undefined): boolean {
+  return hvStyle === 'practical' || hvStyle === 'mixed';
 }
 
 export function createDailyQuota(weightKg?: number, targetScale?: number): DailyQuotaState {

@@ -16,6 +16,7 @@ import type { Recipe } from '../../../../engines/nutrition-periodization.engine'
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { MealItem } from './meal-plan-engine';
+import { isSauceCondimentFood, isCannedFoodId, CANNED_SUBSTITUTE } from './food-availability';
 
 // C3 (Эпик C): кэш декомпозиции легаси-рецептов (парсинг строк дорогой — гейт аллергенов
 // вызывает его на каждый скоринг; WeakMap кэш делает это O(1) после первого прохода).
@@ -106,12 +107,16 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
   if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
     for (const fid of recipe.ingredientIds) {
       if (used.has(fid)) continue;
-      const food = FOOD_DB.find(f => f.id === fid);
+      // P0-3 (консервы): рецепт-путь обязан соблюдать тот же гейт, что и пулы —
+      // «консервы — не автогенерация» (жалоба «опять консервированный тунец»).
+      // Замена свежим аналогом 1-в-1 сохраняет позицию и нормализуется по ккал ниже.
+      const _fid = isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid;
+      const food = FOOD_DB.find(f => f.id === _fid);
       if (!food) continue;
       const grams = recipe.portions?.[fid] ?? 100;
       const item = makeMealItem(food, grams, roleForFood(food));
       items.push(item);
-      used.add(fid);
+      used.add(_fid);
     }
     // Если порций мало и есть молоко (milk: true в завтраках) — добавим ТОЛЬКО если
     // пользователь явно указал молоко в ингредиентах (раньше 200 мл навязывались каждому
@@ -243,6 +248,10 @@ function findFoodByName(name: string): FoodItem | undefined {
 
 function roleForFood(food: FoodItem): MealItem['role'] {
   const cat = food.category;
+  // P0-2 (соусы ≠ белок): категория 'other' у соусов/приправ раньше валилась в
+  // 'protein' → пол реалистичных порций поднимал соевый соус 15 г до 80 г.
+  // Приправа семантически ближе к жиру (кап 10 г, без «белкового пола»).
+  if (isSauceCondimentFood(food)) return 'fat';
   if (cat === 'supplement') return 'fast_protein';
   if (cat === 'dairy') return 'slow_protein';
   if (cat === 'grain' || cat === 'carb') return 'carb_slow';
