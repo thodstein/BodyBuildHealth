@@ -98,7 +98,7 @@ export const ProgramMetricsCSV: React.FC<{ program: UserProgram; dir: string; on
 
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={download} title="Скачать все сеты в CSV (Excel)">📊 CSV</button>
+      <button className="extra-csv" style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={download} title="Скачать все сеты в CSV (Excel)">📊 CSV</button>
     </div>
   );
 };
@@ -146,6 +146,7 @@ export const RecoveryBadge: React.FC<{ onApplyAutoDeload?: () => void }> = ({ on
       <span>Готовность: {todayLabel}</span>
       {showAutoDeleload && onApplyAutoDeload && (
         <button
+          className="extra-deload"
           onClick={onApplyAutoDeload}
           title="Превратить текущую/следующую неделю в deload"
           style={{

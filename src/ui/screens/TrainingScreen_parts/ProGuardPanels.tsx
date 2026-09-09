@@ -259,7 +259,7 @@ export const RIRCalibrationPanel: React.FC<GuardPanelProps> = ({ program, dir, o
       </div>
 
       {Math.abs(bias) >= 0.5 && dir === 'bb' && onChange && showToast && (
-        <button onClick={applyCorrection} style={{ marginTop: 4, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: biasColor + '15', border: '1px solid ' + biasColor + '40', color: biasColor, fontWeight: 700, minHeight: 38, width: '100%' }}>
+        <button className="guard-apply" onClick={applyCorrection} style={{ marginTop: 4, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: biasColor + '15', border: '1px solid ' + biasColor + '40', color: biasColor, fontWeight: 700, minHeight: 38, width: '100%' }}>
           🔧 Применить корректировку RIR ко всем сетам
         </button>
       )}
@@ -445,7 +445,7 @@ export const StickingPointPanel: React.FC<GuardPanelProps> = ({ program, dir, on
                         const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : w) } };
                         onChange(upd);
                         showToast('✅ ' + (a.name || a.exercise || a) + ' → неделя 1, день 1');
-                      }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700, minHeight: 32 }}>
+                      }} className="guard-add-ex" style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700, minHeight: 32 }}>
                         + {a.name || a.exercise || a}
                       </button>
                     ))}

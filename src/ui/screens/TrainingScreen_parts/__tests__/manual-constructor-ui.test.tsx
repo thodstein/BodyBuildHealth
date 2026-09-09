@@ -13,6 +13,7 @@ import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
 import { HybridPlanPanel } from '../HybridPlanPanel';
 import { PlanSummaryTable } from '../ProgramEditorPanels';
+import { ProgramMetricsCSV } from '../ProgramExtras';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -231,6 +232,22 @@ describe('Сводная таблица: хуки §108 (табы недель)'
     } as any;
     const { container } = render(<PlanSummaryTable program={program} />);
     expect(container.querySelectorAll('.panel-week-tab').length).toBe(2);
+  });
+});
+
+describe('Экстры: хуки §109 (CSV-кнопка)', () => {
+  it('ProgramMetricsCSV рендерит .extra-csv', () => {
+    const program = {
+      meta: { id: 'e1', title: 'Тест', author: '', goal: 'hypertrophy', level: 'intermediate', daysPerWeek: 1, weeks: 1, direction: 'bb', createdAt: '', updatedAt: '', source: 'custom' },
+      bb: {
+        direction: 'bb', microcycleTemplate: { daySlots: [] },
+        weeks: [{ week: 1, phase: 'accumulation' as const, deload: false, sessions: [] }],
+        volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] },
+        constraints: { equipment: [] },
+      },
+    } as any;
+    const { container } = render(<ProgramMetricsCSV program={program} dir="bb" />);
+    expect(container.querySelector('.extra-csv')).toBeInTheDocument();
   });
 });
 

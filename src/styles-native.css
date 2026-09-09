@@ -12657,6 +12657,102 @@ html.app-native .lib-picker .lib-sheet-close:focus-visible {
   }
 }
 
+/* ─── 109. MANUAL GUARDS/EXTRAS PRO — PRO-панели и экстры редактора ───
+ * Хуки: .guard-apply/.guard-add-ex (ProGuardPanels), .extra-csv/.extra-deload
+ * (ProgramExtras). Кнопки 44px + press/focus, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+html.app-native .manual-constructor .guard-apply {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .manual-constructor .guard-apply:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .guard-apply:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .guard-add-ex {
+  min-height: 44px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+html.app-native .manual-constructor .guard-add-ex:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .guard-add-ex:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .extra-csv {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+html.app-native .manual-constructor .extra-csv:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .extra-csv:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .manual-constructor .extra-deload {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+html.app-native .manual-constructor .extra-deload:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .extra-deload:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .guard-apply:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .guard-add-ex:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .extra-csv:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .extra-deload:active {
+    transform: none !important;
+  }
+}
+
 /* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
 html.app-native .nd-data-btn {
   min-height: 44px !important;
