@@ -12,6 +12,7 @@ import { ManualProgramWizard } from '../ManualProgramWizard';
 import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
 import { HybridPlanPanel } from '../HybridPlanPanel';
+import { PlanSummaryTable } from '../ProgramEditorPanels';
 
 describe('ManualExport ICS', () => {
   it('генерирует валидный ICS для ББ-программы', () => {
@@ -211,6 +212,25 @@ describe('Гибрид-панель: хуки §107', () => {
     );
     expect(container.querySelector('.manual-hybrid-form')).toBeInTheDocument();
     expect(screen.getByText(/Собрать powerbuilder-план/)).toBeInTheDocument();
+  });
+});
+
+describe('Сводная таблица: хуки §108 (табы недель)', () => {
+  it('2 недели → 2 таба panel-week-tab', () => {
+    const mkWeek = (n: number) => ({
+      week: n, phase: 'accumulation' as const, deload: false,
+      sessions: [{ id: `s${n}`, name: 'Грудь', focus: 'грудь', dayOfWeek: 0, blocks: [{ id: `b${n}`, type: 'compound' as const, exerciseName: 'Жим', muscle: 'chest', role: 'primary' as const, sets: [{ reps: 8, rir: 2 }] }] }],
+    });
+    const program = {
+      meta: { id: 't1', title: 'Тест', author: '', goal: 'hypertrophy', level: 'intermediate', daysPerWeek: 1, weeks: 2, direction: 'bb', createdAt: '', updatedAt: '', source: 'custom' },
+      bb: {
+        direction: 'bb', microcycleTemplate: { daySlots: [] }, weeks: [mkWeek(1), mkWeek(2)],
+        volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] },
+        constraints: { equipment: [] },
+      },
+    } as any;
+    const { container } = render(<PlanSummaryTable program={program} />);
+    expect(container.querySelectorAll('.panel-week-tab').length).toBe(2);
   });
 });
 

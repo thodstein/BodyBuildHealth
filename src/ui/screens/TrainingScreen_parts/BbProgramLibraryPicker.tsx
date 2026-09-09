@@ -136,7 +136,7 @@ export const BbProgramLibraryPicker: React.FC<{
           <div className="lib-sheetbody" style={{ padding: '12px 14px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{label}</div>
-              <button onClick={() => setOpen(false)} style={{
+              <button className="lib-sheet-close" onClick={() => setOpen(false)} style={{
                 padding: '4px 8px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.06)',
                 color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>✕</button>

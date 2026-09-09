@@ -95,7 +95,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
                       const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk, wi) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s, si) => si === targetIdx ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
                       onChange(upd);
                       showToast('✅ ' + ex.name + ' → ' + (GROUP_RU[w.muscle] ?? w.muscle) + ` · день ${targetIdx + 1}`);
-                    }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}>+ {ex.name}</button>
+                    }} className="panel-add-ex" style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}>+ {ex.name}</button>
                   ))}
                 </div>
               </div>
@@ -160,7 +160,7 @@ export const PlanSummaryTable: React.FC<{
           {body.weeks.map((w, i) => {
             const pc = phaseColors[w.phase] || '#666';
             return (
-              <button key={i} onClick={() => onShowWeekChange?.(w.week)}
+              <button key={i} className="panel-week-tab" onClick={() => onShowWeekChange?.(w.week)}
                 style={{
                   padding: '5px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', minHeight: 34, minWidth: 36,
                   background: showWeek === w.week ? pc + '20' : 'rgba(255,255,255,0.04)',
@@ -277,7 +277,7 @@ export const AutoPeriodizationPanel: React.FC<{
         );
       })}
       {onApply && (
-        <button onClick={() => onApply(phases)} style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', fontWeight: 700, minHeight: 38, width: '100%' }}>
+        <button className="panel-apply" onClick={() => onApply(phases)} style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', fontWeight: 700, minHeight: 38, width: '100%' }}>
           🔧 Применить периодизацию
         </button>
       )}
@@ -349,7 +349,7 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
                 <span key={di} style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: DIM_STRONG }}>Д{di+1}: {day.map((g: string) => (GROUP_RU[g as keyof typeof GROUP_RU] ?? g)).join('/')}</span>
               ))}
             </div>
-            <button style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}
+            <button className="panel-apply" style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}
               onClick={() => {
                 const sessions = (c.groupsPerDay || []).map((groups: string[], di: number) => ({
                   id: newId('ses'), name: 'День ' + (di + 1), focus: groups.map((g: string) => GROUP_RU[g as keyof typeof GROUP_RU] ?? g).join('/'),
@@ -474,8 +474,8 @@ export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onC
               <span style={{ fontSize: 10, color: bc, minWidth: 48, textAlign: 'right', fontWeight: 600 }}>{statusLabel}</span>
               {canEdit && (
                 <div style={{ display: 'flex', gap: 2, marginLeft: 4 }}>
-                  <button onClick={() => removeSetFromMuscle(m)} disabled={cur === 0} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: cur === 0 ? 'not-allowed' : 'pointer', background: cur === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', color: cur === 0 ? DIM : '#ef4444', opacity: cur === 0 ? 0.4 : 1 }}>−</button>
-                  <button onClick={() => addSetToMuscle(m)} disabled={pct > 100} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: pct > 100 ? 'not-allowed' : 'pointer', background: pct > 100 ? 'rgba(255,255,255,0.02)' : 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: pct > 100 ? DIM : '#22c55e', opacity: pct > 100 ? 0.4 : 1 }}>+</button>
+                  <button className="panel-vol-step" onClick={() => removeSetFromMuscle(m)} disabled={cur === 0} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: cur === 0 ? 'not-allowed' : 'pointer', background: cur === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', color: cur === 0 ? DIM : '#ef4444', opacity: cur === 0 ? 0.4 : 1 }}>−</button>
+                  <button className="panel-vol-step" onClick={() => addSetToMuscle(m)} disabled={pct > 100} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: pct > 100 ? 'not-allowed' : 'pointer', background: pct > 100 ? 'rgba(255,255,255,0.02)' : 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: pct > 100 ? DIM : '#22c55e', opacity: pct > 100 ? 0.4 : 1 }}>+</button>
                 </div>
               )}
             </div>
@@ -584,7 +584,7 @@ export const SubstitutionPanel: React.FC<PanelProps> = ({ program, dir, onChange
                     const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === weekIdx ? { ...w, sessions: w.sessions.map((se, si) => si === sessionIdx ? { ...se, blocks: se.blocks.map((bl, bi) => bi === blockIdx ? { ...bl, exerciseName: s.name, note: `Замена: ${block.exerciseName} → ${s.name}` } : bl) } : se) } : w) } };
                     onChange(upd);
                     showToast('✅ ' + s.name);
-                  }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 600, minHeight: 38 }}>
+                  }} className="panel-apply" style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 600, minHeight: 38 }}>
                     {s.name}
                   </button>
                 ))}
