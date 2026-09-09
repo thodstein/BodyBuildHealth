@@ -10054,6 +10054,71 @@ html.app-native .nd-weeklegend {
     transform: none !important;
   }
 }
+/* --- 93. NUTRITION DIARY PRO-5: quick cards/week grid/scan-in --- */
+html.app-native .nd-favadd {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-favnow {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-favadd:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-histadd {
+  min-height: 44px !important;
+}
+html.app-native .nd-histadd:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-lastadd {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-lastadd:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-presetadd {
+  min-height: 44px !important;
+}
+html.app-native .nd-presetadd:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .nd-hist {
+  min-height: 40px !important;
+}
+html.app-native .nd-nethead {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-noresult {
+  border-radius: 12px !important;
+}
+html.app-native .nd-ocr-err {
+  border-radius: 12px !important;
+}
+html.app-native .nd-ocr-hint {
+  border-radius: 12px !important;
+}
+html.app-native .nd-ocr-raw {
+  border-radius: 12px !important;
+}
+html.app-native .nd-weekstats {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+html.app-native .nd-weekstats > div {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-weekstats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-presetadd {
+    transform: none !important;
+  }
+}
 
 /* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
  * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.
@@ -10807,6 +10872,117 @@ html.app-native .training-hero .training-hero-zone:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   html.app-native .training-hero .training-hero-zone:active .tp-hchev {
+    transform: none !important;
+  }
+}
+
+/* ─── 95. TRAINING TABS PRO — поднавигация и готовность ───
+ * Хуки: .training-tabs-head.tp-tabs-head/.tp-tabs-back/.tp-tabs-zone/
+ * .tp-tabs-body/.tp-tabs-title/.tp-tabs-cats/.tp-tabs-cat/.tp-tabs-catlabel/
+ * .tp-tabs-caticon/.tp-tabs-pill[data-active]/.tp-tabs-flat/
+ * .tp-readiness/.tp-readiness-head/.tp-readiness-val/.tp-readiness-grid/
+ * .tp-readiness-row/.tp-readiness-acwr.
+ * Липкая стеклянная шапка 56, кнопки-пилюли 44px с актив-градиентом,
+ * готовность-стекло 18px с полосами 6px, цифры tabular, press 0.98,
+ * focus-visible, 380px, reduced-motion. Только APK: TG/web — как было. */
+html.app-native .training-tabs-head.tp-tabs-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  min-height: 56px !important;
+  padding: 8px 10px !important;
+  background: rgba(9, 18, 34, 0.85) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12) !important;
+}
+html.app-native .training-tabs-head .tp-tabs-back {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+html.app-native .training-tabs-head .tp-tabs-back:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .training-tabs-head .tp-tabs-zone {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-tabs-body {
+  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+}
+html.app-native .tp-tabs-title {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+  margin: 8px 0 !important;
+}
+html.app-native .tp-tabs-cat {
+  border-radius: 18px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .tp-tabs-catlabel {
+  text-transform: uppercase !important;
+}
+html.app-native .tp-tabs-caticon {
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.25) !important;
+}
+html.app-native .tp-tabs-pill {
+  min-height: 44px !important;
+  border-radius: 13px !important;
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-tabs-pill:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .tp-tabs-pill[data-active='true'] {
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.35) !important;
+}
+html.app-native .tp-tabs-flat {
+  border-radius: 18px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-native .tp-readiness {
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(21, 38, 66, 0.72), rgba(12, 23, 40, 0.72)) !important;
+  border: 1px solid rgba(140, 190, 255, 0.12) !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .tp-readiness-val {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-readiness-grid {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .tp-readiness-acwr {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .training-tabs-head .tp-tabs-back:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .tp-tabs-pill:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .tp-tabs-body {
+    padding: 0 8px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .tp-tabs-pill {
+    flex: 1 1 44% !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .training-tabs-head .tp-tabs-back:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .tp-tabs-pill:active {
     transform: none !important;
   }
 }

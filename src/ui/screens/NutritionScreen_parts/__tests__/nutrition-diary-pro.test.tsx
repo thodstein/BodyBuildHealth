@@ -154,6 +154,7 @@ describe('nutrition-diary-pro hooks', () => {
     );
     expect(container.querySelector('.nd-weekview')).not.toBeNull();
     expect(container.querySelector('.nd-weeksum')).not.toBeNull();
+    expect(container.querySelector('.nd-weekstats')).not.toBeNull();
     expect(container.querySelectorAll('.nd-weekstat')).toHaveLength(4);
     expect(container.querySelectorAll('.nd-dayrow')).toHaveLength(7);
   });

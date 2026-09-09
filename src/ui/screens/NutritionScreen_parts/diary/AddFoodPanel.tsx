@@ -231,7 +231,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         )}
         {(isSearchingRetail || retailResults.length > 0) && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="nd-nethead" style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>🏪 Супермаркеты РФ</span>
               {retailResults.length > 0 && (
                 <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.18)' }}>{retailResults.length}</span>
@@ -278,7 +278,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         )}
         {internetResults.length > 0 && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="nd-nethead" style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>🌐 Найдено в интернете (РФ)</span>
               <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.18)' }}>{internetResults.length}</span>
             </div>
@@ -305,7 +305,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </div>
         )}
         {debouncedSearch.trim() && foodSearchResults.length===0 && internetResults.length===0 && retailResults.length===0 && !isSearchingNet && !isSearchingRetail && (
-          <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Ничего не найдено — попробуйте другое написание или создайте <span style={{ color:'#8b5cf6' }}>свою еду</span></div>
+          <div className="nd-noresult" style={{ marginTop:8, fontSize:12, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'10px 12px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Ничего не найдено — попробуйте другое написание или создайте <span style={{ color:'#8b5cf6' }}>свою еду</span></div>
         )}
         {!debouncedSearch.trim() && history.length>0 && (
           <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
@@ -408,8 +408,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                           <span>Б{f.protein}</span><span>Ж{f.fat}</span><span>У{f.carbs}</span>
                         </div>
                       </div>
-                      <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(139,92,246,0.3)' }}>＋</button>
-                      {onDirectAdd && <button onClick={() => onDirectAdd(f)} style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>⚡</button>}
+                      <button onClick={() => onAddFoodFromDB(f)} aria-label="В очередь" className="nd-favadd" style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44, boxShadow: '0 2px 8px rgba(139,92,246,0.3)' }}>＋</button>
+                      {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-favnow" style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>⚡</button>}
                     </div>
                   ))}
                 </div>
@@ -441,7 +441,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontSize: 14 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
                           <span style={{ flex: 1, fontSize: 11, color: '#fff', fontWeight: 500 }}>{f.name}</span>
-                          <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>＋ В очередь</button>
+                          <button onClick={() => onAddFoodFromDB(f)} aria-label="В очередь" className="nd-histadd" style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, cursor: 'pointer', minHeight: 44 }}>＋ В очередь</button>
                         </div>
                       );
                     })}
@@ -464,7 +464,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                           <span>{it.qty || '100г'}</span>
                         </div>
                       </div>
-                      <button onClick={() => onAddFoodFromDB({ id: it.foodId || it.name, name: it.name, kcal: it.kcal, protein: it.p || 0, fat: it.f || 0, carbs: it.c || 0, category: it.category } as any)} style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>＋</button>
+                      <button onClick={() => onAddFoodFromDB({ id: it.foodId || it.name, name: it.name, kcal: it.kcal, protein: it.p || 0, fat: it.f || 0, carbs: it.c || 0, category: it.category } as any)} aria-label="Добавить последнее" className="nd-lastadd" style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44, boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>＋</button>
                     </div>
                   ))}
                 </div>
@@ -482,7 +482,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{p.items?.length || 0} продуктов • {p.items?.reduce((s: any, it: any) => s + (it.kcal || 0), 0) || 0} ккал</div>
                       </div>
-                      <button onClick={() => onAddPreset(p.items)} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>Добавить</button>
+                      <button onClick={() => onAddPreset(p.items)} aria-label="Добавить набор" className="nd-presetadd" style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44, boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>Добавить</button>
                     </div>
                   ))}
                 </div>
@@ -496,17 +496,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
           {ocrError && (
-            <div role="alert" style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
+            <div role="alert" className="nd-ocr-err" style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12, lineHeight: 1.35 }}>
               {ocrError}
             </div>
           )}
           {ocrHint && !ocrError && (
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#86efac', fontSize: 11, lineHeight: 1.35 }}>
+            <div className="nd-ocr-hint" style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#86efac', fontSize: 12, lineHeight: 1.35 }}>
               {ocrHint}
             </div>
           )}
           {ocrText && !ocrError && ocrHint && (
-            <details style={{ padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+            <details className="nd-ocr-raw" style={{ padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.8)' }}>Сырой текст OCR (для отладки)</summary>
               <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>{ocrText.slice(0, 1500)}</pre>
             </details>

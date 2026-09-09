@@ -75,7 +75,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
           </div>
           <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>{weeklyTotals.days ? `${Math.round(weeklyTotals.days/7*100)}%` : '0%'}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <div className="nd-weekstats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {[
             { l: 'Ккал/день', v: avgKcal, t: targets.kcal, c: '#00e68a', bg:'rgba(0,230,138,0.08)', icon:'🔥' },
             { l: 'Белки/день', v: avgP, t: targets.protein, c: '#3b82f6', bg:'rgba(59,130,246,0.08)', u: 'г', icon:'🥩' },
