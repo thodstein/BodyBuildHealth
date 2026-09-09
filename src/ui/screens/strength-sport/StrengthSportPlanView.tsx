@@ -96,7 +96,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         {plan.rationale?.length ? <div style={{ fontSize:13, color:'rgba(235,235,245,0.62)', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.55 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:8 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
       </SectionCard>
 
-      <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" >
+      <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" collapsible defaultOpen={false} summary={`${plan.weeks} нед · ${plan.weeksData.length} блоков`}>
         <StrengthGantt weeks={plan.weeksData} totalWeeks={plan.weeks} />
         <div style={{ fontSize:12, color: TEXT_3, background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.05)', lineHeight:1.5 }}>Тапер <span style={{ color:'#30D158', fontWeight:700 }}>зелёный</span> 1-2нед (объём ×0.45/0.65) выносится отдельной фазой в Gantt — как в annual-training taperWeeksForBlock</div>
       </SectionCard>
@@ -104,7 +104,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
       {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || (plan.workMax as any).clean || 0) > 0 && (() => {
         const meet = buildWLMeetPlan(plan.workMax.snatch as number, (plan.workMax.cleanJerk || (plan.workMax as any).clean) as number, 'balanced', { bodyweight, sex });
         return meet ? (
-          <div data-ss="attempts"><SectionCard icon="🏋️" title="Попытки ТА · IWF 1кг" subtitle={`Тотал ${meet.total}кг`} accent>
+          <div data-ss="attempts"><SectionCard icon="🏋️" title="Попытки ТА · IWF 1кг" subtitle={`Тотал ${meet.total}кг`} accent collapsible defaultOpen={false} summary={`Тотал ${meet.total}кг · 92/97/102%`}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               <Badge color="#0a84ff" bg="rgba(10,132,255,0.12)" border="rgba(10,132,255,0.22)">Тотал <Highlight color="#0a84ff">{meet.total}кг</Highlight></Badge>
               {meet.sinclair && <Badge color="#30d158" bg="rgba(48,209,88,0.10)" border="rgba(48,209,88,0.18)">Sinclair <Highlight color="#30d158">{meet.sinclair}</Highlight></Badge>}
@@ -128,7 +128,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         ) : null;
       })()}
       {(plan.inputSnapshot as any)?.contest?.events?.length ? (
-        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · taper Winwood 8.6д`} strong>
+        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · taper Winwood 8.6д`} strong collapsible defaultOpen={false} summary={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'}`}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {(plan.inputSnapshot as any).contest.events.map((e:any, i:number)=> (
               <span key={i} style={{ padding:'7px 12px', borderRadius:12, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.20)', fontSize:12, fontWeight:600, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {e.timeCapS?`cap${e.timeCapS}с`:''} {e.heightCm?`${e.heightCm}см`:''} {e.turn?'разв.':''} {(TAPER_CESSATION_DAYS as any)[e.id] ? `· cess ${(TAPER_CESSATION_DAYS as any)[e.id]}д`:''}</span>
@@ -150,7 +150,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
       {(() => {
         const cond = buildConditioningRationale(1, plan.weeks, plan.mode);
         return cond.length && plan.mode==='strongman' ? (
-          <SectionCard icon="🏃" title="Кондиция" subtitle={cond.join(' · ')}>
+          <SectionCard icon="🏃" title="Кондиция" subtitle={cond.join(' · ')} collapsible defaultOpen={false} summary={buildConditioningRationale(1, plan.weeks, plan.mode).join(' · ')}>
             <InfoBanner tone="info">Фаза: alactic 8×10с/50с → lactic 5×60с/90с → aerobic Zone2 30′ · внезала high — пауза (Winwood 54% plyo)</InfoBanner>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {cond.map((c,i)=> <Badge key={i} color="#0a84ff" bg="rgba(10,132,255,0.08)" border="rgba(10,132,255,0.16)">{c}</Badge>)}
@@ -166,7 +166,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         // medley для ивент-дня: берём первые 2 carries недели 1
         const medleyEx = plan.weeksData[0]?.sessions.find(s=> s.sessionTag==='event_day')?.exercises.filter(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','sled_push_sprint'].includes(e.id)).slice(0,2) || [];
         return (yPlan || lPlan || medleyEx.length>=2) ? (
-          <div data-ss="attempts"><SectionCard icon="🪨" title="Попытки стронг + Medley" subtitle="шаг йок 10кг / лог 2.5кг · medley 90с переход cap 180с" strong>
+          <div data-ss="attempts"><SectionCard icon="🪨" title="Попытки стронг + Medley" subtitle="шаг йок 10кг / лог 2.5кг · medley 90с переход cap 180с" strong collapsible defaultOpen={false} summary="опенеры 90/96/102 · medley 90с">
             <div style={{ display:'grid', gridTemplateColumns: yPlan && lPlan ? '1fr 1fr' : '1fr', gap:10 }}>
               {yPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🚜 Йок {(yPlan.warmup[0] as any)?.distanceM||20}м cap {(yPlan.warmup[0] as any)?.timeCapS||60}с</div><div style={{ display:'flex', gap:8, marginTop:8, fontSize:16, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{yPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.third}кг</HighlightStrong></div>{yPlan.ladder && <div style={{ fontSize:10, color:TEXT_3, marginTop:4 }}>Лестница: {yPlan.ladder.weights.slice(0,3).join('→')}кг</div>}</div>}
               {lPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🪵 Лог</div><div style={{ display:'flex', gap:8, marginTop:8, fontSize:16, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{lPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.third}кг</HighlightStrong></div></div>}
@@ -180,7 +180,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
       {plan.validation?.warnings.map((w,i) => <InfoBanner key={i} tone="warn">{w}</InfoBanner>)}
 
       {/* Heatmap 4 rows (carry/stone/overhead / squat+deadlift) — P2 как CardioUI */}
-      <SectionCard icon="🔥" title="Heatmap · 4 ряда" subtitle="Carry м / Stone подъёмы / Overhead+Жим / Присед+Тяга — как CardioUI 4 rows">
+      <SectionCard icon="🔥" title="Heatmap · 4 ряда" subtitle="Carry м / Stone подъёмы / Overhead+Жим / Присед+Тяга — как CardioUI 4 rows" collapsible defaultOpen={false} summary="Carry · Stone · Overhead · Присед+Тяга">
         <StrengthHeatmap weeksData={plan.weeksData as any} level={plan.level} />
       </SectionCard>
 
@@ -281,7 +281,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 
       {annual && (
         <>
-        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация Stark`} >
+        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация Stark`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков`}>
           <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · ${plan.weeks} нед текущий`} />
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {annual.blocks.map((b:any) => {
@@ -323,7 +323,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
             <button onClick={onBuildAnnualFromCycles} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #0A84FF, #30D158)', color:'#fff', border:'none' }}>📚 Год из циклов ({annualCycleSel?.length || 3})</button>
           </SectionCard>
         {plan.mode==='strongman' && (
-          <SectionCard icon="🗓️" title="Сезон — Multi-peak (PRO)" subtitle="GPP 4w + 2×camp 8-12w + transition 2w (season planner)" >
+          <SectionCard icon="🗓️" title="Сезон — Multi-peak (PRO)" subtitle="GPP 4w + 2×camp 8-12w + transition 2w (season planner)" collapsible defaultOpen={false} summary="GPP 4w · 2 пика · transition 2w">
             <GroupHeading icon="🏁" text="Сезон 2 пика" desc="GPP + camp→пик + transition + camp→пик — backend готов, фронт Season Planner"/>
             <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:13, fontWeight:700, color:TEXT_2 }}>GPP</span><input type="number" value={4} style={{ width:72, ...INPUT, padding:'12px 8px', fontSize:14, fontWeight:700, textAlign:'center', minHeight:52 }} readOnly />
@@ -336,7 +336,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         </>
       )}
 
-      <div data-ss="exports"><SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV/XLS · ICS · дайджест · в программу">
+      <div data-ss="exports"><SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV/XLS · ICS · дайджест · в программу" collapsible defaultOpen={false} summary="CSV · XLS · ICS · печать">
         <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен и печать" />
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px,1fr))', gap:10 }}>
           <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); setTimeout(()=>setMsg(''),1800); }} style={BTN}>⎙ Копировать</button>

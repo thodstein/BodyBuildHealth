@@ -51,6 +51,16 @@ describe('SS wizard structure (BB-style)', () => {
     expect(pills.length).toBe(4);
   });
 
+  it('выдача: сводка открыта, остальные свернуты с саммари', async () => {
+    render(<StrengthSportConstructor />);
+    fireEvent.click(screen.getByText(/Далее → Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → Сплит/));
+    fireEvent.click(screen.getByText(/Собрать план/));
+    const card = await screen.findByText('Сводка плана', {}, { timeout: 8000 });
+    expect(card).toBeTruthy();
+    expect(document.body.textContent).toContain('Gantt фаз');
+  });
+
   it('навигация Далее/Назад по всем шагам', () => {
     const { container } = render(<StrengthSportConstructor />);
     fireEvent.click(screen.getByText(/Далее → Вне зала/));
