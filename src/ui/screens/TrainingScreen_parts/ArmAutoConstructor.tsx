@@ -55,13 +55,13 @@ function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth
 }
 function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
   return (
-    <div style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px' }}>
-      <div aria-hidden style={{ fontSize: 30, lineHeight: 1, width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <h2 style={{ ...H, margin: 0 }}>{title}</h2>
-        {sub ? <p style={{ ...SMALL, margin: '4px 0 0', color: '#fff' }}>{sub}</p> : null}
+    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px' }}>
+      <div className="ad-head-ic" aria-hidden style={{ fontSize: 30, lineHeight: 1, width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
+      <div className="ad-head-tx" style={{ flex: 1, minWidth: 0 }}>
+        <h2 className="ad-head-title" style={{ ...H, margin: 0 }}>{title}</h2>
+        {sub ? <p className="ad-head-sub" style={{ ...SMALL, margin: '4px 0 0', color: '#fff' }}>{sub}</p> : null}
       </div>
-      {side ? <div style={{ flexShrink: 0 }}>{side}</div> : null}
+      {side ? <div className="ad-head-side" style={{ flexShrink: 0 }}>{side}</div> : null}
     </div>
   );
 }
@@ -660,10 +660,10 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         side={best ? (<div className="ad-hero-side"><div className="ad-hero-score" aria-hidden><b>{ranked[0]?.score ?? 0}</b><span>баллов</span></div><div className="ad-hero-name">{best.name}<span>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
-      <div data-arm="steps" aria-label="Шаги" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, overflowX: 'auto' as const, alignItems: 'center' }}>
+      <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, overflowX: 'auto' as const, alignItems: 'center' }}>
         {STEP_GROUPS.map((g, gi) => (
-          <span key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <span aria-hidden style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}>{g.name}</span>
+          <span key={g.name} className="ad-step-group" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <span className="ad-step-group-label" aria-hidden style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}>{g.name}</span>
             {g.ids.map((id) => {
               const idx = STEP_DEFS.findIndex((s) => s.id === id);
               const s = STEP_DEFS[idx];
@@ -683,7 +683,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 </button>
               );
             })}
-            {gi < STEP_GROUPS.length - 1 && <span aria-hidden style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', margin: '0 2px' }} />}
+            {gi < STEP_GROUPS.length - 1 && <span className="ad-step-sep" aria-hidden style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', margin: '0 2px' }} />}
           </span>
         ))}
       </div>

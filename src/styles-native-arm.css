@@ -757,3 +757,82 @@ html.app-native .train-arm.arm-apk .ad-ph[data-phase='deload'] {
     animation: none !important;
   }
 }
+
+/* ─── 24. BB-СТРУКТУРА 7 ШАГОВ — группы, quality/export, week-лента ─── */
+/* Групповые подписи ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА в ленте шагов */
+html.app-native .train-arm.arm-apk .ad-step-group-label {
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps {
+  scrollbar-width: none !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps .ad-step {
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps .ad-step:active {
+  transform: scale(0.96) !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps .ad-step:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Шаги Проверка и Экспорт — акцентная верхняя кромка карточек */
+html.app-native .train-arm.arm-apk [data-arm='quality-card'] {
+  border-top: 2px solid rgba(var(--accent-rgb), 0.5) !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='weights-card'] {
+  border-top: 2px solid rgba(var(--arm-amber-rgb), 0.5) !important;
+}
+
+/* Лента недель плана — snap + tabular */
+html.app-native .train-arm.arm-apk [data-arm='week-pills'] {
+  scroll-snap-type: x mandatory !important;
+  scrollbar-width: none !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='week-pills']::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='week-pills'] .ad-wpill:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* Пустые состояния новых шагов — CTA во всю ширину */
+html.app-native .train-arm.arm-apk .ad-empty .ad-btn-block {
+  min-height: 48px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .train-arm.arm-apk .ad-step-group-label {
+    display: none !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-steps .ad-step {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-wpill {
+    min-width: 48px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-arm.arm-apk .ad-steps .ad-step {
+    transition: none !important;
+  }
+  html.app-native .train-arm.arm-apk .ad-steps .ad-step:active {
+    transform: none !important;
+  }
+}
