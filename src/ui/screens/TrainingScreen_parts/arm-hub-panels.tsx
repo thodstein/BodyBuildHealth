@@ -12,12 +12,22 @@ import { angleJointForWeakPoint, isValidAngleForArmWeakPoint } from '../../../en
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
+import { CARD } from './training-ui';
+
+/* BB-shell: hero/controls/action поверх тех же .ad-* классов и data-arm
+ * хуков (APK-CSS и тесты целы) — только воздух, иерархия CTA и липкость. */
+const HUB_HERO: React.CSSProperties = {
+  ...CARD,
+  borderTop: '2px solid rgba(245, 158, 11, 0.5)',
+  padding: '14px 16px',
+};
+const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 };
 import { LEVEL_OPTS, TAB_DEFS } from './arm-hub-shared';
 
 export function HubHead({ H }: { H: any }) {
   const { state, report, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, hasWeak } = H;
   return (
-    <div className="ad-card" data-tone="amber" data-arm="hub-head">
+    <div className="ad-card" data-tone="amber" data-arm="hub-head" style={HUB_HERO}>
       <div className="ad-head">
         <div className="ad-head-ic" aria-hidden>
           🤝
@@ -69,7 +79,7 @@ export function HubHead({ H }: { H: any }) {
 export function HubControls({ H }: { H: any }) {
   const { state, setState, weightClassAuto, applyToConstructor, tab, setTab } = H;
   return (
-    <>
+    <div style={HUB_SECTION_GAP}>
       <div>
         <div className="ad-fl">Уровень</div>
         <div className="ad-chips">
@@ -96,9 +106,9 @@ export function HubControls({ H }: { H: any }) {
           {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
         </div>
       </div>
-      <AdBtn variant="amber" block onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
+      <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
       <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
-    </>
+    </div>
   );
 }
 
