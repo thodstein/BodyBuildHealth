@@ -341,7 +341,6 @@ export const AddHealthModal: React.FC<{
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 5,
-                boxShadow: active ? `0 3px 12px ${t.color}2e` : undefined,
                 transition: 'all 0.15s',
               }}
             >
