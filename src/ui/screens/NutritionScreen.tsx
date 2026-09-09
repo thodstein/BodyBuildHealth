@@ -1540,9 +1540,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         position:'sticky', top:0, zIndex:20,
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <button onClick={() => setPage('hero')} style={{
-          padding:'4px 8px', cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
-          border:'none', background:'transparent', display:'flex', alignItems:'center',
+        <button onClick={() => setPage('hero')} aria-label="Назад" style={{
+          width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
+          border:'none', background:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
         }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
         {isNativeApp() && (
@@ -1552,7 +1552,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
             title="Сканировать штрихкод"
             className="nutrition-scan-btn"
             style={{
-              width:36, height:36, borderRadius:12, cursor:'pointer', flexShrink:0,
+              width:44, height:44, borderRadius:12, cursor:'pointer', flexShrink:0,
               display:'flex', alignItems:'center', justifyContent:'center',
               background:'rgba(var(--nut-accent-rgb, 0,230,138),0.12)',
               border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.25)',
@@ -1578,9 +1578,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
             { id: 'analytics' as NutritionSection, label: 'Аналитика' },
             { id: 'overview' as NutritionSection, label: 'Обзор' },
           ]).map(s => (
-            <button key={s.id} onClick={() => setNutritionSection(s.id)} className="nutrition-section" data-active={nutritionSection === s.id} style={{
-              flexShrink:0, padding:'7px 12px', borderRadius:999, cursor:'pointer',
-              fontSize:11, fontWeight: nutritionSection === s.id ? 800 : 600,
+            <button key={s.id} onClick={() => setNutritionSection(s.id)} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
+              flexShrink:0, padding:'10px 14px', borderRadius:999, cursor:'pointer', minHeight:44,
+              fontSize:12, fontWeight: nutritionSection === s.id ? 800 : 600,
               border: nutritionSection === s.id ? '1px solid var(--nut-accent, #00e68a)' : '1px solid rgba(255,255,255,0.08)',
               background: nutritionSection === s.id ? 'rgba(var(--nut-accent-rgb, 0,230,138),0.14)' : 'transparent',
               color: nutritionSection === s.id ? 'var(--nut-accent, #00e68a)' : '#fff',
@@ -1619,7 +1619,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         return (
           <div style={{ display:'flex', gap:3, padding:'4px 8px', overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
             {active.map((a,i) => (
-              <span key={i} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(var(--nut-accent-rgb, 0,230,138),0.1)', color:'var(--nut-accent, #00e68a)', border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.2)', whiteSpace:'nowrap' }}>{a}</span>
+              <span key={i} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, background:'rgba(var(--nut-accent-rgb, 0,230,138),0.1)', color:'var(--nut-accent, #00e68a)', border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.2)', whiteSpace:'nowrap' }}>{a}</span>
             ))}
           </div>
         );
@@ -1643,7 +1643,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
                 color: isActive ? '#000' : 'rgba(255,255,255,0.85)',
                 transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
                 boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
-                minHeight:40, display:'inline-flex', alignItems:'center', gap:6,
+                minHeight:44, display:'inline-flex', alignItems:'center', gap:6,
                 transform: isActive ? 'translateY(-1px)' : 'none',
               }}>
                 {TAB_LABELS[t] || t}
