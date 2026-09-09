@@ -62,6 +62,18 @@ describe('nutrition-diary-pro hooks', () => {
     expect(onSelect).toHaveBeenCalledWith('2026-09-07');
   });
 
+  it('WeekDaySelector: Enter/Space по дню зовёт onSelectDate', () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />
+    );
+    const days = container.querySelectorAll('.nd-weekday');
+    fireEvent.keyDown(days[1], { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith('2026-09-08');
+    fireEvent.keyDown(days[3], { key: ' ' });
+    expect(onSelect).toHaveBeenCalledWith('2026-09-10');
+  });
+
   it('MealCard: карточка + строки + экшены 44px-хуки', () => {
     const items = [
       { name: 'Курица', qty: '100 г', kcal: 165, p: 31, f: 3.6, c: 0 },
@@ -170,5 +182,17 @@ describe('nutrition-diary-pro hooks', () => {
     const active = container.querySelectorAll('.nd-freqchip[data-active="true"]');
     expect(active).toHaveLength(1);
     expect(container.querySelector('.nd-freqitem')).not.toBeNull();
+  });
+
+  it('FrequentFoodsPanel: шапка разворачивается с клавиатуры', () => {
+    (useFrequentFoods as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      { name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27, qty: 100 },
+    ]);
+    render(<FrequentFoodsPanel diary={{}} onAddFood={noop} />);
+    const head = screen.getByLabelText('Быстрое добавление');
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(head, { key: 'Enter' });
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Гречка')).toBeInTheDocument();
   });
 });

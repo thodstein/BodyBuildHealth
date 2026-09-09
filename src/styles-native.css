@@ -10119,6 +10119,83 @@ html.app-native .nd-weekstats > div {
     transform: none !important;
   }
 }
+/* --- 94. NUTRITION DIARY PRO-6: dialogs/sheets/a11y --- */
+html.app-native .nd-pdlg-sheet {
+  border-radius: 22px !important;
+}
+html.app-native .nd-ddlg-sheet {
+  border-radius: 22px !important;
+}
+html.app-native .nd-confirm-sheet {
+  border-radius: 22px !important;
+}
+html.app-native .nd-pdlg-input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .nd-ddlg-input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+}
+html.app-native .nd-pdlg-close {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-ddlg-close {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-pdlg-close:active {
+  transform: scale(0.92) !important;
+}
+html.app-native .nd-pdlg-cancel {
+  min-height: 48px !important;
+}
+html.app-native .nd-pdlg-save {
+  min-height: 48px !important;
+}
+html.app-native .nd-pdlg-save:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .nd-ddlg-cancel {
+  min-height: 48px !important;
+}
+html.app-native .nd-ddlg-save {
+  min-height: 48px !important;
+}
+html.app-native .nd-confirm-cancel {
+  min-height: 48px !important;
+}
+html.app-native .nd-confirm-go {
+  min-height: 48px !important;
+}
+html.app-native .nd-confirm-go:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .nd-storerr {
+  border-radius: 14px !important;
+}
+html.app-native .nd-storerr-x {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-wipeall {
+  min-height: 44px !important;
+}
+html.app-native .nd-freqhead {
+  border-radius: 12px !important;
+}
+html.app-native .nd-freqhead:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-confirm-go {
+    transform: none !important;
+  }
+}
 
 /* 91. NATIVE PROFILE USER MODERN — полное визуальное улучшение «Пользователь».
  * Только APK (html.app-native). TG/web — через инлайн-обновление TSX выше.

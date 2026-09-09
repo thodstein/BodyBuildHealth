@@ -51,7 +51,10 @@ export const FrequentFoodsPanel: React.FC<FrequentFoodsPanelProps> = ({
   return (
     <div className="nd-freq" style={{ padding: 14, borderRadius: 18, background: 'linear-gradient(135deg, rgba(18,18,20,0.9), rgba(24,24,27,0.8))', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => setCollapsed(!collapsed)}>
+        <div role="button" tabIndex={0} aria-expanded={!collapsed} aria-label="Быстрое добавление" className="nd-freqhead"
+          onClick={() => setCollapsed(!collapsed)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(!collapsed); } }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
           <span style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, boxShadow: '0 2px 8px rgba(0,230,138,0.25)' }}>⚡</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: -0.2, display: 'flex', alignItems: 'center', gap: 6 }}>Быстрое добавление <span style={{ fontSize: 9, background: 'rgba(0,230,138,0.12)', color: '#00e68a', padding: '2px 6px', borderRadius: 999, border: '1px solid rgba(0,230,138,0.18)' }}>{frequentFoods.length}</span></div>

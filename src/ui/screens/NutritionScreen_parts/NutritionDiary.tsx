@@ -612,9 +612,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       )}
       
       {storageError && (
-        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12, fontWeight: 500 }}>
+        <div role="alert" className="nd-storerr" style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12, fontWeight: 500 }}>
           ⚠️ {storageError}
-          <button onClick={() => setStorageError(null)} style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, border: 'none', background: 'rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>
+          <button onClick={() => setStorageError(null)} aria-label="Закрыть ошибку" className="nd-storerr-x" style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontSize: 12, minWidth: 44, minHeight: 44 }}>
             ✕
           </button>
         </div>
@@ -933,7 +933,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         
         <button
           onClick={() => setClearDiaryConfirmOpen(true)}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto' }}
+          aria-label="Очистить весь дневник"
+          className="nd-wipeall"
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto', minHeight: 44 }}
         >
           🗑 Очистить всё
         </button>
@@ -950,61 +952,61 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {/* Modern popups */}
       {presetDialog && (
-        <div onClick={e => { if (e.target===e.currentTarget) setPresetDialog(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(0,230,138,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,230,138,0.08)', backdropFilter:'blur(20px)' }}>
+        <div role="dialog" aria-modal="true" aria-label="Сохранить набор" className="nd-pdlg" onClick={e => { if (e.target===e.currentTarget) setPresetDialog(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div className="nd-pdlg-sheet" style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(0,230,138,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,230,138,0.08)', backdropFilter:'blur(20px)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
               <span style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#00e68a,#00c8a0)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>📦</span>
               <div>
                 <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>Сохранить набор</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{presetDialog.items.length} поз. • {presetDialog.meal}</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>{presetDialog.items.length} поз. • {presetDialog.meal}</div>
               </div>
-              <button onClick={()=>setPresetDialog(null)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
+              <button onClick={()=>setPresetDialog(null)} aria-label="Закрыть" className="nd-pdlg-close" style={{ marginLeft:'auto', width:44, height:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>
             </div>
-            <input autoFocus value={presetName} onChange={e=>setPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSavePreset(); if(e.key==='Escape') setPresetDialog(null); }} placeholder="Название набора, например: Завтрак спортсмена" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }} />
+            <input autoFocus value={presetName} onChange={e=>setPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSavePreset(); if(e.key==='Escape') setPresetDialog(null); }} placeholder="Название набора, например: Завтрак спортсмена" aria-label="Название набора" className="nd-pdlg-input" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:16, outline:'none', minHeight:48 }} />
             <div style={{ display:'flex', gap:8, marginTop:14 }}>
-              <button onClick={()=>setPresetDialog(null)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-              <button onClick={confirmSavePreset} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(0,230,138,0.25)' }}>💾 Сохранить</button>
+              <button onClick={()=>setPresetDialog(null)} className="nd-pdlg-cancel" style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer', minHeight:48 }}>Отмена</button>
+              <button onClick={confirmSavePreset} className="nd-pdlg-save" style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, cursor:'pointer', minHeight:48, boxShadow:'0 4px 16px rgba(0,230,138,0.25)' }}>💾 Сохранить</button>
             </div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:8, textAlign:'center' }}>Сохранит КБЖУ на 100г • при сборке можно менять граммы</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:8, textAlign:'center' }}>Сохранит КБЖУ на 100г • при сборке можно менять граммы</div>
           </div>
         </div>
       )}
       {dayPresetDialogOpen && (
-        <div onClick={e => { if (e.target===e.currentTarget) setDayPresetDialogOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(245,158,11,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+        <div role="dialog" aria-modal="true" aria-label="Шаблон дня" className="nd-ddlg" onClick={e => { if (e.target===e.currentTarget) setDayPresetDialogOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div className="nd-ddlg-sheet" style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(245,158,11,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
               <span style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#f59e0b,#f97316)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>💾</span>
-              <div><div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>Шаблон дня</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{selectedDate} • {Object.values(dayMeals).flat().length} поз.</div></div>
-              <button onClick={()=>setDayPresetDialogOpen(false)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
+              <div><div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>Шаблон дня</div><div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>{selectedDate} • {Object.values(dayMeals).flat().length} поз.</div></div>
+              <button onClick={()=>setDayPresetDialogOpen(false)} aria-label="Закрыть" className="nd-ddlg-close" style={{ marginLeft:'auto', width:44, height:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>
             </div>
-            <input autoFocus value={dayPresetName} onChange={e=>setDayPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSaveDayPreset(); if(e.key==='Escape') setDayPresetDialogOpen(false); }} placeholder="Название шаблона" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }} />
+            <input autoFocus value={dayPresetName} onChange={e=>setDayPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSaveDayPreset(); if(e.key==='Escape') setDayPresetDialogOpen(false); }} placeholder="Название шаблона" aria-label="Название шаблона" className="nd-ddlg-input" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:16, outline:'none', minHeight:48 }} />
             <div style={{ display:'flex', gap:8, marginTop:14 }}>
-              <button onClick={()=>setDayPresetDialogOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-              <button onClick={confirmSaveDayPreset} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#f59e0b,#f97316)', color:'#000', fontWeight:700, cursor:'pointer' }}>💾 Сохранить</button>
+              <button onClick={()=>setDayPresetDialogOpen(false)} className="nd-ddlg-cancel" style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer', minHeight:48 }}>Отмена</button>
+              <button onClick={confirmSaveDayPreset} className="nd-ddlg-save" style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#f59e0b,#f97316)', color:'#000', fontWeight:700, cursor:'pointer', minHeight:48 }}>💾 Сохранить</button>
             </div>
           </div>
         </div>
       )}
       {clearDayConfirmOpen && (
-        <div onClick={e => { if (e.target===e.currentTarget) setClearDayConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+        <div role="alertdialog" aria-modal="true" aria-label="Очистить день" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDayConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div className="nd-confirm-sheet" style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить день?</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Все приёмы за <b style={{color:'#fff'}}>{selectedDate}</b> будут удалены. Это нельзя отменить.</div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={()=>setClearDayConfirmOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-              <button onClick={confirmClearDay} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer' }}>🗑 Очистить</button>
+              <button onClick={()=>setClearDayConfirmOpen(false)} className="nd-confirm-cancel" style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer', minHeight:48 }}>Отмена</button>
+              <button onClick={confirmClearDay} className="nd-confirm-go" style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer', minHeight:48 }}>🗑 Очистить</button>
             </div>
           </div>
         </div>
       )}
       {clearDiaryConfirmOpen && (
-        <div onClick={e => { if (e.target===e.currentTarget) setClearDiaryConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+        <div role="alertdialog" aria-modal="true" aria-label="Очистить весь дневник" className="nd-confirm" onClick={e => { if (e.target===e.currentTarget) setClearDiaryConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div className="nd-confirm-sheet" style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить весь дневник?</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Удалятся все дни и приёмы без возможности восстановления. Рекомендуем сначала сделать экспорт JSON/CSV.</div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={()=>setClearDiaryConfirmOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-              <button onClick={confirmClearDiary} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer' }}>🗑 Удалить всё</button>
+              <button onClick={()=>setClearDiaryConfirmOpen(false)} className="nd-confirm-cancel" style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer', minHeight:48 }}>Отмена</button>
+              <button onClick={confirmClearDiary} className="nd-confirm-go" style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer', minHeight:48 }}>🗑 Удалить всё</button>
             </div>
           </div>
         </div>
