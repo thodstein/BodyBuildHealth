@@ -1131,16 +1131,18 @@ export const ArmDiagnosticsHub: React.FC = () => {
       <AdCard>
         <HubControls H={H} />
 
-        {/* Tab content */}
-        {tab==='grip' && <HubGripTab H={H} />}
+        {/* Tab content — key remount даёт enter-переход панели */}
+        <div key={tab} className="ad-tabpanel" data-arm="hub-tabpanel">
+          {tab==='grip' && <HubGripTab H={H} />}
 
-        {tab==='wrist' && <HubWristTab H={H} />}
+          {tab==='wrist' && <HubWristTab H={H} />}
 
-        {tab==='pressure' && <HubPressureTab H={H} />}
+          {tab==='pressure' && <HubPressureTab H={H} />}
 
-        {tab==='strength' && <HubStrengthTab H={H} />}
+          {tab==='strength' && <HubStrengthTab H={H} />}
 
-        {tab==='recovery' && <HubRecoveryTab H={H} />}
+          {tab==='recovery' && <HubRecoveryTab H={H} />}
+        </div>
       </AdCard>
 
       <HubOutput H={H} />

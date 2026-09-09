@@ -1034,6 +1034,9 @@
 
 /* ─── Reduced motion ─────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  :is(.train-armdiag) .ad-tabpanel {
+    animation: none;
+  }
   :is(.train-arm, .train-armdiag).ad-wrap {
     animation: none;
   }
@@ -1277,6 +1280,23 @@
 
 :is(.train-arm, .train-armdiag) .ad-finding[data-level='ok']::before {
   background: var(--ad-green);
+}
+
+/* ─── PRO ХАБ: enter-переход таб-панели ────────────────────────────── */
+:is(.train-armdiag) .ad-tabpanel {
+  animation: adTabIn 0.3s cubic-bezier(0.22, 0.68, 0, 1);
+  min-width: 0;
+}
+
+@keyframes adTabIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ─── PRO ХАБ: стол-полоса со snap ─────────────────────────────────── */
