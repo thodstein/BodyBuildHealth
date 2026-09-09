@@ -135,7 +135,7 @@ describe('Profile §86 — тело дневников: рутинг, фильт
     expect(search.style.minHeight).toBe('48px');
     const filters = container.querySelectorAll('.pf-dfilter');
     expect(filters.length).toBeGreaterThan(0);
-    filters.forEach(f => expect((f as HTMLElement).style.minHeight).toBe('40px'));
+    filters.forEach(f => expect((f as HTMLElement).style.minHeight).toBe('44px'));
     cleanup();
   });
 

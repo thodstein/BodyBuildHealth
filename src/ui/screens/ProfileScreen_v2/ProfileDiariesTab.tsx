@@ -1305,7 +1305,7 @@ const exportAllDiariesPdf = () => {
                         )}
                         {it.pace && (
                           <div style={{ marginTop: 6 }}>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>
+                            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
                               Темп: {it.pace.achieved}/{it.pace.needed} дн.
                             </div>
                             <div
@@ -1432,17 +1432,20 @@ const exportAllDiariesPdf = () => {
                 className="pf-djump"
                 style={{
                   position: 'sticky',
-                  top: 0,
+                  top: -8,
                   zIndex: 10,
                   display: 'flex',
-                  gap: 4,
-                  flexWrap: 'wrap',
-                padding: '8px 4px 4px',
-                margin: '-12px -16px 8px',
-                background: 'linear-gradient(180deg, rgba(28,28,32,0.95), rgba(28,28,32,0.7) 80%, transparent)',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '0 0 12px 12px',
-                backdropFilter: 'blur(8px)',
+                  gap: 7,
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                padding: '10px 2px 8px',
+                margin: '-12px -16px 10px',
+                background: 'linear-gradient(180deg, rgba(16,16,20,0.96), rgba(16,16,20,0.75) 80%, transparent)',
+                borderBottom: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '0 0 14px 14px',
+                backdropFilter: 'blur(14px)',
+                WebkitBackdropFilter: 'blur(14px)',
               }}
               role="navigation"
               aria-label="Быстрая навигация по дневникам"
@@ -1462,29 +1465,25 @@ const exportAllDiariesPdf = () => {
                   aria-label={`Перейти к дневнику ${DIARY_META[d.key].title}`}
                   className="pf-dfilter"
                   style={{
-                    flex: '1 1 auto',
-                    minWidth: 76,
-                    maxWidth: 110,
-                    minHeight: 40,
-                    padding: '8px 12px',
-                    borderRadius: 12,
-                    fontSize: 11.5,
+                    flex: '0 0 auto',
+                    minHeight: 44,
+                    padding: '8px 15px',
+                    borderRadius: 999,
+                    fontSize: 12,
                     fontWeight: 800,
                     color: '#fff',
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+                    background: `linear-gradient(135deg, ${DIARY_META[d.key].color}20, ${DIARY_META[d.key].color}08)`,
                     border: `1px solid ${DIARY_META[d.key].color}40`,
-                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06)`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.07)`,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 5,
+                    gap: 6,
                   }}
                 >
-                  <span style={{ display: 'inline-flex', lineHeight: 1, color: DIARY_META[d.key].color }}><NativeIcon name={DIARY_META[d.key].icon} size={isWeightDiaryKey(d.key) ? 15 : 13} /></span>
+                  <span style={{ display: 'inline-flex', lineHeight: 1, color: DIARY_META[d.key].color }}><NativeIcon name={DIARY_META[d.key].icon} size={14} /></span>
                   <span>{DIARY_META[d.key].title}</span>
                 </button>
               ))}

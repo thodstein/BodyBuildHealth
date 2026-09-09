@@ -193,7 +193,7 @@ export const BPChart = forwardRef<SVGSVGElement, BPChartProps>(({
             key={key}
             onClick={() => toggleSeries(key)}
             style={{
-              padding: '6px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', minHeight: 32,
+              padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 36,
               border: visibleSeries.has(key) ? `1.5px solid ${SERIES_COLORS[key]}` : '1px solid #444',
               background: visibleSeries.has(key) ? `${SERIES_COLORS[key]}22` : '#18181b',
               color: visibleSeries.has(key) ? '#fff' : '#888',

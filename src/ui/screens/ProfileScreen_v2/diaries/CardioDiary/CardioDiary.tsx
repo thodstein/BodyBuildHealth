@@ -529,7 +529,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             {importPreview.entries.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 220, overflowY: 'auto' }}>
                 {importPreview.entries.slice(0, 5).map(e => (
-                  <div key={e.id} style={{ display: 'flex', gap: 8, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontVariantNumeric: 'tabular-nums' }}>
+                  <div key={e.id} style={{ display: 'flex', gap: 8, fontSize: 12.5, padding: '9px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontVariantNumeric: 'tabular-nums' }}>
                     <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.date}</span>
                     <span style={{ fontWeight: 800, color: '#fff' }}>{TYPES.find(t=>t.id===e.type)?.label || e.type}</span>
                     <span>{e.durationMin} мин</span>
