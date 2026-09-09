@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { formatDate } from '../../../core/utils/date-utils';
+import { formatDate, parseDateOnly } from '../../../core/utils/date-utils';
 import { type DiaryItem } from './types';
 
 interface Props {
@@ -129,7 +129,7 @@ const Sparkline: React.FC<{ data: number[]; color: string; height?: number; labe
 const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDate: string }> = ({ diaryData, selectedDate }) => {
   const freq = useMemo(() => {
     const map = new Map<string, { count: number; totalKcal: number }>();
-    const cutOff = new Date(selectedDate);
+    const cutOff = parseDateOnly(selectedDate);
     cutOff.setDate(cutOff.getDate() - 30);
     Object.entries(diaryData).forEach(([date, day]) => {
       if (date < formatDate(cutOff) || date > selectedDate) return;
@@ -230,7 +230,7 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
 
   function computeWeekly(diaryData: Record<string, any>, field: string): number[] {
     const vals: number[] = [];
-    const current = new Date(selectedDate);
+    const current = parseDateOnly(selectedDate);
     for (let i = 6; i >= 0; i--) {
       const d = new Date(current);
       d.setDate(d.getDate() - i);

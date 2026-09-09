@@ -12,6 +12,7 @@ import { QualityInsights } from '../diary/QualityInsights';
 import { NutritionDiaryCharts } from '../NutritionDiaryCharts';
 import { StorageErrorBanner } from '../diary/StorageErrorBanner';
 import { WeekView } from '../diary/WeekView';
+import { formatDate, parseDateOnly } from '../../../../core/utils/date-utils';
 
 vi.mock('../useNutritionDiary', () => ({
   useFrequentFoods: vi.fn(() => []),
@@ -168,6 +169,28 @@ describe('nutrition-diary-pro hooks', () => {
     );
     expect(full.querySelector('.nd-storeerr')).not.toBeNull();
     expect(full.querySelector('.nd-storedismiss')).not.toBeNull();
+  });
+
+  it('parseDateOnly: локальный парсинг без UTC-сдвига', () => {
+    // 2026-09-07 — понедельник в любой зоне (new Date('...').getDay() врёт в UTC−)
+    expect(parseDateOnly('2026-09-07').getDay()).toBe(1);
+    expect(parseDateOnly('2026-09-13').getDay()).toBe(0);
+    for (const ds of WEEK) {
+      expect(formatDate(parseDateOnly(ds))).toBe(ds);
+    }
+  });
+
+  it('WeekDaySelector: номера и имена дней из локального парсинга', () => {
+    const { container } = render(
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={noop} diaryData={{}} />
+    );
+    const names = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const days = container.querySelectorAll('.nd-weekday');
+    expect(days).toHaveLength(7);
+    days.forEach((el, i) => {
+      expect(el.getAttribute('aria-label')).toContain(names[i]);
+      expect(el.textContent).toContain(String(parseDateOnly(WEEK[i]).getDate()));
+    });
   });
 
   it('WeekView: сводка + 4 стат-тайла + 7 строк', () => {

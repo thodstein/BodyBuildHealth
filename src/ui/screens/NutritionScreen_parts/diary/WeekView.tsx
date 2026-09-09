@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { formatDate } from '../../../../core/utils/date-utils';
+import { formatDate, parseDateOnly } from '../../../../core/utils/date-utils';
 
 interface WeekViewProps {
   diaryData: Record<string, any>;
@@ -10,7 +10,7 @@ interface WeekViewProps {
 
 export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selectedDate, onSelectDate }) => {
   const weekStart = useMemo(() => {
-    const d = new Date(selectedDate);
+    const d = parseDateOnly(selectedDate);
     const day = d.getDay();
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     return d;
@@ -56,7 +56,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
   const today = formatDate(new Date());
   const weekRangeLabel = (() => {
     try {
-      const a = new Date(weekDays[0]); const b = new Date(weekDays[6]);
+      const a = parseDateOnly(weekDays[0]); const b = parseDateOnly(weekDays[6]);
       const sameMonth = a.getMonth()===b.getMonth();
       const fmt = (d:Date) => d.toLocaleDateString('ru-RU', { day:'numeric', month: sameMonth ? undefined : 'short' });
       return `${fmt(a)} — ${fmt(b)} ${b.toLocaleDateString('ru-RU',{month:'long', year:'numeric'})}`;
@@ -137,7 +137,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: isToday || isSelected ? '#00e68a' : '#fff', letterSpacing:-0.2 }}>
-                      {new Date(d.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {parseDateOnly(d.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </span>
                     {isToday && <span style={{ fontSize: 8, color: '#00e68a', background: 'rgba(0,230,138,0.12)', padding: '2px 6px', borderRadius: 999, border:'1px solid rgba(0,230,138,0.18)', fontWeight:700 }}>Сегодня</span>}
                     {isSelected && !isToday && <span style={{ fontSize: 8, color:'#a78bfa', background:'rgba(167,139,250,0.12)', padding:'2px 6px', borderRadius:999, border:'1px solid rgba(167,139,250,0.18)', fontWeight:700 }}>Выбран</span>}

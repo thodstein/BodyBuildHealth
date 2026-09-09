@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatDate } from '../../../../core/utils/date-utils';
+import { formatDate, parseDateOnly } from '../../../../core/utils/date-utils';
 
 interface WeekDaySelectorProps {
   weekDays: string[];
@@ -19,7 +19,7 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
   };
   const weekLabel = (() => {
     try {
-      const a = new Date(weekDays[0]); const b = new Date(weekDays[6]);
+      const a = parseDateOnly(weekDays[0]); const b = parseDateOnly(weekDays[6]);
       const fmt = (d:Date) => d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year: a.getFullYear()!==b.getFullYear() ? 'numeric' : undefined });
       return `${fmt(a)} — ${fmt(b)}`;
     } catch { return ''; }
@@ -52,8 +52,9 @@ export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, sele
           const isToday = ds === today;
           const isSelected = ds === selectedDate;
           const hasData = !!diaryData[ds];
-          const dayNum = new Date(ds).getDate();
-          const dayName = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][new Date(ds).getDay()];
+          const dayDate = parseDateOnly(ds);
+          const dayNum = dayDate.getDate();
+          const dayName = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][dayDate.getDay()];
           const dayKcal = (() => {
             const day = diaryData[ds];
             if (!day?.meals) return 0;

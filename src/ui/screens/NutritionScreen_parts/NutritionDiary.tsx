@@ -4,7 +4,7 @@ import { fillMissingMicros, parseNutritionText, quantityToGrams, findFood } from
 import { processUploadedFile } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
-import { formatDate } from '../../../core/utils/date-utils';
+import { formatDate, parseDateOnly } from '../../../core/utils/date-utils';
 import { type DiaryItem } from './types';
 import { aggregateDiaryMicros } from './diary-storage';
 import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo, onDiaryChangeV2 } from './diary-storage-v2';
@@ -119,7 +119,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   // Auto-select first meal type
   useEffect(() => { if (!mealType && allMealTypes.length > 0) setMealType(allMealTypes[0]); }, [tab, allMealTypes, mealType]);
 
-  const weekStart = useMemo(() => { const d = new Date(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
+  const weekStart = useMemo(() => { const d = parseDateOnly(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
   const weekDays = useMemo(() => Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return formatDate(d); }), [weekStart]);
 
   const dayMeals = diaryData[selectedDate]?.meals || {};

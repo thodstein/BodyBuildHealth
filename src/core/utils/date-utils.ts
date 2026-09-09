@@ -26,6 +26,18 @@ export function isValidDate(dateString: string): boolean {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
+/**
+ * Парсинг даты БЕЗ времени строго в локальной зоне.
+ * `new Date('YYYY-MM-DD')` — это UTC-полночь: в UTC− getDate()/getDay()
+ * отдают предыдущие сутки (неделя дневника уезжала на день). Существующий
+ * `formatDate(string)` не трогаем (общая семантика) — новая функция только
+ * для мест, где дата-календарь критична.
+ */
+export function parseDateOnly(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y || 1970, (m || 1) - 1, d || 1);
+}
+
 export function addDays(date: Date | string, days: number): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   d.setDate(d.getDate() + days);
