@@ -424,9 +424,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast(`✅ Вставлено в ${targetDate}`);
   }, [copySource, diaryData, selectedDate, saveDiary, showToast]);
 
-  const addCustomMeal = useCallback(() => { 
+  const addCustomMeal = useCallback(() => {
     const name = customMealInput.trim();
-    if (!name || customMeals.includes(name)) return; 
+    if (!name) {
+      showToast('❌ Введите название приёма');
+      return;
+    }
+    if (customMeals.includes(name)) {
+      showToast('⚠️ Такой приём уже есть');
+      return;
+    }
     const updated = [...customMeals, name]; 
     setCustomMeals(updated); 
     safeSet('he_custom_meals', updated); 
@@ -475,7 +482,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const addCustomFood = useCallback(() => {
     const name = customFoodName.trim();
-    if (!name) return;
+    if (!name) {
+      showToast('❌ Введите название продукта');
+      return;
+    }
     setParsedItems(prev => [...prev, { 
       name, kcal: Math.round(+customFoodKcal || 0), 
       p: Math.round((+customFoodP || 0) * 10) / 10, 
@@ -484,7 +494,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       qty: 100 
     }]);
     setCustomFoodName(''); setCustomFoodKcal('100'); setCustomFoodP('10'); setCustomFoodF('5'); setCustomFoodC('10'); setShowCustomFood(false);
-  }, [customFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC]);
+    showToast(`✅ ${name} → очередь`);
+  }, [customFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC, showToast]);
 
   const updateParsedItemQty = useCallback((idx: number, qty: number) => {
     setParsedItems(prev => prev.map((x, j) => j === idx ? { ...x, qty: Math.max(10, Math.min(1000, qty)) } : x));
@@ -557,7 +568,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast(`📋 День ${selectedDate} скопирован — выберите дату и Вставить`);
   }, [diaryData, selectedDate, showToast]);
   const pasteDay = useCallback((targetDate: string) => {
-    if (!copiedDay || !diaryData[copiedDay]) return;
+    if (!copiedDay || !diaryData[copiedDay]) {
+      showToast('❌ Буфер пуст — скопируйте день сначала');
+      return;
+    }
     const data = { ...diaryData };
     data[targetDate] = { meals: JSON.parse(JSON.stringify(diaryData[copiedDay].meals)) };
     saveDiary(data);
