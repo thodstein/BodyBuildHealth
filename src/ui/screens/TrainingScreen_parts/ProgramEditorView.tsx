@@ -829,7 +829,7 @@ return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 850, color: '#a78bfa' }}>👤 Профиль — сводка</span>
           <span style={{ fontSize: 10, color: DIM, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.18)', borderRadius: 20, padding: '2px 8px' }}>основа точности</span>
-          <button style={{ ...BTN_GHOST, marginLeft: 'auto', padding: '6px 12px', fontSize: 11, minHeight: 34, borderColor: 'rgba(167,139,250,0.35)', color: '#a78bfa', background: 'rgba(167,139,250,0.10)' }} onClick={() => setProfileModalOpen(true)}>✏️ Редактировать профиль</button>
+          <button className="editor-inline-cta" style={{ ...BTN_GHOST, marginLeft: 'auto', padding: '6px 12px', fontSize: 11, minHeight: 34, borderColor: 'rgba(167,139,250,0.35)', color: '#a78bfa', background: 'rgba(167,139,250,0.10)' }} onClick={() => setProfileModalOpen(true)}>✏️ Редактировать профиль</button>
         </div>
         <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.55, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
           ПМ/оборудование/травмы/уровень — один раз заполнили → авто-сборка и подбор упражнений становятся точными. Откройте редактирование, если меняли зал или веса.
@@ -1339,7 +1339,7 @@ return (
             <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚠ Дней {expected} ↔ в неделе {actual}</span>
               <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Нажмите чтобы выровнять недели под настройку (лишние дни с контентом спросят подтверждение)</span>
-              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={async () => {
+               <button className="editor-inline-cta" style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={async () => {
                 const w = program.bb!.weeks;
                 const willDelete = expected < actual && w.some(week => week.sessions.slice(expected).some(s=> (s.blocks??[]).some(b=> b.exerciseName && b.exerciseName.trim())));
                 if (willDelete) {
@@ -1517,7 +1517,7 @@ return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
           {/* Анализ */}
           <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccAnalysis ? '#22c55e' : 'rgba(255,255,255,0.06)'}` }}>
-            <button onClick={() => setProAccAnalysis(v => !v)} aria-expanded={proAccAnalysis} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccAnalysis ? 'rgba(34,197,94,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button className="proacc-head" onClick={() => setProAccAnalysis(v => !v)} aria-expanded={proAccAnalysis} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccAnalysis ? 'rgba(34,197,94,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13 }}>{proAccAnalysis ? '▼' : '▶'}</span>
                 <span style={{ fontSize: 12, fontWeight: 800, color: proAccAnalysis ? '#22c55e' : '#fff' }}>📊 Анализ</span>
@@ -1552,7 +1552,7 @@ return (
           </div>
           {/* Обратная связь */}
           <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccFeedback ? '#3b82f6' : 'rgba(255,255,255,0.06)'}` }}>
-            <button onClick={() => setProAccFeedback(v => !v)} aria-expanded={proAccFeedback} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccFeedback ? 'rgba(59,130,246,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button className="proacc-head" onClick={() => setProAccFeedback(v => !v)} aria-expanded={proAccFeedback} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccFeedback ? 'rgba(59,130,246,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13 }}>{proAccFeedback ? '▼' : '▶'}</span>
                 <span style={{ fontSize: 12, fontWeight: 800, color: proAccFeedback ? '#3b82f6' : '#fff' }}>🔄 Обратная связь</span>
@@ -1562,13 +1562,13 @@ return (
             </button>
             {proAccFeedback && (
               <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <ProPanelsGroup sections={[{ id: 'feedback', title: '🔄 Обратная связь (sRPE / RIR / чек-ин)', hint: 'ACWR, RIR-bias, готовность, чек-ин, what-if', color: '#3b82f6', content: <><LoadGuardPanel program={program} dir={dir} /><RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} /><CheckinGuardPanel program={program} dir={dir} /><StrengthDiaryPanel program={program} dir={dir} /><button onClick={() => setShowFeedbackAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showFeedbackAdv ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.10)', color: showFeedbackAdv ? '#00e68a' : DIM }}>{showFeedbackAdv ? '▲ Скрыть прогноз' : '▼ Дополнительно: прогноз готовности / what-if'}</button>{showFeedbackAdv && <><ReadinessForecastPanel program={program} dir={dir} /><WhatIfGuardPanel program={program} dir={dir} /></>}</> }]} />
+                <ProPanelsGroup sections={[{ id: 'feedback', title: '🔄 Обратная связь (sRPE / RIR / чек-ин)', hint: 'ACWR, RIR-bias, готовность, чек-ин, what-if', color: '#3b82f6', content: <><LoadGuardPanel program={program} dir={dir} /><RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} /><CheckinGuardPanel program={program} dir={dir} /><StrengthDiaryPanel program={program} dir={dir} /><button className="propanels-more" onClick={() => setShowFeedbackAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showFeedbackAdv ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.10)', color: showFeedbackAdv ? '#00e68a' : DIM }}>{showFeedbackAdv ? '▲ Скрыть прогноз' : '▼ Дополнительно: прогноз готовности / what-if'}</button>{showFeedbackAdv && <><ReadinessForecastPanel program={program} dir={dir} /><WhatIfGuardPanel program={program} dir={dir} /></>}</> }]} />
               </div>
             )}
           </div>
           {/* Инструменты */}
           <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccTools ? '#a78bfa' : 'rgba(255,255,255,0.06)'}` }}>
-            <button onClick={() => setProAccTools(v => !v)} aria-expanded={proAccTools} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccTools ? 'rgba(167,139,250,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button className="proacc-head" onClick={() => setProAccTools(v => !v)} aria-expanded={proAccTools} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccTools ? 'rgba(167,139,250,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13 }}>{proAccTools ? '▼' : '▶'}</span>
                 <span style={{ fontSize: 12, fontWeight: 800, color: proAccTools ? '#a78bfa' : '#fff' }}>🔧 Инструменты</span>
@@ -1586,7 +1586,7 @@ return (
                     <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}><PlDeadpointsBarPathCard /></div>
                   </div>
                 )}
-                <ProPanelsGroup sections={[{ id: 'technique', title: '🦴 Техника и биомеханика', hint: 'Срывы, bar-path, блины, инфо об упражнениях', color: '#06b6d4', content: <><PlateAutoPanel program={program} dir={dir} /><ExerciseInfoPanel program={program} dir={dir} /><button onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>{showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}</> }, { id: 'tools', title: '🔧 Инструменты тренера', hint: 'Подбор сплита, замены упражнений, история ревизий', color: '#a78bfa', content: <><SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><ProgramRevisionsDiff program={program} /></> }]} />
+                <ProPanelsGroup sections={[{ id: 'technique', title: '🦴 Техника и биомеханика', hint: 'Срывы, bar-path, блины, инфо об упражнениях', color: '#06b6d4', content: <><PlateAutoPanel program={program} dir={dir} /><ExerciseInfoPanel program={program} dir={dir} /><button className="propanels-more" onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>{showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}</> }, { id: 'tools', title: '🔧 Инструменты тренера', hint: 'Подбор сплита, замены упражнений, история ревизий', color: '#a78bfa', content: <><SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><ProgramRevisionsDiff program={program} /></> }]} />
                 {revisions.length > 0 && (
                   <div style={{ ...CARD, padding: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span><span style={{ fontSize: 10, color: DIM }}>({revisions.length} записей)</span></div>
@@ -1750,7 +1750,7 @@ return (
         <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>👤 Профиль для качества</span>
           <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Веса, оборудование и травмы влияют на подбор упражнений — заполните в «Профессиональном» режиме → Профиль</span>
-          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={() => onMode('pro')}>🎓 В Pro → Профиль</button>
+          <button className="editor-inline-cta" style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={() => onMode('pro')}>🎓 В Pro → Профиль</button>
         </div>
       )}
       <CycleTemplatesPanel program={program} onChange={onChange as any} showToast={showToast} />
@@ -1880,7 +1880,7 @@ return (
             <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{hasNoWeeks ? '⚡ Пустая ББ-часть — 1 клик' : '⚡ Пустые ББ-дни — 1 клик'}</span>
               <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>{hasNoWeeks ? 'Добавит ББ-недели по сплиту (с учётом дней/нед и уровня)' : 'Заполнит пустые ББ-дни базовыми упражнениями'}</span>
-              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={() => {
+              <button className="editor-inline-cta" style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={() => {
                 if (hasNoWeeks) {
                   const bbDays = Math.max(1, (program.meta.daysPerWeek ?? 4) - (program.hybrid!.plRef?.sessionIndices?.length ?? 2));
                   const weeks = Math.max(1, program.meta.weeks ?? 4);

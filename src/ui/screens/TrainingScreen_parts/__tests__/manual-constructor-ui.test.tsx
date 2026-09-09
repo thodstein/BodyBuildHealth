@@ -152,6 +152,12 @@ describe('Редактор: хуки недель/сессий §102', () => {
     expect(container.querySelector('.editor-sets-heading')).toBeInTheDocument();
     // §105: тоглы шапки редактора — тач-норма
     expect(container.querySelectorAll('.editor-head-toggle').length).toBeGreaterThanOrEqual(2);
+    // §111: шапки аккордеонов — в шаге Недели без pro; клик раскрывает тумблеры
+    expect(container.querySelectorAll('.proacc-head').length).toBe(3);
+    fireEvent.click(screen.getByText('🔄 Обратная связь'));
+    expect(container.querySelectorAll('.propanels-more').length).toBe(1);
+    fireEvent.click(screen.getByText('🔧 Инструменты'));
+    expect(container.querySelectorAll('.propanels-more').length).toBe(2);
   }, 60000);
 });
 

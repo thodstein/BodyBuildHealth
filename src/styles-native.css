@@ -12826,6 +12826,76 @@ html.app-native .manual-constructor .manual-prog-tools button:focus-visible {
   }
 }
 
+/* ─── 111. MANUAL INLINE/PROPANELS PRO — инлайн-CTA и тумблеры групп ───
+ * Хуки: NEW .editor-inline-cta (×4) + .propanels-more (×2) + .proacc-head (×3,
+ * ProgramEditorView); шапки ProPanelsGroup 44px из коробки.
+ * Кнопки 44px (шапки аккордеонов 52px) + press/focus, 380px, reduced-motion.
+ * Только APK: TG/web — байт-в-байт как было. */
+
+/* ── Инлайн-CTA карточек: 44px ── */
+html.app-native .manual-constructor .editor-inline-cta {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+}
+
+html.app-native .manual-constructor .editor-inline-cta:active {
+  transform: scale(0.97) !important;
+}
+
+html.app-native .manual-constructor .editor-inline-cta:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Внутренние тумблеры ProPanelsGroup: 44px во всю ширину ── */
+html.app-native .manual-constructor .propanels-more {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .propanels-more:active {
+  transform: scale(0.98) !important;
+}
+
+html.app-native .manual-constructor .propanels-more:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .editor-inline-cta:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .propanels-more:active {
+    transform: none !important;
+  }
+}
+
+/* ── Шапки Pro-аккордеонов: 52px во всю ширину ── */
+html.app-native .manual-constructor .proacc-head {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+
+html.app-native .manual-constructor .proacc-head:active {
+  transform: scale(0.99) !important;
+}
+
+html.app-native .manual-constructor .proacc-head:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: -2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .manual-constructor .proacc-head:active {
+    transform: none !important;
+  }
+}
+
 /* --- 95. NUTRITION DIARY SECTIONS: DiarySection/mini-gauges/data-daycount --- */
 html.app-native .nd-data-btn {
   min-height: 44px !important;
