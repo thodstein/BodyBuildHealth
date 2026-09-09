@@ -297,4 +297,12 @@ describe('nutrition-diary-pro hooks', () => {
     expect(screen.getByText(/Экспорт CSV/)).toBeInTheDocument();
     expect(screen.getByText(/Импорт JSON/)).toBeInTheDocument();
   });
+
+  it('NutritionDiary: табы обёрнуты в секции add/week', () => {
+    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    expect(container.querySelector('.nd-sec-add')).not.toBeNull();
+    expect(container.querySelector('.nd-sec-week')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Неделя' }));
+    expect(container.querySelector('.nd-sec-week')).not.toBeNull();
+  });
 });

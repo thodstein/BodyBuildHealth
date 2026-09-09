@@ -176,6 +176,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Tab content */}
       {tab === 'add' && (
         <>
+        <DiarySection id="add" icon="🔍" title="Добавление" sub="поиск · штрихкод · фото · очередь" color="#00e68a" count={parsedItems.length > 0 ? `${parsedItems.length} в очереди` : null}>
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
@@ -226,6 +227,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           onAddCustomFood={addCustomFood}
           ocrFileRef={ocrFileRef} ocrCameraRef={ocrCameraRef}
         />
+        </DiarySection>
         {/* FatSecret-уровень: частые продукты 1-клик */}
         <FrequentFoodsPanel diary={diaryData} onAddFood={(food, mealType) => {
           const data = { ...diaryData };
@@ -350,7 +352,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       )}
 
       {tab === 'week' && (
+        <DiarySection id="week" icon="📊" title="Неделя" sub="итоги · по дням" color="#a78bfa">
         <WeekView diaryData={diaryData} targets={targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 }} selectedDate={selectedDate} onSelectDate={(d)=>{ setSelectedDate(d); setTab('day'); }} />
+        </DiarySection>
       )}
 
       {/* Edit modal */}
