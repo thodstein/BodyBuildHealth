@@ -6,10 +6,11 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { CycleCatalog } from '../CycleCatalog';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { StrengthSportConstructor } from '../../strength-sport/StrengthSportConstructor';
+import { applyToPlanner, clearPlannerApply } from '../planner-bridge';
 
 const PROPS = { goal: 'strength', level: 'II-KMS', daysPerWeek: 3 };
 
@@ -89,5 +90,23 @@ describe('Мост Библиотека → конструкторы', () => {
     seedBridge('ss_cycle', 'nope');
     render(<StrengthSportConstructor />);
     expect(screen.getByText(/не найден в библиотеке/)).toBeTruthy();
+  });
+
+  it('арм-конструктор подхватывает цикл живьём (уже открыт)', () => {
+    try { localStorage.removeItem('he_planner_apply'); } catch { /* ignore */ }
+    const { container } = render(<ArmAutoConstructor />);
+    expect(container.querySelector('[data-arm="msg"]')).toBeNull();
+    act(() => { applyToPlanner({ kind: 'arm_cycle', label: 'Toproll', data: { cycleId: 'toproll_6' } }); });
+    expect(container.querySelector('[data-arm="msg"]')?.textContent).toContain('Toproll 6-week');
+    clearPlannerApply();
+  });
+
+  it('SS-конструктор подхватывает цикл живьём (уже открыт)', () => {
+    try { localStorage.removeItem('he_planner_apply'); } catch { /* ignore */ }
+    const { container } = render(<StrengthSportConstructor />);
+    act(() => { applyToPlanner({ kind: 'ss_cycle', label: 'Peak', data: { cycleId: 'ss-sm-peak-4' } }); });
+    expect(localStorage.getItem('he_ss_cycle_v1')).toBe('ss-sm-peak-4');
+    expect(container.querySelector('[data-ss="msg"]')?.textContent).toContain('Стронг пик');
+    clearPlannerApply();
   });
 });
