@@ -1,18 +1,17 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { type OFFProduct, productToFoodItem } from '../../../engines/openfoodfacts.engine';
-import { fillMissingMicros, parseNutritionText, quantityToGrams, findFood } from '../../../engines/nutrition-ocr-parser';
-import { processUploadedFile } from '../../../core/ocr-engine';
-import { FOOD_DB } from '../../../core/nutrition-database';
-import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
-import { formatDate, parseDateOnly } from '../../../core/utils/date-utils';
-import { type DiaryItem } from './types';
-import { aggregateDiaryMicros } from './diary-storage';
-import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo, onDiaryChangeV2, readJSONArr } from './diary-storage-v2';
-import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
+import React, { useState, useRef, useCallback } from 'react';
+import { findFood, quantityToGrams } from '../../../engines/nutrition-ocr-parser';
+import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo } from './diary-storage-v2';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
-import { useRecentFoods } from './useNutritionDiary';
 import { ModernHero, modernCardBg } from './nutrition-modern-kit';
+import { useDiaryToast } from './diary/hooks/useDiaryToast';
+import { useDiaryData } from './diary/hooks/useDiaryData';
+import { useDiarySearch } from './diary/hooks/useDiarySearch';
+import { useDiaryMealTypes } from './diary/hooks/useDiaryMealTypes';
+import { useDiaryQueue } from './diary/hooks/useDiaryQueue';
+import { useDiaryDay } from './diary/hooks/useDiaryDay';
+import { useDiaryDayOps } from './diary/hooks/useDiaryDayOps';
+import { useDiaryPresets } from './diary/hooks/useDiaryPresets';
 
 // Extracted components
 import { WeekDaySelector } from './diary/WeekDaySelector';
@@ -24,10 +23,7 @@ import { QualityInsights } from './diary/QualityInsights';
 import { WeekView } from './diary/WeekView';
 import { FrequentFoodsPanel } from './diary/FrequentFoodsPanel';
 
-type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };
-export type { FoodItemLike };
-
-const MEAL_PRESETS = ['Завтрак', 'Второй завтрак', 'Обед', 'Полдник', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки', 'Поздний перекус'];
+export type { FoodItemLike } from './types';
 
 interface NutritionTargets { kcal: number; protein: number; fats: number; carbs: number; }
 
@@ -38,572 +34,67 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [tab, setTab] = useState<'add' | 'day' | 'week'>('add');
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
-  const [foodSearch, setFoodSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(foodSearch), 250);
-    return () => clearTimeout(t);
-  }, [foodSearch]);
+  // Состояние разбито по хукам diary/hooks/* (структурный разрез, поведение 1-в-1)
+  const { toast, showToast, safeSet } = useDiaryToast();
+  const { diaryData, setDiaryData, refreshKey, bumpRefresh, saveDiary, storageError, setStorageError } = useDiaryData({ onDiaryChange });
+  const { foodSearch, setFoodSearch, debouncedSearch, usdaFoods } = useDiarySearch();
+  const { mealType, setMealType, allMealTypes, customMealInput, setCustomMealInput, addCustomMeal } = useDiaryMealTypes({ tab, safeSet, showToast });
+  const { selectedDate, setSelectedDate, weekDays, dayMeals, dayTotals, dayMicros, mealQuality, dayQuality, favoriteFoods, recentFoods } = useDiaryDay({ diaryData, refreshKey });
+  const {
+    ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading,
+    showCustomFood, setShowCustomFood,
+    customFoodName, setCustomFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC,
+    addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
+    fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
+    addCustomFood, updateParsedItemQty, extractQty, addPresetItems,
+  } = useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch });
+  const {
+    editItem, setEditItem, editQty, setEditQty, copySource, setCopySource, copiedDay,
+    clearDayConfirmOpen, setClearDayConfirmOpen,
+    foodPatterns, foodTriggers, mealMood,
+    deleteItem, clearDay, confirmClearDay, openEdit, saveEdit,
+    copyMeal, pasteMeal, copyDay, pasteDay,
+    saveMealMood, savePatterns, saveTriggers,
+    importFromPlan, fillDayMicros,
+  } = useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, safeSet });
+  const {
+    dayPresets, mealPresets,
+    presetDialog, setPresetDialog, presetName, setPresetName,
+    dayPresetDialogOpen, setDayPresetDialogOpen, dayPresetName, setDayPresetName,
+    savePreset, confirmSavePreset, saveDayPreset, confirmSaveDayPreset, loadDayPreset,
+  } = useDiaryPresets({ diaryData, selectedDate, saveDiary, showToast, safeSet, extractQty });
 
-  const [mealType, setMealType] = useState('');
-  const [ocrText, setOcrText] = useState('');
-  const [parsedItems, setParsedItems] = useState<DiaryItem[]>([]);
-  const [ocrError, setOcrError] = useState('');
-  const [ocrHint, setOcrHint] = useState('');
-  const [ocrFileLoading, setOcrFileLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-  const [showCustomFood, setShowCustomFood] = useState(false);
-  const [customFoodName, setCustomFoodName] = useState('');
-  const [customFoodKcal, setCustomFoodKcal] = useState('100');
-  const [customFoodP, setCustomFoodP] = useState('10');
-  const [customFoodF, setCustomFoodF] = useState('5');
-  const [customFoodC, setCustomFoodC] = useState('10');
-  const [customMealInput, setCustomMealInput] = useState('');
-  const [editItem, setEditItem] = useState<{ meal: string; idx: number; item: any } | null>(null);
-  const [editQty, setEditQty] = useState(100);
-  const [copySource, setCopySource] = useState<string | null>(null);
-  const [copiedDay, setCopiedDay] = useState<string | null>(null);
-  const [dayPresets, setDayPresets] = useState<any[]>(() => readJSONArr<any>('he_day_presets'));
-  const [toast, setToast] = useState<string | null>(null);
-  const [storageError, setStorageError] = useState<string | null>(null);
-  const [customMeals, setCustomMeals] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []; } catch { return []; } });
-  const [mealPresets, setMealPresets] = useState<any[]>(() => readJSONArr<any>('he_meal_presets'));
-  const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
-  const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
-  const [mealMood, setMealMood] = useState<Record<string, { satiety: number; enjoyment: number; note: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_meal_mood') || '{}'); } catch { return {}; } });
-  const [usdaFoods, setUsdaFoods] = useState<FoodItemLike[]>([]);
-  const [diaryData, setDiaryData] = useState<Record<string, any>>(() => readDiaryV2());
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const ocrFileRef = useRef<HTMLInputElement>(null);
-  const ocrCameraRef = useRef<HTMLInputElement>(null);
-
-  const showToast = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); }, []);
-  const safeSet = useCallback((key: string, data: any) => { try { localStorage.setItem(key, JSON.stringify(data)); } catch {} }, []);
-
-  // Lazy-load USDA
-  useEffect(() => {
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      import('../../../data/usda-foods').then(m => {
-        if (!cancelled && m.USDA_FOODS) {
-          try { setUsdaFoods(m.USDA_FOODS.slice(0, 5000)); } catch { setUsdaFoods([]); }
-        }
-      }).catch(() => { setUsdaFoods([]); });
-    }, 600);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
-
-  // Diary storage listener
-  useEffect(() => {
-    return onDiaryChangeV2(setDiaryData);
-  }, []);
-
-  const saveDiary = useCallback((data: any) => { 
-    try {
-      writeDiaryV2(data); 
-      setDiaryData(data); 
-      setRefreshKey(k => k + 1); 
-      onDiaryChange?.(); 
-      setStorageError(null);
-    } catch (e) {
-      console.error('Diary save error:', e);
-      const errorMsg = e instanceof Error ? e.message : 'неизвестная ошибка';
-      setStorageError('Ошибка сохранения дневника: ' + errorMsg);
-    }
-  }, [onDiaryChange]);
-
-  const allMealTypes = useMemo(() => [...MEAL_PRESETS, ...customMeals], [customMeals]);
-
-  // Auto-select first meal type
-  useEffect(() => { if (!mealType && allMealTypes.length > 0) setMealType(allMealTypes[0]); }, [tab, allMealTypes, mealType]);
-
-  const weekStart = useMemo(() => { const d = parseDateOnly(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
-  const weekDays = useMemo(() => Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return formatDate(d); }), [weekStart]);
-
-  const dayMeals = diaryData[selectedDate]?.meals || {};
-
-  const dayTotals = useMemo(() => {
-    try {
-      const items = Object.values(dayMeals).filter(Array.isArray).flat().filter((i:any) => i && typeof i === 'object');
-      return {
-        kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0),
-        p: items.reduce((s: number, i: any) => s + (i.p || 0), 0),
-        f: items.reduce((s: number, i: any) => s + (i.f || 0), 0),
-        c: items.reduce((s: number, i: any) => s + (i.c || 0), 0),
-      };
-    } catch { return { kcal:0, p:0, f:0, c:0 }; }
-  }, [dayMeals, diaryData, refreshKey]);
-
-  const dayMicros = useMemo(() => aggregateDiaryMicros(diaryData[selectedDate]), [diaryData, selectedDate, refreshKey]);
   const microLabels: Record<string, { name: string; unit: string; target: number }> = {
     sodium_mg: { name: 'Натрий', unit: 'мг', target: 2300 }, potassium_mg: { name: 'Калий', unit: 'мг', target: 3500 }, magnesium_mg: { name: 'Магний', unit: 'мг', target: 400 }, calcium_mg: { name: 'Кальций', unit: 'мг', target: 1000 }, iron_mg: { name: 'Железо', unit: 'мг', target: sex === 'female' ? 18 : 8 }, zinc_mg: { name: 'Цинк', unit: 'мг', target: sex === 'female' ? 8 : 11 }, vitamin_c_mg: { name: 'Витамин C', unit: 'мг', target: sex === 'female' ? 75 : 90 }, vitamin_d_mcg: { name: 'Витамин D', unit: 'мкг', target: 15 }, vitamin_b12_mcg: { name: 'Витамин B12', unit: 'мкг', target: 2.4 }, fiber_g: { name: 'Клетчатка', unit: 'г', target: 30 },
   };
 
-  const mealQuality = useMemo(() => {
-    try {
-      const items = Object.values(dayMeals).flat() as any[];
-      if (items.length === 0) return null;
-      return calcMealQuality(items);
-    } catch { return null; }
-  }, [dayMeals, refreshKey]);
+  // Состояние поиска/очереди/дня/пресетов — см. diary/hooks/* (разрез без смены поведения)
 
-  // Per-product usefulness from bb_quality_score stored in diary entries
-  const dayQuality = useMemo(() => {
-    try {
-      const items = Object.values(dayMeals).flat().filter((i: any) => i && typeof i === 'object') as any[];
-      if (items.length === 0) return null;
-      let totalScore = 0;
-      let scoredCount = 0;
-      const perProduct: Array<{ name: string; score?: number; label: string; color: string }> = [];
-      items.forEach((item: any) => {
-        let score: number | undefined = item.qualityScore;
-        if (score == null && item.foodId) {
-          const food = FOOD_DB.find(f => f.id === item.foodId);
-          score = food?.bb_quality_score;
-        }
-        if (score == null && item.name) {
-          const food = FOOD_DB.find(f => f.name.toLowerCase() === (item.name || '').toLowerCase());
-          score = food?.bb_quality_score;
-        }
-        if (score != null && Number.isFinite(score)) {
-          totalScore += score;
-          scoredCount++;
-          const { label, color } = getQualityLabel(score * 10); // scale 1-10 → 0-100
-          perProduct.push({ name: item.name, score, label, color });
-        }
-      });
-      const avg = scoredCount > 0 ? Math.round(totalScore / scoredCount * 10) / 10 : null;
-      return { avg, scoredCount, total: items.length, perProduct };
-    } catch { return null; }
-  }, [dayMeals, refreshKey]);
+  const ocrFileRef = useRef<HTMLInputElement>(null);
+  const ocrCameraRef = useRef<HTMLInputElement>(null);
 
-  const favoriteFoods = useMemo(() => {
-    const favs = readJSONArr<string>('he_food_favs');
-    return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB;
-  }, [refreshKey]);
+  // (хуки данных/поиска/типов приёмов/недели — см. выше)
 
-  const recentFoods = useRecentFoods(diaryData as any, 10);
+  // (итоги/микро дня — useDiaryDay; microLabels определён выше в композиции)
 
-  // Handlers
-  const addFoodFromDB = useCallback((food: FoodItemLike) => {
-    setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category || 'other' }]);
-    setFoodSearch('');
-    try {
-      const favs = readJSONArr<string>('he_food_favs');
-      const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12);
-      localStorage.setItem('he_food_favs', JSON.stringify(updated));
-      setRefreshKey(k => k + 1);
-    } catch {}
-  }, []);
+  // (качество/избранное/недавнее — useDiaryDay)
 
-  const handleDirectAdd = useCallback((food: FoodItemLike) => {
-    const data = { ...diaryData };
-    if (!data[selectedDate]) data[selectedDate] = { meals: {} };
-    const mt = mealType || 'Перекус';
-    if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
-    (data[selectedDate].meals[mt] as any).push({ name: food.name, qty: '100 г', kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, category: food.category, foodId: (food as any).id });
-    saveDiary(data);
-    showToast(`⚡ ${food.name} → ${mt} 100г`);
-  }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
+  // (очередь/OCR/поиск еды — useDiaryQueue)
 
-  const handleBarcodeProduct = useCallback((product: OFFProduct) => { 
-    setShowBarcode(false); 
-    const item = productToFoodItem(product); 
-    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100 }]); 
-  }, []);
-
-  const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number>; confidence?: number }> }[], usdaFallback?: FoodItemLike[]) => {
-    return meals.flatMap(m => m.items.map(item => {
-      const qtyMatch = item.qty?.match(/[\d]+(?:[.,]\d+)?/);
-      const parsedQty = qtyMatch ? Number.parseFloat(qtyMatch[0].replace(',', '.')) : 100;
-      const qty = Math.max(10, Math.round(item.qtyGrams ?? parsedQty));
-       let result: DiaryItem = { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros, confidence: item.confidence };
-      // USDA fallback: if food not in FOOD_DB, try external catalog
-      if (!result.foodId && usdaFallback?.length) {
-        const usdaMatch = findFood(item.name, usdaFallback as any);
-        if (usdaMatch) {
-          result.foodId = (usdaMatch as any).id || result.foodId;
-          result.category = (usdaMatch as any).category || result.category;
-          // Enrich with USDA kcal/macros if parsed data is sparse
-          if (result.kcal === 0 && (usdaMatch as any).kcal) result.kcal = (usdaMatch as any).kcal;
-          if (result.p === 0 && (usdaMatch as any).protein) result.p = (usdaMatch as any).protein;
-          if (result.f === 0 && (usdaMatch as any).fat) result.f = (usdaMatch as any).fat;
-          if (result.c === 0 && (usdaMatch as any).carbs) result.c = (usdaMatch as any).carbs;
-        }
-      }
-      return result;
-    })).filter(item => Boolean(item.foodId) && (item.confidence === undefined || item.confidence >= 0.8));
-  }, []);
-
-  const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
-
-  const fillDayMicros = useCallback(() => {
-    const data = { ...diaryData };
-    const day = data[selectedDate];
-    if (!day?.meals) return;
-    (Object.values(day.meals) as any[][]).forEach(items => items.forEach((item: any) => {
-      const food = FOOD_DB.find(f => f.id === item.foodId) || FOOD_DB.find(f => f.name === item.name);
-      const grams = quantityToGrams(String(item.qty || '100 г'), food);
-      item.micros = fillMissingMicros(item.name, grams, item.micros);
-    }));
-    saveDiary(data);
-    showToast('✨ Микронутриенты дополнены');
-  }, [diaryData, selectedDate, saveDiary, showToast]);
-
-  const handleOcrFileUpload = useCallback(async (file: File) => { 
-    if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); setOcrFileLoading(false); return; }
-    setOcrFileLoading(true); setOcrError(''); setOcrHint(`⏳ Файл выбран: ${((file as any)?.size ? ((file.size/1024/1024).toFixed(2)+' МБ') : '…')} — загружаем…`);
-    if ((file as any)?.size > 15 * 1024 * 1024) {
-      setOcrFileLoading(false);
-      setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
-      return;
-    }
-    let backup: number | undefined;
-    let hard: number | undefined;
-    const backupPromise = new Promise<never>((_, reject) => {
-      backup = window.setTimeout(() => reject(new Error('Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, 50_000);
-    });
-    hard = window.setTimeout(() => {
-      setOcrFileLoading(false);
-      setOcrError(prev => (prev as any) || 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).');
-    }, 55_000) as any;
-    try {
-      const result: any = await Promise.race([
-        processUploadedFile(file),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
-        backupPromise,
-      ]);
-      setOcrText(result.text || '');
-      if (result.meals.length > 0) {
-        const converted = convertOCRItems(result.meals, usdaFoods);
-        if (converted.length > 0) {
-          setParsedItems(converted);
-          setOcrError('');
-          setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь — тап по названию для правки. Сырой текст ниже.` );
-        } else {
-          setOcrError('Распознано 0 позиций — попробуйте более чёткий скриншот или вставьте текст вручную через «Текст».');
-        }
-      } else if (result.meals.length === 0 && result.labs.length === 0) {
-        setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
-      }
-    } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
-    finally { if (backup) clearTimeout(backup); if (hard) clearTimeout(hard); setOcrFileLoading(false); }
-   }, [convertOCRItems, usdaFoods]);
-
-  const handleOCR = useCallback(() => { 
-    if (!ocrText.trim()) return; 
-    setOcrError(''); 
-    setOcrHint(''); 
-    try { 
-      const converted = convertOCRItems(parseNutritionText(ocrText)); 
-      if (converted.length === 0) setOcrError('Не удалось найти продукты. Пример: «Курица 200 г» или «Курица 200 г 330 ккал Б:35 Ж:7 У:0».'); 
-      else {
-        setParsedItems(converted); 
-        if (converted.length <= 2 && ocrText.split(/\r?\n/).filter(l => l.trim().length > 2).length > 4) {
-          setOcrHint('💡 Распознано мало позиций для такого объёма текста. Проверьте, весь ли скриншот был распознан, или добавьте недостающие продукты вручную.');
-        }
-      }
-    } catch (e) { setOcrError('' + (e instanceof Error ? e.message : String(e))); } 
-  }, [ocrText, convertOCRItems]);
-
-  const saveItemsToDiary = useCallback((items: DiaryItem[]) => {
-    if (items.length === 0) return;
-    const data = { ...diaryData };
-    if (!data[selectedDate]) data[selectedDate] = { meals: {} };
-    const mt = mealType || 'Приём пищи';
-    if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
-    items.forEach(item => {
-      const q = Number(item.qty) || 100;
-      if (q <= 0) return;
-      // Pull bb_quality_score from FOOD_DB for usefulness tracking
-      let qualityScore: number | undefined;
-      const food = item.foodId
-        ? FOOD_DB.find(f => f.id === item.foodId)
-        : FOOD_DB.find(f => f.name.toLowerCase() === (item.name || '').toLowerCase());
-      if (food?.bb_quality_score != null) qualityScore = food.bb_quality_score;
-      data[selectedDate].meals[mt].push({
-        name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
-        p: Math.round((item.p * q / 100) * 10) / 10, f: Math.round((item.f * q / 100) * 10) / 10, c: Math.round((item.c * q / 100) * 10) / 10,
-        category: item.category, foodId: item.foodId, micros: item.micros,
-        qualityScore,
-      });
-    });
-    saveDiary(data);
-    setParsedItems([]);
-    setOcrText('');
-    showToast(`✅ ${items.length} позиций → ${mt}`);
-  }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
-
-  const deleteItem = useCallback((meal: string, idx: number) => {
-    const data = { ...diaryData };
-    if (!data[selectedDate]?.meals?.[meal]) return;
-    data[selectedDate].meals[meal] = data[selectedDate].meals[meal].filter((_: any, i: number) => i !== idx);
-    if (data[selectedDate].meals[meal].length === 0) delete data[selectedDate].meals[meal];
-    if (Object.keys(data[selectedDate].meals).length === 0) delete data[selectedDate];
-    saveDiary(data);
-    showToast('🗑 Удалено');
-  }, [diaryData, selectedDate, saveDiary, showToast]);
-
-  const clearDay = useCallback(() => { 
-    if (!diaryData[selectedDate]) return; 
-    setClearDayConfirmOpen(true);
-  }, [diaryData, selectedDate]);
-
-  const confirmClearDay = useCallback(() => {
-    const data = { ...diaryData };
-    delete data[selectedDate];
-    saveDiary(data);
-    setClearDayConfirmOpen(false);
-    showToast('🗑 День очищен');
-  }, [diaryData, selectedDate, saveDiary, showToast]);
-
+  // (операции дня/правка/копирование/настроение — useDiaryDayOps)
+  const [clearDiaryConfirmOpen, setClearDiaryConfirmOpen] = useState(false);
   const confirmClearDiary = useCallback(() => {
     writeDiaryV2({});
     setDiaryData({});
-    setRefreshKey(k => k + 1);
+    bumpRefresh();
     setClearDiaryConfirmOpen(false);
     showToast('🗑 Дневник очищен');
-  }, [showToast]);
+  }, [showToast, setDiaryData, bumpRefresh]);
 
-  const openEdit = useCallback((meal: string, idx: number, item: any) => { 
-    setEditItem({ meal, idx, item }); 
-    const match = item.qty?.match(/(\d+)/); 
-    setEditQty(match ? +match[1] : 100); 
-  }, []);
+  // (своя еда/пресеты очереди — useDiaryQueue)
 
-  const saveEdit = useCallback(() => {
-    if (!editItem) return;
-    const data = { ...diaryData };
-    if (!data[selectedDate]?.meals?.[editItem.meal]) return;
-    const day = data[selectedDate];
-    const items = [...day.meals[editItem.meal]];
-    const current = items[editItem.idx];
-    if (!current) return;
-    const savedQty = Number.parseFloat(String(current.qty || '100').replace(',', '.')) || 100;
-    const per100 = (value: number) => Number(value || 0) / savedQty * 100;
-    const portion = (value: number, decimals = 1) => {
-      const factor = 10 ** decimals;
-      return Math.round(per100(value) * editQty / 100 * factor) / factor;
-    };
-    items[editItem.idx] = {
-      ...current,
-      qty: `${editQty} г`,
-      kcal: Math.round(portion(current.kcal, 0)),
-      p: portion(current.p),
-      f: portion(current.f),
-      c: portion(current.c),
-      micros: current.micros
-        ? Object.fromEntries(Object.entries(current.micros).map(([key, value]) => [key, portion(Number(value), 2)]))
-        : current.micros,
-    };
-    data[selectedDate] = { ...day, meals: { ...day.meals, [editItem.meal]: items } };
-    saveDiary(data); 
-    setEditItem(null); 
-    showToast('✅ Количество обновлено');
-  }, [editItem, diaryData, selectedDate, editQty, saveDiary, showToast]);
-
-  const copyMeal = useCallback((meal: string) => { 
-    setCopySource(meal); 
-    showToast(`📋 «${meal}» скопирован. Выберите день.`); 
-  }, [showToast]);
-
-  const pasteMeal = useCallback((targetDate: string) => {
-    if (!copySource || !diaryData[selectedDate]?.meals?.[copySource]) {
-      showToast('❌ Буфер пуст — скопируйте приём сначала');
-      return;
-    }
-    const data = { ...diaryData };
-    if (!data[targetDate]) data[targetDate] = { meals: {} };
-    data[targetDate].meals[copySource] = JSON.parse(JSON.stringify(diaryData[selectedDate].meals[copySource]));
-    saveDiary(data); 
-    setCopySource(null); 
-    showToast(`✅ Вставлено в ${targetDate}`);
-  }, [copySource, diaryData, selectedDate, saveDiary, showToast]);
-
-  const addCustomMeal = useCallback(() => {
-    const name = customMealInput.trim();
-    if (!name) {
-      showToast('❌ Введите название приёма');
-      return;
-    }
-    if (customMeals.includes(name)) {
-      showToast('⚠️ Такой приём уже есть');
-      return;
-    }
-    const updated = [...customMeals, name]; 
-    setCustomMeals(updated); 
-    safeSet('he_custom_meals', updated); 
-    setCustomMealInput(''); 
-    showToast('✅ Приём добавлен'); 
-  }, [customMealInput, customMeals, safeSet, showToast]);
-
-  const saveMealMood = useCallback((date: string, mood: { satiety: number; enjoyment: number; note: string }) => {
-    const upd = { ...mealMood, [date]: mood };
-    setMealMood(upd);
-    safeSet('he_meal_mood', upd);
-  }, [mealMood, safeSet]);
-
-  const savePatterns = useCallback((date: string, patterns: string[]) => {
-    const upd = { ...foodPatterns, [date]: patterns };
-    setFoodPatterns(upd);
-    safeSet('he_food_patterns', upd);
-  }, [foodPatterns, safeSet]);
-
-  const saveTriggers = useCallback((date: string, triggers: string[]) => {
-    const upd = { ...foodTriggers, [date]: triggers };
-    setFoodTriggers(upd);
-    safeSet('he_food_triggers', upd);
-  }, [foodTriggers, safeSet]);
-
-  const importFromPlan = useCallback(() => {
-    try {
-      const plans = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]');
-      if (plans.length === 0) { showToast('❌ Нет сохранённых планов'); return; }
-      const latest = plans[0];
-      const meals = latest.dayPlan?.meals || [];
-      if (meals.length === 0) { showToast('❌ План пуст — нет приёмов'); return; }
-      const data = { ...diaryData };
-      if (!data[selectedDate]) data[selectedDate] = { meals: {} };
-      meals.forEach((m: any) => {
-        const label = m.label || 'Приём пищи';
-        if (!data[selectedDate].meals[label]) data[selectedDate].meals[label] = [];
-        (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
-          data[selectedDate].meals[label].push({ name: it.name, qty: `${it.amount || 100} г`, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: it.micros });
-        });
-      });
-      saveDiary(data);
-      showToast('✅ Импортировано из плана');
-    } catch { showToast('❌ Ошибка импорта плана'); }
-  }, [diaryData, selectedDate, saveDiary, showToast]);
-
-  const addCustomFood = useCallback(() => {
-    const name = customFoodName.trim();
-    if (!name) {
-      showToast('❌ Введите название продукта');
-      return;
-    }
-    setParsedItems(prev => [...prev, { 
-      name, kcal: Math.round(+customFoodKcal || 0), 
-      p: Math.round((+customFoodP || 0) * 10) / 10, 
-      f: Math.round((+customFoodF || 0) * 10) / 10, 
-      c: Math.round((+customFoodC || 0) * 10) / 10, 
-      qty: 100 
-    }]);
-    setCustomFoodName(''); setCustomFoodKcal('100'); setCustomFoodP('10'); setCustomFoodF('5'); setCustomFoodC('10'); setShowCustomFood(false);
-    showToast(`✅ ${name} → очередь`);
-  }, [customFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC, showToast]);
-
-  const updateParsedItemQty = useCallback((idx: number, qty: number) => {
-    setParsedItems(prev => prev.map((x, j) => j === idx ? { ...x, qty: Math.max(10, Math.min(1000, qty)) } : x));
-  }, []);
-
-  const extractQty = useCallback((item: any): number => {
-    if (typeof item.qty === 'string') {
-      const m = String(item.qty).match(/[\d.,]+/);
-      if (m) return Math.max(10, Math.round(parseFloat(m[0].replace(',', '.')))) || 100;
-    }
-    if (typeof item.qty === 'number' && Number.isFinite(item.qty)) return Math.max(10, Math.round(item.qty));
-    if (typeof item.qtyGrams === 'number' && Number.isFinite(item.qtyGrams)) return Math.max(10, Math.round(item.qtyGrams));
-    return 100;
-  }, []);
-
-  const addPresetItems = useCallback((items: any[]) => {
-    // Items in presets are stored per 100g; queue expects per-100 values + qty in grams
-    setParsedItems(prev => [...prev, ...items.map((it: any) => ({
-      name: it.name, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0,
-      qty: it.qty || 100, category: it.category, foodId: it.foodId,
-    }))]);
-    showToast(`📦 Набор "${items.length} поз." → очередь`);
-  }, [showToast]);
-
-  const [presetDialog, setPresetDialog] = useState<{ meal: string; items: any[] } | null>(null);
-  const [presetName, setPresetName] = useState('');
-  const [dayPresetDialogOpen, setDayPresetDialogOpen] = useState(false);
-  const [dayPresetName, setDayPresetName] = useState('');
-  const [clearDayConfirmOpen, setClearDayConfirmOpen] = useState(false);
-  const [clearDiaryConfirmOpen, setClearDiaryConfirmOpen] = useState(false);
-
-  const savePreset = useCallback((meal: string, items: any[]) => {
-    setPresetDialog({ meal, items });
-    setPresetName(`${meal} (набор)`);
-  }, []);
-
-  const confirmSavePreset = useCallback(() => {
-    if (!presetDialog) return;
-    const name = presetName.trim();
-    if (!name) { showToast('❌ Введите название'); return; }
-    const { items } = presetDialog;
-    // Normalize to per-100g to fix "Не собирается набор еды" — previously saved scaled kcal directly
-    const presetItems = items.map((i: any) => {
-      const qty = extractQty(i);
-      const factor = qty > 0 ? 100 / qty : 1;
-      return {
-        name: i.name,
-        kcal: Math.round((i.kcal || 0) * factor),
-        p: Math.round((i.p || 0) * factor * 10) / 10,
-        f: Math.round((i.f || 0) * factor * 10) / 10,
-        c: Math.round((i.c || 0) * factor * 10) / 10,
-        qty,
-        category: i.category, foodId: i.foodId,
-      };
-    });
-    const preset = { name, items: presetItems };
-    setMealPresets(prev => {
-      const upd = [...prev, preset];
-      safeSet('he_meal_presets', upd);
-      return upd;
-    });
-    setPresetDialog(null);
-    setPresetName('');
-    showToast('✅ Набор сохранён');
-  }, [presetDialog, presetName, extractQty, safeSet, showToast]);
-
-  const copyDay = useCallback(() => {
-    if (!diaryData[selectedDate]?.meals) { showToast('❌ День пуст'); return; }
-    setCopiedDay(selectedDate);
-    showToast(`📋 День ${selectedDate} скопирован — выберите дату и Вставить`);
-  }, [diaryData, selectedDate, showToast]);
-  const pasteDay = useCallback((targetDate: string) => {
-    if (!copiedDay || !diaryData[copiedDay]) {
-      showToast('❌ Буфер пуст — скопируйте день сначала');
-      return;
-    }
-    const data = { ...diaryData };
-    data[targetDate] = { meals: JSON.parse(JSON.stringify(diaryData[copiedDay].meals)) };
-    saveDiary(data);
-    showToast(`✅ День ${copiedDay} → ${targetDate}`);
-  }, [copiedDay, diaryData, saveDiary, showToast]);
-  const saveDayPreset = useCallback(() => {
-    const day = diaryData[selectedDate];
-    if (!day?.meals || Object.keys(day.meals).length===0) { showToast('❌ День пуст'); return; }
-    setDayPresetName(`Шаблон ${selectedDate}`);
-    setDayPresetDialogOpen(true);
-  }, [diaryData, selectedDate]);
-
-  const confirmSaveDayPreset = useCallback(() => {
-    const name = dayPresetName.trim();
-    if (!name) { showToast('❌ Введите название'); return; }
-    const day = diaryData[selectedDate];
-    if (!day?.meals) return;
-    const upd = [...dayPresets, { name, meals: JSON.parse(JSON.stringify(day.meals)) }];
-    setDayPresets(upd);
-    safeSet('he_day_presets', upd);
-    setDayPresetDialogOpen(false);
-    setDayPresetName('');
-    showToast('💾 Шаблон дня сохранён');
-  }, [diaryData, selectedDate, dayPresets, dayPresetName, safeSet, showToast]);
-  const loadDayPreset = useCallback((preset: any) => {
-    const data = { ...diaryData };
-    if (!data[selectedDate]) data[selectedDate] = { meals: {} };
-    for (const [meal, items] of Object.entries(preset.meals as Record<string, any[]>)) {
-      if (!data[selectedDate].meals[meal]) data[selectedDate].meals[meal] = [];
-      (data[selectedDate].meals[meal] as any).push(...JSON.parse(JSON.stringify(items)));
-    }
-    saveDiary(data);
-    showToast(`✅ Шаблон "${preset.name}" добавлен`);
-  }, [diaryData, selectedDate, saveDiary, showToast]);
+  // (пресеты приёмов/дней — useDiaryPresets; clearDiaryConfirmOpen — шелл ниже)
 
   const printDay = useCallback(() => {
     const day = diaryData[selectedDate];

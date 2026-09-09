@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
-import { type FoodItemLike } from '../NutritionDiary';
+import { type FoodItemLike } from '../types';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
 import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../../../engines/retail-search.engine';
