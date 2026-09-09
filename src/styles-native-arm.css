@@ -617,7 +617,51 @@ html.app-native .train-armdiag.arm-apk .ad-volbar {
   border-radius: 99px !important;
 }
 
-/* ─── 21. REDUCED MOTION ──────────────────────────────────────────── */
+/* ─── 21. ТАБЫ — force/vbt/видео/журналы/история ───────────────────── */
+html.app-native .train-armdiag.arm-apk .ad-tag[data-sev='ok'] {
+  box-shadow: 0 0 12px rgba(48, 209, 88, 0.25) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-tag[data-sev='warn'] {
+  box-shadow: 0 0 12px var(--arm-amber-glow) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-tag[data-sev='bad'] {
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.4) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-bars > [data-bar]:last-child {
+  box-shadow: 0 0 12px var(--arm-amber-glow) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-video-ph {
+  border-radius: 15px !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='ftest'] {
+  border-top: 2px solid rgba(var(--arm-amber-rgb), 0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='hist-strip'] {
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='vbt-inputs'] .ad-field {
+  min-width: 0 !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='rehab-out'] {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='tiq-out'] {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ─── 22. REDUCED MOTION ──────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html.app-native .train-arm.arm-apk {
     animation: none !important;

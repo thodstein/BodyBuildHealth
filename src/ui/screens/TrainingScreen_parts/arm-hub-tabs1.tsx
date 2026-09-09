@@ -39,7 +39,11 @@ export function HubGripTab({ H }: { H: any }) {
       </AdGrid>
       <AdGrid cols="2">
         <AdSec title={`Force Vector · WAF ${weightClassAuto}`}>
-          <div className="ad-muted">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch} · Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} → <b>{forceVecPro.totalScore}</b> {forceVecPro.asymmetryPct!=null ? `· Асим ${forceVecPro.asymmetryPct}%${forceVecPro.asymmetryPct>=12?' 🔴':forceVecPro.asymmetryPct>=7?' 🟠':' 🟢'}` : ''}</div>
+          <div className="ad-hero-side" data-arm="force-score">
+            <div className="ad-hero-score" aria-hidden><b>{forceVecPro.totalScore}</b><span>сила</span></div>
+            <div className="ad-hero-name">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch}<span>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure}</span></div>
+            {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
+          </div>
           <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
           {platformP0 && (
             <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')} · {platformP0.note}</div>
@@ -50,7 +54,7 @@ export function HubGripTab({ H }: { H: any }) {
             {measureHistP0.length > 0 && <span className="ad-muted">RT: {measureHistP0.slice(-5).map((h: any) => h.rtKg ?? '—').join(' → ')}</span>}
           </div>
           {measureHistP0.filter((h: any) => h.rtKg != null).length >= 2 && (
-            <div className="ad-bars">
+            <div className="ad-bars" data-arm="rt-bars">
               {(() => {
                 const vals = measureHistP0.filter((h: any) => h.rtKg != null).slice(-12).map((h: any) => h.rtKg as number);
                 const mx = Math.max(...vals);
@@ -74,15 +78,21 @@ export function HubGripTab({ H }: { H: any }) {
         <AdSec title="VBT">
           <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
           {vbtThP0 && <div className="ad-muted">Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
-          <div className="ad-row">
-            <input inputMode="decimal" value={state.vbtWeight} onChange={e=>setState((s: any)=>({...s, vbtWeight:e.target.value}))} placeholder="кг" aria-label="VBT вес кг" />
-            <input inputMode="numeric" value={state.vbtReps} onChange={e=>setState((s: any)=>({...s, vbtReps:e.target.value}))} placeholder="повт" aria-label="VBT повторы" />
-            <input inputMode="decimal" value={state.vbtVel} onChange={e=>setState((s: any)=>({...s, vbtVel:e.target.value}))} placeholder="м/с" aria-label="VBT скорость м/с" />
+          <div className="ad-row" data-arm="vbt-inputs">
+            <AdField label="Вес, кг">
+              <input inputMode="decimal" value={state.vbtWeight} onChange={e=>setState((s: any)=>({...s, vbtWeight:e.target.value}))} placeholder="кг" aria-label="VBT вес кг" />
+            </AdField>
+            <AdField label="Повторы">
+              <input inputMode="numeric" value={state.vbtReps} onChange={e=>setState((s: any)=>({...s, vbtReps:e.target.value}))} placeholder="повт" aria-label="VBT повторы" />
+            </AdField>
+            <AdField label="Скорость, м/с">
+              <input inputMode="decimal" value={state.vbtVel} onChange={e=>setState((s: any)=>({...s, vbtVel:e.target.value}))} placeholder="м/с" aria-label="VBT скорость м/с" />
+            </AdField>
           </div>
         </AdSec>
       </AdGrid>
       <AdSec title={`Бенчмарки · ${benchRes.level}`}>
-        <div className="ad-muted">{benchRes.details.map((d: any)=>`${d.id}:${d.value}→${d.level}`).join(' · ') || 'введи WristCurl/Coc'}</div>
+        <div className="ad-muted" data-arm="bench">{benchRes.details.map((d: any)=>`${d.id}:${d.value}→${d.level}`).join(' · ') || 'введи WristCurl/Coc'}</div>
         <div className="ad-muted">{benchAdviceForLevel(benchRes.level)}</div>
       </AdSec>
       {(state.pinchSec && parseFloat(state.pinchSec) < 10) || (state.rtKg && parseFloat(state.rtKg) < 60) ? (
@@ -165,14 +175,14 @@ export function HubWristTab({ H }: { H: any }) {
             </>
           ) : (
             <>
-              <div>video preview — PRO: BlazePose + angleBetween()</div>
+              <div className="ad-video-ph" data-arm="video-ph">video preview — PRO: BlazePose + angleBetween()</div>
               <div className="ad-muted">Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {hasVideoSupport()?'Hands ready':'нужен Hands'}</div>
             </>
           )}
         </div>
       </AdSec>
       <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`}>
-        <div className="ad-row">
+        <div className="ad-row" data-arm="wp-groups">
           {WEAK_GROUPS.map(g=> (
             <div key={g.title}>
               <div className="ad-muted">{g.title} {g.title==='Кисть'?'🤚' : g.title==='Ротация'?'🔄':'💥'}</div>
@@ -204,10 +214,10 @@ export function HubWristTab({ H }: { H: any }) {
               const valid = aj==='none' ? null : isValidAngleForArmWeakPoint(c.weakPoint as ArmWeakPoint, curDeg);
               const corr = ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint];
               return (
-                <div key={c.weakPoint} className="ad-sec">
+                <div key={c.weakPoint} className="ad-sec ad-bio" data-valid={valid===null?'na':valid?'ok':'bad'}>
                   <div className="ad-row">
                     <span><b>{c.label}</b></span>
-                    <span className="ad-tag">{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
+                    <span className="ad-tag ad-angle">{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
                     <span className="ad-muted">{c.technique.join('/')} · {c.weakMuscles.join('/')}</span>
                   </div>
                   <div className="ad-muted">{c.reason}</div>

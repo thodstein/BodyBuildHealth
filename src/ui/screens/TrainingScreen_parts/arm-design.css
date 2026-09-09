@@ -1281,6 +1281,86 @@
   font-size: 15px;
 }
 
+/* ─── PRO ТАБЫ: force/vbt/видео/группы/журналы ─────────────────────── */
+:is(.train-armdiag) .ad-tag[data-sev='ok'] {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+:is(.train-armdiag) .ad-tag[data-sev='warn'] {
+  border-color: rgba(245, 158, 11, 0.45);
+  color: var(--ad-amber);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+:is(.train-armdiag) .ad-tag[data-sev='bad'] {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+:is(.train-armdiag) .ad-bars > [data-bar]:last-child {
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+:is(.train-armdiag) [data-arm='vbt-inputs'] .ad-field {
+  flex: 1 1 100px;
+  min-width: 0;
+}
+
+:is(.train-armdiag) .ad-video-ph {
+  border-radius: 15px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ad-dim);
+}
+
+:is(.train-armdiag) [data-arm='wp-groups'] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+:is(.train-armdiag) [data-arm='ftest'] {
+  border-top: 2px solid rgba(245, 158, 11, 0.4);
+}
+
+:is(.train-armdiag) [data-arm='hist-strip'] {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px 10px;
+  scroll-snap-type: x proximity;
+  flex-wrap: nowrap;
+}
+
+:is(.train-armdiag) [data-arm='hist-strip']::-webkit-scrollbar {
+  display: none;
+}
+
+:is(.train-armdiag) [data-arm='hist-strip'] .ad-stat {
+  min-width: 104px;
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+:is(.train-armdiag) [data-arm='rehab-out'],
+:is(.train-armdiag) [data-arm='tiq-out'] {
+  margin-top: 10px;
+}
+
+:is(.train-armdiag) [data-arm='dyn'] .ad-muted,
+:is(.train-armdiag) [data-arm='acwr'] .ad-muted {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── Фокус с клавиатуры ─────────────────────────────────────────── */
 :is(.train-arm, .train-armdiag) .ad-btn:focus-visible,
 :is(.train-arm, .train-armdiag) .ad-chip:focus-visible,

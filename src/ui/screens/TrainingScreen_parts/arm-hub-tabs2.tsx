@@ -60,7 +60,7 @@ export function HubPressureTab({ H }: { H: any }) {
         </AdSec>
       </AdGrid>
       <AdSec title="🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол">
-        <div className="ad-strip">
+        <div className="ad-strip" data-arm="hub-strip">
           {tablePreview.map(({ wk, kind }: any) => {
             const col = kind==='moderate'? '#22c55e' : kind==='heavy'? '#f59e0b' : '#ef4444';
             return <div key={wk} className="ad-stat" style={{ borderTopColor: col }}><div className="ad-stat-v">{wk}</div><div className="ad-stat-l">{kind}</div></div>;
@@ -112,7 +112,7 @@ export function HubPressureTab({ H }: { H: any }) {
           if (!tiq.length) return <div className="ad-muted">Веди журнал схваток: фолы/срывы/ремень/центр/финиш — стол скажет, что чинить.</div>;
           const iq = analyzeTableIq({ bouts: tiq });
           const trend = tableIqTrend(tiq);
-          return <div className="ad-muted"><div>{iq.note}</div>{iq.levers.map((l: string,i: number)=><div key={i}>• {l}</div>)}<div>{trend.note}</div></div>;
+          return <div className="ad-sec ad-bio" data-valid="na" data-arm="tiq-out"><div>{iq.note}</div>{iq.levers.map((l: string,i: number)=><div key={i} className="ad-finding" data-level="warn">• {l}</div>)}<div className="ad-muted">{trend.note}</div></div>;
         } catch { return null; } })()}
       </AdSec>
     </div>
@@ -127,14 +127,14 @@ export function HubStrengthTab({ H }: { H: any }) {
         <b>4 теста Bezkorovainyi — ARM1 Device FB5k (патент #43082)</b>
         <div>finger_flex (сгибание пальцев) · hammer (разгиб. молот) · hook (крюк) · cup (сгибание кисти). Введи силу кг + время достижения макс мс → получи F/t, F100, F500, градиент, F/m.</div>
       </AdBanner>
-      <AdGrid cols="auto">
+      <AdGrid cols="auto" >
         {[
           ['fingerKg','fingerMs','Finger flex кг/мс'],
           ['hammerKg','hammerMs','Hammer кг/мс'],
           ['hookKg','hookMs','Hook кг/мс'],
           ['cupKg','cupMs','Cup кг/мс'],
         ].map(([kKg,kMs,label])=> (
-          <AdSec key={kKg} title={label}>
+          <AdSec key={kKg} title={label} hook="ftest">
             <AdField label="Сила, кг">
               <input inputMode="decimal" value={(state as any)[kKg]} onChange={e=>setState((s: any)=>({...s, [kKg]:e.target.value}))} placeholder="кг" />
             </AdField>
@@ -145,7 +145,7 @@ export function HubStrengthTab({ H }: { H: any }) {
         ))}
       </AdGrid>
       <AdGrid cols="2">
-        <AdSec title="Динамика — F/t градиент">
+        <AdSec title="Динамика — F/t градиент" hook="dyn">
           <div className="ad-muted">
             {(dynamicReport as any)?.avgFt ? `Avg F/t ${(dynamicReport as any).avgFt} кг/с · Total ${(dynamicReport as any).totalF}кг · Avg ${(dynamicReport as any).avgF}кг` : 'Введи 4 теста → F/t'}
             {(dynamicReport as any)?.tactic ? <div><b>Тактика:</b> {(dynamicReport as any).tactic}</div> : null}
@@ -213,7 +213,7 @@ export function HubStrengthTab({ H }: { H: any }) {
       )}
       {forceHistory.stats.length>0 && (
         <AdSec title="История 12 нед — avg/max/min + fatigue" collapsible defaultOpen={false} summary="Графики и усталость">
-          <div className="ad-row">
+          <div className="ad-row" data-arm="hist-strip">
             {forceHistory.stats.map((w:any)=> (
               <div key={w.week} className="ad-stat">
                 <div className="ad-stat-v">{w.avg}</div>
@@ -235,7 +235,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
   return (
     <div>
       <AdGrid cols="2">
-        <AdSec title={`ACWR ${acwr? acwr.ratio.toFixed(2) : '—'}`}>
+        <AdSec title={`ACWR ${acwr? acwr.ratio.toFixed(2) : '—'}`} hook="acwr">
           <div className="ad-muted">{acwr? `Острая/хроническая — факт` : 'нет данных (нужен дневник sRPE)'}</div>
         </AdSec>
         <AdSec title={`Tendon ACWR ${tendonAcwr? tendonAcwr.ratio.toFixed(2) : '—'}`}>
@@ -256,8 +256,8 @@ export function HubRecoveryTab({ H }: { H: any }) {
           <span> · Per-muscle: {perMuscleAcwrSumP0.danger.length > 0 && <b>🔴 {perMuscleAcwrSumP0.danger.join(', ')}</b>} {perMuscleAcwrSumP0.caution.length > 0 && <span>🟠 {perMuscleAcwrSumP0.caution.join(', ')}</span>}</span>
         )}
       </AdBanner>
-      <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible>
-        <div className="ad-chips">
+      <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible hook="mob">
+        <div className="ad-chips" data-arm="mob-chips">
           {[
             ['mobWristFlex', 'Сгиб кисти ≥80°'],
             ['mobWristExt', 'Разгиб ≥70°'],
@@ -318,7 +318,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         {(()=>{ try {
           if (rh.injury==='none') return <div className="ad-muted">Скрининг, не диагноз: выбери травму — покажем фазу, допуски и критерии перехода.</div>;
           const rhm = buildRehabPlanFn({ injury: rh.injury, weeksSince: parseFloat(rh.weeks) || 0, pain: parseFloat(rh.pain) || 0, surgery: rh.surg });
-          return <div>
+          return <div className="ad-sec ad-bio" data-valid="na" data-arm="rehab-out">
             <div><b>Фаза {rhm.phase}: {rhm.current.title}</b> ({rhm.current.weeks})</div>
             <div className="ad-muted">✅ {rhm.current.allowed.slice(0,3).join(' · ')}</div>
             <div>⛔ {rhm.current.forbidden.slice(0,3).join(' · ')}</div>
