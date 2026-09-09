@@ -208,6 +208,25 @@ describe('diary-storage-v2', () => {
       const csv = exportDiaryCSV();
       expect(csv).toContain('"2024-01-01","Обед, поздний","Food ""special"""');
     });
+
+    it('should neutralize =-formula injection in food names', () => {
+      writeDiaryV2({ '2024-01-01': { meals: { 'Обед': [{ ...sampleItem, name: "=cmd|'/c calc'!A0" }] } } });
+      const csv = exportDiaryCSV();
+      expect(csv).toContain(`"'=cmd`);
+      expect(csv).not.toContain(`,"=cmd`);
+    });
+
+    it('should neutralize + - @ prefixes in CSV fields', () => {
+      writeDiaryV2({ '2024-01-01': { meals: {
+        '+бонус': [{ ...sampleItem, name: '-минус' }],
+        '@сеть': [{ ...sampleItem, name: '@магазин' }],
+      } } });
+      const csv = exportDiaryCSV();
+      expect(csv).toContain(`"'+бонус"`);
+      expect(csv).toContain(`"'-минус"`);
+      expect(csv).toContain(`"'@магазин"`);
+      expect(csv).not.toContain(`,"+бонус"`);
+    });
   });
 
   describe('same-tab change notifications', () => {

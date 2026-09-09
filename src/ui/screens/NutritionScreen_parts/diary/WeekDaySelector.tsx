@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDate } from '../../../../core/utils/date-utils';
 
 interface WeekDaySelectorProps {
   weekDays: string[];
@@ -8,12 +9,13 @@ interface WeekDaySelectorProps {
 }
 
 export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, selectedDate, onSelectDate, diaryData }) => {
-  const today = new Date().toISOString().slice(0, 10);
+  // Локальные даты (toISOString уезжал на ±1 день в UTC± — тот же UTC-класс,
+  // что чинился в дневнике тренировок): today и сдвиг недели — через formatDate.
+  const today = formatDate(new Date());
   const shiftWeek = (dir: number) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + dir * 7);
-    const iso = d.toISOString().slice(0,10);
-    onSelectDate(iso);
+    onSelectDate(formatDate(d));
   };
   const weekLabel = (() => {
     try {

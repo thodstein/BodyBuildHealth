@@ -247,7 +247,13 @@ export function importDiaryJSON(json: string): { success: boolean; error?: strin
 
 export function exportDiaryCSV(): string {
   const data = readDiaryV2();
-  const csv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  // Формульная инъекция Excel: ячейка с ведущим = + - @ выполняется при открытии.
+  // Гард — префикс-апостроф ВНУТРИ кавычек (прецедент дневника тренировок).
+  const csv = (value: unknown) => {
+    const raw = String(value ?? '');
+    const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
   const rows: string[] = ['Date,Meal,Food,Qty (g),Kcal,Protein (g),Fat (g),Carbs (g)'];
   for (const [date, day] of Object.entries(data)) {
     for (const [meal, items] of Object.entries(day.meals)) {

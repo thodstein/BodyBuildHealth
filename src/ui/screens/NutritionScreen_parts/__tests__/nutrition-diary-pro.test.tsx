@@ -62,6 +62,17 @@ describe('nutrition-diary-pro hooks', () => {
     expect(onSelect).toHaveBeenCalledWith('2026-09-07');
   });
 
+  it('WeekDaySelector: стрелки сдвигают неделю на ±7 локальных дней', () => {
+    const onSelect = vi.fn();
+    render(
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />
+    );
+    fireEvent.click(screen.getByLabelText('Пред. неделя'));
+    expect(onSelect).toHaveBeenCalledWith('2026-09-02');
+    fireEvent.click(screen.getByLabelText('След. неделя'));
+    expect(onSelect).toHaveBeenCalledWith('2026-09-16');
+  });
+
   it('WeekDaySelector: Enter/Space по дню зовёт onSelectDate', () => {
     const onSelect = vi.fn();
     const { container } = render(
