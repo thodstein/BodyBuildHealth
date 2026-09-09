@@ -11,7 +11,7 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { angleJointForWeakPoint, isValidAngleForArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
-import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdSteps } from './arm-design-system';
+import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
 import { LEVEL_OPTS, TAB_DEFS } from './arm-hub-shared';
 
 export function HubHead({ H }: { H: any }) {
@@ -35,20 +35,22 @@ export function HubHead({ H }: { H: any }) {
           const col = scoring.level==='ok' ? '#22c55e' : scoring.level==='warn' ? '#f59e0b' : '#ef4444';
           const circ = 2 * Math.PI * 15;
           return (
-          <div className="ad-head-side">
-            <svg width="52" height="52" viewBox="0 0 40 40" role="img" aria-label={`Скор ${scoring.score}`}>
+          <div className="ad-head-side" data-arm="hub-score">
+            <span className="ad-score-ring" data-level={scoring.level} aria-hidden>
+            <svg width="68" height="68" viewBox="0 0 40 40" role="img" aria-label={`Скор ${scoring.score}`}>
               <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="5" />
               <circle cx="20" cy="20" r="15" fill="none" stroke={col} strokeWidth="5" strokeLinecap="round"
                 strokeDasharray={`${(circ * pct / 100).toFixed(1)} ${circ.toFixed(1)}`} transform="rotate(-90 20 20)" />
               <text x="20" y="24" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">{scoring.score}</text>
             </svg>
+            </span>
             <div className="ad-muted">{scoreLabel(scoring.score)} · v{Math.round(scoring.verification*100)}%</div>
-            {scoring.floors.length>0 && <div>{scoring.floors[0]}</div>}
+            {scoring.floors.length>0 && <div className="ad-tip">{scoring.floors[0]}</div>}
           </div>
           );
         })()}
       </div>
-      <div className="ad-row">
+      <div className="ad-row" data-arm="hub-tags">
         <span className="ad-tag">Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
         <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.totalScore})</span>
         {report.asymmetryPct!=null && <span className="ad-tag">Асимметрия {report.asymmetryPct}%</span>}
@@ -106,7 +108,7 @@ export function HubOutput({ H }: { H: any }) {
     <AdCard>
       <AdSec title="🔬 Диагностика — мёртвые точки (12) + сустав/сухожилие">
         <div className="ad-muted">{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''} {(report as any).weakPoints?.length? `· точек ${(report as any).weakPoints.join(', ')}` : ''}</div>
-        {report.findings.length>3 && <div className="ad-sec">{report.findings.map((f:any,i:number)=><div key={i} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e' }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
+        {report.findings.length>3 && <div className="ad-sec">{report.findings.map((f:any,i:number)=><div key={i} className="ad-finding" data-level={f.level} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e' }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
         {(diag as any).biomechCards?.length ? (
           <div className="ad-list">
             {(diag as any).biomechCards.map((c:any)=>{
@@ -114,10 +116,10 @@ export function HubOutput({ H }: { H: any }) {
               const curDeg = aj==='wrist' ? (parseFloat(state.wristDeg)||10) : aj==='elbow' ? (parseFloat(state.elbowDeg)||110) : (parseFloat(state.forearmDeg)||90);
               const valid = aj==='none' ? null : isValidAngleForArmWeakPoint(c.weakPoint, curDeg);
               return (
-              <div key={c.weakPoint} className="ad-sec">
+              <div key={c.weakPoint} className="ad-sec ad-bio" data-valid={valid===null?'na':valid?'ok':'bad'}>
                 <div className="ad-row">
                   <span><b>{c.label}</b></span>
-                  <span className="ad-tag">{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
+                  <span className="ad-tag ad-angle">{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
                   <span className="ad-muted">{c.weakMuscles.join('/')}</span>
                 </div>
                 <div className="ad-muted">{c.reason}</div>
@@ -130,13 +132,14 @@ export function HubOutput({ H }: { H: any }) {
         ) : diag.priorities.length===0 ? <div className="ad-muted">Слабые зоны не выявлены — баланс. {H.dynamicReport && (H.dynamicReport as any).asymmetry ? `· ${(H.dynamicReport as any).tactic}` : ''}</div> : (
           <div className="ad-list">
             {diag.priorities.map((p: any,i: number)=>(
-              <div key={i} className="ad-sec">
+              <div key={i} className="ad-sec ad-bio" data-valid="na">
                 <div className="ad-row">
                   <span><b>{ARM_MUSCLE_RU[p.muscle as any] || p.muscle}</b></span>
-                  <span className="ad-muted">{p.reason}</span>
+                  <span className="ad-tag ad-angle">MEV {getArmLandmarks(state.level, p.muscle).mev} · MAV {getArmLandmarks(state.level, p.muscle).mav} · MRV {getArmLandmarks(state.level, p.muscle).mrv}</span>
                 </div>
+                <div className="ad-muted">{p.reason}</div>
                 <div className="ad-tip">{p.exercises.join(' · ')}</div>
-                <div className="ad-muted">MEV {getArmLandmarks(state.level, p.muscle).mev} · MAV {getArmLandmarks(state.level, p.muscle).mav} · MRV <b>{getArmLandmarks(state.level, p.muscle).mrv}</b> · Tendon {getArmLandmarks(state.level, p.muscle).mrv <=9?'низкий (humerus)':''}</div>
+                <div className="ad-muted">Tendon {getArmLandmarks(state.level, p.muscle).mrv <=9?'низкий (humerus)':'в норме'}</div>
               </div>
             ))}
           </div>
@@ -178,8 +181,9 @@ export function HubP0Panel({ H }: { H: any }) {
               const top = (armTop3P0 as any)[wp] || [];
               const sim = (() => { try { return simulateArmInjection(armPlan as any, wp); } catch { return null; } })();
               return (
-                <div key={wp} className="ad-sec">
+                <div key={wp} className="ad-sec ad-bio" data-valid={cause ? 'ok' : 'na'}>
                   <div><b>{wp} {cause ? `· ${cause.cause} (${Math.round(cause.confidence * 100)}%)` : ''}</b></div>
+                  {cause && <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.round(cause.confidence * 100)}%` }} /></div>}
                   {cause && <div className="ad-muted">{cause.evidence.join(' · ')} → <b>{cause.fix}</b></div>}
                   {top.length > 0 && <div className="ad-tip">Топ-3: {top.map((t: any) => `${t.id} (${t.score})`).join(' · ')} {sim ? `· Δ ${sim.summary}` : ''}</div>}
                 </div>
@@ -222,7 +226,7 @@ export function HubTableStrip({ H }: { H: any }) {
   return (
     <AdCard>
       <AdSec title="🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол" hint="≥50% тренировок — стол. Тейпер 2–3 нед: 0.65/0.45, side×0.5, RIR+1/+2. Moderate 50-75% 1-3мин / Heavy 75-100% 10с-1мин / Stress 100-125% 5-10с.">
-        <div className="ad-strip">
+        <div className="ad-strip" data-arm="hub-strip">
           {tablePreview.map(({ wk, kind }: any) => {
             const col = kind==='moderate'? '#22c55e' : kind==='heavy'? '#f59e0b' : '#ef4444';
             return <div key={wk} className="ad-stat" style={{ borderTopColor: col }}><div className="ad-stat-v">{wk}</div><div className="ad-stat-l">{kind}</div></div>;
@@ -238,7 +242,9 @@ export function HubAction({ H }: { H: any }) {
   const { applyToConstructor, state, diag, dynamicReport, report } = H;
   return (
     <AdCard>
+      <AdCta>
       <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор ({(state.weakPoints.length? state.weakPoints.join(', ') : diag.weakMuscles.slice(0,2).join(', ')) || (dynamicReport && Object.keys((dynamicReport as any).metrics||{}).length ? 'динамика' : 'баланс')} · {(state.weakPoints.length? `${state.weakPoints.length} точек` : `${diag.weakMuscles.length} мышц`)})</AdBtn>
+      </AdCta>
       <div className="ad-muted">Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
       {(diag as any).biomechCards?.length ? <div className="ad-muted">Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}
     </AdCard>

@@ -566,7 +566,58 @@ html.app-native .train-armdiag.arm-apk .ad-btn:focus-visible {
   }
 }
 
-/* ─── 20. REDUCED MOTION ──────────────────────────────────────────── */
+/* ─── 20. ХАБ PRO — gauge, bio, findings, стол-полоса ─────────────── */
+html.app-native .train-armdiag.arm-apk .ad-score-ring[data-level='ok'] {
+  filter: drop-shadow(0 0 14px rgba(48, 209, 88, 0.6)) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-score-ring[data-level='warn'] {
+  filter: drop-shadow(0 0 14px var(--arm-amber-glow)) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-score-ring[data-level='critical'] {
+  filter: drop-shadow(0 0 14px rgba(255, 59, 48, 0.65)) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-bio {
+  border-radius: 15px !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-bio[data-valid='ok'] {
+  box-shadow: 0 6px 20px rgba(48, 209, 88, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-bio[data-valid='bad'] {
+  box-shadow: 0 6px 20px rgba(255, 59, 48, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-angle {
+  font-variant-numeric: tabular-nums !important;
+  box-shadow: 0 0 12px var(--arm-amber-wash) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-finding {
+  border-radius: 10px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-strip {
+  scroll-snap-type: x mandatory !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-strip .ad-stat {
+  min-width: 78px !important;
+  scroll-snap-align: start !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-volbar {
+  height: 6px !important;
+  border-radius: 99px !important;
+}
+
+/* ─── 21. REDUCED MOTION ──────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html.app-native .train-arm.arm-apk {
     animation: none !important;
