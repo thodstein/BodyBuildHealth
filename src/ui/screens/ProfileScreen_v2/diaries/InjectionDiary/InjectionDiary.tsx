@@ -944,10 +944,10 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     setPage(1);
                   }}
                   placeholder="Поиск: препарат, зона, дата, заметка"
-                  style={{ ...inputStyle, flex: 1, paddingRight: query ? 30 : undefined }}
+                  style={{ ...inputStyle, flex: 1, fontSize: 16, minHeight: 44, paddingRight: query ? 38 : undefined }}
                 />
                 {query && (
-                  <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+                  <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
                 )}
               </div>
               {(['all', '7', '30', '90'] as Range[]).map((value) => (

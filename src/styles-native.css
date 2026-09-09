@@ -11076,6 +11076,27 @@ html.app-native .diary-header [role='menuitem']:focus-visible {
   outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
   outline-offset: -2px !important;
 }
+html.app-native .pf-dfilter:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .pf-dfilter:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-data-btn:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .pf-data-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .pf-quicklink:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .pf-quicklink:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
 html.app-native .diary-card {
   font-variant-numeric: tabular-nums !important;
 }
