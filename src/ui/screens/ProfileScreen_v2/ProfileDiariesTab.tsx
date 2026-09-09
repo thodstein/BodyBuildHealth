@@ -377,7 +377,7 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
     role="navigation"
     aria-label={ariaLabel}
     className="pf-quicklinks"
-    style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}
+    style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}
   >
     {links.map((link) => (
       <button
@@ -388,49 +388,52 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '12px 14px',
-          borderRadius: 12,
+          gap: 12,
+          padding: '13px 14px',
+          borderRadius: 16,
           cursor: 'pointer',
           textAlign: 'left',
-          minHeight: 56,
-          background: `${link.color}14`,
-          border: `1px solid ${link.color}55`,
+          minHeight: 64,
+          background: `linear-gradient(135deg, ${link.color}1c, ${link.color}08)`,
+          border: `1px solid ${link.color}45`,
           color: colors.text,
-          boxShadow: '0 1px 6px rgba(0,0,0,0.18)',
+          boxShadow: '0 6px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
           transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
           position: 'relative',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = `${link.color}22`;
+          e.currentTarget.style.background = `${link.color}26`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = `${link.color}14`;
+          e.currentTarget.style.background = `linear-gradient(135deg, ${link.color}1c, ${link.color}08)`;
         }}
       >
         <div
           aria-hidden="true"
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
+            width: 40,
+            height: 40,
+            borderRadius: 13,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: `${link.color}33`,
-            fontSize: 18,
+            background: `linear-gradient(135deg, ${link.color}35, ${link.color}12)`,
+            border: `1px solid ${link.color}45`,
+            boxShadow: `0 4px 12px ${link.color}26, inset 0 1px 0 rgba(255,255,255,0.12)`,
+            fontSize: 19,
             flexShrink: 0,
+            color: '#fff',
           }}
         >
           {link.icon}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: link.color }}>{link.label}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', letterSpacing: '-0.1px' }}>{link.label}</div>
           {link.desc && (
-            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2, lineHeight: 1.3 }}>{link.desc}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4 }}>{link.desc}</div>
           )}
         </div>
-        <span style={{ color: link.color, fontSize: 16, opacity: 0.7 }}>→</span>
+        <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${link.color}16`, border: `1px solid ${link.color}30`, color: '#fff', fontSize: 14, fontWeight: 800 }}>→</span>
       </button>
     ))}
   </div>

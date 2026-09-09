@@ -258,14 +258,14 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
           const weeklyW = deltaW / days * 7;
           const label = phaseLabels[p.label] || p.label;
           return (
-            <div key={`${p.label}-${i}`} style={{ padding: 10, background: `${p.color}15`, border: `1px solid ${p.color}44`, borderRadius: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <b style={{ color: p.color }}>{label}</b>
-                <small style={{ color: colors.textMuted }}>
+            <div key={`${p.label}-${i}`} style={{ padding: 13, background: `linear-gradient(180deg, ${p.color}18, ${p.color}06)`, border: `1px solid ${p.color}45`, borderRadius: 15, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                <b style={{ color: '#fff', fontSize: 13.5 }}>{label}</b>
+                <small style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
                   {p.start} → {p.end} ({days}д, {p.entries.length} записей)
                 </small>
               </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>
                 <span>Вес: {deltaW > 0 ? '+' : ''}{deltaW.toFixed(1)} кг</span>
                 {deltaBF !== null && <span>Жир: {deltaBF > 0 ? '+' : ''}{deltaBF.toFixed(1)}%</span>}
                 {deltaMuscle !== null && <span>Мышцы: {deltaMuscle > 0 ? '+' : ''}{deltaMuscle.toFixed(1)} кг</span>}

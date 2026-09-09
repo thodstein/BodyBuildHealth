@@ -275,14 +275,15 @@ export const tableTh: React.CSSProperties = {
   padding: '10px 10px',
   cursor: 'pointer',
   borderBottom: '1px solid rgba(255,255,255,0.10)',
-  fontSize: 10,
+  fontSize: 11,
   textTransform: 'uppercase',
-  letterSpacing: '0.6px',
-  color: 'rgba(255,255,255,0.52)',
+  letterSpacing: '0.7px',
+  color: 'rgba(255,255,255,0.55)',
   whiteSpace: 'nowrap',
-  fontWeight: 700,
+  fontWeight: 800,
   fontFamily: FONT,
   background: 'rgba(255,255,255,0.02)',
+  fontVariantNumeric: 'tabular-nums',
 };
 
 export const tableTd: React.CSSProperties = {
@@ -291,6 +292,7 @@ export const tableTd: React.CSSProperties = {
   fontSize: 13,
   fontFamily: FONT,
   color: 'rgba(255,255,255,0.88)',
+  fontVariantNumeric: 'tabular-nums',
 };
 
 // ── Пилюли/бейджи ──────────────────────────────────────────────────────

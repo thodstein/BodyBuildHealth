@@ -929,9 +929,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const badge = (color: string): React.CSSProperties => ({
     display: 'inline-block',
     marginLeft: 6,
-    padding: '3px 9px',
+    padding: '4px 10px',
     borderRadius: 999,
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: 800,
     letterSpacing: '0.4px',
     background: color === 'green' ? '#30d15826' : color === 'red' ? '#ff453a26' : color === 'orange' ? '#ff9f0a26' : '#0a84ff26',
@@ -1709,7 +1709,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         {row.photos && row.photos.length > 0 ? (
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             {row.photos.map((src, i) => (
-                              <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setViewPhoto({ src, date: row.date })} />
+                              <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} onClick={() => setViewPhoto({ src, date: row.date })} />
                             ))}
                           </div>
                         ) : (

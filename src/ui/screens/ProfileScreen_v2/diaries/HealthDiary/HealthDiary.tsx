@@ -1084,7 +1084,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                       </label>
                       {supportable && (
                         <div style={{ marginTop: 3, paddingLeft: 29 }}>
-                          <button style={{ ...button, minHeight: 32, padding: '3px 10px', fontSize: 11 }} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
+                          <button style={{ ...button, minHeight: 40, padding: '8px 14px', fontSize: 12.5, fontWeight: 800 }} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
                         </div>
                       )}
                     </div>
