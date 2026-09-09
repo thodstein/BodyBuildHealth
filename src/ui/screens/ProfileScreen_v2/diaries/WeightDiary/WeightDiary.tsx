@@ -1755,13 +1755,14 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           onClick={() => setViewPhoto(null)}
         >
           <button
-            style={{ position: 'absolute', top: 16, right: 16, background: '#2c2c2e', border: '1px solid #3a3a3c', color: '#fff', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', fontSize: 18, zIndex: 1 }}
+            style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(44,44,46,0.9)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: 14, cursor: 'pointer', fontSize: 18, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={() => setViewPhoto(null)}
+            aria-label="Закрыть просмотр фото"
           >
             ×
           </button>
-          <img src={viewPhoto.src} alt="" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
-          <div style={{ position: 'absolute', bottom: 16, background: 'rgba(0,0,0,0.8)', padding: '6px 12px', borderRadius: 999, color: '#ffffff', fontSize: 12 }}>
+          <img src={viewPhoto.src} alt="" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 18, boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} />
+          <div style={{ position: 'absolute', bottom: 16, background: 'rgba(0,0,0,0.82)', padding: '7px 15px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', color: '#ffffff', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
             {viewPhoto.date}
           </div>
         </div>

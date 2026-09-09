@@ -895,7 +895,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
 
         {/* Навигация по блокам */}
         {rows.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             {[
               ['📈', 'График'],
               ['🗓', 'Хитмап'],
@@ -905,7 +905,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             ].map(([icon, label]) => (
               <button
                 key={label as string}
-                style={{ ...chip, fontSize: 11 }}
+                style={{ ...chip, fontSize: 12.5 }}
                 onClick={() => {
                   const id = label === 'График' ? 'sleep-chart' : label === 'Хитмап' ? 'sleep-calendar' : label === 'Тренды' ? 'sleep-trends' : label === 'Инсайты' ? 'sleep-insights' : 'sleep-table';
                   try {
@@ -930,24 +930,25 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
               style={{
                 ...glassCard,
                 marginBottom: 12,
-                padding: 14,
+                padding: 16,
                 display: 'flex',
-                gap: 14,
+                gap: 15,
                 alignItems: 'center',
                 flexWrap: 'wrap',
                 border: `1px solid ${ACCENT_BORDER}`,
-                background: 'linear-gradient(120deg, rgba(167,139,250,0.12), rgba(56,189,248,0.05) 55%, transparent)',
+                background: 'linear-gradient(120deg, rgba(167,139,250,0.15), rgba(56,189,248,0.06) 55%, transparent)',
+                boxShadow: '0 12px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.07)',
               }}
             >
-              <div style={{ fontSize: 34, lineHeight: 1 }}>🌙</div>
+              <div style={{ fontSize: 38, lineHeight: 1, filter: 'drop-shadow(0 4px 12px rgba(167,139,250,0.4))' }}>🌙</div>
               <div style={{ flex: 1, minWidth: 180 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.9px' }}>
                   Сегодня
                 </div>
                 {todays ? (
                   <>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
-                      <b style={{ fontSize: 26, fontWeight: 800, color: hColor }}>{todays.hours} ч</b>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                      <b style={{ fontSize: 28, fontWeight: 800, color: hColor, fontVariantNumeric: 'tabular-nums' }}>{todays.hours} ч</b>
                       <Stars value={todays.quality} size={15} />
                       <span style={{ color: colors.textMuted, fontSize: 13 }}>🛌 {todays.bedtime}–{todays.wakeTime}</span>
                       {todays.latency !== undefined && (
