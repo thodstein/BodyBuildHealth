@@ -152,7 +152,7 @@ const CartTab: React.FC = () => {
         { k:'Магазинов', v: carts.length, sub:'списков', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
         { k:'Позиций', v: items.length, sub:'товаров', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
         { k:'Ккал', v: Math.round(totalKcal), sub:'всего', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
-      ]} action={<button onClick={() => setShowNewStore(!showNewStore)} style={{ padding:'8px 14px', borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:750, fontSize:11, cursor:'pointer', boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>＋ Магазин</button>} />
+      ]} action={<button onClick={() => setShowNewStore(!showNewStore)} style={{ padding:'12px 16px', borderRadius:12, border:'1px solid rgba(0,230,138,0.25)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', minHeight:44, boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>＋ Магазин</button>} />
       {showNewStore && (
         <div style={{ ...modernCardBg, padding:12, display:'flex', gap:8 }}>
           <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="Название магазина (например: Перекрёсток)" style={{ flex:1, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background:'#202023', color:'#fff', outline:'none', fontSize:12 }} onKeyDown={e => { if (e.key === 'Enter') addStore(); }} />
@@ -161,16 +161,16 @@ const CartTab: React.FC = () => {
         </div>
       )}
       <div style={{ ...modernCardBg, padding:12 }}>
-        <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8 }}>Магазины</div>
+        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8 }}>Магазины</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           {carts.length===0 ? <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Нет списков — создай первый</span> : carts.map(s => {
             const isActive = s.id === (activeStore?.id || '');
             return (
-              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 4px 4px 8px', borderRadius:999, background: isActive ? 'rgba(0,230,138,0.10)' : '#202023', border: isActive ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }} onClick={() => switchStore(s.id)}>
-                <span style={{ fontSize:11, fontWeight: isActive?700:500, color: isActive?'#00e68a':'rgba(255,255,255,0.75)' }}>{s.name}</span>
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 6px 6px 12px', borderRadius:999, background: isActive ? 'rgba(0,230,138,0.10)' : '#202023', border: isActive ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer', minHeight:44 }} onClick={() => switchStore(s.id)}>
+                <span style={{ fontSize:12, fontWeight: isActive?700:500, color: isActive?'#00e68a':'rgba(255,255,255,0.75)' }}>{s.name}</span>
                 <span style={{ fontSize:9, padding:'2px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>{s.items.length}</span>
-                <button onClick={e => { e.stopPropagation(); duplicateStore(s.id); }} style={{ width:22, height:22, borderRadius:999, border:'none', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10 }}>⎘</button>
-                {carts.length>1 && <button onClick={e => { e.stopPropagation(); deleteStore(s.id); }} style={{ width:22, height:22, borderRadius:999, border:'none', background:'rgba(239,68,68,0.10)', color:'#ef4444', cursor:'pointer', fontSize:10 }}>✕</button>}
+                <button aria-label="Дублировать список" onClick={e => { e.stopPropagation(); duplicateStore(s.id); }} style={{ width:32, height:32, borderRadius:999, border:'none', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>⎘</button>
+                {carts.length>1 && <button aria-label="Удалить список" onClick={e => { e.stopPropagation(); deleteStore(s.id); }} style={{ width:32, height:32, borderRadius:999, border:'none', background:'rgba(239,68,68,0.10)', color:'#ef4444', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>}
               </div>
             );
           })}
@@ -196,14 +196,14 @@ const CartTab: React.FC = () => {
                 {k:'Сумма',v:`${totalPrice.toFixed(0)}₽`,col:'#f59e0b',bg:'rgba(245,158,11,0.08)'},
               ].map(s=>(
                 <div key={s.k} style={{ background:s.bg, border:`1px solid ${s.col}18`, borderRadius:12, padding:'10px', textAlign:'center' }}>
-                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', fontWeight:600 }}>{s.k}</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', fontWeight:600 }}>{s.k}</div>
                   <div style={{ fontSize:16, fontWeight:800, color:s.col, marginTop:2 }}>{s.v}</div>
                 </div>
               ))}
             </div>
             <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
-              <button onClick={clearStore} style={{ padding:'7px 12px', borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕ Очистить</button>
-              <button onClick={() => duplicateStore(activeStore.id)} style={{ padding:'7px 12px', borderRadius:10, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⎘ Дублировать</button>
+              <button onClick={clearStore} style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>✕ Очистить</button>
+              <button onClick={() => duplicateStore(activeStore.id)} style={{ padding:'12px', borderRadius:12, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>⎘ Дублировать</button>
             </div>
             <textarea value={storeNotes[activeStore.id] ?? activeStore.notes ?? ''} onChange={e => { setStoreNotes(p => ({ ...p, [activeStore.id]: e.target.value })); }} onBlur={() => { updateStoreNotes(activeStore.id, storeNotes[activeStore.id] ?? activeStore.notes ?? ''); }} placeholder="📝 Заметки к списку (например: без сахара, только акции)…" style={{ width:'100%', boxSizing:'border-box', marginTop:10, padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', fontSize:11, minHeight:48, resize:'vertical' as const }} />
           </div>
@@ -224,25 +224,25 @@ const CartTab: React.FC = () => {
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {catItems.map(item => (
-                      <div key={item.id} style={{ padding:'10px 12px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.05)', display:'flex', flexDirection:'column', gap:8 }}>
+                      <div key={item.id} style={{ padding:'10px 12px', borderRadius:14, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.05)', boxShadow:'0 2px 10px rgba(0,0,0,0.12)', display:'flex', flexDirection:'column', gap:8 }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{item.name}</div>
+                            <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{item.name}</div>
                             <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
-                              <button onClick={() => updateQty(item.id, -10)} style={{ width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700 }}>-</button>
-                              <span style={{ fontSize:11, fontWeight:800, color:'#00e68a', minWidth:40, textAlign:'center' }}>{item.amount}г</span>
-                              <button onClick={() => updateQty(item.id, 10)} style={{ width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700 }}>+</button>
+                              <button aria-label="Уменьшить количество" onClick={() => updateQty(item.id, -10)} style={{ width:44, height:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>-</button>
+                              <span style={{ fontSize:12, fontWeight:800, color:'#00e68a', minWidth:44, textAlign:'center' }}>{item.amount}г</span>
+                              <button aria-label="Увеличить количество" onClick={() => updateQty(item.id, 10)} style={{ width:44, height:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                               <span style={{ marginLeft:8, fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal)} ккал</span>
                             </div>
                           </div>
-                          <button onClick={() => removeItem(item.id)} style={{ width:30, height:30, borderRadius:10, border:'1px solid rgba(239,68,68,0.15)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontWeight:700 }}>✕</button>
+                          <button aria-label="Удалить позицию" onClick={() => removeItem(item.id)} style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(239,68,68,0.15)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontWeight:700, fontSize:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✕</button>
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
                           <div style={{ display:'flex', alignItems:'center', gap:6, background:'#18181b', borderRadius:10, padding:'6px 8px', border:'1px solid rgba(255,255,255,0.04)' }}>
-                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>₽</span>
-                            <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)} onBlur={() => confirmPrice(item.id)} placeholder="цена" style={{ width:60, background:'transparent', border:'none', color:'#f59e0b', fontSize:11, fontWeight:700, outline:'none', textAlign:'right' }} />
+                            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>₽</span>
+                            <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)} onBlur={() => confirmPrice(item.id)} placeholder="цена" aria-label="Цена" style={{ width:60, background:'transparent', border:'none', color:'#f59e0b', fontSize:12, fontWeight:700, outline:'none', textAlign:'right' }} />
                           </div>
-                          <input value={item.note || ''} onChange={e => setItemNote(item.id, e.target.value)} placeholder="📌 Заметка…" style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'#18181b', border:'1px solid rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.75)', outline:'none', fontSize:10 }} />
+                          <input value={item.note || ''} onChange={e => setItemNote(item.id, e.target.value)} placeholder="📌 Заметка…" aria-label="Заметка" style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'#18181b', border:'1px solid rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.75)', outline:'none', fontSize:12 }} />
                         </div>
                       </div>
                     ))}
@@ -1179,7 +1179,7 @@ const FavoritesTab: React.FC = () => {
   const groups: Record<string, typeof FOOD_DB> = {};
   favs.forEach(f => { const g = catLabels[f.category] || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
   const pill = (t: string, icon: string, label: string) => (
-    <button onClick={() => setFavTab(t as any)} style={{ padding:'6px 12px', borderRadius:999, fontSize:10, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
+    <button onClick={() => setFavTab(t as any)} aria-pressed={favTab === t} style={{ padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', minHeight:44, border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:80 }}>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0' }}>
@@ -1191,14 +1191,14 @@ const FavoritesTab: React.FC = () => {
         {Object.entries(groups).map(([cat, items]) => (
           <div key={cat}>
             <div style={{ fontSize:9, fontWeight:700, color:'#f97316', marginBottom:2, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.08)', display:'flex', alignItems:'center', gap:4 }}>
-              {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
+              {cat} <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
             </div>
             {items.map(f => (
-              <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4, boxShadow:'0 2px 8px rgba(0,0,0,0.08)' }}>
-                <div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{f.name}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div></div>
-                <div style={{ display:'flex', gap:2, alignItems:'center' }}>
-                  <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'3px 6px', borderRadius:5, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>🛒</button>
-                  <button onClick={() => removeFav(f.id)} style={{ padding:'3px 6px', borderRadius:5, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
+              <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:14, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4, boxShadow:'0 2px 8px rgba(0,0,0,0.08)' }}>
+                <div><div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{f.name}</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div></div>
+                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                  <button aria-label="В корзину" onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ width:44, height:44, borderRadius:10, fontSize:14, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', display:'flex', alignItems:'center', justifyContent:'center' }}>🛒</button>
+                  <button aria-label="Убрать из избранного" onClick={() => removeFav(f.id)} style={{ width:44, height:44, borderRadius:10, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
                 </div>
               </div>
             ))}
@@ -1206,29 +1206,29 @@ const FavoritesTab: React.FC = () => {
         ))}
       </div>}
     </div>}
-    {favTab === 'recipes' && <div style={{ padding:14, ...modernCardBg }}>
+      {favTab === 'recipes' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>🍳 Сохранённые рецепты ({myRecipes.length})</div>
-      {myRecipes.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет рецептов. Создайте в 🍳 Рецепты.</div> : myRecipes.slice(0,50).map((r,i) => (
-        <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
-          <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{r.name || 'Рецепт'}</div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>Ккал: {r.kcal || '—'} • Б{r.protein||0} Ж{r.fat||0} У{r.carbs||0}</div>
+      {myRecipes.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>Нет рецептов. Создайте в 🍳 Рецепты.</div> : myRecipes.slice(0,50).map((r,i) => (
+        <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{r.name || 'Рецепт'}</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>Ккал: {r.kcal || '—'} • Б{r.protein||0} Ж{r.fat||0} У{r.carbs||0}</div>
         </div>
       ))}
     </div>}
     {favTab === 'plans' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>📋 Сохранённые планы ({savedPlans.length})</div>
-      {savedPlans.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет планов. Сохраните в 🥗 План.</div> : savedPlans.slice(0,30).map((p,i) => (
-        <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
-          <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{p.name || `План ${i+1}`}</div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{p.kcal ? `${Math.round(p.kcal)} ккал` : ''}</div>
+      {savedPlans.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>Нет планов. Сохраните в 🥗 План.</div> : savedPlans.slice(0,30).map((p,i) => (
+        <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{p.name || `План ${i+1}`}</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>{p.kcal ? `${Math.round(p.kcal)} ккал` : ''}</div>
         </div>
       ))}
     </div>}
     {favTab === 'stacks' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>🧩 Сохранённые стеки ({savedStacks.length})</div>
-      {savedStacks.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет стеков. Сохраните в Бады → Готовые стеки.</div> : savedStacks.map((ids, i) => (
-        <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>{Array.isArray(ids) ? ids.join(', ') : JSON.stringify(ids)}</div>
+      {savedStacks.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>Нет стеков. Сохраните в Бады → Готовые стеки.</div> : savedStacks.map((ids, i) => (
+        <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>{Array.isArray(ids) ? ids.join(', ') : JSON.stringify(ids)}</div>
         </div>
       ))}
     </div>}
