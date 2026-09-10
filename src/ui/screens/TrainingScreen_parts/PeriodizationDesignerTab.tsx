@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ReactDOM from 'react-dom';
 import {
   type MacrocycleDesign,
   type DesignStats,
@@ -58,6 +59,65 @@ const CARD: React.CSSProperties = { padding: 14, borderRadius: 14, background: '
 
 const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', minHeight: 38 };
 
+/* ── Красивые попапы хаба (bottom-sheet, вместо нативных select) ── */
+const PhOverlay: React.FC<{ onClose: () => void; accent: string; title: string; children: React.ReactNode }> = ({ onClose, accent, title, children }) => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setMounted(true), 10);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { window.clearTimeout(t); window.removeEventListener('keydown', onKey); };
+  }, [onClose]);
+  return (
+    <div onClick={onClose} role="presentation" style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.66)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:12, opacity: mounted ? 1 : 0, transition:'opacity 0.18s ease' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title} style={{ width:'100%', maxWidth:440, maxHeight:'82vh', borderRadius:'18px 18px 14px 14px', background:'rgba(20,21,26,0.97)', border:'1px solid rgba(255,255,255,0.10)', overflow:'hidden', boxShadow:'0 24px 70px rgba(0,0,0,0.6)', transform: mounted ? 'translateY(0)' : 'translateY(24px)', transition:'transform 0.2s ease' }}>
+        <div style={{ height:4, background:`linear-gradient(90deg,${accent},${accent}88)` }} />
+        <div style={{ padding:'12px 14px 14px', maxHeight:'calc(82vh - 4px)', overflowY:'auto' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ fontSize:13, fontWeight:900, color:accent }}>{title}</div>
+            <button onClick={onClose} aria-label="Закрыть попап" style={{ width:34, height:34, borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:14, cursor:'pointer' }}>✕</button>
+          </div>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+const PhSelect: React.FC<{ label: string; value: string; accent: string; options: Array<{ id: string; label: string; desc?: string }>; onChange: (v: string) => void; title?: string }> = ({ label, value, accent, options, onChange, title }) => {
+  const [open, setOpen] = useState(false);
+  const sel = options.find(o => o.id === value);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" style={{ width:'100%', padding:'10px 12px', borderRadius:11, cursor:'pointer', textAlign:'left', minHeight:48, background: value ? accent+'10' : 'rgba(255,255,255,0.03)', border:`1px solid ${value ? accent+'44' : 'rgba(255,255,255,0.09)'}`, color:'#fff' }}>
+        <div style={{ fontSize:10, color:'#fff', opacity:0.75, fontWeight:700, marginBottom:2 }}>{label}</div>
+        <div style={{ fontSize:12, fontWeight:800, color: value ? accent : '#fff', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</span>
+          <span style={{ fontSize:12, opacity:0.7 }}>▾</span>
+        </div>
+        {sel?.desc && <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>{sel.desc}</div>}
+      </button>
+      {open && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <PhOverlay onClose={() => setOpen(false)} accent={accent} title={title || label}>
+          <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+            {options.map(o => {
+              const active = o.id === value;
+              return (
+                <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); }} aria-pressed={active} style={{ display:'block', width:'100%', padding:'11px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', minHeight:48, background: active ? accent+'16' : 'rgba(255,255,255,0.03)', border:`1px solid ${active ? accent+'55' : 'rgba(255,255,255,0.07)'}`, color: active ? accent : '#fff' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, fontSize:12, fontWeight: active ? 800 : 600 }}>
+                    <span>{o.label}</span>{active && <span>✓</span>}
+                  </div>
+                  {o.desc && <div style={{ fontSize:10, color:'#fff', opacity:0.72, marginTop:3, lineHeight:1.4 }}>{o.desc}</div>}
+                </button>
+              );
+            })}
+          </div>
+        </PhOverlay>,
+        document.body,
+      )}
+    </>
+  );
+};
+
 export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' | 'deload' | 'progression' | 'tracker' | 'taper'; initialActivePanel?: 'phases' | 'splits' }> = ({ initialUnifiedMode, initialActivePanel }) => {
   const [designs, setDesigns] = useState<MacrocycleDesign[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -67,11 +127,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
   const pastRef = useRef<MacrocycleDesign[]>([]);
   const futureRef = useRef<MacrocycleDesign[]>([]);
   const [, setHistoryTick] = useState(0);
-  const touchPhaseRef = useRef<PhaseKey | null>(null);
-  const touchTimerRef = useRef<number | null>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [touchActive, setTouchActive] = useState(false);
-  const [dragWeek, setDragWeek] = useState<number | null>(null);
+  // выбор фазы для размещения тапом (без перетаскивания): тап по фазе → тап по неделе
   const { confirm } = useConfirmDialog();
   const [programs, setPrograms] = useState<UserProgram[]>([]);
   const [linkProgramId, setLinkProgramId] = useState('');
@@ -427,11 +483,11 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
           <button onClick={() => setShowHelp(v => !v)} style={{ ...btn, minHeight: 36, fontSize: 11, background: showHelp ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: showHelp ? accent+'44' : 'rgba(255,255,255,0.08)', color: showHelp ? accent : DIM }}>
             {showHelp ? '✕ Скрыть справку' : '❓ Как пользоваться'}
           </button>
-          <span style={{ fontSize: 10, color: DIM, alignSelf: 'center', lineHeight: 1.3 }}>{isMobile ? 'Тап по фазе → тап по неделе — быстрый ввод' : 'Drag&Drop фазы на таймлайн, или тап по фазе → клик по неделе'}</span>
+          <span style={{ fontSize: 10, color: DIM, alignSelf: 'center', lineHeight: 1.3 }}>Тап по фазе → тап по неделе — размещение без перетаскивания</span>
         </div>
         {showHelp && (
           <div style={{ marginTop: 8, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, lineHeight: 1.5, color: '#fff' }}>
-            <div style={{ fontWeight: 800, color: '#fff', marginBottom: 6 }}>📱 Телефон: зажмите фазу 0.35с → вибрация → перетащите на неделю (или тап фаза → тап неделя)</div>
+            <div style={{ fontWeight: 800, color: '#fff', marginBottom: 6 }}>📱 Телефон и ПК: тап по фазе → тап по неделе. Сдвиг блока — кнопками ◀ ▶ или выбором стартовой недели в редакторе.</div>
             <div>• <b>ПЛ</b>: GPP база → сила → DE/скорость → пик к помосту · <b>ББ</b>: гипертрофия объём → интенс → памп → пик формы</div>
             <div>• Таймлайн — кварталы по {isMobile ? 8 : 13} нед, свайп/кнопки ◀▶ · Список — удобно на узком экране</div>
             <div>• Тап по блоку — редактирование: длительность, сдвиг, смена фазы, дублирование, заметки</div>
@@ -445,17 +501,15 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }} className="pd-header-row">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} className="pd-header-actions">
           <button onClick={() => handleNewDesignForDiscipline(effectiveDiscipline)} style={{ ...btn, background: accent + '14', borderColor: accent + '55', color: accent, minHeight: 44 }}>➕ Новый {effectiveDiscipline === 'pl' ? 'ПЛ' : 'ББ'}</button>
-          <select value={currentId || ''} onChange={e => setCurrentId(e.target.value || null)} style={{ ...btn, padding: '10px 10px', background: 'rgba(24,24,27,0.6)', fontSize: 11, minHeight: 44, maxWidth: 260 }}>
-            <option value="">— выберите дизайн —</option>
-            {designs
-              .filter(d => sportToDiscipline(d.sport) === effectiveDiscipline || d.sport === 'general')
-              .map(d => <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} бл · {d.totalWeeks} нед)</option>)}
-            {designs.filter(d => sportToDiscipline(d.sport) !== effectiveDiscipline && d.sport !== 'general').length > 0 && (
-              <optgroup label={`— другие (${effectiveDiscipline === 'pl' ? 'ББ' : 'ПЛ'}) —`}>
-                {designs.filter(d => sportToDiscipline(d.sport) !== effectiveDiscipline && d.sport !== 'general').map(d => <option key={d.id} value={d.id}>{d.name} [{d.sport}]</option>)}
-              </optgroup>
-            )}
-          </select>
+          <div style={{ flex:1, minWidth:200, maxWidth:340 }}>
+            <PhSelect label="Дизайн" title="Выбор дизайна" value={currentId || ''} accent={accent}
+              options={[{ id:'', label:'— выберите дизайн —', desc:`${designs.length} всего` },
+                ...designs.filter(d => sportToDiscipline(d.sport) === effectiveDiscipline || d.sport === 'general')
+                  .map(d => ({ id:d.id, label:`${d.name}`, desc:`${d.blocks.length} бл · ${d.totalWeeks} нед` })),
+                ...designs.filter(d => sportToDiscipline(d.sport) !== effectiveDiscipline && d.sport !== 'general')
+                  .map(d => ({ id:d.id, label:`${d.name} [${d.sport}]`, desc:`чужой · ${d.blocks.length} бл` }))]}
+              onChange={v => setCurrentId(v || null)} />
+          </div>
           {current && <button onClick={handleDeleteDesign} style={{ ...btn, color: '#ef4444', minHeight: 44, minWidth: 44 }}>🗑</button>}
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -577,13 +631,11 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>🔗 К программе:</span>
-              <select value={linkProgramId} onChange={e => setLinkProgramId(e.target.value)}
-                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 11, cursor: 'pointer', minHeight: 44, flex: 1, minWidth: 180 }}>
-                <option value="">— выберите программу —</option>
-                {programs.map(p => (
-                  <option key={p.meta.id} value={p.meta.id}>{p.meta.title} ({p.meta.direction})</option>
-                ))}
-              </select>
+              <div style={{ flex:1, minWidth:180 }}>
+                <PhSelect label="Программа" title="Привязка к программе" value={linkProgramId} accent={ACCENT}
+                  options={[{ id:'', label:'— выберите программу —' }, ...programs.map(p => ({ id:p.meta.id, label:p.meta.title, desc:String(p.meta.direction) }))]}
+                  onChange={v => setLinkProgramId(v)} />
+              </div>
               <button onClick={handleLinkToProgram} disabled={!linkProgramId}
                 style={{ ...btn, minHeight: 44, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, opacity: linkProgramId ? 1 : 0.4 }}>
                 🔗 Привязать
@@ -592,8 +644,8 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
             {linkMsg && <div style={{ fontSize: 11, color: DIM, marginTop: 6, lineHeight: 1.4 }}>{linkMsg}</div>}
           </div>
 
-          {/* Palette — draggable phase blocks (PL/BB filtered) — sticky на телефоне */}
-          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}`, position: isMobile ? 'sticky' as const : 'relative', top: isMobile ? 4 : undefined, zIndex: isMobile ? 6 : undefined, backdropFilter: isMobile ? 'blur(12px)' : undefined }}>
+          {/* Палитра фаз — без перетаскивания: тап по фазе → тап по неделе */}
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}`, position:'relative', scrollMarginTop:70 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🎨 Палитра — {disciplineLabel} {effectiveDiscipline === 'pl' ? '(сила/техника/DE)' : '(масса/памп/сушка)'}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -612,67 +664,16 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                 const pkTyped = pk as PhaseKey;
                 return (
                 <div key={pk}
-                  draggable
                   role="button"
                   tabIndex={0}
                   aria-label={`Добавить блок ${PHASE_LABELS_RU[pkTyped]}`}
-                  onDragStart={() => setDragPhase(pkTyped)}
-                  onDragEnd={() => setDragPhase(null)}
+                  aria-pressed={dragPhase === pkTyped}
                   onClick={() => setDragPhase(previous => previous === pkTyped ? null : pkTyped)}
                   onKeyDown={event => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       setDragPhase(previous => previous === pkTyped ? null : pkTyped);
                     }
-                  }}
-                  onTouchStart={(e) => {
-                    const touch = e.touches[0];
-                    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-                    touchPhaseRef.current = pkTyped;
-                    touchTimerRef.current = window.setTimeout(() => {
-                      setTouchActive(true);
-                      setDragPhase(pkTyped);
-                      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
-                    }, 180);
-                  }}
-                  onTouchMove={(e) => {
-                    if (!touchStartRef.current) return;
-                    const touch = e.touches[0];
-                    const dx = Math.abs(touch.clientX - touchStartRef.current.x);
-                    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
-                    if (!touchActive) {
-                      if (dx > 8 || dy > 8) {
-                        // moved before long-press fired — treat as scroll, cancel
-                        window.clearTimeout(touchTimerRef.current as number);
-                        touchTimerRef.current = null;
-                        touchStartRef.current = null;
-                      }
-                      return;
-                    }
-                    try { e.preventDefault(); } catch { /* ignore */ }
-                    const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
-                    const week = el?.getAttribute('data-week');
-                    setDragWeek(week != null ? Number(week) : null);
-                  }}
-                  onTouchEnd={(e) => {
-                    if (touchTimerRef.current) {
-                      window.clearTimeout(touchTimerRef.current);
-                      touchTimerRef.current = null;
-                    }
-                    if (touchActive) {
-                      const touch = e.changedTouches[0];
-                      const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
-                      const week = el?.getAttribute('data-week');
-                      if (week && dragPhase) handleDropOnCanvas(Number(week), dragPhase);
-                      setDragPhase(null);
-                    } else {
-                      // tap = select phase for tap-to-place
-                      setDragPhase(prev => prev === pkTyped ? null : pkTyped);
-                    }
-                    setTouchActive(false);
-                    setDragWeek(null);
-                    touchPhaseRef.current = null;
-                    touchStartRef.current = null;
                   }}
                   className="pd-palette-chip"
                   style={{
@@ -681,11 +682,11 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     textAlign: 'left',
                     lineHeight: 1.3,
                     alignItems: 'center',
-                    background: DESIGNER_PHASE_VISUAL[pkTyped].color + (touchActive && dragPhase === pkTyped ? '44' : '1A'),
+                    background: DESIGNER_PHASE_VISUAL[pkTyped].color + (dragPhase === pkTyped ? '44' : '1A'),
                     border: '1px solid ' + DESIGNER_PHASE_VISUAL[pkTyped].color + (dragPhase === pkTyped ? '88' : '38'),
                     color: DESIGNER_PHASE_VISUAL[pkTyped].color,
                     boxShadow: dragPhase === pkTyped ? `0 4px 12px ${DESIGNER_PHASE_VISUAL[pkTyped].color}33` : 'none',
-                    transform: touchActive && dragPhase === pkTyped ? 'scale(1.03)' : 'none',
+                    transform: dragPhase === pkTyped ? 'scale(1.03)' : 'none',
                   }}>
                   <span>{DESIGNER_PHASE_VISUAL[pkTyped].icon}</span>
                   <span>{DESIGNER_PHASE_VISUAL[pkTyped].label}</span>
@@ -778,10 +779,8 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 8 }}>
                       <div>
-                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Уровень</div>
-                        <select value={plLevel} onChange={e => setPlLevel(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                          {['novice','II-KMS','KMS-MS','MS-MSMK','intermediate'].map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
+                        <PhSelect label="Уровень" title="Уровень ПЛ" value={plLevel} accent={accent}
+                          options={['novice','II-KMS','KMS-MS','MS-MSMK','intermediate'].map(l => ({ id:l, label:l }))} onChange={setPlLevel} />
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Дней/нед</div>
@@ -806,12 +805,10 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     {plShowCompare && (
                       <>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                          <select value={plCycleA} onChange={e => setPlCycleA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                            {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
-                          </select>
-                          <select value={plCycleB} onChange={e => setPlCycleB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                            {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
-                          </select>
+                          <PhSelect label="Цикл A" title="Цикл A" value={plCycleA} accent={accent}
+                            options={LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => ({ id:c.meta.id, label:c.meta.title, desc:String(c.meta.level) }))} onChange={setPlCycleA} />
+                          <PhSelect label="Цикл B" title="Цикл B" value={plCycleB} accent={accent}
+                            options={LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => ({ id:c.meta.id, label:c.meta.title, desc:String(c.meta.level) }))} onChange={setPlCycleB} />
                         </div>
                         {(() => {
                           const a = LMS_CYCLES.find(c => c.meta.id===plCycleA);
@@ -836,16 +833,12 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                       <div>
-                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Уровень ББ</div>
-                        <select value={bbLevel} onChange={e => setBbLevel(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                          {['beginner','intermediate','advanced','enhanced'].map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
+                        <PhSelect label="Уровень ББ" title="Уровень ББ" value={bbLevel} accent={accent}
+                          options={['beginner','intermediate','advanced','enhanced'].map(l => ({ id:l, label:l }))} onChange={setBbLevel} />
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Цель</div>
-                        <select value={bbGoal} onChange={e => setBbGoal(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                          {['mass','cut','recomp','maintenance','strength_mass'].map(g => <option key={g} value={g}>{g}</option>)}
-                        </select>
+                        <PhSelect label="Цель" title="Цель ББ" value={bbGoal} accent={accent}
+                          options={['mass','cut','recomp','maintenance','strength_mass'].map(g => ({ id:g, label:g }))} onChange={setBbGoal} />
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Дней/нед</div>
@@ -870,12 +863,10 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     {bbShowCompare && (
                       <>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                          <select value={bbSplitA} onChange={e => setBbSplitA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                            {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
-                          </select>
-                          <select value={bbSplitB} onChange={e => setBbSplitB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                            {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
-                          </select>
+                          <PhSelect label="Сплит A" title="Сплит A" value={bbSplitA} accent={accent}
+                            options={SPLIT_PATTERNS.slice(0,24).map(p => ({ id:p.id, label:p.name, desc:`${p.sessionsPerRotation}/${p.rotationDays}д` }))} onChange={setBbSplitA} />
+                          <PhSelect label="Сплит B" title="Сплит B" value={bbSplitB} accent={accent}
+                            options={SPLIT_PATTERNS.slice(0,24).map(p => ({ id:p.id, label:p.name, desc:`${p.sessionsPerRotation}/${p.rotationDays}д` }))} onChange={setBbSplitB} />
                         </div>
                         {(() => {
                           const a = SPLIT_PATTERNS.find(p=>p.id===bbSplitA);
@@ -1182,13 +1173,14 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               {/* Quarter nav */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 10 }} className="pd-quarter-nav">
                 <button aria-label="Предыдущий квартал" onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, minWidth: 44, minHeight: 44, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
-                <select aria-label="Квартал таймлайна" value={viewQuarter} onChange={e => setViewQuarter(Number(e.target.value))} style={{ ...btn, flex: 1, textAlign: 'center', background: 'rgba(24,24,27,0.6)', minHeight: 44, fontSize: 11, fontWeight: 700 }}>
-                  {Array.from({ length: Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter)) }, (_, quarter) => {
-                    const start = quarter * weeksPerQuarter + 1;
-                    const end = Math.min(start + weeksPerQuarter - 1, current?.totalWeeks || 52);
-                    return <option key={quarter} value={quarter}>Недели {start}–{end} · {weeksPerQuarter} нед</option>;
-                  })}
-                </select>
+                <div style={{ flex:1 }}>
+                  <PhSelect label={`Недели ${quarterStart}–${quarterEnd}`} title="Квартал таймлайна" value={String(viewQuarter)} accent={accent}
+                    options={Array.from({ length: Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter)) }, (_, quarter) => {
+                      const start = quarter * weeksPerQuarter + 1;
+                      const end = Math.min(start + weeksPerQuarter - 1, current?.totalWeeks || 52);
+                      return { id: String(quarter), label: `Недели ${start}–${end}`, desc: `${weeksPerQuarter} нед` };
+                    })} onChange={v => setViewQuarter(Number(v))} />
+                </div>
                 <button aria-label="Следующий квартал" onClick={() => setViewQuarter(Math.min(quarterCount - 1, viewQuarter + 1))} disabled={quarterEnd >= (current?.totalWeeks || 52)} style={{ ...btn, minWidth: 44, minHeight: 44, opacity: quarterEnd >= (current?.totalWeeks || 52) ? 0.3 : 1 }}>▶</button>
               </div>
 
@@ -1205,8 +1197,8 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               {current.blocks.filter(b => b.startWeek <= quarterEnd && b.endWeek >= quarterStart).length === 0 && (
                 <div style={{ padding: 22, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12, marginTop: 4, background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ fontSize: 22, marginBottom: 6 }}>📍</div>
-                  Перетащите блоки из палитры {disciplineLabel} на недели {quarterStart}–{quarterEnd}<br />
-                  <span style={{ fontSize: 10 }}>или тапните фазу → тап по неделе</span>
+                  Выберите фазу в палитре → тап по неделе {quarterStart}–{quarterEnd}<br />
+                  <span style={{ fontSize: 10 }}>без перетаскивания: всё кнопками ◀ ▶ и степперами ниже</span>
                 </div>
               )}
 
@@ -1218,21 +1210,15 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   return (
                     <div key={wn}
                       data-week={wn}
-                      onDragOver={e => { e.preventDefault(); }}
-                      onClick={() => { if (dragPhase) handleDropOnCanvas(wn, dragPhase); }}
-                      onDrop={e => { e.preventDefault(); if (dragPhase) { handleDropOnCanvas(wn, dragPhase); } }}
-                      onTouchEnd={() => {
-                        if (dragPhase) {
-                          handleDropOnCanvas(wn, dragPhase);
-                          setDragPhase(null);
-                          setTouchActive(false);
-                        }
-                      }}
+                      onClick={() => { if (dragPhase) { handleDropOnCanvas(wn, dragPhase); setDragPhase(null); } else { setEditBlockId(null); } }}
+                      role="button"
+                      tabIndex={dragPhase ? 0 : -1}
+                      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && dragPhase) { e.preventDefault(); handleDropOnCanvas(wn, dragPhase); setDragPhase(null); } }}
                       aria-label={dragPhase ? `Разместить ${PHASE_LABELS_RU[dragPhase]} на неделе ${wn}` : `Неделя ${wn}`}
                       style={{
                         position: 'absolute', left: 38 + i * colW, top: 0, width: colW, height: '100%',
-                        background: dragWeek === wn ? accent + '2e' : (dragPhase ? accent + '14' : 'transparent'),
-                        borderLeft: '1px dashed ' + (dragWeek === wn ? accent + '88' : (dragPhase ? accent + '44' : 'rgba(255,255,255,0.10)')),
+                        background: dragPhase ? accent + '14' : 'transparent',
+                        borderLeft: '1px dashed ' + (dragPhase ? accent + '44' : 'rgba(255,255,255,0.10)'),
                         borderRadius: 6,
                         cursor: dragPhase ? 'copy' : 'default',
                         zIndex: 1,
@@ -1277,9 +1263,13 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                         {PHASE_ICONS[block.phaseKey]} <span style={{ display: isMobile && width < 80 ? 'none' : 'inline' }}>{PHASE_LABELS_RU[block.phaseKey]}</span><span style={{ display: isMobile && width < 80 ? 'inline' : 'none' }}>{DESIGNER_PHASE_VISUAL[block.phaseKey]?.label.split(' ')[0] ?? block.phaseKey}</span>
                       </span>
                       <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+                        <button aria-label={`Сдвинуть ${PHASE_LABELS_RU[block.phaseKey]} влево`} onClick={e => { e.stopPropagation(); handleMoveBlock(block.id, Math.max(1, block.startWeek - 1)); }}
+                          style={{ fontSize: 12, padding: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, cursor: 'pointer', color: '#fff', lineHeight: 1, minWidth: 34, minHeight: 34 }}>◀</button>
                         <div style={{ fontSize: 10, color: color + 'BB', fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(0,0,0,0.18)' }}>
                           {block.endWeek - block.startWeek + 1}н
                         </div>
+                        <button aria-label={`Сдвинуть ${PHASE_LABELS_RU[block.phaseKey]} вправо`} onClick={e => { e.stopPropagation(); const len = block.endWeek - block.startWeek; handleMoveBlock(block.id, Math.min((current?.totalWeeks || 52) - len, block.startWeek + 1)); }}
+                          style={{ fontSize: 12, padding: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, cursor: 'pointer', color: '#fff', lineHeight: 1, minWidth: 34, minHeight: 34 }}>▶</button>
                         <button aria-label={`Удалить блок ${PHASE_LABELS_RU[block.phaseKey]}`} onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }}
                           style={{ fontSize: 13, padding: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, cursor: 'pointer', color: '#ef4444', lineHeight: 1, minWidth: 34, minHeight: 34 }}>
                           ✕
@@ -1300,7 +1290,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               </div>
 
               <div style={{ fontSize: 10, color: DIM, marginTop: 8, textAlign: 'center', lineHeight: 1.4 }}>
-                Свайп по таймлайну → квартал · {isMobile ? `показ ${weeksPerQuarter} нед` : `показ ${weeksPerQuarter} нед`} · тап по фазе → тап по неделе — быстрый ввод без drag
+                Свайп по таймлайну → квартал · показ {weeksPerQuarter} нед · тап по фазе → тап по неделе · сдвиг — ◀ ▶ на блоке
               </div>
             </div>
           </div>
@@ -1332,7 +1322,11 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                       {block.notes && !block.notes.includes('[OVERLAP') && <div style={{ fontSize: 10, color: '#fff', marginTop: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.notes}</div>}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <button aria-label="Удалить" onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }} style={{ ...btn, minHeight: 36, color: '#ef4444' }}>✕</button>
+                      <div style={{ display:'flex', gap:4 }}>
+                        <button aria-label="Влево" onClick={e => { e.stopPropagation(); handleMoveBlock(block.id, Math.max(1, block.startWeek - 1)); }} style={{ ...btn, minHeight: 36, minWidth:40 }}>◀</button>
+                        <button aria-label="Вправо" onClick={e => { e.stopPropagation(); const len = block.endWeek - block.startWeek; handleMoveBlock(block.id, Math.min((current?.totalWeeks || 52) - len, block.startWeek + 1)); }} style={{ ...btn, minHeight: 36, minWidth:40 }}>▶</button>
+                      </div>
+                      <button aria-label="Удалить" onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }} style={{ ...btn, minHeight: 36, color: '#ef4444' }}>✕ Удалить</button>
                     </div>
                   </div>
                 );
@@ -1360,13 +1354,9 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:10 }}>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:10, color:'#fff', fontWeight:800, marginBottom:6, letterSpacing:0.3, textTransform:'uppercase' }}>Фаза</div>
-                  <select value={editBlock.phaseKey} onChange={e => handleChangeBlockPhase(editBlock.id, e.target.value as PhaseKey)}
-                    style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 44 }}>
-                    {allowedKeys.map(pk => {
-                      const pkT = pk as PhaseKey;
-                      return <option key={pk} value={pk}>{PHASE_ICONS[pkT]} {PHASE_LABELS_RU[pkT]}</option>;
-                    })}
-                  </select>
+                  <PhSelect label="Фаза блока" title="Фаза блока" value={editBlock.phaseKey} accent={accent}
+                    options={allowedKeys.map(pk => ({ id: pk as string, label: `${PHASE_ICONS[pk as PhaseKey]} ${PHASE_LABELS_RU[pk as PhaseKey]}`, desc: getPhaseTemplate(pk as PhaseKey)?.description || '' }))}
+                    onChange={v => handleChangeBlockPhase(editBlock.id, v as PhaseKey)} />
                   <div style={{ fontSize:10, color:'#fff', marginTop:6, lineHeight:1.4, opacity:0.85 }}>Смена фазы — объём/интенсивность пересчитаются по шаблону {disciplineLabel}.</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -1395,8 +1385,17 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4, opacity:0.7 }}><span>1 нед</span><span>{Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} нед макс</span></div>
               </div>
               <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:10, color:'#fff', marginBottom:8, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Сдвиг по таймлайну</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:8, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Стартовая неделя — точно, без перетаскивания</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <button onClick={() => handleMoveBlock(editBlock.id, Math.max(1, editBlock.startWeek - 1))} aria-label="Старт на неделю раньше" style={{ ...btn, minWidth:44, minHeight:44, fontSize:14, background:'rgba(255,255,255,0.04)', color:'#fff' }}>◀</button>
+                  <div style={{ flex:1 }}>
+                    <PhSelect label={`Старт: неделя ${editBlock.startWeek}`} title="Стартовая неделя блока" value={String(editBlock.startWeek)} accent={accent}
+                      options={Array.from({ length: current!.totalWeeks }, (_, i) => ({ id: String(i + 1), label: `Неделя ${i + 1}`, desc: i + 1 === editBlock.startWeek ? 'текущий старт' : '' }))}
+                      onChange={v => { const len = editBlock.endWeek - editBlock.startWeek; handleMoveBlock(editBlock.id, Math.max(1, Math.min(current!.totalWeeks - len, Number(v)))); }} />
+                  </div>
+                  <button onClick={() => { const len = editBlock.endWeek - editBlock.startWeek; handleMoveBlock(editBlock.id, Math.min(current!.totalWeeks - len, editBlock.startWeek + 1)); }} aria-label="Старт на неделю позже" style={{ ...btn, minWidth:44, minHeight:44, fontSize:14, background: accent+'14', color:accent, borderColor: accent+'33' }}>▶</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginTop:8 }}>
                   {[-4, -2, -1, 1, 2, 4].map(delta => (
                     <button key={delta} onClick={() => {
                       const newStart = Math.max(1, Math.min(current!.totalWeeks - (editBlock.endWeek - editBlock.startWeek), editBlock.startWeek + delta));
@@ -1407,7 +1406,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     </button>
                   ))}
                 </div>
-                <div style={{ fontSize:10, color:'#fff', marginTop:6, opacity:0.7, textAlign:'center' }}>Сдвиг — неделя старта ±1/2/4 · границы пересчитаются</div>
+                <div style={{ fontSize:10, color:'#fff', marginTop:6, opacity:0.7, textAlign:'center' }}>Старт — попапом или ◀ ▶ ±1/2/4 · границы пересчитаются</div>
               </div>
               <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Заметки блока</div>
