@@ -952,12 +952,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     return low.includes('complex') || low.includes('_blend') || low.includes('_mix') || low.endsWith('_combo');
   };
 
-  const handlePubMedSearch = async () => {
-    if (!pubMedQuery.trim()) return;
+  // Явный q побеждает стейт: чипы-пресеты раньше звали setQuery + handler
+  // подряд — handler читал СТАРЫЙ запрос (stale state) и искал пустоту.
+  const handlePubMedSearch = async (q?: string) => {
+    const query = (q ?? pubMedQuery).trim();
+    if (!query) return;
     setPubMedLoading(true);
     setPubMedError('');
     try {
-      const result = await searchPubMed(pubMedQuery, 20);
+      const result = await searchPubMed(query, 20);
       setPubMedResults(result.articles);
     } catch (e: any) {
       setPubMedError(e.message || 'Ошибка поиска');
@@ -986,12 +989,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     setPharmaSearchResults(results.slice(0, 30));
   };
 
-  const handlePubchemSearch = async () => {
-    if (!pubMedQuery.trim()) return;
+  const handlePubchemSearch = async (q?: string) => {
+    const query = (q ?? pubMedQuery).trim();
+    if (!query) return;
     setPubchemLoading(true);
     setPubchemError('');
     try {
-      const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(pubMedQuery)}/JSON`);
+      const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(query)}/JSON`);
       if (!res.ok) throw new Error('PubChem: соединение не найдено');
       const data = await res.json();
       const pc = data?.PC_Compounds?.[0];
@@ -1001,7 +1005,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         if (p.urn?.label) props[p.urn.label] = p.value;
       });
       setPubchemResults([{
-        name: props['IUPAC Name']?.sval || props['Title']?.sval || pubMedQuery,
+        name: props['IUPAC Name']?.sval || props['Title']?.sval || query,
         mw: props['Molecular Weight']?.fval || props['Molecular Formula']?.sval || '—',
         iupac: props['IUPAC Name']?.sval || '—',
         formula: props['Molecular Formula']?.sval || '—',
@@ -1015,12 +1019,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     }
   };
 
-  const handleFDASearch = async () => {
-    if (!pubMedQuery.trim()) return;
+  const handleFDASearch = async (q?: string) => {
+    const query = (q ?? pubMedQuery).trim();
+    if (!query) return;
     setFdaLoading(true);
     setFdaError('');
     try {
-      const res = await fetch(`https://api.fda.gov/drug/label.json?search=${encodeURIComponent(pubMedQuery)}&limit=5`);
+      const res = await fetch(`https://api.fda.gov/drug/label.json?search=${encodeURIComponent(query)}&limit=5`);
       if (!res.ok) throw new Error('OpenFDA: препарат не найден');
       const data = await res.json();
       const items = (data.results || []).map((r: any) => ({
