@@ -58,7 +58,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 }) => {
   const doMsg = (m: string, ms = 1800) => { setMsg?.(m); setTimeout(() => setMsg?.(''), ms); };
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {/* Сводка — Apple glass + Highlights + StatTiles */}
       <SectionCard icon="📋" title="Сводка плана" subtitle={`${ruLabel(MODE_RU, plan.mode)} · ${ruLabel(PHASE_RU, plan.weeksData[0]?.phase || 'accumulation')} · ${plan.weeks} нед`} accent>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10 }}>
@@ -90,10 +90,10 @@ export const StrengthSportPlanView: React.FC<Props> = ({
           if (!total) return null;
           const reportLines = buildStrengthSportReport(plan).split('\n');
           const sinLine = reportLines.find(l=> l.includes('Sinclair') || l.includes('DOTS'));
-          return sinLine ? <div style={{ fontSize:13, color:'rgba(235,235,245,0.75)', background:'rgba(255,255,255,0.035)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>{sinLine.split('·').map((p,i)=> <span key={i} style={{ marginRight:6 }}>{p.trim().split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color={modeColor}>{w}</Highlight> : w+' ').reduce((a,c)=> <>{a} {c}</> as any, null as any)}</span>)}</div> : null;
+          return sinLine ? <div style={{ fontSize:13, color:'#fff', background:'rgba(255,255,255,0.035)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>{sinLine.split('·').map((p,i)=> <span key={i} style={{ marginRight:6 }}>{p.trim().split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color={modeColor}>{w}</Highlight> : w+' ').reduce((a,c)=> <>{a} {c}</> as any, null as any)}</span>)}</div> : null;
         })()}
         {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#30d158'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
-        {plan.rationale?.length ? <div style={{ fontSize:13, color:'rgba(235,235,245,0.62)', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.55 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:8 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
+        {plan.rationale?.length ? <div style={{ fontSize:13, color:'#fff', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.55 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:8 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
       </SectionCard>
 
       <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" collapsible defaultOpen={false} summary={`${plan.weeks} нед · ${plan.weeksData.length} блоков`}>
@@ -123,7 +123,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
                 <div style={{ fontSize:12, color:TEXT_3, marginTop:6, lineHeight:1.5 }}>92% · 97% · 102% от ПМ</div>
               </div>
             </div>
-            <div style={{ fontSize:13, color:'rgba(235,235,245,0.62)', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>{wlAttemptRationale(meet).slice(0,3).map((t,i)=> <span key={i} style={{ marginRight:8 }}>{t.includes('кг') ? t.split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color="#0a84ff">{w}</Highlight> : w+' ') : t}</span>)}</div>
+            <div style={{ fontSize:13, color:'#fff', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>{wlAttemptRationale(meet).slice(0,3).map((t,i)=> <span key={i} style={{ marginRight:8 }}>{t.includes('кг') ? t.split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color="#0a84ff">{w}</Highlight> : w+' ') : t}</span>)}</div>
           </SectionCard></div>
         ) : null;
       })()}
@@ -242,7 +242,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
                   {sess.exercises.map(ex => (
                     <div key={ex.id} data-ss="exercise" style={{ background:'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', border:'0.5px solid rgba(255,255,255,0.08)', borderLeft:'3px solid rgba(0,230,138,0.35)', borderRadius:16, padding:14, display:'flex', flexDirection:'column', gap:10 }}>
                       <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                        <span style={{ fontSize:15, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif', lineHeight:1.35 }}>{ex.name} <span style={{ fontWeight:500, color:'rgba(235,235,245,0.62)' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight>{(ex.workSets[0] as any)?.distanceM ? <> · <Highlight color={ACCENT_STRONG}>{(ex.workSets[0] as any).distanceM}м</Highlight></> : null}{(ex.workSets[0] as any)?.timeCapS ? <> · <Highlight>{(ex.workSets[0] as any).timeCapS}с cap</Highlight></> : null} · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:11.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
+                        <span style={{ fontSize:15, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif', lineHeight:1.35 }}>{ex.name} <span style={{ fontWeight:500, color:'#fff' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight>{(ex.workSets[0] as any)?.distanceM ? <> · <Highlight color={ACCENT_STRONG}>{(ex.workSets[0] as any).distanceM}м</Highlight></> : null}{(ex.workSets[0] as any)?.timeCapS ? <> · <Highlight>{(ex.workSets[0] as any).timeCapS}с cap</Highlight></> : null} · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:11.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'76px 76px 76px auto', gap:8, alignItems:'center' }}>
                         <input type="number" value={ex.weight} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'12px 8px', fontSize:15, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:52 }} placeholder="кг" />
@@ -250,12 +250,12 @@ export const StrengthSportPlanView: React.FC<Props> = ({
                         <input type="number" value={ex.rir} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'12px 8px', fontSize:15, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:52 }} placeholder="RIR" />
                         <div style={{ display:'flex', gap:6 }}><button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, -1)} style={{ width:46, height:52, borderRadius:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:15 }}>↑</button><button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, 1)} style={{ width:46, height:52, borderRadius:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:15 }}>↓</button></div>
                       </div>
-                      {ex.comment && <div style={{ fontSize:11, color:'rgba(235,235,245,0.68)', background: mode==='strongman'?'rgba(245,158,11,0.08)':'rgba(48,209,88,0.08)', borderLeft:`2px solid ${mode==='strongman'?'rgba(245,158,11,0.28)':'rgba(48,209,88,0.28)'}`, padding:'6px 8px', borderRadius:8, lineHeight:1.4 }}>{ex.comment}</div>}
+                      {ex.comment && <div style={{ fontSize:11, color:'#fff', background: mode==='strongman'?'rgba(245,158,11,0.08)':'rgba(48,209,88,0.08)', borderLeft:`2px solid ${mode==='strongman'?'rgba(245,158,11,0.28)':'rgba(48,209,88,0.28)'}`, padding:'6px 8px', borderRadius:8, lineHeight:1.4 }}>{ex.comment}</div>}
                       {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize:10.5, color:TEXT_3, fontFamily:'-apple-system, system-ui, sans-serif' }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                           {ex.workSets.map((s,si)=> (
                           <span key={si} data-ss="set-row" style={{ display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.045)', padding:'8px 10px', borderRadius:12, fontSize:12, fontWeight:600, color:'#fff', border:'0.5px solid rgba(255,255,255,0.07)', fontVariantNumeric:'tabular-nums', minHeight:52 }}>
-                            <span style={{ color:'rgba(255,255,255,0.45)', fontWeight:700 }}>#{si+1}</span>
+                            <span style={{ color:'#fff', fontWeight:700 }}>#{si+1}</span>
                             <input type="number" value={s.weight} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{ width:62, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />кг
                             <input type="number" value={s.reps} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:48, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />×
                             <input type="number" value={s.rir} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:46, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />RIR
@@ -307,7 +307,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
             })}
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:TEXT_3, fontVariantNumeric:'tabular-nums' }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
-            <div style={{ fontSize:12, color:'rgba(235,235,245,0.62)', background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>Синхронизация: <Highlight>he_strength_annual_sync_v1</Highlight> · годовой доступен в дневнике и общем плане</div>
+            <div style={{ fontSize:12, color:'#fff', background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.5 }}>Синхронизация: <Highlight>he_strength_annual_sync_v1</Highlight> · годовой доступен в дневнике и общем плане</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {rankedCycles.filter(r=> !r.blocked).map(r=> {
                 const id = r.cycle.meta.id;

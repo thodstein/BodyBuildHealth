@@ -19,7 +19,7 @@ import { parseSmBridgePayload } from './sm-bridge-intake';
 import type { StrongmanContest } from '../../../engines/strength-sport/strength-sport-contest.types';
 import { ensureStrongmanApkStyles } from './strongman-apk-loader';
 
-export type StrengthSportStep = 'params' | 'outside' | 'split' | 'plan';
+export type StrengthSportStep = 'params' | 'athlete' | 'outside' | 'split' | 'plan' | 'quality' | 'export';
 
 export function useStrengthSportWizard() {
   const [step, setStep] = useState<StrengthSportStep>('params');

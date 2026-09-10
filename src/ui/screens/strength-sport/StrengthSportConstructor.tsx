@@ -6,7 +6,7 @@ import React from 'react';
 import { useStrengthSportWizard } from './useStrengthSportWizard';
 import { StrengthSportPlanView } from './StrengthSportPlanView';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
-import { finalizeStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-finalize.engine';
+import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
 import { buildStrengthCsv, downloadStrengthCsv, downloadStrengthXlsx, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
 import { defaultOutsideLoadFor } from '../../../engines/outside-load.engine';
@@ -31,10 +31,21 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
-import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
+import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
+import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
 
-type Step = 'params' | 'outside' | 'split' | 'plan';
-const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
+type Step = 'params' | 'athlete' | 'outside' | 'split' | 'plan' | 'quality' | 'export';
+const STEP_LABEL_RU: Record<Step,string> = { params:'1 ⚙️ Параметры', athlete:'2 👤 Атлет', outside:'3 🏃 Вне зала', split:'4 🧩 Сплит', plan:'5 📋 План', quality:'6 ✅ Качество', export:'7 📤 Экспорт' };
+const STEP_GROUPS: Record<string, Step[]> = {
+  'ПАРАМЕТРЫ': ['params', 'athlete', 'outside', 'split'],
+  'ПЛАН': ['plan', 'quality'],
+  'ВЫДАЧА': ['export'],
+};
+
+/* Лёгкий haptic на навигации (guard — тишина вне устройства) */
+function buzzStep(): void {
+  try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
+}
 const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя', yokeWalk:'Йок', farmersWalk:'Фермер', frameCarry:'Рама', husafellCarry:'Хусафелл', sandbagLoad:'Мешок загр.', kegToss:'Бочка', carDeadlift:'Автотяга', axlePress:'Аксель-жим', atlasStone:'Камень', axleDeadlift:'Аксель', logPress:'Лог' };
 
 export const StrengthSportConstructor: React.FC = () => {
@@ -378,34 +389,64 @@ export const StrengthSportConstructor: React.FC = () => {
     }catch{ setMsg('Не собралось'); setTimeout(()=>setMsg(''),1800); }
   };
 
-  const stepIndex = (['params','outside','split','plan'] as Step[]).indexOf(step) + 1;
+  const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
+  const stepIndex = stepList.indexOf(step) + 1;
   const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
   const modeGrad = mode === 'weightlifting' ? ACCENT_GRAD : mode === 'strongman' ? STRONG_GRAD : 'linear-gradient(135deg, #0ea5e9, #6366f1)';
+  const groupEndKeys = new Set(Object.values(STEP_GROUPS).map(arr => arr[arr.length - 1]).filter(Boolean));
+  // План без плана показывает CTA-пустышку со сборкой — лочим только качество.
+  const needsPlan = (s: Step) => s === 'quality' && !plan;
+  const exportLocked = !plan && !annual;
+
+  const go = (s: Step) => { buzzStep(); setStep(s); };
+  const renderStepNav = () => (
+    <div style={{ background: 'rgba(24,24,27,0.55)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 2, display: 'flex', gap: 4, overflowX: 'auto' as const, alignItems: 'center' }}>
+      {stepList.map(s => {
+        const active = step === s;
+        const disabled = s === 'export' ? exportLocked : needsPlan(s);
+        return (
+          <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
+            <button disabled={disabled} onClick={() => { if (disabled) return; go(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}>{STEP_LABEL_RU[s]}</button>
+            {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
+          </span>
+        );
+      })}
+    </div>
+  );
+  const renderNavRow = (prev: Step | null, next: Step | null, nextLabel?: string) => (
+    <div data-ss="wizard-nav" style={{ display: 'flex', gap: 8 }}>
+      {prev && <button onClick={() => go(prev)} style={{ ...T_BTN_GHOST, flex: 1 }}>← Назад</button>}
+      {next && <button onClick={() => go(next)} style={{ ...T_BTN, flex: 1.4 }}>{nextLabel || `Далее → ${STEP_LABEL_RU[next]}`}</button>}
+    </div>
+  );
+
+  const athleteSummary = `${sex === 'male' ? 'М' : 'Ж'} · ${bodyweight}кг · ${age} лет${acwr ? ` · ACWR ${acwr.ratio}` : ''}`;
+  const methodologySummary = `${methodology === 'compound_first' ? 'База первой' : methodology === 'pre_exhaust' ? 'Предутомление' : 'Постутомление'} · ${dupMode === 'off' ? 'DUP выкл' : dupMode === 'heavy_light' ? 'Тяж/лёг' : 'Волна'} · ${intensityTech === 'none' ? 'чисто' : 'кластер'}`;
+  const qualitySummary = weakPoints.length ? `Слабые: ${weakPoints.length}` : injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'проверки по плану';
 
   return (
-    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 880, margin: '0 auto' }}>
+    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 880, margin: '0 auto' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:8px; border-radius:999px; background:rgba(255,255,255,0.10); border:0.5px solid rgba(255,255,255,0.06); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30), 0 0 0 5px ${mode === 'strongman' ? 'rgba(245,158,11,0.15)' : mode === 'hybrid' ? 'rgba(14,165,233,0.15)' : 'rgba(0,230,138,0.15)'}; cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30); cursor:pointer; }
         input[type="date"]{ color-scheme: dark; }`}</style>
 
-      {/* HERO — Apple glass + Highlights */}
+      {/* HERO — компакт в стиле комбата: без glow-пятен и пустот */}
       <div data-ss="hero" style={mode === 'strongman' ? CARD_STRONG : CARD_HERO}>
-        <div style={{ position: 'absolute', top: -36, right: -36, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${modeColor}22, transparent 70%)`, filter: 'blur(2px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -28, left: 30, width: 220, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${modeColor}0F, transparent 70%)`, filter: 'blur(2px)', pointerEvents: 'none' }} />
         <div style={ROW}>
-          <span style={{ width: 56, height: 56, borderRadius: 17, background: modeGrad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 27, color: mode === 'weightlifting' ? '#06281c' : '#fff', boxShadow: `0 8px 24px ${modeColor}44, inset 0 1px 0 rgba(255,255,255,0.28)`, flexShrink: 0 }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
+          <span style={{ width: 44, height: 44, borderRadius: 13, background: modeGrad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: mode === 'weightlifting' ? '#06281c' : '#fff', boxShadow: `0 6px 18px ${modeColor}44, inset 0 1px 0 rgba(255,255,255,0.28)`, flexShrink: 0 }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', lineHeight: 1.1, letterSpacing: -0.02*19, fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
-            <div style={{ fontSize: 12.5, color: 'rgba(235,235,245,0.60)', lineHeight: 1.4, marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Highlight color={modeColor}>Torokhtiy 3/3/3/1</Highlight><span>·</span><Highlight color={modeColor}>Prilepin</Highlight><span>·</span><Highlight color={modeColor}>SINCLAIR 2025</Highlight><span>·</span><span style={{ color: 'rgba(255,255,255,0.52)' }}>92/97/102%</span></div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
+            <div style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · 92/97/102%</div>
           </div>
-          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
+          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge>
         </div>
-        <ProgressBar value={stepIndex} max={4} color={modeColor} height={8} />
-        <div data-ss="steps"><SectionNav numbered dividersAfter={['split']} activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} /></div>
+        <ProgressBar value={stepIndex} max={7} color={modeColor} height={8} />
+        <div data-ss="steps">{renderStepNav()}</div>
         <div style={{ ...ROW, justifyContent:'space-between', gap: 8 }}>
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
+            {Object.keys(hubVelocity).length > 0 && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</Badge>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
             {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)': acwr.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={acwr.zone==='dangerous'?'rgba(239,68,68,0.22)': acwr.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
             {hrv && <Badge color={hrv.zone==='dangerous'?'#fecaca': hrv.zone==='caution'?'#fde68a':'#86efac'} bg={hrv.zone==='dangerous'?'rgba(239,68,68,0.12)': hrv.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={hrv.zone==='dangerous'?'rgba(239,68,68,0.22)': hrv.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>HRV {hrv.ewma ?? hrv.last} мс · {hrv.zone}</Badge>}
@@ -416,7 +457,7 @@ export const StrengthSportConstructor: React.FC = () => {
 
       {/* Mobile lazy: только активный шаг монтируется (step==='params' &&) — 1/4 DOM, 60% меньше памяти на мобильном, как CardioUI */}
       {step === 'params' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны" summary={`${ruLabel(MODE_RU, mode)} · ${ruLabel(GOAL_RU, goal)} · ${ruLabel(LEVEL_RU, level)} · ${weeks}н × ${days}дн`}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <StrengthPopupSelect label="Режим" value={mode} onChange={v=> setMode(v as any)} strong={mode==='strongman'} options={[
@@ -452,90 +493,14 @@ export const StrengthSportConstructor: React.FC = () => {
             <Divider />
             <GroupHeading icon="📅" text="Объём цикла" desc="Недели и частота — тоннаж и восстановление" />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:TEXT_3, fontFamily:'-apple-system, system-ui, sans-serif' }}><span>2</span><span>16</span></div></Field>
-              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:TEXT_3 }}><span>2</span><span>6</span></div></Field>
+              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}><span>2</span><span>16</span></div></Field>
+              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff' }}><span>2</span><span>6</span></div></Field>
             </div>
           </SectionCard>
 
-          <SectionCard icon="👤" title="Атлет" subtitle="Подсветка ключевых метрик" collapsible defaultOpen={false} summary={`${sex === 'male' ? 'М' : 'Ж'} · ${bodyweight}кг · ${age}л${acwr ? ` · ACWR ${acwr.ratio}` : ''}${competitionDate ? ' · 🏁' : ''}`} status={competitionDate ? 'ok' : undefined}>
-            <GroupHeading icon="⚖️" text="Профиль" desc="Вес, возраст и дата пика — базис для % и SINCLAIR" />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10 }}>
-              <StrengthPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} />
-              <StrengthPopupNumber label="Вес" value={bodyweight} min={40} max={160} suffix="кг" onChange={v=> setBodyweight(v)} strong={mode==='strongman'} />
-              <StrengthPopupNumber label="Возраст" value={age} min={14} max={65} onChange={v=> setAge(v)} strong={mode==='strongman'} />
-              <Field label="Дата пика"><input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></Field>
-            </div>
-            {goal==='peaking' && competitionDate && (
-              <StrengthPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[{id:'1',label:'1 неделя',desc:'объём −45%'},{id:'2',label:'2 недели',desc:'−35% → −55%'}]} />
-            )}
-            {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': '— оптимум'}</InfoBanner>}
-            {hrv && <InfoBanner tone={hrv.zone==='dangerous'?'warn': hrv.zone==='caution'?'warn':'info'}><Highlight color={hrv.zone==='dangerous'?'#ff3b30':hrv.zone==='caution'?'#ff9f0a':'#30d158'}>HRV {hrv.ewma ?? hrv.last} мс</Highlight> · {hrv.zone} {hrv.zone==='dangerous'?'— recovery ×0.85': hrv.zone==='caution'?'— recovery ×0.94':'— оптимум'} · mean {hrv.mean}±{hrv.sd}</InfoBanner>}
-            <Divider />
-            <GroupHeading icon="⚡" text="Скорость (VBT)" desc=">20% → объём ×0.90, RIR+1" />
-            <Field label={`VBT потеря`} hint={`потеря скорости vs бюджет`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#30d158'}>{velocityLoss}%</Highlight></div></Field>
-            {(() => {
-              const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
-              const warns: string[] = [];
-              if(sn && cj && sn > cj) warns.push('Рывок > толчка — проверьте ПМ');
-              if(cj && sq && cj > sq) warns.push('Толчок > приседа — редко');
-              if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте');
-              return warns.length ? <InfoBanner tone="warn">{warns.join(' · ')}</InfoBanner> : null;
-            })()}
-          </SectionCard>
 
-          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026) + EWMA 7/14д" accent collapsible defaultOpen={false} summary={`потеря ${velocityLoss}% · ${(['snatch','clean','squat'] as const).filter(l => ((vbtPerLift as any)[l]?.best || 0) > 0).length}/3 лифта`} status={(velocityLoss > 0 || (['snatch','clean','squat'] as const).some(l => ((vbtPerLift as any)[l]?.best || 0) > 0)) ? 'ok' : undefined}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8 }}>
-              {(['snatch','clean','squat'] as const).map(lift => {
-                const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
-                const loss = vals.best>0 && vals.last>0 ? Math.round((vals.best - vals.last)/vals.best*100) : 0;
-                const col = loss>20 ? '#ef4444' : loss>10 ? '#f59e0b' : '#22c55e';
-                return (
-                  <div key={lift} style={{ background:'rgba(0,0,0,0.16)', padding:'12px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', flexDirection:'column', gap:8 }}>
-                    <div style={{ fontSize:10, fontWeight:800, color:'#86efac', textTransform:'uppercase', letterSpacing:0.5 }}>{lift==='snatch'?'🏋️ Рывок':lift==='clean'?'🏋️ Толчок':'🦵 Присед'} · {lift}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                      <Field label="Best м/с"><input type="number" step={0.05} value={vals.best||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="1.60" /></Field>
-                      <Field label="Last м/с"><input type="number" step={0.05} value={vals.last||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="1.40" /></Field>
-                    </div>
-                    {loss>0 && <div style={{ fontSize:10, fontWeight:700, color:col }}>{loss}% · {loss>20?'⚠️ стоп':loss>10?'контроль':'✅'} · порог {lift==='snatch'||lift==='clean'?10:15}%</div>}
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра `VBT потеря`: если заполнен хотя бы один lift — builder режет объём/RIR индивидуально (иначе скаляр). Пороги TA 10% / тяга 15% (PLOS). Замеры из плана применятся при следующей сборке.</div>
-            {Object.keys(hubVelocity).length > 0 && (
-              <div style={{ fontSize:11, color:'#f5b04c', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', padding:'8px 10px', borderRadius:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <span>📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</span>
-                <button onClick={() => setHubVelocity({})} style={{ padding:'6px 12px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>✕ Сбросить</button>
-              </div>
-            )}
-           </SectionCard>
 
-           <SectionCard icon="📈" title="LVP калибровка" subtitle="Индивидуальный профиль скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent collapsible defaultOpen={false} summary={lvpResult ? `${lvpLift} · r² ${lvpResult.r2}` : 'не калиброван'} status={lvpResult ? 'ok' : undefined}>
-             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-               <StrengthPopupSelect label="Лифт" value={lvpLift} onChange={v=> setLvpLift(v)} options={[{id:'snatch',label:'🏋️ Рывок'},{id:'clean',label:'🏋️ Толчок'},{id:'squat',label:'🦵 Присед'},{id:'deadlift',label:'🏋️ Тяга'},{id:'yoke_walk',label:'🚜 Йок'},{id:'farmers_walk',label:'🚜 Фермер'}]} />
-               <div style={{ display:'flex', alignItems:'flex-end', gap:6 }}>
-                 <button onClick={()=> {
-                   const res = calibrateLVP(lvpLift, lvpPoints as any);
-                   if (res) { saveLVPProfile(res); setLvpResult(res); setMsg(`✦ LVP ${lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setMsg(''),2000); }
-                   else { setMsg('⚠ Need ≥3 точки с покрытием 20%'); setTimeout(()=>setMsg(''),2000); }
-                 }} style={{ ...BTN_PRIMARY, flex:1 }}>Калибровать</button>
-                 <button onClick={()=> { const all=loadLVPProfiles(); setMsg(`LVP профилей: ${Object.keys(all).join(', ')||'—'}`); setTimeout(()=>setMsg(''),2000); }} style={BTN}>Показать</button>
-               </div>
-             </div>
-             <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6, marginTop:8 }}>
-               {lvpPoints.map((pt,idx)=> (
-                  <div key={idx} style={{ background:'rgba(0,0,0,0.16)', padding:'10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)' }}>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.50)', marginBottom:4 }}>{Math.round(pt.pct*100)}% → м/с</div>
-                    <input type="number" step={0.05} value={pt.velocity||''} onChange={e=> { const v=Number(e.target.value)||0; setLvpPoints(s=> s.map((p,i)=> i===idx?{...p, velocity:v}:p)); }} style={{ ...INPUT, fontSize:14, fontWeight:700, padding:'10px 8px', minHeight:48 }} placeholder="1.80" />
-                   <div style={{ fontSize:9, color: velocityTypeForLift(lvpLift)==='peak' ? '#22c55e':'#f59e0b' }}>{velocityTypeForLift(lvpLift)==='peak'?'peak':'mpv'}</div>
-                 </div>
-               ))}
-             </div>
-             {lvpResult && <div style={{ fontSize:10, color: lvpResult.valid ? '#22c55e':'#f59e0b', background: lvpResult.valid?'rgba(34,197,94,0.08)':'rgba(245,158,11,0.08)', padding:'6px 8px', borderRadius:8, border:`0.5px solid ${lvpResult.valid?'rgba(34,197,94,0.18)':'rgba(245,158,11,0.18)'}` }}>r² {lvpResult.r2} slope {lvpResult.slope} intercept {lvpResult.intercept} {lvpResult.valid?'✅ валиден ≥0.85':'⚠ проверьте'} · e1RM пример {estimate1RMFromVelocitySS(80, lvpResult.valid? velocityForLVP(lvpResult,0.8)??0 : 0, lvpLift)||'—'}кг</div>}
-             <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (PLOS Wood 2026: individual калибровка обязательна).</div>
-           </SectionCard>
-
-           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={`${methodology === 'compound_first' ? 'База первой' : methodology === 'pre_exhaust' ? 'Предутомление' : 'Постутомление'} · ${dupMode === 'off' ? 'DUP выкл' : dupMode === 'heavy_light' ? 'Тяж/лёг' : 'Волна'} · ${intensityTech === 'none' ? 'чисто' : 'кластер'}`} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
+           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={methodologySummary} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
               <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
@@ -543,38 +508,9 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · стронг — ниже" collapsible defaultOpen={false} summary={`${(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).filter(k => ((workMax as any)[k] || 0) > 0).length}/6 ПМ${weakPoints.length ? ` · слабые ${weakPoints.length}` : ''}`} status={(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).some(k => ((workMax as any)[k] || 0) > 0) ? 'ok' : undefined}>
-            <GroupHeading icon="🏋️" text="Олимпийка · база зала" desc="ПМ для % зон и SINCLAIR/Robi" />
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
-              {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
-                <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={{ ...INPUT, fontVariantNumeric:'tabular-nums' }} placeholder="кг" /></Field>
-              ))}
-            </div>
-            {mode !== 'weightlifting' && (
-              <>
-                <Divider />
-                <GroupHeading icon="🪨" text="Стронг-ивенты" desc="Йок / фермер / рама / хус / камень / лог · отдельные ПМ" strong />
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
-                  {(['yokeWalk','farmersWalk','frameCarry','husafellCarry','atlasStone','sandbagLoad','kegToss','carDeadlift','axlePress','logPress'] as const).map(k => (
-                    <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={{ ...INPUT, fontVariantNumeric:'tabular-nums', borderColor:'rgba(255,159,10,0.22)' }} placeholder="кг" /></Field>
-                  ))}
-                </div>
-              </>
-            )}
-            <Divider />
-            <GroupHeading icon="🎯" text="Слабые точки" desc="Объём ×1.15 на выбранные зоны" />
-            <Field label="Слабые точки — объём ×1.15">
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
-                  <ChipToggle key={k} active={weakPoints.includes(k)} onClick={()=> setWeakPoints(s=> s.includes(k)? s.filter(x=>x!==k): s.length>=2?s:[...s,k])}>{label}</ChipToggle>
-                ))}
-              </div>
-            </Field>
-            {mode==='strongman' && (
-              <>
-                <Divider />
-                <GroupHeading icon="🏆" text="Контест — пакет ивентов" desc="Выбери точные ивенты старта: йок/лог/камни/конэн/трак → план строит под них" strong />
-                <Field label="Пресет контеста">
+          {mode==='strongman' && (
+            <SectionCard icon="🏆" title="Контест — пакет ивентов" subtitle="Йок/лог/камни → план строит под них" collapsible defaultOpen={false} summary={contest ? `${contest.name || 'Кастом'} · ${contest.events.length} ивентов` : 'без пакета — generic 5-фаз'} status={contest ? 'ok' : undefined}>
+              <Field label="Пресет контеста">
                   <div data-ss="presets" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                     {Object.entries(CONTEST_PRESETS).map(([pid, pc])=> (
                       <button key={pid} onClick={()=> setContest(pc as StrongmanContest)} style={{ padding:'11px 16px', borderRadius:14, border: contest?.name===pc.name ? '1.5px solid #f59e0b' : '1px solid rgba(255,255,255,0.10)', background: contest?.name===pc.name ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))':'rgba(255,255,255,0.04)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', minHeight:48, boxShadow: contest?.name===pc.name ? '0 4px 16px rgba(245,158,11,0.25)' : 'none' }}>{pc.name}</button>
@@ -590,7 +526,7 @@ export const StrengthSportConstructor: React.FC = () => {
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                       {contest.events.map((ev, idx)=> (
-                        <div key={idx} style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', background:'rgba(0,0,0,0.22)', padding:'12px 14px', borderRadius:16, border:'0.5px solid rgba(255,255,255,0.08)' }}>
+                        <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', background:'rgba(0,0,0,0.22)', padding:'10px 12px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.08)' }}>
                           <span style={{ fontSize:14, fontWeight:700, color:'#fff', minWidth:110, flex:'1 1 110px' }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
                           <span style={{ fontSize:11, fontWeight:700, color:'#f5b04c', background:'rgba(245,158,11,0.12)', padding:'4px 10px', borderRadius:22, border:'0.5px solid rgba(245,158,11,0.22)', whiteSpace:'nowrap' }}>{ev.format}</span>
                           <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:78, minHeight:48, padding:'10px 8px', fontSize:15, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:12, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
@@ -608,7 +544,7 @@ export const StrengthSportConstructor: React.FC = () => {
                         <option value="">＋ Добавить ивент…</option>
                         {Object.keys(EVENT_META).map(id=> <option key={id} value={id}>{(EVENT_META as any)[id]?.label || id}</option>)}
                       </select>
-                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.36)' }}>Taper: йок/камень 7д · лог/фермер 5д · броски 4д</span>
+                      <span style={{ fontSize:10, color:'#fff' }}>Taper: йок/камень 7д · лог/фермер 5д · броски 4д</span>
                     </div>
                     {contestSim && (
                       <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:6 }}>
@@ -618,8 +554,8 @@ export const StrengthSportConstructor: React.FC = () => {
                             <span key={ev.id} style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: ev.isWeak ? 'rgba(239,68,68,0.14)':'rgba(34,197,94,0.10)', border:`0.5px solid ${ev.isWeak?'rgba(239,68,68,0.22)':'rgba(34,197,94,0.18)'}`, color: ev.isWeak?'#fecaca':'#86efac' }}>{ev.id} {ev.points}pts {ev.effectiveRatio*100>0?`${Math.round(ev.effectiveRatio*100)}%`:''}</span>
                           ))}
                         </div>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>Rec order: {contestSim.recOrder.join(' → ')}</div>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.36)' }}>{contestSim.rationale.join(' · ')}</div>
+                        <div style={{ fontSize:10, color:'#fff' }}>Rec order: {contestSim.recOrder.join(' → ')}</div>
+                        <div style={{ fontSize:9, color:'#fff' }}>{contestSim.rationale.join(' · ')}</div>
                         {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них (injection)</div>}
                       </div>
                     )}
@@ -627,43 +563,109 @@ export const StrengthSportConstructor: React.FC = () => {
                   </div>
                 )}
                 {!contest && <InfoBanner tone="info">Без пакета — план generic 5-фаз. Выбери пресет для PRO-контеста.</InfoBanner>}
+            </SectionCard>
+          )}
+
+          {renderNavRow(null, 'athlete')}
+        </div>
+      )}
+
+      {step === 'athlete' && (
+        <div className="ss-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <SectionCard icon="👤" title="Атлет" subtitle="Вес и возраст — % от ПМ и SINCLAIR" summary={athleteSummary}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <StrengthPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} />
+              <StrengthPopupNumber label="Вес" value={bodyweight} min={40} max={160} suffix="кг" onChange={v=> setBodyweight(v)} strong={mode==='strongman'} />
+              <StrengthPopupNumber label="Возраст" value={age} min={14} max={65} onChange={v=> setAge(v)} strong={mode==='strongman'} />
+              <Field label="Дата пика"><input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></Field>
+            </div>
+            {goal==='peaking' && competitionDate && (
+              <StrengthPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[{id:'1',label:'1 неделя',desc:'объём −45%'},{id:'2',label:'2 недели',desc:'−35% → −55%'}]} />
+            )}
+            {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1':'— оптимум'}</InfoBanner>}
+            {hrv && <InfoBanner tone={hrv.zone==='dangerous'?'warn': hrv.zone==='caution'?'warn':'info'}><Highlight color={hrv.zone==='dangerous'?'#ff3b30':hrv.zone==='caution'?'#ff9f0a':'#30d158'}>HRV {hrv.ewma ?? hrv.last} мс</Highlight> · {hrv.zone} · mean {hrv.mean}±{hrv.sd}</InfoBanner>}
+            {(() => {
+              const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
+              const warns: string[] = [];
+              if(sn && cj && sn > cj) warns.push('Рывок > толчка — проверьте ПМ');
+              if(cj && sq && cj > sq) warns.push('Толчок > приседа — редко');
+              if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте');
+              return warns.length ? <InfoBanner tone="warn">{warns.join(' · ')}</InfoBanner> : null;
+            })()}
+            <button onClick={pullFromProfile} style={{ ...BTN, flex:1 }}>⟡ Из профиля</button>
+          </SectionCard>
+
+          <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · стронг — ниже" collapsible defaultOpen={false} summary={`${(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).filter(k => ((workMax as any)[k] || 0) > 0).length}/6 ПМ`} status={(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).some(k => ((workMax as any)[k] || 0) > 0) ? 'ok' : undefined}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
+              {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
+                <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={{ ...INPUT, fontVariantNumeric:'tabular-nums' }} placeholder="кг" /></Field>
+              ))}
+            </div>
+            {mode !== 'weightlifting' && (
+              <>
+                <Divider />
+                <GroupHeading icon="🪨" text="Стронг-ивенты" desc="Йок / фермер / рама / хус / камень / лог · отдельные ПМ" strong />
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
+                  {(['yokeWalk','farmersWalk','frameCarry','husafellCarry','atlasStone','sandbagLoad','kegToss','carDeadlift','axlePress','logPress'] as const).map(k => (
+                    <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={{ ...INPUT, fontVariantNumeric:'tabular-nums', borderColor:'rgba(255,159,10,0.22)' }} placeholder="кг" /></Field>
+                  ))}
+                </div>
               </>
             )}
           </SectionCard>
 
-          <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп" collapsible defaultOpen={false} summary={injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'всё доступно'} status={injuries.length ? 'warn' : (equipment.length || mobility.length) ? 'ok' : undefined}>
-            <GroupHeading icon="🏋️" text="Доступное оборудование" desc="Пусто — доступно всё; выбор фильтрует пул" />
-            <Field label="Оборудование">
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
-                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{(EQUIP_RU as any)[eq] || eq}</ChipToggle>
-                ))}
+          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026)" accent collapsible defaultOpen={false} summary={`потеря ${velocityLoss}% · ${(['snatch','clean','squat'] as const).filter(l => ((vbtPerLift as any)[l]?.best || 0) > 0).length}/3 лифта`} status={(velocityLoss > 0 || (['snatch','clean','squat'] as const).some(l => ((vbtPerLift as any)[l]?.best || 0) > 0)) ? 'ok' : undefined}>
+            <Field label="VBT потеря" hint="потеря скорости vs бюджет · >20% → объём ×0.90, RIR+1"><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#30d158'}>{velocityLoss}%</Highlight></div></Field>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8 }}>
+              {(['snatch','clean','squat'] as const).map(lift => {
+                const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
+                const loss = vals.best>0 && vals.last>0 ? Math.round((vals.best - vals.last)/vals.best*100) : 0;
+                const col = loss>20 ? '#ef4444' : loss>10 ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={lift} style={{ background:'rgba(0,0,0,0.16)', padding:'10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:'#86efac', textTransform:'uppercase', letterSpacing:0.5 }}>{lift==='snatch'?'🏋️ Рывок':lift==='clean'?'🏋️ Толчок':'🦵 Присед'} · {lift}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <Field label="Best м/с"><input type="number" step={0.05} value={vals.best||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="1.60" /></Field>
+                      <Field label="Last м/с"><input type="number" step={0.05} value={vals.last||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="1.40" /></Field>
+                    </div>
+                    {loss>0 && <div style={{ fontSize:10, fontWeight:700, color:col }}>{loss}% · {loss>20?'⚠️ стоп':loss>10?'контроль':'✅'} · порог {lift==='snatch'||lift==='clean'?10:15}%</div>}
+                  </div>
+                );
+              })}
+            </div>
+            {Object.keys(hubVelocity).length > 0 && (
+              <div style={{ fontSize:11, color:'#f5b04c', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', padding:'8px 10px', borderRadius:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <span>📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</span>
+                <button onClick={() => setHubVelocity({})} style={{ padding:'6px 12px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>✕ Сбросить</button>
               </div>
-            </Field>
-            <Divider />
-            <GroupHeading icon="🩹" text="Травмы — щадящий режим" desc="Снижает вес ×0.6 и RIR+1, прячет осевые" />
-            <Field label="Травмы — щадящий режим" hint="Снижает вес ×0.6, фильтрует опасные движения">
-              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: колено, плечо" style={{ ...INPUT, flex:1, minWidth:160 }} />
-                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? '✦ Травмы применены':'Список очищен'); setTimeout(()=>setMsg(''),1800); }} style={BTN_SMALL}>Применить</button>
-              </div>
-              {injuries.length>0 && <InfoBanner tone="warn"><Highlight color="#ff9f0a">Щадящий</Highlight>: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6–0.7, RIR+1</InfoBanner>}
-            </Field>
-            <Divider />
-            <GroupHeading icon="🤸" text="Мобильность" desc="Фильтрует глубокие амплитуды" />
-            <Field label="Мобильность">
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {(['shoulder','hip','knee','ankle','wrist','lower_back'] as const).map(m => (
-                  <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{(MOBILITY_RU as any)[m]}</ChipToggle>
-                ))}
-              </div>
-            </Field>
+            )}
           </SectionCard>
 
-          <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
-            <button onClick={pullFromProfile} style={{ ...BTN, flex:1, background:'rgba(255,255,255,0.05)' }}>⟡ Из профиля</button>
-            <button onClick={() => setStep('outside')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.2 }}>Далее → Вне зала</button>
-          </div>
+          <SectionCard icon="📈" title="LVP калибровка" subtitle="Скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent collapsible defaultOpen={false} summary={lvpResult ? `${lvpLift} · r² ${lvpResult.r2}` : 'не калиброван'} status={lvpResult ? 'ok' : undefined}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <StrengthPopupSelect label="Лифт" value={lvpLift} onChange={v=> setLvpLift(v)} options={[{id:'snatch',label:'🏋️ Рывок'},{id:'clean',label:'🏋️ Толчок'},{id:'squat',label:'🦵 Присед'},{id:'deadlift',label:'🏋️ Тяга'},{id:'yoke_walk',label:'🚜 Йок'},{id:'farmers_walk',label:'🚜 Фермер'}]} />
+              <div style={{ display:'flex', alignItems:'flex-end', gap:6 }}>
+                <button onClick={()=> {
+                  const res = calibrateLVP(lvpLift, lvpPoints as any);
+                  if (res) { saveLVPProfile(res); setLvpResult(res); setMsg(`✦ LVP ${lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setMsg(''),2000); }
+                  else { setMsg('⚠ Need ≥3 точки с покрытием 20%'); setTimeout(()=>setMsg(''),2000); }
+                }} style={{ ...BTN_PRIMARY, flex:1 }}>Калибровать</button>
+                <button onClick={()=> { const all=loadLVPProfiles(); setMsg(`LVP профилей: ${Object.keys(all).join(', ')||'—'}`); setTimeout(()=>setMsg(''),2000); }} style={BTN}>Показать</button>
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6 }}>
+              {lvpPoints.map((pt,idx)=> (
+                <div key={idx} style={{ background:'rgba(0,0,0,0.16)', padding:'10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize:10, color:'#fff', marginBottom:4 }}>{Math.round(pt.pct*100)}% → м/с</div>
+                  <input type="number" step={0.05} value={pt.velocity||''} onChange={e=> { const v=Number(e.target.value)||0; setLvpPoints(s=> s.map((p,i)=> i===idx?{...p, velocity:v}:p)); }} style={{ ...INPUT, fontSize:14, fontWeight:700, padding:'10px 8px', minHeight:48 }} placeholder="1.80" />
+                  <div style={{ fontSize:9, color: velocityTypeForLift(lvpLift)==='peak' ? '#22c55e':'#f59e0b' }}>{velocityTypeForLift(lvpLift)==='peak'?'peak':'mpv'}</div>
+                </div>
+              ))}
+            </div>
+            {lvpResult && <div style={{ fontSize:10, color: lvpResult.valid ? '#22c55e':'#f59e0b', background: lvpResult.valid?'rgba(34,197,94,0.08)':'rgba(245,158,11,0.08)', padding:'6px 8px', borderRadius:8, border:`0.5px solid ${lvpResult.valid?'rgba(34,197,94,0.18)':'rgba(245,158,11,0.18)'}` }}>r² {lvpResult.r2} slope {lvpResult.slope} intercept {lvpResult.intercept} {lvpResult.valid?'✅ валиден ≥0.85':'⚠ проверьте'} · e1RM пример {estimate1RMFromVelocitySS(80, lvpResult.valid? velocityForLVP(lvpResult,0.8)??0 : 0, lvpLift)||'—'}кг</div>}
+          </SectionCard>
+
+          {renderNavRow('params', 'outside')}
         </div>
       )}
 
@@ -685,10 +687,7 @@ export const StrengthSportConstructor: React.FC = () => {
               </>
             )}
           </SectionCard>
-          <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
-            <button onClick={() => setStep('params')} style={{ ...BTN, flex:1 }}>← Назад</button>
-            <button onClick={() => setStep('split')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:2 }}>Далее → Сплит</button>
-          </div>
+          {renderNavRow('athlete', 'split')}
           {diaryLoad != null && (
             <InfoBanner tone={diaryLoad>30?'warn':'info'}>Дневник: нагрузка 7д ≈ <Highlight color={diaryLoad>30?'#ff9f0a':'#30d158'}>{diaryLoad}</Highlight> {diaryLoad>30?'— высоко, лёгкую неделю?':'— норма'} {acwr && <span>· ACWR <Highlight>{acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)}</span>}</InfoBanner>
           )}
@@ -699,15 +698,15 @@ export const StrengthSportConstructor: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" accent>
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-              <span style={{ fontSize:12, color: TEXT_3 }}>Рекомендуем:</span><Highlight color={modeColor}>{recommendStrengthSportPattern(mode, days, level).name}</Highlight>
+              <span style={{ fontSize:12, color: '#fff' }}>Рекомендуем:</span><Highlight color={modeColor}>{recommendStrengthSportPattern(mode, days, level).name}</Highlight>
               <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>{recommendStrengthSportPattern(mode, days, level).sessionsPerRotation}×/нед</Badge>
             </div>
-            <div style={{ fontSize:11, color: TEXT_3 }}>{patternId ? <span>Выбран: <Highlight color={modeColor}>{STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}</Highlight></span> : 'Авто по режиму/дням/уровню · тапните карточку ниже'}</div>
-            <div style={{ fontSize:10, color:'rgba(235,235,245,0.36)', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
+            <div style={{ fontSize:11, color: '#fff' }}>{patternId ? <span>Выбран: <Highlight color={modeColor}>{STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}</Highlight></span> : 'Авто по режиму/дням/уровню · тапните карточку ниже'}</div>
+            <div style={{ fontSize:10, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
           </SectionCard>
           <SectionCard icon="📚" title="Интернет-цикл" subtitle="Дословные программы ТА/стронга · перекрывает сплит ниже" accent={!!cycleId}>
             {!cycleId && rankedCycles.filter(r=> !r.blocked).length > 0 && (
-              <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)' }}>💡 Рекомендуем цикл: <Highlight color={modeColor}>{rankedCycles.filter(r=> !r.blocked)[0].cycle.meta.title}</Highlight></div>
+              <div style={{ fontSize:11, color:'#fff' }}>💡 Рекомендуем цикл: <Highlight color={modeColor}>{rankedCycles.filter(r=> !r.blocked)[0].cycle.meta.title}</Highlight></div>
             )}
             <StrengthPopupSelect label="Цикл" value={cycleId} onChange={v=> setCycleId(v)} strong={mode==='strongman'} options={[
               { id:'', label:'Без цикла — параметрический план', desc:'сплит ниже' },
@@ -726,7 +725,7 @@ export const StrengthSportConstructor: React.FC = () => {
                   <ChipToggle active={cycleMode==='faithful'} onClick={()=> setCycleMode('faithful')}>📜 Дословно (дефолт)</ChipToggle>
                   <ChipToggle active={cycleMode==='adapt'} onClick={()=> setCycleMode('adapt')}>🛡️ Адаптировать (ACWR/VBT)</ChipToggle>
                 </div>
-                <div style={{ fontSize:10, color:'rgba(235,235,245,0.52)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
                   {cycleMode==='faithful'
                     ? 'Дословно: сеты/повторы/% 1-в-1 из источника, без авто-срезок объёма. Травмы и фолбэк снарядов действуют всегда.'
                     : 'Адаптировать: поверх дословного — срезки ACWR/outside/VBT и дрейф ПМ по лифту.'}
@@ -746,8 +745,8 @@ export const StrengthSportConstructor: React.FC = () => {
                           return <span key={wn} style={{ fontSize:10, padding:'3px 7px', borderRadius:8, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.08)', color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{wn}·{wkDays.length}д·{phaseShort[ph||'']||'·'}{marks}</span>;
                         })}
                       </div>
-                      <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', lineHeight:1.45 }}>{tpl.meta.description}</div>
-                      <div style={{ fontSize:10, color:'rgba(235,235,245,0.45)' }}>{tpl.meta.howItWorks}</div>
+                      <div style={{ fontSize:11, color:'#fff', lineHeight:1.45 }}>{tpl.meta.description}</div>
+                      <div style={{ fontSize:10, color:'#fff' }}>{tpl.meta.howItWorks}</div>
                       {tpl.meta.needsSpecialty && !(['other','specialty'].some(e=> equipment.map(x=>String(x).toLowerCase()).includes(e)) || equipment.length===0) && (
                         <InfoBanner tone="warn">Нет спец-снарядов — ивенты заменятся (йок→фермер ×0.73, камень→мешок ×0.66) с бейджем в плане</InfoBanner>
                       )}
@@ -771,20 +770,20 @@ export const StrengthSportConstructor: React.FC = () => {
             })()}
           </SectionCard>
           <div data-ss="split-list" style={{ display:'flex', flexDirection:'column', gap:8, opacity: cycleId ? 0.45 : 1 }}>
-            <div style={{ fontSize:10, color:'rgba(235,235,245,0.40)' }}>{cycleId ? 'Сплит перекрыт интернет-циклом (дни/недели из шаблона)' : 'Сплит для параметрического плана'}</div>
+            <div style={{ fontSize:10, color:'#fff' }}>{cycleId ? 'Сплит перекрыт интернет-циклом (дни/недели из шаблона)' : 'Сплит для параметрического плана'}</div>
             {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendStrengthSportPattern(mode, days, level).id;
               const preview = p.schedule.map(s=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
               return (
                 <button key={p.id} onClick={()=> setPatternId(p.id)} style={{
-                  textAlign:'left', padding:18, borderRadius:20, cursor:'pointer', transition:'all 0.18s ease', minHeight:88,
+                  textAlign:'left', padding:12, borderRadius:16, cursor:'pointer', transition:'all 0.18s ease', minHeight:72,
                   background: active ? (mode==='strongman' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(239,68,68,0.10))' : 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(14,165,233,0.10))') : 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))',
                   border: active ? `1.5px solid ${modeColor}55` : '1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:12,
                   boxShadow: active ? `0 8px 24px ${modeColor}1F, inset 0 1px 0 rgba(255,255,255,0.09)` : '0 4px 12px rgba(0,0,0,0.14)', backdropFilter:'blur(12px)'
                 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}><b style={{ fontSize:15, color: active? '#fff':'rgba(255,255,255,0.94)' }}>{p.name}</b><span style={{ fontSize:12, fontWeight:800, color: active? modeColor : 'rgba(255,255,255,0.45)', background: active?`${modeColor}1F`:'rgba(255,255,255,0.06)', padding:'5px 12px', borderRadius:22, border:`1px solid ${active?`${modeColor}33`:'rgba(255,255,255,0.07)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
-                  <div style={{ fontSize:13, color:'rgba(255,255,255,0.66)', marginTop:6, lineHeight:1.5 }}>{p.description}</div>
-                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.38)', marginTop:8, fontFamily:'ui-monospace, monospace', background:'rgba(0,0,0,0.18)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>{preview}</div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}><b style={{ fontSize:15, color: active? '#fff':'#fff' }}>{p.name}</b><span style={{ fontSize:12, fontWeight:800, color: active? modeColor : '#fff', background: active?`${modeColor}1F`:'rgba(255,255,255,0.06)', padding:'5px 12px', borderRadius:22, border:`1px solid ${active?`${modeColor}33`:'rgba(255,255,255,0.07)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
+                  <div style={{ fontSize:13, color:'#fff', marginTop:6, lineHeight:1.5 }}>{p.description}</div>
+                  <div style={{ fontSize:12, color:'#fff', marginTop:8, fontFamily:'ui-monospace, monospace', background:'rgba(0,0,0,0.18)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>{preview}</div>
                   {active && <div style={{ fontSize:12, color:modeColor, fontWeight:800, marginTop:10, display:'flex', alignItems:'center', gap:8 }}><span style={{ width:8, height:8, borderRadius:'50%', background:modeColor, boxShadow:`0 0 10px ${modeColor}`}} /> Выбран — {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>}
                 </button>
               );
@@ -804,6 +803,88 @@ export const StrengthSportConstructor: React.FC = () => {
           <div data-ss="wizard-nav" style={{ display:'flex', gap:8 }}>
             <button onClick={() => setStep('outside')} style={{ ...BTN, flex:1 }}>← Назад</button>
           </div>
+        </div>
+      )}
+
+      {step === 'quality' && (
+        <div className="ss-pane" data-pane="quality" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <SectionCard icon="🎯" title="Слабые точки" subtitle="Объём ×1.15 на выбранные зоны" summary={weakPoints.length ? `Выбрано: ${weakPoints.length}/2` : 'не выбраны — план сбалансирован'} status={weakPoints.length ? 'ok' : undefined}>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
+                <ChipToggle key={k} active={weakPoints.includes(k)} onClick={()=> setWeakPoints(s=> s.includes(k)? s.filter(x=>x!==k): s.length>=2?s:[...s,k])}>{label}</ChipToggle>
+              ))}
+            </div>
+            {diagnosticLevel ? <InfoBanner tone={diagnosticLevel==='critical'?'warn':'info'}>Уровень диагностики из хаба: <Highlight>{diagnosticLevel}</Highlight>{diagnosticLevel==='critical' ? ' — объём ×0.85, RIR+1 на сборке' : ''}</InfoBanner> : <InfoBanner tone="info">Диагностика не подключена — инъекции коррекций выключены, план параметрический.</InfoBanner>}
+            {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)}</InfoBanner>}
+            {contestSim && mode==='strongman' && (
+              <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10</div>
+                {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп" collapsible defaultOpen={false} summary={injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'всё доступно'} status={injuries.length ? 'warn' : (equipment.length || mobility.length) ? 'ok' : undefined}>
+            <GroupHeading icon="🏋️" text="Доступное оборудование" desc="Пусто — доступно всё; выбор фильтрует пул" />
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
+                <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{(EQUIP_RU as any)[eq] || eq}</ChipToggle>
+              ))}
+            </div>
+            <Divider />
+            <GroupHeading icon="🩹" text="Травмы — щадящий режим" desc="Снижает вес ×0.6 и RIR+1, прячет осевые" />
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: колено, плечо" style={{ ...INPUT, flex:1, minWidth:160 }} />
+              <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? '✦ Травмы применены':'Список очищен'); setTimeout(()=>setMsg(''),1800); }} style={BTN_SMALL}>Применить</button>
+            </div>
+            {injuries.length>0 && <InfoBanner tone="warn"><Highlight color="#ff9f0a">Щадящий</Highlight>: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6–0.7, RIR+1</InfoBanner>}
+            <Divider />
+            <GroupHeading icon="🤸" text="Мобильность" desc="Фильтрует глубокие амплитуды" />
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {(['shoulder','hip','knee','ankle','wrist','lower_back'] as const).map(m => (
+                <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{(MOBILITY_RU as any)[m]}</ChipToggle>
+              ))}
+            </div>
+          </SectionCard>
+
+          {renderNavRow('plan', 'export')}
+        </div>
+      )}
+
+      {step === 'export' && (
+        <div className="ss-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!plan && !annual && (
+            <SectionCard icon="📤" title="Пока пусто" subtitle="Соберите план — откроются файлы, печать и год">
+              <div style={{ fontSize:14, color:'#fff', textAlign:'center', lineHeight:1.55 }}>Выдача строится после сборки плана на шаге «5 План».</div>
+              {renderNavRow('quality', null)}
+            </SectionCard>
+          )}
+          {(plan || annual) && (
+            <SectionCard icon="📤" title="Экспорт и шаринг" subtitle={plan ? `${plan.weeks}нед · ${plan.patternId}` : `${(annual as any)?.totalWeeks ?? 0}нед год`} summary={qualitySummary}>
+              {plan && (
+                <>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px,1fr))', gap:8 }}>
+                    <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); setTimeout(()=>setMsg(''),1800); }} style={BTN}>⎙ Копировать</button>
+                    <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } setMsg('Печать'); }} style={BTN}>🖨 Печать</button>
+                    <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест'); }} style={BTN}>📋 Дайджест</button>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px,1fr))', gap:8 }}>
+                    <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV'); }} style={BTN}>📊 CSV</button>
+                    <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS'); }} style={{ ...BTN, background:'rgba(48,209,88,0.12)', color:'#30d158', border:'0.5px solid rgba(48,209,88,0.20)' }}>📗 XLSX</button>
+                    <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS'); }} style={BTN}>📅 План .ics</button>
+                    <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
+                  </div>
+                  <Divider />
+                </>
+              )}
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <button onClick={handleBuildAnnualFromCycles} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #0A84FF, #30D158)', color:'#fff', border:'none' }}>📚 Год из циклов ({annualCycleSel?.length || 3})</button>
+                <button onClick={handleBuildSeason} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #f59e0b, #ef4444)', color:'#fff', border:'none' }}>✦ Сезон 2 пика</button>
+              </div>
+              {annual && <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Год: {annual.totalWeeks}нед · {annual.blocks.length} блоков</span></div>}
+              {renderNavRow('quality', 'plan', 'К плану →')}
+            </SectionCard>
+          )}
         </div>
       )}
 
@@ -837,6 +918,7 @@ export const StrengthSportConstructor: React.FC = () => {
           onBuildAnnualFromCycles={handleBuildAnnualFromCycles}
         />
       )}
+      {step === 'plan' && plan && renderNavRow('split', 'quality')}
       {step === 'plan' && !plan && (
         <SectionCard icon="📋" title="Плана пока нет" subtitle="Здесь появятся сводка, гант, попытки и недели">
           <div style={{ textAlign:'center', fontSize:44, lineHeight:1, padding:'8px 0 4px' }} aria-hidden="true">📋</div>

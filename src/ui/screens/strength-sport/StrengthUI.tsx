@@ -22,8 +22,9 @@ export const GLASS_SHADOW = '0 1px 3px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0
 export const VIBRANCY = 'blur(20px) saturate(180%)';
 
 export const TEXT_1 = '#FFFFFF';
-export const TEXT_2 = 'rgba(235,235,245,0.60)';
-export const TEXT_3 = 'rgba(235,235,245,0.30)';
+// Белый текст везде (требование TOP-АПК): иерархия — размером/жирностью, не серым.
+export const TEXT_2 = '#FFFFFF';
+export const TEXT_3 = '#FFFFFF';
 export const SEPARATOR = 'rgba(84,84,88,0.36)';
 
 export const RADIUS_LG = 18;
@@ -260,7 +261,7 @@ export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string;
     <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 14 }}>{icon}</span>{text}
     </span>
-    {desc && <span style={{ fontSize: 12, color: 'rgba(235,235,245,0.42)', lineHeight: 1.45, fontFamily: SF }}>{desc}</span>}
+    {desc && <span style={{ fontSize: 12, color: '#fff', lineHeight: 1.45, fontFamily: SF }}>{desc}</span>}
   </div>
 );
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 8 }) => {
@@ -283,9 +284,9 @@ export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; childr
 );
 export const Field: React.FC<{ label?: string; hint?: string; error?: string; children: React.ReactNode }> = ({ label, hint, error, children }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '1 1 148px', minWidth: 0, fontFamily: SF }}>
-    {label && <span style={{ fontSize: 11, color: 'rgba(235,235,245,0.60)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1.2, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>{label}</span>}
+    {label && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1.2, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>{label}</span>}
     {children}
-    {hint && !error && <span style={{ fontSize: 12, color: 'rgba(235,235,245,0.38)', lineHeight: 1.45, fontFamily: SF }}>{hint}</span>}
+    {hint && !error && <span style={{ fontSize: 12, color: '#fff', lineHeight: 1.45, fontFamily: SF }}>{hint}</span>}
     {error && <span style={{ fontSize: 13, color: '#FF3B30', fontWeight: 600, fontFamily: SF }}>⚠ {error}</span>}
   </div>
 );
