@@ -190,15 +190,15 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         {durability && <StatTile label="DECOUPL" value={durability.decouplingPct + '%'} color={durability.level === 'strong' ? '#4ade80' : durability.level === 'moderate' ? '#fbbf24' : '#f87171'} sub={durability.level} />}
         {interference && <StatTile label="INTERF." value={String(interference.score)} color={interference.level === 'low' ? '#4ade80' : interference.level === 'mid' ? '#fbbf24' : '#f87171'} sub={interference.level} />}
       </div>
-      {hr?.advice && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
-      {polarized && !polarized.ok && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ Поляризация {polarized.pct}% интенсива — по Seiler держите ≤20% HIIT/MISS, остальное Zone2.</div>}
+      {hr?.advice && <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid rgba(255,255,255,0.25)', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }}>{hr.advice}</div>}
+      {polarized && !polarized.ok && <div style={{ fontSize: 11.5, color: '#fbbf24', background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.26)', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }}>⚠ Поляризация {polarized.pct}% интенсива — по Seiler держите ≤20% HIIT/MISS, остальное Zone2.</div>}
       {monotony && (
-        <div style={{ fontSize: 11, color: monotony.warn ? '#f87171' : '#4ade80', background: monotony.warn ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.08)', border: `1px solid ${monotony.warn ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11.5, color: monotony.warn ? '#f87171' : '#4ade80', background: monotony.warn ? 'rgba(239,68,68,0.09)' : 'rgba(0,230,138,0.09)', border: `1px solid ${monotony.warn ? 'rgba(239,68,68,0.28)' : 'rgba(0,230,138,0.28)'}`, borderLeft: `3px solid ${monotony.warn ? '#ef4444' : '#00e68a'}`, borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
           {monotony.warn ? '⚠' : '✓'} Monotony {monotony.monotony} · Strain {monotony.strain} {monotony.warn ? '— варьируйте нагрузку (Foster)' : '— вариативность в норме'}
         </div>
       )}
       {factCtl && (
-        <div style={{ fontSize: 11, color: Math.abs(factCtl.tsb) > 10 ? '#f87171' : factCtl.tsb > 5 ? '#4ade80' : '#fff', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.24)', borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11.5, color: Math.abs(factCtl.tsb) > 10 ? '#f87171' : factCtl.tsb > 5 ? '#4ade80' : '#fff', background: 'rgba(96,165,250,0.09)', border: '1px solid rgba(96,165,250,0.28)', borderLeft: '3px solid #60a5fa', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
           📈 Факт CTL {factCtl.ctl} · ATL {factCtl.atl} · TSB {factCtl.tsb > 0 ? '+' : ''}{factCtl.tsb} {factCtl.tsb > 15 ? '— пик формы, снизьте объём' : factCtl.tsb < -10 ? '— перегруз, восстановитесь' : '— баланс'}
         </div>
       )}

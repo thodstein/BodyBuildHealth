@@ -193,31 +193,33 @@ export const CardioAutoTunePanel: React.FC<{
   return (
     <div className="train-autotune" style={CARD}>
       <div style={ROW}>
-        <span style={LABEL}>🔄 Авто-режим</span>
+        <span style={{ ...LABEL, fontSize: 12.5 }}>🔄 Авто-режим</span>
         <button
-          style={autoMode ? { ...BTN_PRIMARY, minHeight: 32, padding: '6px 10px' } : { ...BTN, minHeight: 32, padding: '6px 10px' }}
+          style={autoMode ? { ...BTN_PRIMARY, minHeight: 44, padding: '9px 14px' } : { ...BTN, minHeight: 44, padding: '9px 14px' }}
           onClick={() => toggleAuto(!autoMode)}
+          aria-pressed={autoMode}
           title="Подстраивать кардио по дневнику (adherence/RPE/ACWR) с подтверждением diff"
         >
           {autoMode ? '🟢 Включён' : '⚪ Выключен'}
         </button>
-        <button style={BTN} onClick={previewTune} title="Показать, что изменится по текущему дневнику">🔄 Подстроить сейчас</button>
+        <button style={{ ...BTN, minHeight: 44 }} onClick={previewTune} title="Показать, что изменится по текущему дневнику">🔄 Подстроить сейчас</button>
         <button
-          style={autoApply ? { ...BTN_PRIMARY, minHeight: 32, padding: '6px 10px' } : { ...BTN, minHeight: 32, padding: '6px 10px' }}
+          style={autoApply ? { ...BTN_PRIMARY, minHeight: 44, padding: '9px 14px' } : { ...BTN, minHeight: 44, padding: '9px 14px' }}
           onClick={() => toggleAutoApply(!autoApply)}
+          aria-pressed={autoApply}
           title="Применять подстройки автоматически (с сохранением версии для отмены)"
         >
           {autoApply ? '⚡ Авто-применение: вкл' : '⚡ Авто-применение: выкл'}
         </button>
-        {hasVersion && <button style={BTN} onClick={undoVersion} title="Отменить последнюю авто-подстройку/правку">↩ Вернуть версию</button>}
+        {hasVersion && <button style={{ ...BTN, minHeight: 44 }} onClick={undoVersion} title="Отменить последнюю авто-подстройку/правку">↩ Вернуть версию</button>}
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
 
       {pending && (
-        <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, color: '#93c5fd', fontWeight: 700 }}>Предпросмотр изменений ({pending.changes.length})</div>
+        <div style={{ background: 'rgba(59,130,246,0.09)', border: '1px solid rgba(59,130,246,0.32)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: 11, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ fontSize: 11.5, color: '#93c5fd', fontWeight: 800 }}>Предпросмотр изменений ({pending.changes.length})</div>
           {pending.changes.map((c, i) => (
-            <div key={i} style={{ fontSize: 11, color: '#fff' }}>
+            <div key={i} style={{ fontSize: 11.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
               Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}
             </div>
           ))}
@@ -262,9 +264,9 @@ export const CardioAutoTunePanel: React.FC<{
           <NumberInput value={lthrLast20} onChange={setLthrLast20} min={80} max={220} step={1} placeholder="168" ariaLabel="Средн ЧСС последн 20′ (30-мин тест)" width={110} suffix="последн 20′" />
           <button style={BTN_SMALL} onClick={() => { const v = estimateLTHRFrom30Min(Number(lthrLast20)); if (v) { setLthr(String(v)); flashMsg(`LTHR ${v} уд/мин из последн 20′ — применён`); } else flashMsg('⚠ Укажите ЧСС 80-220'); }} title="30-мин all-out: средняя ЧСС последних 20 мин → LTHR (Friel)">→ LTHR</button>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           {zones.map(z => (
-            <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : '#fff', fontWeight: z.zone === 2 ? 800 : 500 }}>
+            <div key={z.zone} title={z.purpose} style={{ fontSize: 11, padding: '7px 10px', borderRadius: 9, background: z.zone === 2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.40)' : '1px solid rgba(255,255,255,0.08)', color: z.zone === 2 ? '#4ade80' : '#fff', fontWeight: z.zone === 2 ? 800 : 500, fontVariantNumeric: 'tabular-nums', boxShadow: z.zone === 2 ? '0 0 8px rgba(0,230,138,0.14)' : 'none' }}>
               {z.label}: {z.bpmMin}–{z.bpmMax}
             </div>
           ))}

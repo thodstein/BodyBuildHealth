@@ -119,21 +119,21 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
   return (
     <div className="train-cardiovol" style={CARD}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>📈 Объём по неделям</span>
-        <button style={metric === 'minutes' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('minutes')}>мин</button>
-        <button style={metric === 'kcal' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('kcal')}>ккал</button>
-        <button style={metric === 'trimp' ? { ...BTN_SMALL, borderColor: 'rgba(139,92,246,0.45)', color: '#a78bfa' } : BTN_SMALL} onClick={() => setMetric('trimp')} title="TRIMP = нагрузка (Banister)">TRIMP</button>
-        <button style={metric === 'ctl' ? { ...BTN_SMALL, borderColor: 'rgba(59,130,246,0.45)', color: '#60a5fa' } : BTN_SMALL} onClick={() => setMetric('ctl')} title="CTL/ATL/TSB (Fitness-Fatigue)">CTL</button>
+        <span style={{ fontSize: 12.5, fontWeight: 850, color: '#fff', letterSpacing: -0.1 }}>📈 Объём по неделям</span>
+        <button style={metric === 'minutes' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.50)', color: '#4ade80', boxShadow: '0 0 10px rgba(0,230,138,0.16)' } : BTN_SMALL} onClick={() => setMetric('minutes')} aria-pressed={metric === 'minutes'}>мин</button>
+        <button style={metric === 'kcal' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.50)', color: '#4ade80', boxShadow: '0 0 10px rgba(0,230,138,0.16)' } : BTN_SMALL} onClick={() => setMetric('kcal')} aria-pressed={metric === 'kcal'}>ккал</button>
+        <button style={metric === 'trimp' ? { ...BTN_SMALL, borderColor: 'rgba(139,92,246,0.50)', color: '#a78bfa', boxShadow: '0 0 10px rgba(139,92,246,0.16)' } : BTN_SMALL} onClick={() => setMetric('trimp')} title="TRIMP = нагрузка (Banister)" aria-pressed={metric === 'trimp'}>TRIMP</button>
+        <button style={metric === 'ctl' ? { ...BTN_SMALL, borderColor: 'rgba(59,130,246,0.50)', color: '#60a5fa', boxShadow: '0 0 10px rgba(59,130,246,0.16)' } : BTN_SMALL} onClick={() => setMetric('ctl')} title="CTL/ATL/TSB (Fitness-Fatigue)" aria-pressed={metric === 'ctl'}>CTL</button>
         {fact && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: fact.pct != null && fact.pct >= 80 ? '#4ade80' : fact.pct != null && fact.pct >= 50 ? '#fbbf24' : '#f87171' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: fact.pct != null && fact.pct >= 80 ? '#4ade80' : fact.pct != null && fact.pct >= 50 ? '#fbbf24' : '#f87171', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
             план vs факт: {fact.pct ?? 0}% · {fact.doneS}/{fact.plannedS} сесс
           </span>
         )}
-        <button style={{ ...BTN_SMALL, marginLeft: 'auto' }} onClick={() => setOpen(v => !v)}>{open ? '▾ Скрыть' : '▸ Показать'}</button>
+        <button style={{ ...BTN_SMALL, marginLeft: 'auto' }} onClick={() => setOpen(v => !v)} aria-expanded={open}>{open ? '▾ Скрыть' : '▸ Показать'}</button>
       </div>
       {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 104, background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10, padding: '8px 6px 4px' }}>
             {series.map((s, i) => {
               if (metric === 'ctl') {
                 const ctl = (s as unknown as Record<string, number>).ctl ?? 0;
@@ -164,29 +164,29 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
               const tip = 'Нед ' + s.week + ': план ' + val + ' ' + label + ' · ' + phaseLabel + (s.taper ? ' · taper/делод' : '') + (fVal > 0 ? ' · факт ' + fVal + ' ' + label : '');
               return (
                 <div key={s.week} title={tip} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 82 }}>
-                    <div style={{ width: '100%', borderRadius: '2px 2px 0 0', height: h, background: PHASE_COLOR[s.phase] ?? '#888', opacity: s.taper ? 0.55 : 1 }} />
+                  <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 88 }}>
+                    <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: h, background: `linear-gradient(180deg, ${PHASE_COLOR[s.phase] ?? '#888'}, ${PHASE_COLOR[s.phase] ?? '#888'}cc)`, opacity: s.taper ? 0.55 : 1, boxShadow: val === peak ? `0 0 8px ${PHASE_COLOR[s.phase] ?? '#888'}88` : 'none' }} />
                     {fh > 0 && (
-                      <div style={{ position: 'absolute', bottom: 0, width: '42%', borderRadius: '2px 2px 0 0', height: fh, background: '#f8fafc', opacity: 0.85 }} title={'факт: ' + fVal + ' ' + label} />
+                      <div style={{ position: 'absolute', bottom: 0, width: '42%', borderRadius: '3px 3px 0 0', height: fh, background: '#f8fafc', opacity: 0.9, boxShadow: '0 0 6px rgba(248,250,252,0.5)' }} title={'факт: ' + fVal + ' ' + label} />
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
-          <div style={{ display: 'flex', gap: 2 }}>
+          <div style={{ display: 'flex', gap: 3 }}>
             {series.map(s => (
-              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: '#fff' }}>{s.week}</div>
+              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 9, fontWeight: s.week === peakWeek ? 850 : 500, color: s.week === peakWeek ? '#4ade80' : 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{s.week}</div>
             ))}
           </div>
-          <div style={{ fontSize: 10, color: '#fff' }}>
+          <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 9, padding: '7px 10px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.55 }}>
             Пик: {peak} {label} (нед {peakWeek}) · Средняя: {avg} {label}
             {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : '#fff' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
             {fact && fact.factKcal > 0 && <span> · Факт: {fact.factKcal} ккал{fact.factKm > 0 ? ` · ${fact.factKm} км` : ''}</span>}
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3b82f6', marginRight: 4 }} />план</span>
-            {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f8fafc', marginRight: 4 }} />факт (дневник)</span>}
+          <div style={{ display: 'flex', gap: 9, fontSize: 10.5, color: '#fff' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: '#3b82f6', marginRight: 5 }} />план</span>
+            {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: '#f8fafc', marginRight: 5 }} />факт (дневник)</span>}
           </div>
           {metric === 'trimp' && <div style={HINT_SM}>TRIMP Banister (HRr) где есть HR, иначе фактор zone2×2/miss×3/hiit×5. Резкий рост {'>'}15% — риск.</div>}
           {metric === 'ctl' && (
