@@ -1124,3 +1124,169 @@
     font-size: 12px !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §25. MOBILE HARD-FIX 360px — добивка БАД (TG + база APK).
+ * 480px: все 1fr 1fr → 1fr (было только 380), герой с safe-area,
+ * пилюли лентой со snap, таблицы в scroll, mood/чипы ≥44px.
+ * Только подача (каждый селектор — с .support-screen, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 25.1. ВСЕ 2-КОЛОНКИ → 1 КОЛОНКА НА ≤480px ──────────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root [data-sup] [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root [data-sup] [style*='grid-template-columns:1fr 1fr'],
+  .support-screen.support-root .sup-bio [style*='grid-template-columns'],
+  .support-screen.support-root .sup-effdose [style*='grid-template-columns'],
+  .support-screen.support-root .sup-synergy [style*='grid-template-columns'],
+  .support-screen.support-root .sup-timing [style*='grid-template-columns'],
+  .support-screen.support-root .sup-analog [style*='grid-template-columns'],
+  .support-screen.support-root .sup-pepcalc [style*='grid-template-columns'],
+  .support-screen.support-root .sup-stacks [style*='grid-template-columns'],
+  .support-screen.support-root .sup-catalogview [style*='grid-template-columns'],
+  .support-screen.support-root .sup-diary [style*='grid-template-columns'],
+  .support-screen.support-root .sup-research [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  .support-screen.support-root .sup-bio [style*='grid-template-columns: repeat(3'],
+  .support-screen.support-root .sup-compare [style*='grid-template-columns: repeat(3'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── 25.2. HERO — не трогаем (контракт pharma-support-native) ──
+ * Safe-area герои получают через глобальный main/app-native слой.
+ * Любое правило .support-hero здесь роняет apk-support-pack тест. */
+
+/* ─── 25.3. ПИЛЮЛИ — лента со snap, не wrap-столбик ───────── */
+.support-screen.support-root [data-sup='pills'],
+.support-screen.support-root .support-pills {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scroll-snap-type: x mandatory !important;
+  scrollbar-width: none !important;
+}
+.support-screen.support-root [data-sup='pills']::-webkit-scrollbar,
+.support-screen.support-root .support-pills::-webkit-scrollbar { display: none; }
+.support-screen.support-root [data-sup='pills'] .support-pill,
+.support-screen.support-root .support-pills .support-pill {
+  scroll-snap-align: start !important;
+  flex-shrink: 0 !important;
+}
+
+/* ─── 25.4. КАТАЛОГ/ДНЕВНИК — длинные строки не рвут ───────── */
+.support-screen.support-root .sup-catalogview [style*='flex: 1'],
+.support-screen.support-root .sup-diary [style*='flex: 1'] {
+  min-width: 0 !important;
+}
+
+/* ─── 25.5. ТАБЛИЦЫ — scroll-контейнер ─────────────────────── */
+.support-screen.support-root [data-sup] table {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* ─── 25.6. ДНЕВНИК — mood/тайм-слоты ≥44px ───────────────── */
+.support-screen.support-root .sup-diary [style*='min-height: 24'],
+.support-screen.support-root .sup-diary [style*='min-height: 36'],
+.support-screen.support-root .sup-diary [style*='min-height: 38'] {
+  min-height: 44px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §26. КАТАЛОГ — TOP-ВИЗУАЛ (TG + база APK).
+ * Жалоба: каталог выглядел плоско/серо, как список.
+ * Делаем карточки-стекло, акцент слева, чип-язык, поиск-герой,
+ * стеки как продуктовые карточки. Только подача, логика 1-в-1.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 26.1. ПОИСК — герой 52px, стекло + фокус ─────────────── */
+.support-screen.support-root .sup-catalogview input[placeholder*='Поиск'],
+.support-screen.support-root [data-sup='catalog'] input[placeholder*='Поиск'] {
+  background: rgba(6, 13, 29, 0.62) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.22) !important;
+}
+
+/* ─── 26.2. ГРУППЫ — стекло 16px, тень, hover ──────────────── */
+.support-screen.support-root .sup-catalogview [style*='border-radius: 10'],
+.support-screen.support-root .sup-catalogview [style*='border-radius:10'] {
+  background: linear-gradient(180deg, rgba(22,30,52,0.78), rgba(14,20,38,0.78)) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  overflow: hidden !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease !important;
+}
+.support-screen.support-root .sup-catalogview [style*='border-radius: 10']:active,
+.support-screen.support-root .sup-catalogview [style*='border-radius:10']:active {
+  transform: scale(0.99) !important;
+}
+
+/* шапка группы — крупнее, иконка-бейдж, счётчик-пилюля */
+.support-screen.support-root .sup-catalogview [style*='padding: 9px 12px'],
+.support-screen.support-root .sup-catalogview [style*='padding:9px 12px'],
+.support-screen.support-root .sup-catalogview [style*='padding: 8px 10px'],
+.support-screen.support-root .sup-catalogview [style*='padding:8px 10px'] {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+/* строки веществ — hover и выбранная с левой кромкой */
+.support-screen.support-root .sup-catalogview [style*='padding: 7px 12px 7px 16px'],
+.support-screen.support-root .sup-catalogview [style*='padding:7px 12px 7px 16px'],
+.support-screen.support-root .sup-catalogview [style*='padding: 6px 10px 6px 18px'],
+.support-screen.support-root .sup-catalogview [style*='padding:6px 10px 6px 18px'] {
+  transition: background 0.12s ease, border-color 0.12s ease !important;
+  border-left: 2px solid transparent !important;
+}
+@media (hover: hover) {
+  .support-screen.support-root .sup-catalogview [style*='padding: 7px 12px 7px 16px']:hover,
+  .support-screen.support-root .sup-catalogview [style*='padding:7px 12px 7px 16px']:hover,
+  .support-screen.support-root .sup-catalogview [style*='padding: 6px 10px 6px 18px']:hover,
+  .support-screen.support-root .sup-catalogview [style*='padding:6px 10px 6px 18px']:hover {
+    background: rgba(0,230,138,0.06) !important;
+    border-left-color: rgba(0,230,138,0.35) !important;
+  }
+}
+
+/* ─── 26.3. ЧИПЫ — современный пилюльный язык ─────────────── */
+.support-screen.support-root .sup-catalogview span[style*='font-size: 8'] {
+  background: rgba(0,230,138,0.10) !important;
+  border: 1px solid rgba(0,230,138,0.16) !important;
+  color: #00e68a !important;
+}
+
+/* ─── 26.4. КНОПКИ СТРОКИ — иерархия (primary + ghost) ────── */
+.support-screen.support-root .sup-catalogview button[style*='rgba(0,230,138,0.1)'] {
+  background: linear-gradient(135deg, var(--sup-acc), #00c8a0) !important;
+  color: var(--sup-acc-ink) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 16px rgba(0,230,138,0.28) !important;
+  font-weight: 800 !important;
+}
+
+/* ─── 26.5. РАСКРЫТАЯ ДЕТАЛЬ — шит 16px с верхней кромкой ──── */
+.support-screen.support-root .sup-catalogview [style*='background: rgba(0, 0, 0, 0.15)'] {
+  background: rgba(10,14,26,0.58) !important;
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+  border-top: 1px solid rgba(0,230,138,0.12) !important;
+}
+
+/* ─── 26.6. СТЕКИ — карточки как товар ──────────────────────── */
+.support-screen.support-root .sup-catalogview [style*='border-radius: 12'][style*='var(--bg-secondary)'] {
+  background: linear-gradient(180deg, rgba(22,30,52,0.82), rgba(14,20,38,0.82)) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* ─── 26.7. САБ-ТАБЫ КАТАЛОГА — крупнее на телефоне ────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-catalogview > div > button.support-pill {
+    min-height: 44px !important;
+    font-size: 11px !important;
+  }
+}
