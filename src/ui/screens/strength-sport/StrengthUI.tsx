@@ -37,10 +37,10 @@ export const CARD: React.CSSProperties = {
   background: GLASS_BG,
   border: `0.5px solid ${GLASS_BORDER}`,
   borderRadius: RADIUS_LG,
-  padding: 18,
+  padding: 14,
   display: 'flex',
   flexDirection: 'column',
-  gap: 14,
+  gap: 10,
   boxShadow: GLASS_SHADOW,
   backdropFilter: VIBRANCY,
   WebkitBackdropFilter: VIBRANCY,
@@ -59,8 +59,8 @@ export const CARD_HERO: React.CSSProperties = {
   background: 'rgba(44,44,46,0.84)',
   borderColor: 'rgba(84,84,88,0.32)',
   boxShadow: '0 4px 24px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.24)',
-  padding: 20,
-  gap: 14,
+  padding: 14,
+  gap: 10,
 };
 export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontFamily: SF };
 export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10, fontFamily: SF };
@@ -257,7 +257,7 @@ export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent' | '
   );
 };
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string; strong?: boolean }> = ({ icon, text, desc, strong }) => (
-  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 0 8px 14px', borderLeft: `3px solid ${strong ? ACCENT_STRONG : ACCENT}`, borderRadius: '0 10px 10px 0', background: strong ? 'rgba(245,158,11,0.05)' : 'rgba(0,230,138,0.04)', margin: '6px 0', fontFamily: SF }}>
+  <div className="kit-grouphead" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 0 6px 12px', borderLeft: `3px solid ${strong ? ACCENT_STRONG : ACCENT}`, borderRadius: '0 10px 10px 0', background: strong ? 'rgba(245,158,11,0.05)' : 'rgba(0,230,138,0.04)', margin: '2px 0', fontFamily: SF }}>
     <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 14 }}>{icon}</span>{text}
     </span>
@@ -283,7 +283,7 @@ export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; childr
   </button>
 );
 export const Field: React.FC<{ label?: string; hint?: string; error?: string; children: React.ReactNode }> = ({ label, hint, error, children }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '1 1 148px', minWidth: 0, fontFamily: SF }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 148px', minWidth: 0, fontFamily: SF }}>
     {label && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1.2, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6 }}>{label}</span>}
     {children}
     {hint && !error && <span style={{ fontSize: 12, color: '#fff', lineHeight: 1.45, fontFamily: SF }}>{hint}</span>}

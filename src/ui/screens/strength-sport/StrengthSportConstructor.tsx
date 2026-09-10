@@ -780,10 +780,12 @@ export const StrengthSportConstructor: React.FC = () => {
                   border: active ? `1.5px solid ${modeColor}55` : '1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:12,
                   boxShadow: active ? `0 8px 24px ${modeColor}1F, inset 0 1px 0 rgba(255,255,255,0.09)` : '0 4px 12px rgba(0,0,0,0.14)', backdropFilter:'blur(12px)'
                 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}><b style={{ fontSize:15, color: active? '#fff':'#fff' }}>{p.name}</b><span style={{ fontSize:12, fontWeight:800, color: active? modeColor : '#fff', background: active?`${modeColor}1F`:'rgba(255,255,255,0.06)', padding:'5px 12px', borderRadius:22, border:`1px solid ${active?`${modeColor}33`:'rgba(255,255,255,0.07)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
-                  <div style={{ fontSize:13, color:'#fff', marginTop:6, lineHeight:1.5 }}>{p.description}</div>
-                  <div style={{ fontSize:12, color:'#fff', marginTop:8, fontFamily:'ui-monospace, monospace', background:'rgba(0,0,0,0.18)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>{preview}</div>
-                  {active && <div style={{ fontSize:12, color:modeColor, fontWeight:800, marginTop:10, display:'flex', alignItems:'center', gap:8 }}><span style={{ width:8, height:8, borderRadius:'50%', background:modeColor, boxShadow:`0 0 10px ${modeColor}`}} /> Выбран — {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}><b style={{ fontSize:15, color:'#fff' }}>{p.name}</b><span style={{ fontSize:12, fontWeight:800, color: active? modeColor : '#fff', background: active?`${modeColor}1F`:'rgba(255,255,255,0.06)', padding:'5px 12px', borderRadius:22, border:`1px solid ${active?`${modeColor}33`:'rgba(255,255,255,0.07)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
+                  {active && (<>
+                  <div style={{ fontSize:12, color:'#fff', marginTop:6, lineHeight:1.45 }}>{p.description}</div>
+                  <div style={{ fontSize:12, color:'#fff', marginTop:6, fontFamily:'ui-monospace, monospace', background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)' }}>{preview}</div>
+                  <div style={{ fontSize:12, color:modeColor, fontWeight:800, marginTop:6, display:'flex', alignItems:'center', gap:8 }}><span style={{ width:8, height:8, borderRadius:'50%', background:modeColor, boxShadow:`0 0 10px ${modeColor}`}} /> Выбран — {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>
+                  </>)}
                 </button>
               );
             })}

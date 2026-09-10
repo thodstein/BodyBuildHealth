@@ -73,9 +73,9 @@ export const StrengthSportPlanView: React.FC<Props> = ({
           <Badge>{plan.patternId}</Badge>
           {plan.inputSnapshot?.focus && <Badge color={mode==='strongman'?ACCENT_STRONG:ACCENT} bg={mode==='strongman'?STRONG_SOFT:ACCENT_SOFT} border={mode==='strongman'?STRONG_BORDER:ACCENT_BORDER}>Фокус {plan.inputSnapshot.focus}</Badge>}
         </div>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:6, overflowX:'auto' as const, scrollbarWidth:'none' as const, WebkitOverflowScrolling:'touch' as const, paddingBottom:2 }}>
           {plan.weeksData.map(w=> (
-            <span key={w.week} style={{ padding:'6px 10px', borderRadius:12, background:'rgba(255,255,255,0.045)', border:'0.5px solid rgba(255,255,255,0.07)', fontSize:12, fontWeight:600, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':modeColor}>{w.totalSets}</Highlight> сетов · <Highlight>{Math.round((w.totalTonnage||0)/1000)}т</Highlight></span>
+            <span key={w.week} style={{ flexShrink:0, padding:'6px 10px', borderRadius:12, background:'rgba(255,255,255,0.045)', border:'0.5px solid rgba(255,255,255,0.07)', fontSize:12, fontWeight:600, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':modeColor}>{w.totalSets}</Highlight> · <Highlight>{Math.round((w.totalTonnage||0)/1000)}т</Highlight></span>
           ))}
         </div>
         {/* Sinclair / DOTS блок */}
