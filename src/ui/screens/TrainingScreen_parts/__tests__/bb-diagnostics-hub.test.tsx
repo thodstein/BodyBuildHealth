@@ -290,18 +290,22 @@ describe('BBDiagnosticsHub', () => {
       (document as any).createElement = origCreate;
     }
   });
-  it('P7: teen-гейт 14 лет + женская лютеиновая пометка', () => {
+  it('PRO-3: карточка скорости/сухожилий видна, LVP пустой — честная строка', () => {
     render(<BBDiagnosticsHub />);
-    fireEvent.click(screen.getByRole('button', { name: /Симметрия/ }));
-    fireEvent.change(screen.getByLabelText(/Возраст, лет/), { target: { value: '14' } });
-    expect(screen.getAllByText(/без отказа/)[0]).toBeInTheDocument();
-    // пол через попап-шит симметрии (шапка тоже несёт «Пол» — берём по testId)
-    fireEvent.click(screen.getByTestId('bb-sex-sym'));
-    fireEvent.click(screen.getAllByText('Женский')[0]);
-    fireEvent.click(screen.getByTestId('bb-cycle'));
-    fireEvent.click(screen.getAllByText(/Лютеиновая/)[0]);
-    fireEvent.change(screen.getByLabelText(/Талия, см/), { target: { value: '70' } });
-    fireEvent.change(screen.getByLabelText(/Бёдра, см/), { target: { value: '95' } });
-    expect(screen.getAllByText(/Лютеиновая фаза/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/PRO-3 — скорость/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/LVP пуст/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Плечо: порядок/)[0]).toBeInTheDocument();
+  });
+  it('PRO-3: LVP-точки дают валидный профиль в карточке', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText(/LVP-точки вес скорость/), { target: { value: '100 0.62\n110 0.55\n120 0.47' } });
+    expect(screen.getAllByText(/e1RM ≈/)[0]).toBeInTheDocument();
+  });
+  it('PRO-3: цель VBT меняет совет + ICS-кнопка на месте', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByTestId('bb-vbt-goal'));
+    fireEvent.click(screen.getAllByText('Сила')[0]);
+    expect(screen.getByTestId('bb-vbt-goal').textContent).toMatch(/Сила/);
+    expect(screen.getByRole('button', { name: /Спец-блок \(.ics\)/ })).toBeInTheDocument();
   });
 });

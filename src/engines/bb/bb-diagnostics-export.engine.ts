@@ -19,6 +19,13 @@ export interface BBDiagnosticsPro2Meta {
   pose?: { hip?: number; knee?: number; ankle?: number; shoulder?: number; n: number; faults: string[] } | null;
   teen?: string | null;
   femaleNotes?: string[];
+  /** PRO-3: LVP-профиль, сухожилия, MMC, return-to, направление перекоса, рабочие веса. */
+  lvp?: { lift: string; r2: number; e1rm: number | null; text: string } | null;
+  tendon?: { elbow: string; shoulder: string };
+  mmc?: string | null;
+  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string }> } | null;
+  lrDirection?: Array<{ group: string; text: string }>;
+  workingRange?: string | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -97,6 +104,12 @@ ${(() => {
     if (m.pose) parts.push(`<h2>Углы (таблица)</h2><div style="font-size:12px">Таз ${m.pose.hip ?? '—'}° · колено ${m.pose.knee ?? '—'}° · голеностоп ${m.pose.ankle ?? '—'}° · плечо ${m.pose.shoulder ?? '—'}° (кадров: ${m.pose.n})${m.pose.faults.length ? ` — ${esc(m.pose.faults.join(' · '))}` : ''}</div>`);
     if (m.teen) parts.push(`<h2>Подросток</h2><div style="font-size:12px">${esc(m.teen)}</div>`);
     if (m.femaleNotes?.length) parts.push(`<h2>Женские ориентиры</h2><ul>${m.femaleNotes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`);
+    if (m.lvp) parts.push(`<h2>LVP (нагрузка–скорость)</h2><div style="font-size:12px">${esc(m.lvp.text)}</div>`);
+    if (m.tendon) parts.push(`<h2>Сухожилия (скрининг)</h2><ul><li>${esc(m.tendon.elbow)}</li><li>${esc(m.tendon.shoulder)}</li></ul>`);
+    if (m.mmc) parts.push(`<h2>Фокус внимания</h2><div style="font-size:12px">${esc(m.mmc)}</div>`);
+    if (m.returnTo) parts.push(`<h2>Возврат после флагов</h2><div style="font-size:12px">${esc(m.returnTo.text)}</div><ul>${m.returnTo.stages.map((s) => `<li>${esc(s.title)}: ${esc(s.volume)}, ${esc(s.rir)} — ${esc(s.note)}</li>`).join('')}</ul>`);
+    if (m.lrDirection?.length) parts.push(`<h2>Направление перекоса</h2><ul>${m.lrDirection.map((d) => `<li>${esc(d.text)}</li>`).join('')}</ul>`);
+    if (m.workingRange) parts.push(`<h2>Рабочий вес (ориентир)</h2><div style="font-size:12px">${esc(m.workingRange)}</div>`);
     return parts.join('');
   })()}
 <h2>Симметрия</h2><table><tr><th>Рацио</th><th>Значение</th></tr>${rowsSym}</table><ul>${issuesSym}</ul>
@@ -170,6 +183,15 @@ export function buildBBDiagnosticsCsv(
   }
   if (meta?.teen) lines.push(['teen', meta.teen].map(escCsv).join(','));
   if (meta?.femaleNotes?.length) lines.push(['female_notes', meta.femaleNotes.join(' · ')].map(escCsv).join(','));
+  if (meta?.lvp) lines.push(['lvp', meta.lvp.text].map(escCsv).join(','));
+  if (meta?.tendon) {
+    lines.push(['tendon_elbow', meta.tendon.elbow].map(escCsv).join(','));
+    lines.push(['tendon_shoulder', meta.tendon.shoulder].map(escCsv).join(','));
+  }
+  if (meta?.mmc) lines.push(['mmc', meta.mmc].map(escCsv).join(','));
+  if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
+  if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));
+  if (meta?.workingRange) lines.push(['working_range', meta.workingRange].map(escCsv).join(','));
   // упражнения → эффект (максимально)
   try {
     const p = plan || (() => { try { const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_bb_plan_saved') : null; if (!raw) return null; const j = JSON.parse(raw); return j?.plan?.weeks ? j.plan : j?.weeks ? j : null; } catch { return null; } })();

@@ -16,6 +16,13 @@ export interface BBVbtRecommendation {
   exceeded: boolean;
   recommendation: string;
   suggestedRirShift: number;
+  /** e1RM по скорости последнего повтора (канон pro/vbt, популяционный LVP) — null без веса. */
+  e1RMByVelocity: number | null;
+}
+
+export interface BBVbtGoalOpts {
+  /** Цель меняет акцент совета (наука: ≤20–25% — сила/скорость, 20–40% — гипертрофия ценой RFD). */
+  goal?: 'mass' | 'strength';
 }
 
 /**
@@ -26,7 +33,7 @@ export interface BBVbtRecommendation {
  * - 25-40%: метаболический стресс → снизить вес (RIR+1);
  * - >40%: отказ близко → стоп/снизить (RIR+2).
  */
-export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelocity: number, weightKg?: number): BBVbtRecommendation {
+export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelocity: number, weightKg?: number, opts?: BBVbtGoalOpts): BBVbtRecommendation {
   const d = diagnoseVelocity(lift as never, bestVelocity, lastVelocity, weightKg);
   const loss = d.lossPct;
   let rirShift = 0;
@@ -46,7 +53,15 @@ export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelo
     rec = `Потеря ${loss.toFixed(0)}% — отказ близко (${d.zone}), остановитесь/снизьте вес, RIR+2.`;
   }
   if (d.exceeded && d.suggestedPhase) rec += ` Вероятная фаза срыва: «${d.suggestedPhase}».`;
-  return { lossPct: loss, zone: d.zone, exceeded: d.exceeded, recommendation: rec, suggestedRirShift: rirShift };
+  if (d.e1RMByVelocity) rec += ` e1RM по скорости ≈ ${d.e1RMByVelocity} кг (популяционный LVP).`;
+  // PRO-3 R5: акцент под цель (базовые зоны не меняются — только строка)
+  const goal = opts?.goal;
+  if (goal === 'strength' && loss >= 20) {
+    rec += ' Для силы держите потерю ≤20–25% — дальше только усталость без прибавки.';
+  } else if (goal === 'mass' && loss >= 10 && loss < 20) {
+    rec += ' Для массы можно допустить потерю 20–30% в последних сетах.';
+  }
+  return { lossPct: loss, zone: d.zone, exceeded: d.exceeded, recommendation: rec, suggestedRirShift: rirShift, e1RMByVelocity: d.e1RMByVelocity };
 }
 
 /** Зона VBT для бейджа. */

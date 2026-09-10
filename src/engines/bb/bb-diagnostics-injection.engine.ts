@@ -58,6 +58,12 @@ export interface BBInjectionOpts {
   weekIdxs?: number[];
   /** MAX PRO: предпочитаемые id упражнений (из correction-rank топ-1) */
   preferredIds?: Record<string, string>;
+  /** PRO-3 R2: унилатеральная добивка слабой стороны (из L/R-вердиктов): группа → сторона+сеты. */
+  unilateralTopUp?: Record<string, { side: 'left' | 'right'; sets: number }>;
+  /** PRO-3 R2: сдвиг RIR вставляемых коррекций (красная готовность → +1). */
+  rirShift?: number;
+  /** PRO-3 R2: множитель объёма вставляемых коррекций (красная готовность → 0.75). */
+  volumeMult?: number;
 }
 
 export interface BBInjectionResult {
@@ -106,10 +112,19 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const base = wm[muscleKey] ?? wm[wp] ?? 50;
     const weight = Math.round(base * 0.65 / 2.5) * 2.5; // 65% для изоляции
     const reps = muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10;
-    const rir = 2;
+    // PRO-3 R2: готовность дня двигает вставку (острая, не мезоцикл): RIR+1 / объём −25%
+    const rir = 2 + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0);
     const tempo = opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
     const rest = 90;
-    const wantSets = Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
+    const wantBase = Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
+    const volMult = Number.isFinite(opts.volumeMult as number) ? Math.max(0.5, Math.min(1, opts.volumeMult as number)) : 1;
+    let wantSets = Math.max(2, Math.round(wantBase * volMult));
+    // PRO-3 R2: добивка слабой стороны — сверху в пределах бюджета (унилатерально, слабая первой)
+    const topUp = opts.unilateralTopUp?.[wp] || opts.unilateralTopUp?.[muscleKey];
+    const topUpSets = topUp && (topUp.side === 'left' || topUp.side === 'right') && Number.isFinite(topUp.sets)
+      ? Math.max(0, Math.min(3, Math.round(topUp.sets)))
+      : 0;
+    if (topUpSets > 0) wantSets = Math.min(6, wantSets + topUpSets);
     for (const wi of weekIdxs) {
       const week = (copy.weeks as any[])[wi] as any;
       const configuredDays = opts.dayMap?.[wp] || opts.dayMap?.[muscleKey];
@@ -146,7 +161,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         exerciseType: catType,
         tempoSpec: tempo,
         restSeconds: rest,
-        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}`,
+        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}`,
         warmupSets: [],
       } as any;
       targetSession.exercises.push(ex);

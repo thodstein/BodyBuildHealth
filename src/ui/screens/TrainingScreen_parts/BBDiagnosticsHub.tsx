@@ -23,6 +23,12 @@ import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
 import { bbBarPathVerdict } from '../../../engines/bb/bb-bar-path.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
+import { calibrateBbLvp, parseBbLvpText } from '../../../engines/bb/bb-lvp.engine';
+import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
+import { buildReturnToPlan } from '../../../engines/bb/bb-return-to.engine';
+import { mmcAdviceFor, posingIsoNote } from '../../../engines/bb/bb-mmc-gate.engine';
+import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
+import { buildBBSpecIcs, downloadBBSpecIcs, bbWorkingRange } from '../../../engines/bb/bb-spec-ics.engine';
 import { isSpecializationTargetConflict, canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
 import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
 import { auditPlanExercises } from '../../../engines/bb/bb-plan-exercise-audit.engine';
@@ -71,6 +77,11 @@ type BBState = {
   swelling: boolean;
   numbness: boolean;
   jointClickPain: boolean;
+  /** PRO-3: LVP-строки «вес скорость», цель VBT, позинг-опция, боль в локте. */
+  lvpText: string;
+  vbtGoal: '' | 'mass' | 'strength';
+  posingIso: boolean;
+  elbowPain: boolean;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -100,6 +111,10 @@ const DEFAULT_STATE: BBState = {
   swelling: false,
   numbness: false,
   jointClickPain: false,
+  lvpText: '',
+  vbtGoal: '',
+  posingIso: false,
+  elbowPain: false,
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -363,8 +378,9 @@ export const BBDiagnosticsHub: React.FC = () => {
     const best = parseFloat(state.vbtBest), last = parseFloat(state.vbtLast);
     if (!Number.isFinite(best) || !Number.isFinite(last) || !best) return null;
     const w = state.vbtWeight ? parseFloat(state.vbtWeight) : undefined;
-    return bbVbtRecommendation('squat', best, last, w);
-  }, [state.vbtBest, state.vbtLast, state.vbtWeight]);
+    // PRO-3 R5: совет под цель (масса — допустить 20–30%, сила — кап 20–25%)
+    return bbVbtRecommendation('squat', best, last, w, state.vbtGoal ? { goal: state.vbtGoal } : undefined);
+  }, [state.vbtBest, state.vbtLast, state.vbtWeight, state.vbtGoal]);
 
   // P4: разбор траектории из поля ввода (без нового ввода — тот же csvText)
   const barLast = useMemo(() => {
@@ -414,6 +430,66 @@ export const BBDiagnosticsHub: React.FC = () => {
   const teenNote = useMemo(() => {
     try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; }
   }, [state.age]);
+  // PRO-3 R1: LVP-лайт из строк «вес скорость» (популяционный профиль — запасной)
+  const lvpProfile = useMemo(() => {
+    try {
+      const pts = parseBbLvpText(state.lvpText);
+      if (pts.length < 3) return null;
+      return calibrateBbLvp('squat', pts);
+    } catch { return null; }
+  }, [state.lvpText]);
+  // PRO-3 R3: сухожилия (тяжёлые сеты недели + боль/плечо из присед-теста)
+  const tendonGuard = useMemo(() => {
+    try {
+      return assessBbTendonGuard(diarySessions as any, {
+        elbowPain: state.elbowPain,
+        shoulderOhsFail: !state.ohsArmsOverMidfoot,
+      });
+    } catch { return null; }
+  }, [diarySessions, state.elbowPain, state.ohsArmsOverMidfoot]);
+  // PRO-3 R2: return-to после стоп-флагов
+  const returnToPlan = useMemo(() => {
+    try { return buildReturnToPlan(redFlags as any); } catch { return null; }
+  }, [redFlags]);
+  // PRO-3 R7: рабочий вес-ориентир от e1RM по скорости
+  const workingRange = useMemo(() => {
+    try {
+      const e = vbt?.e1RMByVelocity ?? null;
+      if (e == null) return null;
+      return bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
+    } catch { return null; }
+  }, [vbt, state.vbtGoal]);
+  // PRO-3 R6: направление перекоса (история слабых сторон)
+  const lrDirection = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_lr_history');
+      const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
+      const out: Array<{ group: string; text: string }> = [];
+      for (const v of lrVerdicts.slice(0, 2)) {
+        const d = summarizeLrDirection(hist, v.group);
+        if (d) out.push({ group: v.group, text: d.text });
+      }
+      return out;
+    } catch { return []; }
+  }, [lrVerdicts]);
+  // PRO-3 R2: добивка слабой стороны + острая готовность для моста/вставки
+  const lrTopUpMap = useMemo(() => {
+    const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
+    try {
+      for (const v of lrVerdicts) {
+        if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
+          out[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
+        }
+      }
+    } catch { /* noop */ }
+    return out;
+  }, [lrVerdicts]);
+  const readinessAction = useMemo(() => {
+    try {
+      if (readiness?.level === 'red') return { level: 'red', volumeMult: 0.75, rirShift: 1 };
+      return null;
+    } catch { return null; }
+  }, [readiness]);
 
   const measNum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
@@ -444,6 +520,13 @@ export const BBDiagnosticsHub: React.FC = () => {
   const score = report.score.score;
   const sLevel = report.score.level;
   const sColor = bbScoreColor(sLevel);
+  // PRO-3 R4: фокус внимания (после report — изоляция/средний вес → внутренний, иначе внешний)
+  const mmcAdvice = useMemo(() => {
+    try {
+      const iso = (report.weakZonesGranular || []).length > 0;
+      return mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+    } catch { return null; }
+  }, [report]);
 
   // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
   const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
@@ -547,6 +630,16 @@ export const BBDiagnosticsHub: React.FC = () => {
       topIds = topIds.slice(0, 6);
       weakHeads = heads;
     } catch { /* noop */ }
+    // PRO-3 R6: копим направление перекоса (сырые стороны + дата) для динамики
+    try {
+      const raw = localStorage.getItem('he_bb_lr_history');
+      let hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
+      const today = new Date().toISOString().slice(0, 10);
+      for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 4)) {
+        hist = pushLrSnapshot(hist, { date: today, group: v.group, weakSide: v.weakSide, asymPct: v.asymPct, verdict: v.verdict });
+      }
+      localStorage.setItem('he_bb_lr_history', JSON.stringify(hist));
+    } catch { /* noop */ }
     applyToPlanner({
       kind: 'weakpoints',
       label: `ББ-диагностика: ${report.weakZonesGranular.map(weakRu).join(', ')}`,
@@ -601,6 +694,79 @@ export const BBDiagnosticsHub: React.FC = () => {
           } catch { return null; }
         })(),
         teenNote: (() => { try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; } })(),
+        // PRO-3 R1–R7 (лениво — мемы ниже недоступны из-за TDZ, считаем теми же движками)
+        lvp: (() => {
+          try {
+            const pts = parseBbLvpText(state.lvpText);
+            if (pts.length < 3) return null;
+            const p = calibrateBbLvp('squat', pts);
+            return p ? { lift: p.lift, r2: p.r2, e1rm: p.e1rm, text: p.text } : null;
+          } catch { return null; }
+        })(),
+        tendon: (() => {
+          try {
+            const g = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot });
+            return { elbow: g.elbow.text, shoulder: g.shoulder.text, elbowLevel: g.elbow.level, shoulderLevel: g.shoulder.level };
+          } catch { return null; }
+        })(),
+        returnTo: (() => {
+          try {
+            const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+            return buildReturnToPlan(gate as any);
+          } catch { return null; }
+        })(),
+        readinessAction: (() => {
+          try {
+            const pain = state.pain010 ? parseFloat(state.pain010) : null;
+            const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+            const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+            const r = assessBbReadiness({
+              sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
+              pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+              vbtLossPct: vbt?.lossPct ?? null,
+              dangerMuscles: danger,
+            });
+            return r.level === 'red' ? { level: 'red', volumeMult: 0.75, rirShift: 1 } : null;
+          } catch { return null; }
+        })(),
+        lrTopUp: (() => {
+          try {
+            const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
+            for (const v of lrVerdictsFromSessions(diarySessions as any)) {
+              if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
+                out[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
+              }
+            }
+            return out;
+          } catch { return {}; }
+        })(),
+        lrDirection: (() => {
+          try {
+            const raw = localStorage.getItem('he_bb_lr_history');
+            const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
+            const out: Array<{ group: string; text: string }> = [];
+            for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 2)) {
+              const d = summarizeLrDirection(hist, v.group);
+              if (d) out.push({ group: v.group, text: d.text });
+            }
+            return out;
+          } catch { return []; }
+        })(),
+        mmc: (() => {
+          try {
+            const iso = (report.weakZonesGranular || []).length > 0;
+            const a = mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+            return `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}`;
+          } catch { return null; }
+        })(),
+        workingRange: (() => {
+          try {
+            const e = vbt?.e1RMByVelocity ?? null;
+            if (e == null) return null;
+            const r = bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
+            return r ? r.text : null;
+          } catch { return null; }
+        })(),
       },
       source: 'intellectual',
     });
@@ -642,6 +808,36 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (!res) { setToast('Нет точек'); return; }
     setToast(`✓ Разбор: петля ${res.xLoop} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
     setTimeout(() => setToast(''), 3000);
+  };
+
+  // PRO-3: общий сбор для экспорта (HTML/CSV) и моста — те же движки, что мемы экрана
+  const buildPro3Export = (): Record<string, unknown> => {
+    try {
+      const lvpPts = parseBbLvpText(state.lvpText);
+      const lvpP = lvpPts.length >= 3 ? calibrateBbLvp('squat', lvpPts) : null;
+      const tg = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot });
+      const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+      const rt = buildReturnToPlan(gate as any);
+      const raw = localStorage.getItem('he_bb_lr_history');
+      const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
+      const dir: Array<{ group: string; text: string }> = [];
+      for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 2)) {
+        const d = summarizeLrDirection(hist, v.group);
+        if (d) dir.push({ group: v.group, text: d.text });
+      }
+      const e = vbt?.e1RMByVelocity ?? null;
+      const wr = e != null ? bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
+      const iso = (report.weakZonesGranular || []).length > 0;
+      const mmc = mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+      return {
+        lvp: lvpP ? { lift: lvpP.lift, r2: lvpP.r2, e1rm: lvpP.e1rm, text: lvpP.text } : null,
+        tendon: { elbow: tg.elbow.text, shoulder: tg.shoulder.text },
+        mmc: `${mmc.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${mmc.cue} — ${mmc.text}`,
+        returnTo: rt,
+        lrDirection: dir,
+        workingRange: wr ? wr.text : null,
+      };
+    } catch { return {}; }
   };
 
   const handleExport = () => {
@@ -727,6 +923,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           )
           : [],
       };
+      try { Object.assign(pro2, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
     const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
@@ -815,11 +1012,40 @@ export const BBDiagnosticsHub: React.FC = () => {
           )
           : [],
       };
+      try { Object.assign(pro2csv, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
     const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
     setToast('✓ CSV экспорт (причины + спец-блок + упражнения + PRO-2)');
     setTimeout(() => setToast(''), 2000);
+  };
+
+  // PRO-3 R7: календарь спец-блока (.ics) — тот же паттерн, что SM/TA
+  const handleSpecIcs = () => {
+    try {
+      if (!report.weakZonesGranular.length) {
+        setToast('Выбери 1-2 слабые зоны — нечего класть в календарь');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
+      const f: Record<string, number> = {};
+      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const ics = buildBBSpecIcs(
+        { weeks: (sb.weeks || []).map((w) => ({ week: w.week, targetSets: w.targetSets, note: w.note })), weakZones: report.weakZonesGranular },
+        { title: 'ББ спец-блок' },
+      );
+      if (!ics) {
+        setToast('Не удалось собрать календарь');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
+      downloadBBSpecIcs(ics, `bb-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+      setToast('📅 Календарь спец-блока скачан');
+      setTimeout(() => setToast(''), 2000);
+    } catch {
+      setToast('⚠ Не удалось собрать календарь');
+      setTimeout(() => setToast(''), 2000);
+    }
   };
 
   const unifiedSnap = useMemo(() => {
@@ -1205,7 +1431,18 @@ export const BBDiagnosticsHub: React.FC = () => {
         if (Number.isFinite(v)) targetSets[z] = v;
       }
       try {
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi] });
+        // PRO-3 R2: острая готовность и L/R-добивка двигают вставку (не мезоцикл)
+        const rirShift = readiness?.level === 'red' ? 1 : 0;
+        const volumeMult = readiness?.level === 'red' ? 0.75 : 1;
+        const unilateralTopUp: Record<string, { side: 'left' | 'right'; sets: number }> = {};
+        try {
+          for (const v of lrVerdicts) {
+            if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
+              unilateralTopUp[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
+            }
+          }
+        } catch { /* noop */ }
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;
@@ -1411,6 +1648,59 @@ export const BBDiagnosticsHub: React.FC = () => {
                 ))}
               </div>
             )}
+            {/* PRO-3 R1–R7: скорость/LVP, сухожилия, возврат, фокус, веса, направление, календарь */}
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="pro3-card">
+              <b style={{ color: '#fff' }}>🧪 PRO-3 — скорость, сухожилия, возврат</b>
+              {tendonGuard && (
+                <div style={{ marginTop: 4 }} data-bb="tendon-card">
+                  <div style={{ color: tendonGuard.elbow.level === 'ok' ? '#22c55e' : tendonGuard.elbow.level === 'warn' ? '#f59e0b' : '#ef4444' }}>{tendonGuard.elbow.text}</div>
+                  <div style={{ color: tendonGuard.shoulder.level === 'ok' ? '#22c55e' : tendonGuard.shoulder.level === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 2 }}>{tendonGuard.shoulder.text}</div>
+                </div>
+              )}
+              {returnToPlan && (
+                <div style={{ marginTop: 4, color: '#fff' }} data-bb="return-to">
+                  <b>↩ {returnToPlan.text}</b>
+                  {returnToPlan.stages.map((s) => (
+                    <div key={s.stage} style={{ marginTop: 2 }}>Ступень {s.stage}: {s.title} — {s.volume}, {s.rir}. {s.note}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 6 }}>
+                <label style={{ display: 'block', color: '#fff', marginBottom: 3 }}>LVP-точки «вес скорость» — по строке на замер (мин. 3)</label>
+                <textarea value={state.lvpText} onChange={(e) => setState((s) => ({ ...s, lvpText: e.target.value }))} placeholder="100 0.62&#10;110 0.55&#10;120 0.47" aria-label="LVP-точки вес скорость" data-bb="lvp-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                <div style={{ color: '#fff', marginTop: 4 }} data-bb="lvp-line">
+                  {state.lvpText.trim() === '' && 'LVP пуст — e1RM считаем по популяционному профилю из скорости сета.'}
+                  {state.lvpText.trim() !== '' && !lvpProfile && 'Точек мало или мусор — нужно 3+ с разбросом веса ≥10 кг.'}
+                  {lvpProfile && (lvpProfile.valid ? `✓ ${lvpProfile.text}` : `⚠ ${lvpProfile.text}`)}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbSheetSelect label="Цель VBT" value={state.vbtGoal} onChange={(v) => setState((s) => ({ ...s, vbtGoal: v as any }))} options={[{ id: '', label: 'Не указана' }, { id: 'mass', label: 'Масса' }, { id: 'strength', label: 'Сила' }]} testId="bb-vbt-goal" />
+                <BbCheckCard active={state.elbowPain} title="Боль в локте" desc="сухожилие бицепса — стоп" onToggle={() => setState((s) => ({ ...s, elbowPain: !s.elbowPain }))} accent="#f87171" />
+              </div>
+              {vbt?.e1RMByVelocity != null && (
+                <div style={{ color: '#fff', marginTop: 4 }} data-bb="vbt-e1rm">e1RM по скорости ≈ {vbt.e1RMByVelocity} кг (популяционный LVP).</div>
+              )}
+              {workingRange && (
+                <div style={{ color: '#fff', marginTop: 2 }} data-bb="working-range">{workingRange.text}</div>
+              )}
+              {mmcAdvice && (
+                <div style={{ color: '#fff', marginTop: 4 }} data-bb="mmc-line">
+                  {mmcAdvice.focus === 'internal' ? '🧠 Внутренний' : '🎯 Внешний'} фокус: {mmcAdvice.cue} — {mmcAdvice.text}
+                </div>
+              )}
+              <div style={{ marginTop: 6 }}>
+                <BbCheckCard active={state.posingIso} title="Позинг 30 с в отдыхе (квадрицепс)" desc={posingIsoNote()} onToggle={() => setState((s) => ({ ...s, posingIso: !s.posingIso }))} accent="#a78bfa" />
+              </div>
+              {lrDirection.length > 0 && (
+                <div style={{ marginTop: 4 }} data-bb="lr-direction">
+                  {lrDirection.map((d) => (
+                    <div key={d.group} style={{ color: '#fff', marginTop: 2 }}>{d.text}</div>
+                  ))}
+                </div>
+              )}
+              <button onClick={handleSpecIcs} data-bb="export-ics" style={{ width: '100%', minHeight: 48, marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📅 Спец-блок (.ics)</button>
+            </div>
             {report.weakZonesGranular.length > 0 && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 <button onClick={handleInjectToPlan} data-bb="inject" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>

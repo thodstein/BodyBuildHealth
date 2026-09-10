@@ -51,6 +51,17 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   barPath?: { xLoop: number; yMax: number; type: string; text: string } | null;
   poseAngles?: { hip?: number; knee?: number; ankle?: number; shoulder?: number; n: number } | null;
   teenNote?: string | null;
+  /** PRO-3 (BBDiagnosticsHub R1–R7 → BbAutoConstructor): всё опционально. */
+  lvp?: { lift: string; r2: number; e1rm: number | null; text: string } | null;
+  tendon?: { elbow: string; shoulder: string; elbowLevel: string; shoulderLevel: string } | null;
+  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string }> } | null;
+  /** Острая готовность → вставка: объём ×0.75 + RIR+1 при red (применяется к коррекциям, не к мезоциклу). */
+  readinessAction?: { level: string; volumeMult: number; rirShift: number } | null;
+  /** Добивка слабой стороны: группа → сторона+сеты (применяется к вставке в пределах бюджета). */
+  lrTopUp?: Record<string, { side: 'left' | 'right'; sets: number }>;
+  lrDirection?: Array<{ group: string; text: string }>;
+  mmc?: string | null;
+  workingRange?: string | null;
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }
