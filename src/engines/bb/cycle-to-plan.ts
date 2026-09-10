@@ -1208,7 +1208,16 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       rationale.push(`🔋 Разгрузка нед ${w}: ${protocol.description} — ${protocol.instructions}`);
     }
 
-    weeks.push({ week: w, sessions });
+    // Phase labels: deload-недели по meta.deloadWeeks, остальное 30/70
+    // (accumulation → intensification → peaking). Фазы нужны финализатору
+    // (bbRir/repShift/tempoFor читают phaseMap) — P2-13 матрица ждёт
+    // «фазы везде» для cycle-пути, как в generic buildBBPlan.
+    const weekPhase = isDeload
+      ? 'deload'
+      : w <= Math.ceil(totalWeeks * 0.3) ? 'accumulation'
+        : w <= Math.ceil(totalWeeks * 0.75) ? 'intensification' : 'peaking';
+
+    weeks.push({ week: w, phase: weekPhase, sessions });
   }
 
   // Compute rotationMuscleVolume

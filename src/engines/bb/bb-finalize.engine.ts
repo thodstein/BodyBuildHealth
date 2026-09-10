@@ -2833,9 +2833,12 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       }
       for (const candidate of feederQueue) {
         if (remaining <= 0 || session.exercises.length >= 10 || feederSlots >= 2) break;
+        // remaining — float (effectiveSets из aggregateBBVolume несёт косвенные
+        // доли); без округления второй слот пушит sets=2.4000000000000004 →
+        // sets_mismatch валидатора (female-beginner матрица).
         const sets = feederSlots === 0
           ? Math.min(5, Math.max(2, Math.ceil(remaining / 2)))
-          : Math.min(3, Math.max(2, remaining));
+          : Math.min(3, Math.max(2, Math.round(remaining)));
         if (sets < 2) break;
         const workSets = Array.from({ length: sets }, () => ({ reps: 15, rir: 3, weight, tempo: '3-0-1-0', restSeconds: 45 }));
         session.exercises.push({

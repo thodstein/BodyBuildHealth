@@ -46,6 +46,12 @@ import { CYCLE_BB_09 } from './cycle-bb-09';
 import { CYCLE_BB_10 } from './cycle-bb-10';
 import { CYCLE_BB_11 } from './cycle-bb-11';
 import { CYCLE_BB_12 } from './cycle-bb-12';
+// Женские циклы (P2-13, docs/BB-FEMALE-POSTERIOR-QUALITY-PLAN.md)
+import { CYCLE_BB_F_GLUTE_12 } from './cycle-bb-f-glute-12';
+import { CYCLE_BB_F_POSTERIOR_10 } from './cycle-bb-f-posterior-10';
+import { CYCLE_BB_F_BIKINI_PREP_8 } from './cycle-bb-f-bikini-prep-8';
+import { CYCLE_BB_F_BEGINNER_6 } from './cycle-bb-f-beginner-6';
+import { CYCLE_BB_F_CUT_8 } from './cycle-bb-f-cut-8';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
@@ -155,8 +161,14 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_08,
   CYCLE_BB_09,
   CYCLE_BB_10,
-  CYCLE_BB_11,
-  CYCLE_BB_12,
+   CYCLE_BB_11,
+   CYCLE_BB_12,
+   // Женские циклы (специализация ягодиц / задняя цепь / bikini-prep / новичок / сушка)
+   CYCLE_BB_F_GLUTE_12,
+   CYCLE_BB_F_POSTERIOR_10,
+   CYCLE_BB_F_BIKINI_PREP_8,
+   CYCLE_BB_F_BEGINNER_6,
+   CYCLE_BB_F_CUT_8,
    // СРЦ2
    SRC2_MURAVYOV_16,
    SRC2_SOLOVYOV_BENCH_28,

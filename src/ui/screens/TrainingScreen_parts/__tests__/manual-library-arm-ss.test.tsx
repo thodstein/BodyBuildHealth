@@ -110,7 +110,8 @@ describe('Ручная библиотека: маппинг фильтров (в
   it('уровень Новичок/Опытный больше не даёт 0 ПЛ-циклов', () => {
     const beg = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'beginner'));
     const adv = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'advanced'));
-    expect(beg.length).toBe(9);
+    // 10 = 9 базовых novice + cycle-bb-f-beginner-6 (женский стартовый, P2-13)
+    expect(beg.length).toBe(10);
     expect(adv.length).toBe(59);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
@@ -140,7 +141,7 @@ describe('Ручная библиотека: маппинг фильтров (в
     fireEvent.click(screen.getByRole('tab', { name: /ПЛ \(/ }));
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'beginner' } });
-    // 9 novice-циклов: таб-счётчик и карточки
-    expect(screen.getByRole('tab', { name: /ПЛ \(9\)/ })).toBeInTheDocument();
+    // 10 novice-циклов: 9 базовых + женский стартовый (cycle-bb-f-beginner-6)
+    expect(screen.getByRole('tab', { name: /ПЛ \(10\)/ })).toBeInTheDocument();
   });
 });
