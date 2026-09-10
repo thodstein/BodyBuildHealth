@@ -52,6 +52,19 @@ import { CYCLE_BB_F_POSTERIOR_10 } from './cycle-bb-f-posterior-10';
 import { CYCLE_BB_F_BIKINI_PREP_8 } from './cycle-bb-f-bikini-prep-8';
 import { CYCLE_BB_F_BEGINNER_6 } from './cycle-bb-f-beginner-6';
 import { CYCLE_BB_F_CUT_8 } from './cycle-bb-f-cut-8';
+// Ф4 (CYCLE-SYSTEM-FULL-AUDIT): вторая волна женских циклов
+import { CYCLE_BB_F_GLUTE_ADV_12 } from './cycle-bb-f-glute-adv-12';
+import { CYCLE_BB_F_MAINT_8 } from './cycle-bb-f-maint-8';
+import { CYCLE_BB_F_UPPER_8 } from './cycle-bb-f-upper-8';
+import { CYCLE_BB_F_GLUTE_2D_6 } from './cycle-bb-f-glute-2d-6';
+import { CYCLE_PL_F_BASE_12 } from './cycle-pl-f-base-12';
+// Ф4 (CYCLE-SYSTEM-FULL-AUDIT): мужские циклы второй волны
+import { CYCLE_BB_M_BEGINNER_UL_8 } from './cycle-bb-m-beginner-ul-8';
+import { CYCLE_BB_M_CUT_UL_8 } from './cycle-bb-m-cut-ul-8';
+import { CYCLE_BB_M_PEC_8 } from './cycle-bb-m-pec-8';
+import { CYCLE_BB_M_BACK_10 } from './cycle-bb-m-back-10';
+import { CYCLE_BB_M_MAINT_4 } from './cycle-bb-m-maint-4';
+import { CYCLE_BB_M_DUMBBELL_8 } from './cycle-bb-m-dumbbell-8';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
@@ -167,8 +180,19 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
    CYCLE_BB_F_GLUTE_12,
    CYCLE_BB_F_POSTERIOR_10,
    CYCLE_BB_F_BIKINI_PREP_8,
-   CYCLE_BB_F_BEGINNER_6,
-   CYCLE_BB_F_CUT_8,
+ CYCLE_BB_F_BEGINNER_6,
+ CYCLE_BB_F_CUT_8,
+ CYCLE_BB_F_GLUTE_ADV_12,
+ CYCLE_BB_F_MAINT_8,
+ CYCLE_BB_F_UPPER_8,
+ CYCLE_BB_F_GLUTE_2D_6,
+ CYCLE_PL_F_BASE_12,
+ CYCLE_BB_M_BEGINNER_UL_8,
+ CYCLE_BB_M_CUT_UL_8,
+ CYCLE_BB_M_PEC_8,
+ CYCLE_BB_M_BACK_10,
+ CYCLE_BB_M_MAINT_4,
+ CYCLE_BB_M_DUMBBELL_8,
    // СРЦ2
    SRC2_MURAVYOV_16,
    SRC2_SOLOVYOV_BENCH_28,

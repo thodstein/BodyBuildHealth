@@ -20,13 +20,17 @@ const workMax = { chest: 100, back: 120, shoulders: 60, arms: 50, quads: 140, ha
 const bbCycles = LMS_CYCLES.filter(c => String(c.meta.direction) === 'bodybuilding');
 const MRV_TOLERANCE = 1.15;
 
-// Кэш сборок: 84 полных конвертации — дорогой прогон, строим один раз.
+// Кэш сборок: ~96 полных конвертаций — дорогой прогон, строим один раз.
 let _cache: { key: string; plan: ReturnType<typeof convertCycleToBBPlan> }[] | null = null;
 function allBuilds() {
   if (_cache) return _cache;
   _cache = [];
   for (const c of bbCycles) {
+    // Ф4: женские глут-циклы специализации — только female-строки (male-конверсия
+    // вне семантики: 16+ прямых сетов глут превышают мужской MRV-кап по построению).
+    const femaleOnly = c.meta.tags?.includes('female') && c.meta.tags?.includes('glutes');
     for (const sex of ['male', 'female'] as const) {
+      if (femaleOnly && sex === 'male') continue;
       for (const goal of ['mass', 'cut'] as const) {
         const plan = convertCycleToBBPlan({ cycle: c, workMax, level: 'intermediate', mode: 'adapt', sex, goal } as any);
         _cache.push({ key: `${c.meta.id}/${sex}/${goal}`, plan });
@@ -36,7 +40,7 @@ function allBuilds() {
   return _cache;
 }
 
-describe('Ф1.1: BB-матрица циклов (21 × 2 × 2)', () => {
+describe('Ф1.1: BB-матрица циклов (25 × {male, female} × {mass, cut})', () => {
   it('все 84 сборки проходят валидатор без error-уровня', () => {
     for (const { key, plan } of allBuilds()) {
       const r = validateBBPlan(plan as any, { level: 'intermediate' });

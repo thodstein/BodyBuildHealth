@@ -110,9 +110,11 @@ describe('Ручная библиотека: маппинг фильтров (в
   it('уровень Новичок/Опытный больше не даёт 0 ПЛ-циклов', () => {
     const beg = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'beginner'));
     const adv = LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'advanced'));
-    // 10 = 9 базовых novice + cycle-bb-f-beginner-6 (женский стартовый, P2-13)
-    expect(beg.length).toBe(10);
-    expect(adv.length).toBe(59);
+    // 12 = 9 базовых novice + cycle-bb-f-beginner-6 (P2-13) + glute-2d-6 и
+    // beginner-ul-8 (вторая волна Ф4, CYCLE-SYSTEM-FULL-AUDIT)
+    expect(beg.length).toBe(12);
+    // 62 = 59 базовых + glute-adv-12 / pec-8 / back-10 (KMS-MS, вторая волна Ф4)
+    expect(adv.length).toBe(62);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
 
@@ -141,7 +143,7 @@ describe('Ручная библиотека: маппинг фильтров (в
     fireEvent.click(screen.getByRole('tab', { name: /ПЛ \(/ }));
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'beginner' } });
-    // 10 novice-циклов: 9 базовых + женский стартовый (cycle-bb-f-beginner-6)
-    expect(screen.getByRole('tab', { name: /ПЛ \(10\)/ })).toBeInTheDocument();
+    // 12 novice-циклов: 9 базовых + женский стартовый (P2-13) + 2 второй волны (Ф4)
+    expect(screen.getByRole('tab', { name: /ПЛ \(12\)/ })).toBeInTheDocument();
   });
 });
