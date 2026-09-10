@@ -229,6 +229,20 @@ describe('Combat bugfixes', () => {
     expect(screen.getByRole('button', { name: /Собрать PRO-план/ }).textContent).not.toContain('combat_4');
   });
 
+  it('смена уровня на новичка сбрасывает combat_4', () => {
+    render(<CombatConstructor />);
+    go('4 Сплит');
+    fireEvent.click(screen.getByRole('button', { name: /4×\/нед — Верх\/Низ ×2/ }));
+    expect(screen.getByRole('button', { name: /Собрать PRO-план.*combat_4/ })).toBeTruthy();
+    go('1 Параметры');
+    fireEvent.click(screen.getByRole('button', { name: 'Уровень' }));
+    const dlg = screen.getByRole('dialog', { name: 'Уровень' });
+    fireEvent.click(within(dlg).getByText('Новичок'));
+    expect(document.body.textContent).toContain('Сплит сброшен под уровень');
+    go('4 Сплит');
+    expect(screen.getByRole('button', { name: /Собрать PRO-план/ }).textContent).not.toContain('combat_4');
+  });
+
   it('весогонка в 0 сбрасывает моды воды/натрия/углей', () => {
     const { container } = render(<CombatConstructor />);
     go('3 Вне зала');

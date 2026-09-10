@@ -124,6 +124,14 @@ const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'L
 const CB_RU_INTERF: Record<string, string> = { high: 'высокая', medium: 'средняя', low: 'низкая' };
 const CB_RU_MODE: Record<string, string> = { stable: 'стабильно', load_cut: 'загрузка-срез', moderate_cut: 'плавный срез', deplete_reload: 'слив-загрузка' };
 export function cbRuInterference(v: string): string { return CB_RU_INTERF[v] || v; }
+/** RU-имена для экспортов (печать/CSV/XLS/ICS/год): теги сессий, фазы года, статусы. */
+const CB_RU_SESSION: Record<string, string> = { upper_power: 'Верх · тяж', lower_power: 'Низ · тяж', full_power: 'Фулбоди · тяж', full_conditioning: 'Фулбоди + кондиция', neck_grip: 'Шея + хват' };
+export function cbSessionTagName(tag: string): string { return CB_RU_SESSION[tag] || tag; }
+export function cbDisciplineName(id: string): string { return CB_RU_DISC[id] || id; }
+const CB_RU_APHASE: Record<string, string> = { accumulation: 'Накопление', transmutation: 'Трансформация', realization: 'Реализация', transition: 'Переход', gpp: 'ОФП', power: 'Сила', taper: 'Тапер', deload: 'Делод', conjugate: 'Сопряжённая' };
+export function cbAnnualPhaseName(p: string): string { return CB_RU_APHASE[p] || p; }
+const CB_RU_STATUS: Record<string, string> = { built: 'собран', planned: 'запланирован', error: 'ошибка' };
+export function cbAnnualStatusName(s: string): string { return CB_RU_STATUS[s] || s; }
 const CB_TECHNIQUE: Record<string,string> = {
   bench_bar:'Жим: лопатки сведены, грудь вверх, стопы в пол',
   row_bar:'Тяга: нейтральная спина, локти к корпусу',
@@ -312,7 +320,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const goal = input.goal || (outsideSessions >= 4 ? 'maintenance' : 'power');
 
   let pattern: CombatPattern | undefined = input.patternId ? getCombatPattern(input.patternId) : undefined;
-  if (!pattern || pattern.sessionsPerRotation !== daysPerWeek) {
+  const patternLevelMismatch = !!pattern && !pattern.level.includes(level);
+  if (!pattern || pattern.sessionsPerRotation !== daysPerWeek || patternLevelMismatch) {
     pattern = recommendCombatPattern(daysPerWeek, outsideSessions, level);
   }
   const outsideMetrics = computeOutsideMetrics(effectiveOutsideLoad as OutsideLoad);
@@ -353,6 +362,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const wcProtocol = input.weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
   if (forceDowngraded) rationale.push(`Частота зала снижена ${origPatternId}→${pattern.id} из-за высокой внезальной ${outsideSessions}×/нед (sparring) — перегруз предотвращён`);
+  if (patternLevelMismatch) rationale.push(`Сплит ${input.patternId} не для уровня «${level}» — взят ${pattern.name}`);
   rationale.push(`Дисциплина: ${CB_RU_DISC[discipline] || discipline} · стиль ${CB_RU_STYLE[input.fightStyle as string] || input.fightStyle || 'гибрид'} · цель ${CB_RU_GOAL[goal] || goal} · ${weeks} нед · ${pattern.name} · модель ${CB_RU_MODEL[periodModelEarly] || periodModelEarly}`);
   rationale.push(styleNarrative(input.fightStyle as any, discipline as any));
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));

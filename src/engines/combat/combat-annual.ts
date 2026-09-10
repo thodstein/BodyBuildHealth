@@ -3,6 +3,7 @@
  * Не трогает annual-training.
  */
 import type { CombatPlan } from './combat.types';
+import { cbAnnualPhaseName, cbAnnualStatusName, cbDisciplineName } from './combat-builder.engine';
 export type AnnualCBPhase = 'accumulation' | 'transmutation' | 'realization' | 'transition' | 'gpp' | 'power' | 'taper';
 export interface AnnualCBBlock { id: string; startWeek:number; weeks:number; discipline:string; phase: AnnualCBPhase; status:'built'|'planned'|'error'; plan?: CombatPlan; fightDate?: string | null; }
 export interface AnnualCBCompetition { id:string; name:string; date:string; weightClass?:string; }
@@ -169,20 +170,20 @@ export function buildAnnualPrintHtml(annual: AnnualCB): string {
   const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };
   const rows = annual.blocks.map(b=>{
     const col = phaseColor[b.phase] || '#6b7280';
-    return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(b.phase)}</span></td><td>${esc(b.discipline)}</td><td>${b.weeks}нед</td><td>${b.status}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
+    return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(cbAnnualPhaseName(b.phase))}</span></td><td>${esc(cbDisciplineName(b.discipline))}</td><td>${b.weeks}нед</td><td>${esc(cbAnnualStatusName(b.status))}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
   }).join('');
   const comps = annual.competitions.map(c=> `<li>${esc(c.name)} — ${esc(c.date)} ${c.weightClass? '('+esc(c.weightClass)+')':''}</li>`).join('');
   // Gantt — горизонтальная полоса ATR (как annual-training-print)
   const ganttSegs = annual.blocks.map(b=> {
     const col = phaseColor[b.phase] || '#6b7280';
     const w = (b.weeks / annual.totalWeeks * 100).toFixed(2);
-    const label = `${esc(b.phase)} ${b.weeks}н`;
+    const label = `${esc(cbAnnualPhaseName(b.phase))} ${b.weeks}н`;
     return `<div title="${label} нед ${b.startWeek}-${b.startWeek+b.weeks-1}${b.fightDate? ' бой '+esc(b.fightDate):''}" style="width:${w}%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:7px;font-weight:700;overflow:hidden;white-space:nowrap;border-right:0.5px solid #fff">${b.weeks>=3? label : ''}</div>`;
   }).join('');
   const gantt = `<div style="display:flex;height:14px;border-radius:6px;overflow:hidden;border:0.5px solid #e5e7eb;margin:8px 0 4px">${ganttSegs}</div><div style="display:flex;justify-content:space-between;font-size:8px;color:#6b7280"><span>Нед 1</span><span>Нед ${annual.totalWeeks}</span></div>`;
   const hash = `cb-${annual.discipline}-${annual.totalWeeks}w-${annual.blocks.map(b=> b.phase[0]).join('')}`;
   const qrData = encodeURIComponent(hash);
-  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(annual.discipline)} ${annual.totalWeeks}нед</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px;color:#111}table th{background:#f3f4f6} h1{margin:0 0 8px} @media print{body{padding:8px}}</style></head><body><h1>${esc(annual.discipline.toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1>${gantt}<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;margin-top:8px"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul><div style="margin-top:12px;padding:8px 10px;background:#f3f4f6;border-radius:6px;font-size:10px;color:#6b7280;display:flex;align-items:center;gap:10">hash: ${esc(hash)} · #combat-annual · печать: Ctrl+P → PDF <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${qrData}" alt="QR ${esc(hash)}" style="border-radius:4px;border:0.5px solid #e5e7eb" width="70" height="70"/></div></body></html>`;
+  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(cbDisciplineName(annual.discipline))} ${annual.totalWeeks}нед</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px;color:#111}table th{background:#f3f4f6} h1{margin:0 0 8px} @media print{body{padding:8px}}</style></head><body><h1>${esc(cbDisciplineName(annual.discipline).toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1>${gantt}<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;margin-top:8px"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul><div style="margin-top:12px;padding:8px 10px;background:#f3f4f6;border-radius:6px;font-size:10px;color:#6b7280;display:flex;align-items:center;gap:10">hash: ${esc(hash)} · #combat-annual · печать: Ctrl+P → PDF <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${qrData}" alt="QR ${esc(hash)}" style="border-radius:4px;border:0.5px solid #e5e7eb" width="70" height="70"/></div></body></html>`;
 }
 
 export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): string {
@@ -193,7 +194,7 @@ export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): str
   for (const b of annual.blocks) {
     const s = new Date(start.getTime() + (b.startWeek-1)*7*86400000);
     const e = new Date(s.getTime() + b.weeks*7*86400000);
-    lines.push('BEGIN:VEVENT', `UID:cb-${b.id}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(s)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`${b.phase} ${b.discipline} ${b.weeks}нед`)}`, `DESCRIPTION:${escIcs(`Фаза ${b.phase}, статус ${b.status}${b.fightDate?' бой '+b.fightDate:''}`)}`, 'END:VEVENT');
+    lines.push('BEGIN:VEVENT', `UID:cb-${b.id}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(s)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`${cbAnnualPhaseName(b.phase)} ${cbDisciplineName(b.discipline)} ${b.weeks}нед`)}`, `DESCRIPTION:${escIcs(`Фаза ${cbAnnualPhaseName(b.phase)}, статус ${cbAnnualStatusName(b.status)}${b.fightDate?' бой '+b.fightDate:''}`)}`, 'END:VEVENT');
   }
   for (const c of annual.competitions) {
     const d = new Date(c.date);

@@ -103,10 +103,24 @@ export function getCombatPattern(id: string): CombatPattern | undefined {
 export function recommendCombatPattern(daysPerWeek: number, outsideSessions: number, level: string): CombatPattern {
   // при высокой внезальной — не рекомендуем 4×
   if (outsideSessions >= 4 && daysPerWeek >= 4) daysPerWeek = 3;
+  // сначала — подходящие по дням И уровню (новичку нельзя intermediate+ паттерны)
+  const byDaysLevel = COMBAT_PATTERNS.filter(p => p.sessionsPerRotation === daysPerWeek && p.level.includes(level));
+  if (byDaysLevel.length) return byDaysLevel[0];
   const byDays = COMBAT_PATTERNS.filter(p => p.sessionsPerRotation === daysPerWeek);
   if (byDays.length) {
     const byLevel = byDays.find(p => p.level.includes(level));
     if (byLevel) return byLevel;
+    // дни совпали, уровень нет — ближайший подходящий по уровню
+    const lvlOk = COMBAT_PATTERNS.filter(p => p.level.includes(level));
+    if (lvlOk.length) {
+      let best = lvlOk[0];
+      let bestDiff = Math.abs(best.sessionsPerRotation - daysPerWeek);
+      for (const p of lvlOk) {
+        const d = Math.abs(p.sessionsPerRotation - daysPerWeek);
+        if (d < bestDiff) { best = p; bestDiff = d; }
+      }
+      return best;
+    }
     return byDays[0];
   }
   // fallback ближайший

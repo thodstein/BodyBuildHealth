@@ -181,7 +181,7 @@ export const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', in
 export const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', transmutation: 'Трансформация', realization: 'Реализация', gpp: 'ОФП', power: 'Сила', taper: 'Тапер', deload: 'Разгрузка', conjugate: 'Сопряжённая', transition: 'Переход', intensification: 'Интенсификация', peaking: 'Пик' };
 export const ZONE_RU: Record<string, string> = { optimal: 'Оптимум', caution: 'Внимание', dangerous: 'Перегруз', undertrained: 'Недотрен' };
 export const PERIODIZATION_RU: Record<string, string> = { atr_10: 'ATR 5/3/2 · 10 нед', linear_12: 'Линейная · 12 нед', conjugate: 'Сопряжённая' };
-export const SESSION_TAG_RU: Record<string, string> = { upper_power: 'Верх тяж', lower_power: 'Низ тяж', full_power: 'Фулбоди тяж', full_conditioning: 'Фулбоди+конд.', snatch_day: 'Рывок', clean_day: 'Толчок', strength_day: 'Сила' };
+export const SESSION_TAG_RU: Record<string, string> = { upper_power: 'Верх тяж', lower_power: 'Низ тяж', full_power: 'Фулбоди тяж', full_conditioning: 'Фулбоди+конд.', neck_grip: 'Шея+хват', snatch_day: 'Рывок', clean_day: 'Толчок', strength_day: 'Сила' };
 export function ruLabel(map: Record<string, string>, key: string | undefined | null) { return key != null ? ((map as any)[key] ?? key) : ''; }
 
 // ─── Apple компоненты ───

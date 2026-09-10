@@ -5,6 +5,10 @@
  */
 import type { CombatPlan } from './combat.types';
 import { getCombat } from './combat-volume';
+import { cbSessionTagName, cbDisciplineName, cbAnnualPhaseName } from './combat-builder.engine';
+
+const CB_RU_GOAL_X: Record<string, string> = { power: 'Взрывная сила', endurance: 'Выносливость', maintenance: 'Поддержание', camp: 'Кэмп к бою', weight_cut: 'Весогонка' };
+const CB_RU_LEVEL_X: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'На курсе' };
 import * as XLSXNS from 'xlsx';
 const XLSX: any = (XLSXNS as any).default || XLSXNS;
 
@@ -16,10 +20,10 @@ export function buildCombatXlsxHtml(plan: CombatPlan): string {
   // шапка с Gantt
   const ganttCells = plan.weeksData.map(w=> {
     const col = phaseColor[w.phase] || '#a855f7';
-    return `<th style="background:${col};color:#fff;font-size:9px;padding:4px;">Н${w.week}<br/>${escCell(w.phase)}</th>`;
+    return `<th style="background:${col};color:#fff;font-size:9px;padding:4px;">Н${w.week}<br/>${escCell(cbAnnualPhaseName(w.phase))}</th>`;
   }).join('');
   const header = `<tr style="background:#1f1f23;color:#fff;"><th style="padding:6px;">Неделя</th>${ganttCells}</tr>`;
-  const ganttRow = `<tr><td style="padding:4px;font-weight:700;">Фаза</td>${plan.weeksData.map(w=> `<td style="background:${(phaseColor[w.phase]||'#a855f7')}14;border-left:3px solid ${phaseColor[w.phase]||'#a855f7'};padding:4px;font-size:10px;">${escCell(w.phase)}<br/>${w.totalSets||0}с</td>`).join('')}</tr>`;
+  const ganttRow = `<tr><td style="padding:4px;font-weight:700;">Фаза</td>${plan.weeksData.map(w=> `<td style="background:${(phaseColor[w.phase]||'#a855f7')}14;border-left:3px solid ${phaseColor[w.phase]||'#a855f7'};padding:4px;font-size:10px;">${escCell(cbAnnualPhaseName(w.phase))}<br/>${w.totalSets||0}с</td>`).join('')}</tr>`;
   // heatmap шея/хват/core
   const heatKind = (kind:'neck'|'grip'|'core', w:any) => {
     let sets = 0;
@@ -38,20 +42,20 @@ export function buildCombatXlsxHtml(plan: CombatPlan): string {
     const col = phaseColor[w.phase] || '#a855f7';
     const sessHtml = w.sessions.map(s=> {
       const exRows = s.exercises.map(e=> `<tr><td>${escCell(e.name)}</td><td>${e.sets}×${escCell(e.reps)}</td><td>${e.weight}кг</td><td>RIR${e.rir}</td><td>${escCell(e.tempo||'')}</td><td>${e.restSeconds||''}с</td><td style="font-size:9px;">${escCell(e.comment||'')}</td></tr>`).join('');
-      return `<h4 style="margin:8px 0 4px;color:${col};">День ${s.day} · ${escCell(s.sessionTag)} · ${escCell(s.character)} · ${s.durationMin||''}′</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;"><tr style="background:#f3f4f6;"><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
+      return `<h4 style="margin:8px 0 4px;color:${col};">День ${s.day} · ${escCell(cbSessionTagName(s.sessionTag))} · ${escCell(s.character)} · ${s.durationMin||''}′</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;"><tr style="background:#f3f4f6;"><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
     }).join('');
-    return `<div style="border-left:4px solid ${col};background:${col}0a;padding:8px;margin:8px 0;"><h3 style="margin:0 0 6px;color:${col};">Неделя ${w.week} · ${escCell(w.phase)}${w.deload?' · делод':(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов ${(w as any).totalTonnage? `· ${(((w as any).totalTonnage)/1000).toFixed(1)}т`:''}</h3>${sessHtml}</div>`;
+    return `<div style="border-left:4px solid ${col};background:${col}0a;padding:8px;margin:8px 0;"><h3 style="margin:0 0 6px;color:${col};">Неделя ${w.week} · ${escCell(cbAnnualPhaseName(w.phase))}${w.deload?' · делод':(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов ${(w as any).totalTonnage? `· ${(((w as any).totalTonnage)/1000).toFixed(1)}т`:''}</h3>${sessHtml}</div>`;
   }).join('<hr/>');
   // sparring / weightcut / style
   const snap: any = plan.inputSnapshot || {};
   const metaRows = [
-    snap.sparringLoad ? `<tr><td>Спарринг</td><td>hard ${snap.sparringLoad.hardSparSessions}× / tech ${snap.sparringLoad.techSparSessions}× / борьба ${snap.sparringLoad.wrestlingSessions}×</td></tr>` : '',
-    snap.weightCutProtocol ? `<tr><td>Весогонка ISSN</td><td>${snap.weightCutProtocol.targetLossKg}кг · ${snap.weightCutProtocol.weighInType} · ${snap.weightCutProtocol.waterMode}/${snap.weightCutProtocol.sodiumMode}/${snap.weightCutProtocol.carbMode} · ORS ${snap.weightCutProtocol.orsSodiumMmolPerDl} · fiber ${snap.weightCutProtocol.fiberGPerDay}г</td></tr>` : '',
-    snap.fightStyle ? `<tr><td>Стиль</td><td>${escCell(snap.fightStyle)} — ${snap.fightStyle==='striker'?'ротация+плио':snap.fightStyle==='grappler'?'шея/хват':'баланс'}</td></tr>` : '',
+    snap.sparringLoad ? `<tr><td>Спарринг</td><td>жёсткий ${snap.sparringLoad.hardSparSessions}× / технический ${snap.sparringLoad.techSparSessions}× / борьба ${snap.sparringLoad.wrestlingSessions}×</td></tr>` : '',
+    snap.weightCutProtocol ? `<tr><td>Весогонка ISSN</td><td>${snap.weightCutProtocol.targetLossKg}кг · ${snap.weightCutProtocol.weighInType==='same_day_2h'?'взвешивание в день':'взвешивание за 24ч'} · вода/Na/угли · ORS ${snap.weightCutProtocol.orsSodiumMmolPerDl} · волокно ${snap.weightCutProtocol.fiberGPerDay}г</td></tr>` : '',
+    snap.fightStyle ? `<tr><td>Стиль</td><td>${escCell(snap.fightStyle==='striker'?'ударник':snap.fightStyle==='grappler'?'борец':'гибрид')} — ${snap.fightStyle==='striker'?'ротация+плио':snap.fightStyle==='grappler'?'шея/хват':'баланс'}</td></tr>` : '',
   ].filter(Boolean).join('');
   const metaTable = metaRows ? `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;margin:8px 0;font-size:11px;"><tr style="background:#1f1f23;color:#fff;"><th>Параметр</th><th>Значение</th></tr>${metaRows}</table>` : '';
   const hash = `cb-${plan.discipline}-${plan.weeks}w-${plan.patternId}`;
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial,sans-serif;padding:12px;color:#111} h2{margin:0} h3{margin:8px 0 4px} table th{background:#1f1f23;color:#fff} @media print{body{padding:8px}}</style></head><body><h2>Единоборства ${escHtml(plan.discipline)} · ${escHtml(plan.goal)} · ${escHtml(plan.level)} · ${plan.weeks}нед · ${escHtml(plan.patternId)}</h2><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;">${header}${ganttRow}</table><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;margin:6px 0;font-size:11px;"><tr style="background:#1f1f23;color:#fff;"><th>Heatmap</th>${plan.weeksData.map(w=> `<th>Н${w.week}</th>`).join('')}</tr>${heatRows}</table>${metaTable}${weeksHtml}<div style="margin-top:12px;font-size:10px;color:#6b7280;">hash: ${escHtml(hash)} · #combat-xlsx · Excel HTML</div></body></html>`;
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial,sans-serif;padding:12px;color:#111} h2{margin:0} h3{margin:8px 0 4px} table th{background:#1f1f23;color:#fff} @media print{body{padding:8px}}</style></head><body><h2>Единоборства ${escHtml(cbDisciplineName(plan.discipline))} · ${escHtml(CB_RU_GOAL_X[plan.goal] || plan.goal)} · ${escHtml(CB_RU_LEVEL_X[plan.level] || plan.level)} · ${plan.weeks}нед · ${escHtml(plan.patternId)}</h2><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;">${header}${ganttRow}</table><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;margin:6px 0;font-size:11px;"><tr style="background:#1f1f23;color:#fff;"><th>Heatmap</th>${plan.weeksData.map(w=> `<th>Н${w.week}</th>`).join('')}</tr>${heatRows}</table>${metaTable}${weeksHtml}<div style="margin-top:12px;font-size:10px;color:#6b7280;">hash: ${escHtml(hash)} · #combat-xlsx · Excel HTML</div></body></html>`;
 }
 
 export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
@@ -63,7 +67,7 @@ export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
   for (const w of plan.weeksData) {
     for (const s of w.sessions) {
       for (const e of s.exercises) {
-        rows.push([w.week, w.phase, s.day, s.sessionTag, s.character, e.name, e.sets, e.reps, e.weight, e.rir, e.tempo||'', e.restSeconds||'', e.comment||'']);
+        rows.push([w.week, cbAnnualPhaseName(w.phase), s.day, cbSessionTagName(s.sessionTag), s.character, e.name, e.sets, e.reps, e.weight, e.rir, e.tempo||'', e.restSeconds||'', e.comment||'']);
       }
     }
   }
@@ -89,10 +93,10 @@ export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
   XLSX.utils.book_append_sheet(wb, ws2, 'Heatmap');
   // Sheet 3: Мета
   const snap:any = plan.inputSnapshot || {};
-  const meta: any[][] = [['Параметр','Значение'], ['Дисциплина', plan.discipline], ['Цель', plan.goal], ['Уровень', plan.level], ['Недель', plan.weeks], ['Паттерн', plan.patternId]];
-  if (snap.sparringLoad) meta.push(['Спарринг', `hard ${snap.sparringLoad.hardSparSessions}× / tech ${snap.sparringLoad.techSparSessions}× / борьба ${snap.sparringLoad.wrestlingSessions}×`]);
-  if (snap.weightCutProtocol) meta.push(['Весогонка', `${snap.weightCutProtocol.targetLossKg}кг · ${snap.weightCutProtocol.weighInType} · ${snap.weightCutProtocol.waterMode}/${snap.weightCutProtocol.sodiumMode}/${snap.weightCutProtocol.carbMode} · ORS ${snap.weightCutProtocol.orsSodiumMmolPerDl} · fiber ${snap.weightCutProtocol.fiberGPerDay}г`]);
-  if (snap.fightStyle) meta.push(['Стиль', snap.fightStyle]);
+  const meta: any[][] = [['Параметр','Значение'], ['Дисциплина', cbDisciplineName(plan.discipline)], ['Цель', CB_RU_GOAL_X[plan.goal] || plan.goal], ['Уровень', CB_RU_LEVEL_X[plan.level] || plan.level], ['Недель', plan.weeks], ['Паттерн', plan.patternId]];
+  if (snap.sparringLoad) meta.push(['Спарринг', `жёсткий ${snap.sparringLoad.hardSparSessions}× / технический ${snap.sparringLoad.techSparSessions}× / борьба ${snap.sparringLoad.wrestlingSessions}×`]);
+  if (snap.weightCutProtocol) meta.push(['Весогонка', `${snap.weightCutProtocol.targetLossKg}кг · ${snap.weightCutProtocol.weighInType==='same_day_2h'?'взвешивание в день':'взвешивание за 24ч'} · вода/Na/угли · ORS ${snap.weightCutProtocol.orsSodiumMmolPerDl} · волокно ${snap.weightCutProtocol.fiberGPerDay}г`]);
+  if (snap.fightStyle) meta.push(['Стиль', snap.fightStyle==='striker'?'ударник':snap.fightStyle==='grappler'?'борец':'гибрид']);
   meta.push(['Hash', `cb-${plan.discipline}-${plan.weeks}w-${plan.patternId}`]);
   const ws3 = XLSX.utils.aoa_to_sheet(meta);
   ws3['!cols'] = [{wch:16},{wch:48}];

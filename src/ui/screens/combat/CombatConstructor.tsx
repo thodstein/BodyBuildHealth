@@ -123,8 +123,18 @@ export const CombatConstructor: React.FC = () => {
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
 
-  /* Смена дней сбрасывает вручную выбранный сплит под новую частоту —
-   * иначе UI показывал бы combat_4, а движок молча строил бы на combat_2a. */
+  /* Смена уровня/дней сбрасывает вручную выбранный сплит под новые условия —
+   * иначе UI показывал бы combat_4, а движок молча строил бы на другом. */
+  const changeLevel = (v: CombatInput['level']) => {
+    setLevel(v);
+    if (patternId) {
+      const p = COMBAT_PATTERNS.find(p => p.id === patternId);
+      if (p && !p.level.includes(v as string)) {
+        setPatternId('');
+        setMsg('Сплит сброшен под уровень — выберите заново'); setTimeout(() => setMsg(''), 2600);
+      }
+    }
+  };
   const changeDays = (n: number) => {
     setDays(n);
     if (patternId) {
@@ -554,7 +564,7 @@ export const CombatConstructor: React.FC = () => {
                 ]} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <CombatPopupSelect label="Уровень" value={level} onChange={v=> setLevel(v as any)} options={[
+                <CombatPopupSelect label="Уровень" value={level} onChange={v=> changeLevel(v as any)} options={[
                   { id:'beginner', label:'Новичок', desc:'RIR 3-4, техника' },
                   { id:'intermediate', label:'Средний', desc:'RIR 2-3' },
                   { id:'advanced', label:'Продвинутый', desc:'RIR 1-2, taper' },
