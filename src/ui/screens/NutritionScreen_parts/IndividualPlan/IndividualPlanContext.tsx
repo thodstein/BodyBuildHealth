@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
+﻿import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
 import { applyBBNutritionToTargets } from "./planner-bb-nutrition";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
@@ -3156,6 +3156,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const hardWindow: string[][] = varietyLedgerRef.current.recent.length > 0
         ? [...varietyLedgerRef.current.recent]
         : [];
+      // FIX «свалка»: offset уже пушивший семейства в weekFamilies (в week-пути день 0
+      // строится дважды: d1 + week-цикл — двойной пуш давал бан с первого дня недели).
+      const _pushedFamOffsets = new Set<number>();
       const collectDayFoods = (day: any): string[] => {
         const ids: string[] = [];
         if (day?.meals) day.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) ids.push(it.id); }));
@@ -3536,10 +3539,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // D (Эпик D): леджер хранит окно последних 2 дней — стык недель месяца не повторяет стейплы.
         varietyLedgerRef.current.recent = hardWindow.slice();
         // P1-3: семейства дня → недельный ledger («одна крупа ≤2 дней недели»,
-        // гейт weekStapleFamilies в движке). P1-1/P1-4: весь леджер персистится.
+        // гейт weekStapleFamilies в движке). P1-1/P1-4: весь леджер персистится
+        // (СОХРАНЕНИЕ всегда — recents/fresh-гейт живут между регенерациями).
+        // FIX «свалка» (жалоба Sep 09): пуш weekFamilies — только в многодневном
+        // прогоне и 1 раз на offset (в week-пути день 0 строился дважды — d1 +
+        // week-цикл — и его семейства сразу давали ≥2 → бан гарниров с 1-го дня);
+        // одиночная генерация дня НЕ пушит (иначе 2-я регенерация дня банила
+        // собственные гарниры → движок тянул остатки пула).
         try {
           const _dayFams = Array.from(new Set(_dayFoodIds.map((id: string) => stapleFamilyOf(id)).filter(Boolean) as string[]));
-          varietyLedgerRef.current.weekFamilies = [...varietyLedgerRef.current.weekFamilies, _dayFams].slice(-LEDGER_WEEK_FAMILIES_CAP);
+          if (days >= 3 && !_pushedFamOffsets.has(offset)) {
+            _pushedFamOffsets.add(offset);
+            varietyLedgerRef.current.weekFamilies = [...varietyLedgerRef.current.weekFamilies, _dayFams].slice(-LEDGER_WEEK_FAMILIES_CAP);
+          }
           saveVarietyLedger({
             foods: Array.from(varietyLedgerRef.current.foods),
             recipes: Array.from(varietyLedgerRef.current.recipes),
@@ -3587,6 +3599,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         };
       };
 
+      // FIX «свалка»: окно weekFamilies — только текущая многодневная генерация
+      // (пушится в buildOneDay; ресет здесь = новая неделя начинается с чистого окна,
+      // баны из прошлых регенераций не наследуются).
+      varietyLedgerRef.current.weekFamilies = [];
       await maybeYield();
       const d1 = buildOneDay(dayIdx);
       let d2: any = null, d3: any = null, weekDays: any[] = [], weekData: any = null;
@@ -3602,6 +3618,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // давая две тренировки подряд на стыке недель).
         const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
         const _weekAcc: any[] = [];
+        // FIX «свалка»: новая неделя месяца — чистое окно weekFamilies (бан не тащится
+        // из прошлой недели/прошлых регенераций).
+        varietyLedgerRef.current.weekFamilies = [];
         for (let _i = 0; _i < 7; _i++) {
           await maybeYield();
           _weekAcc.push(buildOneDay(_weekBase + _i));

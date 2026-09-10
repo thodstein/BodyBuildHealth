@@ -3,7 +3,7 @@
  * работоспособность/дубли (B1/B3/B6/C5 + P1-6 HV-стиль + P1-9 «Снять потолок»).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { IndividualPlan } from '../index';
 
@@ -82,5 +82,25 @@ describe('Настройки: аудит кнопок (фиксы B1/B6/C5/C8 + 
       expect(Array.isArray(l.foods) && l.foods.length > 0).toBe(true);
       expect(Array.isArray(l.weekFamilies)).toBe(true);
     }, { timeout: 30000 });
+  });
+
+  it('FIX «свалка»: одиночная генерация дня НЕ пушит weekFamilies, перегенерация не накапливает', { timeout: 45000 }, async () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickBtn(/Сгенерировать план питания/);
+    await waitFor(() => {
+      expect(localStorage.getItem('he_planner_variety_ledger_v1')).toBeTruthy();
+    }, { timeout: 30000 });
+    // день 1: weekFamilies пусты (пуш только в многодневных прогонах)
+    const after1 = JSON.parse(localStorage.getItem('he_planner_variety_ledger_v1')!);
+    expect(after1.weekFamilies.length, 'одиночный день попушит семейства → накопительный бан гарниров').toBe(0);
+    // перегенерация (свежий монтируй + сброс сохранённого таба «План»):
+    // окно не растёт (ресет на старте прогона)
+    cleanup();
+    localStorage.removeItem('he_plan_active_tab');
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickBtn(/Сгенерировать план питания/);
+    await new Promise(r => setTimeout(r, 12000));
+    const after2 = JSON.parse(localStorage.getItem('he_planner_variety_ledger_v1')!);
+    expect(after2.weekFamilies.length, 'weekFamilies накапливаются между регенерациями дня').toBe(0);
   });
 });
