@@ -196,6 +196,21 @@ function rirTint(rir: any): React.CSSProperties {
   return c ? { borderColor: `${c}88`, color: c, fontVariantNumeric: 'tabular-nums' as const } : { fontVariantNumeric: 'tabular-nums' as const };
 }
 
+/* ── №2 Варианты арм-планов (как bb-plans-store, легче): сохранить текущий
+ * (с применёнными правками), загрузить, удалить. Кап 10, старый вытесняется. ── */
+const ARM_VARIANTS_KEY = 'he_arm_plan_variants';
+export type ArmPlanVariant = { id: string; name: string; dateIso: string; plan: any };
+export function loadArmVariants(): ArmPlanVariant[] {
+  try {
+    const raw = localStorage.getItem(ARM_VARIANTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((v) => v && v.plan && Array.isArray(v.plan.weeks)) : [];
+  } catch { return []; }
+}
+export function saveArmVariants(list: ArmPlanVariant[]): void {
+  try { localStorage.setItem(ARM_VARIANTS_KEY, JSON.stringify(list.slice(0, 10))); } catch {}
+}
+
 /* ── №1 Ручная коррекция плана (overlay поверх builtPlan, как exerciseEdits
  * в ББ-авто): сеты/повторы/вес + своп внутри substitutionGroup каталога.
  * Валидация/отчёт остаются базовыми (честная пометка «с правками»). ── */
@@ -709,6 +724,9 @@ export function ArmAutoConstructor() {
   // №1: ручные правки упражнений (overlay; сбрасываются при пересборке)
   const [armEdits, setArmEdits] = useState<Record<string, ArmExerciseEdit>>({});
   const [editOpen, setEditOpen] = useState<string | null>(null);
+  // №2: сохранённые варианты
+  const [armVariants, setArmVariants] = useState<ArmPlanVariant[]>(() => loadArmVariants());
+  const [variantName, setVariantName] = useState('');
   const viewPlan = useMemo(() => applyArmEdits(builtPlan, armEdits, workMax), [builtPlan, armEdits, workMax]);
   const editsCount = Object.keys(armEdits).length;
 
@@ -1596,6 +1614,48 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch { fallback(); }
                 }}>📋 Копировать сводку</AdBtn>
               </div>
+              <AdSec title="💾 Варианты плана" hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10." collapsible defaultOpen={false} summary={`${armVariants.length}/10`}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <AdField label="Название варианта">
+                    <input aria-label="Название варианта" value={variantName} onChange={e=>setVariantName(e.target.value)} placeholder={`${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед`} style={{ minWidth: 180 }} />
+                  </AdField>
+                  <AdBtn variant="primary" onClick={()=>{
+                    const name = variantName.trim() || `${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед · ${new Date().toLocaleDateString('ru-RU')}`;
+                    const v: ArmPlanVariant = { id: `armv-${Date.now()}`, name, dateIso: new Date().toISOString(), plan: viewPlan };
+                    const next = [v, ...armVariants].slice(0, 10);
+                    setArmVariants(next);
+                    saveArmVariants(next);
+                    setVariantName('');
+                    flash(`💾 Вариант сохранён: ${name}`);
+                  }}>💾 Сохранить вариант{editsCount > 0 ? ' (с правками)' : ''}</AdBtn>
+                </div>
+                {armVariants.length === 0 ? <div className="ad-muted">Вариантов пока нет.</div> : (
+                  <div className="ad-list" data-arm="variants-list">
+                    {armVariants.map(v=>(
+                      <div key={v.id} className="ad-sec ad-bio" data-valid="na">
+                        <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ flex: 1 }}><b>{v.name}</b> <span className="ad-muted">· {(v.plan?.weeks || []).length} нед · {String(v.dateIso || '').slice(0, 10)}</span></span>
+                          <AdBtn variant="ghost" aria-label={`Загрузить ${v.name}`} onClick={()=>{
+                            setBuiltPlan(v.plan);
+                            try { localStorage.setItem('he_arm_last_plan', JSON.stringify(v.plan)); } catch {}
+                            setArmEdits({});
+                            setEditOpen(null);
+                            setWeekSel(1);
+                            setStep('plan');
+                            flash(`📥 Вариант загружен: ${v.name}`);
+                          }}>📥</AdBtn>
+                          <AdBtn variant="ghost" aria-label={`Удалить ${v.name}`} onClick={()=>{
+                            const next = armVariants.filter(x=>x.id!==v.id);
+                            setArmVariants(next);
+                            saveArmVariants(next);
+                            flash('🗑 Вариант удалён');
+                          }}>✕</AdBtn>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </AdSec>
               <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
                 <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
               </AdSec>
