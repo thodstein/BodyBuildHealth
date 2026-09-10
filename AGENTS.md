@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Арм-хаб: без бокового скролла + компакт + PRO-2 план (Sep 10 2026, закоммичен, без пуша)
+
+Жалобы: «прокрутка в сторону» + «пустые места» в хабе Арм-диагностики. Корень скролла: хаб (`.train-armdiag`) был осознанно исключён из правила №6 («ленты → перенос» действовало только на `.train-arm`) — в хабе остались `overflow-x:auto + flex-shrink:0 + nowrap` на 4 лентах (`.ad-chips/.ad-strip/.ad-steps/hist-strip`). Только подача, логика/строки/aria/хуки 1-в-1.
+
+- **Скролл** (`arm-design.css`, хвост): `.train-armdiag` чипы/полосы/шаги/история → `flex-wrap:wrap + overflow-x:visible + snap:none`, дети `flex-shrink:1` (прецедент №6, sticky `.ad-steps` цел); страховка `.ad-wrap/.ad-tabpanel → overflow-x:clip`, `.ad-mono → width:100%`. Селекторы только `:is(.train-armdiag)` — чекер цел.
+- **Пустоты**: `.ad-wrap 12→8`, `.ad-card 16/12→12/8`, `.ad-sec 13/12→10/8`, head/banner/чипы/полосы/video-ph/empty/cta/list/finding/volbar ужаты; `HUB_HERO 14/16→10/12`, `HUB_SECTION_GAP 8/8→6/6` (`arm-hub-panels.tsx`, 2 константы).
+- **Аудит + интернет**: полный разбор 11 узлов хаба (дубли: bio-карточки ×2, стол-полоса ×2, scoring ×3, Force ×2, CTA ×3, асимметрия ×3, findings ×3) + синтез (техники hook/toproll/press, Holstein–Lewis перелом, WAF Rules 2025, оптимум угла EMG, IronMind WR, Bezkorovainyi F/t, ACWR-связка) → NEW `docs/ARM-DIAGNOSTICS-HUB-PRO-2.md` (эпики P1 мастер-шаги / P2 дедуп / P3 нормы / P4 видео-VBT / P5 red-flags / P6 сценарии / P7 мост-превью; вне скоупа: Hands в бандл, год из хаба, ICS, диагнозы).
+- **Проверено**: hub 30/30 + tabpanel 4/4 + top-ui 16/16 + apk-arm 17/17 → **67/67**, `tsc --noEmit` 0 (6GB), `verify:apk-design` OK. Коммит `858a3ea1` (pathspec 3 своих: css/panels/NEW план+док; чужие pharma/ocr-WIP в worktree не тронуты). НЕ ПУШИТЬ.
+
 ## Питание под АПК: выдача/сканер/OCR/тоглы метаболики (Sep 10 2026, НЕ пушить — очередь чужих)
 
 Три задачи одним заходом. Только подача/маршруты, движки/строки 1-в-1 (TG/web — байт-в-байт, АПК-дожим в §96).
