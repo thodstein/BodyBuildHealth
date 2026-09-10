@@ -184,7 +184,7 @@ describe('Combat cycles', () => {
   it('применение цикла выставляет сплит и тост', () => {
     render(<CombatConstructor />);
     go('4 Сплит');
-    expect(screen.getByText('Готовые циклы')).toBeTruthy();
+    expect(screen.getByText(/Готовые циклы/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Применить «ММА · кэмп к бою 8 нед»/ }));
     expect(screen.getByRole('button', { name: /Собрать PRO-план.*combat_4/ })).toBeTruthy();
     expect(document.body.textContent).toContain('применён');

@@ -95,7 +95,7 @@ const CbSec: React.FC<{
           <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
         </span>
       </button>
-      <div style={{ display: open ? 'flex' : 'none', flexDirection: 'column', gap: 12, padding: '10px 12px' }}>{children}</div>
+      <div style={{ display: open ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>{children}</div>
     </div>
   );
 };
@@ -909,6 +909,62 @@ export const CombatConstructor: React.FC = () => {
             </div>
           </div>
 
+          <div style={{ ...CARD, padding: 12, gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📚</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Готовые циклы · {COMBAT_CYCLE_LIBRARY.length}</div>
+                <div style={{ fontSize: 11, color: '#fff' }}>Одна кнопка — дисциплина, цель, недели, дни, модель и сплит</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Фильтр циклов по виду спорта">
+              {([['all', 'Все'], ['boxing', '🥊 Бокс'], ['wrestling', '🤼 Борьба'], ['mma', '🥋 ММА'], ['kickboxing', '🦵 Кик'], ['general', '🏋️ Общая']] as const).map(([id, label]) => (
+                <ChipToggle key={id} active={cycFilter === id} onClick={() => { setCycFilter(id); buzzStep(); }}>{label}</ChipToggle>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {COMBAT_CYCLE_LIBRARY.filter(c => cycFilter === 'all' || c.discipline === cycFilter).map(c => {
+                const edge = DISCIPLINE_COLOR[c.discipline] || '#a855f7';
+                return (
+                <div
+                  key={c.id}
+                  className="cb-cycle-card"
+                  style={{
+                    textAlign: 'left', padding: 10, borderRadius: 14,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderLeft: `3px solid ${edge}`,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.14)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{c.name}</span>
+                    <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                    <span className="cb-cycle-author" style={{ fontSize: 10, fontWeight: 800, color: edge, background: `${edge}1f`, padding: '3px 8px', borderRadius: 20, border: `1px solid ${edge}55` }}>✒ {c.author}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{ruLabel(LEVEL_RU, c.level)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{GOAL_RU[c.goal] || c.goal}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', fontVariantNumeric: 'tabular-nums' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{c.blurb}</div>
+                  <button
+                    onClick={() => {
+                      setDiscipline(c.discipline); setGoal(c.goal); setLevel(c.level); setWeeks(c.weeks); setDays(c.daysPerWeek);
+                      setPeriodizationModel(c.periodizationModel); setPatternId(c.patternId);
+                      buzzStep(); setMsg(`✦ Цикл «${c.name}» применён — жмите «Собрать PRO-план»`); setTimeout(() => setMsg(''), 2600);
+                    }}
+                    className="cb-cycle-apply"
+                    style={{ ...BTN_PRIMARY, width: '100%', marginTop: 6, padding: '10px 14px', fontSize: 12, borderRadius: 12 }}
+                  >
+                    ✦ Применить «{c.name}»
+                  </button>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {COMBAT_PATTERNS.map(p => {
               const active = patternId ? patternId === p.id : p.id === recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).id;
@@ -920,7 +976,7 @@ export const CombatConstructor: React.FC = () => {
                   className="cb-split-card"
                   data-active={active ? 'true' : 'false'}
                   style={{
-                    textAlign: 'left', padding: 14, borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
+                    textAlign: 'left', padding: 12, borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
                     background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.16), rgba(236,72,153,0.10))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
                     border: active ? '1px solid rgba(168,85,247,0.36)' : '1px solid rgba(255,255,255,0.06)',
                     boxShadow: active ? '0 6px 20px rgba(168,85,247,0.16), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 4px 12px rgba(0,0,0,0.14)',
@@ -940,62 +996,6 @@ export const CombatConstructor: React.FC = () => {
           </div>
 
           <InfoBanner>ATR 5/3/2: 10 нед → 5 накопление 6-10/RIR2-3 → 3 трансформация 3-6/RIR1-2 → 2 реализация тапер. Conjugate — ротация макс/динам/повтор. Linear — ОФП/сила/тапер.</InfoBanner>
-
-          <div style={{ ...CARD, padding: 14, gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📚</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Готовые циклы</div>
-                <div style={{ fontSize: 11, color: '#fff' }}>Одна кнопка — дисциплина, цель, недели, дни, модель и сплит</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Фильтр циклов по виду спорта">
-              {([['all', 'Все'], ['boxing', '🥊 Бокс'], ['wrestling', '🤼 Борьба'], ['mma', '🥋 ММА'], ['kickboxing', '🦵 Кик'], ['general', '🏋️ Общая']] as const).map(([id, label]) => (
-                <ChipToggle key={id} active={cycFilter === id} onClick={() => { setCycFilter(id); buzzStep(); }}>{label}</ChipToggle>
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {COMBAT_CYCLE_LIBRARY.filter(c => cycFilter === 'all' || c.discipline === cycFilter).map(c => {
-                const edge = DISCIPLINE_COLOR[c.discipline] || '#a855f7';
-                return (
-                <div
-                  key={c.id}
-                  className="cb-cycle-card"
-                  style={{
-                    textAlign: 'left', padding: 12, borderRadius: 14,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderLeft: `3px solid ${edge}`,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.14)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{c.name}</span>
-                    <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                    <span className="cb-cycle-author" style={{ fontSize: 10, fontWeight: 800, color: edge, background: `${edge}1f`, padding: '3px 8px', borderRadius: 20, border: `1px solid ${edge}55` }}>✒ {c.author}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{ruLabel(LEVEL_RU, c.level)}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{GOAL_RU[c.goal] || c.goal}</span>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>{c.blurb}</div>
-                  <div style={{ fontSize: 11, color: '#fff', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>Модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</b></div>
-                  <button
-                    onClick={() => {
-                      setDiscipline(c.discipline); setGoal(c.goal); setLevel(c.level); setWeeks(c.weeks); setDays(c.daysPerWeek);
-                      setPeriodizationModel(c.periodizationModel); setPatternId(c.patternId);
-                      buzzStep(); setMsg(`✦ Цикл «${c.name}» применён — жмите «Собрать PRO-план»`); setTimeout(() => setMsg(''), 2600);
-                    }}
-                    className="cb-cycle-apply"
-                    style={{ ...BTN_PRIMARY, width: '100%', marginTop: 8, padding: '10px 14px', fontSize: 12, borderRadius: 12 }}
-                  >
-                    ✦ Применить «{c.name}»
-                  </button>
-                </div>
-                );
-              })}
-            </div>
-          </div>
 
           <button onClick={build} className="cb-build" style={{ ...BTN_PRIMARY, width: '100%', padding: '14px 16px', fontSize: 13, borderRadius: 14 }}>
             ✦ Собрать PRO-план {patternId ? `· ${patternId}` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}
@@ -1080,7 +1080,7 @@ export const CombatConstructor: React.FC = () => {
           <CbQualityMap plan={plan} />
           {plan.rationale?.length ? (
             <CbSec title="📄 Подробный отчёт (текст)" summary={`${plan.rationale.length} строк`}>
-              <div style={{ fontSize:11, color:'#fff', whiteSpace:'pre-wrap', lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
+              <div style={{ fontSize:11, color:'#fff', whiteSpace:'pre-wrap', lineHeight:1.5, padding: '10px 12px' }}>{buildCombatReport(plan)}</div>
             </CbSec>
           ) : null}
           {renderNavRow('plan', 'export')}
