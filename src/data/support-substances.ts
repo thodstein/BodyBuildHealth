@@ -2,6 +2,10 @@ import { resolveCanonicalId } from './support-meta';
 import { INTERACTIONS_DB, resolveInteractionId } from './support-interactions-db';
 import { SYNERGY_NETWORK } from './support-synergy-network';
 import { SUPPORT_CATALOG_DATA } from './support-catalog-data';
+// Шарды каталога должны успеть добавиться ДО backfill описаний внизу файла:
+// иначе прямой импорт этого модуля (мимо barrel) видит неполный каталог
+// и часть записей остаётся без описаний. Цикла нет (shard тянет только base).
+import './support-catalog-supplement';
 
 export interface SupportSubstance {
   id: string;
@@ -189,7 +193,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   { id:'TELMISARTAN', name:'Телмисартан', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TESTOSTERONE', name:'TESTOSTERONE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'THEANINE', name:'THEANINE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
-  { id:'pharma', name:'THYROID DRUGS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'pharma', name:'Лекарственные препараты (группа)', type:'supplement', description:'Групповая метка лекарственных взаимодействий — не отдельное вещество. Совместимость каждого препарата проверяйте индивидуально по инструкции и с врачом.', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TONGKAT_ALI', name:'Тонгкат Али', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TRIBULUS', name:'TRIBULUS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TRYPTOPHAN', name:'Триптофан', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -387,8 +391,8 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   { id:'L_HISTIDINE', name:'L-Гистидин', type:'amino', description:'Незаменимая аминокислота — предшественник гистамина', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'L_LYSINE', name:'L-Лизин', type:'amino', description:'Незаменимая аминокислота — компонент коллагена', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'BENFOTIAMINE', name:'Бенфотиамин', type:'supplement', description:'Жирорастворимая форма B1', mechanisms:[], organs:[], categories:[], deficiency:'' },
-  { id:'NICOTINAMIDE_RIBOSIDE', name:'Никотинамид Рибозид (NR)', type:'supplement', description:'Предшественник NAD+', mechanisms:[], organs:[], categories:[], deficiency:'' },
-  { id:'SPERMIDINE', name:'Спермидин', type:'supplement', description:'Индуктор аутофагии', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'NICOTINAMIDE_RIBOSIDE', name:'Никотинамид Рибозид (NR)', type:'supplement', description:'Никотинамид рибозид (NR) — предшественник NAD+: поддержка митохондриальной энергетики и репарации ДНК. Обычно 300–500 мг/день.', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'SPERMIDINE', name:'Спермидин', type:'supplement', description:'Спермидин — полиамин, индуктор аутофагии: клеточное обновление и поддержка долголетия. Обычно 1–5 мг/день.', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'URIDINE_MONOPHOSPHATE', name:'Уридин монофосфат', type:'supplement', description:'Нуклеотид для памяти и сна', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'CHOLINE_BITARTRATE', name:'Холина битартрат', type:'supplement', description:'Соль холина — предшественник ацетилхолина', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'CHANTERELLE', name:'Лисички (грибы)', type:'supplement', description:'Природный источник витамина D, антипаразитарное', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -578,4 +582,51 @@ for (const _cid of Object.keys(_catData)) {
   if (_cautToAdd.length > 0) {
     _entry.cautions = [...(_entry.cautions || []), ..._cautToAdd.slice(0, 10)];
   }
+}
+
+// ── BACKFILL ОПИСАНИЙ: пустых description быть не должно ──
+// 151 запись ALL_SUBSTANCES имела description:'' → в пикере/синергиях/
+// взаимодействиях показывались пустые карточки. Единый источник —
+// SUPPORT_CATALOG_DATA: прямое совпадение id (без регистра) + явные алиасы.
+// К описанию докатываем каталожную дозу/время приёма (если есть) —
+// карточка полная без захода в детали. Остаток без пары в каталоге —
+// ручные описания (стандартные формулировки, без недоказанных заявлений).
+// Существующие непустые description НЕ трогаем. mechanisms/organs/
+// categories НЕ трогаем (пустые везде, на них завязаны фильтры).
+const _catByLower: Record<string, any> = {};
+for (const [_cid, _centry] of Object.entries(SUPPORT_CATALOG_DATA as Record<string, any>)) {
+  _catByLower[(_cid || '').toLowerCase()] = _centry;
+}
+const _descAlias: Record<string, string> = {
+  acetyl_l_carnitine: 'l_carnitine',
+  carnitine: 'l_carnitine',
+  chondroitin: 'chondroitin_sulfate',
+  hyaluronic: 'hyaluronic_acid',
+};
+const _manualDesc: Record<string, string> = {
+  beetroot: 'Свёкла (сок, порошок) — источник диетических нитратов: конверсия в NO, поддержка выносливости и сосудистого тонуса. Обычно 300–500 мл сока за 2–3 ч до нагрузки.',
+  echinacea: 'Эхинацея — иммуномодулятор: поддержка при простудных заболеваниях, короткие курсы 7–14 дней. Обычно 300–500 мг экстракта 2–3 раза в день.',
+  propolis: 'Прополис — продукт пчеловодства: флавоноиды и фенольные кислоты, поддержка иммунитета и слизистых. Обычно 500–1000 мг/день или настойка 20–30 капель.',
+  pygeum: 'Пиджеум (кора африканской сливы) — поддержка предстательной железы: фитостеролы, облегчение симптомов ДГПЖ. Обычно 100–200 мг/день.',
+  tamoxifen: 'Тамоксифен — SERM: блокатор эстрогеновых рецепторов, база ПКТ для восстановления HPTA. Только по назначению врача. Обычно 20 мг/день.',
+  tongkat_ali: 'Тонгкат али (эврикома длиннолистная) — адаптоген: поддержка тестостерона и либидо, курсовое применение. Обычно 200–400 мг экстракта/день.',
+  tribulus: 'Трибулус (якорцы стелющиеся) — поддержка либидо; влияние на тестостерон не доказано. Обычно 500–1500 мг/день.',
+};
+for (const _s of ALL_SUBSTANCES) {
+  if (_s.description) continue;
+  const _key = (_s.id || '').toLowerCase();
+  const _cat = _catByLower[_key] || _catByLower[_descAlias[_key] || ''];
+  if (_cat && _cat.description) {
+    let _d = _cat.description as string;
+    const _dose = _cat.dosage as { mg?: number; timing?: string } | undefined;
+    if (_dose && Number.isFinite(_dose.mg) && (_dose.mg as number) > 0) {
+      _d += ` Доза: ${_dose.mg} мг${_dose.timing ? ` · ${_dose.timing}` : ''}.`;
+    } else if (_dose && _dose.timing) {
+      _d += ` Приём: ${_dose.timing}.`;
+    }
+    _s.description = _d;
+    continue;
+  }
+  const _m = _manualDesc[_key];
+  if (_m) _s.description = _m;
 }
