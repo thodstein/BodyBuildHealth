@@ -16,12 +16,12 @@ const workMax = {
   glutes: 120, calves: 80, abs: 60, traps: 80, forearms: 40,
 };
 
-const FEMALE_IDS = ['cycle-bb-f-glute-adv-12', 'cycle-bb-f-maint-8', 'cycle-bb-f-upper-8', 'cycle-bb-f-glute-2d-6', 'cycle-pl-f-base-12'];
-const MALE_IDS = ['cycle-bb-m-beginner-ul-8', 'cycle-bb-m-cut-ul-8', 'cycle-bb-m-pec-8', 'cycle-bb-m-back-10', 'cycle-bb-m-maint-4', 'cycle-bb-m-dumbbell-8'];
+const FEMALE_IDS = ['cycle-bb-f-glute-adv-12', 'cycle-bb-f-maint-8', 'cycle-bb-f-upper-8', 'cycle-bb-f-glute-2d-6', 'cycle-pl-f-base-12', 'cycle-bb-f-glute-pump-4'];
+const MALE_IDS = ['cycle-bb-m-beginner-ul-8', 'cycle-bb-m-cut-ul-8', 'cycle-bb-m-pec-8', 'cycle-bb-m-back-10', 'cycle-bb-m-maint-4', 'cycle-bb-m-dumbbell-8', 'cycle-bb-m-arms-8', 'cycle-bb-m-shoulders-8', 'cycle-bb-m-legs-10', 'cycle-bb-m-strength-8', 'cycle-bb-m-hotel-4'];
 const NEW_IDS = [...FEMALE_IDS, ...MALE_IDS];
 
 describe('Ф4: вторая волна циклов (5 женских + 6 мужских)', () => {
-  it('все 11 зарегистрированы в каталоге с правильными тегами', () => {
+  it('все 17 зарегистрированы в каталоге с правильными тегами', () => {
     for (const id of NEW_IDS) {
       const c = LMS_CYCLES.find(x => x.meta.id === id);
       expect(c, `${id}: нет в каталоге`).toBeDefined();
@@ -30,7 +30,7 @@ describe('Ф4: вторая волна циклов (5 женских + 6 муж
     for (const id of FEMALE_IDS) {
       expect(LMS_CYCLES.find(x => x.meta.id === id)!.meta.tags.includes('female'), `${id}: tags female`).toBe(true);
     }
-    expect(LMS_CYCLES.length).toBe(121);
+    expect(LMS_CYCLES.length).toBe(127);
   });
 
   it('все 11 собираются через конвертер: 0 ошибок валидатора, делоды присутствуют', () => {

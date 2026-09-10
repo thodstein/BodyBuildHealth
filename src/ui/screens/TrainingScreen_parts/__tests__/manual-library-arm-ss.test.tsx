@@ -113,8 +113,8 @@ describe('Ручная библиотека: маппинг фильтров (в
     // 12 = 9 базовых novice + cycle-bb-f-beginner-6 (P2-13) + glute-2d-6 и
     // beginner-ul-8 (вторая волна Ф4, CYCLE-SYSTEM-FULL-AUDIT)
     expect(beg.length).toBe(12);
-    // 62 = 59 базовых + glute-adv-12 / pec-8 / back-10 (KMS-MS, вторая волна Ф4)
-    expect(adv.length).toBe(62);
+    // 65 = 59 базовых + Ф4 (pec-8/back-10/glute-adv-12) + топ-волна (arms-8/shoulders-8/legs-10)
+    expect(adv.length).toBe(65);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
 

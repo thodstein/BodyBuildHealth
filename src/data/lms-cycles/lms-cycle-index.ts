@@ -65,6 +65,13 @@ import { CYCLE_BB_M_PEC_8 } from './cycle-bb-m-pec-8';
 import { CYCLE_BB_M_BACK_10 } from './cycle-bb-m-back-10';
 import { CYCLE_BB_M_MAINT_4 } from './cycle-bb-m-maint-4';
 import { CYCLE_BB_M_DUMBBELL_8 } from './cycle-bb-m-dumbbell-8';
+// Топ-волна (CYCLE-SYSTEM-FULL-AUDIT Ф4-3): третья волна
+import { CYCLE_BB_M_ARMS_8 } from './cycle-bb-m-arms-8';
+import { CYCLE_BB_M_SHOULDERS_8 } from './cycle-bb-m-shoulders-8';
+import { CYCLE_BB_M_LEGS_10 } from './cycle-bb-m-legs-10';
+import { CYCLE_BB_M_STRENGTH_8 } from './cycle-bb-m-strength-8';
+import { CYCLE_BB_M_HOTEL_4 } from './cycle-bb-m-hotel-4';
+import { CYCLE_BB_F_GLUTE_PUMP_4 } from './cycle-bb-f-glute-pump-4';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
@@ -193,6 +200,12 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_BB_M_BACK_10,
  CYCLE_BB_M_MAINT_4,
  CYCLE_BB_M_DUMBBELL_8,
+ CYCLE_BB_M_ARMS_8,
+ CYCLE_BB_M_SHOULDERS_8,
+ CYCLE_BB_M_LEGS_10,
+ CYCLE_BB_M_STRENGTH_8,
+ CYCLE_BB_M_HOTEL_4,
+ CYCLE_BB_F_GLUTE_PUMP_4,
    // СРЦ2
    SRC2_MURAVYOV_16,
    SRC2_SOLOVYOV_BENCH_28,
