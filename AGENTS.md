@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Тапер ББ PRO-2: все 7 эпиков выполнены кодом (Sep 11 2026, закоммичен, без пуша)
+
+По команде «выполняй полностью от начала до конца» закрыт `docs/BB-TAPER-PRO-2.md` (синтез Escalante 2021 / Homer-Cross-Helms 2024 / Bosquet 2007 / Travis 2020 / Helms-recovery 2025 / Buechel 2025). Только Edit/Write + vitest/tsc через терминал; чужие WIP не тронуты.
+
+- **Движок** (`bb-contest-prep.engine.ts`): P1 `manipulationLockedFor`/`applyManipulationGate`/`manipulationLockNote` (только high-вода, back-compat — tapered warning-only, иначе легли бы 3 старых теста; гейт на UI, не в `applyForcedModes`); P2 `trialCarbDoseGPerKg` (spill→низ/flat→верх коридора 3–12 г/кг) + `buildPeakWeek(cfg,{carbDoseGPerKg})` (без opts байт-в-байт); P3 фибра load 16→12, high-кап воды 8 л, калий по полу (Ж3500/М4000), Na-SGLT1-кламп тестом; P4 `LAST_HARD_BY_GROUP` (ноги D-6→руки памп D-2) + `TAPER_VS_DELOAD_NOTE`; P5 `postShowRecoveryDiet` (+75/нед, regain 5–10%) дефолтом + `postShowTrack` (opts>план>recovery, reverse жив); P7 `prepDietBreaks` (≥16 нед, 7 дней каждые 8 нед, приоритет над рефидом везде).
+- **NEW `bb-prep-post-show-log.engine.ts`** (P6): CRUD `he_prep_postshow_v1` (кап 6, битый стор → []), 5 маркеров восстановления, comedown-памятка без доз.
+- **UI**: чип-замок P1, доза trial P2, колонка «Клетч.» P3, бейдж тапер≠делод + last-hard чипы P4, селектор треков 56px P5, блок восстановления P6, бейдж diet-break P7 (белый текст, 44px+, без нового CSS).
+- **Проверено**: NEW `bb-taper-pro2` 20/20 + соседи 282/282 + bb-область 2206/2207 (1 падение — чужое `bb-diagnostics-max-pro` female-symmetry, моих импортов нет) + UI 20/20 + `tsc` 0 + `verify:apk-design` OK. Контекст питания не тронут (трек едет через план).
+- Файлы: MOD движок/BbAuto/PeakWeekCard, NEW движок лога + NEW тест + PRO-2 док. Коммит pathspec своих, без пуша.
+
 ## Тапер ББ PRO: план выполнен полностью Э0–Э9 кодом (Sep 11 2026, в worktree БЕЗ коммита)
 
 По команде «выполни план полностью от начала до конца» закрыты все 10 эпиков `docs/BB-TAPER-PRO-PLAN.md` (статус в доке обновлён). Только Edit/Write-инструмент + прогоны vitest/tsc через терминал; чужие WIP в worktree не тронуты (planner-bridge/BBDiagnosticsHub/BB-хаб).

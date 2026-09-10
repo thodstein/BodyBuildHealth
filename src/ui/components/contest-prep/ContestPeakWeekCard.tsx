@@ -90,6 +90,7 @@ export const ContestPeakWeekCard: React.FC<ContestPeakWeekCardProps> = ({
               <th style={{ padding: '4px 6px', textAlign: 'right' }}>Б/У/Ж</th>
               <th style={{ padding: '4px 6px' }}>💧 Вода</th>
               <th style={{ padding: '4px 6px', textAlign: 'right' }}>Na мг</th>
+              <th style={{ padding: '4px 6px', textAlign: 'right' }}>Клетч.</th>
               <th style={{ padding: '4px 6px' }}>🏋️ Трен.</th>
               {showPosing && <th style={{ padding: '4px 6px' }}>🎭 Позы</th>}
             </tr>
@@ -116,6 +117,7 @@ export const ContestPeakWeekCard: React.FC<ContestPeakWeekCardProps> = ({
                   <td style={{ padding: '4px 6px', textAlign: 'right' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
                   <td style={{ padding: '4px 6px' }}>{d.waterLiters}л</td>
                   <td style={{ padding: '4px 6px', textAlign: 'right' }}>{d.sodiumMg}</td>
+                  <td style={{ padding: '4px 6px', textAlign: 'right' }}>≤{d.fiberMaxG}г</td>
                   <td style={{ padding: '4px 6px' }}>{d.training.minutes > 0 ? `${d.training.minutes}'` : '—'}</td>
                   {showPosing && <td style={{ padding: '4px 6px' }}>{d.posingMinutes}'</td>}
                 </tr>

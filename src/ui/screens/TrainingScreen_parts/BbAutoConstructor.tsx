@@ -90,6 +90,9 @@ import {
   type BBTaperRecommendation,
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
+  manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
+  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks,
+  postShowRecoveryDiet,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
@@ -132,6 +135,10 @@ import {
   loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d,
   type PrepWeekCheckin,
 } from '../../../engines/bb/bb-prep-weekly-log';
+import {
+  getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers,
+  postShowComedownNotes,
+} from '../../../engines/bb/bb-prep-post-show-log.engine';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
 
 /* ── CollapsibleCard helper для шага 5 (заголовок-кнопка карточки) ── */
@@ -905,6 +912,14 @@ export const BbAutoConstructor: React.FC = () => {
   });
   const [liveFull, setLiveFull] = useState(3);
   const [liveWater, setLiveWater] = useState(3);
+  // PRO-2 P6: лог восстановления post-show (6 нед) — вводы формы.
+  const [postLogTick, setPostLogTick] = useState(0);
+  const [postLogWeek, setPostLogWeek] = useState<number>(1);
+  const [postLogWeight, setPostLogWeight] = useState('');
+  const [postLogSleep, setPostLogSleep] = useState('');
+  const [postLogHunger, setPostLogHunger] = useState(3);
+  const [postLogCycle, setPostLogCycle] = useState<'restored' | 'irregular' | 'absent' | 'na'>('na');
+  const [postLogStrength, setPostLogStrength] = useState('');
   const [contestWizard, setContestWizard] = useState<1|2|3|4|5>(1);
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
   const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
@@ -6373,6 +6388,18 @@ export const BbAutoConstructor: React.FC = () => {
               <span>⚠ Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний; диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор.</span>
             </label>
           )}
+          {/* PRO-2 P1: замок high-манипуляций без trial (движок back-compat, гейт на поверхности сборки) */}
+          {(() => {
+            try {
+              const note = manipulationLockNote(buildContestPrepConfig());
+              if (!note) return null;
+              return (
+                <div style={{ fontSize:10, color:'#fbbf24', background:'rgba(251,191,36,0.07)', border:'1px solid rgba(251,191,36,0.25)', borderRadius:8, padding:8, marginBottom:8, lineHeight:1.5 }}>
+                  {note} Сборка с High заблокирована до trial (кнопка ниже вернёт ошибку) — tapered доступен с подтверждением выше.
+                </div>
+              );
+            } catch { return null; }
+          })()}
           <div style={{ fontSize:10, color:'#fff', background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', borderRadius:8, padding:8, marginBottom:8, lineHeight:1.5 }}>
             <b style={{ color:'#60a5fa' }}>Что изменится в плане:</b> только финальная подготовка (×0.9, RIR 2–3), taper (объём 85%→60%, веса сохраняются, RIR 2–4) и пик-неделя (памп). Недели подготовки остаются по объёму 100% (режим подготовки: RIR 1–3, без отказных техник). Весь цикл НЕ переделывается; короткий план не расширяется автоматически — при необходимости добавьте недели подготовки.
           </div>
@@ -6553,6 +6580,17 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ fontSize:9, color:'#fff', marginTop:3 }}>
                     Объём снижается, веса сохраняются, RIR 2–4, без отказа и новых упражнений. Изменения настроек ниже пересобирают эти недели.
                   </div>
+                  {/* PRO-2 P4: тапер≠делод + last-hard по группам */}
+                  <div style={{ fontSize:9, color:'#fff', marginTop:4, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', borderRadius:6, padding:6 }}>
+                    {TAPER_VS_DELOAD_NOTE}
+                  </div>
+                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:4 }}>
+                    {([['legs','Ноги'],['back','Спина'],['chest','Грудь+дельты'],['biceps','Руки']] as const).map(([key, ru]) => (
+                      <span key={key} style={{ fontSize:9, color:'#fff', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:999, padding:'3px 8px' }}>
+                        {ru}: <b>{lastHardDayForMuscle(key).slice(0, 4)}</b>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               );
             })()}
@@ -6604,6 +6642,22 @@ export const BbAutoConstructor: React.FC = () => {
                     {rest > 0 ? `и ещё ${rest} недель подготовки с тем же режимом. ` : ''}
                     Объём подготовки не переделывает цикл: меняются только RIR/техники (+объём при выборе ×0.85), веса сохраняются.
                   </div>
+                  {/* PRO-2 P7: diet-break длинного препа */}
+                  {prepPlan.preparation.weeks >= 16 && (() => {
+                    const breaks = prepDietBreaks(prepPlan);
+                    if (breaks.length === 0) return null;
+                    const start = prepPlan.preparation.startDate;
+                    const nums = Array.from(new Set(breaks.map(d => {
+                      const [y, m, dd] = d.split('-').map(Number);
+                      const [sy, sm, sd] = start.split('-').map(Number);
+                      return Math.floor((new Date(y, m - 1, dd).getTime() - new Date(sy, sm - 1, sd).getTime()) / 604800000) + 1;
+                    }))).sort((a, b) => a - b);
+                    return (
+                      <div style={{ fontSize:9, color:'#fff', marginTop:4, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', borderRadius:6, padding:6 }}>
+                        🏖 Diet break: нед {nums.join(', ')} — на поддержании дня (гормоны/психика). Цели рациона переключатся автоматически.
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
@@ -6788,6 +6842,11 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   <div style={{ color:'#fff', marginTop:2 }}>{lastTest.recommendation}</div>
                   <div style={{ color:'#a78bfa', marginTop:4 }}>PRO рекомендация загрузки: <b>{recommendCarbStrategyFromTrial(lastTest)}</b> (spill→back, flat→front, волна→undulating)</div>
+                  {/* PRO-2 P2: персональная доза загрузки из trial (Homer 2024: 3–12 г/кг, титрация по trial) */}
+                  <div style={{ color:'#4ade80', marginTop:2 }}>
+                    Доза trial: <b>{trialCarbDoseGPerKg(lastTest, prepPlan.category, prepPlan.sex)} г/кг</b> total за 36–48 ч
+                    (коридор {CATEGORY_PROFILES[prepPlan.category]?.carbTotalBudgetGPerKg?.join('–') ?? ''} г/кг) — применится к финальной пик-неделе через «Пересобрать и применить».
+                  </div>
                   <div style={{ color:'#38bdf8', marginTop:2 }}>Live-adjust D-1: {liveAdjustForPeakDay(lastTest.responses.fullness, 6 - lastTest.responses.waterRetention, lastTest.responses.waterRetention).note}</div>
                   {prepPlan.testPeakWeekId && (
                     <div style={{ color:'#fff', marginTop:4 }}>
@@ -7036,6 +7095,45 @@ export const BbAutoConstructor: React.FC = () => {
                     <div style={{ color:'#fff', marginBottom:4 }}>
                       <b>{post.kcal} ккал</b> (поддержание) · Б {post.proteinG} г · 💧 {post.waterLiters} л стабильно · {post.durationDays} дней
                     </div>
+                    {/* PRO-2 P5: трек восстановления — recovery (дефолт) vs reverse (opt-in) */}
+                    <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                      {([
+                        ['recovery', '🔄 Recovery — сразу maintenance', 'гликоген/гормоны/сон быстрее, +5–10% веса'],
+                        ['reverse', '🐢 Reverse — +100/нед', 'медленнее, только осознанно'],
+                      ] as const).map(([track, label, sub]) => {
+                        const active = (prepPlan.postShowTrack ?? 'recovery') === track;
+                        return (
+                          <button
+                            key={track}
+                            onClick={() => {
+                              const next = { ...prepPlan, postShowTrack: track, updatedAt: new Date().toISOString() };
+                              setPrepPlan(next);
+                              try { savePrepToProfile(next, buildContestPrepConfig()); } catch { /* ignore */ }
+                              flash(track === 'recovery' ? '🔄 Recovery-трек: сразу к maintenance' : '🐢 Reverse-трек: медленно +100/нед');
+                            }}
+                            aria-pressed={active}
+                            style={{
+                              flex:1, minHeight:56, borderRadius:10, padding:'6px 8px', cursor:'pointer', textAlign:'left',
+                              fontSize:10, fontWeight:800, color: active ? '#4ade80' : '#fff',
+                              background: active ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.03)',
+                              border: active ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.1)',
+                            }}
+                          >
+                            {label}
+                            <span style={{ display:'block', fontSize:8, fontWeight:400, color:'#fff', marginTop:2 }}>{sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const curve = postShowRecoveryDiet(prepPlan);
+                      const w0 = prepPlan.preparation.startingWeightKg;
+                      return (
+                        <div style={{ fontSize:9, color:'#fff', marginBottom:4 }}>
+                          Recovery-кривая: {curve.map(wk => `${wk.week}н ${wk.kcal}`).join(' → ')} ккал · regain-цель +5–10% веса сцены (~{Math.round(w0 * 1.05)}–{Math.round(w0 * 1.1)} кг при сцене {w0} кг)
+                        </div>
+                      );
+                    })()}
                     {post.notes.map((n, i) => <div key={`n${i}`} style={{ color:'#fff', marginTop:2 }}>• {n}</div>)}
                     <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>🏋️ {post.training.join(' ')}</div>
                     <div style={{ marginTop:4, color:'rgba(96,165,250,0.75)' }}>⚖️ {post.weightCheck}</div>
@@ -7043,6 +7141,88 @@ export const BbAutoConstructor: React.FC = () => {
                 );
               })()}
             </div>
+
+            {/* PRO-2 P6: лог восстановления post-show (6 нед) + comedown-памятка */}
+            {(() => {
+              void postLogTick;
+              const entries = getPostShowLog(prepPlan.id);
+              const last = entries[entries.length - 1];
+              const markers = postShowRecoveryMarkers(last ?? null, prepPlan.preparation.startingWeightKg);
+              const markRow: Array<[string, boolean]> = [
+                ['Вес +5%', markers.weightRegained],
+                ['Сон ≥7ч', markers.sleepOk],
+                ['Голод ≤3', markers.hungerOk],
+                ['Цикл/гормоны', markers.cycleOk],
+                ['Сила ≥95%', markers.strengthOk],
+              ];
+              return (
+                <div style={{ marginTop:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)', borderRadius:8, padding:10 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#4ade80', marginBottom:4 }}>
+                    🔄 Восстановление · {markers.recoveredCount}/5 {markers.allRecovered ? '— восстановлены ✅' : ''}
+                  </div>
+                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:6 }}>
+                    {markRow.map(([label, ok]) => (
+                      <span key={label} style={{ fontSize:9, color:'#fff', background: ok ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', border: ok ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.1)', borderRadius:999, padding:'3px 8px' }}>
+                        {ok ? '✓ ' : ''}{label}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', fontSize:10, color:'#fff', marginBottom:6 }}>
+                    <span>Нед:</span>
+                    <button style={BTN_GHOST} onClick={() => setPostLogWeek(w => Math.max(1, w - 1))}>−</button>
+                    <b style={{ minWidth:18, textAlign:'center' }}>{postLogWeek}</b>
+                    <button style={BTN_GHOST} onClick={() => setPostLogWeek(w => Math.min(6, w + 1))}>+</button>
+                    <input type="number" step={0.1} placeholder="Вес кг" value={postLogWeight} onChange={e => setPostLogWeight(e.target.value)} style={{ width:74, ...IN }} />
+                    <input type="number" step={0.5} placeholder="Сон ч" value={postLogSleep} onChange={e => setPostLogSleep(e.target.value)} style={{ width:64, ...IN }} />
+                    <span>Голод:</span>
+                    <span style={{ display:'flex', gap:3 }}>
+                      {[1,2,3,4,5].map(v => (
+                        <button key={v} onClick={() => setPostLogHunger(v)} style={{ width:24, height:24, borderRadius:6, fontSize:10, cursor:'pointer', color:'#fff', border:'1px solid rgba(34,197,94,0.35)', background: postLogHunger === v ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.03)' }}>{v}</button>
+                      ))}
+                    </span>
+                    <select value={postLogCycle} onChange={e => setPostLogCycle(e.target.value as typeof postLogCycle)} style={{ ...IN, fontSize:10 }}>
+                      <option value="na">М — н/п</option>
+                      <option value="restored">Цикл вернулся</option>
+                      <option value="irregular">Нерегулярно</option>
+                      <option value="absent">Нет цикла</option>
+                    </select>
+                    <input type="number" step={1} placeholder="Сила %" value={postLogStrength} onChange={e => setPostLogStrength(e.target.value)} style={{ width:64, ...IN }} />
+                    <button
+                      style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#4ade80' }}
+                      onClick={() => {
+                        savePostShowEntry(prepPlan.id, {
+                          week: postLogWeek as 1|2|3|4|5|6,
+                          dateIso: isoToday(),
+                          weightKg: parseFloat(postLogWeight) || undefined,
+                          sleepH: parseFloat(postLogSleep) || undefined,
+                          hunger1_5: postLogHunger,
+                          cycle: postLogCycle,
+                          strengthReturnPct: parseFloat(postLogStrength) || undefined,
+                        });
+                        setPostLogTick(t => t + 1);
+                        setPostLogWeight(''); setPostLogSleep(''); setPostLogStrength('');
+                        flash(`🔄 Запись нед ${postLogWeek} сохранена`);
+                      }}
+                    >
+                      💾 Сохранить нед {postLogWeek}
+                    </button>
+                  </div>
+                  {entries.length > 0 && (
+                    <div style={{ fontSize:9, color:'#fff', marginBottom:4 }}>
+                      {entries.map(e => (
+                        <span key={e.week} style={{ marginRight:8 }}>
+                          Н{e.week}: {e.weightKg ? `${e.weightKg} кг` : '—'}
+                          <button onClick={() => { removePostShowEntry(prepPlan.id, e.week); setPostLogTick(t => t + 1); }} style={{ marginLeft:3, color:'#f87171', background:'transparent', border:'none', cursor:'pointer', fontSize:10 }} aria-label={`Удалить запись недели ${e.week}`}>✕</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ fontSize:9, color:'#fff', borderTop:'1px solid rgba(34,197,94,0.15)', paddingTop:6 }}>
+                    {postShowComedownNotes().map((n, i) => <div key={i} style={{ marginTop:2 }}>• {n}</div>)}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 🔎 Сравнение до/после: какие недели изменились (diff тренировочного цикла) */}
             {prepApplied && builtPlan && prepBasePlan && (() => {

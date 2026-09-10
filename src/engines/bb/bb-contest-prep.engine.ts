@@ -620,6 +620,41 @@ export function applyForcedModes(cfg: BBContestPrepConfig): BBContestPrepConfig 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P1: гейт агрессивных водных манипуляций (back-compat: движок НЕ форсит,
+// гейт применяется на UI-поверхностях сборки; см. BbAutoConstructor: high без
+// trial блокируется до сборки). high/classic вода без trial И без confirm =
+// locked → stable. Tapered вода/натрий — только warning (умеренная манипуляция).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Запрошена ли агрессивная водная манипуляция (high/classic load+cut). */
+export function manipulationRequestedHighWater(cfg: BBContestPrepConfig): boolean {
+  return canonicalWaterStrategy(cfg.waterStrategy) === 'high';
+}
+
+/** PRO-2 P1: заблокирована ли манипуляция (нет ни trial, ни явного подтверждения). */
+export function manipulationLockedFor(cfg: BBContestPrepConfig): boolean {
+  if (!manipulationRequestedHighWater(cfg)) return false;
+  return cfg.hasTrialPeak !== true && cfg.confirmedManipulation !== true;
+}
+
+/**
+ * PRO-2 P1: применить гейт к конфигу (не меняет вход): locked → water stable.
+ * Натрий/карбс не трогаем (tapered Na — умеренная манипуляция, warning-only;
+ * карбс-доза — через trialCarbDoseGPerKg). Back-compat: applyForcedModes НЕ
+ * вызывает эту функцию — существующие тесты и сохранённые конфиги целы.
+ */
+export function applyManipulationGate(cfg: BBContestPrepConfig): BBContestPrepConfig {
+  if (!manipulationLockedFor(cfg)) return cfg;
+  return { ...cfg, waterStrategy: 'stable' as WaterStrategy };
+}
+
+/** Подсказка замка для UI (чип 44px в шаге contest). */
+export function manipulationLockNote(cfg: BBContestPrepConfig): string | null {
+  if (!manipulationLockedFor(cfg)) return null;
+  return '🔒 High water/load+cut закрыт: сначала trial peak за 21–28 дней (блок trial ниже) или явное подтверждение. Без прогона — только stable (Mitchell: манипуляции без репетиции неэффективны).';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Тренировочный тапер (canonical BB-кривая; PL/classic — из Библиотеки методик)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -832,7 +867,48 @@ const TRAINING_BY_PHASE: Record<PeakDayPhase, DayTraining> = {
 const POSING_BY_DAY: Record<number, number> = { 1: 20, 2: 20, 3: 25, 4: 30, 5: 30, 6: 45, 7: 60 };
 const STEPS_BY_DAY: Record<number, number> = { 1: 12000, 2: 12000, 3: 10000, 4: 9000, 5: 8000, 6: 6000, 7: 4000 };
 
-export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P4: последний тяжёлый день по группам (ноги раньше верха —
+// weightlifting-обзор 2026: deadlift 6–8д, squat 5–6.5д, bench 3–5д до старта;
+// в BB-терминах: ноги D-6, спина D-5, грудь/дельты D-4, руки — только памп D-2).
+// Тапер держит вес (≥85%), делод роняет всё — разные инструменты (Bell 2025).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Последний тяжёлый день группы (D-N до шоу; памп-дни — отдельно). */
+export const LAST_HARD_BY_GROUP: Record<string, string> = {
+  legs: 'D-6 — последний тяжёлый низ (присед-паттерн/RDL), дальше только прогулки и позы',
+  quads: 'D-6 — последний тяжёлый низ (присед-паттерн/RDL), дальше только прогулки и позы',
+  hamstrings: 'D-6 — последний тяжёлый низ (присед-паттерн/RDL), дальше только прогулки и позы',
+  glutes: 'D-6 — последний тяжёлый низ (присед-паттерн/RDL), дальше только прогулки и позы',
+  calves: 'D-6 — последний тяжёлый низ, дальше только прогулки и позы',
+  back: 'D-5 — последняя тяжёлая спина (тяги без отказа, RIR 2–3)',
+  back_width: 'D-5 — последняя тяжёлая спина (тяги без отказа, RIR 2–3)',
+  back_thickness: 'D-5 — последняя тяжёлая спина (тяги без отказа, RIR 2–3)',
+  chest: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+  shoulders: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+  delt_front: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+  delt_mid: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+  delt_rear: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+  biceps: 'D-2 — только памп 1 круг 12–15 повт, 50% (без тяжёлой работы)',
+  triceps: 'D-2 — только памп 1 круг 12–15 повт, 50% (без тяжёлой работы)',
+  forearms: 'D-2 — только памп 1 круг 12–15 повт, 50% (без тяжёлой работы)',
+  abs: 'D-2 — только памп 1 круг 12–15 повт, 50% (без тяжёлой работы)',
+  traps: 'D-4 — последний умеренный верх (памп 12–15, ~60%), дальше отдых',
+};
+
+/** Последний тяжёлый день мышцы (канонический ключ → строка; неизвестная → верх D-4). */
+export function lastHardDayForMuscle(muscle: string | null | undefined): string {
+  const key = String(muscle || '').toLowerCase();
+  return LAST_HARD_BY_GROUP[key]
+    ?? LAST_HARD_BY_GROUP[['quads', 'hamstrings', 'glutes', 'calves'].includes(key) ? 'legs' : 'chest']
+    ?? LAST_HARD_BY_GROUP.chest;
+}
+
+/** Explainer «тапер ≠ делод» для шага contest (строка, без новой математики). */
+export const TAPER_VS_DELOAD_NOTE =
+  '📉 Тапер держит вес (≥85%) и режет только объём — готовность к сцене. Делод роняет всё (вес ×0.6, RIR+3) — восстановление внутри цикла. У вас наложен тапер (Bell 2025).';
+
+export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): PeakWeekDayPlan[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
   const eff = applyForcedModes(cfg);
@@ -853,7 +929,14 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
   // Бюджет total = среднее * вес * tolerance, кламп по категории
   const budgetMidPerKg = (budgetMin + budgetMax) / 2;
   const rawBudget = w * budgetMidPerKg * tolMult;
-  const totalBudget = clamp(Math.round(rawBudget), Math.round(w * budgetMin), Math.round(w * budgetMax * tolMult));
+  // PRO-2 P2: явная доза из trial (trialCarbDoseGPerKg) приоритетнее среднего —
+  // кламп по категории сохраняется (без trial путь байт-в-байт).
+  const dosePerKg = opts?.carbDoseGPerKg != null && Number.isFinite(opts.carbDoseGPerKg)
+    ? clamp(opts.carbDoseGPerKg, budgetMin, budgetMax)
+    : null;
+  const totalBudget = dosePerKg != null
+    ? Math.round(w * dosePerKg)
+    : clamp(Math.round(rawBudget), Math.round(w * budgetMin), Math.round(w * budgetMax * tolMult));
   const distribution = CARB_DISTRIBUTION[strat] ?? CARB_DISTRIBUTION.moderate;
   // load-дни: распределить бюджет по долям; деплеция — мягкая 1.2-1.8 г/кг (Homer 2024 без брутальной деплеции)
   // Для новичков/без trial — повышенная деплеция (не ниже 1.5 для light), для опытных с trial — можно 0.9
@@ -894,6 +977,9 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
   if (leanMass < 52) waterBase = Math.max(2.0, round1(waterBase * 0.82));
   if (bsa > 2.15) waterBase = Math.min(waterBase, canonWater === 'high' ? 9 : 5.5);
   if (bsa < 1.55) waterBase = Math.min(waterBase, 4.0);
+  // PRO-2 P3: high-кап 8 л базы (наблюдаемый потолок Mitchell: >10 л без trial — мусор;
+  // Escalante 4–12 л — верх только с trial+confirm, кап держит внутри коридора).
+  if (canonWater === 'high') waterBase = Math.min(waterBase, 8);
   // Luteal phase: +0.5л воды, не резать ниже 2.5л (TeamUSA)
   const lutealBoost = isLutealPhase(eff.cycleDay) ? 0.5 : 0;
   if (lutealBoost > 0) waterBase = round1(waterBase + lutealBoost);
@@ -930,9 +1016,11 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
     for (let i=5;i<7;i++) naRow[i] = Math.max(naRow[i], 2100);
   }
 
-  // PRO FIBER: low-residue — деплеция 18-22г, load 12-18г, show 8-12г (не 40г!) — вздутие
+  // PRO FIBER (PRO-2 P3, Escalante/Rale): дни 1–2 (D-6…D-5) ≤20г, дни 3–6
+  // (D-4…D-1, включая загрузку) 10–13г, шоу ≤10г. Загрузка НЕ исключение:
+  // клетчатка во время load тормозит SGLT1-транспорт и дует живот.
   const fiberFor = (phase: PeakDayPhase): number =>
-    phase.startsWith('deplete') ? 20 : phase === 'show' ? 10 : phase === 'peak' ? 12 : 16;
+    phase.startsWith('deplete') ? 20 : phase === 'show' ? 10 : 12;
 
   const fatGPerKg = (phase: PeakDayPhase): number => {
     if (phase.startsWith('deplete')) return profile.light ? 0.75 : 0.85;
@@ -2089,6 +2177,13 @@ export interface BBContestPrepPlan {
   trainingPlanId?: string;
   nutritionPlanId?: string;
   testPeakWeekId?: string;
+  /**
+   * PRO-2 P5: трек восстановления post-show. 'recovery' (дефолт) — сразу к
+   * maintenance нового веса (Helms/Buechel: adherence + гормоны + RMR);
+   * 'reverse' (opt-in) — медленная обратная диета +100/нед (восстановление медленнее).
+   * Опционально — старые планы читаются как recovery.
+   */
+  postShowTrack?: 'recovery' | 'reverse';
 
   safety: {
     contraindications: string[];
@@ -2201,7 +2296,7 @@ export function computePrepPhaseRanges(
   const ps = phases.find(p => p.key === 'post_show');
   if (ps) {
     ps.dateEnd = isoAddDays(showDate, 28);
-    ps.note = 'Post-show (4 нед): обратная диета — калории ступенчато к поддержанию (+100 ккал/нед), белок 2 г/кг, вода/натрий стабильны.';
+    ps.note = 'Post-show (4 нед): recovery — сразу maintenance (дефолт) либо reverse +100 ккал/нед (opt-in); белок 2 г/кг, вода/натрий стабильны.';
   }
 
   return phases;
@@ -2236,6 +2331,8 @@ export interface BuildPrepPlanOpts {
   trainingPlanId?: string;
   nutritionPlanId?: string;
   testPeakWeekId?: string;
+  /** PRO-2 P5: трек post-show (дефолт 'recovery'). */
+  postShowTrack?: 'recovery' | 'reverse';
 }
 
 export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
@@ -2345,6 +2442,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
     trainingPlanId: opts.trainingPlanId,
     nutritionPlanId: opts.nutritionPlanId,
     testPeakWeekId: opts.testPeakWeekId,
+    postShowTrack: opts.postShowTrack === 'reverse' ? 'reverse' : 'recovery',
     safety: {
       contraindications: [...(cfg.contraindications || [])],
       warnings,
@@ -2562,6 +2660,8 @@ export function prepRefeedDates(plan: BBContestPrepPlan): string[] {
   try {
     const start = plan.preparation.startDate;
     if (!isValidIsoDate(start)) return out;
+    // PRO-2 P7: единый источник — diet-break дни исключаются здесь же.
+    const breaks = new Set(prepDietBreaks(plan));
     for (const p of plan.phases) {
       if (p.key !== 'preparation' && p.key !== 'final_preparation') continue;
       const startIdx = isoDiffDays(start, p.dateStart);
@@ -2569,7 +2669,10 @@ export function prepRefeedDates(plan: BBContestPrepPlan): string[] {
       for (let d = Math.max(0, startIdx); d <= endIdx; d++) {
         if (d % 7 !== 6) continue; // рефид — последний день 7-дневки
         const weekIdx = Math.floor(d / 7) + 1;
-        if (p.key === 'final_preparation' || weekIdx % 3 === 0) out.push(isoAddDays(start, d));
+        if (p.key === 'final_preparation' || weekIdx % 3 === 0) {
+          const iso = isoAddDays(start, d);
+          if (!breaks.has(iso)) out.push(iso);
+        }
       }
     }
   } catch { /* ignore */ }
@@ -2581,7 +2684,39 @@ export function isPrepRefeedDay(dateIso: string, plan: BBContestPrepPlan): boole
   if (!isValidIsoDate(dateIso)) return false;
   const phase = prepPhaseForDate(plan, dateIso);
   if (!phase || (phase.key !== 'preparation' && phase.key !== 'final_preparation')) return false;
+  // PRO-2 P7: diet-break дни — не рефиды (не двойной бонус).
+  if (isPrepDietBreakDay(dateIso, plan)) return false;
   return prepRefeedDates(plan).includes(dateIso);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P7: diet-break длинного препа (препы ≥16 нед — 7 дней на поддержании
+// каждые 8 нед, блоком в конце 8-й/16-й/24-й недели; выравнивание по 8-недельным
+// блокам ≈ типичный тайминг делода. Синк с конкретными deload-неделями BB-плана —
+// на UI-стороне (бейдж недели), здесь — детерминированный календарь дат.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Даты diet-break (7-дневные окна на поддержании, только длинные препы). */
+export function prepDietBreaks(plan: BBContestPrepPlan): string[] {
+  const out: string[] = [];
+  try {
+    const prepWeeks = Math.round(plan.preparation.weeks || 0);
+    if (prepWeeks < 16) return out;
+    const start = plan.preparation.startDate;
+    if (!isValidIsoDate(start)) return out;
+    for (let s = 8; s <= prepWeeks; s += 8) {
+      for (let d = (s - 1) * 7; d < s * 7; d++) out.push(isoAddDays(start, d));
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
+/** Diet-break день ли эта дата (только preparation/final_preparation). */
+export function isPrepDietBreakDay(dateIso: string, plan: BBContestPrepPlan): boolean {
+  if (!isValidIsoDate(dateIso)) return false;
+  const phase = prepPhaseForDate(plan, dateIso);
+  if (!phase || (phase.key !== 'preparation' && phase.key !== 'final_preparation')) return false;
+  return prepDietBreaks(plan).includes(dateIso);
 }
 
 /**
@@ -2597,25 +2732,45 @@ export function nutritionTargetsForPrepDate(
   dateIso: string,
   plan: BBContestPrepPlan,
   base: PeakNutritionBase,
-  opts?: { isHeavyTrainDay?: boolean },
+  opts?: { isHeavyTrainDay?: boolean; postShowTrack?: 'recovery' | 'reverse' },
 ): PeakNutritionTargets {
   const day = peakWeekDayForDate(dateIso, configFromPlan(plan));
   if (day) {
     return computePeakWeekNutritionTargets(dateIso, base, configFromPlan(plan));
   }
   const phase = prepPhaseForDate(plan, dateIso);
+  const potassiumMg = plan.sex === 'female' ? 3500 : 4000;
   if (!phase) {
     return {
       kcal: base.kcal, proteinG: base.proteinG, fatG: base.fatG, carbsG: base.carbsG,
-      fiberMaxG: 60, waterMl: base.waterMl, sodiumMg: base.sodiumMg, potassiumMg: 3500,
+      fiberMaxG: 60, waterMl: base.waterMl, sodiumMg: base.sodiumMg, potassiumMg,
       phase: null, phaseLabel: '', note: '',
     };
   }
   if (phase.key === 'post_show') {
-    // Э7: после шоу — обратная диета по недельной кривой (авто-переключение целей).
+    // PRO-2 P5: трек восстановления — recovery (дефолт, сразу maintenance) vs
+    // reverse (opt-in, медленно). Источник: opts > план > recovery.
+    const track = opts?.postShowTrack ?? plan.postShowTrack ?? 'recovery';
     const post = buildPostShowPlan(plan);
-    const curve = postShowReverseDiet(plan);
     const daysAfter = Math.max(0, isoDiffDays(plan.showDate, dateIso));
+    if (track === 'reverse') {
+      const curve = postShowReverseDiet(plan);
+      const level = curve[Math.min(3, Math.floor(daysAfter / 7))] ?? curve[0];
+      return {
+        kcal: level.kcal,
+        proteinG: level.proteinG,
+        fatG: level.fatG,
+        carbsG: level.carbsG,
+        fiberMaxG: Math.min(70, Math.max(25, Math.round(level.kcal * 0.014))),
+        waterMl: Math.round(post.waterLiters * 1000),
+        sodiumMg: base.sodiumMg,
+        potassiumMg,
+        phase: null,
+        phaseLabel: PREP_PHASE_LABELS.post_show,
+        note: `🔄 Post-show (reverse): ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
+      };
+    }
+    const curve = postShowRecoveryDiet(plan);
     const level = curve[Math.min(3, Math.floor(daysAfter / 7))] ?? curve[0];
     return {
       kcal: level.kcal,
@@ -2625,10 +2780,10 @@ export function nutritionTargetsForPrepDate(
       fiberMaxG: Math.min(70, Math.max(25, Math.round(level.kcal * 0.014))),
       waterMl: Math.round(post.waterLiters * 1000),
       sodiumMg: base.sodiumMg,
-      potassiumMg: 3500,
+      potassiumMg,
       phase: null,
       phaseLabel: PREP_PHASE_LABELS.post_show,
-      note: `🔄 Post-show: ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
+      note: `🔄 Post-show (recovery): ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
     };
   }
   const profile = CATEGORY_PROFILES[plan.category];
@@ -2645,9 +2800,14 @@ export function nutritionTargetsForPrepDate(
   let kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult + posingExtra));
   let carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
   // Э3: рефид и карб-волна (только preparation/final_preparation).
+  // PRO-2 P7: diet-break имеет приоритет над рефидом (не двойной бонус).
   let waveNote = '';
   const isPrepPhase = phase.key === 'preparation' || phase.key === 'final_preparation';
-  if (isPrepPhase && isPrepRefeedDay(dateIso, plan)) {
+  if (isPrepPhase && isPrepDietBreakDay(dateIso, plan)) {
+    kcal = Math.max(kcal, Math.round(base.kcal));
+    carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+    waveNote = ' 🏖 Diet break: неделя на поддержании дня — гормоны/психика восстанавливаются, дефицит продолжится.';
+  } else if (isPrepPhase && isPrepRefeedDay(dateIso, plan)) {
     kcal = Math.max(kcal, Math.round(base.kcal));
     carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
     waveNote = ' 🔄 Рефид-день: калории до поддержания дня, карбс на гликоген/лептин, жиры на полу.';
@@ -2685,7 +2845,7 @@ export function nutritionTargetsForPrepDate(
     fiberMaxG: Math.min(70, Math.max(25, Math.round(kcal * 0.014))),
     waterMl: base.waterMl,
     sodiumMg: base.sodiumMg,
-    potassiumMg: 3500,
+    potassiumMg,
     phase: null,
     phaseLabel: phase.label,
     note: `🗓 ${phase.label}: ${kcal} ккал · Б/У/Ж ${proteinG}/${carbsG}/${fatG} г · 💧 ${(base.waterMl / 1000).toFixed(1)} л · Na ${base.sodiumMg} мг (стабильно). ${phaseNote}`,
@@ -2816,6 +2976,34 @@ export function recommendCarbStrategyFromTrial(t: TestPeakWeekResult | null): Ca
   if (ct <= 2 || wr === 3) return 'undulating';                       // непредсказуемый → волна
   if (Math.abs(t.weightDeltaKg) <= 1 && wr >= 3) return 'linear';
   return 'moderate';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P2: персональная доза загрузки из trial (Homer 2024: 3–12 г/кг,
+// титрация по trial + визуал; категорийный коридор — жёсткий кап).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * PRO-2 P2: доза карб-загрузки (г/кг total за 36–48ч) по итогам trial.
+ * spill-склонный (wr≤2 / Δ>2 / переполнен) → низ коридора категории;
+ * flat-склонный (wr≥4 + плоско) → верх; середина — в остальных случаях.
+ * Без trial → середина коридора (совпадает с дефолтом buildPeakWeek).
+ */
+export function trialCarbDoseGPerKg(
+  t: TestPeakWeekResult | null | undefined,
+  category: BBContestCategory,
+  _sex: 'male' | 'female',
+): number {
+  void _sex;
+  const profile = CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.mens_physique;
+  const [lo, hi] = profile.carbTotalBudgetGPerKg;
+  const mid = Math.round(((lo + hi) / 2) * 10) / 10;
+  if (!t) return mid;
+  const wr = t.responses.waterRetention;
+  const ft = t.responses.fullness;
+  if (wr <= 2 || t.weightDeltaKg > 2 || ft >= 4) return lo;
+  if (wr >= 4 && ft <= 2) return hi;
+  return mid;
 }
 
 /** PRO: Проверка монотонности тапера (каждая неделя ≤ предыдущей). */
@@ -3047,6 +3235,46 @@ export function postShowReverseDiet(plan: BBContestPrepPlan): ReverseDietWeek[] 
         : `Обратная диета: нед ${week}/4 — +${(week - 1) * 100} ккал к поддержанию (угли +${(week - 1) * 25} г/нед).`,
     };
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P5: recovery diet post-show (дефолт; Helms 2025, Buechel 2025, Chappell
+// 2021). Нед 1 = СРАЗУ maintenance нового веса (≈ финал препа +300–500 ккал:
+// гликоген/вода возвращаются), далее +75/нед к offseason-цели, кап —
+// maintenance +300. Цель regain 5–10% stage weight. Reverse остаётся opt-in
+// (postShowReverseDiet) — медленнее восстанавливает RMR/гормоны/цикл.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface RecoveryDietWeek {
+  week: 1 | 2 | 3 | 4;
+  kcal: number;
+  proteinG: number;
+  fatG: number;
+  carbsG: number;
+  note: string;
+}
+
+export function postShowRecoveryDiet(plan: BBContestPrepPlan): RecoveryDietWeek[] {
+  const w = plan.preparation.startingWeightKg;
+  const post = buildPostShowPlan(plan);
+  const fatG = Math.max(plan.sex === 'female' ? 40 : 30, Math.round(w * prepFatFloorGPerKg(plan.sex)));
+  const proteinG = post.proteinG;
+  const cap = post.kcal + 300;
+  return ([1, 2, 3, 4] as const).map(week => {
+    const kcal = Math.min(cap, post.kcal + (week - 1) * 75);
+    const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+    return {
+      week, kcal, proteinG, fatG, carbsG,
+      note: week === 1
+        ? 'Recovery: нед 1/4 — сразу maintenance нового веса (гликоген/вода вернутся, вес +1–3 кг — норма, голод спадёт). Цель regain 5–10% веса сцены.'
+        : `Recovery: нед ${week}/4 — +${(week - 1) * 75} ккал к maintenance (угли +~${(week - 1) * 19} г/нед), вес плавно к offseason.`,
+    };
+  });
+}
+
+/** Активная post-show кривая по треку плана (recovery — дефолт). */
+export function activePostShowCurve(plan: BBContestPrepPlan): Array<ReverseDietWeek | RecoveryDietWeek> {
+  return plan.postShowTrack === 'reverse' ? postShowReverseDiet(plan) : postShowRecoveryDiet(plan);
 }
 
 /**
