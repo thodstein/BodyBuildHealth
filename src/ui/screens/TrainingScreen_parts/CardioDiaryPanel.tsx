@@ -14,7 +14,7 @@ import {
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge, TYPE_COLOR } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge, TYPE_COLOR, EmptyState } from './CardioUI';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -218,15 +218,15 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   return (
     <div className="train-cardiodiary" style={CARD}>
       <div style={ROW}>
-        <span style={LABEL}>📓 Дневник выполнения кардио</span>
-        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : '#fff'}>🔥 стрик {streak.current}д</Badge>
+        <span style={{ ...LABEL, fontSize: 12.5 }}>📓 Дневник выполнения кардио</span>
+        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.32)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : '#fff'}>🔥 стрик {streak.current}д · макс {streak.best}д</Badge>
         <button style={BTN_SMALL} onClick={exportCsv} title="Экспорт в CSV">📥 CSV</button>
         <button style={BTN_SMALL} onClick={exportJson} title="Экспорт в JSON">📥 JSON</button>
         {undoPrev && (
-          <button style={{ ...BTN, minHeight: 30, padding: '4px 10px', fontSize: 10 }} onClick={() => { const restored = replaceCardioLog(undoPrev); commitLog(restored); setUndoPrev(null); flashMsg('↩ Отменено'); }} aria-label="Отменить последнее изменение">↩ Отменить</button>
+          <button style={{ ...BTN, minHeight: 44, padding: '8px 13px' }} onClick={() => { const restored = replaceCardioLog(undoPrev); commitLog(restored); setUndoPrev(null); flashMsg('↩ Отменено'); }} aria-label="Отменить последнее изменение">↩ Отменить</button>
         )}
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 700 }} role="status">{flash}</div>}
+      {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
 
       <div style={ROW}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={INPUT} aria-label="Дата" />
@@ -241,8 +241,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="ЧСС" />
         <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
         <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 'auto' }} aria-label="Км" title="Дистанция (для бега/езды)" />
-        <button style={{ ...BTN_PRIMARY, minHeight: 44 }} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
-        <button style={{ ...BTN, minHeight: 44 }} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
+        <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
+        <button style={{ ...BTN, minHeight: 48 }} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
       </div>
       {warnings && (
         <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
@@ -251,26 +251,26 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       )}
 
       {adherence && (
-        <div style={{ fontSize: 11, color: '#fff' }}>
+        <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
           Неделя {adherence.week}: выполнено {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
         </div>
       )}
       {weekHint && (
-        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11.5, color: HINT_COLOR[weekHint.kind] ?? '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderLeft: `3px solid ${HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.2)'}`, borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }}>
           {HINT_ICON[weekHint.kind] ?? '💡'} {weekHint.text}
         </div>
       )}
       {cycleStats && (
-        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.24)', borderLeft: '3px solid #60a5fa', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
           📊 Цикл: {cycleStats.weeksDone} пройденных нед · сессий {cycleStats.doneSessions}/{cycleStats.planned} ({cycleStats.pctSessions ?? 0}%) · минут {cycleStats.doneMin}/{cycleStats.plannedMin} ({cycleStats.pctMinutes ?? 0}%)
         </div>
       )}
-      <div style={{ fontSize: 11, color: '#fff' }}>
+      <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.6 }}>
         7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
         {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
+      <div style={{ fontSize: 13, fontWeight: 850, color: ADVICE_COLOR[advice.action], letterSpacing: -0.1 }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
       </div>
       {(() => {
@@ -292,21 +292,21 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           );
         } catch { return null; }
       })()}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: 10 }}>
-        <div style={LABEL}>🧘 Wellness (POMS) — готовность {wellnessReadiness(wellness)}/10</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 13, padding: 12 }}>
+        <div style={{ ...LABEL, fontSize: 11.5 }}>🧘 Wellness (POMS) — готовность {wellnessReadiness(wellness)}/10</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 7 }}>
           {[
             { k: 'sleep' as const, label: 'Сон 1-5' },
             { k: 'stress' as const, label: 'Стресс 1-5' },
             { k: 'soreness' as const, label: 'Боль 1-5' },
             { k: 'mood' as const, label: 'Настроение 1-5' },
           ].map(f => (
-            <div key={f.k} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#fff' }}>{f.label}</span>
+            <div key={f.k} style={{ display: 'flex', flexDirection: 'column', gap: 5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 9px' }}>
+              <span style={{ fontSize: 10.5, color: '#fff', fontWeight: 700 }}>{f.label}</span>
               <div style={ROW}>
-                <button style={BTN_SMALL} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.max(1, (v as unknown as Record<string, number>)[f.k] - 1) }))}>−</button>
-                <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700 }}>{(wellness as unknown as Record<string, number>)[f.k]}</span>
-                <button style={BTN_SMALL} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.min(5, (v as unknown as Record<string, number>)[f.k] + 1) }))}>+</button>
+                <button style={{ ...BTN_SMALL, minWidth: 44 }} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.max(1, (v as unknown as Record<string, number>)[f.k] - 1) }))} aria-label={`${f.label} уменьшить`}>−</button>
+                <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 850, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>{(wellness as unknown as Record<string, number>)[f.k]}</span>
+                <button style={{ ...BTN_SMALL, minWidth: 44 }} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.min(5, (v as unknown as Record<string, number>)[f.k] + 1) }))} aria-label={`${f.label} увеличить`}>+</button>
               </div>
             </div>
           ))}
@@ -330,32 +330,30 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       </div>
 
       {log.length === 0 && (
-        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>
-          📭 Записей пока нет — заполните форму выше и нажмите «+ Записать», чтобы вести журнал кардио.
-        </div>
+        <EmptyState icon="📭" title="Записей пока нет" desc="Заполните форму выше и нажмите «+ Записать», чтобы вести журнал кардио." />
       )}
       {log.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {(showAll ? log : log.slice(0, 6)).map(e => (
-            <div key={e.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', minWidth: 78, fontWeight: 700 }}>{e.date}</span>
-              <span style={{ fontSize: 11, minWidth: 64, fontWeight: 800, color: TYPE_COLOR[e.type] ?? '#fff', background: `${TYPE_COLOR[e.type] ?? '#fff'}14`, border: `1px solid ${TYPE_COLOR[e.type] ?? '#fff'}28`, borderRadius: 20, padding: '2px 8px', textAlign: 'center' }}>{TYPE_LABEL[e.type]}</span>
-              <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1, alignItems: 'center' }}>
+            <div key={e.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${TYPE_COLOR[e.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 11, padding: '9px 11px', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.75)', minWidth: 82, fontWeight: 700 }}>{e.date}</span>
+              <span style={{ fontSize: 11, minWidth: 68, fontWeight: 800, color: TYPE_COLOR[e.type] ?? '#fff', background: `${TYPE_COLOR[e.type] ?? '#fff'}14`, border: `1px solid ${TYPE_COLOR[e.type] ?? '#fff'}28`, borderRadius: 20, padding: '3px 9px', textAlign: 'center' }}>{TYPE_LABEL[e.type]}</span>
+              <span style={{ display: 'flex', flexWrap: 'wrap', gap: 5, flex: 1, alignItems: 'center' }}>
                 {e.completed === false
-                  ? <span style={{ fontSize: 11, color: '#f87171', fontWeight: 700 }}>⏭ пропущена</span>
-                  : <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{e.durationMin} мин</span>}
+                  ? <span style={{ fontSize: 11.5, color: '#f87171', fontWeight: 800 }}>⏭ пропущена</span>
+                  : <span style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>{e.durationMin} мин</span>}
                 {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>RPE {e.rpe}</span>}
                 {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.avgHr} уд</span>}
                 {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.calories} ккал</span>}
                 {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
                   <>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.distanceKm} км</span>
-                    <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                    <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 800 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
                   </>
                 )}
               </span>
-              <button style={{ ...BTN, minHeight: 36, padding: '6px 10px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
-              <button style={{ ...BTN, minHeight: 36, padding: '6px 10px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setUndoPrev(log); commitLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
+              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '8px 11px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
+              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '8px 11px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setUndoPrev(log); commitLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}
           {log.length > 6 && (

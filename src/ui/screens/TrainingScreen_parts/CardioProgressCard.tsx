@@ -64,14 +64,14 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
         <span style={{ fontSize: 11, color: '#fff' }}>осталось {data.left} нед</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Неделя {data.current || '—'} из {data.totalWeeks}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginLeft: 'auto' }}>{data.pct}%</span>
+        <span style={{ fontSize: 24, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: -0.3, fontVariantNumeric: 'tabular-nums' }}>Неделя {data.current || '—'} из {data.totalWeeks}</span>
+        <span style={{ fontSize: 13, fontWeight: 850, color: '#00e68a', marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{data.pct}%</span>
       </div>
-      <ProgressBar value={data.pct} color="#00e68a" height={8} />
+      <ProgressBar value={data.pct} color="#00e68a" height={9} />
       <div style={ROW}>
-        <span style={{ fontSize: 11, color: '#fff' }}>{data.pct}% пройдено</span>
+        <span style={{ fontSize: 11.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{data.pct}% пройдено</span>
         {data.adherence != null && (
-          <span style={{ fontSize: 11, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171' }}>
+          <span style={{ fontSize: 11.5, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
             · выполнение прошлых недель: {data.adherence}%{data.factKcal > 0 ? ` · факт ${data.factKcal} ккал` : ''}{data.factKm > 0 ? ` · ${data.factKm} км` : ''}
           </span>
         )}

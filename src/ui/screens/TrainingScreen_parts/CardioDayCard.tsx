@@ -39,13 +39,13 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
   const strengthPct = totalLoad > 0 ? 100 - cardioPct : 0;
 
   return (
-    <div className="train-cardioday" style={{ ...CARD, gap: 10 }}>
+    <div className="train-cardioday" style={{ ...CARD, gap: 11 }}>
       <div style={ROW}>
-        <span style={LABEL}>📅 Кардио и нагрузка дня</span>
+        <span style={{ ...LABEL, fontSize: 12.5 }}>📅 Кардио и нагрузка дня</span>
         <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">{today.slice(5)}</Badge>
         <span style={{ flex: 1 }} />
         <button
-          style={{ ...BTN_PRIMARY, minHeight: 30, padding: '5px 12px', fontSize: 11 }}
+          style={{ ...BTN_PRIMARY, minHeight: 44, padding: '8px 14px', fontSize: 12 }}
           onClick={() => { if (onOpen) onOpen(); else { try { localStorage.setItem('he_training_planning_track', 'cardio'); } catch { /* ignore */ } window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'cardio' })); } }}
           aria-label="Открыть кардио-дневник"
         >
@@ -54,14 +54,14 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       </div>
 
       {cycle ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>План на сегодня</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#fff' }}>План на сегодня</div>
           {load.planned.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px' }}>Кардио не запланировано — отдых.</div>
+            <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.10)', borderRadius: 11, padding: '9px 11px' }}>Кардио не запланировано — отдых.</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {load.planned.map((s, i) => (
-                <span key={i} style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[s.type] ?? '#4ade80', background: `${TYPE_COLOR[s.type] ?? '#4ade80'}14`, border: `1px solid ${TYPE_COLOR[s.type] ?? '#4ade80'}28`, borderRadius: 20, padding: '4px 10px' }}>
+                <span key={i} style={{ fontSize: 11.5, fontWeight: 800, color: TYPE_COLOR[s.type] ?? '#4ade80', background: `${TYPE_COLOR[s.type] ?? '#4ade80'}14`, border: `1px solid ${TYPE_COLOR[s.type] ?? '#4ade80'}30`, borderRadius: 20, padding: '5px 11px', fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 8px ${TYPE_COLOR[s.type] ?? '#4ade80'}22` }}>
                   {TYPE_LABEL[s.type]} {s.durationMin}м{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment)}` : ''}{s.targetHr?.max ? ` · ${s.targetHr.min}-${s.targetHr.max}` : ''}
                 </span>
               ))}
@@ -73,7 +73,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       )}
 
       {legDay?.isLegDay && (
-        <div style={{ fontSize: 11, background: load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.09)' : 'rgba(245,158,11,0.09)', border: `1px solid ${load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.36)' : 'rgba(245,158,11,0.36)'}`, borderRadius: 10, padding: '7px 10px', color: load.planned.some(s => s.type !== 'recovery') ? '#f87171' : '#fbbf24', lineHeight: 1.45 }} role="status">
+        <div style={{ fontSize: 11.5, background: load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)', border: `1px solid ${load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.38)' : 'rgba(245,158,11,0.38)'}`, borderLeft: `3px solid ${load.planned.some(s => s.type !== 'recovery') ? '#ef4444' : '#f59e0b'}`, borderRadius: 11, padding: '8px 11px', color: load.planned.some(s => s.type !== 'recovery') ? '#f87171' : '#fbbf24', lineHeight: 1.5 }} role="status">
           {load.planned.some(s => s.type !== 'recovery')
             ? `🦵 День тяжёлых ног: на сегодня запланировано интенсивное кардио (${load.planned.filter(s => s.type !== 'recovery').map(s => TYPE_LABEL[s.type]).join(', ')}) — лучше перенести его или заменить на recovery.`
             : load.planned.length > 0
@@ -103,18 +103,18 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       </div>
 
       {(load.cardioMinutes > 0 || load.strengthSessions > 0) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.14)', borderRadius: 10, padding: '8px 10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#fbbf24', fontWeight: 700 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', borderLeft: '3px solid #f59e0b', borderRadius: 11, padding: '9px 11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#fbbf24', fontWeight: 800 }}>
             <span>🔥 Нагрузка дня</span>
-            <span style={{ fontSize: 11, color: '#fff' }}>кардио {load.cardioLoad} · сила {load.strengthLoad} · итого {totalLoad}</span>
+            <span style={{ fontSize: 11.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>кардио {load.cardioLoad} · сила {load.strengthLoad} · итого {totalLoad}</span>
           </div>
-          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
-            <div style={{ width: cardioPct + '%', background: '#00e68a', transition: 'width 0.3s ease' }} title={`кардио ${cardioPct}%`} />
+          <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.25)' }}>
+            <div style={{ width: cardioPct + '%', background: 'linear-gradient(90deg,#00e68a,#00c8a0)', transition: 'width 0.3s ease', boxShadow: '0 0 8px rgba(0,230,138,0.4)' }} title={`кардио ${cardioPct}%`} />
             <div style={{ width: strengthPct + '%', background: '#f59e0b', transition: 'width 0.3s ease' }} title={`сила ${strengthPct}%`} />
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00e68a', marginRight: 4 }} />кардио {load.cardioMinutes}м</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#f59e0b', marginRight: 4 }} />сила {load.strengthSessions} сесс</span>
+          <div style={{ display: 'flex', gap: 9, fontSize: 10.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00e68a', marginRight: 5 }} />кардио {load.cardioMinutes}м</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#f59e0b', marginRight: 5 }} />сила {load.strengthSessions} сесс</span>
           </div>
         </div>
       )}
