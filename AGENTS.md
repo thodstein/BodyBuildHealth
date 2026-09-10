@@ -10,6 +10,7 @@
 - **Поймано своим прогоном**: `TEXT_3` с пробелом (`color: TEXT_3`, сплит-шаг) после удаления из импорта — `ReferenceError`; hub-бейдж «Из хаба» жил в VBT-карточке → после переезда виден только на атлете — дублирован компактным бейджем в hero (заодно закрыл `sm-bridge` без правок теста); `annual` possibly-null в сабтайтле экспорта.
 - **Проверено**: SS-зона **743/743 (54 файла)** + `rest-hooks-native` 68/68 + `verify:apk-design` OK + `tsc` чист по своим файлам (1 ошибка — чужой `bb/cycle-to-plan.ts` `mrv`, не тронут). Тесты своей зоны обновлены: `ss-wizard-structure` 7/7 (переписан под 7 шагов), `cycles` helper params→атлет→вне→сплит, `apk-strongman-pack`/`sm-bridge` без правок. Файлы: `StrengthSportConstructor.tsx`, `StrengthSportPlanView.tsx`, `StrengthUI.tsx`, `useStrengthSportWizard.ts`, 2 теста. НЕ КОММИТИЛ/НЕ ПУШИЛ.
 - **Коммит `765a3376` (pathspec 7 своих, без пуша)** + широкий круг: combat 24/24 + TrainingScreen_parts **846/848** (2 падения — оба чужие pre-existing, моих файлов в замыкании нет: `MesocycleProgressionCard` lms-only + `training-library-promax` галерея, proven stash ранее). НЕ ПУШИТЬ.
+- **Доводка `a0961464`**: микрошрифты 9→10px (слайдеры/симулятор/LVP), outside-панель gap 12→10, тройные пустые строки подчищены; АПК-слой новые пилюли/панели покрывает из коробки (`data-ss=steps/wizard-nav`, CSS не тронут). UI-зона 39/39 + `verify:apk-design` OK + `tsc` **0 по всему проекту**. НЕ ПУШИТЬ.
 
 ## ББ-авто: женские циклы-шаблоны + фазы cycle-пути + float-фикс фидера (Sep 10 2026, НЕ пушить — очередь чужих)
 
