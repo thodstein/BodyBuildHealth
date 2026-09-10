@@ -75,6 +75,50 @@ CTA ×3, асимметрия ×3, findings (Head/Output/P0) ×3.
 - **ACWR/тендоны:** per-muscle ACWR уже есть; **нет связки** «ACWR-danger точка →
   причина volume/fatigue в топе» (данные рядом, вывод не соединён).
 
+## 2.1. Исследование PRO-2 — 6 свежих запросов (Sep 10 2026, этот раунд)
+
+Старый план (`ARM-DIAGNOSTICS-PRO-PLAN.md`, Sep 05) исследовал движки
+(~15 источников: Mithril/StrengthLog/GoldenGrip/Ezreal/Grokipedia/Bezkorovainyi/
+IronMind/GripStrength/WAF). PRO-2 — НОВЫЙ док про подачу хаба; ниже — свежие
+запросы именно под него (что проверено, что изменило эпики, что осталось открытым):
+
+- **Техники (en.wikipedia.org/wiki/Arm_wrestling):** hook/toproll/press +
+  rising/posting определения 1-в-1 с чипами хаба; press новичкам опасен →
+  прямое обоснование **P5 press-гейта** (не выдумано).
+- **WAF Rules 2025 (waf-armwrestling.com, PDF 18 стр.):** вес XXI века: L/R —
+  отдельные зачёты (в хабе уже), фолы/ремень/сгонка. → Table-IQ покрывает
+  фолы/срывы/ремень; правил-памятка «фол → чинить» — открытый пункт (не P1–P7).
+- **RT WR (en.wikipedia.org/wiki/Rolling_Thunder_(exercise)):** Tyukalov 130.5
+  (V3, 2013 Visegrip Viking); рекорды V1/V2 (Felix 146.7) — аннулированы как
+  flawed units. → 130.5 в хабе корректен, причём именно V3; женщины —
+  Gaiduchenko 77.2 (2012) 1-в-1. Обоснование **P3 norms-table**.
+- **Apollon's Axle WR (ironmind.com, rules & records):** мужчины Myerscough
+  **237.5** (2022), женщины Gaiduchenko 137.9. ⚠️ ОТКРЫТОЕ: в хабе Axle
+  сравнивается с **133** (Saxon-тип; ср. Tyukalov Saxon 127.5, 2025) — для
+  грифа Apollon это заниженный ориентир. Не менял кодом (тронуло бы нормы и
+  тесты): честный follow-up — селект снаряда (Saxon/Apollon) в P3-таблицу.
+- **CoC (en.wikipedia.org/wiki/Captains_of_Crush_Grippers + ironmind.com):**
+  No.3 (~127 кг рейтинг) = мировой benchmark crush-грипа (288+ сертифицированных),
+  No.4 — элита единиц (Myerscough 2023). ⚠️ Оговорка Strossen: рейтинг ≠
+  калибровка — поэтому `cocLevel` в хабе остаётся ordinal-уровнем, а не кг.
+- **Armlifting-дисциплины SAR (sportscategory.info + armliftingusa.com +
+  ironmind.com):** RT / Axle / Hub / 2H Pinch Block / Excalibur / Silver Bullet
+  / Saxon. → Хаб покрывает 5 из 7 (RT, Axle, Hub≈pinch, 2H-pinch, CoC≈Silver
+  Bullet); Excalibur в хабе нет — открытый пункт.
+- **ARM1 Bezkorovainyi (researchgate.net, Sep 2023 / Jun 2024):** FB5k-тензодинамометр,
+  author block device, патент #43082, метрики F100/F500/t05F — прибор и метрики
+  реальны. → Обоснование Strength-таба; популяционных норм F/t в паблике нет —
+  поэтому в **P3** только качественный порог из кода (30), без выдуманных «элит».
+- **Переломы (PMC9592113/PMC8667248/PMC10426487/Ogawa 2022/Kruczynski/Brismar):**
+  9 из 10 серьёзных травм — спираль дистальной трети плеча; торсия+изгиб,
+  пик 60 МПа на 115 мм выше локтя (medial-posterior); лучевой нерв 8–20%;
+  пик возраста 20–24; подростки 14–15 — отрыв медиального надмыщелка (тяга
+  flexor-pronator). → Обоснование **P5** (red-flags + side-капы + RIR≥2);
+  открытый пункт: teen-гейт 14–15 лет (MHE-риск) — в P1–P7 не входил.
+- **PMC11206825 (grip force–time review):** RFD считают наклоном кривой за
+  10-мс окна, пик — первые 50–75 мс; единого стандарта нет. → F/t в хабе как
+  ориентир ок, «эталона» не существует — честно отражено в P3-пороге.
+
 ## 3. План PRO (эпики P1–P7 — ВСЕ ВЫПОЛНЕНЫ, каждый своим коммитом pathspec)
 
 - **P1 Навигация-мастер ✅ (`168424ab`):** HowTo-портянка → 4 строки
