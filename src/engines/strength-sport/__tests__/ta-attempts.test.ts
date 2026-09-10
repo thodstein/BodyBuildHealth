@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planTAAttempts, roundDownKg } from '../strength-sport-ta-attempts.engine';
+import { planTAAttempts, roundDownKg, attemptBandKg } from '../strength-sport-ta-attempts.engine';
 
 describe('TA attempts E12', () => {
   it('90/96/102 от 100', () => {
@@ -26,5 +26,23 @@ describe('TA attempts E12', () => {
     expect(planTAAttempts({})).toBeNull();
     expect(planTAAttempts({ declaredMaxKg: -5 })).toBeNull();
     expect(roundDownKg(87.9)).toBe(87);
+  });
+  it('W1 полоса: дефолт ±2.5, advanced ±3.5, в rationale', () => {
+    expect(attemptBandKg()).toBe(2.5);
+    expect(attemptBandKg('intermediate')).toBe(2.5);
+    expect(attemptBandKg('advanced')).toBe(3.5);
+    expect(attemptBandKg('elite')).toBe(3.5);
+    const p = planTAAttempts({ declaredMaxKg: 100 });
+    expect(p?.bandKg).toBe(2.5);
+    expect(p?.rationale.join(' ')).toContain('±2.5');
+    const pa = planTAAttempts({ declaredMaxKg: 100, level: 'advanced' });
+    expect(pa?.bandKg).toBe(3.5);
+    expect(pa?.attempts).toEqual([90, 96, 102]);
+  });
+  it('W1 полоса складывается с readiness (не поглощает)', () => {
+    const p = planTAAttempts({ declaredMaxKg: 100, peakVelStandard: 1.9, peakVelToday: 1.7, level: 'advanced' });
+    expect(p?.readinessCut).toBe(true);
+    expect(p?.bandKg).toBe(3.5);
+    expect(p?.attempts).toEqual([87, 93, 99]);
   });
 });

@@ -1,5 +1,42 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ТА-хаб PRO-v3 выполнен кодом полностью W1–W9 (Sep 10 2026, в worktree БЕЗ коммита — чекаут и повершел запрещены)
+
+По команде «выполняй полностью от начала до конца» закрыты все 9 эпиков `docs/TA-DIAGNOSTICS-PRO-PLAN-V3.md` (§5 в доке). Только Edit/Write/Read-инструмент (шелл-правок нет, чекаутов нет); прогоны — vitest/tsc/verify через терминал, всё зелёное.
+
+- **W3 barbell-гейт** (NEW `strength-sport-ta-velocity-guard.engine.ts` + тест 3/3): все подписи скоростей — «м/с (штанга)», suspect-флаг `data-wl="vel-guard"` (потолки 2.7/2.5/hard 3.0/низ 0.3, Suchomel 2025); LVP-инпуты заодно переведены на 16px/44px (были пропущены UI-раундом). Тест/UI +1.
+- **W2 IMTP PF-first** (`strength-sport-ta-imtp.engine.ts`: серая зона RFD 4500–6000 только warning + `IMTP_PROTOCOL_CHECKLIST` + `IMTP_CLEAN_TRANSFER_NOTE` Arauz; хаб показывает): тесты 8/8 (старые 4000→дефицит / 9000→баланс целы).
+- **W1 заявки ±** (`strength-sport-ta-attempts.engine.ts`: `attemptBandKg` ±2.5/±3.5 + rationale PMC 2025; хаб `90/96/102 (±N)`, level прямым чтением стора — TDZ `taLevel` обойдён + `planNonce` в deps): тесты 7/7.
+- **W5 риск-рамка** (хаб: Arauz-строка + «Скрининг, не диагноз» + `data-wl="ohs-risk"` 🔴🟡🟢; экспорт NEW `notes[]` → «Заметки» HTML + CSV): тест/UI 1.
+- **W4 съёмка** (`strength-sport-video.engine.ts`: `videoQualityForCapture` ok/rough/unknown; хаб: 4 поля + блок + `≈` у xLoop + нота в экспорт): тесты 4+1.
+- **W7 кросс-чек** (NEW `strength-sport-ta-strength-base.engine.ts`: `attemptBaseDivergence` RMSE 3/3 + предикторы, коэффициенты НЕ зашиты осознанно; хаб `data-wl="base-div"` + 3 поля подсобок + экспорт; weak-cause `baseDivergenceKg` → сигнал + low→med): тесты 4+1+1. Поймано: динамический placeholder заявки — чинено хуками `attempt-sn/cj`.
+- **W8 L/R голеностоп** (`strength-sport-ohs.engine.ts`: ×3.6, `diagnoseKneeToWallBilateral`, катоффы 12/9, флаг ≥2см; хаб `kneeToWallL/R` + миграция legacy→оба, худшая в assessOHS/profile, `data-wl="ktw"`, экспорт): тесты движок + UI (8/13см → 5см, 28.8°/46.8°). Поймано: tsc TS18047 — явные гарды; свой nesting грида — чинен до verification.
+- **W9 пофазная тяга** (NEW `strength-sport-ta-pull-phase.engine.ts` first/transition/second + linkWeak; хаб `data-wl="pull-phase"` + «🎯 Открыть фазу» setTab+toggleWeak, каст типа): тесты 4+1.
+- **W6 хвосты** (стрип `data-wl="coverage"` + scroll-snap в §99; `buildWLDiagnosticsHtml(snap,{apkHeader})`, печать с флагом): тест 1.
+- **Проверено**: strength-sport 52/52 + хаб 52/52 (39+13) = **772/772**, rest-hooks 68/68 (1 jsdom-open шум предсуществующий), `tsc --noEmit` 0, `verify:apk-design` OK. Поймано: дубль-фрагмент W4-теста ломал коллекцию — удалён. НЕ закоммичено (шелл запрещён — git не трогал вообще): файлы в worktree — 4 NEW движка + 4 NEW теста, MOD 6 движков/тестов, `WLDiagnosticsHub.tsx`, apk-тест, §99 CSS, V3-док + эта запись.
+
+## Арм-хаб PRO-3 (остаток 1–6) выполнен кодом (Sep 10 2026, в worktree БЕЗ коммита — чекаут и повершел запрещены)
+
+По команде «выполняй полностью» закрыты все 6 пунктов остатка до PRO (§5 в `docs/ARM-DIAGNOSTICS-HUB-PRO-2.md`). Только Edit-инструмент, проверка чтением (прогоны за владельцем).
+
+- **R1 вердикт асимметрии** (`arm-hub-tabs2.tsx` Strength, `data-arm="asym-verdict"`): max из динамика/хват/bilateral + слабая рука + вердикт по 7/12; детали ниже целы. `bilateralWeakBonus`-канон не тронут.
+- **R2 Recovery** — 3 мастер-группы «📊 Нагрузка» / «🦿 Тело» / «📈 Итог» (fatigue схлопнут); строки/aria/хуки внутри 1-в-1.
+- **R3 Grip** — «✊ Замеры» + Force + «📟 Приборы» (VBT, схлопнут) + бенчмарки (схлопнуты); поймана своя ошибка nesting обёртки через границу грида — исправлена до валидной до verification.
+- **R4 кнопки P0**: инъекция `primary block hero`, экспорты — `ghost`.
+- **R5 связка матчапа**: пересечение мышц точек × приоритет соперника в Pressure (try/catch, импорты были).
+- **R6 findings**: scoring-строка удалена из Head (кольцо/floors[0]/теги целы), полный список — только HubOutput.
+- **Тесты R1–R5** (итого 44 в `arm-diagnostics-hub.test.tsx`). Файлы в worktree: `arm-hub-tabs1.tsx`, `arm-hub-tabs2.tsx`, `arm-hub-panels.tsx`, тест, PRO-2 док + эта запись. НЕ закоммичено (нечем — git через запрещённый шелл).
+
+## Арм-хаб PRO-2 follow-ups F1–F3 выполнены кодом (Sep 10 2026, в worktree БЕЗ коммита — чекаут и повершел запрещены)
+
+По команде «выполняй полностью, без недоделок» закрыты все 3 открытых пункта §2.1 `docs/ARM-DIAGNOSTICS-HUB-PRO-2.md` (§4 в доке). Только Edit-инструмент, чтение-проверка вместо прогонов (vitest/tsc гнать было нечем — шелл запрещён; прогон за владельцем).
+
+- **F1 селект Axle** (`ArmDiagnosticsHub.tsx`: `axleImpl` в типе + дефолт saxon; `arm-hub-tabs1.tsx`: чипы Saxon/Apollon + условная норма `Apollon WR` М237.5/Ж137.9 vs `Saxon-ориентир` 133 + подпись Force Vector): оговорка «Axle-133 занижен» закрыта без сдвига дефолта.
+- **F2 teen-гейт** (`arm-hub-panels.tsx` HubControls: чипы `ageBand` Взрослый 16+/Подросток 14–15 с тогглом + bad-баннер MHE/«не диагноз»): пункт «teen-гейт 14–15» закрыт.
+- **F3 памятка фолов** (`arm-hub-tabs2.tsx` Pressure: collapsible «📖 Фолы WAF → что чинить», 5 kv на точках хаба): пункт «памятка фол→чинить» закрыт.
+- **Тесты F1/F2/F3** (`arm-diagnostics-hub.test.tsx`, итого 39): нормы 133↔237.5 (150%/84%), MHE-баннер, фолы в Давлении. Движки/строки/aria 1-в-1 (Next-кнопка с нейтральным aria-label не тронута).
+- **НЕ закоммичено** (нечем — git тоже идёт через запрещённый шелл): файлы в worktree — `ArmDiagnosticsHub.tsx`, `arm-hub-tabs1.tsx`, `arm-hub-tabs2.tsx`, `arm-hub-panels.tsx`, тест, PRO-2 док + эта запись. Excalibur-снаряд остался вне хаба (единственный непокрытый из 7 SAR-дисциплин, отдельного требования не было).
+
 ## Арм-хаб PRO-2 выполнен полностью: P1–P7 + армлифтинг-покрытие (Sep 10 2026, закоммичен, без пуша)
 
 Ответ: да, хаб учитывает армлифтинг — RT/Axle/Pinch-поля, Force Vector с WAF-классом, помост RT (%WR + попытки 90/96/102 + весогонка), CoC-уровни, pinch-коррекции, IronMind-нормы (RT 130.5/77.2, Saxon 133), журнал попыток с %WR. По команде «делай P2 и весь план полностью» выполнены все 7 эпиков `docs/ARM-DIAGNOSTICS-HUB-PRO-2.md`, каждый своим коммитом pathspec (только подача, движки/строки/aria 1-в-1).

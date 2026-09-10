@@ -45,4 +45,12 @@ describe('TA weak cause E2', () => {
     expect(r.cause).toBe('strength');
     expect(r.signals.some(s => s.includes('IMTP'))).toBe(true);
   });
+  it('W7 расхождение базы усиливает технический след', () => {
+    const base = diagnoseTAWeakCause({ zone: 'snatch_off_floor' });
+    expect(base.cause).toBe('technique');
+    expect(base.confidence).toBe('low');
+    const div = diagnoseTAWeakCause({ zone: 'snatch_off_floor', baseDivergenceKg: 8 });
+    expect(div.signals.some(s => s.includes('база↔заявка'))).toBe(true);
+    expect(div.confidence).toBe('med');
+  });
 });

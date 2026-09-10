@@ -3,7 +3,7 @@ import { TA_BIOMECH, diagnoseTAWeakPoint, isValidAngleForWeakPoint } from '../st
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal } from '../strength-sport-barpath.engine';
 import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift } from '../strength-sport-vbt.engine';
 import { scoreTA } from '../strength-sport-scoring.engine';
-import { assessOHS, OHS_NORMS } from '../strength-sport-ohs.engine';
+import { assessOHS, OHS_NORMS, diagnoseKneeToWallBilateral, kneeToWallDeg } from '../strength-sport-ohs.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, hasPoseSupport, livePoseStatus } from '../strength-sport-pose.engine';
 import { diagnoseVelocityLossSS } from '../strength-sport-vbt.engine';
@@ -133,6 +133,18 @@ describe('OHS 6-сегментов', () => {
   it('нормы OHS', () => {
     expect(OHS_NORMS.kneeToWallCm.optimal).toBe(12);
     expect(OHS_NORMS.ankleDeg.optimal).toBe(35);
+  });
+  it('W8 knee-to-wall: см→градусы, катоффы, асимметрия', () => {
+    expect(kneeToWallDeg(10)).toBe(36);
+    expect(kneeToWallDeg(null)).toBeNull();
+    const sym = diagnoseKneeToWallBilateral(12, 13);
+    expect(sym.isAsym).toBe(false);
+    expect(sym.worseCm).toBe(12);
+    const asym = diagnoseKneeToWallBilateral(8, 13);
+    expect(asym.isAsym).toBe(true);
+    expect(asym.asymCm).toBe(5);
+    expect(asym.text).toContain('асимметрия');
+    expect(diagnoseKneeToWallBilateral(null, null).text).toBeNull();
   });
 });
 

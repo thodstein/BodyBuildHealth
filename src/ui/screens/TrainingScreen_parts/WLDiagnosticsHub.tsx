@@ -8,14 +8,18 @@ import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '
 import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose, diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
-import { loadBarTracking, saveBarTracking, parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { loadBarTracking, saveBarTracking, parseKinoveaCSV, analyzeBarTracking, videoQualityForCapture } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { optimalFvSlopeForPmax, vbtEwma, TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift, diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { applyToPlanner } from './planner-bridge';
-import { CARD, DIM, ACCENT } from './training-ui';
+import { CARD, ACCENT } from './training-ui';
+import { isSystemVelocitySuspect } from '../../../engines/strength-sport/strength-sport-ta-velocity-guard.engine';
+import { attemptBaseDivergence, SNATCH_PREDICTORS, CJ_PREDICTORS } from '../../../engines/strength-sport/strength-sport-ta-strength-base.engine';
+import { diagnosePullPhaseProfile } from '../../../engines/strength-sport/strength-sport-ta-pull-phase.engine';
+import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sport-scoring.engine';
-import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, diagnoseKneeToWallBilateral, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
@@ -30,7 +34,7 @@ import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
 import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
-import { diagnoseTAImtp } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
+import { diagnoseTAImtp, IMTP_PROTOCOL_CHECKLIST, IMTP_CLEAN_TRANSFER_NOTE } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
 import { buildTAAnnualOverlay, saveTAAnnualOverlay } from '../../../engines/strength-sport/strength-sport-ta-annual-bridge.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
@@ -76,7 +80,9 @@ type WLState = {
   ohsArmsOverMidfoot: boolean;
   ohsLumbarNeutral: boolean;
   // (V9: удалены legacy overheadSquat/ankleDorsiflex — писать их было нечему с v1.)
-  kneeToWallCm: string;
+  // W8: knee-to-wall двусторонний (L/R), в assessOHS идёт худшая сторона
+  kneeToWallL: string;
+  kneeToWallR: string;
   ankleDeg: string;
   heelRetest: '' | 'better' | 'same';
   // IMTP
@@ -107,6 +113,10 @@ type WLState = {
   taVelStd: string;
   taVelToday: string;
   taStrategy: string;
+  // W7: лучшие подсобки для силового кросс-чека (контекст тренера, Sandau&Kipp 2025)
+  taPullBest: string;
+  taSquat3: string;
+  taOhpBest: string;
   // E13: IMTP/RFD ввод
   imtpRfd: string;
   imtpDur: string;
@@ -120,6 +130,11 @@ type WLState = {
   annualEndWeek: string;
   // V3: MediaPipe live-статус + прогресс двоеборья
   poseLive: '' | 'loading' | 'ok' | 'fail';
+  // W4: метаданные съёмки для флага качества xLoop (Shah 2026)
+  videoHeightM: string;
+  videoDistM: string;
+  videoSide: '' | 'left' | 'front' | 'right';
+  videoDevice: '' | 'kinovea' | 'enode' | 'phone';
   progBw: string;
   progSnatch: string;
   progCj: string;
@@ -140,7 +155,7 @@ const DEFAULT_STATE: WLState = {
   fvrLift: 'snatch' as 'snatch' | 'clean',
   lvpLift: 'snatch', lvp50: '2.70', lvp65: '2.15', lvp75: '1.80', lvp90: '1.55', lvpResult: '',
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
-  kneeToWallCm: '', ankleDeg: '',
+  kneeToWallL: '', kneeToWallR: '', ankleDeg: '',
   heelRetest: '',
   imtpKg: '', isppKg: '',
   xLoopCm: '', yMaxCm: '', peakVelMs: '',
@@ -154,12 +169,19 @@ const DEFAULT_STATE: WLState = {
   jerkLeftFwd: '', jerkRightFwd: '',
   // E12: заявки/скорости/стратегия
   taSnatchMax: '', taCjMax: '', taVelStd: '', taVelToday: '', taStrategy: 'balanced',
+  // W7: подсобки (персистятся)
+  taPullBest: '', taSquat3: '', taOhpBest: '',
   // E13: IMTP/RFD
   imtpRfd: '', imtpDur: '', imtpCountermove: false,
   // V6-B3: ручной вес IMTP
   imtpBw: '',
   // V3: live-статус + прогресс
   poseLive: '' as '' | 'loading' | 'ok' | 'fail',
+  // W4: метаданные съёмки (персистятся)
+  videoHeightM: '',
+  videoDistM: '',
+  videoSide: '' as '' | 'left' | 'front' | 'right',
+  videoDevice: '' as '' | 'kinovea' | 'enode' | 'phone',
   progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
   // V8: цикл Sinclair (пусто = текущий 2025-2028)
   progCycle: '' as '' | '2025-2028' | '2021-2024',
@@ -185,6 +207,15 @@ export const WLDiagnosticsHub: React.FC = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const merged = { ...DEFAULT_STATE, ...(raw ? JSON.parse(raw) : {}) };
+      // W8: миграция одностороннего kneeToWallCm → L/R (значение — в обе стороны)
+      try {
+        const legacy = (merged as any).kneeToWallCm as string | undefined;
+        if ((!merged.kneeToWallL && !merged.kneeToWallR) && legacy) {
+          merged.kneeToWallL = legacy;
+          merged.kneeToWallR = legacy;
+        }
+        delete (merged as any).kneeToWallCm;
+      } catch { /* noop */ }
       // E9: пустые антропо-поля — из профиля (разово, ручной ввод приоритетнее)
       try {
         const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
@@ -278,13 +309,34 @@ export const WLDiagnosticsHub: React.FC = () => {
     return { diff: Math.round(diff * 10) / 10, isAsym: diff >= 7, isCrit: diff >= 12, weaker: l < r ? 'left' : 'right' };
   }, [state.leftMax, state.rightMax]);
 
+  // W8: двусторонний knee-to-wall — в assessOHS идёт худшая сторона
+  const ktw = useMemo(() => {
+    try {
+      const l = state.kneeToWallL ? parseFloat(state.kneeToWallL) : null;
+      const r = state.kneeToWallR ? parseFloat(state.kneeToWallR) : null;
+      return diagnoseKneeToWallBilateral(l, r);
+    } catch { return { lDeg: null, rDeg: null, asymCm: null, isAsym: false, worseCm: null, text: null }; }
+  }, [state.kneeToWallL, state.kneeToWallR]);
+
   const ohs = useMemo(() => assessOHS({
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
     trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-    kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+    kneeToWallCm: ktw.worseCm,
     ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
-  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
+  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, ktw, state.ankleDeg, state.heelRetest]);
+
+  // W5: ранжир проваленных OHS-сегментов по риску (скрининг, не диагноз)
+  const ohsRiskRank = useMemo(() => {
+    try {
+      const tier: Record<string, 'high' | 'med' | 'low'> = { lumbar: 'high', knee: 'high', hip: 'high', trunk: 'med', ankle: 'med', arm: 'low' };
+      const failed = (ohs.segments || []).filter(s => !s.pass);
+      if (!failed.length) return null;
+      const names: Record<string, string> = { lumbar: 'поясница', knee: 'колени', hip: 'таз', trunk: 'корпус', ankle: 'голеностоп', arm: 'руки' };
+      const byTier = (t: 'high' | 'med' | 'low') => failed.filter(s => tier[s.segment] === t).map(s => names[s.segment] || s.segment);
+      return { high: byTier('high'), med: byTier('med'), low: byTier('low') };
+    } catch { return null; }
+  }, [ohs]);
 
   const vbtLoss = useMemo(() => {
     const best = parseFloat(state.vbtBest);
@@ -302,6 +354,25 @@ export const WLDiagnosticsHub: React.FC = () => {
     const lift = state.barLift.includes('clean') ? 'clean' : state.barLift.includes('jerk') ? 'jerk' : 'snatch';
     return taZoneForVelocity(vel, lift);
   }, [state.vbtVel, state.peakVelMs, state.barLift]);
+
+  // W3: barbell-гейт — все скорости хаба только со штанги (Suchomel 2025)
+  const velGuard = useMemo(() => {
+    const cands: Array<[number | null, string]> = [
+      [parseFloat(state.vbtVel), 'пик'], [parseFloat(state.vbtBest), 'best'],
+      [parseFloat(state.vbtLast), 'last'], [parseFloat(state.peakVelMs), 'vmax'],
+      [parseFloat(state.fvrVmax80), 'vmax80'], [parseFloat(state.fvrVmax110), 'vmax110'],
+      [parseFloat(state.lvp50), 'lvp50'], [parseFloat(state.lvp65), 'lvp65'],
+      [parseFloat(state.lvp75), 'lvp80'], [parseFloat(state.lvp90), 'lvp90'],
+      [parseFloat(state.taVelStd), 'пик-стандарт'], [parseFloat(state.taVelToday), 'пик-сегодня'],
+    ];
+    for (const [v, tag] of cands) {
+      if (v != null && Number.isFinite(v)) {
+        const r = isSystemVelocitySuspect(v, state.barLift || state.lvpLift);
+        if (r.suspect) return { ...r, tag };
+      }
+    }
+    return { suspect: false, reason: null as string | null, tag: '' };
+  }, [state.vbtVel, state.vbtBest, state.vbtLast, state.peakVelMs, state.fvrVmax80, state.fvrVmax110, state.lvp50, state.lvp65, state.lvp75, state.lvp90, state.taVelStd, state.taVelToday, state.barLift, state.lvpLift]);
 
   const fvr = useMemo(() => {
     const l80 = parseFloat(state.fvrLoad80), v80 = parseFloat(state.fvrVmax80), l110 = parseFloat(state.fvrLoad110), v110 = parseFloat(state.fvrVmax110), h = parseFloat(state.fvrHAcc), vt = parseFloat(state.vbtVthres);
@@ -396,6 +467,16 @@ export const WLDiagnosticsHub: React.FC = () => {
   }, [fvr]);
 
   // E12: попытки на старт (заявка; рывок по умолчанию из FvR snatchTh)
+  // W1: уровень для полосы читаем напрямую (taLevel-мем ниже по файлу — TDZ)
+  const hubLevelForBand = (): string => {
+    try {
+      const raw = localStorage.getItem('he_strength_sport_plan_v1');
+      if (!raw) return 'intermediate';
+      const j = JSON.parse(raw);
+      const p = j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null;
+      return (p as any)?.inputSnapshot?.level ?? (p as any)?.level ?? 'intermediate';
+    } catch { return 'intermediate'; }
+  };
   const attemptArgs = useMemo(() => {
     const strat = state.taStrategy === 'conservative' || state.taStrategy === 'aggressive' ? state.taStrategy : 'balanced';
     const std = state.taVelStd ? parseFloat(state.taVelStd) : null;
@@ -409,16 +490,24 @@ export const WLDiagnosticsHub: React.FC = () => {
       const fvrBase = state.fvrLift === 'snatch' ? fvr?.snatchTh ?? null : null;
       const base = Number.isFinite(manual) && manual > 0 ? manual : fvrBase;
       if (base == null) return null;
-      return planTAAttempts({ declaredMaxKg: base, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today });
+      return planTAAttempts({ declaredMaxKg: base, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today, level: hubLevelForBand() });
     } catch { return null; }
-  }, [state.taSnatchMax, state.fvrLift, fvr, attemptArgs]);
+  }, [state.taSnatchMax, state.fvrLift, fvr, attemptArgs, planNonce]);
   const cjAttempts = useMemo(() => {
     try {
       const manual = state.taCjMax ? parseFloat(state.taCjMax) : NaN;
       if (!Number.isFinite(manual) || manual <= 0) return null;
-      return planTAAttempts({ declaredMaxKg: manual, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today });
+      return planTAAttempts({ declaredMaxKg: manual, strategy: attemptArgs.strat as any, peakVelStandard: attemptArgs.std, peakVelToday: attemptArgs.today, level: hubLevelForBand() });
     } catch { return null; }
-  }, [state.taCjMax, attemptArgs]);
+  }, [state.taCjMax, attemptArgs, planNonce]);
+  // W7: расхождение ручной заявки рывка vs FvR-базы (вне ±RMSE — флаг)
+  const snatchDiv = useMemo(() => {
+    try {
+      const manual = state.taSnatchMax ? parseFloat(state.taSnatchMax) : null;
+      const fvrBase = state.fvrLift === 'snatch' ? fvr?.snatchTh ?? null : null;
+      return attemptBaseDivergence(fvrBase, manual, 'snatch');
+    } catch { return { divergent: false, diffKg: null, rmseKg: 3, text: null }; }
+  }, [state.taSnatchMax, state.fvrLift, fvr]);
   const barTrend = useMemo(() => {
     try {
       const hist = loadBarTracking();
@@ -613,6 +702,20 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, profileWeightKg]);
 
+  // W9: пофазная тяга — какой конец проседает первым (Sports Biomech 2025)
+  const pullPhase = useMemo(() => {
+    try {
+      const lift = state.barLift.includes('clean') ? 'clean' : 'snatch';
+      return diagnosePullPhaseProfile({
+        lift,
+        isppRatio,
+        imtpStrengthDeficit: imtpResult?.profile === 'strength_deficit',
+        vbtLossPct: vbtLoss?.lossPct ?? null,
+        imtpExplosiveDeficit: imtpResult?.profile === 'explosive_deficit',
+      });
+    } catch { return { weakestSubPhase: 'unknown' as const, confidence: 'low' as const, linkWeak: null, text: '' }; }
+  }, [state.barLift, isppRatio, imtpResult, vbtLoss]);
+
   // E2: причина слабой фазы (объём/техника/мобильность/усталость/сила)
   const causeFor = (wp: WLWeakPoint) => {
     try {
@@ -627,6 +730,8 @@ export const WLDiagnosticsHub: React.FC = () => {
         isppRatio,
         barPathDeviation: state.barPath || null,
         imtpStrengthDeficit: imtpResult?.profile === 'strength_deficit',
+        // W7: расхождение заявки и FvR-базы — сигнал сила/техника
+        baseDivergenceKg: snatchDiv.divergent ? snatchDiv.diffKg : null,
       });
     } catch { return null; }
   };
@@ -675,7 +780,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           return (
           <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <button onClick={() => togglePreferredCorr(wp, c.id)} aria-pressed={pref === c.id} style={{ minWidth: 24, height: 24, borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)', background: pref === c.id ? '#3b82f6' : 'transparent', color: pref === c.id ? '#fff' : '#60a5fa', fontSize: 11, fontWeight: 800 }}>{pref === c.id ? '⭐' : '☆'}</button>
-            <div style={{ flex: 1, fontSize: 10, color: '#fff' }}>{c.name} <span style={{ color: '#60a5fa', fontWeight: 700 }}>{c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%</span>{d ? <span style={{ color: DIM }}> · Δ {d.summary}</span> : null}</div>
+            <div style={{ flex: 1, fontSize: 10, color: '#fff' }}>{c.name} <span style={{ color: '#60a5fa', fontWeight: 700 }}>{c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%</span>{d ? <span style={{ color: '#fff' }}> · Δ {d.summary}</span> : null}</div>
           </div>
           );
         })}
@@ -918,7 +1023,7 @@ export const WLDiagnosticsHub: React.FC = () => {
     if (!state.ohsTrunkUpright) restrictions.push('hip');
     if (!state.ohsArmsOverMidfoot) restrictions.push('shoulder');
     if (!state.ohsLumbarNeutral) restrictions.push('lower_back');
-    if (state.kneeToWallCm && Number.isFinite(parseFloat(state.kneeToWallCm)) && parseFloat(state.kneeToWallCm) < 12) restrictions.push('ankle');
+    if (ktw.worseCm != null && ktw.worseCm < 12) restrictions.push('ankle');
     if (state.ankleDeg && Number.isFinite(parseFloat(state.ankleDeg)) && parseFloat(state.ankleDeg) < 35) restrictions.push('ankle');
     const uniq = [...new Set(restrictions)];
     try {
@@ -953,6 +1058,35 @@ export const WLDiagnosticsHub: React.FC = () => {
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
       const injectNotes = Array.isArray(state.lastInjectNotes) ? state.lastInjectNotes : [];
       if (injectNotes.length) base.injectionNotes = [...injectNotes];
+      // W5: заметки хаба в экспорт (доминантность + OHS риск-рамка + дисклеймер)
+      const hubNotes: string[] = ['Взятие — force-доминантно (Arauz 2025)', 'OHS: скрининг, не диагноз'];
+      try {
+        if (ohsRiskRank) {
+          const parts: string[] = [];
+          if (ohsRiskRank.high.length) parts.push(`🔴 ${ohsRiskRank.high.join(', ')}`);
+          if (ohsRiskRank.med.length) parts.push(`🟡 ${ohsRiskRank.med.join(', ')}`);
+          if (ohsRiskRank.low.length) parts.push(`🟢 ${ohsRiskRank.low.join(', ')}`);
+          if (parts.length) hubNotes.push(`OHS риск: ${parts.join(' · ')}`);
+        }
+      } catch { /* noop */ }
+      // W4: качество съёмки в экспорт
+      try {
+        if (videoQuality.flag !== 'unknown') hubNotes.push(`Видео ${videoQuality.flag}: ${videoQuality.reason}`);
+      } catch { /* noop */ }
+      // W7: расхождение базы и силовые лучшие в экспорт
+      try {
+        if (snatchDiv.divergent && snatchDiv.text) hubNotes.push(`Кросс-чек: ${snatchDiv.text}`);
+        const bests: string[] = [];
+        if (state.taPullBest) bests.push(`тяга ${state.taPullBest}`);
+        if (state.taSquat3) bests.push(`присед3 ${state.taSquat3}`);
+        if (state.taOhpBest) bests.push(`жим ${state.taOhpBest}`);
+        if (bests.length) hubNotes.push(`Силовые: ${bests.join(' · ')}`);
+      } catch { /* noop */ }
+      // W8: голеностоп L/R в экспорт
+      try {
+        if (ktw.text) hubNotes.push(`Голеностоп: ${ktw.text}`);
+      } catch { /* noop */ }
+      base.notes = hubNotes;
       if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle };
     } catch { /* noop — базовый снап */ }
     return base;
@@ -972,10 +1106,10 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2000);
   };
 
-  // V4-C: печать сводки (то же HTML, что в экспорте)
+  // V4-C: печать сводки (то же HTML, что в экспорте; W6: APK-шапка со скором)
   const handlePrint = () => {
     try {
-      const html = buildWLDiagnosticsHtml(exportSnap());
+      const html = buildWLDiagnosticsHtml(exportSnap(), { apkHeader: true });
       const w = window.open('', '_blank');
       if (!w) {
         setToast('Всплывающие окна заблокированы — скачай HTML');
@@ -991,6 +1125,15 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
     }
   };
+
+  // W4: флаг качества съёмки (Shah 2026 — перспектива меняет xLoop)
+  const videoQuality = useMemo(() => {
+    try {
+      const h = state.videoHeightM ? parseFloat(state.videoHeightM) : null;
+      const d = state.videoDistM ? parseFloat(state.videoDistM) : null;
+      return videoQualityForCapture({ heightM: h, distM: d, side: state.videoSide || null, device: state.videoDevice || null });
+    } catch { return { flag: 'unknown' as const, reason: '' }; }
+  }, [state.videoHeightM, state.videoDistM, state.videoSide, state.videoDevice]);
 
   const mockPose = useMemo(() => {
     const frames = createMockPoseStream();
@@ -1012,9 +1155,9 @@ export const WLDiagnosticsHub: React.FC = () => {
   }, [weakPoints]);
 
   return (
-    <div className="train-wldiag" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
+    <div className="train-wldiag" style={{ padding: '8px 6px 12px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(59,130,246,0.22)', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ ...CARD, padding: '10px 12px', margin: '6px 0', background: 'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(59,130,246,0.22)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(59,130,246,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
@@ -1028,15 +1171,15 @@ export const WLDiagnosticsHub: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{weakPoints.length ? `${weakPoints.length} слабые фазы` : 'баланс'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{state.barPath ? BAR_PATH_LABELS[state.barPath as BarPathDeviation] : 'bar path —'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtZone ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: vbtZone ? '#22c55e' : DIM }}>{vbtZone ? `VBT ${vbtZone}` : 'VBT —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length ? `${weakPoints.length} слабые фазы` : 'баланс'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{state.barPath ? BAR_PATH_LABELS[state.barPath as BarPathDeviation] : 'bar path —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtZone ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: vbtZone ? '#22c55e' : '#fff' }}>{vbtZone ? `VBT ${vbtZone}` : 'VBT —'}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
           {scoring.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
         </div>
         {diaryWeaks.length > 0 && <div style={{ fontSize: 10, color: '#5ee', marginBottom: 4 }}>📓 Дневник группы: {diaryWeaks.map(w => `${w.label} ${w.deltaPct}%`).join(', ')}</div>}
-        {diaryPhases.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 6 }}>📓 Дневник фазы (reps≤2 → max moment, 3-5 → mid): {diaryPhases.map(wp => WL_WEAKPOINT_LABELS[wp as WLWeakPoint] || wp).join(' · ')} <span style={{ color: DIM }}>(phaseForReps)</span></div>}
+        {diaryPhases.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 6 }}>📓 Дневник фазы (reps≤2 → max moment, 3-5 → mid): {diaryPhases.map(wp => WL_WEAKPOINT_LABELS[wp as WLWeakPoint] || wp).join(' · ')} <span style={{ color: '#fff' }}>(phaseForReps)</span></div>}
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые фазы (числовые углы + биомеханика) + bar path с метриками (SRD 4/6см) + VBT/FvR2 → получи RSS-скор, verification и точечные коррекции. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в ТА-конструктор»</b> отправит фазы с biomech в планировщик (mode:weightlifting).
         </div>
@@ -1045,14 +1188,14 @@ export const WLDiagnosticsHub: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ ...CARD, padding: 10, margin: '6px 0' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {TAB_DEFS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as any)} aria-pressed={tab === t.id} style={{ padding: '6px 12px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#3b82f6' : '#1f3a5f', background: tab === t.id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: tab === t.id ? '#3b82f6' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+            <button key={t.id} data-wl="tab" onClick={() => setTab(t.id as any)} aria-pressed={tab === t.id} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#3b82f6' : '#1f3a5f', background: tab === t.id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: tab === t.id ? '#3b82f6' : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
               {t.icon} {t.label}
             </button>
           ))}
-          <button onClick={applyToConstructor} style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>→ Применить в ТА-конструктор</button>
+          <button data-wl="apply" onClick={applyToConstructor} style={{ minHeight: 44, marginLeft: 'auto', padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>→ Применить в ТА-конструктор</button>
         </div>
 
         {tab === 'snatch' && (
@@ -1060,15 +1203,15 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Рывок — 5 фаз (числовые углы + биомеханика)</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {(['snatch_off_floor', 'snatch_mid', 'snatch_pull_under', 'snatch_catch', 'snatch_overhead'] as WLWeakPoint[]).map(wp => (
-                <button key={wp} onClick={() => toggleWeak('snatch', wp)} aria-pressed={state.snatchWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.snatchWeak.includes(wp) ? '#3b82f6' : '#1f3a5f', background: state.snatchWeak.includes(wp) ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.snatchWeak.includes(wp) ? '#3b82f6' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+                <button key={wp} data-wl="weak" onClick={() => toggleWeak('snatch', wp)} aria-pressed={state.snatchWeak.includes(wp)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.snatchWeak.includes(wp) ? '#3b82f6' : '#1f3a5f', background: state.snatchWeak.includes(wp) ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.snatchWeak.includes(wp) ? '#3b82f6' : '#fff', fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
             {state.snatchWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
               return (
                 <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
-                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: '#fff' }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
                   {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
@@ -1079,19 +1222,20 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Bar path — рывок (Vorobyev типы + метрики)</div>
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                <select value={state.barLift} onChange={e => setState(s => ({ ...s, barLift: e.target.value }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
-                  <option value="snatch">Рывок</option><option value="clean">Взятие</option><option value="jerk">Толчок</option><option value="squat">Присед</option>
-                </select>
-                <select value={state.barPath} onChange={e => setState(s => ({ ...s, barPath: e.target.value as any }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
-                  <option value="">— нет отклонения</option>
-                  <option value="forward">Уход вперёд</option><option value="backward">Уход назад</option><option value="loop">Петля</option><option value="early_pull">Ранняя тяга</option><option value="soft_lockout">Мягкий замок</option>
-                </select>
-                <input placeholder="xLoop см" value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} style={{ width: 70, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} />
-                <input placeholder="vmax м/с" value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} style={{ width: 70, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} />
+                <PopupSelect label="Движение" value={state.barLift} onChange={v => setState(s => ({ ...s, barLift: v }))} options={[
+                  { id: 'snatch', label: 'Рывок' }, { id: 'clean', label: 'Взятие' }, { id: 'jerk', label: 'Толчок' }, { id: 'squat', label: 'Присед' },
+                ]} />
+                <PopupSelect label="Отклонение" value={state.barPath} onChange={v => setState(s => ({ ...s, barPath: v as any }))} options={[
+                  { id: '', label: '— нет отклонения' },
+                  { id: 'forward', label: 'Уход вперёд' }, { id: 'backward', label: 'Уход назад' }, { id: 'loop', label: 'Петля' },
+                  { id: 'early_pull', label: 'Ранняя тяга' }, { id: 'soft_lockout', label: 'Мягкий замок' },
+                ]} />
+                <input data-wl="num" placeholder="xLoop см" value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} style={{ width: 84, minHeight: 44, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16 }} />
+                <input data-wl="num" placeholder="vmax м/с" value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} style={{ width: 84, minHeight: 44, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16 }} />
               </div>
               {barPathDiag?.weak && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>→ {WL_WEAKPOINT_LABELS[barPathDiag.weak]} · {barPathDiag.corrections.join(' · ')}</div>}
               {barMetricsDiag && <div style={{ fontSize: 10, color: barMetricsDiag.severity === 'ok' ? '#22c55e' : barMetricsDiag.severity === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 4 }}>{barMetricsDiag.text} {barMetrics?.xLoop ? `(SRD ${isRealChange(barMetrics.xLoop) ? 'реально' : 'в пределах шума'})` : ''}</div>}
-              {barMetrics && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Метрика: xLoop {barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
+              {barMetrics && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Метрика: xLoop {videoQuality.flag === 'rough' ? '≈' : ''}{barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
             </div>
           </div>
         )}
@@ -1101,15 +1245,15 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Взятие — 3 фазы + ISPP (предиктор 81%)</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {(['clean_off_floor', 'clean_mid', 'clean_catch'] as WLWeakPoint[]).map(wp => (
-                <button key={wp} onClick={() => toggleWeak('clean', wp)} aria-pressed={state.cleanWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.cleanWeak.includes(wp) ? '#22c55e' : '#1f3a5f', background: state.cleanWeak.includes(wp) ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.cleanWeak.includes(wp) ? '#22c55e' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+                <button key={wp} data-wl="weak" onClick={() => toggleWeak('clean', wp)} aria-pressed={state.cleanWeak.includes(wp)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.cleanWeak.includes(wp) ? '#22c55e' : '#1f3a5f', background: state.cleanWeak.includes(wp) ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.cleanWeak.includes(wp) ? '#22c55e' : '#fff', fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
             {state.cleanWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
               return (
                 <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}°</span></div>
-                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: '#fff' }}>· {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}°</span></div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>{bio?.weakMuscles.join(', ')}</div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>
                   {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
@@ -1118,22 +1262,42 @@ export const WLDiagnosticsHub: React.FC = () => {
               );
             })}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>IMTP кг<br /><input value={state.imtpKg} onChange={e => setState(s => ({ ...s, imtpKg: e.target.value }))} placeholder="250" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>ISPP кг<br /><input value={state.isppKg} onChange={e => setState(s => ({ ...s, isppKg: e.target.value }))} placeholder="220" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>IMTP кг<br /><input value={state.imtpKg} onChange={e => setState(s => ({ ...s, imtpKg: e.target.value }))} placeholder="250" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>ISPP кг<br /><input value={state.isppKg} onChange={e => setState(s => ({ ...s, isppKg: e.target.value }))} placeholder="220" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
             {isppRatio != null && <div style={{ fontSize: 10, color: isppRatio < 0.85 ? '#f59e0b' : '#22c55e', marginTop: 4 }}>ISPP/IMTP {(isppRatio * 100).toFixed(0)}% {isppRatio < 0.85 ? '— слабый отрыв (приоритет дефицит)' : '— норма'}</div>}
-            <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>ISPP предиктор 81% дисп. рывка/толчка (Essex). Норма ISPP ≥85% IMTP.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>ISPP предиктор 81% дисп. рывка/толчка (Essex). Норма ISPP ≥85% IMTP.</div>
+            {pullPhase.weakestSubPhase !== 'unknown' && (
+              <div data-wl="pull-phase" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)' }}>
+                <div style={{ fontSize: 10, color: '#fff' }}>🔬 Тяга: слабее {pullPhase.weakestSubPhase === 'first' ? 'первая (изометрия)' : pullPhase.weakestSubPhase === 'second' ? 'вторая (скорость)' : 'передача (transition)'} — {pullPhase.text}</div>
+                {pullPhase.linkWeak && (
+                  <button data-wl="pull-phase-open" onClick={() => {
+                    const grp = hubTabForPhase(pullPhase.linkWeak as WLWeakPoint) as 'snatch' | 'clean' | 'jerk' | 'aux';
+                    setTab(grp);
+                    toggleWeak(grp, pullPhase.linkWeak as WLWeakPoint);
+                  }} style={{ marginTop: 6, minHeight: 44, padding: '10px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    🎯 Открыть фазу на разбор
+                  </button>
+                )}
+              </div>
+            )}
             {/* E13: IMTP/RFD-профиль */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>IMTP/RFD — профиль силы vs взрыва{profileWeightKg ? ` · вес ${profileWeightKg}кг` : ' · вес задай в профиле'}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 6 }}>
-                <label style={{ fontSize: 11, color: DIM }}>RFD Н/с (0–200мс)<br /><input value={state.imtpRfd} onChange={e => setState(s => ({ ...s, imtpRfd: e.target.value }))} placeholder="7000" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Длительность с<br /><input value={state.imtpDur} onChange={e => setState(s => ({ ...s, imtpDur: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Вес кг<br /><input value={state.imtpBw} onChange={e => setState(s => ({ ...s, imtpBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '90'} style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: '#fff' }}>RFD Н/с (0–200мс)<br /><input value={state.imtpRfd} onChange={e => setState(s => ({ ...s, imtpRfd: e.target.value }))} placeholder="7000" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Длительность с<br /><input value={state.imtpDur} onChange={e => setState(s => ({ ...s, imtpDur: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Вес кг<br /><input value={state.imtpBw} onChange={e => setState(s => ({ ...s, imtpBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '90'} style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}><input type="checkbox" checked={state.imtpCountermove} onChange={e => setState(s => ({ ...s, imtpCountermove: e.target.checked }))} /> Был dip/пружина перед тягой (инвалидирует тест)</label>
+              <button data-wl="imtp-dip" onClick={() => setState(s => ({ ...s, imtpCountermove: !s.imtpCountermove }))} aria-pressed={state.imtpCountermove} aria-label="Был dip перед тягой"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, width: '100%', marginTop: 6, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 700, background: state.imtpCountermove ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: state.imtpCountermove ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
+                <span aria-hidden style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, background: state.imtpCountermove ? '#ef4444' : 'rgba(255,255,255,0.1)', color: '#fff' }}>{state.imtpCountermove ? '✓' : ''}</span>
+                <span style={{ lineHeight: 1.25 }}>Был dip/пружина перед тягой (инвалидирует тест)</span>
+              </button>
               {imtpResult && <div style={{ fontSize: 10, color: imtpResult.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>{imtpResult.relForce != null ? `${imtpResult.relForce}×BW · ` : ''}{imtpResult.verdict}</div>}
               {imtpResult?.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>⚠️ {w}</div>)}
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>📋 Протокол: {IMTP_PROTOCOL_CHECKLIST.join(' · ')}</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{IMTP_CLEAN_TRANSFER_NOTE}</div>
             </div>
           </div>
         )}
@@ -1143,19 +1307,19 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Толчок — 3 фазы (dip 8-12см критичен)</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {(['jerk_dip', 'jerk_drive', 'jerk_lockout'] as WLWeakPoint[]).map(wp => (
-                <button key={wp} onClick={() => toggleWeak('jerk', wp)} aria-pressed={state.jerkWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.jerkWeak.includes(wp) ? '#a855f7' : '#1f3a5f', background: state.jerkWeak.includes(wp) ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.jerkWeak.includes(wp) ? '#a855f7' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+                <button key={wp} data-wl="weak" onClick={() => toggleWeak('jerk', wp)} aria-pressed={state.jerkWeak.includes(wp)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.jerkWeak.includes(wp) ? '#a855f7' : '#1f3a5f', background: state.jerkWeak.includes(wp) ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.jerkWeak.includes(wp) ? '#a855f7' : '#fff', fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
             {state.jerkWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
-              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}{top3Block(wp)}</div>;
+              return <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: '#fff' }}>· {bio?.angleRangeDeg.join('-')}°</span></div><div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{bio?.biomechanicalReason}</div><div style={{ fontSize: 11, color: '#5ee' }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')}</div>{(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}{top3Block(wp)}</div>;
             })}
             {/* E7: jerk dip метрики (Zhang: оптимум 8-12см за 0.15-0.25с) */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Dip-метрика толчка</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
-                <label style={{ fontSize: 11, color: DIM }}>Глубина dip см<br /><input value={state.jerkDipCm} onChange={e => setState(s => ({ ...s, jerkDipCm: e.target.value }))} placeholder="10" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Время dip мс<br /><input value={state.jerkDipMs} onChange={e => setState(s => ({ ...s, jerkDipMs: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Глубина dip см<br /><input value={state.jerkDipCm} onChange={e => setState(s => ({ ...s, jerkDipCm: e.target.value }))} placeholder="10" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Время dip мс<br /><input value={state.jerkDipMs} onChange={e => setState(s => ({ ...s, jerkDipMs: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               {jerkDip && <div style={{ fontSize: 10, color: jerkDip.isOptimal ? '#22c55e' : '#f59e0b', marginTop: 6 }}>Dip {jerkDip.dipCm}см за {jerkDip.dipTimeMs}мс · скорость {jerkDip.dipVelocityMs} м/с{jerkDip.drivePowerW ? ` · drive ~${jerkDip.drivePowerW}Вт` : ''} — {jerkDip.recommendation}</div>}
             </div>
@@ -1167,15 +1331,15 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>База — присед/тяги/жим (5 фаз, разбор как в двоеборье)</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {(['squat_bottom', 'squat_mid', 'pull_start', 'pull_lockout', 'press_start'] as WLWeakPoint[]).map(wp => (
-                <button key={wp} onClick={() => toggleWeak('aux', wp)} aria-pressed={state.auxWeak.includes(wp)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.auxWeak.includes(wp) ? '#f59e0b' : '#1f3a5f', background: state.auxWeak.includes(wp) ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.auxWeak.includes(wp) ? '#f59e0b' : DIM, fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
+                <button key={wp} data-wl="weak" onClick={() => toggleWeak('aux', wp)} aria-pressed={state.auxWeak.includes(wp)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.auxWeak.includes(wp) ? '#f59e0b' : '#1f3a5f', background: state.auxWeak.includes(wp) ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.auxWeak.includes(wp) ? '#f59e0b' : '#fff', fontSize: 11 }}>{WL_WEAKPOINT_LABELS[wp]}</button>
               ))}
             </div>
             {state.auxWeak.map(wp => {
               const bio = diagnoseTAWeakPoint(wp);
               return (
                 <div key={wp} style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: DIM }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
-                  <div style={{ fontSize: 10, color: DIM }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp]} <span style={{ color: '#fff' }}>· {bio?.joint} {bio?.angleRangeDeg[0]}-{bio?.angleRangeDeg[1]}° · {bio?.keyJoint}</span></div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>{bio?.weakMuscles.join(', ')} {bio?.references.join(' · ') ? `· ${bio?.references.join(', ')}` : ''}</div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{bio?.biomechanicalReason}</div>
                   <div style={{ fontSize: 11, color: '#5ee', marginTop: 4 }}>{(WL_WEAKPOINT_CORRECTION[wp] || []).join(' · ')} {bio?.loadCues ? `· ${bio?.loadCues}` : ''}</div>
                   {(() => { const c = causeFor(wp); return c ? <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔍 Причина: {TA_WEAK_CAUSE_LABELS[c.cause]} ({c.confidence}) — {c.text}</div> : null; })()}
@@ -1190,73 +1354,85 @@ export const WLDiagnosticsHub: React.FC = () => {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>VBT — пиковые зоны (PLOS 2026) + FvR2 (Sandau)</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>Вес штанги кг<br /><input value={state.vbtWeight} onChange={e => setState(s => ({ ...s, vbtWeight: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Пиковая скорость м/с<br /><input value={state.vbtVel} onChange={e => setState(s => ({ ...s, vbtVel: e.target.value }))} placeholder="1.75" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Вес штанги кг<br /><input value={state.vbtWeight} onChange={e => setState(s => ({ ...s, vbtWeight: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Пиковая скорость м/с (штанга)<br /><input value={state.vbtVel} onChange={e => setState(s => ({ ...s, vbtVel: e.target.value }))} placeholder="1.75" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
             {vbtZone && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Зона {vbtZone} (все &gt;80% &gt;1.3 м/с — PLOS 2026). Для рывка absolute 1.3-1.75 м/с.</div>}
+            {velGuard.suspect && <div data-wl="vel-guard" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {velGuard.tag}: {velGuard.reason}</div>}
             {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Женские бенчмарки пика: рывок 1.5–1.8 · взятие 1.3–1.6 м/с (PoinT GO); Type3-траектория — вариант нормы (Hiskia 53% ЧМ).</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>Best м/с<br /><input value={state.vbtBest} onChange={e => setState(s => ({ ...s, vbtBest: e.target.value }))} placeholder="1.90" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Last м/с<br /><input value={state.vbtLast} onChange={e => setState(s => ({ ...s, vbtLast: e.target.value }))} placeholder="1.55" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Best м/с (штанга)<br /><input value={state.vbtBest} onChange={e => setState(s => ({ ...s, vbtBest: e.target.value }))} placeholder="1.90" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Last м/с (штанга)<br /><input value={state.vbtLast} onChange={e => setState(s => ({ ...s, vbtLast: e.target.value }))} placeholder="1.55" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
-            {vbtLoss && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: vbtLoss.exceeded ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${vbtLoss.exceeded ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: vbtLoss.exceeded ? '#ef4444' : '#22c55e' }}>Потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} {vbtLoss.e1RMByVelocity ? `· e1RM ${vbtLoss.e1RMByVelocity}кг` : ''}</div><div style={{ fontSize: 10, color: DIM }}>Порог {thresholdForTALift(state.barLift)}% для ТА-power (vs 20% для силы). {vbtRecommendationSS(vbtLoss.lossPct, state.barLift).action}</div></div>}
+            {vbtLoss && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: vbtLoss.exceeded ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${vbtLoss.exceeded ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: vbtLoss.exceeded ? '#ef4444' : '#22c55e' }}>Потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} {vbtLoss.e1RMByVelocity ? `· e1RM ${vbtLoss.e1RMByVelocity}кг` : ''}</div><div style={{ fontSize: 10, color: '#fff' }}>Порог {thresholdForTALift(state.barLift)}% для ТА-power (vs 20% для силы). {vbtRecommendationSS(vbtLoss.lossPct, state.barLift).action}</div></div>}
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>FvR2 — прогноз {state.fvrLift === 'clean' ? 'взятия (оценка)' : 'рывка ±1.5кг'} (Sandau)</div>
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                 {(['snatch', 'clean'] as const).map(lf => (
-                  <button key={lf} onClick={() => setState(s => ({ ...s, fvrLift: lf }))} aria-pressed={state.fvrLift === lf} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.fvrLift === lf ? '#3b82f6' : '#1f3a5f', background: state.fvrLift === lf ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.fvrLift === lf ? '#3b82f6' : DIM, fontSize: 10 }}>{lf === 'snatch' ? 'Рывковая тяга' : 'Толчковая тяга'}</button>
+                  <button key={lf} onClick={() => setState(s => ({ ...s, fvrLift: lf }))} aria-pressed={state.fvrLift === lf} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.fvrLift === lf ? '#3b82f6' : '#1f3a5f', background: state.fvrLift === lf ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.fvrLift === lf ? '#3b82f6' : '#fff', fontSize: 10 }}>{lf === 'snatch' ? 'Рывковая тяга' : 'Толчковая тяга'}</button>
                 ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                <label style={{ fontSize: 10, color: DIM }}>Нагр80 кг<br /><input value={state.fvrLoad80} onChange={e => setState(s => ({ ...s, fvrLoad80: e.target.value }))} placeholder="80" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Vmax80 м/с<br /><input value={state.fvrVmax80} onChange={e => setState(s => ({ ...s, fvrVmax80: e.target.value }))} placeholder="1.95" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>hAcc м<br /><input value={state.fvrHAcc} onChange={e => setState(s => ({ ...s, fvrHAcc: e.target.value }))} placeholder="0.8" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Нагр110 кг<br /><input value={state.fvrLoad110} onChange={e => setState(s => ({ ...s, fvrLoad110: e.target.value }))} placeholder="110" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Vmax110 м/с<br /><input value={state.fvrVmax110} onChange={e => setState(s => ({ ...s, fvrVmax110: e.target.value }))} placeholder="1.45" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Vthres м/с<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 10, color: '#fff' }}>Нагр80 кг<br /><input value={state.fvrLoad80} onChange={e => setState(s => ({ ...s, fvrLoad80: e.target.value }))} placeholder="80" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Vmax80 м/с (штанга)<br /><input value={state.fvrVmax80} onChange={e => setState(s => ({ ...s, fvrVmax80: e.target.value }))} placeholder="1.95" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>hAcc м<br /><input value={state.fvrHAcc} onChange={e => setState(s => ({ ...s, fvrHAcc: e.target.value }))} placeholder="0.8" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Нагр110 кг<br /><input value={state.fvrLoad110} onChange={e => setState(s => ({ ...s, fvrLoad110: e.target.value }))} placeholder="110" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Vmax110 м/с (штанга)<br /><input value={state.fvrVmax110} onChange={e => setState(s => ({ ...s, fvrVmax110: e.target.value }))} placeholder="1.45" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Vthres м/с (штанга)<br /><input value={state.vbtVthres} onChange={e => setState(s => ({ ...s, vbtVthres: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
-              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{state.fvrLift === 'clean' ? 'CleanTh' : 'SnatchTh'} {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}{state.fvrLift === 'clean' ? ' · оценка (валидировано только для рывка, Sandau 2021)' : ''}</div> : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} {state.fvrLift}: {taVthresNorms(profileSex)[state.fvrLift].min}-{taVthresNorms(profileSex)[state.fvrLift].max} (opt {taVthresNorms(profileSex)[state.fvrLift].optimal})</div>}
+              {fvr ? <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{state.fvrLift === 'clean' ? 'CleanTh' : 'SnatchTh'} {fvr.snatchTh}кг · Pmax {fvr.Pmax}Вт · v0 {fvr.v0} м/с · F0 {fvr.F0}Н · slope {fvr.slope}{state.fvrLift === 'clean' ? ' · оценка (валидировано только для рывка, Sandau 2021)' : ''}</div> : <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Норма vThres{profileSex === 'female' ? ' ♀' : ''} {state.fvrLift}: {taVthresNorms(profileSex)[state.fvrLift].min}-{taVthresNorms(profileSex)[state.fvrLift].max} (opt {taVthresNorms(profileSex)[state.fvrLift].optimal})</div>}
               {fvr && fvrOptimal && <div style={{ fontSize: 10, color: fvrOptimal.forceDom ? '#f59e0b' : '#22c55e', marginTop: 4 }}>FvR-профиль: slope {fvr.slope} vs оптимум {fvrOptimal.opt} (Δ {fvrOptimal.diff > 0 ? '+' : ''}{fvrOptimal.diff}) — {fvrOptimal.forceDom ? 'force-доминантен → приоритет скорость (вис/прыжки)' : 'сбалансирован ✓'}</div>}
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Взятие — force-доминантно (Arauz 2025): при равном slope приоритет силе, IMTP ближе ко взятию, чем к рывку.</div>
             {/* E12: попытки на старт 90/96/102 + readiness −2.5 */}
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🏁 Попытки на старт{fvr && state.fvrLift === 'snatch' ? ` · рывок из FvR: ${fvr.snatchTh}кг` : ''}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <label style={{ fontSize: 10, color: DIM }}>Заявка рывок кг<br /><input value={state.taSnatchMax} onChange={e => setState(s => ({ ...s, taSnatchMax: e.target.value }))} placeholder={fvr && state.fvrLift === 'snatch' ? String(fvr.snatchTh) : '100'} style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Заявка толчок кг<br /><input value={state.taCjMax} onChange={e => setState(s => ({ ...s, taCjMax: e.target.value }))} placeholder="125" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Пик стандарт м/с<br /><input value={state.taVelStd} onChange={e => setState(s => ({ ...s, taVelStd: e.target.value }))} placeholder="1.90" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Пик сегодня м/с<br /><input value={state.taVelToday} onChange={e => setState(s => ({ ...s, taVelToday: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Заявка рывок кг<br /><input data-wl="attempt-sn" value={state.taSnatchMax} onChange={e => setState(s => ({ ...s, taSnatchMax: e.target.value }))} placeholder={fvr && state.fvrLift === 'snatch' ? String(fvr.snatchTh) : '100'} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Заявка толчок кг<br /><input data-wl="attempt-cj" value={state.taCjMax} onChange={e => setState(s => ({ ...s, taCjMax: e.target.value }))} placeholder="125" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Пик стандарт м/с (штанга)<br /><input value={state.taVelStd} onChange={e => setState(s => ({ ...s, taVelStd: e.target.value }))} placeholder="1.90" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Пик сегодня м/с (штанга)<br /><input value={state.taVelToday} onChange={e => setState(s => ({ ...s, taVelToday: e.target.value }))} placeholder="1.85" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                 {(['conservative', 'balanced', 'aggressive'] as const).map(st => (
-                  <button key={st} onClick={() => setState(s => ({ ...s, taStrategy: st }))} aria-pressed={attemptArgs.strat === st} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: attemptArgs.strat === st ? '#3b82f6' : '#1f3a5f', background: attemptArgs.strat === st ? 'rgba(59,130,246,0.14)' : '#0a1629', color: attemptArgs.strat === st ? '#3b82f6' : DIM, fontSize: 10 }}>{st === 'conservative' ? 'Осторожно' : st === 'balanced' ? 'Баланс' : 'Риск'}</button>
+                  <button key={st} onClick={() => setState(s => ({ ...s, taStrategy: st }))} aria-pressed={attemptArgs.strat === st} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: attemptArgs.strat === st ? '#3b82f6' : '#1f3a5f', background: attemptArgs.strat === st ? 'rgba(59,130,246,0.14)' : '#0a1629', color: attemptArgs.strat === st ? '#3b82f6' : '#fff', fontSize: 10 }}>{st === 'conservative' ? 'Осторожно' : st === 'balanced' ? 'Баланс' : 'Риск'}</button>
                 ))}
               </div>
-              {snatchAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Рывок: {snatchAttempts.attempts[0]} / {snatchAttempts.attempts[1]} / {snatchAttempts.attempts[2]}{snatchAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
-              {cjAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 4 }}>Толчок: {cjAttempts.attempts[0]} / {cjAttempts.attempts[1]} / {cjAttempts.attempts[2]}{cjAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
+              {snatchAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Рывок: {snatchAttempts.attempts[0]} / {snatchAttempts.attempts[1]} / {snatchAttempts.attempts[2]} (±{snatchAttempts.bandKg}){snatchAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
+              {cjAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 4 }}>Толчок: {cjAttempts.attempts[0]} / {cjAttempts.attempts[1]} / {cjAttempts.attempts[2]} (±{cjAttempts.bandKg}){cjAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
               {(snatchAttempts?.readinessNote || cjAttempts?.readinessNote) && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {snatchAttempts?.readinessNote || cjAttempts?.readinessNote}</div>}
-              {!snatchAttempts && !cjAttempts && <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Введи заявку (рывок подтянется из FvR) — получишь 90/96/102. Просадка пика &gt;0.15 м/с срежет −2.5кг.</div>}
+              {snatchDiv.divergent && <div data-wl="base-div" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚖️ {snatchDiv.text}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 10, color: '#fff' }}>Тяга лучшая, кг<br /><input data-wl="num" value={state.taPullBest} onChange={e => setState(s => ({ ...s, taPullBest: e.target.value }))} placeholder="120" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Присед 3RM, кг<br /><input data-wl="num" value={state.taSquat3} onChange={e => setState(s => ({ ...s, taSquat3: e.target.value }))} placeholder="140" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Жим стоя 1RM, кг<br /><input data-wl="num" value={state.taOhpBest} onChange={e => setState(s => ({ ...s, taOhpBest: e.target.value }))} placeholder="70" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              </div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Предикторы (Sandau&Kipp 2025): рывок — {SNATCH_PREDICTORS.join(' + ')}; толчок — {CJ_PREDICTORS.join(' + ')}.</div>
+              {!snatchAttempts && !cjAttempts && <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Введи заявку (рывок подтянется из FvR) — получишь 90/96/102. Просадка пика &gt;0.15 м/с срежет −2.5кг.</div>}
             </div>
             </div>
-            <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Пороги ТА: power 10%, strength 15% (не 20%). Все absolute &gt;1.3 м/с — generic startingStrength недействителен (Wood 2026).</div>
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>LVP ramp — индивидуальный профиль (PLOS Wood 2026)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'80px 1fr 1fr 1fr 1fr', gap:6, marginTop:6, alignItems:'end' }}>
-                <label style={{ fontSize:10, color:DIM }}>Лифт<br/><select value={state.lvpLift} onChange={e=> setState(s=>({...s, lvpLift: e.target.value}))} style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }}><option value="snatch">Рывок</option><option value="clean">Толчок</option><option value="squat">Присед</option><option value="deadlift">Тяга</option><option value="yoke_walk">Йок</option></select></label>
-                <label style={{ fontSize:10, color:DIM }}>50% м/с<br/><input value={state.lvp50} onChange={e=> setState(s=>({...s, lvp50:e.target.value}))} placeholder="2.70" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>65% м/с<br/><input value={state.lvp65} onChange={e=> setState(s=>({...s, lvp65:e.target.value}))} placeholder="2.15" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>80% м/с<br/><input value={state.lvp75} onChange={e=> setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.80" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
-                <label style={{ fontSize:10, color:DIM }}>90% м/с<br/><input value={state.lvp90} onChange={e=> setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.55" style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:6, padding:'6px', fontSize:11 }} /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6, alignItems: 'end' }}>
+                <PopupSelect label="Лифт" value={state.lvpLift} onChange={v => setState(s => ({ ...s, lvpLift: v }))} options={[
+                  { id: 'snatch', label: 'Рывок' }, { id: 'clean', label: 'Толчок' }, { id: 'squat', label: 'Присед' },
+                  { id: 'deadlift', label: 'Тяга' }, { id: 'yoke_walk', label: 'Йок' },
+                ]} />
+                <label style={{ fontSize:10, color:'#fff' }}>50% м/с (штанга)<br/><input value={state.lvp50} onChange={e=> setState(s=>({...s, lvp50:e.target.value}))} placeholder="2.70" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize:10, color:'#fff' }}>65% м/с (штанга)<br/><input value={state.lvp65} onChange={e=> setState(s=>({...s, lvp65:e.target.value}))} placeholder="2.15" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize:10, color:'#fff' }}>80% м/с (штанга)<br/><input value={state.lvp75} onChange={e=> setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.80" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize:10, color:'#fff' }}>90% м/с (штанга)<br/><input value={state.lvp90} onChange={e=> setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.55" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               <div style={{ display:'flex', gap:6, marginTop:8 }}>
-                <button onClick={()=> {
+                <button data-wl="lvp-cal" onClick={()=> {
                   const pts = [{pct:0.5, velocity:parseFloat(state.lvp50)}, {pct:0.65, velocity:parseFloat(state.lvp65)}, {pct:0.80, velocity:parseFloat(state.lvp75)}, {pct:0.90, velocity:parseFloat(state.lvp90)}].filter(p=> Number.isFinite(p.velocity) && p.velocity>0) as any;
                   const res = calibrateLVP(state.lvpLift, pts);
                   if (res) { saveLVPProfile(res); setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
                   else { setState(s=>({...s, lvpResult: 'Ошибка: нужно ≥3 точки, spread ≥0.2, slope<0' })); }
-                }} style={{ padding:'6px 12px', borderRadius:8, background:'linear-gradient(135deg,#a855f7,#3b82f6)', color:'#fff', border:'none', fontWeight:700, fontSize:11, cursor:'pointer' }}>Калибровать LVP</button>
-                <span style={{ fontSize:10, color:DIM, alignSelf:'center' }}>{state.lvpResult}</span>
+                }} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#3b82f6)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Калибровать LVP</button>
+                <span style={{ fontSize:10, color:'#fff', alignSelf:'center' }}>{state.lvpResult}</span>
               </div>
-              <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
+              <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
               {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>
            </div>
@@ -1265,40 +1441,59 @@ export const WLDiagnosticsHub: React.FC = () => {
          {tab === 'video' && (
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Видео / Bar tracking — Kinovea + Enode</div>
-            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Полевая методика Ang 2023 (loadsol + Kinovea free). Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
-            <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см" style={{ width: '100%', height: 80, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: 'monospace' }} />
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Полевая методика Ang 2023 (loadsol + Kinovea free). Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
+            <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см" style={{ width: '100%', height: 80, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 13, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button onClick={handleCsvParse} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
-              <span style={{ fontSize: 10, color: DIM, alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
+              <button data-wl="kinovea" onClick={handleCsvParse} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
+              <span style={{ fontSize: 10, color: '#fff', alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
+            </div>
+            {/* W4: метаданные съёмки → флаг качества xLoop */}
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎥 Съёмка — геометрия для xLoop (Shah 2026)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: '#fff' }}>Высота камеры, м<br /><input data-wl="num" value={state.videoHeightM} onChange={e => setState(s => ({ ...s, videoHeightM: e.target.value }))} placeholder="1.2" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Дистанция, м<br /><input data-wl="num" value={state.videoDistM} onChange={e => setState(s => ({ ...s, videoDistM: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                {([['left', 'Сбоку ←'], ['front', 'Спереди'], ['right', 'Сбоку →']] as const).map(([id, label]) => (
+                  <button key={id} data-wl="video-side" onClick={() => setState(s => ({ ...s, videoSide: s.videoSide === id ? '' : id }))} aria-pressed={state.videoSide === id} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.videoSide === id ? '#3b82f6' : '#1f3a5f', background: state.videoSide === id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.videoSide === id ? '#3b82f6' : '#fff', fontSize: 12, cursor: 'pointer' }}>{label}</button>
+                ))}
+                {([['kinovea', 'Kinovea'], ['enode', 'Enode'], ['phone', 'Телефон']] as const).map(([id, label]) => (
+                  <button key={id} data-wl="video-device" onClick={() => setState(s => ({ ...s, videoDevice: s.videoDevice === id ? '' : id }))} aria-pressed={state.videoDevice === id} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.videoDevice === id ? '#a855f7' : '#1f3a5f', background: state.videoDevice === id ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.videoDevice === id ? '#a855f7' : '#fff', fontSize: 12, cursor: 'pointer' }}>{label}</button>
+                ))}
+              </div>
+              <div data-wl="video-quality" style={{ fontSize: 10, color: videoQuality.flag === 'ok' ? '#22c55e' : videoQuality.flag === 'rough' ? '#f59e0b' : '#fff', marginTop: 6 }}>
+                {videoQuality.flag === 'ok' ? '✓ ' : videoQuality.flag === 'rough' ? '≈ ' : '· '}{videoQuality.reason}
+              </div>
             </div>
             {state.bfPattern && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6 }}>📐 {state.bfPattern} (Kipp 2024: P1 +0.42 лучше, P3 −0.38 хуже)</div>}
-            {barTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>📈 История трекинга ({barTrend.n}): vmax {barTrend.from} → {barTrend.to} м/с · EWMA {barTrend.ewma}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>xLoop см<br /><input value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} placeholder="3.2" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>yMax см<br /><input value={state.yMaxCm} onChange={e => setState(s => ({ ...s, yMaxCm: e.target.value }))} placeholder="85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>vMax м/с<br /><input value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} placeholder="1.85" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            {barTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📈 История трекинга ({barTrend.n}): vmax {barTrend.from} → {barTrend.to} м/с · EWMA {barTrend.ewma}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 8 }}>
+              <label style={{ fontSize: 11, color: '#fff' }}>xLoop см<br /><input value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} placeholder="3.2" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>yMax см<br /><input value={state.yMaxCm} onChange={e => setState(s => ({ ...s, yMaxCm: e.target.value }))} placeholder="85" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>vMax м/с (штанга)<br /><input value={state.peakVelMs} onChange={e => setState(s => ({ ...s, peakVelMs: e.target.value }))} placeholder="1.85" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
-            {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: DIM }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD: turnover {isRealChange(barMetrics.xLoop, 'turnover') ? 'реально >4см' : '≤4см норма'} · catch {isRealChange(barMetrics.xLoop, 'catch') ? 'реально >6см' : '≤6см норма'}</div></div>}
+            {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: '#fff' }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD: turnover {isRealChange(barMetrics.xLoop, 'turnover') ? 'реально >4см' : '≤4см норма'} · catch {isRealChange(barMetrics.xLoop, 'catch') ? 'реально >6см' : '≤6см норма'}</div></div>}
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
             <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             {/* E8: углы суставов с видео (CSV трекера поз) → автовалидация фаз + OHS-прогноз */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📐 Углы с видео — вставь CSV трекера (t,hip,knee,ankle,shoulder)</div>
-              <textarea value={state.poseCsv} onChange={e => setState(s => ({ ...s, poseCsv: e.target.value }))} placeholder="t,hip,knee,ankle,shoulder&#10;0,100,80,40,160&#10;0.1,95,70,38,155" style={{ width: '100%', height: 56, marginTop: 6, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: 'monospace' }} />
+              <textarea value={state.poseCsv} onChange={e => setState(s => ({ ...s, poseCsv: e.target.value }))} placeholder="t,hip,knee,ankle,shoulder&#10;0,100,80,40,160&#10;0.1,95,70,38,155" style={{ width: '100%', height: 56, marginTop: 6, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 13, fontFamily: 'monospace' }} />
               {poseSummary && (
                 <div style={{ marginTop: 6 }}>
-                  <div style={{ fontSize: 10, color: DIM }}>Кадров: {poseSummary.n} · колено {poseSummary.knee ? `${poseSummary.knee.min}–${poseSummary.knee.max}° (ср ${poseSummary.knee.avg}°)` : '—'} · таз {poseSummary.hip ? `ср ${poseSummary.hip.avg}°` : '—'} · голеностоп {poseSummary.ankle ? `ср ${poseSummary.ankle.avg}°` : '—'} · плечо {poseSummary.shoulder ? `ср ${poseSummary.shoulder.avg}°` : '—'}</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Кадров: {poseSummary.n} · колено {poseSummary.knee ? `${poseSummary.knee.min}–${poseSummary.knee.max}° (ср ${poseSummary.knee.avg}°)` : '—'} · таз {poseSummary.hip ? `ср ${poseSummary.hip.avg}°` : '—'} · голеностоп {poseSummary.ankle ? `ср ${poseSummary.ankle.avg}°` : '—'} · плечо {poseSummary.shoulder ? `ср ${poseSummary.shoulder.avg}°` : '—'}</div>
                   {poseValidation.length > 0 && <div style={{ marginTop: 4 }}>{poseValidation.map(v => <div key={v.weakPoint} style={{ fontSize: 10, color: v.valid ? '#22c55e' : '#f59e0b', marginTop: 2 }}>{v.valid ? '✅' : '⚠️'} {v.recommendation}</div>)}</div>}
-                  {poseOhs && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>OHS-прогноз по углам: {poseOhs.score}/6 ({poseOhs.level}) — сверь чекбоксы в табе «Мобильность» вручную</div>}
+                  {poseOhs && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>OHS-прогноз по углам: {poseOhs.score}/6 ({poseOhs.level}) — сверь чекбоксы в табе «Мобильность» вручную</div>}
                 </div>
               )}
               {state.poseCsv.trim() && !poseSummary && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>CSV не распознан — нужно ≥2 строк t,hip,knee,ankle,shoulder</div>}
             </div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: DIM }}>📹 BlazePose (MediaPipe) — live-проверка</div>
+              <div style={{ fontSize: 11, color: '#fff' }}>📹 BlazePose (MediaPipe) — live-проверка</div>
               <div style={{ marginTop: 6, display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
-                <button onClick={checkPoseLive} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📡 Проверить MediaPipe</button>
-                {state.poseLive === 'loading' && <span style={{ fontSize: 10, color: DIM }}>проверяем CDN…</span>}
+                <button data-wl="pose-live" onClick={checkPoseLive} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📡 Проверить MediaPipe</button>
+                {state.poseLive === 'loading' && <span style={{ fontSize: 10, color: '#fff' }}>проверяем CDN…</span>}
                 {state.poseLive === 'ok' && <span style={{ fontSize: 10, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
                 {state.poseLive === 'fail' && <span style={{ fontSize: 10, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
               </div>
@@ -1308,78 +1503,94 @@ export const WLDiagnosticsHub: React.FC = () => {
 
         {tab === 'mobility' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Мобильность — OHS 6 сегментов (FMS/NASM + PoinT GO)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHeelsFlat} onChange={e => setState(s => ({ ...s, ohsHeelsFlat: e.target.checked }))} /> Пятки плоско</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={!state.ohsKneeValgus} onChange={e => setState(s => ({ ...s, ohsKneeValgus: !e.target.checked }))} /> Колени без вальгуса</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHipBelowParallel} onChange={e => setState(s => ({ ...s, ohsHipBelowParallel: e.target.checked }))} /> Таз ниже параллели</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsTrunkUpright} onChange={e => setState(s => ({ ...s, ohsTrunkUpright: e.target.checked }))} /> Корпус upright</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsArmsOverMidfoot} onChange={e => setState(s => ({ ...s, ohsArmsOverMidfoot: e.target.checked }))} /> Руки над стопой</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsLumbarNeutral} onChange={e => setState(s => ({ ...s, ohsLumbarNeutral: e.target.checked }))} /> Нейтраль поясницы</label>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Мобильность — OHS 6 сегментов (FMS/NASM + PoinT GO)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginBottom: 8 }}>
+              {([
+                { id: 'heels', label: 'Пятки плоско', on: state.ohsHeelsFlat, set: (v: boolean) => setState(s => ({ ...s, ohsHeelsFlat: v })) },
+                { id: 'valgus', label: 'Колени без вальгуса', on: !state.ohsKneeValgus, set: (v: boolean) => setState(s => ({ ...s, ohsKneeValgus: !v })) },
+                { id: 'hip', label: 'Таз ниже параллели', on: state.ohsHipBelowParallel, set: (v: boolean) => setState(s => ({ ...s, ohsHipBelowParallel: v })) },
+                { id: 'trunk', label: 'Корпус upright', on: state.ohsTrunkUpright, set: (v: boolean) => setState(s => ({ ...s, ohsTrunkUpright: v })) },
+                { id: 'arms', label: 'Руки над стопой', on: state.ohsArmsOverMidfoot, set: (v: boolean) => setState(s => ({ ...s, ohsArmsOverMidfoot: v })) },
+                { id: 'lumbar', label: 'Нейтраль поясницы', on: state.ohsLumbarNeutral, set: (v: boolean) => setState(s => ({ ...s, ohsLumbarNeutral: v })) },
+              ] as const).map(o => (
+                <button key={o.id} data-wl="ohs-card" onClick={() => o.set(!o.on)} aria-pressed={o.on} aria-label={`OHS: ${o.label}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 700, background: o.on ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: o.on ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
+                  <span aria-hidden style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, background: o.on ? '#22c55e' : 'rgba(255,255,255,0.1)', color: '#fff' }}>{o.on ? '✓' : ''}</span>
+                  <span style={{ lineHeight: 1.25 }}>{o.label}</span>
+                </button>
+              ))}
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: ohs.level === 'ok' ? '#22c55e' : ohs.level === 'warn' ? '#f59e0b' : '#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver ? `· драйвер ${ohs.primaryDriver}` : ''}</div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>{ohs.recommendation} {ohs.needsPhysio ? '· нужен физио' : ''}</div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Нормы OHS_NORMS knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}, hip {OHS_NORMS.hipFlexion}°/IR {OHS_NORMS.hipIR}°, shoulder {OHS_NORMS.shoulderFlexion}°</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{ohs.recommendation} {ohs.needsPhysio ? '· нужен физио' : ''}</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Скрининг, не диагноз: провалы — повод проверить, а не ярлык.</div>
+              {ohsRiskRank && (ohsRiskRank.high.length + ohsRiskRank.med.length + ohsRiskRank.low.length > 0) && (
+                <div data-wl="ohs-risk" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
+                  Риск по сегментам:{ohsRiskRank.high.length ? ` 🔴 ${ohsRiskRank.high.join(', ')}` : ''}{ohsRiskRank.med.length ? ` 🟡 ${ohsRiskRank.med.join(', ')}` : ''}{ohsRiskRank.low.length ? ` 🟢 ${ohsRiskRank.low.join(', ')}` : ''}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Нормы OHS_NORMS knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}, hip {OHS_NORMS.hipFlexion}°/IR {OHS_NORMS.hipIR}°, shoulder {OHS_NORMS.shoulderFlexion}°</div>
             </div>
             {/* V4-C: история OHS */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-              <button onClick={takeOhsSnapshot} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок OHS ({ohs.totalScore}/6)</button>
-              {ohsTrend && <span style={{ fontSize: 10, color: DIM }}>Тренд ({ohsTrend.n}): {ohsTrend.delta > 0 ? '+' : ''}{ohsTrend.delta} {ohsTrend.delta >= 0 ? '✓' : '⚠️'}</span>}
+              <button data-wl="ohs-snap" onClick={takeOhsSnapshot} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок OHS ({ohs.totalScore}/6)</button>
+              {ohsTrend && <span style={{ fontSize: 10, color: '#fff' }}>Тренд ({ohsTrend.n}): {ohsTrend.delta > 0 ? '+' : ''}{ohsTrend.delta} {ohsTrend.delta >= 0 ? '✓' : '⚠️'}</span>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>Knee-to-wall см<br /><input value={state.kneeToWallCm} onChange={e => setState(s => ({ ...s, kneeToWallCm: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Голеностоп °<br /><input value={state.ankleDeg} onChange={e => setState(s => ({ ...s, ankleDeg: e.target.value }))} placeholder="35" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Knee-to-wall Л, см<br /><input data-wl="ktw-l" value={state.kneeToWallL} onChange={e => setState(s => ({ ...s, kneeToWallL: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Knee-to-wall П, см<br /><input data-wl="ktw-r" value={state.kneeToWallR} onChange={e => setState(s => ({ ...s, kneeToWallR: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Голеностоп °<br /><input value={state.ankleDeg} onChange={e => setState(s => ({ ...s, ankleDeg: e.target.value }))} placeholder="35" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
+            {ktw.text && <div data-wl="ktw" style={{ fontSize: 10, color: ktw.isAsym ? '#f59e0b' : '#22c55e', marginBottom: 8 }}>🦶 {ktw.text} (1см ≈3.6°; гонио-катофф &lt;18.5°)</div>}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: DIM }}>Heel-raise retest 2.5см</span>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : '#1f3a5f', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.heelRetest === 'better' ? '#22c55e' : DIM, fontSize: 11 }}>Лучше</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : '#1f3a5f', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.heelRetest === 'same' ? '#f59e0b' : DIM, fontSize: 11 }}>Без изменений</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid #1f3a5f', background: '#0a1629', color: DIM, fontSize: 11 }}>Сброс</button>
+              <span style={{ fontSize: 11, color: '#fff' }}>Heel-raise retest 2.5см</span>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : '#1f3a5f', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.heelRetest === 'better' ? '#22c55e' : '#fff', fontSize: 11 }}>Лучше</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : '#1f3a5f', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.heelRetest === 'same' ? '#f59e0b' : '#fff', fontSize: 11 }}>Без изменений</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid #1f3a5f', background: '#0a1629', color: '#fff', fontSize: 11 }}>Сброс</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>Левая макс кг<br /><input value={state.leftMax} onChange={e => setState(s => ({ ...s, leftMax: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Правая макс кг<br /><input value={state.rightMax} onChange={e => setState(s => ({ ...s, rightMax: e.target.value }))} placeholder="102" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Левая макс кг<br /><input value={state.leftMax} onChange={e => setState(s => ({ ...s, leftMax: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Правая макс кг<br /><input value={state.rightMax} onChange={e => setState(s => ({ ...s, rightMax: e.target.value }))} placeholder="102" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             </div>
             {asymmetry && (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: asymmetry.isCrit ? 'rgba(239,68,68,0.08)' : asymmetry.isAsym ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${asymmetry.isCrit ? 'rgba(239,68,68,0.2)' : asymmetry.isAsym ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}` }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: asymmetry.isCrit ? '#ef4444' : asymmetry.isAsym ? '#f59e0b' : '#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit ? 'CRITICAL ≥12%' : asymmetry.isAsym ? 'WARN ≥7%' : '— норма <7%'} {asymmetry.isAsym ? `→ слабее ${asymmetry.weaker}` : ''}</div>
-                <div style={{ fontSize: 10, color: DIM }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
               </div>
             )}
             {/* E9: антропометрия → хват/старт */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📏 Антропометрия — хват рывка</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                <label style={{ fontSize: 11, color: DIM }}>Рост см<br /><input value={state.anthroHeight} onChange={e => setState(s => ({ ...s, anthroHeight: e.target.value }))} placeholder="180" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Размах см<br /><input value={state.anthroArmSpan} onChange={e => setState(s => ({ ...s, anthroArmSpan: e.target.value }))} placeholder="182" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Плечи см<br /><input value={state.anthroShoulder} onChange={e => setState(s => ({ ...s, anthroShoulder: e.target.value }))} placeholder="42" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: '#fff' }}>Рост см<br /><input value={state.anthroHeight} onChange={e => setState(s => ({ ...s, anthroHeight: e.target.value }))} placeholder="180" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Размах см<br /><input value={state.anthroArmSpan} onChange={e => setState(s => ({ ...s, anthroArmSpan: e.target.value }))} placeholder="182" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Плечи см<br /><input value={state.anthroShoulder} onChange={e => setState(s => ({ ...s, anthroShoulder: e.target.value }))} placeholder="42" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               {anthro
-                ? <div style={{ marginTop: 6 }}><div style={{ fontSize: 10, color: '#a78bfa' }}>Размах {anthro.diffCm > 0 ? '+' : ''}{anthro.diffCm}см → {anthro.gripAdvice}</div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{anthro.startAdvice}</div></div>
-                : <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Введи рост + размах — посчитаем хват (Everett: широкий хват = риск промаха назад).</div>}
-              <button onClick={applyAnthroToProfile} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Размах/плечи в профиль</button>
+                ? <div style={{ marginTop: 6 }}><div style={{ fontSize: 10, color: '#a78bfa' }}>Размах {anthro.diffCm > 0 ? '+' : ''}{anthro.diffCm}см → {anthro.gripAdvice}</div><div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{anthro.startAdvice}</div></div>
+                : <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Введи рост + размах — посчитаем хват (Everett: широкий хват = риск промаха назад).</div>}
+              <button data-wl="anthro-profile" onClick={applyAnthroToProfile} style={{ marginTop: 6, width: '100%', minHeight: 44, padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Размах/плечи в профиль</button>
             </div>
             {/* E11: split-jerk ножницы L/R */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🦵 Ножницы толчка — левая/правая впереди</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
-                <label style={{ fontSize: 11, color: DIM }}>Левая впереди кг<br /><input value={state.jerkLeftFwd} onChange={e => setState(s => ({ ...s, jerkLeftFwd: e.target.value }))} placeholder="95 нож" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-                <label style={{ fontSize: 11, color: DIM }}>Правая впереди кг<br /><input value={state.jerkRightFwd} onChange={e => setState(s => ({ ...s, jerkRightFwd: e.target.value }))} placeholder="100 нож" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Левая впереди кг<br /><input value={state.jerkLeftFwd} onChange={e => setState(s => ({ ...s, jerkLeftFwd: e.target.value }))} placeholder="95 нож" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Правая впереди кг<br /><input value={state.jerkRightFwd} onChange={e => setState(s => ({ ...s, jerkRightFwd: e.target.value }))} placeholder="100 нож" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               {jerkAsym && <div style={{ fontSize: 10, color: jerkAsym.isCrit ? '#ef4444' : jerkAsym.isAsym ? '#f59e0b' : '#22c55e', marginTop: 6 }}>Ножницы {jerkAsym.diffPct}% {jerkAsym.isCrit ? 'CRITICAL ≥12%' : jerkAsym.isAsym ? 'WARN ≥7%' : '— норма'} — {jerkAsym.text}</div>}
-              {jerkTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд разницы ({jerkTrend.n} зам.): {jerkTrend.deltaPp > 0 ? '+' : ''}{jerkTrend.deltaPp} п.п. {jerkTrend.deltaPp <= 0 ? '— выравнивается ✓' : '— растёт ⚠️'}</div>}
-              <button onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
+              {jerkTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд разницы ({jerkTrend.n} зам.): {jerkTrend.deltaPp > 0 ? '+' : ''}{jerkTrend.deltaPp} п.п. {jerkTrend.deltaPp <= 0 ? '— выравнивается ✓' : '— растёт ⚠️'}</div>}
+              <button data-wl="jerk-snap" onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', minHeight: 44, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
             </div>
-            <button onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
+            <button data-wl="ohs-profile" onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', minHeight: 48, padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
           </div>
         )}
       </div>
 
       {/* Summary */}
-      <div style={{ ...CARD, padding: 12, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)' }}>
-        <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {weakPoints.length ? weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''} · score {score} · ver {scoring.verification} {scoring.floors.join(' · ')}</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{scoring.findings.map(f => f.text).join(' · ')}</div>
+      <div style={{ ...CARD, padding: 10, margin: '6px 0', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)' }}>
+        <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>Выбрано: {weakPoints.length ? weakPoints.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ') : '— баланс'} {asymmetry?.isAsym ? `· асимметрия ${asymmetry.diff}%` : ''} · score {score} · ver {scoring.verification} {scoring.floors.join(' · ')}</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>{scoring.findings.map(f => f.text).join(' · ')}</div>
         {/* E1: аудит плана ТА */}
         <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
@@ -1388,20 +1599,20 @@ export const WLDiagnosticsHub: React.FC = () => {
           {planAudit.hasPlan && planAudit.missing.length > 0 && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>Нет в плане: {planAudit.missing.map(w => WL_WEAKPOINT_LABELS[w] || w).join(' · ')}</div>}
           {planAudit.hasPlan && planAudit.missing.length === 0 && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>Все 11 фаз двоеборья покрыты ✓</div>}
           {planAudit.hasPlan && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+            <div data-wl="coverage" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
               {TA_CORE_PHASES.map(wp => {
                 const c = planAudit.byPhase[wp];
                 const isWorst = planAudit.worstPhase === wp;
                 const short = ({ snatch_off_floor: 'рыв.отрыв', snatch_mid: 'рыв.серед', snatch_pull_under: 'рыв.уход', snatch_catch: 'рыв.сед', snatch_overhead: 'рыв.верх', clean_off_floor: 'вз.отрыв', clean_mid: 'вз.серед', clean_catch: 'вз.сед', jerk_dip: 'dip', jerk_drive: 'drive', jerk_lockout: 'замок' } as Record<string, string>)[wp] || wp;
                 return (
-                  <span key={wp} title={`${c.label}: ${c.sets} сетов`} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 12, background: isWorst ? 'rgba(239,68,68,0.12)' : c.covered ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWorst ? 'rgba(239,68,68,0.35)' : c.covered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: isWorst ? '#ef4444' : c.covered ? '#22c55e' : DIM }}>{short} {c.sets}</span>
+                  <span key={wp} title={`${c.label}: ${c.sets} сетов`} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 12, background: isWorst ? 'rgba(239,68,68,0.12)' : c.covered ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWorst ? 'rgba(239,68,68,0.35)' : c.covered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: isWorst ? '#ef4444' : c.covered ? '#22c55e' : '#fff' }}>{short} {c.sets}</span>
                 );
               })}
             </div>
           )}
           {/* V7-B: вспомогательные фазы (присед/тяги/жим) — только покрытие, без разбора */}
           {planAudit.hasPlan && (
-            <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>
               Вспомогательные: {TA_AUX_PHASES.map(wp => {
                 const c = planAudit.byPhase[wp];
                 const short = ({ squat_bottom: 'прис.низ', squat_mid: 'прис.серед', pull_start: 'тяга.старт', pull_lockout: 'тяга.замок', press_start: 'жим.старт' } as Record<string, string>)[wp] || wp;
@@ -1410,7 +1621,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
           )}
           {planAudit.hasPlan && planAudit.worstPhase && (
-            <button onClick={selectWorstPhase} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            <button data-wl="worst" onClick={selectWorstPhase} style={{ minHeight: 44, marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
               🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({planAudit.byPhase[planAudit.worstPhase].sets} сетов) → разобрать
             </button>
           )}
@@ -1420,45 +1631,45 @@ export const WLDiagnosticsHub: React.FC = () => {
         {specPreview && specPreview.weakPoints.length > 0 && (
           <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.16)', marginBottom: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>📅 Спец-блок {specPreview.totalWeeks} нед: {specPreview.weeks.map(w => `Н${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}</div>
-            <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{specPreview.rationale[0]}</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{specPreview.rationale[0]}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button onClick={handleInjectToPlan} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
-              <button onClick={handleExportIcs} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>с нед<input value={state.annualStartWeek} onChange={e => setState(s => ({ ...s, annualStartWeek: e.target.value }))} placeholder="1" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>по<input value={state.annualEndWeek} onChange={e => setState(s => ({ ...s, annualEndWeek: e.target.value }))} placeholder="—" style={{ width: 40, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-              <button onClick={handleAnnualSync} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
-              {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
+              <button data-wl="inject" onClick={handleInjectToPlan} style={{ flex: 1, minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план ({specPreview.weakPoints.length} фазы × все нед)</button>
+              <button data-wl="ics" onClick={handleExportIcs} style={{ minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📅 ICS</button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#fff' }}>с нед<input data-wl="num" value={state.annualStartWeek} onChange={e => setState(s => ({ ...s, annualStartWeek: e.target.value }))} placeholder="1" style={{ width: 40, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#fff' }}>по<input data-wl="num" value={state.annualEndWeek} onChange={e => setState(s => ({ ...s, annualEndWeek: e.target.value }))} placeholder="—" style={{ width: 40, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              <button data-wl="annual" onClick={handleAnnualSync} style={{ minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗓 В годовой синк</button>
+              {hasInjectPrev && <button data-wl="rollback" onClick={handleRollbackInject} style={{ minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат</button>}
             </div>
           </div>
         )}
         {/* V3: прогресс двоеборья + Sinclair */}
         <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📈 Прогресс двоеборья + Sinclair (IWF 2021–2024)</div>
-          <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>Коэффициенты олимпийского цикла 2021–2024 — при смене цикла сверь на iwf.sport</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-            <label style={{ fontSize: 11, color: DIM }}>Вес кг<br /><input value={state.progBw} onChange={e => setState(s => ({ ...s, progBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '80'} style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-            <label style={{ fontSize: 11, color: DIM }}>Рывок кг<br /><input value={state.progSnatch} onChange={e => setState(s => ({ ...s, progSnatch: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-            <label style={{ fontSize: 11, color: DIM }}>Толчок кг<br /><input value={state.progCj} onChange={e => setState(s => ({ ...s, progCj: e.target.value }))} placeholder="125" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+          <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>Коэффициенты олимпийского цикла 2021–2024 — при смене цикла сверь на iwf.sport</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+            <label style={{ fontSize: 11, color: '#fff' }}>Вес кг<br /><input value={state.progBw} onChange={e => setState(s => ({ ...s, progBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '80'} style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+            <label style={{ fontSize: 11, color: '#fff' }}>Рывок кг<br /><input value={state.progSnatch} onChange={e => setState(s => ({ ...s, progSnatch: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+            <label style={{ fontSize: 11, color: '#fff' }}>Толчок кг<br /><input value={state.progCj} onChange={e => setState(s => ({ ...s, progCj: e.target.value }))} placeholder="125" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
             {(['male', 'female'] as const).map(sx => (
-              <button key={sx} onClick={() => setState(s => ({ ...s, progSex: sx }))} aria-pressed={progSexEff === sx} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: progSexEff === sx ? '#3b82f6' : '#1f3a5f', background: progSexEff === sx ? 'rgba(59,130,246,0.14)' : '#0a1629', color: progSexEff === sx ? '#3b82f6' : DIM, fontSize: 10 }}>{sx === 'male' ? 'Муж' : 'Жен'}</button>
+              <button key={sx} onClick={() => setState(s => ({ ...s, progSex: sx }))} aria-pressed={progSexEff === sx} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: progSexEff === sx ? '#3b82f6' : '#1f3a5f', background: progSexEff === sx ? 'rgba(59,130,246,0.14)' : '#0a1629', color: progSexEff === sx ? '#3b82f6' : '#fff', fontSize: 10 }}>{sx === 'male' ? 'Муж' : 'Жен'}</button>
             ))}
             {(['2025-2028', '2021-2024'] as const).map(cy => (
-              <button key={cy} onClick={() => setState(s => ({ ...s, progCycle: cy }))} aria-pressed={progCycleEff === cy} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: progCycleEff === cy ? '#a855f7' : '#1f3a5f', background: progCycleEff === cy ? 'rgba(168,85,247,0.14)' : '#0a1629', color: progCycleEff === cy ? '#a855f7' : DIM, fontSize: 10 }}>{cy}</button>
+              <button key={cy} onClick={() => setState(s => ({ ...s, progCycle: cy }))} aria-pressed={progCycleEff === cy} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: progCycleEff === cy ? '#a855f7' : '#1f3a5f', background: progCycleEff === cy ? 'rgba(168,85,247,0.14)' : '#0a1629', color: progCycleEff === cy ? '#a855f7' : '#fff', fontSize: 10 }}>{cy}</button>
             ))}
-            <button onClick={takeProgSnapshot} style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
+            <button data-wl="prog-snap" onClick={takeProgSnapshot} style={{ marginLeft: 'auto', minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
           </div>
           {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle})</div>}
-          {progTrend && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
+          {progTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
-          <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
-          <button onClick={handlePrint} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Печать</button>
-          <button onClick={handleExportCsv} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button data-wl="apply-bottom" onClick={applyToConstructor} style={{ flex: 1, minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
+          <button data-wl="export-html" onClick={handleExport} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
+          <button data-wl="print" onClick={handlePrint} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Печать</button>
+          <button data-wl="export-csv" onClick={handleExportCsv} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
         </div>
-        <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
       </div>
     </div>
   );

@@ -43,9 +43,11 @@ export interface WLDiagnosticSnapshot {
   attempts?: { snatch?: [number, number, number]; cj?: [number, number, number] };
   // V4-B: Sinclair прогресса; V8: цикл коэффициентов
   sinclair?: { total: number; coeff: number | null; value: number; cycle?: string } | null;
+  // W5 v3: заметки хаба (доминантность, OHS риск-рамка, качество видео)
+  notes?: string[];
 }
 
-export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot): string {
+export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot, opts?: { apkHeader?: boolean }): string {
   const rows = snap.weakPoints.map(wp => {
     const cause = snap.causes?.[wp];
     return `<tr><td>${esc(wp)}</td><td>${esc(cause || '—')}</td></tr>`;
@@ -56,16 +58,19 @@ export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot): string {
   const corrRows = (snap.corrections || []).map(c =>
     `<tr><td>${esc(c.weakPoint)}</td><td>${esc(c.name || c.corrId)}</td><td>${esc(c.protocol || '')}</td></tr>`).join('');
   const injRows = (snap.injectionNotes || []).map(n => `<li>${esc(n)}</li>`).join('');
+  const noteRows = (snap.notes || []).map(n => `<li>${esc(n)}</li>`).join('');
   const att = snap.attempts;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ТА-диагностика</title><style>body{font-family:system-ui;padding:24px;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:8px}h1{font-size:18px}h2{font-size:15px;margin-top:18px}</style></head><body>
-<h1>ТА-диагностика — отчёт ${esc(new Date().toISOString().slice(0,10))}</h1>
+ <h1>ТА-диагностика — отчёт ${esc(new Date().toISOString().slice(0,10))}</h1>
+${opts?.apkHeader ? `<div>Score ${snap.score} · ver ${snap.verification} · ${esc(new Date().toISOString().slice(0,10))} · ТА-хаб PRO (APK)</div>` : ''}
 <div>Score ${snap.score} (${esc(snap.level)}) · verification ${snap.verification}${snap.sex ? ` · ${esc(snap.sex)}` : ''}</div>
 <h2>Слабые фазы + причины</h2><table><tr><th>Фаза</th><th>Причина</th></tr>${rows || '<tr><td>баланс</td><td>—</td></tr>'}</table>
 ${bioRows ? `<h2>Биомеханика фаз</h2><table><tr><th>Фаза</th><th>Метка</th><th>Сустав/угол</th><th>Мышцы</th><th>Причина</th></tr>${bioRows}</table>` : ''}
 ${corrRows ? `<h2>Коррекции топ-3</h2><table><tr><th>Фаза</th><th>Упражнение</th><th>Протокол</th></tr>${corrRows}</table>` : ''}
 ${att && (att.snatch || att.cj) ? `<h2>Попытки</h2><ul>${att.snatch ? `<li>Рывок: ${att.snatch.join(' / ')}</li>` : ''}${att.cj ? `<li>Толчок: ${att.cj.join(' / ')}</li>` : ''}</ul>` : ''}
 ${snap.sinclair ? `<h2>Sinclair${snap.sinclair.cycle ? ` (${esc(snap.sinclair.cycle)})` : ''}</h2><ul><li>Сумма ${esc(String(snap.sinclair.total))}кг · коэфф ${snap.sinclair.coeff != null ? esc(String(snap.sinclair.coeff)) : '—'} · Sinclair ${esc(String(snap.sinclair.value))}</li></ul>` : ''}
-${injRows ? `<h2>Инъекция в план</h2><ul>${injRows}</ul>` : ''}
+ ${injRows ? `<h2>Инъекция в план</h2><ul>${injRows}</ul>` : ''}
+${noteRows ? `<h2>Заметки</h2><ul>${noteRows}</ul>` : ''}
 <h2>Метрики</h2><ul>
 <li>Bar path: ${esc(snap.barPath || '—')}</li>
 <li>VBT: ${esc(snap.vbt || '—')}</li>
@@ -92,6 +97,7 @@ export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
     ['corrections', (snap.corrections || []).map(c => `${c.weakPoint}:${c.corrId}@${c.protocol || ''}`).join(';')],
     ['attempts', snap.attempts ? [snap.attempts.snatch ? `snatch=${snap.attempts.snatch.join('/')}` : '', snap.attempts.cj ? `cj=${snap.attempts.cj.join('/')}` : ''].filter(Boolean).join(';') : ''],
     ['sinclair', snap.sinclair ? `${snap.sinclair.total}/${snap.sinclair.coeff ?? ''}/${snap.sinclair.value}/${snap.sinclair.cycle ?? ''}` : ''],
+    ['notes', (snap.notes || []).join('; ')],
     ['findings', snap.findings.join('; ')],
   ];
   return rows.map(r => r.map(escCsv).join(',')).join('\n');

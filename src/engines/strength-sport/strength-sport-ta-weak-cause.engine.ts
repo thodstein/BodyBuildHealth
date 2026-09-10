@@ -49,6 +49,8 @@ export interface TAWeakCauseInput {
   barPathDeviation?: string | null;
   /** E13: IMTP-профиль strength_deficit (из imtp-блока хаба). */
   imtpStrengthDeficit?: boolean | null;
+  /** W7: расхождение заявки vs FvR-базы, кг (вне ±RMSE — сигнал сила/техника). */
+  baseDivergenceKg?: number | null;
 }
 
 export interface TAWeakCauseResult {
@@ -84,6 +86,10 @@ export function diagnoseTAWeakCause(input: TAWeakCauseInput): TAWeakCauseResult 
   const volBad = input.factSetsPerWeek != null && input.factSetsPerWeek < minSets * 0.7;
   if (volBad) signals.push(`объём ${input.factSetsPerWeek} <${Math.round(minSets * 0.7 * 10) / 10}/нед`);
 
+  // W7: заявка вне полосы FvR-модели — сила и техника расходятся
+  const divBad = input.baseDivergenceKg != null && Number.isFinite(input.baseDivergenceKg) && Math.abs(input.baseDivergenceKg) > 3;
+  if (divBad) signals.push(`база↔заявка ${input.baseDivergenceKg}кг (>RMSE)`);
+
   const techHint = !!input.barPathDeviation;
 
   // Приоритет: fatigue (острое) → mobility (структурное) → strength (предиктор) → volume → technique
@@ -112,7 +118,8 @@ export function diagnoseTAWeakCause(input: TAWeakCauseInput): TAWeakCauseResult 
     confidence = 'med';
   } else {
     cause = 'technique';
-    confidence = techHint ? 'med' : 'low';
+    // W7: расхождение базы и заявки усиливает технический след (было low → med)
+    confidence = divBad ? 'med' : (techHint ? 'med' : 'low');
   }
 
   const texts: Record<TAWeakCause, string> = {

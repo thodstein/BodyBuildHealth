@@ -236,3 +236,35 @@ export function loadBarTracking(): BarTrackingResult[] {
 export function clearBarTracking(): void {
   try { localStorage.removeItem(LS_KEY_BAR); } catch {}
 }
+
+/**
+ * W4 PRO-v3: качество съёмки для xLoop (Shah et al. 2026, ISACE 2025 —
+ * CV-трекинг требует коррекции перспективных искажений: высота/дистанция
+ * камеры; вид строго сбоку, иначе горизонталь несравнима).
+ */
+export type VideoSide = 'left' | 'front' | 'right';
+export type VideoDevice = 'kinovea' | 'enode' | 'phone';
+
+export interface VideoCaptureMeta {
+  heightM?: number | null; // высота камеры над помостом
+  distM?: number | null; // дистанция до штанги
+  side?: VideoSide | '' | null;
+  device?: VideoDevice | '' | null;
+}
+
+export interface VideoQuality {
+  flag: 'ok' | 'rough' | 'unknown';
+  reason: string;
+}
+
+/** Флаг качества съёмки: без метаданных — unknown; фронт/кривая перспектива — rough. */
+export function videoQualityForCapture(meta: VideoCaptureMeta): VideoQuality {
+  const h = meta.heightM, d = meta.distM;
+  const hasH = h != null && Number.isFinite(h) && h > 0;
+  const hasD = d != null && Number.isFinite(d) && d > 0;
+  if (!hasH && !hasD && !meta.side) return { flag: 'unknown', reason: 'Нет метаданных съёмки — xLoop сравнивай только внутри одной серии.' };
+  if (meta.side === 'front') return { flag: 'rough', reason: 'Вид спереди: горизонталь xLoop несравнима — снимай строго сбоку (Shah 2026).' };
+  if (hasH && (h as number) > 2.5) return { flag: 'rough', reason: `Камера высоко (${h}м): перспектива завышает xLoop — опускай до 1–1.5м.` };
+  if (hasD && ((d as number) > 8 || (d as number) < 2)) return { flag: 'rough', reason: `Дистанция ${d}м вне 2–8м: перспективные искажения xLoop.` };
+  return { flag: 'ok', reason: 'Геометрия съёмки в допуске — xLoop сравним.' };
+}

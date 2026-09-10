@@ -13457,3 +13457,87 @@ html.app-native .nd-scanphoto {
     transform: none !important;
   }
 }
+
+/* ─── 99. WL-DIAG PRO — хаб ТА-диагностики: тач-нормы, попапы, ввод ───
+ * Корень: .train-wldiag (WLDiagnosticsHub). Все кнопки/пилюли 44-48px,
+ * инпуты/селекты/textarea 16px без iOS-зума, попапы TrainingPopups
+ * (портал .pl-popupoverlay) во всю ширину, цифры tabular, чипы покрытия
+ * без вертикального сжатия (перенос + nowrap), press 0.97-0.98,
+ * focus-visible, 380px, reduced-motion. Только APK: TG/web — как было. */
+html.app-native .train-wldiag {
+  overflow-x: clip !important;
+}
+html.app-native .train-wldiag button {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-wldiag button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-wldiag button:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-wldiag input,
+html.app-native .train-wldiag select,
+html.app-native .train-wldiag textarea {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 10px !important;
+}
+html.app-native .train-wldiag textarea {
+  min-height: 64px !important;
+  line-height: 1.45 !important;
+}
+html.app-native .train-wldiag input:focus-visible,
+html.app-native .train-wldiag select:focus-visible,
+html.app-native .train-wldiag textarea:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8) !important;
+  outline-offset: 1px !important;
+}
+html.app-native .train-wldiag [data-wl="coverage"] {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  padding-bottom: 4px !important;
+  scroll-snap-type: x mandatory !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+html.app-native .train-wldiag [data-wl="coverage"] > span {
+  flex-shrink: 0 !important;
+  scroll-snap-align: start !important;
+}
+html.app-native .pl-popupoverlay {
+  padding: 12px !important;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)) !important;
+}
+html.app-native .pl-popupoverlay button {
+  min-height: 48px !important;
+  font-size: 13px !important;
+}
+html.app-native .pl-popupoverlay button:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .pl-popupoverlay input {
+  min-height: 48px !important;
+  font-size: 16px !important;
+}
+html.app-native .pl-popupoverlay button:focus-visible,
+html.app-native .pl-popupoverlay input:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .train-wldiag button {
+    font-size: 12px !important;
+  }
+  html.app-native .train-wldiag input,
+  html.app-native .train-wldiag select {
+    font-size: 16px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-wldiag button:active,
+  html.app-native .pl-popupoverlay button:active {
+    transform: none !important;
+  }
+}

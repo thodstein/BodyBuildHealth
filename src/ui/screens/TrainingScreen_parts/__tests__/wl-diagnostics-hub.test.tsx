@@ -272,7 +272,7 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.change(container.querySelector('input[placeholder="220"]')!, { target: { value: '200' } });
     fireEvent.change(container.querySelector('input[placeholder="7000"]')!, { target: { value: '4000' } });
     await waitFor(() => expect(container.textContent).toContain('×BW'), { timeout: 2000 });
-    const cb = container.querySelector('input[type="checkbox"]')!;
+    const cb = container.querySelector('[data-wl="imtp-dip"]')!;
     fireEvent.click(cb);
     await waitFor(() => expect(container.textContent).toContain('невалиден'), { timeout: 2000 });
   });

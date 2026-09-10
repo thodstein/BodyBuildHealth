@@ -30,4 +30,18 @@ describe('TA IMTP/RFD E13', () => {
     expect(diagnoseTAImtp({})).toBeNull();
     expect(diagnoseTAImtp({ peakForceN: NaN, bodyweightKg: 0 } as any)?.profile).toBe('unknown');
   });
+  it('W2 серая зона RFD 5000: balanced + warning, не explosive', () => {
+    const r = diagnoseTAImtp({ peakForceN: 3000, bodyweightKg: 90, rfdNs: 5000 });
+    expect(r?.profile).toBe('balanced');
+    expect(r?.rfdGray).toBe(true);
+    expect(r?.warnings.some(w => w.includes('серой зоне'))).toBe(true);
+  });
+  it('W2 граница 4500 — дефицит; чек-лист и трансфер-константы', async () => {
+    const r = diagnoseTAImtp({ peakForceN: 3000, bodyweightKg: 90, rfdNs: 4499 });
+    expect(r?.profile).toBe('explosive_deficit');
+    expect(r?.rfdGray).toBe(false);
+    const mod = await import('../strength-sport-ta-imtp.engine');
+    expect(mod.IMTP_PROTOCOL_CHECKLIST.length).toBeGreaterThanOrEqual(5);
+    expect(mod.IMTP_CLEAN_TRANSFER_NOTE).toContain('взятие');
+  });
 });

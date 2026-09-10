@@ -103,6 +103,52 @@ export const OHS_NORMS = {
   shoulderFlexion: 180,
 };
 
+/**
+ * W8 PRO-v3: двусторонний knee-to-wall.
+ * 1 см ≈ 3.6° DF (Physiopedia/evidence, ICC 0.80–0.99); гонио-катоффы 2025:
+ * <18.5° с согнутым коленом / <11.5° с прямым (Korean Acad Rehab Med,
+ * sens 91/86%, spec 81/79%). Разница сторон ≥2см — флаг асимметрии.
+ */
+export const KTW_CM_PER_DEG = 3.6;
+export const KTW_ASYM_CM = 2;
+
+/** см → градусы DF (округление 0.1). */
+export function kneeToWallDeg(cm: number | null | undefined): number | null {
+  if (cm == null || !Number.isFinite(cm) || cm <= 0) return null;
+  return Math.round(cm * KTW_CM_PER_DEG * 10) / 10;
+}
+
+export interface KneeToWallBilateral {
+  lDeg: number | null;
+  rDeg: number | null;
+  asymCm: number | null;
+  isAsym: boolean;
+  /** Худшая сторона (меньше см) — идёт в assessOHS. */
+  worseCm: number | null;
+  text: string | null;
+}
+
+/** Двусторонний разбор knee-to-wall. null-входы → нейтрально (не флаг). */
+export function diagnoseKneeToWallBilateral(lCm: number | null | undefined, rCm: number | null | undefined): KneeToWallBilateral {
+  const l = lCm != null && Number.isFinite(lCm) && lCm > 0 ? lCm : null;
+  const r = rCm != null && Number.isFinite(rCm) && rCm > 0 ? rCm : null;
+  if (l == null && r == null) return { lDeg: null, rDeg: null, asymCm: null, isAsym: false, worseCm: null, text: null };
+  const lDeg = kneeToWallDeg(l);
+  const rDeg = kneeToWallDeg(r);
+  const worseCm = l == null ? r : r == null ? l : Math.min(l, r);
+  let asymCm: number | null = null;
+  let isAsym = false;
+  if (l != null && r != null) {
+    asymCm = Math.round(Math.abs(l - r) * 10) / 10;
+    isAsym = asymCm >= KTW_ASYM_CM;
+  }
+  const parts: string[] = [];
+  if (l != null && lDeg != null) parts.push(`Л ${l}см ≈${lDeg}°${l < 9 ? ' 🔴' : l < 12 ? ' 🟡' : ' ✓'}`);
+  if (r != null && rDeg != null) parts.push(`П ${r}см ≈${rDeg}°${r < 9 ? ' 🔴' : r < 12 ? ' 🟡' : ' ✓'}`);
+  if (isAsym) parts.push(`асимметрия ${asymCm}см — проверь односторонне`);
+  return { lDeg, rDeg, asymCm, isAsym, worseCm, text: parts.join(' · ') };
+}
+
 // V4-C: история OHS-скринингов (свой ключ хаба, кап 30)
 export const TA_OHS_HIST_KEY = 'he_ta_ohs_hist_v1';
 

@@ -1,10 +1,13 @@
 /**
- * strength-sport-ta-attempts.engine.ts — ПОПЫТКИ ТА НА СТАРТ (E12 PRO-v2)
+ * strength-sport-ta-attempts.engine.ts — ПОПЫТКИ ТА НА СТАРТ (E12 PRO-v2, W1 PRO-v3)
  *
  * Заявка → 90/96/102% (conservative 0.97 / balanced 1.0 / aggressive 1.03 —
  * parity с contest-simulator), readiness-флаг: просадка пика >0.15 м/с
  * на стандарте → −2.5кг к заявке (PoinT GO 2026). SnatchTh из FvR (±1.5кг, Sandau)
  * используется как база заявки рывка.
+ * W1: MVT-прогноз несёт ошибку, растущую с мастерством (пропорциональный bias +
+ * гетероскедастичность, PMC 2025) → каждая заявка идёт с полосой ±bandKg
+ * (intermediate и ниже ±2.5, advanced+ ±3.5).
  * Чистый движок, без UI/storage.
  */
 
@@ -16,6 +19,8 @@ export interface TAAttemptInput {
   /** Пик на стандарте (база) и сегодня — для readiness-флага. */
   peakVelStandard?: number | null;
   peakVelToday?: number | null;
+  /** W1: уровень для ширины полосы (advanced+ шире — ошибка растёт с мастерством). */
+  level?: string | null;
 }
 
 export interface TAAttemptPlan {
@@ -23,7 +28,15 @@ export interface TAAttemptPlan {
   attempts: [number, number, number];
   readinessCut: boolean;
   readinessNote: string | null;
+  /** W1: полуширина полосы неопределённости MVT-оценки, кг. */
+  bandKg: number;
   rationale: string[];
+}
+
+/** W1: полоса MVT-ошибки — у сильных шире (гетероскедастичность, PMC 2025). */
+export function attemptBandKg(level?: string | null): number {
+  const l = String(level || '').toLowerCase();
+  return l === 'advanced' || l === 'elite' || l === 'enhanced' ? 3.5 : 2.5;
 }
 
 const STRAT_MULT: Record<TAStrategy, number> = { conservative: 0.97, balanced: 1.0, aggressive: 1.03 };
@@ -53,9 +66,11 @@ export function planTAAttempts(input: TAAttemptInput): TAAttemptPlan | null {
     roundDownKg(adj * 0.96),
     roundDownKg(adj * 1.02),
   ];
+  const bandKg = attemptBandKg(input.level);
   const rationale = [
-    `Заявка ${base}кг × ${strategy} ${mult} ${readinessCut ? '− 2.5кг readiness' : ''} → ${attempts[0]}/${attempts[1]}/${attempts[2]}`,
+    `Заявка ${base}кг × ${strategy} ${mult} ${readinessCut ? '− 2.5кг readiness' : ''} → ${attempts[0]}/${attempts[1]}/${attempts[2]} (±${bandKg})`,
     'Опener 90% — гарантированный подход; второй 96% — рабочий; третий 102% — рекорд.',
+    `Полоса ±${bandKg}кг: MVT-оценка, ошибка растёт с мастерством (PMC 2025).`,
   ];
-  return { baseKg: base, attempts, readinessCut, readinessNote, rationale };
+  return { baseKg: base, attempts, readinessCut, readinessNote, bandKg, rationale };
 }
