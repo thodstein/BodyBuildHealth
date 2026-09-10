@@ -325,11 +325,31 @@ export function HubScenarios({ H }: { H: any }) {
 }
 
 export function HubAction({ H }: { H: any }) {
-  const { applyToConstructor, state, diag, dynamicReport, report } = H;
+  const { applyToConstructor, state, diag, dynamicReport, report, criticalSideP0, armTop3P0 } = H;
+  const pts: string[] = state.weakPoints.length ? state.weakPoints : [];
+  const muscles: string[] = pts.length ? [] : diag.weakMuscles.slice(0, 2);
+  const dynKeys: string[] = dynamicReport && (dynamicReport as any).metrics
+    ? Object.entries((dynamicReport as any).metrics).filter(([, v]) => !!v).map(([k]) => k)
+    : [];
+  const days: string[] = Array.from(new Set(((report as any).corrections || []).map((c: any) => c.dayTags[0])));
+  const hasPayload = pts.length > 0 || muscles.length > 0 || dynKeys.length > 0;
+  const label = (pts.join(', ') || muscles.join(', ')) || (dynKeys.length ? 'динамика' : 'баланс');
+  const count = pts.length ? `${pts.length} точек` : `${muscles.length} мышц`;
   return (
     <AdCard>
+      <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
+        {hasPayload ? (
+          <div className="ad-muted">
+            <div>Точки: {pts.join(', ') || '—'} · Мышцы: {muscles.join(', ') || '—'} · Динамика: {dynKeys.join(', ') || '—'}</div>
+            <div>Дни инъекции: {days.join(', ') || '—'} · Топ-коррекции: {pts.length ? pts.map((p) => `${p}: ${((armTop3P0 as any)[p] || [])[0]?.id || '—'}`).join(' · ') : '—'}</div>
+            <div>Гейты: {criticalSideP0 ? '🔴 side gated — только ремень/изометрия' : '✓ humerus/budget/dedup — штатно'}</div>
+          </div>
+        ) : (
+          <div className="ad-muted">Пока нечего отправлять — выбери 1–3 точки (шаг 2) или введи тесты хвата/силы (шаг 3). Пустой мост не полетит: конструктор честно скажет «не выявлены».</div>
+        )}
+      </AdSec>
       <AdCta>
-      <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор ({(state.weakPoints.length? state.weakPoints.join(', ') : diag.weakMuscles.slice(0,2).join(', ')) || (dynamicReport && Object.keys((dynamicReport as any).metrics||{}).length ? 'динамика' : 'баланс')} · {(state.weakPoints.length? `${state.weakPoints.length} точек` : `${diag.weakMuscles.length} мышц`)})</AdBtn>
+      <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор ({label} · {count})</AdBtn>
       </AdCta>
       <div className="ad-muted">Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
       {(diag as any).biomechCards?.length ? <div className="ad-muted">Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}

@@ -314,6 +314,15 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('RT +2');
   });
 
+  it('P7: превью моста — пусто честно, с точками по делу', () => {
+    render(<ArmDiagnosticsHub />);
+    expect(document.body.textContent).toContain('Пока нечего отправлять');
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    fireEvent.click(screen.getByText(/Pron откр/));
+    expect(document.body.textContent).toContain('Что уедет в конструктор');
+    expect(document.body.textContent).toContain('Точки: pron_open');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });
