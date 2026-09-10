@@ -158,7 +158,7 @@ export function HubStrengthTab({ H }: { H: any }) {
           </div>
           {dynamicReport && (dynamicReport as any).metrics && (
             <div className="ad-muted">
-              {Object.entries((dynamicReport as any).metrics).map(([k,v]: any)=> v ? <div key={k}>{k}: F{v.fMax} F/t{v.ftIndex} F100{v.f100}({v.explosivePct}%) F500{v.f500}({v.fastPct}%) t0.5F{v.t05F}мс</div> : null)}
+              {Object.entries((dynamicReport as any).metrics).map(([k,v]: any)=> v ? <div key={k}>{k}: F{v.fMax} F/t{v.ftIndex} {v.ftIndex < 30 ? '⚠ низкая — чинить' : '✓ в допуске'} · F100{v.f100}({v.explosivePct}%) F500{v.f500}({v.fastPct}%) t0.5F{v.t05F}мс</div> : null)}
             </div>
           )}
         </AdSec>
@@ -263,6 +263,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         )}
       </AdBanner>
       <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible hook="mob">
+        <div className="ad-muted">Нормы ROM: сгиб кисти ≥80° · разгиб ≥70° · пронация/супинация ≥80° · локоть полный</div>
         <div className="ad-chips" data-arm="mob-chips">
           {[
             ['mobWristFlex', 'Сгиб кисти ≥80°'],

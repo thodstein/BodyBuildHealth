@@ -276,6 +276,17 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Bezkorovainyi');
   });
 
+  it('P3: нормы ты-vs-мир в Grip + ROM-нормы в Recovery', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '68' } });
+    expect(document.body.textContent).toContain('RT vs WR');
+    expect(document.body.textContent).toContain('% WR');
+    fireEvent.change(screen.getByPlaceholderText('15'), { target: { value: '6' } });
+    expect(document.body.textContent).toContain('<10с — чинить');
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('Нормы ROM');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

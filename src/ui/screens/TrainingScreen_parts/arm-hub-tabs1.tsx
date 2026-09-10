@@ -45,6 +45,30 @@ export function HubGripTab({ H }: { H: any }) {
             {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
           </div>
           <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
+          {(()=>{
+            const rows: Array<{ n: string; v: string }> = [];
+            const rt = parseFloat(state.rtKg);
+            if (Number.isFinite(rt) && rt > 0) {
+              const wr = state.sex === 'female' ? getRtWorldClass('female') : getRtWorldClass('male');
+              rows.push({ n: 'RT vs WR', v: `${rt}кг = ${Math.round((rt / wr) * 100)}% WR (${wr}кг)` });
+            }
+            const ax = parseFloat(state.axleKg);
+            if (Number.isFinite(ax) && ax > 0) rows.push({ n: 'Axle vs Saxon WR', v: `${ax}кг = ${Math.round((ax / 133) * 100)}% (133кг)` });
+            const pin = parseFloat(state.pinchSec);
+            if (Number.isFinite(pin) && pin > 0) rows.push({ n: 'Pinch vs норма', v: `${pin}с ${pin >= 10 ? '✓ ≥10с' : '⚠ <10с — чинить'}` });
+            const sd = parseFloat(state.sideKg);
+            if (Number.isFinite(sd) && sd > 0) rows.push({ n: 'Side vs WAF-норма', v: `${sd}кг vs ${Math.round(bwNum * 0.6)}кг (${Math.round((sd / Math.max(1, bwNum * 0.6)) * 100)}%)` });
+            const bk = parseFloat(state.backKg);
+            if (Number.isFinite(bk) && bk > 0) rows.push({ n: 'Back vs WAF-норма', v: `${bk}кг vs ${Math.round(bwNum * 0.8)}кг (${Math.round((bk / Math.max(1, bwNum * 0.8)) * 100)}%)` });
+            if (!rows.length) return null;
+            return (
+              <div data-arm="norms-table">
+                {rows.map((r) => (
+                  <div key={r.n} className="ad-kv"><span>{r.n}</span><span>{r.v}</span></div>
+                ))}
+              </div>
+            );
+          })()}
           {platformP0 && (
             <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')} · {platformP0.note}</div>
           )}
