@@ -20,6 +20,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
+import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
@@ -449,6 +450,9 @@ export const CombatConstructor: React.FC = () => {
     const a = document.createElement('a'); a.href = url; a.download = `combat-annual-${annual.totalWeeks}w.ics`; a.click(); URL.revokeObjectURL(url);
   };
   const doMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2200); };
+  const sparringErrs = sparringEnabled
+    ? validateSparringLoad({ hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest })
+    : [];
 
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
   const stepIndex = stepList.indexOf(step) + 1;
@@ -895,6 +899,11 @@ export const CombatConstructor: React.FC = () => {
                       <div style={{ gridColumn: '1 / -1' }}>
                         <InfoBanner tone="accent"><Highlight>{sparringHard * 90 * 8.5 + sparringTech * 60 * 5.5 + sparringWrest * 75 * 7.5} load</Highlight> → <Highlight>{sparringHard + sparringTech + sparringWrest}×/нед</Highlight> · декомпозиция</InfoBanner>
                       </div>
+                      {sparringErrs.map((e, i) => (
+                        <div key={i} style={{ gridColumn: '1 / -1' }}>
+                          <InfoBanner tone="warn">{e}</InfoBanner>
+                        </div>
+                      ))}
                     </div>
                   )}
 

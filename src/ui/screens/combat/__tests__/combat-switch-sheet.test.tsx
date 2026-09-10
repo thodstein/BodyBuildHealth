@@ -260,4 +260,17 @@ describe('Combat bugfixes', () => {
     expect(screen.getByRole('button', { name: 'Натрий' }).textContent).toContain('Стабильно');
     expect(screen.getByRole('button', { name: 'Углеводы' }).textContent).toContain('Стабильно');
   });
+
+  it('спарринг 4× hard показывает предупреждение валидатора', () => {
+    const { container } = render(<CombatConstructor />);
+    go('3 Вне зала');
+    openSec(/Вне зала/);
+    fireEvent.click(screen.getByRole('button', { name: 'Декомпозиция спарринга' }));
+    const hardInput = Array.from(container.querySelectorAll('input[type="range"]')).filter(
+      (i) => i.getAttribute('max') === '4' && i.getAttribute('min') === '0',
+    )[0] as HTMLInputElement;
+    expect(hardInput).toBeTruthy();
+    fireEvent.change(hardInput, { target: { value: '4' } });
+    expect(document.body.textContent).toContain('Hard spar >3×/нед');
+  });
 });

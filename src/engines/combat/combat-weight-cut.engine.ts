@@ -40,7 +40,7 @@ export function buildWeightCutProtocol(
 ): WeightCutProtocol | null {
   if (!lossKg || lossKg <= 0) return null;
   const w = Math.max(2, Math.min(12, Math.round(lossKg > 6 ? 10 : lossKg > 3 ? 8 : 6)));
-  const weighInType: WeighInType = (opts?.weighInType as WeighInType) || (opts?.discipline ? getWeighInTypeForDiscipline(opts.discipline) : (lossKg >= 3 ? 'day_before_24h' : 'day_before_24h'));
+  const weighInType: WeighInType = (opts?.weighInType as WeighInType) || (opts?.discipline ? getWeighInTypeForDiscipline(opts.discipline) : 'day_before_24h');
   const isSameDay = weighInType === 'same_day_2h';
   // same-day: ограничиваем агрессивность — вода/sodium/carb стабильнее (ISSN: нет времени на регидратацию)
   let waterMode: WaterMode = (opts?.waterMode as WaterMode) ?? (isSameDay ? 'stable' : (lossKg >= 4 ? 'load_cut' : 'stable'));
