@@ -86,10 +86,17 @@
             if (window.__appBooted) return;
             if (document.getElementById('he-boot-watchdog')) return;
             var errs = window.__bootErrors.slice(-6);
+            var log = window.__bootLog || [];
+            var moduleDead = log.length <= 1;
             var hasAssetFail = errs.some(function (m) { return m.indexOf('assets/') !== -1; });
-            var hint = hasAssetFail
-              ? 'Похоже, в APK битая или неполная web-сборка (не загрузились файлы assets/). Решение: пересобрать командой npm run build:native и переустановить APK.'
-              : 'Приложение не успело стартовать за 20 секунд. Чаще всего помогает перезагрузка; если повторяется — сбросьте локальные данные (аккаунт Telegram сохранится в облаке, локальный дневник — нет).';
+            var hint;
+            if (moduleDead) {
+              hint = 'Код приложения даже не стартовал. Причины: битая web-сборка внутри APK либо слишком старый Android System WebView. Обновите WebView в Play Store, полностью удалите приложение и поставьте свежий APK.';
+            } else if (hasAssetFail) {
+              hint = 'Похоже, в APK битая или неполная web-сборка (не загрузились файлы assets/). Решение: пересобрать командой npm run build:native и переустановить APK.';
+            } else {
+              hint = 'Старт застрял на шаге: ' + (log.length ? log[log.length - 1] : 'неизвестно') + '. Чаще всего помогает перезагрузка; если повторяется — сбросьте локальные данные (аккаунт Telegram сохранится в облаке, локальный дневник — нет).';
+            }
             var diag = 'UA: ' + (navigator.userAgent || '?') + '\n'
               + 'online: ' + (navigator.onLine ? 'yes' : 'no') + '\n'
               + 'bootLog: ' + (window.__bootLog.join(' | ') || '-') + '\n'
@@ -106,7 +113,7 @@
               + '<button id="he-boot-wipe" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">🗑 Сбросить данные</button>'
               + '<button id="he-boot-copy" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">📋 Диагностика</button>'
               + '</div>'
-              + '<pre id="he-boot-diag" style="display:none;max-width:100%;overflow:auto;text-align:left;font-size:11px;color:#8e8e93;background:#0a0a0f;border:1px solid #2a2a2a;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;">' + esc(diag) + '</pre>';
+              + '<pre id="he-boot-diag" style="display:none;max-width:100%;overflow:auto;text-align:left;font-size:11px;color:#8e8e93;background:#0a0a0f;border:1px solid #2a2a2a;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;-webkit-user-select:text;user-select:text;">' + esc(diag) + '</pre>';
             document.body.appendChild(box);
             document.getElementById('he-boot-reload').onclick = function () { location.reload(); };
             document.getElementById('he-boot-wipe').onclick = function () {
@@ -118,9 +125,24 @@
               var pre = document.getElementById('he-boot-diag');
               if (pre) pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
               try {
-                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(diag).catch(function () {});
-              } catch (e) {}
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  navigator.clipboard.writeText(diag).catch(function () { legacyCopy(diag); });
+                } else {
+                  legacyCopy(diag);
+                }
+              } catch (e) { legacyCopy(diag); }
             };
+            function legacyCopy(text) {
+              try {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              } catch (e) {}
+            }
           } catch (e) {}
         }, 20000);
       } catch (e) {}

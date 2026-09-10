@@ -148,7 +148,9 @@ async function bootstrap() {
   // Тема APK (dark/amoled/light): внутри — гейт на native, в TG/web no-op.
   try { initApkAppearance(); } catch (e) { console.warn('initApkAppearance failed:', e); }
   if (platform === 'native') {
-    try { await initNativeChrome(); } catch (e) { console.warn('initNativeChrome failed:', e); }
+    // Нативный хром (статус-бар/сплэш) никогда не должен стопить старт:
+    // зависший вызов плагина = вечный спиннер только в APK.
+    try { await withTimeout(initNativeChrome(), 8000, 'native-chrome'); } catch (e) { console.warn('initNativeChrome failed:', e); }
   }
 
   let isTg = false;
@@ -192,7 +194,7 @@ async function bootstrap() {
     const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
     const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || '';
     if (adminEmail && adminPass) {
-      await ensureAdmin(adminEmail, adminPass, 'Admin', 'admin');
+      await withTimeout(ensureAdmin(adminEmail, adminPass, 'Admin', 'admin'), 10000, 'ensure-admin');
     }
   } catch (e) {
     console.warn('Admin seed failed:', e);
