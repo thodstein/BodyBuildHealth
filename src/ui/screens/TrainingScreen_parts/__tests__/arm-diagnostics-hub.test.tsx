@@ -265,6 +265,17 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(container.querySelectorAll('[data-bar="rt"]').length).toBe(2);
   });
 
+  it('P1: кнопка Следующий шаг ведёт по табам и не двоит имена', () => {
+    render(<ArmDiagnosticsHub />);
+    // ровно одна кнопка с именем таба — навигация Next имеет нейтральный aria-label
+    expect(screen.getAllByRole('button', { name: /Давление/ }).length).toBe(1);
+    const next = screen.getByRole('button', { name: 'Следующий шаг диагностики' });
+    expect(next.textContent).toContain('Шаг 1 из 5');
+    fireEvent.click(next);
+    expect(screen.getByRole('button', { name: 'Следующий шаг диагностики' }).textContent).toContain('Шаг 2 из 5');
+    expect(document.body.textContent).toContain('Bezkorovainyi');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

@@ -22,7 +22,7 @@ import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard } from './arm-design-system';
 import { LEVEL_OPTS, TAB_DEFS, WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
 import type { HubTab, TiqBout } from './arm-hub-shared';
-import { HubHead, HubControls, HubOutput, HubP0Panel, HubAction } from './arm-hub-panels';
+import { HubHead, HubControls, HubOutput, HubP0Panel, HubAction, HubTabNext } from './arm-hub-panels';
 import { HubGripTab, HubWristTab } from './arm-hub-tabs1';
 import { HubPressureTab, HubStrengthTab, HubRecoveryTab } from './arm-hub-tabs2';
 import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
@@ -1143,6 +1143,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
           {tab==='recovery' && <HubRecoveryTab H={H} />}
         </div>
+        <HubTabNext H={H} />
       </AdCard>
 
       <HubOutput H={H} />

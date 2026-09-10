@@ -63,9 +63,9 @@ export function HubHead({ H }: { H: any }) {
         <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.totalScore})</span>
         {report.asymmetryPct!=null && <span className="ad-tag">Асимметрия {report.asymmetryPct}%</span>}
       </div>
-      <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="12 точек + тесты">
+      <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="4 шага до плана">
         <div className="ad-muted">
-           Выбери <b>12 мёртвых точек</b> (группы Кисть/Ротация/Давление) + провалы + хват + углы + 4 теста силы (кг+мс) + VBT → получи биомех-карточки (угол {`{0-20°при 110°}`}) + коррекции из каталога. Кнопка <b>«Применить в Арм-конструктор»</b> отправит мёртвые точки + динамику. RSS оверлей — только при видео/VBT/истории. Видео — опционально (BlazePose/HANDS).
+          <b>1 Тело</b> — вес, хват (RT/Axle/Pinch), VBT · <b>2 Точки</b> — 1–3 мёртвые точки из 12 (подсветка ● = для твоей техники) · <b>3 Тесты</b> — 4×F/t + L/R + стол/scale · <b>4 План</b> — причины → топ-3 → «💉 Вставить» или «→ Применить в Арм-конструктор» внизу. Видео — опционально.
         </div>
       </AdSec>
       {showScoring && scoring && <div className="ad-muted">{scoring.findings.slice(0,3).map((f: any)=>f.text).join(' · ')} {scoring.floors.length? `· floor: ${scoring.floors.join(', ')}` : ''} · v{Math.round(scoring.verification*100)}% (видео 0.35+VBT 0.35+история 0.30)</div>}
@@ -202,6 +202,19 @@ export function HubP0Panel({ H }: { H: any }) {
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
       </AdSec>
     </AdCard>
+  );
+}
+
+export function HubTabNext({ H }: { H: any }) {
+  const { tab, setTab } = H;
+  const idx = Math.max(0, TAB_DEFS.findIndex((t) => t.id === tab));
+  const next = TAB_DEFS[(idx + 1) % TAB_DEFS.length];
+  return (
+    <div style={{ marginTop: 8 }}>
+      <AdBtn variant="ghost" block aria-label="Следующий шаг диагностики" onClick={() => setTab(next.id)}>
+        Шаг {idx + 1} из {TAB_DEFS.length} · Далее: {next.icon} {next.label} →
+      </AdBtn>
+    </div>
   );
 }
 
