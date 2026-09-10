@@ -49,6 +49,16 @@ describe('Ф1.1: BB-матрица циклов (25 × {male, female} × {mass, 
     }
   });
 
+  it('шум-отчёт: категории taper_volume_increased и deload_volume_not_reduced отсутствуют (Ф1.1-гард)', () => {
+    const counts: Record<string, number> = {};
+    for (const { key, plan } of allBuilds()) {
+      const r = validateBBPlan(plan as any, { level: 'intermediate' });
+      for (const i of r.issues) counts[i.code] = (counts[i.code] || 0) + 1;
+    }
+    expect(counts['taper_volume_increased'] ?? 0, JSON.stringify(counts)).toBe(0);
+    expect(counts['deload_volume_not_reduced'] ?? 0, JSON.stringify(counts)).toBe(0);
+  });
+
   it('фазы на всех неделях; делод-недели снижены (объём ≤75% пред. или pump-семантика)', () => {
     for (const { key, plan } of allBuilds()) {
       const weeks = (plan as any).weeks as any[];

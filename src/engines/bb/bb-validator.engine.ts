@@ -242,8 +242,12 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     const week = plan.weeks[index] as any;
     const previous = plan.weeks[index - 1];
     const phase = String(week.phase || '').toLowerCase();
-    const taper = Boolean(week.taper) || /taper|подвод/i.test(String(week.rationale || ''));
+    const taper = Boolean(week.taper) || /taper|тапер/i.test(String(week.rationale || ''));
     if (!taper && phase !== 'peaking') continue;
+    // Ф1.1: короткие embed-блоки (2-4 недели, спец-вливания) — их «peak» это
+    // бласт-неделя, объём в ней растёт по построению; правило тапера
+    // (снижение к старту) относится к полным мезоциклам.
+    if (plan.weeks.length <= 4) continue;
     const currentSets = week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
     const previousSets = previous.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
     if (currentSets > previousSets) {

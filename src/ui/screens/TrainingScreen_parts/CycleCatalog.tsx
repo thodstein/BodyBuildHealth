@@ -270,6 +270,8 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const [weeks, setWeeks] = React.useState('all');
   const [freq, setFreq] = React.useState('all');
   const [author, setAuthor] = React.useState('all');
+  // ♀ Женские (тег female, Ф5 CYCLE-SYSTEM-FULL-AUDIT) — чип рядом с периодом
+  const [femaleOnly, setFemaleOnly] = React.useState(false);
   const [showRec, setShowRec] = React.useState(false);
   // ⭐ Избранные циклы (he_cycle_fav)
   const [favs, setFavs] = React.useState<string[]>(readCycleFavs);
@@ -323,6 +325,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     return base.filter(c => {
       const m = c.meta;
       if (favOnly && !favs.includes(m.id)) return false;
+      if (femaleOnly && !(m.tags || []).includes('female')) return false;
       if (focus !== 'all' && focusKeyOf(c, cat) !== focus) return false;
       if (levelF !== 'all' && m.level !== levelF) return false;
       if (period !== 'all' && m.period !== period) return false;
@@ -332,7 +335,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (q && !(`${m.title || ''} ${m.description || ''} ${m.howItWorks || ''}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs]);
+  }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs, femaleOnly]);
 
   // ── Арм-библиотека (19 именных циклов): фильтры поиска/фокуса/уровня/недель/частоты ──
   const armFiltered = React.useMemo(() => {
@@ -466,6 +469,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const switchCat = (id: CatFilter) => {
     setCat(id);
     setFocus('all');
+    setFemaleOnly(false);
     if (id === 'strong') {
       if (period !== 'all' && !SS_CYCLES.some(c => matchSSPeriod(c, period))) setPeriod('all');
       if (freq !== 'all' && !SS_CYCLES.some(c => String(c.meta.sessionsPerWeek) === freq)) setFreq('all');
@@ -542,6 +546,8 @@ export const CycleCatalog: React.FC<Props> = (p) => {
               {periodOpts.map(p2 => (
                 <Chip key={p2} label={PERIOD_LABELS[p2]} active={period === p2} onClick={() => setPeriod(period === p2 ? 'all' : p2)} />
               ))}
+              {/* ♀ Женские (Ф5): тег female */}
+              <Chip label="♀ Женские" active={femaleOnly} onClick={() => setFemaleOnly(!femaleOnly)} />
             </div>
           </div>
           )}
