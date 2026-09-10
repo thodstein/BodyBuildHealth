@@ -69,6 +69,20 @@ const BEGINNER_IDS = new Set([
   'row_inverted', // австралийские: supported horizontal pull (NSCA ранний шаг)
 ]);
 
+/** Минимум intermediate: эксцентрик-доминантные/скилл-движения, новичку рано
+ *  (нордик — максимальный эксцентрик хамстрингов, прогрессия требует базы). */
+const INTERMEDIATE_ID = new Set([
+  'nordic_curl',
+]);
+const INTERMEDIATE_NAME_RE = /нордик|nordic/i;
+
+/** Эксцентрик-доминантное скилл-движение (новичку из пулов не даём). */
+export function isSkillEccentric(ex: { id?: string; name?: string }): boolean {
+  const id = String((ex as any)?.id || '').toLowerCase();
+  const nm = String((ex as any)?.name || '');
+  return INTERMEDIATE_ID.has(id) || INTERMEDIATE_NAME_RE.test(nm) || INTERMEDIATE_NAME_RE.test(id);
+}
+
 /** Лесенки регрессий: сложное → более простые (id из каталога, проверены). */
 export const LEVEL_REGRESSIONS: Record<string, string[]> = {
   squat_bar: ['goblet_squat', 'leg_press', 'squat_split'],
@@ -89,6 +103,8 @@ export const LEVEL_REGRESSIONS: Record<string, string[]> = {
   row_bar: ['row_db', 'seated_row', 'row_inverted'],
   pistol_squat: ['squat_split', 'curtsy_lunge', 'lunge_reverse'],
   overhead_squat: ['goblet_squat', 'ohp_smith', 'squat_split'],
+  // Нордик — эксцентрик-доминантный скилл: новичку сгибания в тренажёре.
+  nordic_curl: ['leg_curl_seated', 'leg_curl'],
 };
 
 /** Минимальный уровень упражнения (каталог + оверрайды выше). */
@@ -98,6 +114,7 @@ export function minLevelFor(ex: { id?: string; name?: string; difficulty?: strin
   if (ADVANCED_ID.has(id) && !BANDED_RE.test(id)) return 'advanced';
   if (!BANDED_RE.test(id) && !BANDED_RE.test(nm) && (ADVANCED_NAME_RE.test(nm) || ADVANCED_NAME_RE.test(id))) return 'advanced';
   if (PLYO_RE.test(id) || PLYO_RE.test(nm)) return 'advanced';
+  if (INTERMEDIATE_ID.has(id) || INTERMEDIATE_NAME_RE.test(nm) || INTERMEDIATE_NAME_RE.test(id)) return 'intermediate';
   if (BEGINNER_IDS.has((ex as any)?.id) || BEGINNER_IDS.has(id)) return 'beginner';
   const d = String((ex as any)?.difficulty || '').toLowerCase();
   if (d === 'beginner') return 'beginner';
@@ -128,10 +145,15 @@ export function isHardAdvanced(ex: { id?: string; name?: string }): boolean {
  *  Используется в weak-optional добивке. Пул отбора НЕ трогаем (полный
  *  minLevel-гейт пула душил отбор и рвал объёмы — доказано матрицей);
  *  опасное из отбора и поздних проходов вычищает swap-backstop
- *  финализатора. Intermediate-движения разрешены всем по ACSM 2009. */
+ *  финализатора. Intermediate-движения разрешены всем по ACSM 2009.
+ *  Исключение (аудит Sep 2026): эксцентрик-доминантные скилл-движения
+ *  (нордик) — новичку запрещены даже в добивке, любителю можно. */
 export function isPoolAllowed(userLevel: string | undefined, ex: { id?: string; name?: string; difficulty?: string }): boolean {
   const rank = LEVEL_RANK[String(userLevel || '').toLowerCase()];
   if (rank === undefined || rank >= 2) return true;
+  const id = String((ex as any)?.id || '').toLowerCase();
+  const nm = String((ex as any)?.name || '');
+  if (rank < 1 && (INTERMEDIATE_ID.has(id) || INTERMEDIATE_NAME_RE.test(nm) || INTERMEDIATE_NAME_RE.test(id))) return false;
   return !isHardAdvanced(ex);
 }
 

@@ -270,7 +270,9 @@ describe('многоблочное расписание (12 нед: 1-5 A, 6-10 
       ],
     });
     // В блоке 2 бицепс больше не донор — объём восстановлен.
-    expect(directSets(plan, 8, 'biceps')).toBeGreaterThan(directSets(plan, 1, 'biceps'));
+    // Аудит Sep 2026 (фазы-фикс): неделя 8 — делод (правильная периодизация
+    // слаб-планов), меряем восстановление на неделе 9 (рабочая неделя блока 2).
+    expect(directSets(plan, 9, 'biceps')).toBeGreaterThan(directSets(plan, 1, 'biceps'));
   }, 30000);
 });
 

@@ -237,8 +237,23 @@ export function applyTradeoffToPlan(
   for (const week of plan.weeks) {
     const policy = policyForWeek(week.week);
     if (!policy || policy.mode === 'none' || policy.donorMuscles.length === 0) continue;
-    if ((week as any).phase === 'deload' || week.deload) continue;
     const targets = targetsForWeek(week.week);
+    const isDeloadWeek = (week as any).phase === 'deload' || week.deload;
+    if (isDeloadWeek) {
+      // Аудит Sep 2026: prep-минимум должен держаться и на делод-неделях
+      // (фазы-фикс вернул weak-планам периодизацию — делод-неделя со
+      // «минимальной» мышцей на полном объёме была багом prep-цикла).
+      // Резка доноров идёт (флор-защищена), но перенос цели не делаем:
+      // делод — не неделя для перераспределения объёма.
+      if (targets.length === 0) continue;
+      const removedSets = trimDonorIsolations(week, new Set(policy.donorMuscles.map(canonicalMuscle)), policy, opts);
+      reports.push({
+        week: week.week, removedSets, transferredSets: 0,
+        unusedSets: removedSets, donors: policy.donorMuscles, mode: policy.mode,
+        notes: ['Делод-неделя: доноры подрезаны к флору без переноса цели'],
+      });
+      continue;
+    }
     if (targets.length === 0) continue;
     const report = applyTradeoffToWeek(week, targets, policy, opts);
     reports.push(report);

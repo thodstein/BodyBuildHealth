@@ -48,7 +48,9 @@ describe('BB instructions — честный источник (lab/catalog/gener
   });
 
   it('классические ББ-упражнения (жим/тяга/присед) — exercise-lab', () => {
-    for (const id of ['bench_bar', 'row_bar', 'squat', 'lateral_raise_v2', 'tricep_pushdown_rope', 'curl_ez']) {
+    // Аудит Sep 2026: keep-first дедуп оставил канонический lateral_raise
+    // (lateral_raise_v2 — его поздний дубль с тем же именем).
+    for (const id of ['bench_bar', 'row_bar', 'squat', 'lateral_raise', 'tricep_pushdown_rope', 'curl_ez']) {
       const ex = EXERCISE_CATALOG.find(e => e.id === id)!;
       const p = buildExerciseInstructions({ exerciseId: ex.id, exerciseName: ex.name, muscle: ex.group });
       expect(p.source, `${id}`).toBe('exercise-lab');

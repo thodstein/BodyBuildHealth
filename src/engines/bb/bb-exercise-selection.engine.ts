@@ -1,4 +1,4 @@
-/**
+﻿/**
  * bb-exercise-selection.engine.ts — извлечённая логика выбора упражнений для мышц.
  *
  * ЭТО КАНОНИЧЕСКИЙ REFERENCE-СЛОЙ multi-angle-выбора: источник ANGLE_CLASSES и
@@ -59,8 +59,8 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
     { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
     { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
     // Plotkin 2023: hip thrust — гликово-специфичен (хамсы ~0 роста); мост/траст живут в классе
-    // glutes.hip_thrust. Здесь только шарнир таза: RDL/гакк-на-бицепс/колодец.
-    { name: 'rdl_bridge', match: (e) => /румын|rdl|гакк.*бицепс|hack.*(hamstring|колодец)|колодец/i.test(e.name) },
+    // glutes.hip_thrust. Здесь только шарнир таза: RDL/гакк-на-бицепс/колодец|колодце.
+    { name: 'rdl_bridge', match: (e) => /румын|rdl|гакк.*бицепс|hack.*(hamstring|колодец|колодце)|колодец|колодце/i.test(e.name) },
     { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|гиперэкстенз|back.?extension/i.test(e.name) },
     { name: 'nordic_ghr', match: (e) => /норд|nordic|glute.?ham|ghr/i.test(e.name) },
     { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
@@ -172,7 +172,7 @@ export function selectDiverseExercises(
  * Грудь: разводки (гантели/пек-дек) + жим под углом 30° (гантели/Смит/штанга).
  * Спина: тяга верхнего блока (широкий прямой/параллельный хват), тяга двух
  * гантелей лёжа на скамье (seal), Т-тяга.
- * Бицепс бедра: сгибания ног (лёжа/сидя), гакк на бицепс/«колодец» (нет в
+ * Бицепс бедра: сгибания ног (лёжа/сидя), гакк на бицепс/«колодец|колодце» (нет в
  * каталоге — группа сработает, если появится), румынская тяга.
  * Квадрицепс: приседания со штангой/гакк, разгибания ног сидя.
  * ═══════════════════════════════════════════════════════════════════ */
@@ -226,7 +226,7 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
     {
       key: 'ham_hack', label: 'Гакк на бицепс бедра / приседания в колодце',
       ids: ['hack_squat_ham', 'well_squat'],
-      re: /гакк.*бицепс|hack.*(ham|бицепс)|колодец/i,
+      re: /гакк.*бицепс|hack.*(ham|бицепс)|колодец|колодце/i,
     },
     {
       key: 'ham_rdl', label: 'Румынская тяга',
@@ -318,8 +318,10 @@ export function ensureStrictGroupCoverage(
   opts?: { isPrimary?: boolean; rotationMode?: string; avoidPatterns?: string[] },
 ): void {
   if (opts?.isPrimary === false) return;
-  // rotationMode 'forbid' = запрет ротации: primary-упражнения строго одни и те
-  // же каждую неделю (bb-rotation-mode). Same-class замены запрещены.
+  // Аудит Sep 2026: покрытие работало только на primary-сессиях — на upper_lower
+  // хамы бывают только accessory, и ham_hack (гакк-бицепс/колодец|колодце) выпадал из
+  // программы целиком. Same-class замена объём-нейтральна: разрешаем и для
+  // accessory при ≥2 упражнениях мышцы в сессии. forbid = запрет ротации без правок.
   if (opts?.rotationMode === 'forbid') return;
   const groups = STRICT_EXERCISE_GROUPS[muscle];
   if (!groups || groups.length === 0 || exDatas.length < 2) return;
@@ -356,12 +358,37 @@ export function ensureStrictGroupCoverage(
     // упражнение: width/thickness и прочие паттерны финализатора не сдвигаются,
     // indirect-перекрытия рук не меняются. Если в том же классе кандидатов нет —
     // группа не форсируется (ротация недель принесёт её позже).
+    // Аудит Sep 2026 (плюр relaxed-гейта): кандидат не должен дублировать
+    // имя/паттерн, ОСТАЮЩИЕСЯ в сессии после замены (same-class замена сама
+    // несёт паттерн заменяемого — он уходит) — иначе 2× leg extension
+    // (leg_ext + leg_ext_v2 одно имя) или 2× isolation_legs_ham
+    // (leg curl + nordic) — нарушение инварианта «1 изоляция-паттерн/сессия».
+    const existingPatterns = new Set<string>();
+    for (let pi = 0; pi < exDatas.length; pi++) {
+      if (pi === idx) continue;
+      try { existingPatterns.add(derivePattern(exDatas[pi])); } catch { /* unknown — игнор */ }
+    }
+    // Гвард только на ИЗОЛЯЦИОННЫЕ паттерны: инвариант аудита — «1 изоляция-
+    // паттерн/сессия на мышцу». Шарниры (RDL + гакк + good morning) легитимно
+    // сосуществуют — гвард на hinge ломал покрытие ham_hack.
+    const isoPatternDup = (m: any): boolean => {
+      try {
+        const p = derivePattern(m);
+        return /^isolation/.test(p) && existingPatterns.has(p);
+      } catch { return false; }
+    };
+    const remainingNames = new Set(exDatas.filter((_, pi) => pi !== idx).map(d => d.name));
+    const isFreshCandidate = (m: any): boolean =>
+      !remainingNames.has(m.name) && !exDatas.some(d => d.id === m.id);
     const classes = ANGLE_CLASSES[muscle] || [];
     const sameClass = poolMembers.filter(m =>
       classes.some(ac => ac.match(replaced) && ac.match(m))
-       && !exDatas.some(d => d.id === m.id));
+       && isFreshCandidate(m)
+       && !isoPatternDup(m));
     // Fallback: если в том же классе кандидатов нет — берём любого члена группы (любой угол), чтобы группа всё же появилась
-    const candidates = sameClass.length > 0 ? sameClass : poolMembers.filter(m => !exDatas.some(d => d.id === m.id));
+    const candidates = sameClass.length > 0
+      ? sameClass
+      : poolMembers.filter(m => isFreshCandidate(m) && !isoPatternDup(m));
     if (candidates.length === 0) continue;
     // P1: SFR-тай-брейк среди равных по _score (высокий SFR предпочтителен для
     // изоляций/машин — это группы strict-замены: разводки/сгибания и т.п.).

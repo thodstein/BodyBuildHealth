@@ -24,7 +24,7 @@ import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
-import { isHardAdvanced, swapExerciseForLevel } from './bb-exercise-levels.engine';
+import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exercise-levels.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { buildBBPlanReport } from './bb-report.engine';
@@ -33,7 +33,7 @@ import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
-import { WEAK_TO_MUSCLE } from './bb-builder.engine';
+import { WEAK_TO_MUSCLE, isBBJunk } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { expandDonorMuscles, isSpecializationFocus, isSpecializationWeak, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
@@ -526,10 +526,12 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
     if (eq.includes('bodyweight')) return true;
     return eq.some((e: string) => options.equipment!.includes(e));
   };
-  const findCatalog = (pred: (c: any) => boolean) => EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && !isMobilityRestricted(c, options.mobilityRestrictions) && !(options.avoidAxialLoad && isAxialLoadExercise(c)) && pred(c));
+  // Аудит Sep 2026: вторичка/памп здесь брали из каталога БЕЗ уровневого
+  // гейта — новичку ехал нордик (эксцентрик-скилл) вторым паттерном хамов.
+  const findCatalog = (pred: (c: any) => boolean) => EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && !isMobilityRestricted(c, options.mobilityRestrictions) && !(options.avoidAxialLoad && isAxialLoadExercise(c)) && isPoolAllowed(options.level, c) && !isBBJunk(c) && pred(c));
 
   // 1. Primary compound: присед (quads) / RDL (hamstrings). Тяжёлая нагрузка.
-  const compoundKey = muscle === 'quads' ? /присед|squat|хак|hack|гакк|фронт/i : /румын|rdl|гудморнинг|good.?morning|мёртв.*прям|колодец|well.?squat|гакк.*бицепс|hack.*ham/i;
+  const compoundKey = muscle === 'quads' ? /присед|squat|хак|hack|гакк|фронт/i : /румын|rdl|гудморнинг|good.?morning|мёртв.*прям|колодец|колодце|well.?squat|гакк.*бицепс|hack.*ham/i;
   let compound = items.find((e: any) => classifyLegExercise(e.name).pattern === 'compound_squat' || (muscle === 'hamstrings' && /румын|rdl|гудморнинг/i.test(e.name)));
   if (!compound && muscle === 'hamstrings') compound = items.find((e: any) => /румын|rdl|гудморнинг|мёртв/i.test(e.name));
   if (!compound) {
@@ -560,16 +562,30 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
   // 2. Второй паттерн: quads → жим ногами (приоритет пользователя); hams → leg curl / RDL.
   const usedPatterns = new Set(items.map((e: any) => classifyLegExercise(e.name).pattern));
   const usedNames = new Set(items.map((e: any) => e.name));
+  // Аудит Sep 2026: вторичка/памп добираются по classify-паттернам, а инвариант
+  // аудита — по derivePattern («1 изоляция-паттерн/сессия», для advanced+
+  // допускается 2). Гвардим выбор по derivePattern, иначе TRX-сгибание ехало
+  // вторым «уникальным» паттерном поверх leg curl.
+  const lvlRank = options.level === 'advanced' || options.level === 'enhanced' ? 2 : (options.level === 'intermediate' ? 1 : 0);
+  const isoAllowed = lvlRank >= 2 ? 2 : 1;
+  const isoPatternCount = (m: string) => {
+    try {
+      const p = derivePattern({ name: m } as any);
+      if (!/^isolation/.test(p)) return 0;
+      return items.filter((e: any) => { try { return derivePattern({ name: e.name } as any) === p; } catch { return false; } }).length;
+    } catch { return 0; }
+  };
+  const isoOk = (c: any) => isoPatternCount(c.name) < isoAllowed;
   const hasLegPress = items.some((e: any) => /жим.*ног|leg.?press|хак|hack/i.test(e.name));
   const hasCurl = items.some((e: any) => classifyLegExercise(e.name).pattern === 'leg_curl');
   let second: any = null;
   if (muscle === 'quads' && !hasLegPress && items.length < 4) {
-    second = findCatalog((c: any) => /жим.*ног|leg.?press/i.test(c.name || '') && !usedNames.has(c.name));
-    if (!second) second = findCatalog((c: any) => /хак|hack/i.test(c.name || '') && !usedNames.has(c.name));
+    second = findCatalog((c: any) => /жим.*ног|leg.?press/i.test(c.name || '') && !usedNames.has(c.name) && isoOk(c));
+    if (!second) second = findCatalog((c: any) => /хак|hack/i.test(c.name || '') && !usedNames.has(c.name) && isoOk(c));
   } else if (muscle === 'hamstrings' && !hasCurl && items.length < 4) {
-    second = findCatalog((c: any) => /сгибан.*ног|leg.?curl/i.test(c.name || '') && !usedNames.has(c.name));
+    second = findCatalog((c: any) => /сгибан.*ног|leg.?curl/i.test(c.name || '') && !usedNames.has(c.name) && isoOk(c));
   } else if (items.length < 4) {
-    second = findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern));
+    second = findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern) && isoOk(c));
   }
   if (second) {
     const base = compound || items[0];
@@ -586,7 +602,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
   // 3. Остаток до target — памп-изоляция мышцы (max 5 сетов на упражнение).
   if (total < target) {
     const pumpKey = muscle === 'quads' ? /разгибан.*ног|leg.?extension/i : /сгибан.*ног|leg.?curl/i;
-    const pump = findCatalog((c: any) => pumpKey.test(c.name || '') && !usedNames.has(c.name)) || findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern));
+    const pump = findCatalog((c: any) => pumpKey.test(c.name || '') && !usedNames.has(c.name) && isoOk(c)) || findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern) && isoOk(c));
     if (pump) {
       const base = items[0];
       const added: any = structuredClone(base);
@@ -1973,9 +1989,9 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
     for (const ex of session.exercises.filter((e: any) => e.muscle === 'quads' && !e.warmupActivator)) {
       ex.character = 'памп'; ex.rir = 3;
     }
-    const hasWell = session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).some((e: any) => /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name || ''));
+    const hasWell = session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).some((e: any) => /колодец|колодце|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name || ''));
     // rotationMode 'forbid': primary-состав frozen между неделями (bb-rotation-mode) —
-    // базу-колодец не добавляем (иначе w2+ отличаются от w1).
+    // базу-колодец|колодце не добавляем (иначе w2+ отличаются от w1).
     if (!hasWell && (options as any).rotationMode !== 'forbid' && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
       && pplPushAllowed(options, 'Гакк-присед на бицепс бедра (стопы высоко)')) {
       const wHam = (options.workMax && options.workMax.hamstrings) || 60;
@@ -2251,6 +2267,8 @@ export interface BBFinalizeOptions {
   controlledRotation?: boolean;
   equipment?: string[];
   excludedExercises?: string[];
+  /** Избранное пользователя — iso-вычитка не трогает (адаптив-подбор). */
+  favoriteExercises?: string[];
   avoidAxialLoad?: boolean;
   excludedMuscles?: string[];
   /** Мышцы с ГРАДИРОВАННОЙ травмой (щадящий режим, exclude=false):
@@ -3901,11 +3919,16 @@ for (const week of next.weeks) {
         if (need <= 0) continue;
         // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
         const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
-        // Порядок резки изоляций: меньше сеты → ниже fatigueCost (rehab-дрели первыми) →
-        // отведение последним (NSCA Hodge: abduction — отдельный глут-паттерн, не «добивка»).
+        // Порядок резки изоляций: по sets-asc (legacy) для всех мышц; для glutes —
+        // fatigue-first (rehab-дрели первыми) + отведение последним
+        // (NSCA Hodge: abduction — отдельный глут-паттерн, не «добивка»).
+        // Скоуп строго glutes: изменение порядка резки для других мышц
+        // сдвигало калиброванные объёмы (tradeoff/zero-state).
         const abdLast = (e: any) => (/отведен.*бедр|abduction/i.test(e.name || '') ? 1 : 0);
-        const isolations = candidates.filter(isIsolationEx).sort((a: any, b: any) =>
-          ((a.sets || 0) - (b.sets || 0)) || (fatigueOf(a) - fatigueOf(b)) || (abdLast(a) - abdLast(b)));
+        const isolations = candidates.filter(isIsolationEx).sort((a: any, b: any) => {
+          if (muscle === 'glutes') return ((a.sets || 0) - (b.sets || 0)) || (fatigueOf(a) - fatigueOf(b)) || (abdLast(a) - abdLast(b));
+          return (a.sets || 0) - (b.sets || 0);
+        });
         const others = candidates.filter(e => !isIsolationEx(e)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         // PPL-минимумы по-сессионно (bb-ppl-invariant: Pull biceps 8, Push
         // triceps 8): режем сначала сессии ВЫШЕ минимума, сессии на минимуме
@@ -4556,6 +4579,72 @@ for (const week of next.weeks) {
       widowWeeks++;
     }
     if (widowWeeks > 0 && Array.isArray((next as any).rationale)) (next as any).rationale.push(`💀 DC widowmaker: 1×20 квадрам в ${widowWeeks} нед.`);
+  }
+
+  // Аудит Sep 2026: инвариант аудита «изол-паттернов на сессию/мышцу»
+  // (quads/calves/shoulders — 2 всегда; прочие — 1). Гейт ТОЛЬКО
+  // beginner/intermediate: у advanced/enhanced мульти-изоляция откалибрована
+  // (back-стандарты 18-22 сета с несколькими углами, blast>cruise) — вычитка
+  // рвала пороги. Слоты одной мышцы в одной сессии подбираются независимо
+  // (primary + accessory) и могли дать leg curl + TRX-сгибание новичку.
+  // Финальная вычитка: лишняя (поздняя) accessory-добивка удаляется;
+  // избранное и primary не трогаем; faithful (reorder:false) не переписываем.
+  if (options.reorder !== false) {
+    const lvl = String(options.level || 'intermediate');
+    const dedupeActive = lvl === 'beginner' || lvl === 'intermediate';
+    const isoLimitFor = (p: string): number => {
+      if (p === 'isolation_calves' || p === 'isolation_legs_quad' || p === 'isolation_shoulders') return 2;
+      return 1;
+    };
+    if (dedupeActive) {
+      for (const week of next.weeks) {
+        for (const session of week.sessions) {
+          const seen = new Map<string, any[]>();
+          for (const ex of session.exercises) {
+            if ((ex as any).warmupActivator) continue;
+            const m = String((ex as any).muscle || '');
+            let p = '';
+            try { p = derivePattern({ name: (ex as any).name, group: m } as any); } catch { continue; }
+            if (!/^isolation/.test(p)) continue;
+            const key = `${m}:${p}`;
+            const list = seen.get(key) || [];
+            list.push(ex);
+            seen.set(key, list);
+          }
+          for (const [key, list] of seen) {
+            const limit = isoLimitFor(key.split(':')[1]);
+            const favs = new Set((options.favoriteExercises as any[] | undefined) || []);
+            const isFav = (ex: any) => favs.has((ex as any).exerciseId) || favs.has((ex as any).name);
+            while (list.length > limit) {
+              const removableIdx = (() => {
+                for (let i = list.length - 1; i >= 0; i--) {
+                  if ((list[i] as any).role === 'primary') continue;
+                  if (isFav(list[i])) continue;
+                  return i;
+                }
+                return -1;
+              })();
+              if (removableIdx < 0) break;
+              const victim = list[removableIdx];
+              const victimName = (victim as any).name;
+              session.exercises = session.exercises.filter((x: any) => x !== victim);
+              list.splice(removableIdx, 1);
+              // Чистим supersetWith-ссылки на удалённого партнёра (в той же сессии).
+              const remainingNames = new Set(session.exercises.map((x: any) => (x as any).name));
+              for (const ex of session.exercises) {
+                const partner = (ex as any).supersetWith;
+                if (partner && !remainingNames.has(partner)) {
+                  delete (ex as any).supersetWith;
+                  delete (ex as any).supersetGroup;
+                  delete (ex as any).supersetSlot;
+                  if (ex.comment) ex.comment = ex.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет

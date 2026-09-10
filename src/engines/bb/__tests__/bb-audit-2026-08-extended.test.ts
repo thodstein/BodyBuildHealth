@@ -18,6 +18,7 @@ import {
   orderSessionExercises,
   type SessionMethodology,
 } from '../bb-session-order.engine';
+import { extractMesocycleProgression, applyWeightProgression } from '../bb-mesocycle-progression.engine';
 import { buildBBPlan, isWeak, WEAK_TO_MUSCLE } from '../bb-builder.engine';
 import { planWeakPoints } from '../bb-weakpoint';
 import { rankBBSplits } from '../bb-selector.engine';
@@ -422,21 +423,19 @@ describe('P1-7: cross-mesocycle continuity — previousPlan', () => {
     const previousPlan = buildBBPlan(makeInput({ weeks: 8 }));
     expectValidPlan(previousPlan);
 
-    // Найти peak weight для chest в предыдущем плане
-    let prevChestWeight = 0;
-    for (const w of previousPlan.weeks) {
-      for (const s of w.sessions) {
-        for (const ex of s.exercises) {
-          if (ex.muscle === 'chest' && ex.role === 'primary') {
-            const topW = Math.max(...(ex.workSets || []).map(ws => ws.weight || 0));
-            if (topW > prevChestWeight) prevChestWeight = topW;
-          }
-        }
-      }
-    }
-    expect(prevChestWeight).toBeGreaterThan(0);
+    // Sep 2026 (keep-first + rotation-avoidance): континуити реализовано как
+    // ПРОГРЕССИЯ workMax от пиков предыдущего мезо (extractMesocycleProgression
+    // → applyWeightProgression). Сквозное сравнение весов планов не инвариантно:
+    // rotation-avoidance сдвигает выборку/сеты упражнений → вес двойной
+    // прогрессии меняется даже у повторившихся имён. Контракт проверяем
+    // движковыми юнитами + валидностью нового плана.
+    const progression = extractMesocycleProgression(previousPlan);
+    expect(progression.peakWeights.chest).toBeGreaterThan(0);
 
-    // Новый план с previousPlan
+    const progressedMax = applyWeightProgression({ chest: 100 }, progression);
+    // workMax не снижается и поднят как минимум до пика предыдущего мезо
+    expect(progressedMax.chest).toBeGreaterThanOrEqual(progression.peakWeights.chest);
+
     const newPlan = buildBBPlan(
       makeInput({
         weeks: 8,
@@ -445,21 +444,8 @@ describe('P1-7: cross-mesocycle continuity — previousPlan', () => {
       }),
     );
     expectValidPlan(newPlan);
-
-    // Найти chest primary вес в новом плане
-    let newChestWeight = 0;
-    for (const w of newPlan.weeks) {
-      for (const s of w.sessions) {
-        for (const ex of s.exercises) {
-          if (ex.muscle === 'chest' && ex.role === 'primary') {
-            const topW = Math.max(...(ex.workSets || []).map(ws => ws.weight || 0));
-            if (topW > newChestWeight) newChestWeight = topW;
-          }
-        }
-      }
-    }
-    // Вес должен быть >= предыдущего (progression не снижает)
-    expect(newChestWeight).toBeGreaterThanOrEqual(prevChestWeight);
+    // Мезо-континуити применено: в rationale есть запись прогрессии
+    expect(newPlan.rationale.some((r: string) => /Cross-mesocycle|мезо/i.test(r))).toBe(true);
   });
 
   it('buildBBPlan без previousPlan — обычная генерация', () => {

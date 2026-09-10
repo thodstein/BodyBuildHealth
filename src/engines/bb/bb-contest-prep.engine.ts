@@ -1675,6 +1675,16 @@ export function applyContestPrepToBBPlan(
     weeks[i] = { ...weeks[i], contestPhase: byIdx.get(i) ?? 'preparation' };
   }
 
+  // Аудит Sep 2026 (фазы-фикс): внутренние deload-флаги билдера (последняя
+  // неделя = делод) больше не теряются на слаб/spec-путях и «просачивались»
+  // в пик-неделю/тапер prep-плана. Prep владеет семантикой недели: пик и
+  // тапер — не делоды (свои протоколы), сбрасываем чужой флаг.
+  for (const wk of weeks) {
+    if (wk.contestPhase === 'peak_week' || wk.contestPhase === 'taper') {
+      if ((wk as any).deload) (wk as any).deload = false;
+    }
+  }
+
   // 2.5) РЕЖИМ ПОДГОТОВКИ (тренировочная логика недель подготовки):
   //   - RIR 1–3 (никакого авто-отказа RIR 0 из интенсификации mass-плана);
   //   - отказные интенсив-техники (dropset/rest_pause/myo_rep/negative) убираются;

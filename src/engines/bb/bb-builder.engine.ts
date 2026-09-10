@@ -1,4 +1,4 @@
-/**
+﻿/**
  * bb-builder.engine.ts — генератор бодибилдинг-плана из раскладки ротации (Этап BB6, полный рефактор 3.1).
  * Связывает: bb-split-patterns (расписание) + bb-day-types (тяж/памп/первичная-добивка) +
  * volume-landmarks (MEV/MAV/MRV) + rir-matrix (RIR-прогрессия по неделям) + selection/volume/loading слои.
@@ -40,7 +40,7 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
-import { isPoolAllowed } from './bb-exercise-levels.engine';
+import { isPoolAllowed, isSkillEccentric } from './bb-exercise-levels.engine';
 import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
@@ -787,7 +787,7 @@ function strengthRank(ex: any): number {
 const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжимания.*(?:от пол|от скам|на колен|от колен)|push.?up|русск.*твист|russian.?twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|колесо|ab.?wheel|горн.*ключ|mountain.*climb|90\/90|world.?greatest| йога|yoga/i;
 
 /** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
-function isBBJunk(ex: any): boolean {
+export function isBBJunk(ex: any): boolean {
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
   // Weighted push-ups — валидное ББ-упражнение (не мусор), даже если содержит pushup
@@ -1418,11 +1418,15 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
   const tag = (opts.sessionTag || '').toLowerCase();
   // Гейт уровней — в swap-backstop финализатора (пул НЕ трогаем: удаление
   // из пула сдвигало offsets/ротацию и рвало настроенные объёмы).
+  // Исключение (аудит Sep 2026): эксцентрик-доминантные скилл-движения
+  // (нордик — INTERMEDIATE_MIN) новичку не даём даже из пула — эксцентрик
+  // хамстрингов новичку рано; любителю (intermediate+) можно.
   let pool = EXERCISE_CATALOG.filter((ex: any) => {
     const tm = trueMuscleOf(ex);
     if (tm === null || !opts.roleMuscles.includes(tm)) return false;
     if (isBBJunk(ex)) return false;
     { const _t = bbExerciseTier(ex); if (_t === 4 || (!opts.allowExotic && _t === 3)) return false; }
+    { if (normLevel(opts.level || 'intermediate') === 'beginner' && isSkillEccentric(ex)) return false; }
     // Становая/сумо/жим стоя — только в силовом цикле и по кнопке пользователя.
     if (opts.allowStrengthLifts !== true) {
       const n = (ex.name || '').toLowerCase();
@@ -1464,7 +1468,9 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
       // хамстринг/поясничных днях — иначе хамстринги остаются только с leg_curl (изоляция).
       // Паттерн `Тяга штанги в наклоне` (row) → всё ещё блокируется (BB-posterior не совпадает).
       const isBbPosteriorChain = /румын|мёртв|stiff.?leg|мёртв.*в смите|мёртв.*на прям|мёртв.*на одной|гудморнинг|good.?morning|rdl|гиперэкстенз|обратн.*гипер|reverse.?hyper/.test(n);
-      if ((n.includes('жим') && !n.includes('ногами')) || (!isBbPosteriorChain && n.includes('тяга')) || n.includes('подтяг') || n.includes('бицепс') || n.includes('трицепс')) return false;
+      // Аудит Sep 2026: 'бицепс' в имени ловил и «бицепс БЕДРА» (гакк-присед,
+      // хамстринги) — гакк-хамы выпадали из ножного пула. Гвардим на руку.
+      if ((n.includes('жим') && !n.includes('ногами')) || (!isBbPosteriorChain && n.includes('тяга')) || n.includes('подтяг') || (n.includes('бицепс') && !/бицепс\s*бедра|ham/i.test(n)) || n.includes('трицепс')) return false;
     }
     return true;
   });
@@ -2571,7 +2577,7 @@ function buildSession(
           if (!isPPL) return false;
           const nm = String((d as any).name || '');
           if (pl.muscle === 'chest') return /наклон|incline|жим.*(лёжа|лежа|гориз)|bench.*press|развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(nm);
-          if (pl.muscle === 'hamstrings') return /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(nm);
+          if (pl.muscle === 'hamstrings') return /колодец|колодце|well.?squat|гакк.*бицепс|hack.*ham/i.test(nm);
           return false;
         });
         const dropped = planPackingDrops(
@@ -4179,10 +4185,35 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
             const working = (s.exercises as any[]).filter((x: any) => !(x as any).warmupActivator && !(x as any).optional);
             const wSets = working.reduce((a: number, x: any) => a + (x.sets || 0), 0);
-            if (working.length + 1 > sessLimits.maxExercises) continue;
+            // Аудит Sep 2026: слаб-фидер/спец-раскладка заполняют верхние дни до
+            // лимита, и MGF-слот малой памп-мышцы (forearms/traps/biceps и т.п.)
+            // молча пропадал — фича выключалась целиком. 2-сетный слот-изоляция
+            // (~3 мин) допустим на +1 упражнение сверх лимита СЕССИИ для малых
+            // мышц (strictMuscles — большие — не перегружаем); MRV-кап недели
+            // и лимит рабочих сетов остаются жёсткими.
+            const exOver = strictMuscles.has(tm) ? 1 : 2;
+            if (working.length + 1 > sessLimits.maxExercises + (exOver - 1)) continue;
             if (wSets + 2 > sessLimits.maxWorkingSets) continue;
             const score = (sessLimits.maxExercises - working.length) * 10 + (sessLimits.maxWorkingSets - wSets);
             if (score > bestScore) { bestScore = score; best = s; }
+          }
+          // Fallback (аудит Sep 2026): все tag-разрешённые дни цели заняты
+          // (feeders/спец-частота) — для МАЛОЙ памп-мышцы ставим слот в самый
+          // просторный день С целью (2-сетный памп-контакт), а не молча
+          // выключаем фичу на весь план. Большие мышцы (strictMuscles) — нет:
+          // занос в день цели без частоты не имеет смысла.
+          if (!best && !strictMuscles.has(tm)) {
+            let bestAltScore = -Infinity;
+            for (const s of sessionsWith) {
+              const tag = (s.sessionTag || '').toLowerCase();
+              if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
+              const working = (s.exercises as any[]).filter((x: any) => !(x as any).warmupActivator && !(x as any).optional);
+              const wSets = working.reduce((a: number, x: any) => a + (x.sets || 0), 0);
+              if (working.length + 1 > sessLimits.maxExercises + 1) continue;
+              if (wSets + 2 > sessLimits.maxWorkingSets) continue;
+              const score = (sessLimits.maxExercises - working.length) * 10 + (sessLimits.maxWorkingSets - wSets);
+              if (score > bestAltScore) { bestAltScore = score; best = s; }
+            }
           }
           if (!best) continue;
           const pool = (EXERCISE_CATALOG as any[]).filter((e: any) => {

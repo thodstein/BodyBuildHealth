@@ -257,6 +257,9 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   step_up_glute: { bio: 'step_up' },
   single_leg_extension: { bio: 'leg_extension' },
   seated_leg_extension: { bio: 'leg_extension' },
+  // Аудит Sep 2026: keep-first вернул leg_ext_v2 («Разгибания ног сидя») —
+  // маппинг был только у позднего дубля seated_leg_extension.
+  leg_ext_v2: { bio: 'leg_extension' },
   leg_curl_seated_v2: { bio: 'leg_curl' },
   leg_curl_single: { bio: 'leg_curl' },
   leg_curl_lying: { bio: 'leg_curl' },
@@ -274,8 +277,11 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   cable_hip_thrust: { bio: 'hip_thrust' },
   back_ext_glute: { bio: 'good_morning' },
   cable_hip_abduction: { bio: 'glute_bridge' },
+  // Аудит Sep 2026: канонический id отведения в тренажёре после keep-first.
+  hip_abduction_machine: { bio: 'glute_bridge' },
   cable_hip_adduction: { bio: 'glute_bridge' },
   fire_hydrant: { bio: 'glute_bridge' },
+  bridge_walkout: { bio: 'glute_bridge' },
   donkey_calf_raise: { bio: 'calf_raise' },
   donkey_calf_raise_v2: { bio: 'calf_raise' },
   calf_raise_v2: { bio: 'calf_raise' },
@@ -362,7 +368,9 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   bb_triceps_long: { bio: 'overhead_tricep_ext' },
   bb_triceps_lateral: { bio: 'tricep_pushdown' },
   bb_triceps_medial: { bio: 'tricep_pushdown' },
-  cable_kickback: { bio: 'tricep_pushdown' },
+  // Аудит Sep 2026: keep-first вернул глут-кикбэк под id cable_kickback —
+  // старый маппинг на трицепс-био неверен (это отведение ноги назад в блоке).
+  cable_kickback: { bio: 'glute_bridge' },
   // ── Кор ──
   crunch_reverse: { bio: 'cable_crunch' },
   crunch_bicycle: { bio: 'russian_twist' },

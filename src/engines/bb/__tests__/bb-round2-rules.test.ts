@@ -17,8 +17,10 @@ describe('BB round-2 rules', () => {
     expect(d1Quads.length).toBeGreaterThan(0);
     expect(d1Quads[0].repsRange?.[0]).toBeLessThanOrEqual(10);
     expect(d1Hams.every((e: any) => (e.repsRange?.[0] ?? 0) >= 12)).toBe(true);
-    // День 2: hams compound тяж (RDL), quads памп.
-    const d2Hams = d2.exercises.filter((e: any) => e.muscle === 'hamstrings' && /румын|rdl|гудморнинг/i.test(e.name));
+    // День 2: hams compound тяж (RDL/мёртвая на прямых), quads памп.
+    // Sep 2026 (keep-first): тяжёлый hinge может быть и «Мёртвая тяга на
+    // прямых ногах» (канонический стифф) — не только «румынская».
+    const d2Hams = d2.exercises.filter((e: any) => e.muscle === 'hamstrings' && /румын|rdl|гудморнинг|мёртв|мертв|stiff/i.test(e.name));
     const d2Quads = d2.exercises.filter((e: any) => e.muscle === 'quads' && !(e as any).warmupActivator);
     expect(d2Hams.length).toBeGreaterThan(0);
     expect(d2Hams[0].repsRange?.[0]).toBeLessThanOrEqual(10);

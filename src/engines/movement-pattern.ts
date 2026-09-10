@@ -40,10 +40,10 @@ export function derivePattern(ex: any): string {
 
   // HINGE: специфичные движения (deadlift, RDL, good_morning, hyperextension) — до общей "тяга",
   // иначе row_*/pulldown_* ошибочно классифицируются как hinge.
-  // Аудит Sep 2026: гакк-присед на бицепс бедра / колодец — задняя цепь (hinge),
+  // Аудит Sep 2026: гакк-присед на бицепс бедра / колодец|колодце — задняя цепь (hinge),
   // а не squat/quads (раньше /присед/ в общей ветке бил 'squat' → мышца quads,
   // и quads-фидеры прикреплялись к хамстринг-упражнению).
-  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин|гакк.*бицепс|hack.*ham|hack.*бицепс|колодец/.test(hay)) return 'hinge';
+  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин|гакк.*бицепс|hack.*ham|hack.*бицепс|колодец|колодце/.test(hay)) return 'hinge';
   // GLUTE_BRIDGE / HIP_THRUST: до isolation-ветки (g=legs → должен быть glute_squat, не isolation_legs_ham)
   if (/ягодич|мост|thrust|hip.?thrust|glute.?bridge|ягодичн/.test(hay)) return 'glute_squat';
 
@@ -171,8 +171,8 @@ export function trueMuscleOf(ex: any): string | null {
     // (2) ББ-поза-цепь hinges: Румынская / на прямых ногах / в Смите / одной ноге /
     //     Гудморнинг (compound) / Гиперэкстензия / обратная гипер. Канонический путь
     //     задней цепи для ББ-плана → 'hamstrings' (ведущий гипертрофийный таргет).
-    //     Также: гакк-присед на бицепс бедра (стопы высоко, «колодец») — задняя цепь.
-    if (/румын|мёртв|stiff.?leg|rdl|гудморнинг|good.?morning|гиперэкстенз|back.?extension|обратн.*гипер|reverse.?hyper|гакк.*бицепс|hack.*hamstring|колодец/.test(nm)) {
+    //     Также: гакк-присед на бицепс бедра (стопы высоко, «колодец|колодце») — задняя цепь.
+    if (/румын|мёртв|stiff.?leg|rdl|гудморнинг|good.?morning|гиперэкстенз|back.?extension|обратн.*гипер|reverse.?hyper|гакк.*бицепс|hack.*hamstring|колодец|колодце/.test(nm)) {
       return 'hamstrings';
     }
     // (3) Прочие hinge (махи гирь, jerk pull, snatch pull и т.д.) — null вне ББ-плана.

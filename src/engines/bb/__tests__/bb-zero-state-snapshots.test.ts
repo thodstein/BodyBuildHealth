@@ -29,8 +29,11 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // грудь 30→36, спина 46→45 (effective 49), руки 6/4→8/7, квадры 18→21,
     // предплечья 6→8, пресс 14→16 — бюджет вмещает предписание целиком,
     // zero-sum закрыт. Валидатор зелёный, инварианты целы.
+    // Re-baseline 2 (Sep 2026, keep-first каталог): канонические упражнения
+    // вернулись (hip_thrust/gack-хамы/leg_ext_v2 и др.) — пулы/фидеры сдвинули
+    // квадры 21→25 (валидатор зелёный, инварианты целы).
     expect(directVolume(plan)).toEqual({
-      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
+      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 25, shoulders: 0, traps: 7, triceps: 7,
     });
   });
 
@@ -40,8 +43,11 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // biceps/triceps 8-10, calves 9, traps 5, rear-delt) + MEV-guard подняли
     // недельные объёмы выше baseline Этапа 10. Направления совпадают с
     // требованиями (руки/икры/трапы ровно на минимумах ×2 сессии).
+    // Re-baseline 2 (Sep 2026, keep-first каталог): пулы канонических
+    // упражнений вернули ягодицы 7→9, квадры 16→20; хамы 12→10 (гакк-хамы
+    // в пуле перераспределили сеты). Валидатор зелёный.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 16, biceps: 17, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 17, forearms: 7, glutes: 7, hamstrings: 12, quads: 16, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 16, biceps: 17, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 17, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 
