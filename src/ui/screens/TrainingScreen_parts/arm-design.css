@@ -23,8 +23,9 @@
   --ad-edge: var(--glass-border, rgba(255, 255, 255, 0.09));
   --ad-edge2: rgba(255, 255, 255, 0.14);
   --ad-text: var(--text, #fff);
-  --ad-dim: var(--text-dim, rgba(226, 236, 255, 0.72));
-  --ad-faint: rgba(226, 236, 255, 0.5);
+  /* Белый вместо серого: вторичный текст — чисто белый на тёмном стекле */
+  --ad-dim: #ffffff;
+  --ad-faint: rgba(255, 255, 255, 0.85);
   --ad-acc: var(--accent, #00e68a);
   --ad-acc-ink: var(--accent-contrast, #06281c);
   --ad-amber: #f59e0b;

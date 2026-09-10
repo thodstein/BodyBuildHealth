@@ -140,6 +140,8 @@ describe('APK arm pack', () => {
       '.ad-card',
       "[data-arm='quality-card']",
       "[data-arm='week-pills']",
+      "[data-arm='export-actions']",
+      'content-visibility',
       ".ad-btn[data-variant='primary']",
       ".ad-btn[data-variant='amber']",
       ".ad-chip[data-active='true']",

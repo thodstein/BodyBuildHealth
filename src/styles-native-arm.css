@@ -928,3 +928,27 @@ html.app-native .train-arm.arm-apk [data-arm='sheet-portal'] .ad-sheet-backdrop 
     max-width: 100% !important;
   }
 }
+
+/* ─── 26. ПЕРФ АПК: меньше blur + пропуск закадровых карточек ────── */
+/* Полноэкранный blur 14-20px на слабых GPU даёт лаги скролла — в native
+ * достаточно 8px (TG/web без изменений). content-visibility пропускает
+ * рендер закадровых карточек циклов/сессий (Chromium WebView умеет). */
+html.app-native .train-arm.arm-apk .ad-card,
+html.app-native .train-arm.arm-apk .ad-steps,
+html.app-native .train-arm.arm-apk .ad-cta,
+html.app-native .train-arm.arm-apk .ad-banner,
+html.app-native .train-arm.arm-apk .ad-toast {
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='cycle-picker'] .ad-split,
+html.app-native .train-arm.arm-apk .ad-sess-list > .ad-sess {
+  content-visibility: auto !important;
+  contain-intrinsic-size: auto 140px !important;
+}
+
+html.app-native .train-arm.arm-apk [data-arm='export-actions'] .ad-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}

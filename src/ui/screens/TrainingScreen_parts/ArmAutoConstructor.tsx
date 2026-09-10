@@ -88,7 +88,7 @@ function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary,
         <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
         {dot}
         <span className="ad-sec-t" style={{ flex: 1 }}>{title}</span>
-        {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: 'rgba(255,255,255,0.65)' }}>{summary}</span> : null}
+        {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: '#fff' }}>{summary}</span> : null}
       </button>
       {open ? <div className="ad-sec-body" data-collapsed={!open} style={{ paddingBottom: 10 }}>{hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6 }}>{hint}</div> : null}{children}</div> : <div className="ad-sec-body" data-collapsed={!open} style={{ display: 'none' }}>{children}</div>}
     </div>
@@ -106,7 +106,7 @@ function AdField({ label, children }: { label: React.ReactNode; children: React.
 }
 
 function AdChip({ active, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
-  return <button className="ad-chip" data-active={!!active} aria-pressed={!!active} onClick={onClick} style={{ padding: '8px 12px', borderRadius: 999, fontSize: 11, fontWeight: !!active ? 800 : 500, cursor: 'pointer', minHeight: 38, border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)', background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: !!active ? '#06281c' : '#fff' }} {...rest}>{children}</button>;
+  return <button className="ad-chip" data-active={!!active} aria-pressed={!!active} onClick={onClick} style={{ padding: '8px 12px', borderRadius: 999, fontSize: 11, fontWeight: !!active ? 800 : 500, cursor: 'pointer', minHeight: 44, border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)', background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: !!active ? '#06281c' : '#fff' }} {...rest}>{children}</button>;
 }
 function AdBtn({ variant = 'primary', block, hero, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'amber' | 'danger' | 'dark'; block?: boolean; hero?: boolean }) {
   const st = variant === 'primary' ? BTN : BTN_GHOST;
@@ -324,6 +324,62 @@ function groupWarnings(warnings: string[]): Record<GateKey, string[]> {
   for (const w of warnings || []) out[gateOf(w)].push(w);
   return out;
 }
+
+/* Перф: тяжёлые списки мемоизированы — ререндер только при смене данных/выбора,
+ * а не на каждый ввод в соседних полях. DOM/строки/aria 1-в-1. */
+const SplitList = React.memo(function SplitList({ ranked, patternId, onPick }: { ranked: any[]; patternId: string; onPick: (id: string) => void }) {
+  return (
+    <div className="ad-list" data-arm="split-list">
+      {ranked.slice(0,6).map((r,i)=> (
+        <div key={r.pattern.id} className="ad-sec ad-split" data-active={patternId===r.pattern.id || (!patternId && i===0)} onClick={()=>onPick(r.pattern.id)} role="button" tabIndex={0} aria-pressed={patternId===r.pattern.id} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') onPick(r.pattern.id); }}>
+          <div className="ad-split-top">
+            <span className="ad-split-radio" aria-hidden />
+            <span className="ad-split-name">{i===0 ? '★ ' : ''}{r.pattern.name} <span>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span></span>
+            <span className="ad-split-score">{r.score}</span>
+          </div>
+          <div className="ad-split-desc">{r.pattern.description}</div>
+          <div className="ad-strip" data-arm="split-rot" aria-hidden>
+            {(r.pattern.schedule || []).map((d: any, di: number) => (
+              d && d.kind === 'тренировка'
+                ? <span key={di} className="ad-rot" data-ch={d.character || ''} title={`${d.sessionTag || ''} ${d.character || ''}`}>{shortSplitTag(d.sessionTag)}</span>
+                : <span key={di} className="ad-rest" title="отдых">·</span>
+            ))}
+          </div>
+          {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
+          {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
+        </div>
+      ))}
+    </div>
+  );
+});
+const CyclePickerList = React.memo(function CyclePickerList({ items, cycId, onPick, levelRu, phaseRu }: { items: any[]; cycId: string; onPick: (id: string) => void; levelRu: Record<string, string>; phaseRu: Record<string, string> }) {
+  if (!items.length) return null;
+  return (
+    <div className="ad-list" data-arm="cycle-picker">
+      {items.map(({ cycle: c, score, reasons }, ci) => (
+        <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>onPick(c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') onPick(c.id); }}>
+          <div className="ad-split-top">
+            <span className="ad-split-radio" aria-hidden />
+            <span className="ad-split-name">{ci < 3 ? `★${ci + 1} ` : ''}{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
+            <span className="ad-split-score">{score}</span>
+          </div>
+          <div className="ad-row" data-arm="cycle-chips">
+            <span className="ad-tag">{c.rpe}</span>
+            {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
+            <span className="ad-tag">{c.level.map((l: any)=>levelRu[l] || l).join('/')}</span>
+          </div>
+          <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
+            {Array.from({ length: c.weeks }, (_, i) => {
+              const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
+              return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${phaseRu[ph] || ph}`}>{i + 1}</span>;
+            })}
+          </div>
+          <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
+        </div>
+      ))}
+    </div>
+  );
+});
 
 export function ArmAutoConstructor() {
   const [step, setStep] = useState<Step>('params');
@@ -724,6 +780,9 @@ export function ArmAutoConstructor() {
   const toggleWeak = (m: string) => {
     setWeakPoints(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev, m].slice(0,2));
   };
+  // Стабильные колбэки для мемо-списков (иначе memo бесполезно)
+  const pickSplit = React.useCallback((id: string) => setPatternId(id), []);
+  const pickCycle = React.useCallback((id: string) => setCycId(prev => prev === id ? '' : id), []);
 
   // №1: ручные правки упражнений (overlay; сбрасываются при пересборке)
   const [armEdits, setArmEdits] = useState<Record<string, ArmExerciseEdit>>({});
@@ -780,13 +839,13 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         icon="🤝"
         title="Арм-конструктор PRO"
         sub="Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard."
-        side={best ? (<div className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>баллов</span></div><div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
+        side={best ? (<div className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: '#fff' }}>баллов</span></div><div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
       <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {STEP_GROUPS.map((g, gi) => (
           <span key={g.name} className="ad-step-group" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <span className="ad-step-group-label" aria-hidden style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}>{g.name}</span>
+            <span className="ad-step-group-label" aria-hidden style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.5 }}>{g.name}</span>
             {g.ids.map((id) => {
               const idx = STEP_DEFS.findIndex((s) => s.id === id);
               const s = STEP_DEFS[idx];
@@ -1184,27 +1243,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       {step === 'split' && (
         <AdCard className="ad-stepview">
           <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
-            <div className="ad-list" data-arm="split-list">
-              {ranked.slice(0,6).map((r,i)=> (
-                <div key={r.pattern.id} className="ad-sec ad-split" data-active={patternId===r.pattern.id || (!patternId && i===0)} onClick={()=>setPatternId(r.pattern.id)} role="button" tabIndex={0} aria-pressed={patternId===r.pattern.id} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setPatternId(r.pattern.id); }}>
-                  <div className="ad-split-top">
-                    <span className="ad-split-radio" aria-hidden />
-                    <span className="ad-split-name">{i===0 ? '★ ' : ''}{r.pattern.name} <span>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span></span>
-                    <span className="ad-split-score">{r.score}</span>
-                  </div>
-                  <div className="ad-split-desc">{r.pattern.description}</div>
-                  <div className="ad-strip" data-arm="split-rot" aria-hidden>
-                    {(r.pattern.schedule || []).map((d: any, di: number) => (
-                      d && d.kind === 'тренировка'
-                        ? <span key={di} className="ad-rot" data-ch={d.character || ''} title={`${d.sessionTag || ''} ${d.character || ''}`}>{shortSplitTag(d.sessionTag)}</span>
-                        : <span key={di} className="ad-rest" title="отдых">·</span>
-                    ))}
-                  </div>
-                  {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
-                  {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
-                </div>
-              ))}
-            </div>
+            <SplitList ranked={ranked} patternId={patternId} onPick={pickSplit} />
           </AdSec>
           <AdCta>
             <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
@@ -1213,29 +1252,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           </AdCta>
           <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
             {rankedCycles.length > 0 && (
-              <div className="ad-list" data-arm="cycle-picker">
-                {rankedCycles.map(({ cycle: c, score, reasons }, ci) => (
-                  <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>setCycId(cycId===c.id ? '' : c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setCycId(cycId===c.id ? '' : c.id); }}>
-                    <div className="ad-split-top">
-                      <span className="ad-split-radio" aria-hidden />
-                      <span className="ad-split-name">{ci < 3 ? `★${ci + 1} ` : ''}{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
-                      <span className="ad-split-score">{score}</span>
-                    </div>
-                    <div className="ad-row" data-arm="cycle-chips">
-                      <span className="ad-tag">{c.rpe}</span>
-                      {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
-                      <span className="ad-tag">{c.level.map(l=>CYC_LEVEL_RU[l] || l).join('/')}</span>
-                    </div>
-                    <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
-                      {Array.from({ length: c.weeks }, (_, i) => {
-                        const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
-                        return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${CYC_PHASE_RU[ph] || ph}`}>{i + 1}</span>;
-                      })}
-                    </div>
-                    <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
-                  </div>
-                ))}
-              </div>
+              <CyclePickerList items={rankedCycles} cycId={cycId} onPick={pickCycle} levelRu={CYC_LEVEL_RU} phaseRu={CYC_PHASE_RU} />
             )}
             <AdGrid cols="2">
               <AdSheetSelect label="Цикл" value={cycId} onChange={setCycId} hook="cycle-select" options={[
@@ -1376,7 +1393,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         <div key={ei} className="ad-ex">
                           <div className="ad-ex-top">
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}{armEdits[armEditKey(curWeek.week, si, ei)] ? <span className="ad-tag" data-arm="ex-edited">✏️</span> : ''} <button type="button" className="ad-chip" data-arm="ex-edit-toggle" aria-expanded={editOpen===armEditKey(curWeek.week, si, ei)} aria-label={`Править ${ex.name}`} onClick={()=>setEditOpen(prev=>prev===armEditKey(curWeek.week, si, ei)?null:armEditKey(curWeek.week, si, ei))} style={{ minHeight: 32, padding: '4px 10px' }}>✏️</button></span>
+                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}{armEdits[armEditKey(curWeek.week, si, ei)] ? <span className="ad-tag" data-arm="ex-edited">✏️</span> : ''} <button type="button" className="ad-chip" data-arm="ex-edit-toggle" aria-expanded={editOpen===armEditKey(curWeek.week, si, ei)} aria-label={`Править ${ex.name}`} onClick={()=>setEditOpen(prev=>prev===armEditKey(curWeek.week, si, ei)?null:armEditKey(curWeek.week, si, ei))} style={{ minHeight: 44, padding: '8px 12px' }}>✏️</button></span>
                           </div>
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives|🔄 Замена/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
@@ -1408,7 +1425,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                                 </select>
                               </AdField>
                               )}
-                              <button type="button" className="ad-chip" aria-label={`Сбросить правку ${ex.name}`} onClick={()=>setArmEdits(prev=>{ const n={...prev}; delete n[ekey]; return n; })} style={{ minHeight: 32 }}>↩</button>
+                              <button type="button" className="ad-chip" aria-label={`Сбросить правку ${ex.name}`} onClick={()=>setArmEdits(prev=>{ const n={...prev}; delete n[ekey]; return n; })} style={{ minHeight: 44, padding: '8px 12px' }}>↩</button>
                             </div>
                             );
                           })()}
@@ -1566,7 +1583,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           {!builtPlan ? <AdEmpty icon="📤" title="План не собран — вернись в «Параметры»." sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."><AdBtn variant="primary" block onClick={() => setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <div className="ad-sec-t">📤 Экспорт — {builtPlan.pattern.name}</div>
-              <div className="ad-row" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div className="ad-row" data-arm="export-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                 <AdBtn variant="ghost" onClick={() => {
                   let diag: any = null;
                   try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
@@ -1582,8 +1599,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
-                }}>🖨 Печать</AdBtn>
-                <AdBtn variant="ghost" onClick={() => {
+                }} block style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
+                <AdBtn variant="ghost" block style={{ minHeight: 48 }} onClick={() => {
                   const ics = buildArmIcs(viewPlan);
                   const blob = new Blob([ics], { type: 'text/calendar' });
                   const url = URL.createObjectURL(blob);
@@ -1617,7 +1634,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     if (nav?.clipboard?.writeText) nav.clipboard.writeText(txt).then(done, fallback);
                     else fallback();
                   } catch { fallback(); }
-                }}>📋 Копировать сводку</AdBtn>
+                }} block style={{ minHeight: 48 }}>📋 Копировать сводку</AdBtn>
               </div>
               <AdSec title="💾 Варианты плана" hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10." collapsible defaultOpen={false} summary={`${armVariants.length}/10`}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
