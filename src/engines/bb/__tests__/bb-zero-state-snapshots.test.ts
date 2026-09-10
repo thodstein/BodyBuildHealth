@@ -32,8 +32,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline 2 (Sep 2026, keep-first каталог): канонические упражнения
     // вернулись (hip_thrust/gack-хамы/leg_ext_v2 и др.) — пулы/фидеры сдвинули
     // квадры 21→25 (валидатор зелёный, инварианты целы).
+    // Re-baseline 3 (Ф1.1 CYCLE-SYSTEM-FULL-AUDIT): «Жим ногами (45°)» больше
+    // не мирился в horizontal_push/chest (movement-pattern: leg press →
+    // squat/quads) — quad-бакет честный: quads 25→21 (валидатор зелёный,
+    // инварианты целы).
     expect(directVolume(plan)).toEqual({
-      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 25, shoulders: 0, traps: 7, triceps: 7,
+      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
     });
   });
 
@@ -55,8 +59,11 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     const plan = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
     // Re-baseline (осознанно): те же кухни (минимумы/MEV-guard/back-стандарты),
     // цикл-путь затронут через общие проходы финализатора.
+    // Re-baseline 2 (Ф1.1 CYCLE-SYSTEM-FULL-AUDIT): leg press → squat/quads
+    // (movement-pattern) — квадры 15→13 (косвенный вклад leg press в хамс/
+    // ягодицы убран из quad-бакета; валидатор зелёный).
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
+      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 13, shoulders: 0, traps: 6, triceps: 9,
     });
   });
 

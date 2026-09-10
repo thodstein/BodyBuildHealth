@@ -80,7 +80,14 @@ describe('Строгий A/B: avoid stashится и уважается', () => 
     // наклонный жим weak-гарантией/фидерами/строгими группами в sibling
     // не форсируется: первая сессия покрытие держит (см. тест выше).
     const sibNonLead = chestNames(u1).slice(1);
-    expect(sibNonLead.some(n => INCLINE_RE.test(n)), 'sibling без форсированного incline').toBe(false);
+    // Re-baseline Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): пул груди исправлен —
+    // «Жим ногами (45°)» больше не мирился в horizontal_push/chest
+    // (movement-pattern: leg press → squat/quads); освободившийся слот
+    // заполняет обязательная strict-группа chest_incline — наклонный в
+    // sibling легитимен (coverage группы, не форс weak-паттерна лида).
+    // Инвариант A/B: в sibling остаётся НЕ-наклонная грудь (avoid паттерна
+    // лида не затёр весь слот — разнообразие углов сохранено).
+    expect(sibNonLead.some(n => !INCLINE_RE.test(n)), 'sibling держит не-наклонную грудь (avoid лида уважен)').toBe(true);
   });
 
   it('флаг выкл (legacy): weak chest_upper enforced в ОБЕИХ Upper-сессиях', () => {

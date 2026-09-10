@@ -188,7 +188,15 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     const allowedMuscles = TAG_MUSCLES[session.sessionTag || ''];
     if (allowedMuscles?.length) for (const exercise of session.exercises) {
       const canonical = trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle;
-      const allowed = allowedMuscles.includes(canonical) || (canonical === 'shoulders' && allowedMuscles.some(muscle => /^delt_/.test(muscle)));
+      const allowed = allowedMuscles.includes(canonical) || (canonical === 'shoulders' && allowedMuscles.some(muscle => /^delt_/.test(muscle)))
+        // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): малые мышцы-финишёры (пресс/икры/
+        // предплечья/трапы) легитимны в ЛЮБОЙ день (добивка конца сессии) —
+        // иначе «планка на Legs», «запястья на Pull», «молотки на FullBody»
+        // давали ×1000 шума session_muscle_leak на cycle-матрице.
+        || ['abs', 'calves', 'forearms', 'traps'].includes(canonical)
+        // Композитные ключи: arms (biceps+triceps), legs (все мышцы ног).
+        || (['biceps', 'triceps'].includes(canonical) && allowedMuscles.includes('arms'))
+        || (['quads', 'hamstrings', 'glutes', 'calves'].includes(canonical) && allowedMuscles.includes('legs'));
       if (!allowed) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
     const sessionSets = session.exercises

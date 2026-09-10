@@ -70,7 +70,11 @@ export function derivePattern(ex: any): string {
     return 'core';
   }
 
-  if (/присед|квад|разгибани.*(ног|квад|бедр|leg)|выпрям.*ног| squat/i.test(hay)) return 'squat';
+  // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): «Жим ногами (45°)»/leg press — приседательный
+  // паттерн (quads), не horizontal_push (грудь): без исключения trueMuscleOf
+  // определял жим ногами грудью → ложные muscle_attribution ×300+ и
+  // мирили leg-объём в chest-бакет валидатора.
+  if (/присед|квад|разгибани.*(ног|квад|бедр|leg)|выпрям.*ног|жим.*ног|leg.?press| squat/i.test(hay)) return 'squat';
   if (/шраг/.test(nm)) return 'isolation_back';
   // Горизонтальные тяги (штанга в наклоне, т-гриф, гантель в наклоне, горизонтальный блок) — ДО общего regex "тяга"
   if (/ тяга .*наклон|тяга .*т-?гриф|тяга .*гантел|тяга .*штанги| тяга .*блок .*горизонт| тяга горизонтальн|seated.?row| тяга блока/.test(hay) || /^row[ _]/.test(nm)) return 'horizontal_pull';
