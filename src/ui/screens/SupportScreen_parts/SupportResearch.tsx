@@ -103,7 +103,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                   {researchSource === 'pubmed' && (
                     <div className="card" style={{marginBottom:12}}>
                       <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 PubMed — научные статьи</h4>
-                      <div style={{display:'flex',gap:4,marginBottom:6}}>
+                      <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
                         <button onClick={()=>{setPubMedQuery('creatine supplementation strength performance');handlePubMedSearch('creatine supplementation strength performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Креатин</button>
                         <button onClick={()=>{setPubMedQuery('whey protein muscle hypertrophy');handlePubMedSearch('whey protein muscle hypertrophy');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Протеин</button>
                         <button onClick={()=>{setPubMedQuery('beta-alanine carnosine performance');handlePubMedSearch('beta-alanine carnosine performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Бета-аланин</button>
@@ -256,7 +256,8 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                     </div>
                   )}
 
-                  {/* Quick Research Links — expanded Russian presets */}
+                  {/* Quick Research Links — expanded Russian presets
+                      (на табе Каталога тоже ведут в PubMed, а не ищут в пустоту) */}
                   {researchSource !== 'researchDb' && (
                   <div className="card" style={{marginBottom:12}}>
                     <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 Быстрый поиск по темам</h4>
@@ -283,7 +284,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                         {label:'Глютамин и кишечник',q:'glutamine intestinal permeability gut health'},
                         {label:'Коллаген и суставы',q:'collagen peptides joint pain osteoarthritis'},
                       ].map((preset: any) =>(
-                        <button key={preset.q} onClick={()=>{setPubMedQuery(preset.q);handlePubMedSearch(preset.q);}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{preset.label}</button>
+                        <button key={preset.q} onClick={()=>{setPubMedQuery(preset.q);setResearchSource('pubmed');handlePubMedSearch(preset.q);}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{preset.label}</button>
                       ))}
                     </div>
                   </div>

@@ -18,6 +18,7 @@ import { SupportDiaryView } from '../SupportDiaryView';
 import { SupportStacksView } from '../SupportStacksView';
 import { SupportTimingPlanner } from '../SupportTimingPlanner';
 import { SupportFavoritesView } from '../SupportFavoritesView';
+import { ComplaintsTab } from '../ComplaintsTab';
 
 const noop = () => {};
 
@@ -118,6 +119,28 @@ describe('SUP IO APK (44/48/52px)', () => {
     const { container } = render(<SupportFavoritesView s={planMocks()} />);
     expectMinTap(container, /Сохранить план/, 52, 'fav-save');
     expectMinTap(container, /Из моих стеков|В корзину/, 48, 'fav-actions');
+  });
+
+  it('дневник: экспорт JSON/CSV не бросает (AПК без anchor-download)', () => {
+    const { container, getByText } = render(<SupportDiaryView s={{}} />);
+    fireEvent.click(getByText('📊 История'));
+    // jsdom без URL.createObjectURL/share — как АПК без даунлоада:
+    // shareOrDownload всё гасит внутри, клики не должны ронять экран
+    expect(() => {
+      fireEvent.click(getByText('📥 JSON'));
+      fireEvent.click(getByText('📥 CSV'));
+    }).not.toThrow();
+    expect(container.querySelector('.support-screen, .sup-diary'), 'экран жив').not.toBeNull();
+  });
+
+  it('жалобы: печать с заблокированным popup не падает', () => {
+    const open = vi.fn().mockReturnValue(null);
+    window.open = open as never;
+    const { getByText } = render(<ComplaintsTab />);
+    expect(() => {
+      fireEvent.click(getByText('🖨 Отчёт'));
+    }).not.toThrow();
+    expect(open).toHaveBeenCalled();
   });
 
   it('калькулятор: ряд действий 48px (строковый хук)', () => {
