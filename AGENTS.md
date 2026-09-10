@@ -1,5 +1,16 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Навигация питания + низы над дашбордом (Sep 10 2026, НЕ пушить — очередь чужих)
+
+Жалобы: «навигация подвкладок питания закрывается общей навигацией блока» + «нижний дашборд закрывает информацию внизу экрана» (всё АПК). Корни: (1) лента чипов-подвкладок жила внутри скроллящегося `.nutrition-tabs-body` — при скролле уезжала под липкую шапку/терялась, плюс двойной скролл (outer `overflow:auto` + inner `overflowY:auto`); (2) пилюля `.tabs` занимает снизу ~114px (76 высота + 10 offset + 28 safe-fallback), а ~15 внутренних блоков имели `paddingBottom:80` и 2 фиксированных таймера стояли на `nav-height+14=90px` — всё уходило под пилюлю. Только подача/отступы, логика/движки/строки 1-в-1.
+
+- **Питание** (`NutritionScreen.tsx`): чипы-подвкладки переехали из тела в липкую шапку (`nutrition-chips-head`, тот же DOM/стили/хендлеры, фон шапки + граница); outer `overflow:auto→hidden` (один скролл-контейнер — тело); тело `padding 80→140px`; избранное `paddingBottom:80→var(--tabbar-clear,140px)`.
+- **Низы (§76 `styles-native.css`, только `html.app-native`, без hex — чекер цел)**: `scroll-padding` экрана/main на `var(--tabbar-clear)` (138px native); классовые `paddingBottom:80` перебиты `!important` (`.labs-labdiary/.nut-advisor/.risk-info/.nut-progress/.nut-quests/.nut-customproducts/.nut-achieve/.sup-diary`); шапка/тело питания продублированы в CSS страховкой.
+- **Бесклассовые блоки** — тем же var'ом в TSX (1-в-1, только отступ): Labs-журнал, SupportFavorites ×5 (replaceAll), OrganLoad, IndividualPlan-отчёт.
+- **Таймеры зала** (`ExecutionZone`/`SessionPlayer`): `bottom nav-height+14→var(--tabbar-lift)` (+32px, строго выше пилюли).
+- **Чужое рядом**: в `LabsScreen` параллельный агент чинит то же (subtabs sticky 56→77px) — мой ханк в другом месте файла, совместимо.
+- **Проверено**: `verify:apk-design` OK, diary-pro 22/22 + sup-mobile-fit 11/11 + apk-top-pack 31/31 + diary-bugs 12/12 + retail 15/15 → **91/91**, `tsc` чист по своим файлам (3 ошибки — чужой bb-WIP `bb-builder duplicate level` + `bb-finalize favoriteExercises`, не тронут). НЕ КОММИТИЛ/НЕ ПУШИЛ.
+
 ## Арм: свитчи/шиты + русификация (Sep 10 2026, НЕ пушить — очередь чужих)
 
 Постановка: «доделай работу агента» — фикс падавших тестов после замены нативных галочек/селектов на красивые свитчи/попапы + русификация английских подписей.
@@ -22,7 +33,8 @@
 - **Визуал 1–5**: grip-группы аккордеонами + hero-скор tabular/glow; RIR-светофор + цвет фаз + сводка-чипы + hero-wrap; сеты в пилюлях недель + кромка сессий + «📋 Копировать сводку» (clipboard+fallback, тест).
 - **№1 коррекция (`4d72d63e`)**: overlay `applyArmEdits` (сеты/повторы/вес + своп внутри `substitutionGroup` с пересчётом веса от workMax × характер); редактор ✏️ в строках плана; печать/.ics/копия/heatmap — с правками, гейты честно базовые; NEW `arm-plan-correction` 7/7.
 - **№2 варианты (`2d187333`)**: `he_arm_plan_variants` (сохранить с правками / загрузить / удалить, кап 10, битый стор → []); NEW `arm-plan-variants` 3/3.
-- **№3 микро (`8bd9f2fb`)**: `.ad-stepview` enter-переход (keyframes adTabIn + reduced-motion) + haptic пилюль с гардом. `tsc` по своим 0 (3 ошибки — чужой bb-WIP `bb-builder/bb-finalize`, не тронут).
+- **№3 микро (`8bd9f2fb`)**: `.ad-stepview` enter-переход (keyframes adTabIn + reduced-motion) + haptic пилюль с гардом. `tsc` по своим 0 (3 ошибки — чужой bb-WIP `bb-builder duplicate level` + `bb-finalize favoriteExercises`, не тронут).
+- **№6 циклы+скролл (`b3824112`)**: в пикере были только топ-3 (полный каталог 19 — лишь в шите) → пикер показывает ВСЕ 19 по рангу с бейджами ★1-3 (карточка/шит/мост 1-в-1); горизонтальный скролл убран везде в конструкторе — ленты чипов/полос/шагов на wrap (CSS только под `:is(.train-arm)`, хаб не тронут, префикс-чекер цел). Тесты пикера обновлены (19 + звёзды). `tsc` по своим 0 (те же 3 чужие). НЕ ПУШИТЬ.
 
 ## Каталог продуктов: TOP-визуал карточек (Sep 09 2026, НЕ пушить — очередь чужих)
 
