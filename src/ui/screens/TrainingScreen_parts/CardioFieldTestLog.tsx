@@ -107,21 +107,22 @@ export const CardioFieldTestLog: React.FC = () => {
             key={k}
             onClick={() => { setKind(k); setErr(null); }}
             aria-label={`Замер: ${KIND_META[k].label}`}
+            aria-pressed={kind === k}
             style={kind === k
-              ? { ...BTN, borderColor: 'rgba(0,230,138,0.5)', color: '#00e68a', background: 'rgba(0,230,138,0.12)' }
-              : BTN}
+              ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontWeight: 800 }
+              : { ...BTN, minHeight: 44 }}
           >
             {KIND_META[k].label}
           </button>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{KIND_META[kind].hint}</div>
+      <div style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.5 }}>{KIND_META[kind].hint}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: 700 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11, color: '#fff', fontWeight: 800 }}>
           Дата
           <input
             type="date" value={date} onChange={e => setDate(e.target.value)} aria-label="Дата замера"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 13, minHeight: 44 }}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }}
           />
         </label>
         {kind === 'aet60' && (
@@ -133,9 +134,9 @@ export const CardioFieldTestLog: React.FC = () => {
         {kind === 'lthr30' && <NumberInput label="LTHR" value={lthr} onChange={setLthr} min={80} max={220} step={1} placeholder="165" ariaLabel="LTHR" width={100} suffix="уд/мин" />}
         {kind === 'ftp20' && <NumberInput label="Мощность 20'" value={ftp} onChange={setFtp} min={30} max={800} step={1} placeholder="250" ariaLabel="Мощность 20 минут" width={100} suffix="Вт" />}
         {kind === 'talk' && <NumberInput label="Потолок Z2" value={talk} onChange={setTalk} min={80} max={200} step={1} placeholder="145" ariaLabel="Talk-test" width={100} suffix="уд/мин" />}
-        <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить замер</button>
+        <button style={{ ...BTN_PRIMARY, minHeight: 48 }} onClick={save}>💾 Сохранить замер</button>
       </div>
-      {err && <div style={{ fontSize: 11, color: '#f87171' }} role="alert">⚠ {err}</div>}
+      {err && <div style={{ fontSize: 11.5, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.30)', borderLeft: '3px solid #ef4444', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="alert">⚠ {err}</div>}
       {responder && responder.responder == null && log.length > 0 && (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)' }}>{responder.note}</div>
       )}
@@ -147,11 +148,11 @@ export const CardioFieldTestLog: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[...log].reverse().map(e => (
-            <div key={`${e.date}|${e.kind}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <span style={{ color: 'rgba(255,255,255,0.55)', minWidth: 86 }}>{e.date}</span>
+            <div key={`${e.date}|${e.kind}`} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012))', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 11, padding: '9px 11px', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ color: '#fff', minWidth: 88, fontWeight: 700 }}>{e.date}</span>
               <Badge>{KIND_META[e.kind].label}</Badge>
               <span style={{ flex: 1, color: '#fff' }}>{metricOf(e)}</span>
-              <button style={{ ...BTN_DANGER, minHeight: 32, padding: '4px 8px' }} onClick={() => remove(e.date, e.kind)} aria-label={`Удалить замер ${e.date} ${KIND_META[e.kind].label}`}>✕</button>
+              <button style={{ ...BTN_DANGER, minHeight: 44, minWidth: 44, padding: '8px 11px' }} onClick={() => remove(e.date, e.kind)} aria-label={`Удалить замер ${e.date} ${KIND_META[e.kind].label}`}>✕</button>
             </div>
           ))}
         </div>

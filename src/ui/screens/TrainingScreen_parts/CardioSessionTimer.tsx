@@ -252,7 +252,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
           <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 54, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1.5, textShadow: active.remainingSec < 60 ? '0 0 24px rgba(239,68,68,0.45)' : '0 0 24px rgba(0,230,138,0.40)' }}>{fmt(active.remainingSec)}</div>
           <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={active.durationMin * 60 - active.remainingSec} aria-valuemin={0} aria-valuemax={active.durationMin * 60} aria-label="Прогресс сессии">
             <ProgressBar value={active.durationMin * 60 - active.remainingSec} max={active.durationMin * 60} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#fff', marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
               <span>прошло {fmt(active.durationMin * 60 - active.remainingSec)}</span>
               <span>{active.paused ? '⏸ пауза' : '▶ в процессе'}</span>
               <span>осталось {fmt(active.remainingSec)}</span>

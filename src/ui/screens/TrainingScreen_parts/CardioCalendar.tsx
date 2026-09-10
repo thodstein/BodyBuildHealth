@@ -69,13 +69,13 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?:
     <div style={CARD}>
       <style>{`@media (max-width:380px){.cardio-calendar-grid{grid-template-columns:repeat(7,1fr)!important;gap:2px!important}.cardio-calendar-grid div{font-size:9px!important;padding:3px 2px!important;min-height:52px!important}}`}</style>
       <div style={ROW}>
-        <span style={LABEL}>🗓 Календарь цикла</span>
-        <span style={{ fontSize: 11, color: '#fff', textTransform: 'capitalize' }}>{monthLabel}</span>
+        <span style={{ ...LABEL, fontSize: 12.5 }}>🗓 Календарь цикла</span>
+        <span style={{ fontSize: 11.5, color: '#fff', textTransform: 'capitalize', fontVariantNumeric: 'tabular-nums' }}>{monthLabel}</span>
         <span style={{ flex: 1 }} />
-        <button style={BTN_SMALL} onClick={() => setOpen(v => !v)} aria-expanded={open} aria-label={open ? 'Скрыть календарь' : 'Показать календарь'}>{open ? '▾ Скрыть' : '▸ Календарь'}</button>
-        <button style={BTN_SMALL} disabled={!canPrev} onClick={() => setOffset(o => o - 1)} aria-label="Предыдущий месяц">←</button>
-        <button style={BTN_SMALL} onClick={() => setOffset(0)} title="К месяцу старта" aria-label="К месяцу старта">●</button>
-        <button style={BTN_SMALL} disabled={!canNext} onClick={() => setOffset(o => o + 1)} aria-label="Следующий месяц">→</button>
+        <button style={{ ...BTN_SMALL, minHeight: 44 }} onClick={() => setOpen(v => !v)} aria-expanded={open} aria-label={open ? 'Скрыть календарь' : 'Показать календарь'}>{open ? '▾ Скрыть' : '▸ Календарь'}</button>
+        <button style={{ ...BTN_SMALL, minWidth: 44 }} disabled={!canPrev} onClick={() => setOffset(o => o - 1)} aria-label="Предыдущий месяц">←</button>
+        <button style={{ ...BTN_SMALL, minWidth: 44 }} onClick={() => setOffset(0)} title="К месяцу старта" aria-label="К месяцу старта">●</button>
+        <button style={{ ...BTN_SMALL, minWidth: 44 }} disabled={!canNext} onClick={() => setOffset(o => o + 1)} aria-label="Следующий месяц">→</button>
       </div>
       {open && (
         <>
@@ -100,16 +100,16 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?:
               aria-selected={isToday || undefined}
               tabIndex={inMonth ? 0 : -1}
               style={{
-                minHeight: 66, borderRadius: 10, padding: '5px 6px', display: 'flex', flexDirection: 'column', gap: 3,
-                background: isToday ? 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.04))' : hasSessions ? ((PHASE_BG as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.03)') : 'rgba(255,255,255,0.025)',
-                border: isToday ? '1px solid rgba(0,230,138,0.45)' : isLegConflict ? '1px solid rgba(239,68,68,0.35)' : hasSessions ? `1px solid ${((PHASE_COLOR as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.07)')}44` : '1px solid rgba(255,255,255,0.06)',
-                boxShadow: isToday ? '0 0 10px rgba(0,230,138,0.18)' : 'none',
+                minHeight: 70, borderRadius: 11, padding: '6px 6px', display: 'flex', flexDirection: 'column', gap: 3,
+                background: isToday ? 'linear-gradient(180deg, rgba(0,230,138,0.15), rgba(0,230,138,0.05))' : hasSessions ? ((PHASE_BG as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.03)') : 'rgba(255,255,255,0.025)',
+                border: isToday ? '1px solid rgba(0,230,138,0.50)' : isLegConflict ? '1px solid rgba(239,68,68,0.38)' : hasSessions ? `1px solid ${((PHASE_COLOR as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.07)')}44` : '1px solid rgba(255,255,255,0.06)',
+                boxShadow: isToday ? '0 0 12px rgba(0,230,138,0.20)' : 'none',
                 opacity: inMonth ? 1 : 0.3,
               }}
               title={info ? `${dateIso} · ${(CARDIO_PHASE_LABELS as Record<string, string>)[info.phase] ?? info.phase}${info.sessions.length ? ' · ' + info.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}м`).join(', ') : ' · отдых'}` : dateIso}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: isToday ? 900 : 700, color: isToday ? '#00e68a' : '#fff' }}>{dayNum}</span>
+                <span style={{ fontSize: 12, fontWeight: isToday ? 900 : 700, color: isToday ? '#4ade80' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
                 {info?.isLegDay && <span style={{ fontSize: 9 }} title="День ног">🦵</span>}
                 {isToday && <span style={{ fontSize: 8, fontWeight: 800, color: '#00e68a', background: 'rgba(0,230,138,0.15)', borderRadius: 4, padding: '1px 4px' }}>сегодня</span>}
                 <span style={{ flex: 1 }} />
@@ -121,9 +121,9 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?:
                     {TYPE_LABEL[s.type]} {s.durationMin}
                   </span>
                 ))}
-                {hasSessions === false && info && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>отдых</span>}
+                {hasSessions === false && info && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.50)' }}>отдых</span>}
               </div>
-              {info?.weekNo && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.32)', marginTop: 'auto' }}>нед {info.weekNo} · {(CARDIO_PHASE_LABELS as Record<string, string>)[info.phase] ?? info.phase}</div>}
+              {info?.weekNo && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 'auto', fontVariantNumeric: 'tabular-nums' }}>нед {info.weekNo} · {(CARDIO_PHASE_LABELS as Record<string, string>)[info.phase] ?? info.phase}</div>}
             </div>
           );
         })}

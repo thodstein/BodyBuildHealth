@@ -76,8 +76,8 @@ export const CardioCompsStep: React.FC<{
                 return <div key={week} style={{ flex: 1, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: comp ? '#fff' : 'transparent', borderLeft: week > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', position: 'relative' }} title={comp ? `${comp.name} нед ${week}` : isTaper ? `taper нед ${week}` : `нед ${week}`}>{comp ? '●' : isTaper ? '▓' : ''}</div>;
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.55)' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
+            <div style={{ fontSize: 10.5, color: '#fff', display: 'flex', gap: 9, flexWrap: 'wrap' }}>
               <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#ef4444', marginRight: 4, verticalAlign: 'middle' }} />старт</span>
               <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(234,179,8,0.32)', marginRight: 4 }} />taper</span>
               <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', marginRight: 4 }} />база</span>
@@ -121,7 +121,7 @@ export const CardioCompsStep: React.FC<{
           />
           <button style={{ ...BTN_CTA, flex: '1 1 160px' }} onClick={add}>+ Добавить старт</button>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную.</div>
+        <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.5 }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную.</div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
       </SectionCard>
     </div>

@@ -91,7 +91,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Факт:</div>
         {load.done.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>кардио не записано.</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)' }}>кардио не записано.</div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">{load.done.length} сесс · {load.cardioMinutes}м</Badge>

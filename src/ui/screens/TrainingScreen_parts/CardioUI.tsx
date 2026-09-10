@@ -139,9 +139,9 @@ export const SectionCard: React.FC<{
 
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = '#94a3b8', sub }) => (
   <div className="ck-tile kit-stat" style={{ flex: '1 1 104px', padding: '11px 12px 10px', borderRadius: 13, background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.09)', borderTop: `2px solid ${color}`, display: 'flex', flexDirection: 'column', gap: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 10px rgba(0,0,0,0.18)' }}>
-    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.48)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 800 }}>{label}</span>
+    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.60)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 800 }}>{label}</span>
     <span style={{ fontSize: 20, fontWeight: 900, color, lineHeight: 1, ...TABULAR }}>{value}</span>
-    {sub && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', ...TABULAR }}>{sub}</span>}
+    {sub && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', ...TABULAR }}>{sub}</span>}
   </div>
 );
 
