@@ -130,8 +130,7 @@ describe('APK arm pack', () => {
     expect(hexHits).toEqual([]);
   });
 
-  it('хуки слоя на месте: корни, шаги, карточки, CTA, чипы', () => {
-    const css = readArmCss();
+  it('хуки слоя на месте: корни, шаги, карточки, CTA, чипы', () => {    const css = readArmCss();
     for (const hook of [
       '.train-arm.arm-apk',
       '.train-armdiag.arm-apk',

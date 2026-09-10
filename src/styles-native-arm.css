@@ -952,3 +952,16 @@ html.app-native .train-arm.arm-apk [data-arm='export-actions'] .ad-btn:focus-vis
   outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
   outline-offset: 2px !important;
 }
+
+/* ─── 27. ПЛАН: липкая лента недель для длинных планов ───────────── */
+/* Лента пилюль держится под липкой лентой шагов (та же glass-подача). */
+html.app-native .train-arm.arm-apk [data-arm='week-pills'] {
+  position: sticky !important;
+  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
+  z-index: 4 !important;
+  background: rgba(9, 18, 34, 0.92) !important;
+  border-radius: 14px !important;
+  padding: 6px 4px 8px !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+}

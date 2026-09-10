@@ -2047,6 +2047,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+:is(.train-arm) .ad-split-score,
+:is(.train-arm) .ad-wpill-t,
+:is(.train-arm) .ad-stat-v {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── №3 КОНСТРУКТОР: enter-переход шагов + haptic-готовность ──────── */
 :is(.train-arm) .ad-stepview {
   animation: adTabIn 0.28s cubic-bezier(0.22, 0.68, 0, 1);
