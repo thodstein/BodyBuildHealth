@@ -6,7 +6,7 @@
  * DOM-хуки .cb-* для APK-слоя (§92/§93) сохранены.
  */
 import React from 'react';
-import { buildCombatPlan, cbExerciseName } from '../../../engines/combat/combat-builder.engine';
+import { buildCombatPlan, cbExerciseName, resolveCombatSwapMeta } from '../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { COMBAT_CYCLE_LIBRARY } from '../../../engines/combat/combat-cycle-library';
@@ -122,6 +122,19 @@ export const CombatConstructor: React.FC = () => {
   const [cycFilter, setCycFilter] = React.useState<string>('all');
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
+
+  /* Смена дней сбрасывает вручную выбранный сплит под новую частоту —
+   * иначе UI показывал бы combat_4, а движок молча строил бы на combat_2a. */
+  const changeDays = (n: number) => {
+    setDays(n);
+    if (patternId) {
+      const p = COMBAT_PATTERNS.find(p => p.id === patternId);
+      if (p && p.sessionsPerRotation !== n) {
+        setPatternId('');
+        setMsg(`Сплит сброшен под ${n}×/нед — выберите заново`); setTimeout(() => setMsg(''), 2600);
+      }
+    }
+  };
 
   const pullFromProfile = () => {
     try {
@@ -365,7 +378,10 @@ export const CombatConstructor: React.FC = () => {
       const metaMap: Record<string, { name: string; group: string; pattern: string }> = {
         bench_bar: { name: 'Жим лёжа', group: 'chest', pattern: 'horizontal_push' }, row_bar: { name: 'Тяга штанги', group: 'back', pattern: 'horizontal_pull' }, ohp: { name: 'Жим стоя', group: 'shoulders', pattern: 'vertical_push' }, pullup: { name: 'Подтягивания', group: 'back', pattern: 'vertical_pull' }, neck_harness_ext: { name: 'Шея с упряжью', group: 'neck', pattern: 'isolation' }, neck_lateral_flex: { name: 'Шея боковая', group: 'neck', pattern: 'isolation' }, neck_bridge_wrestler: { name: 'Борцовский мост', group: 'neck', pattern: 'isolation' }, neck_flexion: { name: 'Шея сгибание', group: 'neck', pattern: 'isolation' }, neck_rotation: { name: 'Шея ротация', group: 'neck', pattern: 'isolation' }, gi_grip_pullup: { name: 'Подтягивания на кимоно', group: 'back', pattern: 'vertical_pull' }, face_pull: { name: 'Тяга к лицу', group: 'shoulders', pattern: 'isolation' }, squat: { name: 'Присед', group: 'legs', pattern: 'squat' }, front_squat: { name: 'Фронт-присед', group: 'legs', pattern: 'squat' }, rdl: { name: 'Румынская тяга', group: 'legs', pattern: 'hinge' }, bulgarian_split_heavy: { name: 'Болгарский тяжёлый', group: 'legs', pattern: 'lunge' }, single_leg_rdl_combat: { name: 'Румынка на одной', group: 'legs', pattern: 'hinge' }, cossack_squat: { name: 'Казачий присед', group: 'legs', pattern: 'squat' }, calf_raise: { name: 'Подъёмы на носки', group: 'legs', pattern: 'isolation' }, plate_pinch: { name: 'Щипок блинов', group: 'grip', pattern: 'isolation' }, landmine_rotation: { name: 'Лэндмайн ротация', group: 'core', pattern: 'rotation' }, landmine_180: { name: 'Лэндмайн 180', group: 'core', pattern: 'rotation' }, pallof_rotation_press: { name: 'Паллоф+ротация', group: 'core', pattern: 'anti_rotation' }, suitcase_carry: { name: 'Чемодан', group: 'core', pattern: 'carry' }, med_ball_throw: { name: 'Медбол бросок', group: 'core', pattern: 'plyo' }, wrist_roller: { name: 'Валик', group: 'grip', pattern: 'isolation' }, hang_clean: { name: 'Взятие с виса', group: 'back', pattern: 'hinge' },
       };
-      const meta = metaMap[newId] || { name: newId, group: 'core', pattern: 'unknown' };
+      const curSess = prev.weeksData[wkIdx]?.sessions.find(s => s.day === day);
+      const curEx = curSess?.exercises.find(e => e.id === exId);
+      if (!curSess || !curEx) return prev;
+      const meta = metaMap[newId] || resolveCombatSwapMeta(newId, { name: curEx.name, group: curEx.group, pattern: curEx.pattern });
       pushHistory(prev);
       const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
       const sess = copy.weeksData[wkIdx]?.sessions.find(s => s.day === day);
@@ -550,7 +566,7 @@ export const CombatConstructor: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}><span>2</span><span>12</span></div>
                   </Field>
                   <Field label={`Дней/нед`} hint={`${days}× — зал`}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{days}×</Highlight></div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={4} value={days} onChange={e => changeDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{days}×</Highlight></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}><span>2</span><span>4</span></div>
                   </Field>
                 </div>
@@ -785,7 +801,7 @@ export const CombatConstructor: React.FC = () => {
             <div style={{ ...CARD, background: weightCut > 0 ? 'linear-gradient(180deg, rgba(239,68,68,0.08), rgba(18,16,28,0.62))' : CARD.background, borderColor: weightCut > 0 ? 'rgba(239,68,68,0.22)' : GLASS_BORDER }}>
               <CardHeader icon="⚖️" title="Весогонка ISSN 2025" subtitle={weightCut > 0 ? `Сгонка ${weightCut} кг — плавная, без экстремальных протоколов` : 'Выключена — стабильный режим'} />
               <Field label={`Сгонка · ${weightCut} кг`}>
-                <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => { const v = Number(e.target.value); setWeightCut(v); if (v >= 3) setHeatSessions(true); if (v >= 4) setWaterMode('load_cut'); if (v >= 3) setSodiumMode('moderate_cut'); if (v >= 5) setCarbMode('deplete_reload'); }} />
+                <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => { const v = Number(e.target.value); setWeightCut(v); if (v === 0) { setWaterMode('stable'); setSodiumMode('stable'); setCarbMode('stable'); setHeatSessions(false); return; } if (v >= 3) setHeatSessions(true); if (v >= 4) setWaterMode('load_cut'); if (v >= 3) setSodiumMode('moderate_cut'); if (v >= 5) setCarbMode('deplete_reload'); }} />
               </Field>
               {weightCut > 0 && (
                 <>

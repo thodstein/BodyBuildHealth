@@ -180,8 +180,7 @@ describe('Combat RU guard', () => {
   });
 });
 
-describe('Combat cycles', () => {
-  it('применение цикла выставляет сплит и тост', () => {
+describe('Combat cycles', () => {  it('применение цикла выставляет сплит и тост', () => {
     render(<CombatConstructor />);
     go('4 Сплит');
     expect(screen.getByText(/Готовые циклы/)).toBeTruthy();
@@ -210,5 +209,41 @@ describe('Combat cycles', () => {
     fireEvent.click(screen.getByRole('button', { name: /Применить «ММА · кэмп к бою 8 нед»/ }));
     go('1 Параметры');
     expect(document.body.textContent).toContain('Продвинутый');
+  });
+});
+
+describe('Combat bugfixes', () => {
+  it('смена дней сбрасывает вручную выбранный сплит', () => {
+    const { container } = render(<CombatConstructor />);
+    go('4 Сплит');
+    fireEvent.click(screen.getByRole('button', { name: /4×\/нед — Верх\/Низ ×2/ }));
+    expect(screen.getByRole('button', { name: /Собрать PRO-план.*combat_4/ }).textContent).toContain('combat_4');
+    go('1 Параметры');
+    const daysInput = Array.from(container.querySelectorAll('input[type="range"]')).find(
+      (i) => i.getAttribute('max') === '4' && i.getAttribute('min') === '2',
+    ) as HTMLInputElement;
+    expect(daysInput).toBeTruthy();
+    fireEvent.change(daysInput, { target: { value: '2' } });
+    expect(document.body.textContent).toContain('Сплит сброшен');
+    go('4 Сплит');
+    expect(screen.getByRole('button', { name: /Собрать PRO-план/ }).textContent).not.toContain('combat_4');
+  });
+
+  it('весогонка в 0 сбрасывает моды воды/натрия/углей', () => {
+    const { container } = render(<CombatConstructor />);
+    go('3 Вне зала');
+    openSec(/Весогонка/);
+    const cutInput = Array.from(container.querySelectorAll('input[type="range"]')).find(
+      (i) => i.getAttribute('max') === '8',
+    ) as HTMLInputElement;
+    expect(cutInput).toBeTruthy();
+    fireEvent.change(cutInput, { target: { value: '6' } });
+    expect(screen.getByRole('button', { name: 'Вода' }).textContent).toContain('Load 8л');
+    fireEvent.change(cutInput, { target: { value: '0' } });
+    expect(screen.queryByRole('button', { name: 'Вода' })).toBeNull();
+    fireEvent.change(cutInput, { target: { value: '2' } });
+    expect(screen.getByRole('button', { name: 'Вода' }).textContent).toContain('Стабильно');
+    expect(screen.getByRole('button', { name: 'Натрий' }).textContent).toContain('Стабильно');
+    expect(screen.getByRole('button', { name: 'Углеводы' }).textContent).toContain('Стабильно');
   });
 });

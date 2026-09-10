@@ -111,6 +111,11 @@ const CB_EX_META: Record<string, { name: string; group: string; pattern: string 
 export function cbExerciseName(id: string): string {
   return CB_EX_META[id]?.name || id;
 }
+/** Мета замены: движковая (имя/группа/паттерн) или фолбэк текущей — никогда 'core'/'unknown'. */
+export function resolveCombatSwapMeta(newId: string, fallback: { name: string; group: string; pattern: string }): { name: string; group: string; pattern: string } {
+  const m = CB_EX_META[newId];
+  return m ? { name: m.name, group: m.group, pattern: m.pattern } : fallback;
+}
 /** RU-подписи ids для rationale/отчёта (видны пользователю в плане). */
 const CB_RU_DISC: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
 const CB_RU_GOAL: Record<string, string> = { power: 'взрывная сила', endurance: 'выносливость', maintenance: 'поддержание', camp: 'кэмп к бою', weight_cut: 'весогонка' };
