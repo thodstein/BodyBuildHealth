@@ -501,6 +501,9 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   //    Исправление: только Румынская/мёртвая на прямых ногах = hamstrings (см. ниже).
   // Плечи: махи, подъёмы перед собой / в стороны
   if (l.includes('махи') || l.includes('перед собой') || l.includes('в стороны') || l.includes('в сторону')) return 'shoulders';
+  // Ф1.1: разведения в наклоне = задняя дельта (trueMuscleOf определяет
+  // shoulders; convert раньше давал 'core' → ложные attribution ×270+).
+  if (/развед|развод/.test(l) && /наклон|задн|обратн/.test(l)) return 'shoulders';
   // Жимы на плечи
   if (l.includes('жим') && (l.includes('standing') || l.includes('сидя') || l.includes('армей') || l.includes('швунг') || l.includes('ohp') || l.includes('overhead'))) return 'shoulders';
   // Грудь: жимы + разведения (close-grip уже отловлен выше → triceps)
