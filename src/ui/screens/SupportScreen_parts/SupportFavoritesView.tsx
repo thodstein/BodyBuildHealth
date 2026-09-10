@@ -88,7 +88,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 if (idx >= 0) f.splice(idx, 1);
                 writeSupportJSON('he_support_favorites', f);
                 setFavRefresh((prev:number) => prev + 1);
-              }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
+              }} style={{ padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
             </div>
           ))
         )}
@@ -109,9 +109,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                         queueMixToSupportPlan(rec);
                         setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('calculator');
                       }}
-                        style={{ fontSize: 9, color: '#00e68a', background: 'none', border: '1px solid rgba(0,230,138,0.3)', borderRadius: 6, cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>🧮 В калькулятор</button>
+                        style={{ fontSize: 12, minHeight: 44, color: '#00e68a', background: 'none', border: '1px solid rgba(0,230,138,0.3)', borderRadius: 12, cursor: 'pointer', padding: '10px 12px', whiteSpace: 'nowrap' }}>🧮 В калькулятор</button>
                       <button onClick={() => { deleteFavRecommendation(rec.id); setFavRefresh((prev: number) => prev + 1); }}
-                        style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>✕ Убрать</button>
+                        style={{ fontSize: 12, minHeight: 44, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: '10px 8px' }}>✕ Убрать</button>
                     </div>
                   </div>
                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -166,7 +166,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     const arr: any[] = readSupportArr('he_my_substances');
                     writeSupportJSON('he_my_substances', arr.filter((x:any) => x.id !== sub.id));
                     setFavRefresh((prev:number) => prev + 1);
-                  }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>✕ Убрать</button>
+                  }} style={{ padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>✕ Убрать</button>
                 </div>
               ))}
             </div>
@@ -206,7 +206,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       const arr: any[] = readSupportArr('he_my_stacks');
                       writeSupportJSON('he_my_stacks', arr.filter((x:any) => x.id !== st.id));
                       setFavRefresh((prev:number) => prev + 1);
-                    }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', whiteSpace:'nowrap', flexShrink:0 }}>✕ Удалить</button>
+                    }} style={{ padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>✕ Удалить</button>
                   </div>
                   {st.description && <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>{st.description.slice(0, 120)}{st.description.length > 120 ? '...' : ''}</div>}
                   {st.subs && st.subs.length > 0 && (
@@ -223,7 +223,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     if (fresh.length === 0) { showToast('Все препараты стека уже в плане'); return; }
                     setEnhancedSubs([...(enhancedSubs || []), ...fresh]);
                     showToast(`✅ ${fresh.length} препаратов добавлено в план`);
-                  }} style={{ marginTop:4, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:600 }}>📋 В план</button>
+                  }} style={{ marginTop:4, padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:700 }}>📋 В план</button>
                 </div>
               ))}
             </div>
@@ -273,21 +273,21 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                     {jointMode && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🦴 Суставы</span>}
                     {boostEnabled && <span style={{ fontSize:9, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#fca5a5' }}>🔥 Усиление</span>}
-                    <button onClick={() => setShowModal('intel')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>⚙️ Уровень и режимы</button>
-                    <button onClick={() => setShowModal('weekSelect')} style={{ padding:'6px 12px', borderRadius:20, fontSize:10, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>📅 Неделя {courseWeekState ?? '—'}</button>
+                     <button onClick={() => setShowModal('intel')} style={{ padding:'10px 14px', borderRadius:20, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>⚙️ Уровень и режимы</button>
+                     <button onClick={() => setShowModal('weekSelect')} style={{ padding:'10px 14px', borderRadius:20, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text-light)', fontWeight:700, whiteSpace:'nowrap' }}>📅 Неделя {courseWeekState ?? '—'}</button>
                   </div>
                 </div>
 
                 {/* Action buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
-                  <button onClick={() => setStackPickerOpen(o => !o)} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
+                   <button data-sup-io="from-stacks" onClick={() => setStackPickerOpen(o => !o)} style={{ flex:'1 1 140px', padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:48, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:700 }}>📦 Из моих стеков</button>
                   <button onClick={() => {
                     const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.mg, timing: info.timing }; });
                     const existing: any[] = readSupportArr('supportCart');
                     writeSupportJSON('supportCart', [...existing, ...items]);
                     setCartItems([...cartItems, ...items]);
                     showToast('✅ Добавлено в корзину');
-                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
+                  }} style={{ flex:'1 1 140px', padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:48, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:700 }}>🛒 В корзину</button>
                 </div>
 
                 {/* Инлайн-пикер стеков: добавление идёт через setEnhancedSubs в живой план */}
@@ -310,7 +310,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                               setEnhancedSubs([...(enhancedSubs || []), ...fresh]);
                               showToast(`✅ В план добавлено: ${fresh.length}`);
                               setStackPickerOpen(false);
-                            }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor: fresh.length === 0 ? 'default' : 'pointer', background: fresh.length === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.3)', color: fresh.length === 0 ? 'var(--text-dim)' : '#00e68a', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, opacity: fresh.length === 0 ? 0.5 : 1 }}>
+                            }} style={{ padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:48, cursor: fresh.length === 0 ? 'default' : 'pointer', background: fresh.length === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.3)', color: fresh.length === 0 ? 'var(--text-dim)' : '#00e68a', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, opacity: fresh.length === 0 ? 0.5 : 1 }}>
                               {fresh.length === 0 ? '✓ Всё в плане' : `＋ Добавить (${fresh.length})`}
                             </button>
                           </div>
@@ -364,7 +364,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     existing.push({ id:Date.now(), date:new Date().toISOString(), plan });
                     writeSupportJSON('he_saved_support_plans', existing);
                     setPlanSaved(true);
-                  }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить план</button>
+                  }} style={{ flex:1, padding:'12px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13, minHeight:52 }}>💾 Сохранить план</button>
                 </div>
                 {planSubTab === 'active' && setPlanSaved && s.planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
 
@@ -391,12 +391,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                                 calcSupport(lvl, pSubs);
                                 setPlanSaved(`✅ Загружен: ${p.levelLabel || lvl}`);
                                 setTimeout(() => setPlanSaved(''), 3000);
-                              }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
+                              }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                               <button onClick={() => {
                                 const saved: any[] = readSupportArr('he_saved_support_plans');
                                 writeSupportJSON('he_saved_support_plans', saved.filter((x:any) => x.id !== sp.id));
                                 setFavRefresh((prev:number) => prev + 1);
-                              }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                              }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                             </div>
                           </div>
                         );
@@ -461,7 +461,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                             const key = [...archivedPlans].reverse()[idx];
                             const realIdx = archivedPlans.indexOf(key);
                             if (realIdx >= 0) { archive.splice(realIdx, 1); writeSupportJSON('supportPlanArchive', archive); setArchivedPlans(archive); }
-                          }} style={{ marginTop:6, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑 Удалить из архива</button>
+                          }} style={{ marginTop:6, padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:48, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:700 }}>🗑 Удалить из архива</button>
                         </div>
                       )}
                     </div>
@@ -503,12 +503,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                               if (p.enhancedSubs) setEnhancedSubs(p.enhancedSubs);
                               setPlanSaved('✅ План загружен в калькулятор');
                               setTimeout(() => setPlanSaved(''), 3000);
-                            }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
+                            }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                               <button onClick={() => {
                                 const arr: any[] = readSupportArr('he_my_plans');
                                 writeSupportJSON('he_my_plans', arr.filter((x: any) => x.id !== p.id));
                                 setMyPlansRefresh((prev:number) => prev + 1);
-                              }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                              }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                           </div>
                         </div>
                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>
@@ -557,12 +557,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           if (r.enhancedSubs) setEnhancedSubs(r.enhancedSubs);
                           setPlanSaved('✅ Расчёт загружен из избранного');
                           setTimeout(() => setPlanSaved(''), 3000);
-                        }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
+                        }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
                           const arr: any[] = readSupportArr('he_saved_calc_results');
                           writeSupportJSON('he_saved_calc_results', arr.filter((x: any) => x.id !== r.id));
                           setFavRefresh((prev:number) => prev + 1);
-                        }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                        }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                       </div>
                     </div>
                     {r.calcResult && (
@@ -612,12 +612,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           setPlanSaved('✅ Комплект загружен, переключите тайминги');
                           setTimeout(() => setPlanSaved(''), 3000);
                           setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc');
-                        }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
+                        }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
                           const arr: any[] = readSupportArr('he_saved_calc_results');
                           writeSupportJSON('he_saved_calc_results', arr.filter((x: any) => x.id !== kit.id));
                           setFavRefresh((p:number) => p + 1);
-                        }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                        }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                       </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:7, color:'var(--text-dim)' }}>
@@ -706,7 +706,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       const arch: any[] = readSupportArr('he_support_reports_archive');
                       const realIdx = arch.findIndex((x: any) => x.id === r.id);
                       if (realIdx >= 0) { arch.splice(realIdx, 1); writeSupportJSON('he_support_reports_archive', arch); setFavRefresh((prev:number) => prev + 1); }
-                    }} style={{ padding:'3px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                    }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                   </div>
                 ))}
               </div>

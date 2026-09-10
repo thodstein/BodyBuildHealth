@@ -4175,8 +4175,8 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
   }, [rec, state]);
 
   const btn = (label: string, onClick: () => void, flash: boolean, col: string, icon: string) => (
-    <button onClick={onClick} style={{
-      flex:1, padding:'6px 5px', borderRadius:8, fontSize:8, fontWeight:700, cursor:'pointer',
+    <button data-sup-io="calc-action" onClick={onClick} style={{
+      flex:'1 1 0', padding:'10px 6px', borderRadius:12, fontSize:11, fontWeight:800, cursor:'pointer', minHeight:48,
       background: flash ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.04)',
       border: flash ? '1px solid rgba(0,230,138,0.4)' : `1px solid ${col}`, color: flash ? '#00e68a' : col, minWidth:0,
     }}>
@@ -4185,7 +4185,7 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
   );
 
   return (
-    <div style={{ display:'flex', gap:3, marginTop:6 }}>
+    <div className="sup-io-row" style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
       {btn('Сохранить', saveToFavorites, savedFlash, 'rgba(99,102,241,0.4)', '💾')}
       {btn('Копировать', copyPlan, copiedFlash, 'rgba(96,165,250,0.4)', '📋')}
       {btn('Врачу', copyDoctor, doctorFlash, 'rgba(168,85,247,0.4)', '📄')}

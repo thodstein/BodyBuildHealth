@@ -21,7 +21,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
         <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
         <div style={{ display:'flex', gap:6 }}>
           <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
-            style={{ flex:1, minWidth:0, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
+            style={{ flex:'1 1 160px', minWidth:0, padding:'10px 12px', borderRadius:12, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:13, minHeight:48, boxSizing:'border-box' }} />
           <button onClick={() => {
             if (!stackName.trim()) { showToast('Введите название'); return; }
             // Сохраняем живой план из движка: SUPPORT_LEVELS — пустая заготовка,
@@ -35,7 +35,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
             try { writeSupportStacks(updated); } catch {}
             setStackName('');
             showToast('✅ Стек сохранён');
-          }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
+          }} style={{ padding:'10px 16px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12, minHeight:48, flexShrink:0 }}>Сохранить</button>
         </div>
       </div>
       {savedStacks.length === 0 ? (
@@ -79,7 +79,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
                   <div style={{ display:'flex', gap:4 }}>
                     <button onClick={() => {
                        setSavedStacks((prev: any[]) => prev.filter((s: any) => s.id !== stack.id));
-                    }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600 }}>✕ Удалить</button>
+                    }} style={{ padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:700 }}>✕ Удалить</button>
                   </div>
                 </div>
               )}

@@ -36,8 +36,8 @@ const glassCard: React.CSSProperties = {
 };
 
 const pillBtn = (active: boolean, accent?: string): React.CSSProperties => ({
-  padding: '5px 10px', borderRadius: 16, fontSize: 9, fontWeight: 700,
-  whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+  padding: '8px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700,
+  minHeight: 40, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
   background: active ? (accent || 'var(--accent)') : 'var(--bg-secondary)',
   color: active ? '#000' : 'var(--text-dim)',
   border: `1px solid ${active ? (accent || 'var(--accent)') : 'var(--border)'}`,
@@ -258,7 +258,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
 
     return (
       <div className="sup-solver" style={{ padding: '0 0 80px' }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <button onClick={() => setSelectedSymptom(null)} style={{
             ...pillBtn(false), fontSize: 11, background: 'transparent',
             color: 'var(--accent)', border: '1px solid var(--accent)',

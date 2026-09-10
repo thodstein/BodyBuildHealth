@@ -1551,6 +1551,66 @@ html.app-native .train-sup.sup-apk .sup-weekplan [style*='font-size: 5'] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+ * §26. SUP-IO APK — импорт/сохранение/экспорт/копия как PRO-кнопки.
+ * Зеркало support-design §33: стекло IO-рядов, glow первичных CTA,
+ * press 0.97, focus-visible лайм, tabular-цифры в рядах, 380px-компакт,
+ * reduced-motion. Только native (каждый селектор — с html.app-native,
+ * без hex — чекер цел). TG/web — байт-в-байт.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 26.1. IO-РЯДЫ — стекло + перенос ─────────────────────────── */
+html.app-native .train-sup.sup-apk .sup-io-row {
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+/* ─── 26.2. ПЕРВИЧНЫЕ CTA — glow ───────────────────────────────── */
+html.app-native .train-sup.sup-apk button[data-sup-io='export-json'],
+html.app-native .train-sup.sup-apk button[data-sup-io='diary-save'],
+html.app-native .train-sup.sup-apk button[data-sup-io='stack-save'],
+html.app-native .train-sup.sup-apk button[data-sup-io='calc-action'] {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── 26.3. PRESS 0.97 + FOCUS ЛАЙМ ────────────────────────────── */
+html.app-native .train-sup.sup-apk button[data-sup-io]:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-sup.sup-apk button[data-sup-io]:focus-visible,
+html.app-native .train-sup.sup-apk label[data-sup-io]:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── 26.4. МЕЛКИЕ КНОПКИ 44px — СТЕКЛО ────────────────────────── */
+html.app-native .train-sup.sup-apk [data-sup] button[style*='padding: 3px 6px'],
+html.app-native .train-sup.sup-apk [data-sup] button[style*='padding: 2px 8px'],
+html.app-native .train-sup.sup-apk [data-sup] button[style*='padding: 4px 8px'],
+html.app-native .train-sup.sup-apk [data-sup] button[style*='padding: 4px 10px'] {
+  backdrop-filter: blur(12px) saturate(150%) !important;
+}
+
+/* ─── 26.5. КОМПАКТ 380px: IO-ряды в столбик ───────────────────── */
+@media (max-width: 380px) {
+  html.app-native .train-sup.sup-apk .sup-io-row > button,
+  html.app-native .train-sup.sup-apk .sup-io-row > label {
+    flex: 1 1 100% !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-io-row > button[data-sup-io='calc-action'] {
+    flex: 1 1 calc(50% - 4px) !important;
+  }
+}
+
+/* ─── 26.6. REDUCED MOTION ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-sup.sup-apk button[data-sup-io]:active {
+    transform: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
  * §25. APK MOBILE-FIT: «Общая информация» + «Протоколы» в экран.
  * Зеркало support-design §32 для нативного WebView: меню протоколов
  * и инфо-сетки в 1 колонку ≤480px, строки доза+тайминг с переносом,

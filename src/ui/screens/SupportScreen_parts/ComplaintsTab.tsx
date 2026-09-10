@@ -44,16 +44,16 @@ const GLASS_CARD: React.CSSProperties = {
 };
 
 const PILL_BTN: React.CSSProperties = {
-  padding: '6px 14px',
-  borderRadius: 10,
+  padding: '10px 14px',
+  borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.1)',
   background: 'rgba(255,255,255,0.06)',
   color: '#e2e8f0',
   cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: 700,
   fontFamily: 'inherit',
-  minHeight: 36,
+  minHeight: 44,
 };
 
 // ─── Категории ───

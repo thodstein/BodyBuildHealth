@@ -60,6 +60,7 @@ export const SupportTimingPlanner: React.FC = () => {
     }
   });
   const [timingSearch, setTimingSearch] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const catalog = useMemo(() => buildCatalog(), []);
 
@@ -199,7 +200,7 @@ export const SupportTimingPlanner: React.FC = () => {
         <div style={{ ...S.card }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>Расписание приёма</div>
-            <button onClick={() => {
+            <button data-sup-io="copy-plan" onClick={() => {
               let text = 'РАСПИСАНИЕ ПРИЁМА БАД\n\n';
               TIMING_SLOTS.forEach(ts => {
                 const items = assignedSlots[ts.key];
@@ -208,8 +209,13 @@ export const SupportTimingPlanner: React.FC = () => {
                 items.forEach(item => { text += '  \u2022 ' + item.entry.nameRu + ' \u2014 ' + item.reason + '\n'; });
                 text += '\n';
               });
-              navigator.clipboard.writeText(text).then(() => { alert('Расписание скопировано в буфер обмена'); });
-            }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 8, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}> Копировать план</button>
+              const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
+              try {
+                const p = navigator.clipboard.writeText(text);
+                if (p && typeof (p as Promise<void>).then === 'function') (p as Promise<void>).then(done, done);
+                else done();
+              } catch { done(); }
+            }} style={{ padding: '10px 12px', borderRadius: 12, fontSize: 12, minHeight: 44, fontWeight: 700, cursor: 'pointer', border: copied ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(0,230,138,0.3)', background: copied ? 'rgba(0,230,138,0.18)' : 'rgba(0,230,138,0.08)', color: '#00e68a', flexShrink: 0 }}>{copied ? '✓ Скопировано' : 'Копировать план'}</button>
           </div>
           {TIMING_SLOTS.map(ts => {
             const items = assignedSlots[ts.key];

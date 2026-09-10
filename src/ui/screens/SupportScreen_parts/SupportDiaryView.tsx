@@ -13,6 +13,30 @@ function escapeHtml(s: string): string {
           .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+// ── Скачивание/шаринг файла: в АПК WebView anchor-download молча не
+// работает — там делимся через системный шит, везде иначе качаем как раньше.
+async function shareOrDownload(blob: Blob, filename: string): Promise<boolean> {
+  try {
+    const nav = navigator as Navigator & { canShare?: (d?: { files?: File[] }) => boolean; share?: (d: { files: File[]; title?: string }) => Promise<void> };
+    const file = new File([blob], filename, { type: blob.type });
+    if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+      await nav.share({ files: [file], title: filename });
+      return true;
+    }
+  } catch { /* ниже обычный даунлоад */ }
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return true;
+  } catch { return false; }
+}
+
 // ── Локальная дата (timezone-safe) ──
 function todayLocalStr(): string {
   const d = new Date();
@@ -283,9 +307,9 @@ const sx = {
     color: '#fff', fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit',
   } as React.CSSProperties,
   accentBtn: {
-    padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+    padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
     background: 'linear-gradient(135deg, #00e68a, #00c771)', color: '#000',
-    fontWeight: 700, fontSize: 12, fontFamily: 'inherit', width: '100%', minHeight: 40,
+    fontWeight: 700, fontSize: 13, fontFamily: 'inherit', width: '100%', minHeight: 48,
   } as React.CSSProperties,
 };
 
@@ -1380,22 +1404,17 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                  padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
                }}>Сброс</button>
              </div>
-             {/* Экспорт */}
-             <div style={{ display: 'flex', gap: 6 }}>
-               <button onClick={() => {
-                 const data = JSON.stringify(entries, null, 2);
-                 const blob = new Blob([data], { type: 'application/json' });
-                 const url = URL.createObjectURL(blob);
-                 const a = document.createElement('a');
-                 a.href = url;
-                 a.download = `support-diary-${new Date().toISOString().slice(0,10)}.json`;
-                 a.click();
-                 URL.revokeObjectURL(url);
-               }} style={{
-                 flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)',
-                 background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 600, fontSize: 10,
-                 cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
-               }}>📥 JSON</button>
+              {/* Экспорт */}
+              <div className="sup-io-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button data-sup-io="export-json" onClick={() => {
+                  const data = JSON.stringify(entries, null, 2);
+                  const blob = new Blob([data], { type: 'application/json' });
+                  void shareOrDownload(blob, `support-diary-${new Date().toISOString().slice(0,10)}.json`);
+                }} style={{
+                  flex: '1 1 100px', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(59,130,246,0.2)',
+                  background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 700, fontSize: 12,
+                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 48,
+                }}>📥 JSON</button>
                 <button onClick={() => {
                   const header = ['Date,Substance,Taken,Dose,TimeSlot,SideEffects,Mood,Notes'];
                   const rows: string[] = [];
@@ -1406,21 +1425,16 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                   });
                   // BOM — иначе Excel открывает кириллицу кракозябрами
                   const blob = new Blob(['\uFEFF' + header.concat(rows).join('\n')], { type: 'text/csv' });
-                 const url = URL.createObjectURL(blob);
-                 const a = document.createElement('a');
-                 a.href = url;
-                 a.download = `support-diary-${new Date().toISOString().slice(0,10)}.csv`;
-                 a.click();
-                 URL.revokeObjectURL(url);
-               }} style={{
-                 flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)',
-                 background: 'rgba(34,197,94,0.06)', color: '#22c55e', fontWeight: 600, fontSize: 10,
-                 cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+                  void shareOrDownload(blob, `support-diary-${new Date().toISOString().slice(0,10)}.csv`);
+                }} style={{
+                  flex: '1 1 100px', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(34,197,94,0.2)',
+                  background: 'rgba(34,197,94,0.06)', color: '#22c55e', fontWeight: 700, fontSize: 12,
+                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 48,
                 }}>📥 CSV</button>
-                <label style={{
-                  flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(168,85,247,0.2)',
-                  background: 'rgba(168,85,247,0.06)', color: '#a855f7', fontWeight: 600, fontSize: 10,
-                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 32, textAlign: 'center', display: 'block',
+                <label data-sup-io="import-json" style={{
+                  flex: '1 1 100px', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)',
+                  background: 'rgba(168,85,247,0.06)', color: '#a855f7', fontWeight: 700, fontSize: 12,
+                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 48, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   📤 Импорт JSON
                   <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
@@ -1731,8 +1745,8 @@ function PastDayEditor({ entry, dateStr, getName, onSave, onCancel }: {
       <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Заметки…"
         style={{ width: '100%', minHeight: 44, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.15)', color: '#fff', fontSize: 10, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 8 }} />
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => onSave(notes, mood, subs)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#00e68a', color: '#000', fontWeight: 700, fontSize: 11, fontFamily: 'inherit' }}>💾 Сохранить</button>
-        <button onClick={onCancel} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Отмена</button>
+        <button data-sup-io="diary-save" onClick={() => onSave(notes, mood, subs)} style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer', background: '#00e68a', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 52, fontFamily: 'inherit' }}>💾 Сохранить</button>
+        <button onClick={onCancel} style={{ padding: '12px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', fontSize: 12, minHeight: 52 }}>Отмена</button>
       </div>
     </div>
   );

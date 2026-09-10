@@ -1655,6 +1655,76 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * §33. SUP-IO — кнопки импорта/сохранения/экспорта/копии под АПК.
+ * Все IO-кнопки блока БАД: дневник (JSON/CSV/импорт/заметки), избранное
+ * (план/корзина/архив/иконки), стеки, тайминг-копия, солвер/жалобы,
+ * действия калькулятора, липкий бейдж стека. Норма: первичные 52px,
+ * вторичные 48px, иконки 44px, шрифт 11-13px, ряды с переносом.
+ * Только подача (kebab-селекторы, без hex). Логика/строки целы.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 33.1. IO-РЯДЫ — перенос, не вширь ─────────────────────────── */
+.support-screen.support-root .sup-io-row {
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+.support-screen.support-root .sup-io-row > * {
+  min-width: 0 !important;
+}
+
+/* ─── 33.2. ОСТАТКИ МЕЛКИХ КНОПОК → ТАП 44px ──────────────────────
+ * Добивка §24.4 (там 1px/2px/3px-8px): здесь 3px-6px, 2px-8px/6px,
+ * 4px-8px/10px — иконки архивов/отчётов и старые ряды. Иконки — 44px. */
+.support-screen.support-root [data-sup] button[style*='padding: 3px 6px'],
+.support-screen.support-root [data-sup] button[style*='padding:3px 6px'],
+.support-screen.support-root [data-sup] button[style*='padding: 2px 8px'],
+.support-screen.support-root [data-sup] button[style*='padding:2px 8px'],
+.support-screen.support-root [data-sup] button[style*='padding: 2px 6px'],
+.support-screen.support-root [data-sup] button[style*='padding:2px 6px'],
+.support-screen.support-root [data-sup] button[style*='padding: 4px 8px'],
+.support-screen.support-root [data-sup] button[style*='padding:4px 8px'],
+.support-screen.support-root [data-sup] button[style*='padding: 4px 10px'],
+.support-screen.support-root [data-sup] button[style*='padding:4px 10px'] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+
+/* ─── 33.3. IO-КНОПКИ — отклик и фокус ──────────────────────────── */
+.support-screen.support-root button[data-sup-io] {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+  .support-screen.support-root button[data-sup-io]:hover {
+    filter: brightness(1.08);
+  }
+}
+.support-screen.support-root button[data-sup-io]:active {
+  transform: scale(0.97);
+}
+.support-screen.support-root button[data-sup-io]:focus-visible,
+.support-screen.support-root label[data-sup-io]:focus-visible {
+  outline: 2px solid rgba(0, 230, 138, 0.7) !important;
+  outline-offset: 2px !important;
+}
+.support-screen.support-root label[data-sup-io] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── 33.4. ТЕЛЕФОН ≤480px: IO-ряды в столбик ───────────────────── */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-io-row > button,
+  .support-screen.support-root .sup-io-row > label {
+    flex: 1 1 100% !important;
+  }
+  .support-screen.support-root .sup-io-row > button[data-sup-io='calc-action'] {
+    flex: 1 1 calc(50% - 4px) !important;
+  }
+}
+
 /* ─── 27.4. ДНЕВНИК — gauge + табы + ряды ──────────────────── */
 .support-screen.support-root .sup-diary > div[style*='border-radius: 14'] {
   background: linear-gradient(180deg, rgba(22,30,52,0.76), rgba(14,20,38,0.76)) !important;
