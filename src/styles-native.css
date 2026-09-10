@@ -13281,3 +13281,91 @@ html.app-native .combat-constructor .cb-plan-move:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 77. CARDIO TOP — топ-подача кардио-конструктора ─────────
+ * Только APK. TSX уже несёт PRO-инлайны (44/48px, стекло, tabular);
+ * здесь — press/focus, snap ленты пилюль, табличные цифры, 380px,
+ * reduced-motion. TG/web — инлайны едины, слой только усиливает. */
+html.app-native .ck-wiznav {
+  scroll-snap-type: x proximity !important;
+}
+html.app-native .ck-step-pill {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .ck-step-pill:active {
+  transform: scale(0.95) !important;
+}
+html.app-native .ck-hero {
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+html.app-native .cardio-constructor .kit-tabs {
+  scroll-snap-type: x proximity !important;
+}
+html.app-native .cardio-constructor .kit-tab {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+}
+html.app-native .cardio-constructor .kit-tab:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .cardio-constructor .ck-chip,
+html.app-native .cardio-constructor .kit-chip,
+html.app-native .cardio-constructor .kit-chiptoggle,
+html.app-native .cardio-constructor .ck-stepbtn {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+html.app-native .cardio-constructor .ck-chip:active,
+html.app-native .cardio-constructor .kit-chip:active,
+html.app-native .cardio-constructor .kit-chiptoggle:active,
+html.app-native .cardio-constructor .ck-stepbtn:active,
+html.app-native .cardio-constructor .kit-segmented-opt:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .cardio-constructor button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .cardio-constructor input:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 1px !important;
+}
+html.app-native .cardio-constructor input {
+  font-size: 16px !important;
+}
+html.app-native .cardio-constructor .ck-tile,
+html.app-native .cardio-constructor .kit-stat {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .cardio-constructor .ck-acc-head {
+  min-height: 52px !important;
+}
+html.app-native .ck-libcard {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .cardio-constructor .ck-hero {
+    padding: 12px !important;
+  }
+  html.app-native .cardio-constructor .kit-stat {
+    flex-basis: 46% !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .cardio-constructor .ck-step-pill:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .cardio-constructor .kit-tab:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .cardio-constructor .kit-chip:active {
+    transform: none !important;
+  }
+}

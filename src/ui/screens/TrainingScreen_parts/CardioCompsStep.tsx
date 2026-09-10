@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
-import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_PRIMARY, BTN_DANGER, NumberInput, InfoBanner, Badge } from './CardioUI';
+import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
 
 export interface CompDraft { name: string; week: string; date?: string }
 
@@ -50,16 +50,12 @@ export const CardioCompsStep: React.FC<{
           <span style={HINT_SM}>— настраивается на шаге «Параметры» (Структура фаз).</span>
         </div>
         {comps.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '18px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: 28 }}>🏁</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Стартов пока нет</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 360 }}>Добавьте хотя бы один старт — цикл построит taper и пик-неделю. Без стартов последняя неделя будет переходной.</div>
-          </div>
+          <EmptyState icon="🏁" title="Стартов пока нет" desc="Добавьте хотя бы один старт — цикл построит taper и пик-неделю. Без стартов последняя неделя будет переходной." />
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {comps.map((c, idx) => (
-                <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', opacity: dragIdx === idx ? 0.6 : 1, minHeight: 44 }}>
+                <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.40)' : '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid #ef4444', borderRadius: 12, padding: '9px 11px', opacity: dragIdx === idx ? 0.6 : 1, minHeight: 48, fontVariantNumeric: 'tabular-nums', boxShadow: '0 2px 10px rgba(0,0,0,0.16)' }}>
                   <span style={{ cursor: 'grab', color: '#fff', fontSize: 14, userSelect: 'none', padding: '4px 6px', minWidth: 24, textAlign: 'center' }} aria-hidden>⋮⋮</span>
                   <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
                   <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
@@ -93,7 +89,8 @@ export const CardioCompsStep: React.FC<{
             value={draft.name}
             onChange={e => setDraft({ ...draft, name: e.target.value })}
             placeholder="Название (например, Шоу)"
-            style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 13 }}
+            aria-label="Название старта"
+            style={{ flex: 1, minWidth: 150, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.20)' }}
           />
           <input
             type="date"
@@ -108,7 +105,7 @@ export const CardioCompsStep: React.FC<{
                 setDraft({ ...draft, date: v, week: String(Math.min(Math.max(1, w), totalWeeks)) });
               } else setDraft({ ...draft, date: '' });
             }}
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '9px 10px', color: '#fff', fontSize: 13 }}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 12px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }}
             aria-label="Дата старта"
           />
           <NumberInput
@@ -122,7 +119,7 @@ export const CardioCompsStep: React.FC<{
             width={70}
             suffix="нед"
           />
-          <button style={BTN_PRIMARY} onClick={add}>+ Добавить старт</button>
+          <button style={{ ...BTN_CTA, flex: '1 1 160px' }} onClick={add}>+ Добавить старт</button>
         </div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную.</div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}

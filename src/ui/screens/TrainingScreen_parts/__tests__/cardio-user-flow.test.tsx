@@ -52,6 +52,8 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('параметры из профиля: возраст/вес/пол/ЧСС покоя заполнены автоматически', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    // шаг 2 Атлет в ББ-оболочке
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByRole('button', { name: /Пол: женский/ })).toBeTruthy();
     expect(screen.getByLabelText('Вес')).toHaveValue('70');
     expect(screen.getByLabelText('Возраст')).toHaveValue('35');
@@ -60,6 +62,8 @@ describe('CardioConstructor — сценарий пользователя', () =
 
   it('сборка цикла показывает расписание недель с фазами сразу', () => {
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
@@ -75,6 +79,7 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('«📋 Из профиля» восстанавливает параметры после ручного изменения', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     const age = screen.getByLabelText('Возраст');
     fireEvent.change(age, { target: { value: '99' } });
     fireEvent.click(screen.getByRole('button', { name: /Из профиля/ }));
@@ -86,24 +91,26 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('профиль с другим полом/весом: пол-сегмент и вес соответствуют', () => {
     seedProfile({ 'settings.personal.sex': 'male', 'settings.personal.weight': 88, 'settings.personal.age': 41 });
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByRole('button', { name: /Пол: мужской/ })).toBeTruthy();
     expect(screen.getByLabelText('Вес')).toHaveValue('88');
     expect(screen.getByLabelText('Возраст')).toHaveValue('41');
   });
 
-  it('графа пользователя: карточка с параметрами и кнопками синхронизации', () => {
+  it('шаг «Атлет»: карточка с параметрами и кнопками синхронизации', () => {
     seedProfile({ 'settings.personal.sex': 'female', 'settings.personal.weight': 66, 'settings.personal.age': 29, 'settings.lifestyle.restingHR': 58 });
-    const html = renderToStaticMarkup(<CardioConstructor />);
-    expect(html).toContain('Возраст');
-    expect(html).toContain('Вес');
-    expect(html).toContain('ЧСС покоя');
-    expect(html).toContain('Из профиля');
-    expect(html).toContain('В профиль');
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Параметры пользователя/)).toBeTruthy();
+    expect(screen.getByText(/ЧСС покоя/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Из профиля/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /В профиль/ })).toBeTruthy();
   });
 
   it('«💾 В профиль» сохраняет изменённые параметры в he_profile_v2', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.change(screen.getByLabelText('Возраст'), { target: { value: '44' } });
     fireEvent.change(screen.getByLabelText('ЧСС покоя'), { target: { value: '55' } });
     fireEvent.click(screen.getByRole('button', { name: /В профиль/ }));
@@ -117,12 +124,14 @@ describe('CardioConstructor — сценарий пользователя', () =
     seedProfile({});
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.change(screen.getByLabelText('Неделя старта'), { target: { value: '10' } });
     fireEvent.change(screen.getByPlaceholderText('Название (например, Шоу)'), { target: { value: 'Шоу' } });
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /План/ }));
+    fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     expect(screen.getByText(/План по фазам/)).toBeTruthy();
     expect(screen.getByText(/Taper-план перед стартом/)).toBeTruthy();
     expect(screen.getAllByText(/без HIIT/).length).toBeGreaterThan(0);
@@ -131,6 +140,8 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('варианты нагрузки: «Интенсивный» + пересборка увеличивает объём', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
@@ -148,6 +159,8 @@ describe('CardioConstructor — сценарий пользователя', () =
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     const freqBefore = loadCardioCycles()[0].weeks[4].sessions.filter(s => s.type === 'zone2').reduce((s, x) => s + x.weeklyFrequency, 0);
     fireEvent.click(screen.getByRole('button', { name: /Улучшить/ }));
@@ -163,8 +176,10 @@ describe('CardioConstructor — сценарий пользователя', () =
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /План/ }));
+    fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     expect(screen.getByText(/Неделя по дням/)).toBeTruthy();
     for (const d of ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']) expect(screen.getAllByText(d).length).toBeGreaterThan(0);
   });
@@ -172,6 +187,9 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('дни тяжёлых ног: zone2-сессии не ставятся в выбранные дни', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    // дни ног — шаг 3 «Нагрузка» в ББ-оболочке
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
@@ -188,6 +206,8 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('сценарии: сохранение и загрузка через шаг «Управление»', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
@@ -213,6 +233,8 @@ describe('CardioConstructor — сценарий пользователя', () =
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
@@ -229,8 +251,10 @@ describe('CardioConstructor — сценарий пользователя', () =
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /План/ }));
+    fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     const protoBtns = screen.getAllByRole('button').filter(b => b.getAttribute('aria-label')?.startsWith('Протокол'));
     if (protoBtns.length > 0) {
       fireEvent.click(protoBtns[0]);
@@ -243,8 +267,10 @@ describe('CardioConstructor — сценарий пользователя', () =
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /План/ }));
+    fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     fireEvent.click(screen.getByRole('button', { name: /К текущей неделе/ }));
     expect(screen.getAllByText(/из 12/).length).toBeGreaterThan(0);
   });
@@ -252,6 +278,8 @@ describe('CardioConstructor — сценарий пользователя', () =
   it('«🔥 Ккал в буфер» копирует расход', () => {
     seedProfile({});
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
@@ -263,6 +291,8 @@ describe('CardioConstructor — сценарий пользователя', () =
     seedProfile({});
     localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ version: 2, goal: 'health', totalWeeks: 52, daysAvailable: 4, recoveryLow: false, bodyWeight: 80, taperWeeks: 2, peakWeek: true, phaseAuto: true, phaseBase: 0, phaseBuild: 0, phaseMaint: 0, level: 'intermediate', equipment: [], lowImpact: false, age: 30, sex: 'male', restingHr: 0 }));
     render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));

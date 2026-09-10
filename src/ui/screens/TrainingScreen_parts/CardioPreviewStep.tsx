@@ -15,22 +15,22 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, TYPE_COLOR, Badge, ProgressBar, Stepper, Tabs, CARD_HERO, HINT_SM } from './CardioUI';
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, PHASE_COLOR, TYPE_COLOR, Badge, ProgressBar, Stepper, Tabs, CARD_HERO, HINT_SM, EmptyState } from './CardioUI';
 import { CardioCalendar } from './CardioCalendar';
 
 const VARIANT_CARD: React.CSSProperties = {
-  flex: '1 1 160px', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff',
-  transition: 'all 0.18s ease', minHeight: 84,
+  flex: '1 1 168px', padding: '12px 14px', borderRadius: 13, cursor: 'pointer', textAlign: 'left',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', color: '#fff',
+  transition: 'all 0.18s ease', minHeight: 88, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 const VARIANT_ACTIVE: React.CSSProperties = {
-  ...VARIANT_CARD, border: '1px solid rgba(0,230,138,0.5)', background: 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.06))', color: '#fff',
-  boxShadow: '0 0 16px rgba(0,230,138,0.18)',
+  ...VARIANT_CARD, border: '1px solid rgba(0,230,138,0.55)', background: 'linear-gradient(180deg, rgba(0,230,138,0.16), rgba(0,230,138,0.06))', color: '#fff',
+  boxShadow: '0 0 18px rgba(0,230,138,0.22), inset 0 1px 0 rgba(255,255,255,0.07)',
 };
 const DAY_CELL: React.CSSProperties = {
-  flex: '1 1 0', minWidth: 0, borderRadius: 10, padding: '7px 4px', textAlign: 'center',
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11,
-  display: 'flex', flexDirection: 'column', gap: 3, minHeight: 64,
+  flex: '1 1 0', minWidth: 0, borderRadius: 11, padding: '8px 4px', textAlign: 'center',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11,
+  display: 'flex', flexDirection: 'column', gap: 3, minHeight: 68, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Rec' };
@@ -188,10 +188,12 @@ export const CardioPreviewStep: React.FC<{
   if (!cycle || !summary) {
   return (
     <div className="train-cardiopreview" style={CARD}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>
-          Соберите кардио-цикл из параметров и стартов — появится предпросмотр по неделям.
-        </div>
-        <button style={BTN_PRIMARY} onClick={onBuild}>🛠 Собрать и сохранить цикл</button>
+        <EmptyState
+          icon="🛠"
+          title="Соберите кардио-цикл"
+          desc="Задайте цель и горизонт на шагах 1–4 — здесь появится предпросмотр по неделям с фазами, объёмом и ккал."
+          action={<button style={{ ...BTN_CTA, flex: '1 1 200px' }} onClick={onBuild}>🛠 Собрать и сохранить цикл</button>}
+        />
       </div>
     );
   }
@@ -208,25 +210,25 @@ export const CardioPreviewStep: React.FC<{
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Hero сводка — всегда видна */}
-      <div style={CARD_HERO}>
+      <div className="ck-planhero" style={CARD_HERO}>
         <div style={ROW}>
-          <span style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{cycle.name}</span>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{cycle.name}</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
           <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: summary ? '#00e68a' : '#fff', background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.24)', borderRadius: 20, padding: '3px 10px' }}>{cycle.totalWeeks} нед · {summary.avgMinutesPerWeek} мин/нед</span>
+          <span style={{ fontSize: 11.5, fontWeight: 800, color: '#4ade80', background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.30)', borderRadius: 20, padding: '4px 12px', fontVariantNumeric: 'tabular-nums', boxShadow: '0 0 10px rgba(0,230,138,0.14)' }}>{cycle.totalWeeks} нед · {summary.avgMinutesPerWeek} мин/нед</span>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
           {metrics.map(m => (
-            <div key={m.label} style={{ flex: '1 1 86px', padding: '9px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', backdropFilter: 'blur(4px)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 700 }}>{m.label}</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: m.color, lineHeight: 1 }}>{m.value}</div>
+            <div key={m.label} style={{ flex: '1 1 92px', padding: '10px 11px 9px', borderRadius: 13, background: 'linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.09)', borderTop: `2px solid ${m.color}`, backdropFilter: 'blur(4px)', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.50)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 800 }}>{m.label}</div>
+              <div style={{ fontSize: 19, fontWeight: 900, color: m.color, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button style={{ ...BTN_PRIMARY, flex: '1 1 140px' }} onClick={onBuild}>🔄 Пересобрать цикл</button>
-          <button style={{ ...BTN, flex: '1 1 140px' }} onClick={onEditConfig} title="Загрузить параметры цикла">⚙️ Изменить параметры</button>
-          <button style={{ ...BTN, flex: '1 1 120px' }} onClick={copyKcal} aria-label="Скопировать ккал">
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN_CTA, flex: '1 1 150px' }} onClick={onBuild}>🔄 Пересобрать цикл</button>
+          <button style={{ ...BTN, flex: '1 1 150px' }} onClick={onEditConfig} title="Загрузить параметры цикла">⚙️ Изменить параметры</button>
+          <button style={{ ...BTN, flex: '1 1 130px' }} onClick={copyKcal} aria-label="Скопировать ккал">
             {kcalFlash ? '✅ Ккал в буфере' : '🔥 Ккал в буфер'}
           </button>
         </div>

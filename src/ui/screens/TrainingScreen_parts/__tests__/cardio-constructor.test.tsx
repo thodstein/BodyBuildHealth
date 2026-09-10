@@ -62,14 +62,18 @@ function seedPrepPlan(): void {
 }
 
 describe('CardioConstructor — SSR', () => {
-  it('рендерит степпер из 5 шагов и навигацию', () => {
+  it('рендерит степпер из 7 шагов в стиле ББ-авто и навигацию', () => {
     const html = renderToStaticMarkup(<CardioConstructor />);
     expect(html).toContain('Кардио-конструктор');
+    expect(html).toContain('ck-step-pill');
     expect(html).toContain('1 Параметры');
-    expect(html).toContain('2 Старты');
-    expect(html).toContain('3 Предпросмотр');
-    expect(html).toContain('4 Управление');
-    expect(html).toContain('5 Дневник');
+    expect(html).toContain('Атлет');
+    expect(html).toContain('Нагрузка');
+    expect(html).toContain('Старты');
+    expect(html).toContain('План');
+    expect(html).toContain('Библиотека');
+    expect(html).toContain('Дневник');
+    expect(html).toContain('ПАРАМЕТРЫ');
     expect(html).toContain('Назад');
   });
 
@@ -81,9 +85,14 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('Быстрые старты');
     expect(html).toContain('Структура фаз');
     expect(html).toContain('Предпросмотр цикла');
-    expect(html).toContain('Параметры пользователя');
-    expect(html).toContain('Из профиля');
-    expect(html).toContain('ЧСС покоя');
+  });
+
+  it('шаг 2 показывает параметры пользователя после шага Далее', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /^Далее/ }));
+    expect(screen.getByText(/Параметры пользователя/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Из профиля/ })).toBeTruthy();
+    expect(screen.getByText(/ЧСС покоя/)).toBeTruthy();
   });
 
   it('шаг 1: taper вкл по умолчанию + визуальная карта фаз в предпросмотре', () => {
@@ -111,11 +120,22 @@ describe('CardioConstructor — SSR', () => {
 });
 
 describe('CardioConstructor — CSR', () => {
-  it('навигация: Далее → Далее → предпросмотр с CTA сборки', () => {
+  /** Один шаг вперёд по нижней навигации ББ-оболочки. */
+  const next = () => fireEvent.click(screen.getByRole('button', { name: /^Далее/ }));
+  /** params → athlete → load → comps → preview (5 План). */
+  const goPreview = () => { next(); next(); next(); next(); };
+  /** preview → manage (6 Библиотека). */
+  const goManage = () => { goPreview(); };
+  const buildHere = () => fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+
+  it('навигация: 4× Далее → план с CTA сборки', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    next();
+    expect(screen.getByText(/Параметры пользователя/)).toBeTruthy();
+    next();
+    next();
     expect(screen.getByText(/Соревнования и старты/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    next();
     expect(screen.getByText(/Соберите кардио-цикл/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Собрать и сохранить цикл/ })).toBeTruthy();
   });
@@ -124,7 +144,7 @@ describe('CardioConstructor — CSR', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Недель taper увеличить/ }));
     fireEvent.click(screen.getByRole('button', { name: /Пик-неделя старта/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    next(); next(); next();
     expect(screen.getByText(/Соревнования и старты/)).toBeTruthy();
     expect(screen.getByText(/taper 3 нед/)).toBeTruthy();
   });
@@ -133,35 +153,33 @@ describe('CardioConstructor — CSR', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Taper перед стартом/ }));
     expect(screen.getByText(/Taper: выкл/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    next(); next(); next();
     fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
     fireEvent.change(screen.getByLabelText(/Неделя старта/), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    next();
+    buildHere();
     const saved = loadCardioCycles()[0];
     expect(saved.weeks.some(w => w.phase === 'taper')).toBe(false);
   });
 
-  it('сборка на предпросмотре сохраняет цикл в библиотеку и показывает метрики', () => {
+  it('сборка на плане сохраняет цикл в библиотеку и показывает метрики', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    goPreview();
+    buildHere();
     expect(screen.getByText(/Мин\/нед/)).toBeTruthy();
     expect(screen.getByText(/Ккал\/нед/)).toBeTruthy();
     expect(loadCardioCycles().length).toBe(1);
     expect(JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null')).toBeTruthy();
   });
 
-  it('шапка: прогресс-бар мастера (шаг N из 5) + сводка активного цикла в чипах', () => {
+  it('шапка: прогресс-бар мастера (шаг N из 7) + сводка активного цикла в чипах', () => {
     render(<CardioConstructor />);
-    expect(screen.getByText(/Шаг 1 из 5/)).toBeTruthy();
+    expect(screen.getByText(/Шаг 1 из 7/)).toBeTruthy();
     expect(screen.getByRole('progressbar')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    expect(screen.getByText(/Шаг 3 из 5/)).toBeTruthy();
+    goPreview();
+    buildHere();
+    expect(screen.getByText(/Шаг 5 из 7/)).toBeTruthy();
     expect(screen.getAllByText(/мин\/нед/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ккал\/нед/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/12 нед/).length).toBeGreaterThan(0);
@@ -170,36 +188,34 @@ describe('CardioConstructor — CSR', () => {
   it('пресет «Сушка · 16 нед» применяет параметры и виден в предпросмотре', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Пресет: Сушка · 16 нед/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    goPreview();
+    buildHere();
     const saved = loadCardioCycles()[0];
     expect(saved.totalWeeks).toBe(16);
     expect(saved.goal).toBe('cut');
   });
 
-  it('дни ног: выбор чипов → предпросмотр отмечает их в «Неделя по дням»', () => {
+  it('дни ног: выбор чипов на шаге «Нагрузка» → план отмечает их в «Неделя по дням»', () => {
     render(<CardioConstructor />);
-    // v3: дни ног внутри аккордеона — раскрываем если свёрнуто
+    next(); next();
+    // шаг 3 Нагрузка: дни ног внутри секции оборудования
     const equipHeader = screen.queryByRole('button', { name: /Оборудование и ограничения/ });
     if (equipHeader && equipHeader.getAttribute('aria-expanded') === 'false') fireEvent.click(equipHeader);
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    next(); next();
+    buildHere();
     fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     expect(screen.getAllByText(/🦵/).length).toBeGreaterThanOrEqual(2);
     const saved = loadCardioCycles()[0];
     expect(saved.config?.legDays).toEqual([0, 3]);
   });
 
-  it('шаг 4: подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
+  it('шаг 6: подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     fireEvent.click(screen.getByRole('button', { name: /К ПЛ-авто/ }));
     expect(getCardioLink()?.sport).toBe('pl');
     expect(screen.getByText(/Подключено к ПЛ-авто/)).toBeTruthy();
@@ -207,14 +223,13 @@ describe('CardioConstructor — CSR', () => {
     expect(getCardioLink()).toBeNull();
   });
 
-  it('шаг 4: привязка к годовому плану ББ сохраняет cardioCycleId в макроцикл', () => {
+  it('шаг 6: привязка к годовому плану ББ сохраняет cardioCycleId в макроцикл', () => {
     const macro = buildBbMacrocycle({ level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy' });
     localStorage.setItem(BB_MACRO_KEY, serializeBbMacro(macro));
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     fireEvent.click(screen.getByRole('button', { name: /К плану ББ/ }));
     expect(screen.getByText(/Привязано к годовому плану ББ/)).toBeTruthy();
     const restored = deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '');
@@ -223,34 +238,30 @@ describe('CardioConstructor — CSR', () => {
     expect(deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '')?.cardioCycleId).toBeUndefined();
   });
 
-  it('шаг 4: сравнение сценариев показывает дифф', () => {
+  it('шаг 6: сравнение сценариев показывает дифф', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Библиотека/ }));
+    goPreview();
+    buildHere();
+    next();
+    fireEvent.click(screen.getByRole('button', { name: /📚 Библиотека/ }));
     fireEvent.click(screen.getByRole('button', { name: /⇄ Сравнить/ }));
     expect(screen.getByText(/→/)).toBeTruthy();
   });
 
-  it('шаг 4: «Год кардио» показывает визуализацию последовательности циклов', () => {
+  it('шаг 6: «Год кардио» показывает визуализацию последовательности циклов', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     expect(screen.getAllByText(/Год кардио/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Итого:/).length).toBeGreaterThan(0);
   });
 
-  it('шаг 5: доступны авто-режим и дневник', () => {
+  it('шаг 7: доступны авто-режим и дневник', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next(); next();
     // Авто-режим на вкладке Аналитика
     fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
     expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
@@ -261,9 +272,8 @@ describe('CardioConstructor — CSR', () => {
 
   it('«Сегодня» в шапке ведёт на шаг «Дневник» (быстрый старт)', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    goPreview();
+    buildHere();
     const todayBtn = screen.getByRole('button', { name: /Сегодня/ });
     expect(todayBtn).toBeTruthy();
     fireEvent.click(todayBtn);
@@ -272,9 +282,8 @@ describe('CardioConstructor — CSR', () => {
 
   it('переименование активного цикла сохраняется', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    goPreview();
+    buildHere();
     const input = screen.getByRole('textbox', { name: /Название цикла/ });
     fireEvent.change(input, { target: { value: 'Сушка к Чемпионату' } });
     fireEvent.click(screen.getByRole('button', { name: /Переименовать/ }));
@@ -290,61 +299,57 @@ describe('CardioConstructor — CSR', () => {
     unmount();
   });
 
-  it('персонализация: уровень и оборудование влияют на собранный цикл', () => {
+  it('персонализация: уровень на шаге «Атлет» и оборудование на шаге «Нагрузка» влияют на цикл', () => {
     render(<CardioConstructor />);
+    next();
     fireEvent.click(screen.getByRole('button', { name: /Продвинутый/ }));
+    next();
     fireEvent.click(screen.getByRole('button', { name: /Оборудование: Вело/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    next(); next();
+    buildHere();
     const saved = loadCardioCycles()[0];
     expect(saved.weeks[0].sessions[0].equipment).toBe('cycling');
   });
 
   it('«⚙️ Изменить параметры» сбрасывает вариант нагрузки в «Базовый»', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    // Выбрать интенсивный вариант на предпросмотре.
+    goPreview();
+    buildHere();
+    // Выбрать интенсивный вариант на плане.
     fireEvent.click(screen.getByRole('button', { name: /Варианты/ }));
     fireEvent.click(screen.getByRole('button', { name: /Вариант: Интенсивный/ }));
     // Вернуться к параметрам через «⚙️ Изменить параметры» — вариант сбрасывается в базовый.
     fireEvent.click(screen.getByRole('button', { name: /Изменить параметры/ }));
     expect(screen.getByRole('button', { name: /Taper перед стартом/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
     fireEvent.click(screen.getByRole('button', { name: /Варианты/ }));
     const btn = screen.getByRole('button', { name: /Вариант: Базовый/ });
     expect(btn).toBeTruthy();
   });
 
-  it('изменение параметров после сборки → предупреждение «параметры изменены» на предпросмотре', () => {
+  it('изменение параметров после сборки → предупреждение «параметры изменены» на плане', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    goPreview();
+    buildHere();
     // Назад на шаг 1 и меняем цель.
-    fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
+    const back = () => fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
+    back(); back(); back(); back();
     fireEvent.click(screen.getByRole('button', { name: /Цель: Здоровье/ }));
-    // Снова к предпросмотру — цикл не пересобран, параметры расходятся.
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    // Снова к плану — цикл не пересобран, параметры расходятся.
+    goPreview();
     expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();
   });
 
   it('добавление старта после сборки → предупреждение «параметры изменены»', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    // Назад на шаг 2 и добавляем старт.
+    goPreview();
+    buildHere();
+    // Назад на шаг 4 и добавляем старт.
     fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
     fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
     fireEvent.change(screen.getByLabelText(/Неделя старта/), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Далее/ }));
     expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();
   });
 
@@ -370,10 +375,9 @@ describe('CardioConstructor — CSR', () => {
 
   it('«❤️ Кардио по блокам года»: без годового плана → предупреждение', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
     expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('Сначала постройте макроцикл'))).toBe(true);
   });
@@ -381,10 +385,9 @@ describe('CardioConstructor — CSR', () => {
   it('«❤️ Кардио по блокам года»: циклы собраны по блокам и видны в списке', () => {
     seedAnnualPlan();
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
     expect(screen.getAllByRole('status').some(s => /Кардио по блокам года: собрано \d+ циклов/.test(s.textContent || ''))).toBe(true);
     const cycles = loadCardioCycles();
@@ -399,10 +402,9 @@ describe('CardioConstructor — CSR', () => {
   it('«🗑 Сбросить»: маппинг и циклы года удаляются', () => {
     seedAnnualPlan();
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    goPreview();
+    buildHere();
+    next();
     fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
     fireEvent.click(screen.getByRole('button', { name: /Сбросить/ }));
     expect(loadCardioCycles().filter(c => c.id.startsWith('annual-cardio-')).length).toBe(0);

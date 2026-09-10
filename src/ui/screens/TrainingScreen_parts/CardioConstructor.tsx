@@ -39,30 +39,42 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadSavedBBPlans } from './bb-plans-store';
 import { legDaysFromBBPlan } from '../../../engines/lms/cardio.engine';
-import { CardioParamsStep, type PhaseSplitState } from './CardioParamsStep';
+import { CardioGoalHorizonSection, CardioAthleteSection, CardioLoadSection, CardioParamsPreviewHero, useCardioParamsPreview } from './CardioParamsStep';
+import type { PhaseSplitState } from './CardioParamsStep';
+import { BTN, BTN_GHOST, STEP_PILL } from './training-ui';
 import { CardioCompsStep, type CompDraft } from './CardioCompsStep';
 import { CardioPreviewStep } from './CardioPreviewStep';
 import { CardioManageStep } from './CardioManageStep';
 import { CardioDiaryStep } from './CardioDiaryStep';
 
-type CardioStep = 'params' | 'comps' | 'preview' | 'manage' | 'diary';
+/**
+ * Кардио-конструктор в оболочке ББ-авто (модерн): 7 мелких шагов
+ * params → athlete → load → comps → preview → manage → diary
+ * с группами ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА, пилюлями STEP_PILL и «Далее/Назад».
+ * Движки/расчёты/строки 1-в-1 — перестроена только оболочка мастера.
+ */
+type CardioStep = 'params' | 'athlete' | 'load' | 'comps' | 'preview' | 'manage' | 'diary';
 
-const STEPS: { id: CardioStep; icon: string; label: string }[] = [
-  { id: 'params', icon: '⚙️', label: 'Параметры' },
-  { id: 'comps', icon: '🏁', label: 'Старты' },
-  { id: 'preview', icon: '📋', label: 'Предпросмотр' },
-  { id: 'manage', icon: '🔗', label: 'Управление' },
-  { id: 'diary', icon: '📓', label: 'Дневник' },
+const STEPS: { id: CardioStep; label: string }[] = [
+  { id: 'params', label: '1 Параметры' },
+  { id: 'athlete', label: '2 Атлет' },
+  { id: 'load', label: '3 Нагрузка' },
+  { id: 'comps', label: '4 Старты' },
+  { id: 'preview', label: '5 План' },
+  { id: 'manage', label: '6 Библиотека' },
+  { id: 'diary', label: '7 Дневник' },
 ];
 
-const NAV_BTN: React.CSSProperties = {
-  padding: '11px 18px', borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)',
-  color: '#fff', minHeight: 44, whiteSpace: 'nowrap', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+const STEP_GROUPS: Record<string, CardioStep[]> = {
+  'ПАРАМЕТРЫ': ['params', 'athlete', 'load', 'comps'],
+  'ПЛАН': ['preview', 'manage'],
+  'ВЫДАЧА': ['diary'],
 };
-const NAV_BTN_PRIMARY: React.CSSProperties = {
-  ...NAV_BTN, background: 'linear-gradient(180deg, rgba(0,230,138,0.22), rgba(0,230,138,0.14))', border: '1px solid rgba(0,230,138,0.52)', color: '#00e68a', boxShadow: '0 4px 14px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.08)',
-};
+
+/** Лёгкий haptic на навигации (guard — тишина вне устройства). */
+function buzzStep(): void {
+  try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
+}
 
 /** Ключ сохранения параметров мастера (восстановление при перезаходе). */
 const WIZARD_KEY = 'he_cardio_wizard_state';
@@ -934,6 +946,7 @@ export const CardioConstructor: React.FC = () => {
 
   const stepIdx = STEPS.findIndex(s => s.id === step);
   const goNext = () => {
+    buzzStep();
     if (step === 'preview' && !cycle) {
       build();
       // «Собрать и далее →»: собрать и сразу перейти на следующий шаг (Управление),
@@ -943,34 +956,77 @@ export const CardioConstructor: React.FC = () => {
     }
     if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1].id);
   };
-  const goPrev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1].id); };
+  const goPrev = () => { buzzStep(); if (stepIdx > 0) setStep(STEPS[stepIdx - 1].id); };
+  const goStep = (id: CardioStep) => { buzzStep(); setStep(id); };
+
+  /** Живой итог параметров для hero на шагах 1-3 (тот же предпросмотр движка). */
+  const paramsPreview = useCardioParamsPreview({
+    goal, totalWeeks, daysAvailable, recoveryLow, phaseSplit, comps, bodyWeight,
+    taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
+    lowImpact, age, sex, restingHr, legDays, periodizationModel, maxHrFormula,
+    lthr, ftpWatts, talkHr, tempC, altitudeM,
+  });
+
+  const stepLabels: Record<CardioStep, string> = {
+    params: '1 Параметры', athlete: '2 Атлет', load: '3 Нагрузка', comps: '4 Старты',
+    preview: '5 План', manage: '6 Библиотека', diary: '7 Дневник',
+  };
+  const renderStepNav = () => {
+    const groupEndKeys = new Set(Object.values(STEP_GROUPS).map(arr => arr[arr.length - 1]).filter(Boolean));
+    return (
+      <div className="ck-wiznav" style={{ background: 'rgba(24,24,27,0.60)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 13, padding: '6px', marginBottom: 8, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+        {STEPS.map((s, i) => {
+          const active = step === s.id;
+          const done = i < stepIdx;
+          return (
+            <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
+              <button onClick={() => goStep(s.id)} aria-current={active ? 'step' : undefined} data-active={active} className="ck-step-pill" style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: !active && !done ? 0.88 : 1 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 9, background: active ? 'rgba(6,40,28,0.22)' : done ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.08)', fontSize: 10, fontWeight: 850, marginRight: 6 }}>{done ? '✓' : (i + 1)}</span>
+                {stepLabels[s.id].replace(/^\d+\s/, '')}
+              </button>
+              {groupEndKeys.has(s.id) && s.id !== STEPS[STEPS.length - 1].id && <span style={{ width: 1, height: 20, background: 'linear-gradient(to bottom, transparent, rgba(0,230,138,0.25), transparent)', flexShrink: 0 as const, margin: '0 3px', alignSelf: 'center' }} />}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+  const renderGroupHint = () => {
+    const group = (Object.keys(STEP_GROUPS) as string[]).find(g => (STEP_GROUPS[g] as CardioStep[]).includes(step)) ?? 'ПАРАМЕТРЫ';
+    return (
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: '#00e68a', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '3px 10px' }}>{group}</span>
+      </div>
+    );
+  };
 
   return (
-    <div className="cardio-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      {/* Шапка мастера v2 — чистая, без бейдж-шума */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(16,185,129,0.06) 50%, rgba(6,182,212,0.04) 100%)', border: '1px solid rgba(0,230,138,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(8px)' }}>
+    <div className="cardio-constructor ck-wizard" data-step={step} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      {/* Шапка мастера TOP — стекло, glow-иконка, табличные чипы */}
+      <div className="ck-hero" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '15px 16px', borderRadius: 18, background: 'linear-gradient(135deg, rgba(0,230,138,0.13) 0%, rgba(16,185,129,0.07) 50%, rgba(6,182,212,0.05) 100%)', border: '1px solid rgba(0,230,138,0.28)', boxShadow: '0 10px 32px rgba(0,0,0,0.26), 0 0 24px rgba(0,230,138,0.07), inset 0 1px 0 rgba(255,255,255,0.07)', backdropFilter: 'blur(10px)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #00e68a, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 14px rgba(0,230,138,0.35)' }}>❤️</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: -0.2, lineHeight: 1 }}>Кардио-конструктор</div>
-                <div style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>Шаг {stepIdx + 1} из {STEPS.length} — <span style={{ color: '#00e68a' }}>{STEPS[stepIdx].label}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <span style={{ width: 44, height: 44, borderRadius: 13, background: 'linear-gradient(135deg, #00e68a, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, boxShadow: '0 4px 18px rgba(0,230,138,0.45), inset 0 1px 0 rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.18)' }}>❤️</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: -0.3, lineHeight: 1 }}>Кардио-конструктор</div>
+                <div style={{ fontSize: 11.5, color: '#fff', fontWeight: 600 }}>Шаг {stepIdx + 1} из {STEPS.length} — <span style={{ color: '#00e68a', fontWeight: 800 }}>{STEPS[stepIdx].label}</span></div>
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
             {cycle && (() => {
               const s = cardioCycleSummary(cycle);
+              const chip: React.CSSProperties = { fontSize: 12.5, fontWeight: 800, borderRadius: 11, padding: '6px 12px', fontVariantNumeric: 'tabular-nums', borderTopWidth: 2, borderTopStyle: 'solid' };
               return (
                 <>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#93c5fd', background: 'rgba(59,130,246,0.13)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 10, padding: '5px 11px', boxShadow: '0 1px 6px rgba(59,130,246,0.15)' }} title="Средняя нагрузка цикла">{s.avgMinutesPerWeek} мин/нед</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', background: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 10, padding: '5px 11px' }} title="Средний расход цикла">{s.avgKcalPerWeek} ккал/нед</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '5px 11px' }} title="Длительность цикла">{cycle.totalWeeks} нед</span>
+                  <span style={{ ...chip, color: '#93c5fd', background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.30)', borderTopColor: '#60a5fa', boxShadow: '0 2px 8px rgba(59,130,246,0.18)' }} title="Средняя нагрузка цикла">{s.avgMinutesPerWeek} мин/нед</span>
+                  <span style={{ ...chip, color: '#fbbf24', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.30)', borderTopColor: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.16)' }} title="Средний расход цикла">{s.avgKcalPerWeek} ккал/нед</span>
+                  <span style={{ ...chip, color: '#fff', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', borderTopColor: 'rgba(255,255,255,0.35)' }} title="Длительность цикла">{cycle.totalWeeks} нед</span>
                 </>
               );
             })()}
-            {cycle && <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 20, padding: '5px 12px', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cycle.name}>⭐ {cycle.name}</div>}
+            {cycle && <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.28)', borderRadius: 20, padding: '6px 13px', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxShadow: '0 0 12px rgba(0,230,138,0.14)' }} title={cycle.name}>⭐ {cycle.name}</div>}
           </div>
         </div>
         {/* Второй ряд — статусы, компактно */}
@@ -1007,50 +1063,24 @@ export const CardioConstructor: React.FC = () => {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.25)' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(((stepIdx + 1) / STEPS.length) * 100)}>
-            <div style={{ height: 8, borderRadius: 4, width: `${Math.round(((stepIdx + 1) / STEPS.length) * 100)}%`, background: 'linear-gradient(90deg, #00e68a 0%, #06b6d4 100%)', transition: 'width 0.4s ease', boxShadow: '0 0 10px rgba(0,230,138,0.45)' }} />
+          <div style={{ flex: 1, height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.09)', overflow: 'hidden', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.28)', position: 'relative' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(((stepIdx + 1) / STEPS.length) * 100)}>
+            <div style={{ height: 10, borderRadius: 6, width: `${Math.round(((stepIdx + 1) / STEPS.length) * 100)}%`, background: 'linear-gradient(90deg, #00e68a 0%, #06b6d4 100%)', transition: 'width 0.4s ease', boxShadow: '0 0 12px rgba(0,230,138,0.55)' }} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', minWidth: 34, textAlign: 'right' }}>{Math.round(((stepIdx + 1) / STEPS.length) * 100)}%</span>
+          <span style={{ fontSize: 12, fontWeight: 850, color: '#fff', minWidth: 38, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(((stepIdx + 1) / STEPS.length) * 100)}%</span>
         </div>
       </div>
 
-      {/* Графа пользователя — внутри шага 1, не над степпером */}
-      {/* Степпер v2 */}
-      <div style={{ display: 'flex', gap: 6, padding: 6, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', scrollbarWidth: 'none', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
-        {STEPS.map((s, i) => {
-          const active = step === s.id;
-          const done = i < stepIdx;
-          return (
-            <button
-              key={s.id}
-              onClick={() => setStep(s.id)}
-              style={{
-                flex: '1 0 auto', minWidth: 92, padding: '10px 8px', borderRadius: 11, cursor: 'pointer',
-                border: active ? '1px solid rgba(0,230,138,0.55)' : done ? '1px solid rgba(0,230,138,0.20)' : '1px solid rgba(255,255,255,0.06)',
-                background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.28), rgba(0,230,138,0.10))' : done ? 'rgba(0,230,138,0.07)' : 'rgba(255,255,255,0.025)',
-                color: active ? '#fff' : done ? '#fff' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                fontSize: 11, fontWeight: active ? 800 : 650, whiteSpace: 'nowrap',
-                boxShadow: active ? '0 0 16px rgba(0,230,138,0.22), inset 0 1px 0 rgba(255,255,255,0.07)' : done ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
-                opacity: !active && !done ? 0.85 : 1,
-                transition: 'all 0.18s ease',
-              }}
-            >
-              <span style={{ fontSize: 17, lineHeight: 1 }}>{done ? '✓' : s.icon}</span>
-              <span style={{ fontSize: 11 }}>{i + 1} {s.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Пилюли шагов в стиле ББ-авто: группы ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА */}
+      {renderStepNav()}
+      {renderGroupHint()}
 
-      {flash && <div style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.06))', border: '1px solid rgba(0,230,138,0.28)', color: '#4ade80', fontSize: 12, fontWeight: 750, boxShadow: '0 4px 14px rgba(0,230,138,0.14)' }} role="status">{flash}</div>}
+      {flash && <div className="ck-flash" style={{ padding: '11px 14px', borderRadius: 13, background: 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.06))', border: '1px solid rgba(0,230,138,0.32)', borderLeft: '3px solid #00e68a', color: '#4ade80', fontSize: 12.5, fontWeight: 750, boxShadow: '0 4px 16px rgba(0,230,138,0.16)', lineHeight: 1.5 }} role="status">{flash}</div>}
 
       {/* Переключатель простой/профи — только на шаге Параметры */}
       {step === 'params' && (
-        <div style={{ display: 'flex', gap: 6, padding: 6, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: 700, marginLeft: 6 }}>Режим:</span>
-          <button onClick={() => setWizardMode('simple')} style={wizardMode === 'simple' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>✨ Простой</button>
-          <button onClick={() => setWizardMode('pro')} style={wizardMode === 'pro' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>🛠 Профи</button>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>{wizardMode === 'simple' ? 'Только главное: цель, недели, дни, вес' : 'Все настройки: фазы, оборудование, факторы'}</span>
+        <div className="ck-mode" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 13, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
+          <button onClick={() => setWizardMode('simple')} aria-pressed={wizardMode === 'simple'} style={wizardMode === 'simple' ? { flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.5)', background: 'linear-gradient(180deg, rgba(0,230,138,0.26), rgba(0,230,138,0.12))', color: '#fff', fontSize: 12.5, fontWeight: 800, boxShadow: '0 0 12px rgba(0,230,138,0.18)' } : { flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: '#fff', fontSize: 12.5, fontWeight: 600 }}>✨ Простой</button>
+          <button onClick={() => setWizardMode('pro')} aria-pressed={wizardMode === 'pro'} style={wizardMode === 'pro' ? { flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.5)', background: 'linear-gradient(180deg, rgba(0,230,138,0.26), rgba(0,230,138,0.12))', color: '#fff', fontSize: 12.5, fontWeight: 800, boxShadow: '0 0 12px rgba(0,230,138,0.18)' } : { flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: '#fff', fontSize: 12.5, fontWeight: 600 }}>🛠 Профи</button>
         </div>
       )}
       {step === 'params' && combatCardio && (
@@ -1063,37 +1093,61 @@ export const CardioConstructor: React.FC = () => {
         </div>
       )}
       {step === 'params' && (
-        <CardioParamsStep
-          goal={goal} setGoal={setGoal}
-          totalWeeks={totalWeeks} setTotalWeeks={setTotalWeeks}
-          daysAvailable={daysAvailable} setDaysAvailable={setDaysAvailable}
-          recoveryLow={recoveryLow} setRecoveryLow={setRecoveryLow}
-          phaseSplit={phaseSplit} setPhaseSplit={setPhaseSplit}
-          comps={comps}
-          bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
-          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} taperEnabled={taperEnabled} setTaperEnabled={setTaperEnabled} peakWeek={peakWeek} setPeakWeek={setPeakWeek}
-          previewFactors={previewFactors}
-          level={level} setLevel={setLevel}
-          equipment={equipment} setEquipment={setEquipment}
-          lowImpact={lowImpact} setLowImpact={setLowImpact}
+        <>
+          <CardioGoalHorizonSection
+            goal={goal} setGoal={setGoal}
+            totalWeeks={totalWeeks} setTotalWeeks={setTotalWeeks}
+            daysAvailable={daysAvailable} setDaysAvailable={setDaysAvailable}
+            recoveryLow={recoveryLow} setRecoveryLow={setRecoveryLow}
+            phaseSplit={phaseSplit} setPhaseSplit={setPhaseSplit}
+            comps={comps}
+            taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} taperEnabled={taperEnabled} setTaperEnabled={setTaperEnabled} peakWeek={peakWeek} setPeakWeek={setPeakWeek}
+            previewFactors={previewFactors}
+            periodizationModel={periodizationModel} setPeriodizationModel={setPeriodizationModel}
+            taperModel={taperModel} setTaperModel={setTaperModel}
+            maxHrFormula={maxHrFormula} setMaxHrFormula={setMaxHrFormula}
+            wizardMode={wizardMode}
+          />
+          <CardioParamsPreviewHero
+            preview={paramsPreview.preview} s={paramsPreview.s} tidPreview={paramsPreview.tidPreview}
+            totalWeeks={totalWeeks} goal={goal} taperEnabled={taperEnabled} taperWeeks={taperWeeks} peakWeek={peakWeek}
+            onReset={resetParams}
+          />
+        </>
+      )}
+      {step === 'athlete' && (
+        <CardioAthleteSection
           age={age} setAge={setAge}
-          sex={sex} setSex={setSex}
+          bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
           restingHr={restingHr} setRestingHr={setRestingHr}
-          legDays={legDays} setLegDays={setLegDays}
-          factorsOn={factorsOn} onToggleFactor={onToggleFactor}
-          factorsSummary={factorsSummary}
-          onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} onFromLog={fromFieldTestLog}
-          onReset={resetParams}
-          wizardMode={wizardMode}
-          periodizationModel={periodizationModel} setPeriodizationModel={setPeriodizationModel}
-          taperModel={taperModel} setTaperModel={setTaperModel}
-          maxHrFormula={maxHrFormula} setMaxHrFormula={setMaxHrFormula}
+          sex={sex} setSex={setSex}
+          level={level} setLevel={setLevel}
+          recoveryLow={recoveryLow} setRecoveryLow={setRecoveryLow}
           lthr={lthr} setLthr={setLthr}
           ftpWatts={ftpWatts} setFtpWatts={setFtpWatts}
           talkHr={talkHr} setTalkHr={setTalkHr}
           tempC={tempC} setTempC={setTempC}
           altitudeM={altitudeM} setAltitudeM={setAltitudeM}
+          onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} onFromLog={fromFieldTestLog}
+          wizardMode={wizardMode}
         />
+      )}
+      {step === 'load' && (
+        <>
+          <CardioLoadSection
+            equipment={equipment} setEquipment={setEquipment}
+            lowImpact={lowImpact} setLowImpact={setLowImpact}
+            legDays={legDays} setLegDays={setLegDays}
+            factorsOn={factorsOn} onToggleFactor={onToggleFactor}
+            factorsSummary={factorsSummary}
+            wizardMode={wizardMode}
+          />
+          <CardioParamsPreviewHero
+            preview={paramsPreview.preview} s={paramsPreview.s} tidPreview={paramsPreview.tidPreview}
+            totalWeeks={totalWeeks} goal={goal} taperEnabled={taperEnabled} taperWeeks={taperWeeks} peakWeek={peakWeek}
+            onReset={resetParams}
+          />
+        </>
       )}
       {step === 'comps' && (
         <CardioCompsStep comps={comps} setComps={setComps} draft={compDraft} setDraft={setCompDraft} totalWeeks={totalWeeks}
@@ -1112,7 +1166,7 @@ export const CardioConstructor: React.FC = () => {
             nutritionNotes={cycle ? cardioNutritionNotes(cycle, profileSettingsForNutrition()) : []}
           />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={NAV_BTN} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
+            <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
         </>
       )}
@@ -1133,12 +1187,12 @@ export const CardioConstructor: React.FC = () => {
         <CardioDiaryStep cycle={cycle} acwr={acwrValue} recoveryLow={recoveryLow} onChanged={refreshActive} onApplyWeightAdjust={applyWeightAdjust} />
       )}
 
-      {/* Навигация v2 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 4px 16px rgba(0,0,0,0.18)' }}>
-        <button style={{ ...NAV_BTN, minWidth: 110 }} onClick={goPrev} disabled={stepIdx === 0} aria-label="Назад">← Назад</button>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 600 }}>{stepIdx + 1} / {STEPS.length}</div>
+      {/* Навигация в стиле ББ-авто */}
+      <div className="ck-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: 12, borderRadius: 15, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 6px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+        <button style={{ ...BTN_GHOST, minWidth: 110 }} onClick={goPrev} disabled={stepIdx === 0} aria-label="Назад">← Назад</button>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, color: '#fff', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{stepIdx + 1} / {STEPS.length}</div>
         {stepIdx < STEPS.length - 1 && (
-          <button style={{ ...NAV_BTN_PRIMARY, minWidth: 160, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }} onClick={goNext} aria-label="Далее">
+          <button style={{ ...BTN, minWidth: 170, background: 'linear-gradient(135deg,#00e68a 0%,#00c8a0 60%,#06b6d4 100%)', color: '#06281c', fontWeight: 850, border: 'none', boxShadow: '0 6px 20px rgba(0,230,138,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }} onClick={goNext} aria-label="Далее">
             {step === 'preview' && !cycle ? '🛠 Собрать и далее →' : `Далее: ${STEPS[stepIdx + 1].label} →`}
           </button>
         )}

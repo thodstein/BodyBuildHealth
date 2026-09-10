@@ -16,7 +16,7 @@ import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../en
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
 import { CardioTaperStep } from './CardioTaperStep';
-import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
+import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
   health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
@@ -247,10 +247,10 @@ export const CardioManageStep: React.FC<{
                   if (!c) return <div key={blockKey} style={{ fontSize: 11, color: '#f87171' }}>⚠ Блок {blockKey}: цикл {cycleId} не найден</div>;
                   const cs = cardioCycleSummary(c);
                   return (
-                    <div key={blockKey} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: GOAL_COLOR[c.goal] ?? '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
+                    <div key={blockKey} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${GOAL_COLOR[c.goal] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 11, padding: '9px 11px', fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: GOAL_COLOR[c.goal] ?? '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
                       <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.72)">{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</Badge>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{cs.avgMinutesPerWeek} мин · {cs.avgKcalPerWeek} ккал</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', whiteSpace: 'nowrap' }}>{cs.avgMinutesPerWeek} мин · {cs.avgKcalPerWeek} ккал</span>
                     </div>
                   );
                 })}
@@ -327,7 +327,7 @@ export const CardioManageStep: React.FC<{
               </SectionCard>
               <SectionCard title="📦 В программу">
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Откройте кардио как отдельную программу в ручном конструкторе</div>
-                <button style={{ ...BTN_PRIMARY, alignSelf: 'flex-start' }} onClick={sendToProgram}>{copyFlash ? '✅ Отправлено' : '📦 Открыть как программу'}</button>
+                <button style={{ ...BTN_CTA, alignSelf: 'flex-start' }} onClick={sendToProgram}>{copyFlash ? '✅ Отправлено' : '📦 Открыть как программу'}</button>
               </SectionCard>
             </>
           )}
@@ -353,7 +353,7 @@ export const CardioManageStep: React.FC<{
           {library.length === 0 && <EmptyState icon="📚" title="Пока пусто" desc="Соберите первый цикл на шаге Предпросмотр." />}
           {library.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input value={libraryFilter} onChange={e => { setLibraryFilter(e.target.value); setLibraryPage(0); }} placeholder="🔍 Поиск: имя/цель" style={{ flex: '1 1 160px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 12 }} />
+              <input value={libraryFilter} onChange={e => { setLibraryFilter(e.target.value); setLibraryPage(0); }} placeholder="🔍 Поиск: имя/цель" aria-label="Поиск по библиотеке" style={{ flex: '1 1 170px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.20)' }} />
               <button onClick={() => setLibrarySort('date')} style={librarySort === 'date' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>📅 Дата</button>
               <button onClick={() => setLibrarySort('weeks')} style={librarySort === 'weeks' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>⏱ Нед</button>
               <button onClick={() => setLibrarySort('kcal')} style={librarySort === 'kcal' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>🔥 Ккал</button>
@@ -367,22 +367,22 @@ export const CardioManageStep: React.FC<{
               const s = cardioCycleSummary(c);
               const active = cycle?.id === c.id;
               return (
-                <div key={c.id} style={{ padding: 10, borderRadius: 12, background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: active ? '1px solid rgba(0,230,138,0.36)' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.16)'}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div key={c.id} data-active={active} className="ck-libcard" style={{ padding: 12, borderRadius: 14, background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))', border: active ? '1px solid rgba(0,230,138,0.42)' : '1px solid rgba(255,255,255,0.08)', borderTop: `2px solid ${active ? '#00e68a' : (GOAL_COLOR[c.goal] ?? 'rgba(255,255,255,0.20)')}`, display: 'flex', flexDirection: 'column', gap: 9, boxShadow: active ? '0 0 18px rgba(0,230,138,0.16), inset 0 1px 0 rgba(255,255,255,0.06)' : '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active ? '⭐ ' : ''}{c.name}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 850, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: -0.1 }}>{active ? '⭐ ' : ''}{c.name}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     <Badge bg={GOAL_COLOR[c.goal] ? GOAL_COLOR[c.goal] + '22' : 'rgba(255,255,255,0.06)'} border={GOAL_COLOR[c.goal] ? GOAL_COLOR[c.goal] + '44' : 'rgba(255,255,255,0.12)'} color={GOAL_COLOR[c.goal] ?? '#fff'}>{CARDIO_GOAL_LABELS[c.goal]}</Badge>
                     <Badge>{c.totalWeeks} нед</Badge>
                     <Badge>{s.avgMinutesPerWeek} мин/нед</Badge>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {active ? null : <button style={{ ...BTN_PRIMARY, minHeight: 36, padding: '6px 10px', flex: '1 1 auto' }} onClick={() => onActivate(c)}>Активировать</button>}
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {active ? null : <button style={{ ...BTN_PRIMARY, minHeight: 44, padding: '8px 12px', flex: '1 1 auto' }} onClick={() => onActivate(c)}>Активировать</button>}
                     <button style={{ ...BTN_SMALL, flex: '1 1 auto' }} onClick={() => onDuplicate(c)}>⧉ Копия</button>
                     <button style={BTN_SMALL} onClick={() => onCompare(c)}>⇄ Сравнить</button>
-                    <button style={BTN_SMALL} onClick={() => onExport(c)}>📅</button>
-                    <button style={BTN_SMALL} onClick={() => onPrint(c)}>🖨</button>
-                    <button style={{ ...BTN_DANGER, minHeight: 36, padding: '6px 10px' }} onClick={() => onRemove(c)}>🗑</button>
+                    <button style={BTN_SMALL} onClick={() => onExport(c)} aria-label={`Экспорт ${c.name} в календарь`}>📅</button>
+                    <button style={BTN_SMALL} onClick={() => onPrint(c)} aria-label={`Печать ${c.name}`}>🖨</button>
+                    <button style={{ ...BTN_DANGER, minHeight: 44, padding: '8px 12px' }} onClick={() => onRemove(c)} aria-label={`Удалить ${c.name}`}>🗑</button>
                   </div>
                 </div>
               );
