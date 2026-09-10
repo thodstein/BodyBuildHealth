@@ -41,7 +41,7 @@ export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | nul
       weighInType: wcProtocol.weighInType || 'day_before_24h',
       orsMmol: ors.orsSodium,
       mealInput: meal,
-      note: `Весогонка ${wcProtocol.targetLossKg}кг (${wcProtocol.weighInType}) — W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} волокно ${fiber}г ${nut.notes.join(' | ')}`,
+      note: `Весогонка ${wcProtocol.targetLossKg}кг (${wcProtocol.weighInType === 'same_day_2h' ? 'взвешивание в день' : 'взвешивание за 24ч'}) — W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} волокно ${fiber}г ${nut.notes.join(' | ')}`,
     };
   }
   const weeks = plan.weeksData;
@@ -55,7 +55,12 @@ export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | nul
 
 export function combatToCardioPayload(plan: CombatPlan): { zone2MinPerWeek: number; hiitSessions: number; totalConditioningMin: number; outsideLoad: number | null; needsAerobicMaintenance: boolean } | null {
   const cond = (plan as any).conditioning as { sessions: any[][] } | null | undefined;
-  const outsideLoad = (plan as any).outsideMetrics?.weeklyLoad ?? (plan.inputSnapshot as any)?.outsideLoad ?? null;
+  const snapOutside = (plan.inputSnapshot as any)?.outsideLoad;
+  const snapLoad = typeof snapOutside === 'number' ? snapOutside
+    : snapOutside && typeof snapOutside === 'object'
+      ? Math.round((snapOutside.sessionsPerWeek || 0) * (snapOutside.avgDurationMin || 0) * (snapOutside.avgSRPE || 0))
+      : null;
+  const outsideLoad = (plan as any).outsideMetrics?.weeklyLoad ?? snapLoad ?? null;
   if (!cond) {
     // даже без кондиции — даём maintenance Zone2 если высокая внезальная (P0-2)
     const outsideSessions = (plan.inputSnapshot as any)?.sparringLoad ? 5 : ((plan.inputSnapshot as any)?.outsideLoad?.sessionsPerWeek ?? 0);

@@ -31,7 +31,7 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
   if (!Array.isArray(logs) || logs.length === 0) return null;
   const now = Date.now();
   const dayMs = 24 * 3600 * 1000;
-  const groups = ['neck', 'grip', 'legs', 'push', 'pull', 'rotational'] as const;
+  const groups = ['neck', 'grip', 'legs', 'push', 'pull', 'rotational', 'core'] as const;
   const out: DiaryTrendCB[] = [];
   for (const g of groups) {
     const recent: number[] = [];
@@ -49,15 +49,13 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
         const r = Number(s.reps) || 0;
         const hold = Number(s.holdSec ?? s.timeSec ?? s.durationSec ?? s.seconds ?? 0);
         const effHold = hold > 0 ? hold : (typeof s.reps === 'string' && String(s.reps).includes('с') ? (Number(String(s.reps).replace(/\D/g,'')) || r) : r);
-        // грип/шея изометрия: вес может быть 0 — считаем по удержанию/времени
+        // без веса: изометрия/удержание скорит по времени для ВСЕХ групп
+        // (раньше только grip/neck — планки/лодочки давали 0 и core-тренда не было);
+        // pinch/farmer: вес = r/время ×10 как условный тоннаж; если есть hold, то hold*5
         if (w === 0) {
-          if (g === 'grip' || g === 'neck') {
-            // pinch/farmer: вес = r/время ×10 как условный тоннаж; если есть hold, то hold*5
-            if (effHold > 60) return Math.round(effHold * 0.5); // секунды → очки
-            if (effHold > 0) return effHold * 10;
-            return r * 10;
-          }
-          return r; // pullup bodyweight условный
+          if (effHold > 60) return Math.round(effHold * 0.5); // секунды → очки
+          if (effHold > 0) return effHold * 10;
+          return r * 10;
         }
         // для динамической шеи/грипа с весом — Epley с поправкой на время удержания
         if ((g === 'grip' || g === 'neck') && effHold > 0 && hold > 0) return epley(w, Math.min(12, Math.round(hold/5)));
