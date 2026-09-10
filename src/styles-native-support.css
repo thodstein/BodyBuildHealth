@@ -1576,7 +1576,9 @@ html.app-native .train-sup.sup-apk .sup-protocols [style*='display:flex'] > * {
 }
 @media (max-width: 480px) {
   html.app-native .train-sup.sup-apk .sup-protocols [style*='grid-template-columns'],
-  html.app-native .train-sup.sup-apk .sup-geninfo [style*='grid-template-columns'] {
+  html.app-native .train-sup.sup-apk .sup-geninfo [style*='grid-template-columns'],
+  html.app-native .train-sup.sup-apk .sup-interact [style*='grid-template-columns: 1fr 1fr'],
+  html.app-native .train-sup.sup-apk .sup-interact [style*='grid-template-columns:1fr 1fr'] {
     grid-template-columns: 1fr !important;
   }
   html.app-native .train-sup.sup-apk .sup-protocols button {

@@ -1605,7 +1605,9 @@
   .support-screen.support-root .sup-timing [style*='grid-template-columns'],
   .support-screen.support-root .sup-analog [style*='grid-template-columns'],
   .support-screen.support-root .sup-pepcalc [style*='grid-template-columns'],
-  .support-screen.support-root .sup-calctools [style*='grid-template-columns'] {
+  .support-screen.support-root .sup-calctools [style*='grid-template-columns'],
+  .support-screen.support-root .sup-interact [style*='grid-template-columns: 1fr 1fr'],
+  .support-screen.support-root .sup-interact [style*='grid-template-columns:1fr 1fr'] {
     grid-template-columns: 1fr !important;
   }
   /* Карточки «О подборе» — воздух внутрь, ничего не торчит */
