@@ -9,7 +9,7 @@
 - **Бесклассовые блоки** — тем же var'ом в TSX (1-в-1, только отступ): Labs-журнал, SupportFavorites ×5 (replaceAll), OrganLoad, IndividualPlan-отчёт.
 - **Таймеры зала** (`ExecutionZone`/`SessionPlayer`): `bottom nav-height+14→var(--tabbar-lift)` (+32px, строго выше пилюли).
 - **Чужое рядом**: в `LabsScreen` параллельный агент чинит то же (subtabs sticky 56→77px) — мой ханк в другом месте файла, совместимо.
-- **Проверено**: `verify:apk-design` OK, diary-pro 22/22 + sup-mobile-fit 11/11 + apk-top-pack 31/31 + diary-bugs 12/12 + retail 15/15 → **91/91**, `tsc` чист по своим файлам (3 ошибки — чужой bb-WIP `bb-builder duplicate level` + `bb-finalize favoriteExercises`, не тронут). НЕ КОММИТИЛ/НЕ ПУШИЛ.
+- **Проверено**: `verify:apk-design` OK, diary-pro 22/22 + sup-mobile-fit 11/11 + apk-top-pack 31/31 + diary-bugs 12/12 + retail 15/15 → **91/91**, `tsc` чист по своим файлам (3 ошибки — чужой bb-WIP `bb-builder duplicate level` + `bb-finalize favoriteExercises`, не тронут). Коммит `4159b36a` (pathspec 6 TSX своих; §76 CSS + Labs-ханк + эта запись ушли раньше чужим `add -A` в `d0281ecf4` — сверено, код мой цел). НЕ ПУШИТЬ.
 
 ## Арм: свитчи/шиты + русификация (Sep 10 2026, НЕ пушить — очередь чужих)
 
