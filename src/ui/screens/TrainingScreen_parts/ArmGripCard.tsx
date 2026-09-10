@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
 import { gripVolumeFor } from '../../../engines/arm/arm-grip.engine';
-import { AdCard, AdGrid, AdField, AdBtn } from './arm-design-system';
+import { AdCard, AdGrid, AdField, AdBtn, AdSec } from './arm-design-system';
 
 export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) => void }) {
   const [rt, setRt] = useState<string>('');
@@ -59,6 +59,7 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
         </AdGrid>
         <p className="ad-muted">Рекоменд объём: RT {volRT.sets}×{volRT.reps} · Axle {volAxle.sets}×{volAxle.reps} · Pinch/Side/Back — см. PRO-гейты (4 слоя)</p>
         {diag.priorities.length > 0 ? (
+          <AdSec title="🎯 Найденные зоны" collapsible summary={`${diag.priorities.length} зон`}>
           <div className="ad-list" data-arm="grip-results">
             {diag.priorities.map((p,i)=> (
               <div key={i} className="ad-sec ad-bio" data-valid="warn" data-arm="grip-result">
@@ -69,8 +70,9 @@ export function ArmGripCard({ onApplyWeak }: { onApplyWeak?: (weak: string[]) =>
                 <div className="ad-muted">— {p.reason}</div>
               </div>
             ))}
-            <AdBtn variant="primary" onClick={apply}>➕ В слабые зоны</AdBtn>
+            <AdBtn variant="primary" block onClick={apply}>➕ В слабые зоны</AdBtn>
           </div>
+          </AdSec>
         ) : <div className="ad-muted">Введи данные для диагностики.</div>}
       </AdCard>
     </div>

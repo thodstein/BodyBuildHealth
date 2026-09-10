@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { diagnoseArmWeakPoint } from '../../../engines/arm/arm-weakpoint.engine';
-import { AdCard, AdChip, AdBtn, AdSheetSelect } from './arm-design-system';
+import { AdCard, AdChip, AdBtn, AdSec, AdSheetSelect } from './arm-design-system';
 
 const STORAGE_KEY = 'he_arm_technique_card_v1';
 
@@ -72,6 +72,7 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
           ))}
         </div>
         {diag.priorities.length > 0 ? (
+          <AdSec title="🎯 Найденные зоны" collapsible summary={`${diag.priorities.length} зон`}>
           <div className="ad-list" data-arm="tech-results">
             {diag.priorities.map((p,i) => (
               <div key={i} className="ad-sec ad-bio" data-valid="warn" data-arm="tech-result">
@@ -83,10 +84,15 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
                 <div className="ad-tip">{p.exercises.join(', ')}</div>
               </div>
             ))}
-            <AdBtn variant="primary" onClick={apply}>➕ В слабые зоны</AdBtn>
+            <AdBtn variant="primary" block onClick={apply}>➕ В слабые зоны</AdBtn>
           </div>
+          </AdSec>
         ) : <div className="ad-muted">Слабые звенья не выявлены — баланс.</div>}
-        <div className="ad-muted">{diag.rationale.join(' · ')}</div>
+        {diag.rationale.length > 0 && (
+        <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${diag.rationale.length} причин`}>
+          <div className="ad-muted">{diag.rationale.join(' · ')}</div>
+        </AdSec>
+        )}
       </AdCard>
     </div>
   );
