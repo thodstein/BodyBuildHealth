@@ -493,14 +493,12 @@ export const StrengthSportConstructor: React.FC = () => {
             <Divider />
             <GroupHeading icon="📅" text="Объём цикла" desc="Недели и частота — тоннаж и восстановление" />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}><span>2</span><span>16</span></div></Field>
-              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff' }}><span>2</span><span>6</span></div></Field>
+              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}><span>2</span><span>16</span></div></Field>
+              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff' }}><span>2</span><span>6</span></div></Field>
             </div>
           </SectionCard>
 
-
-
-           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={methodologySummary} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
+          <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={methodologySummary} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
               <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
@@ -555,7 +553,7 @@ export const StrengthSportConstructor: React.FC = () => {
                           ))}
                         </div>
                         <div style={{ fontSize:10, color:'#fff' }}>Rec order: {contestSim.recOrder.join(' → ')}</div>
-                        <div style={{ fontSize:9, color:'#fff' }}>{contestSim.rationale.join(' · ')}</div>
+                        <div style={{ fontSize:10, color:'#fff' }}>{contestSim.rationale.join(' · ')}</div>
                         {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них (injection)</div>}
                       </div>
                     )}
@@ -658,7 +656,7 @@ export const StrengthSportConstructor: React.FC = () => {
                 <div key={idx} style={{ background:'rgba(0,0,0,0.16)', padding:'10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)' }}>
                   <div style={{ fontSize:10, color:'#fff', marginBottom:4 }}>{Math.round(pt.pct*100)}% → м/с</div>
                   <input type="number" step={0.05} value={pt.velocity||''} onChange={e=> { const v=Number(e.target.value)||0; setLvpPoints(s=> s.map((p,i)=> i===idx?{...p, velocity:v}:p)); }} style={{ ...INPUT, fontSize:14, fontWeight:700, padding:'10px 8px', minHeight:48 }} placeholder="1.80" />
-                  <div style={{ fontSize:9, color: velocityTypeForLift(lvpLift)==='peak' ? '#22c55e':'#f59e0b' }}>{velocityTypeForLift(lvpLift)==='peak'?'peak':'mpv'}</div>
+                  <div style={{ fontSize:10, color: velocityTypeForLift(lvpLift)==='peak' ? '#22c55e':'#f59e0b' }}>{velocityTypeForLift(lvpLift)==='peak'?'peak':'mpv'}</div>
                 </div>
               ))}
             </div>
@@ -670,7 +668,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'outside' && (
-        <div style={{ display:'flex', flexDirection:'column', gap: 12 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap: 10 }}>
           <SectionCard icon="🏃" title="Вне зала — поле / кроссфит" subtitle="ACWR и объём зала ×" accent={outsideEnabled}>
             <GroupHeading icon="📊" text="Нагрузка вне зала" desc="Поле, кроссфит, GPP — декремент объёма зала" />
             <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, color:'#fff', fontWeight:700, background: outsideEnabled ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)', padding:'11px 12px', borderRadius:12, border:`1px solid ${outsideEnabled?'rgba(48,209,88,0.22)':'rgba(255,255,255,0.06)'}`, cursor:'pointer', fontFamily: '-apple-system, system-ui, sans-serif' }}>
