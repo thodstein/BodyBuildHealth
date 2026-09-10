@@ -1674,7 +1674,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       <div key={v.id} className="ad-sec ad-bio" data-valid="na">
                         <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ flex: 1 }}><b>{v.name}</b> <span className="ad-muted">· {(v.plan?.weeks || []).length} нед · {String(v.dateIso || '').slice(0, 10)}</span></span>
-                          <AdBtn variant="ghost" aria-label={`Загрузить ${v.name}`} onClick={()=>{
+                          <AdBtn variant="ghost" aria-label={`Загрузить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
                             setBuiltPlan(v.plan);
                             try { localStorage.setItem('he_arm_last_plan', JSON.stringify(v.plan)); } catch {}
                             setArmEdits({});
@@ -1683,7 +1683,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                             setStep('plan');
                             flash(`📥 Вариант загружен: ${v.name}`);
                           }}>📥</AdBtn>
-                          <AdBtn variant="ghost" aria-label={`Скачать ${v.name} JSON`} onClick={()=>{
+                          <AdBtn variant="ghost" aria-label={`Скачать ${v.name} JSON`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
                             try {
                               const blob = new Blob([JSON.stringify(v, null, 2)], { type: 'application/json' });
                               const url = URL.createObjectURL(blob);
@@ -1694,7 +1694,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                               URL.revokeObjectURL(url);
                             } catch { flash('⚠ Не удалось скачать'); }
                           }}>📤</AdBtn>
-                          <AdBtn variant="ghost" aria-label={`Удалить ${v.name}`} onClick={()=>{
+                          <AdBtn variant="ghost" aria-label={`Удалить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
                             const next = armVariants.filter(x=>x.id!==v.id);
                             setArmVariants(next);
                             saveArmVariants(next);
