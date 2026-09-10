@@ -34,6 +34,7 @@ import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.eng
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
+import { buildArmBlock, buildArmYearBlocks } from '../../../engines/arm/arm-annual';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -123,7 +124,7 @@ function AdCta({ children }: { children: React.ReactNode }) {
   return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, position: 'sticky', bottom: 8, zIndex: 5 }}>{children}</div>;
 }
 
-type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export';
+type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export'|'year';
 
 const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
 const GOALS = [
@@ -163,11 +164,12 @@ const STEP_DEFS: AdStepDef[] = [  { id: 'params', label: '🎛 Параметр�
   { id: 'plan', label: '📋 План' },
   { id: 'quality', label: '🏋️ Веса и качество' },
   { id: 'export', label: '📤 Экспорт' },
+  { id: 'year', label: '🗓 Год' },
 ];
 const STEP_GROUPS: Array<{ name: string; ids: Step[] }> = [
   { name: 'ПАРАМЕТРЫ', ids: ['params', 'athlete', 'grip', 'split'] },
   { name: 'ПЛАН', ids: ['plan', 'quality'] },
-  { name: 'ВЫДАЧА', ids: ['export'] },
+  { name: 'ВЫДАЧА', ids: ['export', 'year'] },
 ];
 
 const SPLIT_TAG_RU: Record<string, string> = {
@@ -790,6 +792,21 @@ export function ArmAutoConstructor() {
   // №2: сохранённые варианты
   const [armVariants, setArmVariants] = useState<ArmPlanVariant[]>(() => loadArmVariants());
   const [variantName, setVariantName] = useState('');
+  // Год: серия → блоки (preview) → сборка каждого buildArmBlock
+  const [yearSeries, setYearSeries] = useState<string>('local');
+  const [yearWeeks, setYearWeeks] = useState<number>(52);
+  const [yearSuggest, setYearSuggest] = useState<boolean>(true);
+  const [yearBuilt, setYearBuilt] = useState<any[] | null>(null);
+  const yearBlocks = useMemo(() => {
+    try { return buildArmYearBlocks(yearSeries, Math.max(4, Math.min(52, yearWeeks || 52)), {}, { suggestCycles: yearSuggest, discipline }); }
+    catch { return []; }
+  }, [yearSeries, yearWeeks, yearSuggest, discipline]);
+  const YEAR_SERIES = [
+    { id: 'local', label: 'Локальный' },
+    { id: 'waf_worlds', label: 'WAF Worlds' },
+    { id: 'east_vs_west', label: 'East-vs-West' },
+    { id: 'super_series', label: 'Super Series' },
+  ] as const;
   const viewPlan = useMemo(() => applyArmEdits(builtPlan, armEdits, workMax), [builtPlan, armEdits, workMax]);
   const editsCount = Object.keys(armEdits).length;
 
@@ -1740,9 +1757,76 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 </div>
               </AdSec>
               <AdCta>
+                <AdBtn variant="primary" block hero onClick={() => setStep('year')}>Далее: Год →</AdBtn>
                 <AdBtn variant="ghost" block onClick={() => setStep('quality')}>← Назад</AdBtn>
               </AdCta>
             </>
+          )}
+        </AdCard>
+      )}
+      {step === 'year' && (
+        <AdCard className="ad-stepview">
+          <AdSec title="🗓 Год по блокам" hint="Серия → блоки base/strength/peaking (+тейпер A/B) → сборка каждым buildArmBlock. Без записи в общий годовой план — превью и сборка внутри конструктора.">
+            <AdGrid cols="2">
+              <div>
+                <div className="ad-fl">Серия</div>
+                <div className="ad-chips">
+                  {YEAR_SERIES.map(o=> <AdChip key={o.id} active={yearSeries===o.id} onClick={()=>{ setYearSeries(o.id); setYearBuilt(null); }}>{o.label}</AdChip>)}
+                </div>
+              </div>
+              <AdField label="Недель в году">
+                <input type="number" min={4} max={52} value={yearWeeks} onChange={e=>{ setYearWeeks(Math.max(4, Math.min(52, parseInt(e.target.value) || 52))); setYearBuilt(null); }} />
+              </AdField>
+            </AdGrid>
+            <AdSwitch checked={yearSuggest} onChange={(v)=>{ setYearSuggest(v); setYearBuilt(null); }} label="Именные циклы в блоках (авто-подгонка вкл)" />
+            <div className="ad-list" data-arm="year-blocks">
+              {yearBlocks.map((b: any)=>(
+                <div key={b.blockKey} className="ad-sec ad-bio" data-valid="na">
+                  <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span><b>{b.phase}</b> <span className="ad-muted">· {b.weeks} нед · приоритет {b.priority}</span></span>
+                    <span className="ad-tag">{b.focus}</span>
+                  </div>
+                  {b.suggestedCycleId && <div className="ad-tip">💡 Цикл: {b.suggestedCycleNote || b.suggestedCycleId}</div>}
+                </div>
+              ))}
+            </div>
+          </AdSec>
+          <AdCta>
+            <AdBtn variant="primary" block hero onClick={()=>{
+              try {
+                const res = yearBlocks.map((b: any)=>{
+                  const cfg: any = {
+                    discipline, level, technique, gripFocus, workMax,
+                    weakPoints, focusGroup: focusGroup || undefined, specialization,
+                    patternId: patternId || undefined,
+                    taperEnabled: b.priority !== 'C',
+                    competitionPriority: b.priority,
+                    cycleId: yearSuggest ? b.suggestedCycleId : undefined,
+                    cycleConsent: yearSuggest ? true : undefined,
+                  };
+                  return buildArmBlock({ blockKey: b.blockKey, weeks: b.weeks, phase: b.phase }, cfg, { level });
+                });
+                setYearBuilt(res);
+                const warns = res.reduce((a: number, r: any)=>a + (r.warnings || []).length, 0);
+                flash(`🗓 Год собран: ${res.length} блоков · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns}`);
+              } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); }
+            }}>🗓 Собрать год</AdBtn>
+            <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>
+          </AdCta>
+          {yearBuilt && (
+            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${yearBuilt.length} блоков`}>
+              <div className="ad-list" data-arm="year-result">
+                {yearBuilt.map((r: any)=>(
+                  <div key={r.blockKey} className="ad-sec ad-bio" data-valid={r.warnings.length ? 'warn' : 'ok'}>
+                    <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span><b>{r.blockKey}</b> <span className="ad-muted">· {r.weeks.length} нед{r.taperApplied ? ' · тейпер' : ''}{r.peakApplied ? ' · пик' : ''}</span></span>
+                      {r.warnings.length > 0 && <span className="ad-tag">⚠ {r.warnings.length}</span>}
+                    </div>
+                    {r.warnings.slice(0, 3).map((w: string, i: number)=><div key={i} className="ad-finding" data-level="warn">{w}</div>)}
+                  </div>
+                ))}
+              </div>
+            </AdSec>
           )}
         </AdCard>
       )}

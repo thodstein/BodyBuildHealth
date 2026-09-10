@@ -1,6 +1,6 @@
 /**
- * arm-wizard-nav.test.tsx — визард 7 шагов в стиле ББ-авто:
- * params → athlete → grip → split → plan → quality → export.
+ * arm-wizard-nav.test.tsx — визард 8 шагов в стиле ББ-авто:
+ * params → athlete → grip → split → plan → quality → export → year.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -29,6 +29,7 @@ describe('Arm wizard navigation', () => {
       '5📋 План',
       '6🏋️ Веса и качество',
       '7📤 Экспорт',
+      '8🗓 Год',
     ]);
     expect(document.body.textContent).toContain('Дисциплина');
     expect(container.querySelector("[data-arm='steps']")?.getAttribute('aria-label')).toBe('Шаги');

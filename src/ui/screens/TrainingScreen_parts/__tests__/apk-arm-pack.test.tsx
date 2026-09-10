@@ -210,7 +210,7 @@ describe('APK arm pack', () => {
     expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
   });
 
-  it('весь конструктор: 7 шагов рендерятся без падений (TG)', () => {
+  it('весь конструктор: 8 шагов рендерятся без падений (TG)', () => {
     render(<ArmAutoConstructor />);
     const steps: Array<[string, RegExp]> = [
       ['🎛 Параметры', /Дисциплина/],
@@ -220,6 +220,7 @@ describe('APK arm pack', () => {
       ['📋 План', /План не собран/],
       ['🏋️ Веса и качество', /План не собран/],
       ['📤 Экспорт', /План не собран/],
+      ['🗓 Год', /Год по блокам/],
     ];
     for (const [tab, marker] of steps) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
@@ -244,7 +245,7 @@ describe('APK arm pack', () => {
     };
     resetAppPlatformCache();
     const c = render(<ArmAutoConstructor />);
-    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План', '🏋️ Веса и качество', '📤 Экспорт']) {
+    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План', '🏋️ Веса и качество', '📤 Экспорт', '🗓 Год']) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(c.container.querySelector('.train-arm')?.classList.contains('arm-apk'), tab).toBe(true);
     }
