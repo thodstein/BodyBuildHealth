@@ -33,6 +33,7 @@ import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
+import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -193,6 +194,78 @@ function rirTint(rir: any): React.CSSProperties {
   const n = Number(rir);
   const c = !(n >= 0) ? undefined : n <= 1 ? '#ef4444' : n <= 2 ? '#f59e0b' : '#22c55e';
   return c ? { borderColor: `${c}88`, color: c, fontVariantNumeric: 'tabular-nums' as const } : { fontVariantNumeric: 'tabular-nums' as const };
+}
+
+/* ── №1 Ручная коррекция плана (overlay поверх builtPlan, как exerciseEdits
+ * в ББ-авто): сеты/повторы/вес + своп внутри substitutionGroup каталога.
+ * Валидация/отчёт остаются базовыми (честная пометка «с правками»). ── */
+export type ArmExerciseEdit = { sets?: number; reps?: number; weight?: number; swapId?: string };
+export function armEditKey(week: number, si: number, ei: number): string {
+  return `${week}:${si}:${ei}`;
+}
+export function swapCandidatesFor(ex: any): Array<{ id: string; name: string }> {
+  try {
+    const all = ARM_EXERCISES as any[];
+    const cur = (ex as any)?.exerciseId ? all.find((e) => e.id === (ex as any).exerciseId) : all.find((e) => e.name === ex.name);
+    const grp = (cur as any)?.substitutionGroup || (ex as any)?.substitutionGroup;
+    const pool = grp ? all.filter((e) => e.substitutionGroup === grp) : [];
+    const curId = (cur as any)?.id;
+    return pool.filter((e) => e.id !== curId && e.name !== ex.name).map((e) => ({ id: e.id, name: e.name }));
+  } catch { return []; }
+}
+const CHAR_WEIGHT_PCT: Record<string, number> = { 'тяж': 0.82, 'техника': 0.60, 'памп': 0.68, 'лёг': 0.60 };
+export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>, weightBase?: Record<string, number>): any {
+  if (!plan || !edits || Object.keys(edits).length === 0) return plan;
+  const round2 = (n: number) => Math.round(n * 2) / 2;
+  return {
+    ...plan,
+    weeks: (plan.weeks || []).map((wk: any) => ({
+      ...wk,
+      sessions: (wk.sessions || []).map((sess: any, si: number) => ({
+        ...sess,
+        exercises: (sess.exercises || []).map((ex: any, ei: number) => {
+          const ed = edits[armEditKey(wk.week, si, ei)];
+          if (!ed) return ex;
+          let out: any = { ...ex };
+          if (ed.swapId) {
+            const cat = (ARM_EXERCISES as any[]).find((e) => e.id === ed.swapId);
+            if (cat) {
+              out = {
+                ...out,
+                name: cat.name,
+                exerciseId: cat.id,
+                equipment: cat.equipment,
+                movementPattern: cat.movementPattern,
+                substitutionGroup: cat.substitutionGroup,
+                comment: `🔄 Замена: ${cat.name}. ${cat.technique || ''}`.trim(),
+              };
+              const base = weightBase?.[out.muscle];
+              if (base && base > 0) {
+                const w = round2(base * (CHAR_WEIGHT_PCT[out.character] ?? 0.68));
+                out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, weight: w }));
+              }
+            }
+          }
+          if (ed.sets != null && ed.sets >= 0) out.sets = Math.round(ed.sets);
+          if (ed.sets != null || ed.reps != null || ed.weight != null) {
+            if (!out.workSets || out.workSets.length === 0) {
+              const r = ed.reps ?? out.repsRange?.[0] ?? 8;
+              const w = ed.weight ?? 0;
+              out.workSets = Array.from({ length: Math.max(1, out.sets || 1) }, () => ({ weight: w, reps: r }));
+            }
+          }
+          if (ed.reps != null && ed.reps > 0) {
+            out.repsRange = [Math.round(ed.reps), Math.round(ed.reps)];
+            out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, reps: Math.round(ed.reps as number) }));
+          }
+          if (ed.weight != null && ed.weight >= 0) {
+            out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, weight: ed.weight }));
+          }
+          return out;
+        }),
+      })),
+    })),
+  };
 }
 
 type GateKey = 'humerus' | 'ucl' | 'shoulder' | 'tendon' | 'table' | 'volume' | 'cycle' | 'antagonist' | 'other';
@@ -619,6 +692,8 @@ export function ArmAutoConstructor() {
       setBuiltPlan(plan);
       try { localStorage.setItem('he_arm_last_plan', JSON.stringify(plan)); } catch {}
       setWeekSel(1);
+      setArmEdits({});
+      setEditOpen(null);
       setStep('plan');
       const injInfo = diagWeakPoints.length ? ` + ${diagWeakPoints.join(', ')} инъекция` : '';
       flash(`✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед${injInfo}`);
@@ -631,13 +706,19 @@ export function ArmAutoConstructor() {
     setWeakPoints(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev, m].slice(0,2));
   };
 
-  const curWeek = builtPlan?.weeks?.find((w:any)=>w.week===weekSel) || builtPlan?.weeks?.[0];
+  // №1: ручные правки упражнений (overlay; сбрасываются при пересборке)
+  const [armEdits, setArmEdits] = useState<Record<string, ArmExerciseEdit>>({});
+  const [editOpen, setEditOpen] = useState<string | null>(null);
+  const viewPlan = useMemo(() => applyArmEdits(builtPlan, armEdits, workMax), [builtPlan, armEdits, workMax]);
+  const editsCount = Object.keys(armEdits).length;
+
+  const curWeek = viewPlan?.weeks?.find((w:any)=>w.week===weekSel) || viewPlan?.weeks?.[0];
 
   // Дашборд выдачи — чистые производные плана (логики нет).
   const planDash = (() => {
     try {
-      if (!builtPlan) return null;
-      const weeks = builtPlan.weeks;
+      if (!viewPlan) return null;
+      const weeks = viewPlan.weeks;
       const sess = weeks.flatMap((w: any) => w.sessions);
       const table = sess.filter((s: any) => s.tableTime).length;
       const light = weeks.filter((w: any) => w.deload || w.phase === 'deload' || w.taper || w.phase === 'peaking').length;
@@ -1261,6 +1342,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               {curWeek && (
                 <div>
                   <h4 className="ad-sec-t"><span aria-hidden style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 99, background: PHASE_DOT[curWeek.phase] || '#94a3b8', marginRight: 6, verticalAlign: '1px' }} />Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                  {editsCount > 0 && <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><span className="ad-tag">✏️ Правки: {editsCount} упр.</span><AdBtn variant="ghost" data-arm="edits-reset" onClick={()=>{ setArmEdits({}); setEditOpen(null); }}>Сбросить правки</AdBtn></div>}
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
                   {curWeek.sessions.map((sess:any, si:number)=> (
@@ -1271,14 +1353,42 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         <div key={ei} className="ad-ex">
                           <div className="ad-ex-top">
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}</span>
+                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}{armEdits[armEditKey(curWeek.week, si, ei)] ? <span className="ad-tag" data-arm="ex-edited">✏️</span> : ''} <button type="button" className="ad-chip" data-arm="ex-edit-toggle" aria-expanded={editOpen===armEditKey(curWeek.week, si, ei)} aria-label={`Править ${ex.name}`} onClick={()=>setEditOpen(prev=>prev===armEditKey(curWeek.week, si, ei)?null:armEditKey(curWeek.week, si, ei))} style={{ minHeight: 32, padding: '4px 10px' }}>✏️</button></span>
                           </div>
-                          {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives/.test(ex.comment) && (
+                          {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives|🔄 Замена/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
                           )}
                           {ex.workSets?.[0]?.weight > 0 && ex.sets > 1 && (
                             <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((ex.sets / 5) * 100))}%` }} /></div>
                           )}
+                          {editOpen===armEditKey(curWeek.week, si, ei) && (()=>{
+                            const ekey = armEditKey(curWeek.week, si, ei);
+                            const cur = armEdits[ekey] || {};
+                            const cands = swapCandidatesFor(ex);
+                            const setEd = (patch: Partial<ArmExerciseEdit>) => setArmEdits(prev=>({ ...prev, [ekey]: { ...cur, ...patch } }));
+                            return (
+                            <div data-arm="ex-editor" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                              <AdField label="Сеты">
+                                <input type="number" aria-label={`Сеты ${ex.name}`} min={0} max={20} value={cur.sets ?? ex.sets} onChange={e=>{ const v = parseInt(e.target.value); setEd({ sets: Number.isFinite(v) ? Math.max(0, Math.min(20, v)) : ex.sets }); }} style={{ width: 64 }} />
+                              </AdField>
+                              <AdField label="Повт">
+                                <input type="number" aria-label={`Повторы ${ex.name}`} min={1} max={30} value={cur.reps ?? ex.repsRange[0]} onChange={e=>{ const v = parseInt(e.target.value); if (Number.isFinite(v)) setEd({ reps: Math.max(1, Math.min(30, v)) }); }} style={{ width: 64 }} />
+                              </AdField>
+                              <AdField label="Вес, кг">
+                                <input type="number" aria-label={`Вес ${ex.name}`} min={0} max={500} inputMode="decimal" value={cur.weight ?? ex.workSets?.[0]?.weight ?? 0} onChange={e=>{ const v = parseFloat(e.target.value); if (Number.isFinite(v)) setEd({ weight: Math.max(0, v) }); }} style={{ width: 76 }} />
+                              </AdField>
+                              {cands.length > 0 && (
+                              <AdField label="Замена (та же группа)">
+                                <select aria-label={`Замена для ${ex.name}`} value={cur.swapId ?? ''} onChange={e=>setEd({ swapId: e.target.value || undefined })} style={{ maxWidth: 220 }}>
+                                  <option value="">— как в плане —</option>
+                                  {cands.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                              </AdField>
+                              )}
+                              <button type="button" className="ad-chip" aria-label={`Сбросить правку ${ex.name}`} onClick={()=>setArmEdits(prev=>{ const n={...prev}; delete n[ekey]; return n; })} style={{ minHeight: 32 }}>↩</button>
+                            </div>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -1358,8 +1468,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 </div>
               </AdSec>
               <div>
-                <ArmHeatmap plan={builtPlan} onToast={flash} />
+                <ArmHeatmap plan={viewPlan} onToast={flash} />
               </div>
+              {editsCount > 0 && <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>}
               <AdBanner tone="warn">
                 <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
               </AdBanner>
@@ -1445,25 +1556,25 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch {}
                   let proSummary: any = null;
                   try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  const html = buildArmPrintHtml(builtPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
+                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }}>🖨 Печать</AdBtn>
                 <AdBtn variant="ghost" onClick={() => {
-                  const ics = buildArmIcs(builtPlan);
+                  const ics = buildArmIcs(viewPlan);
                   const blob = new Blob([ics], { type: 'text/calendar' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
                 }}>📅 .ics</AdBtn>
                 <AdBtn variant="ghost" onClick={() => {
-                  const tot = (builtPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
+                  const tot = (viewPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
                   const lines = [
-                    `🤝 Арм-план — ${builtPlan.pattern.name} (${builtPlan.weeks.length} нед)`,
+                    `🤝 Арм-план — ${viewPlan.pattern.name} (${viewPlan.weeks.length} нед)`,
                     `${discipline} · ${technique} · ${level} · ${goal}`,
                     weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
                     cycId ? `Цикл: ${cycId}` : 'Обычный план',
                     `Всего: ${tot} сетов · стол ${planDash ? planDash.tablePct : '—'}%`,
-                    (builtPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
+                    (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
                   ];
                   const txt = lines.join('\n');
                   const done = () => flash('✅ Сводка скопирована');
