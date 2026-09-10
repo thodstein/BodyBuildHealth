@@ -6,7 +6,9 @@
  */
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
-import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
+import { syncBBPlanSetShape } from './bb-validator.engine';
+import { aggregateBBVolume, perExerciseCap } from './bb-volume.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -459,7 +461,11 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   if (/румын|rdl|мёртв|merтв|stiff|сгибан.*ног|leg.?curl|на прямых ногах|тяга.*прям/i.test(_l)) return 'hamstrings';
   if (/ягодичн|hip.?thrust|glute|мост/i.test(_l)) return 'glutes';
   if (/икры|подъём.*носк|подъем.*носк|calf/i.test(_l)) return 'calves';
-  const found = catalog.find(e => e.name === exName);
+  const found = catalog.find(e => e.name === exName)
+    // Ф1.1: ё-нормализация + подстрока — cycle-шаблоны пишут «Подъем» без ё,
+    // каталог «Подъём»; точное несовпадение валило в default 'core' и мирило
+    // бицепс/предплечья в прессовый MRV-бакет (embed-bic abs 22 > 14).
+    || catalog.find(e => e.name.toLowerCase().replace(/ё/g, 'е') === exName.toLowerCase().replace(/ё/g, 'е'));
   if (found?.group) {
     const mg = found.group.toLowerCase();
     const MAP: Record<string, string> = {
@@ -469,6 +475,14 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
       forearms: 'forearms', traps: 'traps', neck: 'neck',
     };
     return MAP[mg] || mg;
+  }
+  // Каталожная запись без группы — каноническая мышца по имени (trueMuscleOf).
+  const byCanonical = catalog.find(e => e.name.toLowerCase().replace(/ё/g, 'е') === exName.toLowerCase().replace(/ё/g, 'е'));
+  if (byCanonical) {
+    try {
+      const canon = trueMuscleOf(byCanonical as any);
+      if (canon) return canon;
+    } catch { /* fallthrough к ключевым словам */ }
   }
   // fallback by name keywords
   const l = exName.toLowerCase();
@@ -508,11 +522,13 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   if (l.includes('deadlift') || l.includes('станов')) return 'legs';
   if (l.includes('сгибан') && !l.includes('бицепс') && !l.includes('молотк') && !l.includes('запяст') && !l.includes('wrist') && !l.includes('предплеч') && !l.includes('ez') && !l.includes('ног') && !l.includes('leg')) return 'hamstrings';
   // Предплечья (ДО сгибан-проверки, иначе "Сгибания запястий" → hamstrings)
-  if (l.includes('запяст') || l.includes('wrist') || l.includes('предплеч') || l.includes('forearm')) return 'forearms';
+  // Ф1.1: «Кисть стоя»/«Подъем обратным хватом» из cycle-шаблонов (обратные
+  // сгибания/кисть = брахирадиалис/сгибатели запястья → forearms, не core).
+  if (l.includes('запяст') || l.includes('wrist') || l.includes('предплеч') || l.includes('forearm') || l.includes('кисть') || l.includes('обратным хватом')) return 'forearms';
   // Икры
   if (l.includes('икры') || l.includes('подъем на носки') || l.includes('подъём на носки')) return 'calves';
   // Бицепс
-  if (l.includes('бицепс') || l.includes('молотк')) return 'biceps';
+  if (l.includes('бицепс') || l.includes('молотк') || l.includes('концентр')) return 'biceps';
   if (l.includes('сгиб') && l.includes('штанги') && !l.includes('ног')) return 'biceps';
   // Трицепс
   if (l.includes('трицепс') || l.includes('француз')) return 'triceps';
@@ -1209,15 +1225,16 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     }
 
     // Phase labels: deload-недели по meta.deloadWeeks, остальное 30/70
-    // (accumulation → intensification → peaking). Фазы нужны финализатору
-    // (bbRir/repShift/tempoFor читают phaseMap) — P2-13 матрица ждёт
-    // «фазы везде» для cycle-пути, как в generic buildBBPlan.
-    const weekPhase = isDeload
-      ? 'deload'
-      : w <= Math.ceil(totalWeeks * 0.3) ? 'accumulation'
-        : w <= Math.ceil(totalWeeks * 0.75) ? 'intensification' : 'peaking';
+    // (accumulation → intensification). Фазы нужны финализатору (bbRir/
+    // repShift/tempoFor читают phaseMap) — P2-13 матрица ждёт «фазы везде»
+    // для cycle-пути, как в generic buildBBPlan.
+    // Двойной делод невозможен (нужен ACWR-гейт). Пиковую фазу НЕ ставим:
+    // BB-циклы (mass) не пикают по фазам buildBBPlan — метка 'peaking' на
+    // последних неделях давала ложные taper_volume_increased в валидаторе
+    // (объём гипертрофийного цикла к финалу растёт, а не падает).
+    const weekPhase = isDeload ? 'deload' : w <= Math.ceil(totalWeeks * 0.3) ? 'accumulation' : 'intensification';
 
-    weeks.push({ week: w, phase: weekPhase, sessions });
+    weeks.push({ week: w, phase: weekPhase, deload: isDeload, sessions });
   }
 
   // Compute rotationMuscleVolume
@@ -1350,6 +1367,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     ...finalPlan,
     volumeLandmarks,
     muscleFrequency,
+    // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks) — авто-taper
+    // финализатора не накладывается поверх (taper W2-W4 рабочего мезоцикла).
+    sourceDeloads: meta.deloadWeeks?.length ? true : undefined,
     // Контекст специализации/лимитов сохраняется для повторной финализации.
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
@@ -1433,6 +1453,90 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     focusGroup: input.focusGroup,
     specialization: input.specialization,
   };
+  // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): недельный MRV-кап. Convert-путь капил
+  // только per-exercise (targetSets ≤ mrv, строка ~1118) — суммарный недельный
+  // объём мышцы уезжал за MRV (hamstrings 24.3 эффективных при капе 16 на
+  // Arnold-сплитах и женских циклах; traps 19/14, triceps 18/14, abs 22/14).
+  // Паритет с generic buildBBPlan: normalizeWeekMrv по каждой неделе +
+  // honest mrvByMuscle на плане (валидатор меряет EFFECTIVE — direct+
+  // indirect — против этого капа; после прямого капа добираем трим по
+  // эффективному объёму: изоляции/accessory последними сетами).
+  if (mode === 'adapt') {
+    const mrvByMuscle: Record<string, number> = {};
+    for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number; mev?: number } | undefined>)) {
+      const lm = lmRaw as { mrv?: number; mev?: number } | undefined;
+      if (!lm?.mrv) continue;
+      let capMrv = Math.round((lm as any).mrv * mrvMult);
+      // Female posterior boost: кап поднимается в такт объёмному ×1.2 (glutes/hams),
+      // иначе кап стирает женский акцент; реальный перебор всё равно режется.
+      if (input.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
+      mrvByMuscle[m] = capMrv;
+    }
+    const specTargets = new Set([...weakPoints, ...(specSchedule.blocks.flatMap(b => b.targets))]);
+    for (const t of specTargets) {
+      const lm = (allLandmarks as any)[t];
+      if (lm?.mrv) mrvByMuscle[t] = Math.round(mrvByMuscle[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvByMuscle[t]);
+    }
+    const floorSetsFor = (muscle: string, ex: any): number => {
+      const cap = perExerciseCap(level, muscle, input.trainingYears, (input as any).onCourse);
+      return Math.min(2, cap);
+    };
+    for (const w of finalized.weeks) {
+      const isDeloadWeek = w.phase === 'deload' || (w as any).deload === true;
+      const caps: Record<string, number> = { ...mrvByMuscle };
+      const weekRes = specResForWeekSchedule(specSchedule, w.week);
+      for (const t of weekRes.targets) {
+        const lm = (allLandmarks as any)[t];
+        if (lm?.mrv) caps[t] = Math.round(caps[t] * specializationMrvFactor(t, weekRes));
+      }
+      normalizeWeekMrv(w.sessions, caps, isDeloadWeek, { level, trainingYears: input.trainingYears, onCourse: (input as any).onCourse });
+      // Эффективный трим: валидатор меряет direct+indirect против plan.mrvByMuscle.
+      // Ключи aggregateBBVolume канонические (core→abs, delt_*→shoulders), а
+      // e.muscle может быть сырым — матчим через trueMuscleOf.
+      for (let guard = 0; guard < 40; guard++) {
+        const vol = aggregateBBVolume(w.sessions);
+        let worst: { muscle: string; over: number; cap: number } | null = null;
+        for (const [muscle, values] of Object.entries(vol)) {
+          const cap = caps[muscle] || mrvByMuscle[muscle];
+          if (cap > 0 && values.effectiveSets > cap) {
+            const over = values.effectiveSets - cap;
+            if (!worst || over > worst.over) worst = { muscle, over, cap };
+          }
+        }
+        if (!worst) break;
+        const canon = (e: any): string => {
+          try { return trueMuscleOf(e as any) || e.muscle; } catch { return e.muscle; }
+        };
+        // Кандидаты на срез: изоляции/accessory этой мышцы, не primary, с сетами > floor.
+        const all = w.sessions
+          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && canon(e) === worst!.muscle));
+        const cands = all
+          .filter((e: any) => e.role !== 'primary' && e.sets > floorSetsFor(worst!.muscle, e))
+          .sort((a: any, b: any) => a.sets - b.sets);
+        if (cands.length > 0) {
+          const victim = cands[0];
+          victim.sets -= 1;
+          if (Array.isArray(victim.workSets) && victim.workSets.length > victim.sets) victim.workSets = victim.workSets.slice(0, victim.sets);
+        } else if (all.length > 1) {
+          // Ф1.1: все по floor, перебор остался — убрать последнее accessory
+          // упражнение мышцы целиком (сохраняем ≥1 упражнение/мышцу/неделю).
+          const removable = all.filter((e: any) => e.role !== 'primary');
+          if (removable.length === 0) break;
+          const victim = removable[removable.length - 1];
+          const s = w.sessions.find(ss => ss.exercises.includes(victim));
+          if (s) s.exercises = s.exercises.filter((e: any) => e !== victim);
+        } else {
+          break;
+        }
+      }
+    }
+    syncBBPlanSetShape(finalized);
+    // Честный кап на плане — валидатор меряет против него (паритет с buildBBPlan).
+    (finalized as any).mrvByMuscle = mrvByMuscle;
+    // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks) — авто-taper
+    // финализатора не накладывается поверх (taper W2-W4 рабочего мезоцикла).
+    if (meta.deloadWeeks?.length) (finalized as any).sourceDeloads = true;
+  }
   return finalized;
 }
 

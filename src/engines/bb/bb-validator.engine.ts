@@ -206,7 +206,23 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     if (phase !== 'deload' && phase !== 'transition') continue;
     const currentSets = week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
     const previousSets = previous.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
-    if (currentSets > Math.ceil(previousSets * 0.75)) {
+    // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): pump-семантика делода — сеты сохраняются,
+    // но вес ×0.55 и RIR 4 (DELOAD_PROTOCOLS.pump). Делод, снизивший НАГРУЗКУ
+    // (средний вес рабочих ≤ 0.8× предыдущей недели при RIR ≥ 3), валиден и
+    // без срезки объёма — срезка была только один из двух каналов разгрузки.
+    const meanWeightOf = (w: any): number => {
+      const ws = w.sessions.flatMap((s: any) => s.exercises.flatMap((e: any) => (e.workSets || []).map((x: any) => x.weight || 0))).filter((x: number) => x > 0);
+      return ws.length ? ws.reduce((a: number, b: number) => a + b, 0) / ws.length : 0;
+    };
+    const minRirOf = (w: any): number => {
+      const rirs = w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.rir)).filter((x: any) => Number.isFinite(x));
+      return rirs.length ? Math.min(...rirs) : 99;
+    };
+    const effortDeload = previousSets > 0
+      && meanWeightOf(week) > 0
+      && meanWeightOf(week) <= meanWeightOf(previous) * 0.8
+      && minRirOf(week) >= 3;
+    if (currentSets > Math.ceil(previousSets * 0.75) && !effortDeload) {
       issues.push({ level: 'warning', code: 'deload_volume_not_reduced', message: `Неделя ${week.week}: deload объём ${currentSets} не снижен относительно ${previousSets}.` });
     }
     const rirValues = week.sessions.flatMap((session: BBSession) => session.exercises.map(exercise => exercise.rir));

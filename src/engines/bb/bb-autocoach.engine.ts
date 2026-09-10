@@ -945,6 +945,10 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
 
   // Найти последнюю deload-неделю (если есть) — taper применяется к неделям ДО неё.
   // Если deload нет — taper к последним 2-3 неделям.
+  // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): если deload в СЕРЕДИНЕ плана (после него
+  // >2 рабочих недель), источник управляет своей периодизацией сам (циклы
+  // cycle-bb-* с meta.deloadWeeks) — авто-taper «3 недели перед серединным
+  // делодом» давал taper-метки на W2-W4 рабочего мезоцикла.
   const weeks = plan.weeks;
   let lastDeloadIdx = -1;
   for (let i = weeks.length - 1; i >= 0; i--) {
@@ -959,6 +963,13 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
     const prevSets = i > 0 ? weeks[i - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : totalSets;
     if (totalSets < prevSets * 0.6) { lastDeloadIdx = i; break; }
   }
+  if (lastDeloadIdx >= 0 && weeks.length - 1 - lastDeloadIdx > 2) return plan;
+  // Ф1.1: источник управляет своей периодизацией (cycle-convert с meta.deloadWeeks —
+  // ставит plan.sourceDeloads) — авто-taper «3 недели перед финальным делодом»
+  // резал блок повторного набора после серединного делода (cycle-bb-08 [5,9]).
+  // Generic-планы (distributePhases) НЕ помечаются — их taper-окно сохранено.
+  const explicitDeloads = weeks.filter(w => w.deload === true || w.phase === 'deload').length;
+  if ((plan as any).sourceDeloads && explicitDeloads >= 1) return plan;
 
   // Taper-окно: 3 недели перед deload (или концом плана). totalWeeks параметр
   // используется для документации/логирования (Bosquet 2005, Helms 2022).
