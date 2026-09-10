@@ -17,7 +17,7 @@ export const CYCLE_BB_M_CUT_UL_8: SRCycleTemplate = {
     title: 'Мужская сушка верх/низ 8н (4×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',
-    period: 'cutting',
+    period: 'mass',
     sessionsPerWeek: 4,
     weeks: 8,
     correctionPct: 0.002,

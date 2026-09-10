@@ -21,7 +21,7 @@ export const CYCLE_BB_F_MAINT_8: SRCycleTemplate = {
     sessionsPerWeek: 3,
     weeks: 8,
     correctionPct: 0,
-    targetFocus: 'full',
+    targetFocus: 'fullbody',
     deloadWeeks: [8],
     rirProgression: { start: 3, end: 2 },
     phases: [],
