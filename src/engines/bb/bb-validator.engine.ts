@@ -247,16 +247,43 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     }
   }
   // P1-1: частота <2×/нед для основных групп — предупреждение (Schoenfeld 2016: 2× 6.8% vs 1× 3.7%)
+  // P1-9 (план BB-FEMALE-POSTERIOR): частота 0×/нед major-мышцы — ERROR (мышца
+  // вообще не тренируется: leg-гейт финализатора молчал — quads 0×/нед
+  // выдавали «valid»). Исключённые травмой мышцы — не ошибка (так и задумано).
   const MAJOR_FOR_FREQ = new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'glutes', 'biceps', 'triceps']);
+  const excludedSet = new Set((options.excludedMuscles || []).map(m => String(m || '').toLowerCase()));
+  // Push/Pull-сплиты без ножных дней (push_pull_2) легитимно дают 0×/нед
+  // на мышцах ног — ошибкой не считается (дизайн сплита, не дыра).
+  const hasLegDay = (plan.weeks || []).some(w => (w.sessions || []).some(s => /legs|lower|fullbody|ног/i.test(String((s as any).sessionTag || ''))));
+  const isExcluded = (muscle: string): boolean => {
+    const key = String(muscle || '').toLowerCase();
+    if (excludedSet.has(key)) return true;
+    // Каноническое collapsing: delt_* → shoulders; композиты раскрываются
+    // (legs → quads/hamstrings/glutes/calves, arms → biceps/triceps).
+    if (/^delt_/.test(key) && excludedSet.has('shoulders')) return true;
+    if (['quads', 'hamstrings', 'glutes', 'calves'].includes(key) && (excludedSet.has('legs') || excludedSet.has('lower'))) return true;
+    if (['biceps', 'triceps', 'forearms'].includes(key) && excludedSet.has('arms')) return true;
+    if (key === 'traps' && excludedSet.has('shoulders')) return true;
+    return false;
+  };
+  const isLegMuscle = (key: string): boolean => ['quads', 'hamstrings', 'glutes', 'calves'].includes(key);
   if (plan.volumeTargets) {
     for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
-      if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 1) {
+      if (isExcluded(muscle)) continue;
+      if (isLegMuscle(muscle) && !hasLegDay) continue;
+      if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 0) {
+        issues.push({ level: 'error', code: 'low_training_frequency', message: `${muscle}: частота 0×/нед — мышца не тренируется вовсе. Проверьте пул/оборудование/травмы.`, exercise: muscle });
+      } else if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 1) {
         issues.push({ level: 'warning', code: 'low_training_frequency', message: `${muscle}: частота 1×/нед — неоптимально для гипертрофии. Рекомендовано ≥2×/нед (Schoenfeld 2016: 2× ES 0.49 vs 1× 0.30). Рассмотрите сплит с 2× частотой.`, exercise: muscle });
       }
     }
   } else if (plan.muscleFrequency) {
     for (const [muscle, freq] of Object.entries(plan.muscleFrequency)) {
-      if (MAJOR_FOR_FREQ.has(muscle) && freq === 1) {
+      if (isExcluded(muscle)) continue;
+      if (isLegMuscle(muscle) && !hasLegDay) continue;
+      if (MAJOR_FOR_FREQ.has(muscle) && freq === 0) {
+        issues.push({ level: 'error', code: 'low_training_frequency', message: `${muscle}: частота 0×/нед — мышца не тренируется вовсе.`, exercise: muscle });
+      } else if (MAJOR_FOR_FREQ.has(muscle) && freq === 1) {
         issues.push({ level: 'warning', code: 'low_training_frequency', message: `${muscle}: частота 1×/нед — неоптимально. Рекомендовано ≥2×/нед (Schoenfeld 2016).`, exercise: muscle });
       }
     }
@@ -277,7 +304,14 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         : 0;
       // Порог 70% MEV: дефициты 70-100% — пограничная точность распределения
       // (шум в rationale для лимитированных natural-сплитов); значимые <70%.
-      if (peakVolume < target.mev * 0.7) {
+      // P1-9 (план BB-FEMALE-POSTERIOR): факт 0 при ненулевом таргете — ERROR
+      // ТОЛЬКО для канонических major-мышц (валидатор пропускал «quads
+      // target 8, факт 0» как warning). PRO/гранулярные ключи (delt_mid,
+      // forearms, traps) легитимно живут с нулевым объёмом в минимальных
+      // планах — факт 0 у них остаётся warning'ом.
+      if (peakVolume <= 0 && target.mev > 0 && MAJOR_FOR_FREQ.has(muscle) && !isExcluded(muscle) && !(isLegMuscle(muscle) && !hasLegDay)) {
+        issues.push({ level: 'error', code: 'target_volume_deficit', message: `${muscle}: effective volume 0 при target MEV ${target.mev} — мышца не получает прямой/косвенной работы.`, exercise: muscle });
+      } else if (peakVolume < target.mev * 0.7) {
         issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${muscle}: effective volume ${Math.round(peakVolume * 10) / 10} ниже MEV ${target.mev} (${Math.round((peakVolume / target.mev) * 100)}%); проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
       }
     }

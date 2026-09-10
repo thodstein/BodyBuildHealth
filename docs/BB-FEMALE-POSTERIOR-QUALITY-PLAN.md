@@ -81,6 +81,8 @@
 
 ## E. План работ (по приоритету, каждый пункт с тестом-мутацией)
 
+> **Статус (Sep 10 2026):** P0 (пп. 1-8) выполнен полностью (коммиты `6f2d34b8` + `548c5ee9` + `dc7b90df`, bb 2117/2117). P1: п. 9 (валидатор-гейты: факт 0 → error для major-мышц, частота 0×/нед → error, с честными исключениями push/pull-сплитов без ножных дней и excludedMuscles; NEW `bb-validator-dead-muscle.test.ts` 5/5) и п. 10 (атрибуция аддукторов — закрыт ранее: derivePattern 'adduction' → trueMuscleOf null) — выполнены; п. 11 (female-матрица дампов) — pending; п. 12 — закрыт ранее (честное переписывание phase-D). P2: п. 13 (женские циклы-шаблоны) — pending; п. 14 (`stretchPhase` в lengthened-скоринг) — **ОТМЕНЁН с обоснованием**: каталог несёт 55 флагов (почти все канонические compound'ы) — полный +10 сдвигает selection-дрейф за калиброванные допуски (packing-инварианты), а тай-брейк по флагу переупорядочивает точные тайлы и пересчитывает zero-state объёмы (back 16→20 у natural). Name-regex в `lengthenedBonus` уже покрывает канонические lengthened-движения; флаг каталога остаётся данными для будущих потребителей (strict-groups уже матчит по id). Внедрение требует отдельной re-baseline кампании.
+
 ### P0 — выдача female_glute_5 (блокирует «грамотный инструмент»)
 1. **Каталог**: дедуп keep-first для `hip_thrust`/`hip_thrust_single` (или исключить их из last-wins). Тест: `hip_thrust` присутствует, `type==='compound'`.
 2. **Пул/скор**: `PREFERRED_BB_EXERCISES` += `hip_thrust`, `leg_press` (женский legs-контекст), `sldl`; fix fallback-fill (bb-builder:2262) — tier-гейт: на тяж-день primary запрещены `difficulty<=2`-band/bodyweight rehab-упражнения (clamshell/fire hydrant → только памп/warmup роль).
