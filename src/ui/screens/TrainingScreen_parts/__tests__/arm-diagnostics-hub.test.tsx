@@ -287,6 +287,14 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Нормы ROM');
   });
 
+  it('P4: тип траектории с подсказкой что чинить', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    const area = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
+    expect(document.body.textContent).toContain('Что чинить:');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

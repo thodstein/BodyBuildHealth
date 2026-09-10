@@ -102,6 +102,14 @@ export function HubGripTab({ H }: { H: any }) {
         <AdSec title="VBT">
           <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
           {vbtThP0 && <div className="ad-muted">Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
+          {vbtThP0 && vbt.velocityLossPct != null && (
+            <div data-arm="vbt-scale">
+              <div className="ad-muted">Шкала потери: 0% · warn {vbtThP0.warnPct}% · stop {vbtThP0.stopPct}% · факт {vbt.velocityLossPct}%</div>
+              <div className="ad-volbar" aria-hidden>
+                <span style={{ width: `${Math.max(0, Math.min(100, Math.round((vbt.velocityLossPct / Math.max(1, vbtThP0.stopPct)) * 100)))}%` }} />
+              </div>
+            </div>
+          )}
           <div className="ad-row" data-arm="vbt-inputs">
             <AdField label="Вес, кг">
               <input inputMode="decimal" value={state.vbtWeight} onChange={e=>setState((s: any)=>({...s, vbtWeight:e.target.value}))} placeholder="кг" aria-label="VBT вес кг" />
@@ -184,6 +192,11 @@ export function HubWristTab({ H }: { H: any }) {
             <div className="ad-muted">
               xLoop {trackMetrics.xLoop} · yMax {trackMetrics.yMax} · vMax {trackMetrics.vMax} · точек {trackMetrics.points} · тип <b>{trackType === 'inside_hook' ? 'hook внутрь' : trackType === 'outside_toproll' ? 'toproll наружу' : 'press прямо'}</b>
               {trackSrd && <span> · {trackSrd}</span>}
+              <div className="ad-tip">
+                {trackType === 'inside_hook' ? 'Что чинить: держи пронацию, не отдавай кисть — качай pron_lock'
+                  : trackType === 'outside_toproll' ? 'Что чинить: rising + тяга на себя, локоть 90° — качай rising_top'
+                  : 'Что чинить: плечо за рукой, только из нейтрали — новичкам пресс опасен'}
+              </div>
             </div>
           )}
         </AdSec>
