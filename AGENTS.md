@@ -1,5 +1,13 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ТА-хаб V4 индивидуальный MVT выполнен кодом (Sep 10 2026, в worktree БЕЗ коммита)
+
+Продолжение V3 (§6 в `docs/TA-DIAGNOSTICS-PRO-PLAN-V3.md`, кандидат из §4): MVT из собственной регрессии атлета (García-Ramos 2023c), популяционный MVT базой не используется (PMC 2025). Только Edit/Write-инструмент.
+
+- **Движок** (NEW `strength-sport-ta-mvt.engine.ts` + тест 4/4): `individualMVT` (гейты: точка ≥85%, r²≥0.85) + `predict1RMFromProfile` (high в замерах / med в экстраполяции, без профиля — null). Поймано: флоат спреда 0.2 в чужом `calibrateLVP` — тест берёт точки шире, движок не тронут.
+- **Хаб** (LVP-блок: мемы `lvpLiveProfile/mvtLive/mvtEst` + `data-wl="mvt"` + нота в экспорт; тест/UI +1).
+- **Проверено**: область + хаб 777/777, свои файлы в `tsc` чистые (3 ошибки — чужой WIP `BBDiagnosticsHub.tsx`, не тронут), `verify:apk-design` OK. Файлы: NEW движок + тест, MOD хаб/apk-тест/V3-док + эта запись.
+
 ## Арм-хаб PRO-4: Excalibur + CoC-ориентир (Sep 10 2026, в worktree БЕЗ коммита — чекаут и повершел запрещены)
 
 Продолжение по команде «продолжай»: единственный покрываемый пробел из остатка (§6 в `docs/ARM-DIAGNOSTICS-HUB-PRO-2.md`). Только Edit-инструмент, проверка чтением (прогоны за владельцем).

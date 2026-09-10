@@ -15,6 +15,7 @@ import { CARD, ACCENT } from './training-ui';
 import { isSystemVelocitySuspect } from '../../../engines/strength-sport/strength-sport-ta-velocity-guard.engine';
 import { attemptBaseDivergence, SNATCH_PREDICTORS, CJ_PREDICTORS } from '../../../engines/strength-sport/strength-sport-ta-strength-base.engine';
 import { diagnosePullPhaseProfile } from '../../../engines/strength-sport/strength-sport-ta-pull-phase.engine';
+import { individualMVT, predict1RMFromProfile } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -560,6 +561,29 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [state.lvp50, state.lvp65, state.lvp75, state.lvp90]);
 
+  // V4: живой LVP-профиль из ramp-ввода → индивидуальный MVT → оценка 1RM
+  const lvpLiveProfile = useMemo(() => {
+    try {
+      const pts = [
+        { pct: 0.5, velocity: parseFloat(state.lvp50) }, { pct: 0.65, velocity: parseFloat(state.lvp65) },
+        { pct: 0.8, velocity: parseFloat(state.lvp75) }, { pct: 0.9, velocity: parseFloat(state.lvp90) },
+      ].filter(p => Number.isFinite(p.velocity) && p.velocity > 0) as Array<{ pct: number; velocity: number }>;
+      if (pts.length < 3) return null;
+      return calibrateLVP(state.lvpLift, pts);
+    } catch { return null; }
+  }, [state.lvp50, state.lvp65, state.lvp75, state.lvp90, state.lvpLift]);
+  const mvtLive = useMemo(() => {
+    try { return lvpLiveProfile ? individualMVT(lvpLiveProfile) : null; } catch { return null; }
+  }, [lvpLiveProfile]);
+  const mvtEst = useMemo(() => {
+    try {
+      const w = state.vbtWeight ? parseFloat(state.vbtWeight) : NaN;
+      const v = state.vbtVel ? parseFloat(state.vbtVel) : NaN;
+      if (!lvpLiveProfile || !Number.isFinite(w) || !Number.isFinite(v)) return null;
+      return predict1RMFromProfile(lvpLiveProfile, w, v);
+    } catch { return null; }
+  }, [lvpLiveProfile, state.vbtWeight, state.vbtVel]);
+
   // E9: антропометрия → хват/старт
   const anthro = useMemo(() => {
     try {
@@ -1086,6 +1110,12 @@ export const WLDiagnosticsHub: React.FC = () => {
       try {
         if (ktw.text) hubNotes.push(`Голеностоп: ${ktw.text}`);
       } catch { /* noop */ }
+      // V4: индивидуальный MVT + оценка в экспорт
+      try {
+        if (mvtLive && mvtLive.valid) {
+          hubNotes.push(`MVT индивид.: ${mvtLive.mvt} м/с (r² ${mvtLive.r2})${mvtEst ? ` · ${mvtEst.note}` : ''}`);
+        }
+      } catch { /* noop */ }
       base.notes = hubNotes;
       if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle };
     } catch { /* noop — базовый снап */ }
@@ -1432,6 +1462,16 @@ export const WLDiagnosticsHub: React.FC = () => {
                 }} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#3b82f6)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Калибровать LVP</button>
                 <span style={{ fontSize:10, color:'#fff', alignSelf:'center' }}>{state.lvpResult}</span>
               </div>
+              {/* V4: индивидуальный MVT + оценка 1RM по текущей скорости */}
+              {mvtLive ? (
+                <div data-wl="mvt" style={{ fontSize: 10, color: mvtLive.valid ? '#22c55e' : '#f59e0b', marginTop: 6 }}>
+                  {mvtLive.valid ? `✓ MVT ${mvtLive.mvt} м/с (r² ${mvtLive.r2}, индивид.)` : `⚠️ MVT: ${mvtLive.reason}`}
+                  {mvtLive.valid && mvtEst && <span> · {mvtEst.note}</span>}
+                  {mvtLive.valid && !mvtEst && <span> · введи вес + пик (штанга) выше — посчитаем 1RM</span>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>MVT: введи ≥3 точки ramp — индивидуальный порог точнее популяционного (García-Ramos 2023c).</div>
+              )}
               <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
               {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>

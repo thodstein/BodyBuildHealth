@@ -129,6 +129,16 @@ describe('WLDiagnosticsHub APK UI', () => {
     await screen.findByText(/Заявка выше модели/);
     expect(container.querySelector('[data-wl="base-div"]')).toBeTruthy();
   });
+  it('V4 MVT: дефолтный ramp → индивид. порог + оценка 1RM', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    await screen.findByText(/MVT .* м\/с \(r²/);
+    expect(container.querySelector('[data-wl="mvt"]')).toBeTruthy();
+    const w = container.querySelector('input[placeholder="100"]')!;
+    fireEvent.change(w, { target: { value: '100' } });
+    fireEvent.change(container.querySelector('input[placeholder="1.75"]')!, { target: { value: '1.75' } });
+    await screen.findByText(/1RM≈/);
+  });
   it('W8 голеностоп L/R: градусы + флаг асимметрии + персист', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/Мобильность/)[0]);
