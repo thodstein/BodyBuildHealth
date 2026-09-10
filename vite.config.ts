@@ -75,6 +75,12 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     sourcemap: false,
+    // APK ставится и на старые телефоны: дефолтный таргет vite
+    // (baseline-widely-available = Chrome 107+) на древнем WebView даёт
+    // SyntaxError всего бандла = вечная «Загрузка». es2019 (Chrome 63+)
+    // парсится везде, где вообще живёт IndexedDB/WebView. TG/web — без
+    // изменений поведения, бандл чуть толще.
+    target: 'es2019',
     rollupOptions: {
       output: {
         manualChunks(id: string) {
