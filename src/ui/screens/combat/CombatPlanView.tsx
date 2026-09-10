@@ -6,7 +6,7 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider } from './CombatUI';
+import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
@@ -261,13 +261,15 @@ export const CombatPlanView: React.FC<Props> = ({
                             <input aria-label="вес" type="number" value={ex.weight} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
                             <input aria-label="повторы" type="text" value={ex.reps} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
                             <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
-                            <select aria-label="замена" value={ex.id} onChange={e => { const v = e.target.value; if (v !== ex.id) onSwapEx(wk.week - 1, sess.day, ex.id, v); }} style={{ ...INPUT, padding: '7px 8px', fontSize: 11, background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.18)', color: '#d8b4fe' }}>
-                              <option value={ex.id}>{ex.id} ✓</option>
-                              {(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => <option key={id} value={id}>{id}</option>)}
-                            </select>
+                            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+                              <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) onSwapEx(wk.week - 1, sess.day, ex.id, v); }} options={[
+                                { id: ex.id, label: `${ex.id} ✓` },
+                                ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: id })),
+                              ]} />
+                            </div>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button aria-label="вверх" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>↑</button>
-                              <button aria-label="вниз" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>↓</button>
+                              <button aria-label="вверх" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↑</button>
+                              <button aria-label="вниз" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↓</button>
                             </div>
                           </div>
 
@@ -293,14 +295,18 @@ export const CombatPlanView: React.FC<Props> = ({
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
             <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
             {setAnnualWeeks && (
-              <select value={annualWeeks} onChange={e => setAnnualWeeks(Number(e.target.value))} style={{ ...INPUT, width: 100, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
-                <option value={12}>12 нед</option><option value={24}>24 нед</option><option value={36}>36 нед</option><option value={52}>52 нед</option>
-              </select>
+              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                <CombatPopupSelect label="Длина года" value={String(annualWeeks)} onChange={v => setAnnualWeeks(Number(v))} options={[
+                  { id:'12', label:'12 нед' }, { id:'24', label:'24 нед' }, { id:'36', label:'36 нед' }, { id:'52', label:'52 нед' },
+                ]} />
+              </div>
             )}
             {setAnnualCycles && (
-              <select value={annualCycles ?? 1} onChange={e => setAnnualCycles(Number(e.target.value))} style={{ ...INPUT, width: 90, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
-                <option value={1}>1 цикл</option><option value={2}>2 цикла</option><option value={3}>3 цикла</option><option value={4}>4 цикла</option>
-              </select>
+              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                <CombatPopupSelect label="Циклы" value={String(annualCycles ?? 1)} onChange={v => setAnnualCycles(Number(v))} options={[
+                  { id:'1', label:'1 цикл' }, { id:'2', label:'2 цикла' }, { id:'3', label:'3 цикла' }, { id:'4', label:'4 цикла' },
+                ]} />
+              </div>
             )}
             <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед{annualCycles && annualCycles>1 ? ` · ${annualCycles}ц` : ''}</Badge>
             {annual?.blocks?.length>4 && <Badge color="#f59e0b" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">Issurin 8-13н ×{annualCycles}</Badge>}

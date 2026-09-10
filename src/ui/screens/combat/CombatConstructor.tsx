@@ -29,7 +29,7 @@ import {
   CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
   INPUT, SELECT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, ACCENT, ACCENT_GRAD, GLASS_BORDER, TEXT_3,
   SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, CardHeader, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
-  EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel,
+  EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
 import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, STEP_PILL, IN as T_IN } from '../TrainingScreen_parts/training-ui';
 import { CombatPlanView } from './CombatPlanView';
@@ -724,15 +724,13 @@ export const CombatConstructor: React.FC = () => {
               <Field label="Травмы — щадящий режим" hint="Снижает вес ×0.6 и повышает RIR, фильтрует опасные движения">
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input value={injInput} onChange={e => setInjInput(e.target.value)} placeholder="напр.: шея, колено, плечо, кисть" style={{ ...INPUT, flex: 1, minWidth: 180 }} />
-                  <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#fff', fontWeight: 700, background: injExclude ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', padding: '8px 10px', borderRadius: 10, border: `1px solid ${injExclude ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={injExclude} onChange={e => setInjExclude(e.target.checked)} style={{ accentColor: '#ef4444' }} /> ⛔ Исключить
-                  </label>
                   <button onClick={() => {
                     const parts = injInput.split(',').map(s => s.trim()).filter(Boolean);
                     setInjuries(parts.map(p => ({ location: p, type: injExclude ? 'exclude' : 'joint', exclude: injExclude, mode: injExclude ? 'exclude' : 'graded', severity: injExclude ? 'high' : 'medium' } as any)));
                     setMsg(parts.length ? (injExclude ? '⛔ Исключены: ' : '⚡ Щадящий: ') + parts.join(', ') : 'Список очищен'); setTimeout(() => setMsg(''), 2000);
                   }} style={BTN_SMALL}>Применить</button>
                 </div>
+                <CbSwitch checked={injExclude} onChange={setInjExclude} label="⛔ Исключить" desc="Выкл — щадящий режим: вес ×0.6–0.7, RIR+1" tone="red" />
                 {injuries.length > 0 && (
                   <InfoBanner tone={injExclude ? 'warn' : 'info'}>{injExclude ? '⛔ Исключены: ' : '⚡ Щадящий: '}{injuries.map((j: any) => j.location).join(', ')} — {injExclude ? 'убраны из пула' : 'вес ×0.6–0.7, RIR+1'}</InfoBanner>
                 )}
@@ -798,12 +796,8 @@ export const CombatConstructor: React.FC = () => {
                       <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — low fiber 4д</div>
                     </Field>
                   </div>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#fff', fontWeight: 700, background: 'rgba(255,255,255,0.04)', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={heatSessions} onChange={e => setHeatSessions(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#a855f7' }} /> Сауна 15-20′ ×3/нед — heat acclimation (≤4% BM/24ч)
-                  </label>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: confirmedManipulation ? '#fff' : 'rgba(255,255,255,0.72)', fontWeight: 700, background: confirmedManipulation ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', padding: '9px 11px', borderRadius: 10, border: `1px solid ${confirmedManipulation ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={confirmedManipulation} onChange={e => setConfirmedManipulation(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#ef4444' }} /> Подтверждаю экстремальные манипуляции (load_cut/deplete) — требуется при &gt;5кг
-                  </label>
+                  <CbSwitch checked={heatSessions} onChange={setHeatSessions} label="Сауна 15-20′ ×3/нед" desc="heat acclimation (≤4% BM/24ч)" />
+                  <CbSwitch checked={confirmedManipulation} onChange={setConfirmedManipulation} label="Подтверждаю экстремальные манипуляции (load_cut/deplete)" desc="требуется при >5кг" tone="red" />
                   {weighInType==='same_day_2h' ? (
                     <InfoBanner tone="warn">Same-day 1-2ч: окно восстановления короткое — сгонка ≤3кг, упор на жир/lean mass, не на воду. После: 0.5-1л ORS + 30-40г углей, без тяжёлой еды.</InfoBanner>
                   ) : (
@@ -817,10 +811,7 @@ export const CombatConstructor: React.FC = () => {
 
           <CbSec title="🥋 Вне зала — спарринг" summary={outsideSummary}>
             <SectionCard icon="🥋" title="Вне зала — спарринг декомпозиция" subtitle="Hard RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× зал сохраняет 1× Zone2 30′ (77% aerobic — Boxing Science)" accent>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#fff', fontWeight: 800, background: outsideEnabled ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 12, border: `1px solid ${outsideEnabled ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
-                <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#a855f7' }} />
-                Учитывать нагрузку вне зала (ринг / татами)
-              </label>
+              <CbSwitch checked={outsideEnabled} onChange={setOutsideEnabled} label="Учитывать нагрузку вне зала (ринг / татами)" />
 
               {outsideEnabled && (
                 <>
@@ -889,10 +880,7 @@ export const CombatConstructor: React.FC = () => {
                   <ChipToggle active={fightStyle === 'hybrid'} onClick={() => setFightStyle('hybrid')} icon="🥋">Гибрид</ChipToggle>
                 </div>
               </Field>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#fff', fontWeight: 700, background: avoidAxialLoad ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: 12, border: `1px solid ${avoidAxialLoad ? 'rgba(239,68,68,0.20)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
-                <input type="checkbox" checked={avoidAxialLoad} onChange={e => setAvoidAxialLoad(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#ef4444' }} />
-                Избегать осевой нагрузки — грыжа / перегруз позвоночника
-              </label>
+              <CbSwitch checked={avoidAxialLoad} onChange={setAvoidAxialLoad} label="Избегать осевой нагрузки" desc="грыжа / перегруз позвоночника" tone="red" />
             </SectionCard>
           </CbSec>
 
@@ -1048,12 +1036,18 @@ export const CombatConstructor: React.FC = () => {
             <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
                 <button onClick={handleBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
-                <select value={annualWeeks} onChange={e => setAnnualWeeks(Number(e.target.value))} style={{ ...INPUT, width: 100, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
-                  <option value={12}>12 нед</option><option value={24}>24 нед</option><option value={36}>36 нед</option><option value={52}>52 нед</option>
-                </select>
-                <select value={annualCycles ?? 1} onChange={e => setAnnualCycles(Number(e.target.value))} style={{ ...INPUT, width: 90, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
-                  <option value={1}>1 цикл</option><option value={2}>2 цикла</option><option value={3}>3 цикла</option><option value={4}>4 цикла</option>
-                </select>
+                <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                  <CombatPopupSelect label="Длина года" value={String(annualWeeks)} onChange={v => setAnnualWeeks(Number(v))} options={[
+                    { id:'12', label:'12 нед' }, { id:'24', label:'24 нед' }, { id:'36', label:'36 нед' }, { id:'52', label:'52 нед' },
+                  ]} />
+                </div>
+                {setAnnualCycles && (
+                  <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                    <CombatPopupSelect label="Циклы" value={String(annualCycles ?? 1)} onChange={v => setAnnualCycles(Number(v))} options={[
+                      { id:'1', label:'1 цикл' }, { id:'2', label:'2 цикла' }, { id:'3', label:'3 цикла' }, { id:'4', label:'4 цикла' },
+                    ]} />
+                  </div>
+                )}
                 <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед{annualCycles && annualCycles>1 ? ` · ${annualCycles}ц` : ''}</Badge>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

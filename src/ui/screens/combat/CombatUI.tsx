@@ -392,6 +392,48 @@ export const AccentText: React.FC<{ children: React.ReactNode }> = ({ children }
   <span style={{ color: ACCENT, fontWeight: 600, fontFamily: SF }}>{children}</span>
 );
 
+// ─── CbSwitch: красивый свитч вместо нативной галочки ───
+export const CbSwitch: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; desc?: string; tone?: 'violet' | 'red' }> = ({ checked, onChange, label, desc, tone = 'violet' }) => {
+  const on = tone === 'red' ? '#ef4444' : ACCENT;
+  const buzz = () => { try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ } };
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      data-on={checked ? 'true' : 'false'}
+      onClick={() => { buzz(); onChange(!checked); }}
+      className="cb-switch"
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+        borderRadius: 12, cursor: 'pointer', textAlign: 'left' as const, fontFamily: SF, minHeight: 52,
+        background: checked ? `${on}1f` : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${checked ? `${on}55` : 'rgba(255,255,255,0.08)'}`,
+        transition: 'all 0.18s',
+      }}
+      onMouseDown={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)'; }}
+      onMouseUp={e => { (e.currentTarget as HTMLButtonElement).style.transform = ''; }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, display: 'block', lineHeight: 1.3 }}>{label}</span>
+        {desc && <span style={{ fontSize: 11, color: TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35 }}>{desc}</span>}
+      </span>
+      <span aria-hidden style={{
+        width: 52, height: 32, borderRadius: 999, flexShrink: 0, position: 'relative',
+        background: checked ? `linear-gradient(135deg, ${on}, ${tone === 'red' ? '#f87171' : '#ec4899'})` : 'rgba(120,120,128,0.32)',
+        boxShadow: checked ? `0 0 14px ${on}66, inset 0 1px 0 rgba(255,255,255,0.22)` : 'inset 0 1px 3px rgba(0,0,0,0.3)',
+        transition: 'all 0.2s',
+      }}>
+        <span style={{
+          position: 'absolute', top: 4, left: checked ? 24 : 4, width: 24, height: 24, borderRadius: '50%',
+          background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.35)', transition: 'left 0.2s',
+        }} />
+      </span>
+    </button>
+  );
+};
+
 // ─── Apple sheets (попапы) ───
 const POP_OVERLAY: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
