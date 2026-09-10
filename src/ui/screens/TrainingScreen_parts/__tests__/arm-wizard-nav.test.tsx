@@ -4,6 +4,8 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import * as fs from 'fs';
+import * as path from 'path';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 
@@ -115,5 +117,16 @@ describe('Arm wizard navigation', () => {
     expect(document.body.textContent).toContain('План не собран');
     expect(container.querySelector("[data-arm='gates']")).toBeNull();
     expect(container.querySelector("[data-arm='weights-card']")).toBeNull();
+  });
+
+  it('шаги с enter-переходом: ad-stepview + reduced-motion', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    expect(container.querySelector('.ad-stepview'), 'stepview').not.toBeNull();
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-design.css'), 'utf-8');
+    expect(css).toContain('.ad-stepview');
+    expect(css).toContain('adTabIn');
+    const rmIdx = css.indexOf('prefers-reduced-motion');
+    expect(rmIdx).toBeGreaterThan(-1);
+    expect(css.slice(rmIdx)).toContain('.ad-stepview');
   });
 });

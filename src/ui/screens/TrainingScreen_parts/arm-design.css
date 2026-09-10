@@ -1258,6 +1258,9 @@
   :is(.train-armdiag) .ad-tabpanel {
     animation: none;
   }
+  :is(.train-arm) .ad-stepview {
+    animation: none;
+  }
   :is(.train-arm, .train-armdiag).ad-wrap {
     animation: none;
   }
@@ -2041,4 +2044,10 @@
 :is(.train-arm, .train-armdiag) .ad-step,
 :is(.train-arm, .train-armdiag) .ad-btn {
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── №3 КОНСТРУКТОР: enter-переход шагов + haptic-готовность ──────── */
+:is(.train-arm) .ad-stepview {
+  animation: adTabIn 0.28s cubic-bezier(0.22, 0.68, 0, 1);
+  min-width: 0;
 }

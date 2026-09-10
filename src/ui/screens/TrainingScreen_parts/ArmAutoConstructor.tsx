@@ -151,8 +151,12 @@ const GRIP_FOCI = [
   { id: 'hub', label: 'Хаб' },
 ] as const;
 
-const STEP_DEFS: AdStepDef[] = [
-  { id: 'params', label: '🎛 Параметры' },
+/* №3: лёгкий haptic на навигации (guard — тишина вне устройства) */
+function buzzStep(): void {
+  try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
+}
+
+const STEP_DEFS: AdStepDef[] = [  { id: 'params', label: '🎛 Параметры' },
   { id: 'athlete', label: '🎯 Атлет' },
   { id: 'grip', label: '✊ Стол и хват' },
   { id: 'split', label: '📚 Сплит и цикл' },
@@ -793,7 +797,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   aria-pressed={active}
                   data-active={active}
                   className="ad-step"
-                  onClick={() => setStep(id)}
+                  onClick={() => { buzzStep(); setStep(id); }}
                   style={{ ...STEP_PILL(active), flexShrink: 0 }}
                 >
                   <span className="ad-step-n" aria-hidden style={{ marginRight: 4, opacity: 0.8 }}>{idx + 1}</span>
@@ -809,7 +813,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       {msg && <div className="ad-toast" data-arm="msg">{msg}</div>}
 
       {step === 'params' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           <AdSec title="🎛 Параметры">
             <div className="ad-list">
               <div>
@@ -865,7 +869,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
 
       {step === 'athlete' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
             <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
@@ -1037,7 +1041,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
 
       {step === 'grip' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           <div>
             <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
           </div>
@@ -1177,7 +1181,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
 
       {step === 'split' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
             <div className="ad-list" data-arm="split-list">
               {ranked.slice(0,6).map((r,i)=> (
@@ -1325,7 +1329,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
 
       {step === 'plan' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           {!builtPlan ? <AdEmpty icon="📋" title="План не собран — вернись в «Параметры»." sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
@@ -1424,12 +1428,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
 
       {step === 'quality' && !builtPlan && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           <AdEmpty icon="🏋️" title="План не собран — вернись в «Сплит и цикл»." sub="Собери план — здесь появятся гейты качества, тепловая карта и веса."><AdBtn variant="primary" block onClick={() => setStep('split')}>📚 К сплиту</AdBtn></AdEmpty>
         </AdCard>
       )}
       {step === 'quality' && builtPlan && (
-        <AdCard data-arm="quality-card">
+        <AdCard data-arm="quality-card" className="ad-stepview">
             <>
               <AdSec title="📊 Качество">
                 <div className="ad-muted"><b>{builtPlan.report?.summary}</b></div>
@@ -1500,7 +1504,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         </AdCard>
       )}
       {step === 'quality' && builtPlan && (
-        <AdCard data-arm="weights-card">
+        <AdCard data-arm="weights-card" className="ad-stepview">
           <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
               <>
                 <div className="ad-stats">
@@ -1557,7 +1561,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         </AdCard>
       )}
       {step === 'export' && (
-        <AdCard>
+        <AdCard className="ad-stepview">
           {!builtPlan ? <AdEmpty icon="📤" title="План не собран — вернись в «Параметры»." sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."><AdBtn variant="primary" block onClick={() => setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
               <div className="ad-sec-t">📤 Экспорт — {builtPlan.pattern.name}</div>
