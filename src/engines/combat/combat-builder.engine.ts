@@ -107,6 +107,10 @@ const CB_EX_META: Record<string, { name: string; group: string; pattern: string 
   battle_rope: { name: 'Канаты', group: 'core', pattern: 'conditioning' },
   sledge_hammer: { name: 'Кувалда по покрышке', group: 'core', pattern: 'rotation' },
 };
+/** Русское имя упражнения по id (для UI: шит замены, точные веса). Фолбэк — сам id. */
+export function cbExerciseName(id: string): string {
+  return CB_EX_META[id]?.name || id;
+}
 const CB_TECHNIQUE: Record<string,string> = {
   bench_bar:'Жим: лопатки сведены, грудь вверх, стопы в пол',
   row_bar:'Тяга: нейтральная спина, локти к корпусу',

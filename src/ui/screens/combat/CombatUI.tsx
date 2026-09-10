@@ -22,8 +22,8 @@ export const GLASS_SHADOW = '0 1px 3px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0
 export const VIBRANCY = 'blur(20px) saturate(180%)';
 
 export const TEXT_1 = '#FFFFFF';
-export const TEXT_2 = 'rgba(235,235,245,0.60)';
-export const TEXT_3 = 'rgba(235,235,245,0.30)';
+export const TEXT_2 = '#fff';
+export const TEXT_3 = '#fff';
 export const SEPARATOR = 'rgba(84,84,88,0.36)';
 
 export const RADIUS_LG = 14;
@@ -108,7 +108,7 @@ export const BTN_GHOST: React.CSSProperties = {
   color: '#BF5AF2',
 };
 
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 32, padding: '7px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 44, padding: '10px 14px', fontSize: 13, borderRadius: 10, fontWeight: 700 };
 
 export const INPUT: React.CSSProperties = {
   background: 'rgba(58,58,60,0.72)',
@@ -478,7 +478,7 @@ export const CombatPopupSelect: React.FC<{ label: string; value: string | undefi
                     border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`,
                   }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span className="cb-pop-optlabel" style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 13, color: '#BF5AF2' }}>✓</span>}</span>
+                      <span className="cb-pop-optlabel" style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}><span className="cb-pop-radio" aria-hidden style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: active ? '#BF5AF2' : 'transparent', border: `2px solid ${active ? '#BF5AF2' : 'rgba(255,255,255,0.25)'}`, boxShadow: active ? '0 0 8px rgba(191,90,242,0.6)' : 'none' }} />{o.label}</span>
                       {o.desc && <span className="cb-pop-optdesc" style={{ fontSize: 12, color: active ? '#BF5AF2' : TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
                     </span>
                   </button>

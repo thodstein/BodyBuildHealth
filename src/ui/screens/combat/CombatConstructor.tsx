@@ -6,9 +6,10 @@
  * DOM-хуки .cb-* для APK-слоя (§92/§93) сохранены.
  */
 import React from 'react';
-import { buildCombatPlan } from '../../../engines/combat/combat-builder.engine';
+import { buildCombatPlan, cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
+import { COMBAT_CYCLE_LIBRARY } from '../../../engines/combat/combat-cycle-library';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
@@ -84,7 +85,7 @@ const CbSec: React.FC<{
       >
         <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{title}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {!open && summary && <span style={{ ...T_SMALL, color: 'rgba(255,255,255,0.65)' }}>{summary}</span>}
+          {!open && summary && <span style={{ ...T_SMALL, color: '#fff' }}>{summary}</span>}
           <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
         </span>
       </button>
@@ -448,7 +449,7 @@ export const CombatConstructor: React.FC = () => {
   const SelectWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div style={{ position: 'relative' }}>
       {children}
-      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>▾</span>
+      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#fff', fontSize: 12 }}>▾</span>
     </div>
   );
   void SelectWrap;
@@ -476,7 +477,7 @@ export const CombatConstructor: React.FC = () => {
           }}>🥊</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="cb-hero-title" style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>Единоборства — PRO силовая</div>
-            <div className="cb-hero-sub" style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.35, marginTop: 2 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
+            <div className="cb-hero-sub" style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
           </div>
           <span className="cb-hero-step"><Badge color="#fff" bg="linear-gradient(135deg, rgba(168,85,247,0.28), rgba(236,72,153,0.22))" border="rgba(255,255,255,0.14)">{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge></span>
         </div>
@@ -539,15 +540,15 @@ export const CombatConstructor: React.FC = () => {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                   <Field label={`Недель`} hint={`${weeks} нед — ATR блок`}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{weeks}</Highlight></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}><span>2</span><span>12</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}><span>2</span><span>12</span></div>
                   </Field>
                   <Field label={`Дней/нед`} hint={`${days}× — зал`}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{days}×</Highlight></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}><span>2</span><span>4</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}><span>2</span><span>4</span></div>
                   </Field>
                 </div>
                 <div style={{ height:0.5, background:'rgba(84,84,88,0.36)', margin:'4px 0' }} />
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:11, color:'rgba(235,235,245,0.60)' }}>Акценты: <Highlight>шея</Highlight> · <Highlight>хват</Highlight> · <Highlight>ротация</Highlight> · <Highlight>кор</Highlight></span></div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:11, color:'#fff' }}>Акценты: <Highlight>шея</Highlight> · <Highlight>хват</Highlight> · <Highlight>ротация</Highlight> · <Highlight>кор</Highlight></span></div>
               </div>
             </SectionCard>
           </CbSec>
@@ -567,8 +568,8 @@ export const CombatConstructor: React.FC = () => {
                 ]} />
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:2 }}>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', background:'rgba(168,85,247,0.08)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(168,85,247,0.14)' }}><Highlight color="#a855f7">50% Accum</Highlight> 6-10/RIR2-3 → <Highlight>30% Trans</Highlight> 3-6/RIR1-2 → <Highlight>20% Real</Highlight> RIR4</span>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', background:'rgba(59,130,246,0.06)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#3b82f6">Lactic 5×3мин</Highlight> · <Highlight color="#3b82f6">Aerobic 40′</Highlight></span>
+                <span style={{ fontSize:10, color:'#fff', background:'rgba(168,85,247,0.08)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(168,85,247,0.14)' }}><Highlight color="#a855f7">50% Accum</Highlight> 6-10/RIR2-3 → <Highlight>30% Trans</Highlight> 3-6/RIR1-2 → <Highlight>20% Real</Highlight> RIR4</span>
+                <span style={{ fontSize:10, color:'#fff', background:'rgba(59,130,246,0.06)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#3b82f6">Lactic 5×3мин</Highlight> · <Highlight color="#3b82f6">Aerobic 40′</Highlight></span>
               </div>
             </SectionCard>
           </CbSec>
@@ -606,7 +607,7 @@ export const CombatConstructor: React.FC = () => {
         <div className="cb-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <CbSec title="👤 Антропометрия" defaultOpen summary={athleteSummary}>
             <SectionCard icon="👤" title="Антропометрия" subtitle="Вес и возраст — % от ПМ и тонус">
-              <div style={{ display: 'flex', gap:6, flexWrap:'wrap', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'rgba(235,235,245,0.60)' }}>Профиль: <Highlight color="#a855f7">{sex==='male'?'Мужской':'Женский'}</Highlight> · <Highlight>{bodyweight}кг</Highlight> · <Highlight>{age} лет</Highlight></div>
+              <div style={{ display: 'flex', gap:6, flexWrap:'wrap', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff' }}>Профиль: <Highlight color="#a855f7">{sex==='male'?'Мужской':'Женский'}</Highlight> · <Highlight>{bodyweight}кг</Highlight> · <Highlight>{age} лет</Highlight></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <CombatPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[
                   { id:'male', label:'Мужской' },
@@ -630,7 +631,7 @@ export const CombatConstructor: React.FC = () => {
                 <Field label="Потеря скорости" hint={`${velocityLoss}% — бюджет`}>
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e => setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#a855f7'}>{velocityLoss}%</Highlight></div>
                 </Field>
-                <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.60)', alignSelf: 'center', background: velocityLoss>20?'rgba(245,158,11,0.08)':'rgba(168,85,247,0.08)', padding: '8px 10px', borderRadius: 10, border: `0.5px solid ${velocityLoss>20?'rgba(245,158,11,0.18)':'rgba(168,85,247,0.14)'}`, display:'flex', gap:6, alignItems:'center' }}>
+                <div style={{ fontSize: 11, color: '#fff', alignSelf: 'center', background: velocityLoss>20?'rgba(245,158,11,0.08)':'rgba(168,85,247,0.08)', padding: '8px 10px', borderRadius: 10, border: `0.5px solid ${velocityLoss>20?'rgba(245,158,11,0.18)':'rgba(168,85,247,0.14)'}`, display:'flex', gap:6, alignItems:'center' }}>
                   Бюджет <Highlight color={velocityLoss>20?'#ff9f0a':'#a855f7'}>×{velocityLoss > 20 ? '0.90' : '1.00'}</Highlight> {velocityLoss > 20 ? '— снижение объёма' : '— норма'}
                 </div>
               </div>
@@ -663,7 +664,7 @@ export const CombatConstructor: React.FC = () => {
                   );
                 })}
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра: если заполнен хотя бы один lift (squat/bench/row) — builder режет вес/RIR индивидуально (иначе скаляр Best/Last).</div>
+              <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра: если заполнен хотя бы один lift (squat/bench/row) — builder режет вес/RIR индивидуально (иначе скаляр Best/Last).</div>
             </SectionCard>
           </CbSec>
 
@@ -676,7 +677,7 @@ export const CombatConstructor: React.FC = () => {
                   </Field>
                 ))}
               </div>
-              <button onClick={() => setShowExactWM(v => !v)} style={{ ...BTN, background: showExactWM ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showExactWM ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.07)'}`, color: showExactWM ? '#d8b4fe' : 'rgba(255,255,255,0.72)', fontSize: 11 }}>
+              <button onClick={() => setShowExactWM(v => !v)} style={{ ...BTN, background: showExactWM ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showExactWM ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.07)'}`, color: showExactWM ? '#d8b4fe' : '#fff', fontSize: 11 }}>
                 {showExactWM ? '▲ Скрыть точные веса' : '▼ Точные веса по упражнениям (64)'}
               </button>
               {showExactWM && (() => {
@@ -695,9 +696,9 @@ export const CombatConstructor: React.FC = () => {
                         <div style={{ fontSize: 10, color: '#c4b5fd', fontWeight: 800, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>{grp.label} · {grp.ids.length}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
                           {grp.ids.map(id => (
-                            <label key={id} style={{ color: 'rgba(255,255,255,0.72)', fontSize: 10, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {id}
-                              <input type="number" value={workMaxByExercise[id] || ''} onChange={e => { const v = Number(e.target.value) || 0; setWorkMaxByExercise(s => { const n = { ...s }; if (v > 0) n[id] = v; else delete n[id]; return n; }); }} style={{ ...INPUT, padding: '7px 8px', fontSize: 12 }} placeholder="кг" />
+                            <label key={id} style={{ color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {cbExerciseName(id)}
+                              <input type="number" value={workMaxByExercise[id] || ''} onChange={e => { const v = Number(e.target.value) || 0; setWorkMaxByExercise(s => { const n = { ...s }; if (v > 0) n[id] = v; else delete n[id]; return n; }); }} style={{ ...INPUT, padding: '7px 8px', fontSize: 12 }} placeholder="кг" aria-label={cbExerciseName(id)} />
                             </label>
                           ))}
                         </div>
@@ -794,7 +795,7 @@ export const CombatConstructor: React.FC = () => {
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={90} step={5} value={orsSodium} onChange={e => setOrsSodium(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{orsSodium}</Highlight></div>
                     </Field>
                     <Field label="Клетчатка fight week" hint={'ISSN <10г ×4д =1-2% BM'}>
-                      <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — low fiber 4д</div>
+                      <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — low fiber 4д</div>
                     </Field>
                   </div>
                   <CbSwitch checked={heatSessions} onChange={setHeatSessions} label="Сауна 15-20′ ×3/нед" desc="heat acclimation (≤4% BM/24ч)" />
@@ -920,11 +921,11 @@ export const CombatConstructor: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: active ? '#fff' : 'rgba(255,255,255,0.92)' }}>{p.name}</span>
-                    <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : 'rgba(255,255,255,0.42)', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: active ? '#fff' : '#fff' }}>{p.name}</span>
+                    <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : '#fff', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.62)', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
-                  <div className="cb-split-preview" style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
+                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
+                  <div className="cb-split-preview" style={{ fontSize: 10, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
                   {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => s.sessionTag).join(', ')}</div>}
                 </button>
               );
@@ -932,6 +933,48 @@ export const CombatConstructor: React.FC = () => {
           </div>
 
           <InfoBanner>ATR 5/3/2: 10 нед → 5 накопление 6-10/RIR2-3 → 3 трансформация 3-6/RIR1-2 → 2 реализация тапер. Conjugate — ротация макс/динам/повтор. Linear — ОФП/сила/тапер.</InfoBanner>
+
+          <div style={{ ...CARD, padding: 14, gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📚</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Готовые циклы</div>
+                <div style={{ fontSize: 11, color: '#fff' }}>Одна кнопка — дисциплина, цель, недели, дни, модель и сплит</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {COMBAT_CYCLE_LIBRARY.map(c => (
+                <div
+                  key={c.id}
+                  className="cb-cycle-card"
+                  style={{
+                    textAlign: 'left', padding: 12, borderRadius: 14,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.14)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{c.name}</span>
+                    <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{c.blurb}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>Модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</b></div>
+                  <button
+                    onClick={() => {
+                      setDiscipline(c.discipline); setGoal(c.goal); setWeeks(c.weeks); setDays(c.daysPerWeek);
+                      setPeriodizationModel(c.periodizationModel); setPatternId(c.patternId);
+                      buzzStep(); setMsg(`✦ Цикл «${c.name}» применён — жмите «Собрать PRO-план»`); setTimeout(() => setMsg(''), 2600);
+                    }}
+                    className="cb-cycle-apply"
+                    style={{ ...BTN_PRIMARY, width: '100%', marginTop: 8, padding: '10px 14px', fontSize: 12, borderRadius: 12 }}
+                  >
+                    ✦ Применить «{c.name}»
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <button onClick={build} className="cb-build" style={{ ...BTN_PRIMARY, width: '100%', padding: '14px 16px', fontSize: 13, borderRadius: 14 }}>
             ✦ Собрать PRO-план {patternId ? `· ${patternId}` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}
@@ -1016,7 +1059,7 @@ export const CombatConstructor: React.FC = () => {
           <CbQualityMap plan={plan} />
           {plan.rationale?.length ? (
             <CbSec title="📄 Подробный отчёт (текст)" summary={`${plan.rationale.length} строк`}>
-              <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
+              <div style={{ fontSize:11, color:'#fff', whiteSpace:'pre-wrap', lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
             </CbSec>
           ) : null}
           {renderNavRow('plan', 'export')}
@@ -1060,7 +1103,7 @@ export const CombatConstructor: React.FC = () => {
               {annual.competitions?.length > 0 && (
                 <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
-                  {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
+                  {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>

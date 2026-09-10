@@ -6,7 +6,8 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
+import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
+import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
@@ -87,7 +88,9 @@ export const CombatPlanView: React.FC<Props> = ({
   onBuildATR, onAddCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
 }) => {
   const [expandedWeek, setExpandedWeek] = React.useState<number | null>(0);
+  const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
+  const sessOpen = (wk: number, day: number, idx: number) => openSess[`${wk}-${day}`] ?? idx === 0;
 
   return (
     <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -97,7 +100,7 @@ export const CombatPlanView: React.FC<Props> = ({
           <button className="cb-plan-undo" onClick={onUndo} disabled={historyLen === 0} style={{
             padding: '8px 12px', minHeight: 44, borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: historyLen ? 'pointer' : 'default',
             background: historyLen ? 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.14))' : 'rgba(255,255,255,0.04)',
-            color: historyLen ? '#d8b4fe' : 'rgba(255,255,255,0.32)', border: `1px solid ${historyLen ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.06)'}`,
+            color: historyLen ? '#d8b4fe' : '#fff', border: `1px solid ${historyLen ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.06)'}`,
             backdropFilter: 'blur(8px)',
           }}>↩ Отменить {historyLen ? `(${historyLen})` : ''}</button>
           <span className="cb-plan-hist" style={{ fontSize: 11, color: TEXT_3, fontWeight: 700 }}>История {historyLen}/10</span>
@@ -152,10 +155,10 @@ export const CombatPlanView: React.FC<Props> = ({
             <InfoBanner tone="info">Меню генерируется через `combatWeightCutToMealInput` → планировщик питания (кнопка «Копировать» сохраняет в `he_combat_meal_preview`)</InfoBanner>
           </SectionCard>
         )}
-        {plan.rationale?.length ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
+        {plan.rationale?.length ? <div style={{ fontSize:11, color:'#fff', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
         <details style={{ background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>
           <summary style={{ fontSize:11, fontWeight:700, color:'#d8b4fe', cursor:'pointer' }}>📄 Подробный отчёт (текст)</summary>
-          <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
+          <div style={{ fontSize:11, color:'#fff', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
         </details>
       </SectionCard>
       </div>
@@ -170,13 +173,13 @@ export const CombatPlanView: React.FC<Props> = ({
           <GroupHeading icon="⚡️" text="Alactic / Lactic / Aerobic" desc="Issurin ATR — кондиция по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {(plan as any).conditioning.sessions.map((week: any[], wi: number) => (
-              <div key={wi} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.05)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <div key={wi} style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.05)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                 <Highlight color="#60a5fa">Нед {wi + 1}</Highlight><span style={{ fontWeight:700, color:'#fff' }}>{ruLabel(PHASE_RU, plan.weeksData[wi]?.phase)}</span><span style={{ color:TEXT_3 }}>·</span>
                 {week.length ? week.map((s: any, si:number) => <Highlight key={si} color={s.modality==='alactic'?'#a855f7': s.modality==='lactic'?'#ef4444':'#0ea5e9'}>{`${s.modality} ${s.durationMin}′ ${s.intervals || ''}`.trim()}</Highlight>) : <span style={{ color: TEXT_3 }}>внезал покрывает</span>}
               </div>
             ))}
           </div>
-          <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(59,130,246,0.08)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#ef4444">Lactic 5×3′</Highlight> · <Highlight color="#0ea5e9">Aerobic 40′ Zone2</Highlight></div>
+          <div style={{ fontSize:11, color:'#fff', background:'rgba(59,130,246,0.08)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#ef4444">Lactic 5×3′</Highlight> · <Highlight color="#0ea5e9">Aerobic 40′ Zone2</Highlight></div>
         </SectionCard>
       )}
 
@@ -219,8 +222,8 @@ export const CombatPlanView: React.FC<Props> = ({
             {!isOpen && (
               <div className="cb-plan-weekchips" style={{ padding: '0 14px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {wk.sessions.map(s => (
-                  <span key={s.day} style={{ fontSize: 10.5, padding: '4px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
-                    {s.sessionTag} · {s.exercises.length}упр
+                  <span key={s.day} style={{ fontSize: 10.5, padding: '4px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>
+                    {SESSION_TAG_RU[s.sessionTag] || s.sessionTag} · {s.exercises.length}упр
                   </span>
                 ))}
               </div>
@@ -235,19 +238,30 @@ export const CombatPlanView: React.FC<Props> = ({
                   }} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>⎙ Копировать неделю</button>
                 </div>
 
-                {wk.sessions.map(sess => (
-                  <div key={sess.day} className="cb-plan-sess" style={{
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 10,
+                {wk.sessions.map((sess, si) => {
+                  const sOpen = sessOpen(wk.week, sess.day, si);
+                  return (
+                  <div key={sess.day} className="cb-plan-sess" data-open={sOpen ? 'true' : 'false'} style={{
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: sOpen ? 10 : '0 10px',
                     backdropFilter: 'blur(8px)',
                   }}>
-                    <div className="cb-plan-sesshead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap:'wrap', gap:6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}>{sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#ff9f0a': sess.character==='памп'?'#a855f7':'#60a5fa'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′</span></span>
-                      <span style={{ fontSize: 10, color: TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>
-                        ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха
+                    <button
+                      onClick={() => setOpenSess(s => ({ ...s, [`${wk.week}-${sess.day}`]: !sOpen }))}
+                      aria-expanded={sOpen}
+                      className="cb-plan-sesshead-btn"
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', minHeight: 48, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' as const, flexWrap: 'wrap', gap: 6 }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily:'-apple-system, system-ui, sans-serif', flex: 1, minWidth: 0 }}>{SESSION_TAG_RU[sess.sessionTag] || sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#ff9f0a': sess.character==='памп'?'#a855f7':'#60a5fa'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′ · {sess.exercises.length} упр.</span></span>
+                      <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>
+                          ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха
+                        </span>
+                        <span aria-hidden style={{ width: 32, height: 32, borderRadius: 10, background: sOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${sOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, transition: 'transform 0.18s', transform: sOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
                       </span>
-                    </div>
+                    </button>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sOpen && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 2 }}>
                       {sess.exercises.map(ex => (
                         <div key={ex.id} className="cb-plan-ex" style={{
                           background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
@@ -255,7 +269,7 @@ export const CombatPlanView: React.FC<Props> = ({
                         }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', flex: '1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>
-                              {ex.name} <span style={{ fontWeight: 500, color: 'rgba(235,235,245,0.62)' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
+                              {ex.name} <span style={{ fontWeight: 500, color: '#fff' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
                               <span style={{ fontSize: 10.5, color: TEXT_3, marginLeft: 6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с</span>
                               {ex.comment?.includes('Тапер') && <Highlight color="#60a5fa">тапер</Highlight>}
                               {ex.comment?.includes('Весогонка') && <Highlight color="#ff9f0a">весогонка</Highlight>}
@@ -268,8 +282,8 @@ export const CombatPlanView: React.FC<Props> = ({
                             <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '7px 8px', fontSize: 12, textAlign: 'center' }} />
                             <div style={{ flex: '1 1 120px', minWidth: 0 }}>
                               <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) onSwapEx(wk.week - 1, sess.day, ex.id, v); }} options={[
-                                { id: ex.id, label: `${ex.id} ✓` },
-                                ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: id })),
+                                { id: ex.id, label: `${cbExerciseName(ex.id)} · текущий` },
+                                ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: cbExerciseName(id) })),
                               ]} />
                             </div>
                             <div style={{ display: 'flex', gap: 4 }}>
@@ -278,14 +292,16 @@ export const CombatPlanView: React.FC<Props> = ({
                             </div>
                           </div>
 
-                          {ex.comment && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.58)', background: 'rgba(168,85,247,0.06)', borderLeft: '2px solid rgba(168,85,247,0.28)', padding: '6px 8px', borderRadius: 8 }}>{ex.comment}</div>}
+                          {ex.comment && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.06)', borderLeft: '2px solid rgba(168,85,247,0.28)', padding: '6px 8px', borderRadius: 8 }}>{ex.comment}</div>}
                           {ex.warmupSets && ex.warmupSets.length > 0 && <div style={{ fontSize: 10.5, color: TEXT_3 }}>Разминка: {ex.warmupSets.map(s => `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.36)', fontFamily: 'ui-monospace, monospace' }}>Сеты: {ex.workSets.map(s => `${s.reps}×${s.weight ? s.weight + 'кг' : '—'} RIR${s.rir}`).join(' · ')}</div>
+                          <div style={{ fontSize: 10.5, color: '#fff', fontFamily: 'ui-monospace, monospace' }}>Сеты: {ex.workSets.map(s => `${s.reps}×${s.weight ? s.weight + 'кг' : '—'} RIR${s.rir}`).join(' · ')}</div>
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -336,7 +352,7 @@ export const CombatPlanView: React.FC<Props> = ({
           {annual.competitions?.length > 0 && (
             <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
-              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
+              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
             </div>
           )}
 

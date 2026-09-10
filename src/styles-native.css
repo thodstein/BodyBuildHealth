@@ -13183,3 +13183,101 @@ html.app-native .combat-constructor .cb-switch:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 115. COMBAT CARDS/BUTTONS — циклы, сессии, экспорт под АПК ───
+ * Хуки: .cb-cycle-card/.cb-cycle-meta/.cb-cycle-apply,
+ * .cb-plan-sesshead-btn, .cb-pop-radio, .cb-plan-export button,
+ * .cb-plan-copyweek, .cb-plan-move.
+ * Карточки циклов 18px, apply 48px, шапки сессий 48px, экспорт/копи/мув
+ * 44px + press 0.97 + focus-visible + tabular, 380px, reduced-motion.
+ * Только APK, без hex. */
+html.app-native .combat-constructor .cb-cycle-card {
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(168, 85, 247, 0.3) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+}
+html.app-native .combat-constructor .cb-cycle-meta {
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+html.app-native .combat-constructor .cb-cycle-apply {
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+html.app-native .combat-constructor .cb-cycle-apply:active {
+  transform: scale(0.98) !important;
+}
+html.app-native .combat-constructor .cb-cycle-apply:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-plan-sesshead-btn {
+  min-height: 48px !important;
+  border-radius: 10px !important;
+}
+html.app-native .combat-constructor .cb-plan-sesshead-btn:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: -2px !important;
+}
+html.app-native .combat-constructor .cb-plan-export button {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-constructor .cb-plan-export button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-constructor .cb-plan-export button:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-plan-copyweek {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+}
+html.app-native .combat-constructor .cb-plan-copyweek:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-constructor .cb-plan-copyweek:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-plan-move {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor .cb-plan-move:active {
+  transform: scale(0.94) !important;
+}
+html.app-native .combat-constructor .cb-plan-move:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor .cb-plan-exgrid {
+    grid-template-columns: 1fr 1fr 1fr !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-cycle-apply:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-plan-export button:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-plan-copyweek:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-plan-move:active {
+    transform: none !important;
+  }
+}
