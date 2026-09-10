@@ -1,3 +1,0 @@
-score=90
-picked=1
-applied=1 recipeApplied=PreW: рис-мёд-шейкер recipeOptions=["PreW: рис-мёд-шейкер"]
