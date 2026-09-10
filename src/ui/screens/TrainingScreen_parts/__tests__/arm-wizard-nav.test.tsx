@@ -88,6 +88,27 @@ describe('Arm wizard navigation', () => {
     expect(container.querySelector("[data-arm='rationale']")).not.toBeNull();
   });
 
+  it('экспорт — копирование сводки в буфер', async () => {
+    const writes: string[] = [];
+    const nav: any = window.navigator as any;
+    const prev = nav.clipboard;
+    try {
+      Object.defineProperty(window.navigator, 'clipboard', { value: { writeText: (s: string) => { writes.push(s); return Promise.resolve(); } }, configurable: true });
+      render(<ArmAutoConstructor />);
+      go('📚 Сплит и цикл');
+      fireEvent.click(screen.getByText('⚡ Собрать план'));
+      go('📤 Экспорт');
+      fireEvent.click(screen.getByText('📋 Копировать сводку'));
+      await screen.findByText('✅ Сводка скопирована');
+      expect(writes.length).toBe(1);
+      expect(writes[0]).toContain('Арм-план');
+      expect(writes[0]).toMatch(/Н1 \(.+?\): \d+/);
+    } finally {
+      if (prev === undefined) { try { delete (window.navigator as any).clipboard; } catch {} }
+      else { Object.defineProperty(window.navigator, 'clipboard', { value: prev, configurable: true }); }
+    }
+  });
+
   it('пустой план — только карточка-мост, гейтов нет', () => {
     const { container } = render(<ArmAutoConstructor />);
     go('📋 План');

@@ -182,6 +182,13 @@ const PHASE_DOT: Record<string, string> = {
   deload: '#60a5fa',
   peaking: '#ef4444',
 };
+/* Кромка сессий по характеру дня */
+const CHAR_EDGE: Record<string, string> = {
+  'тяж': '#ef4444',
+  'памп': '#f59e0b',
+  'техника': '#60a5fa',
+  'лёг': '#22c55e',
+};
 function rirTint(rir: any): React.CSSProperties {
   const n = Number(rir);
   const c = !(n >= 0) ? undefined : n <= 1 ? '#ef4444' : n <= 2 ? '#f59e0b' : '#22c55e';
@@ -1246,7 +1253,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   return (
                   <button key={w.week} className="ad-wpill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)} aria-label={`Неделя ${w.week}, сетов ${v}`}>
                     <span className="ad-wpill-bar" aria-hidden><span className="ad-wpill-fill" style={{ height: `${h}%` }} /></span>
-                    <span className="ad-wpill-t">Н{w.week} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
+                    <span className="ad-wpill-t" style={{ fontVariantNumeric: 'tabular-nums' }}>Н{w.week} · {v} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
                   </button>
                   );
                 })}
@@ -1257,7 +1264,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
                   {curWeek.sessions.map((sess:any, si:number)=> (
-                    <div key={si} className="ad-sess">
+                    <div key={si} className="ad-sess" style={CHAR_EDGE[sess.character] ? { borderLeft: `3px solid ${CHAR_EDGE[sess.character]}` } : undefined}>
                       <div className="ad-sess-h">{sess.sessionTag} <span className="ad-tag" data-ch={sess.character}>{sess.character}</span> {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}</div>
                       {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
                       {sess.exercises.map((ex:any, ei:number)=> (
@@ -1448,6 +1455,35 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
                 }}>📅 .ics</AdBtn>
+                <AdBtn variant="ghost" onClick={() => {
+                  const tot = (builtPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
+                  const lines = [
+                    `🤝 Арм-план — ${builtPlan.pattern.name} (${builtPlan.weeks.length} нед)`,
+                    `${discipline} · ${technique} · ${level} · ${goal}`,
+                    weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
+                    cycId ? `Цикл: ${cycId}` : 'Обычный план',
+                    `Всего: ${tot} сетов · стол ${planDash ? planDash.tablePct : '—'}%`,
+                    (builtPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
+                  ];
+                  const txt = lines.join('\n');
+                  const done = () => flash('✅ Сводка скопирована');
+                  const fallback = () => {
+                    try {
+                      const ta = document.createElement('textarea');
+                      ta.value = txt;
+                      document.body.appendChild(ta);
+                      ta.select();
+                      (document as any).execCommand('copy');
+                      document.body.removeChild(ta);
+                      done();
+                    } catch { flash('⚠ Не удалось скопировать'); }
+                  };
+                  try {
+                    const nav: any = navigator as any;
+                    if (nav?.clipboard?.writeText) nav.clipboard.writeText(txt).then(done, fallback);
+                    else fallback();
+                  } catch { fallback(); }
+                }}>📋 Копировать сводку</AdBtn>
               </div>
               <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
                 <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
