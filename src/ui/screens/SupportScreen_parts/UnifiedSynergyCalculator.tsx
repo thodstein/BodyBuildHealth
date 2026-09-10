@@ -741,8 +741,8 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
         <>
           {/* ─── Score + Quick stats ─── */}
           <div style={{ background:'rgba(24,24,27,0.8)', borderRadius:12, padding:14, border:`2px solid ${LEVEL_COLORS[enrichedScore.level]}44`, marginBottom:8 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:LEVEL_COLORS[enrichedScore.level] }}>Совместимость стека</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:LEVEL_COLORS[enrichedScore.level], minWidth:0 }}>Совместимость стека</div>
               <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                 <span style={{ fontSize:22, fontWeight:800, color:LEVEL_COLORS[enrichedScore.level] }}>{enrichedScore.score}</span>
                 <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)' }}>/ 100</span>

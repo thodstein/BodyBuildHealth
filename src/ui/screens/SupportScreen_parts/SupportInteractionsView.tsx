@@ -208,8 +208,8 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
             {pairTop.length === 0
               ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Нет данных.</div>
               : pairTop.map(p => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <button onClick={() => setPairBId(p.id)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 11, cursor: 'pointer', textAlign: 'left', flex: 1 }}>{p.name}</button>
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <button onClick={() => setPairBId(p.id)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 11, cursor: 'pointer', textAlign: 'left', flex: 1, minWidth: 0 }}>{p.name}</button>
                   <span style={{ fontSize: 10, fontWeight: 700, color: PAIR_LEVEL_COLOR[p.res.level] || 'rgba(255,255,255,0.5)', minWidth: 28, textAlign: 'right' }}>{p.res.score}</span>
                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginLeft: 6, minWidth: 90, textAlign: 'right' }}>{PAIR_LEVEL_RU[p.res.level] || p.res.level}</span>
                 </div>

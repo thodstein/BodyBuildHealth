@@ -324,7 +324,7 @@ export const SupportAnalogCalculator: React.FC = () => {
               )}
 
               {(replacement.form || replacement.doseMg || replacement.timing) && (
-                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 12, rowGap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   {replacement.form && (
                     <div>
                       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Форма: </span>

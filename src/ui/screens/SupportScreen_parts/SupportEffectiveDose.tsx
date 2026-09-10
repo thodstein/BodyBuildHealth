@@ -326,14 +326,14 @@ export const SupportEffectiveDose: React.FC = () => {
       {f1 && !f2 && eff1.absorbed > 0 && (
         <div style={{ ...S.card, borderColor: 'rgba(34,197,94,0.15)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Вещество</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a' }}>{f1.nameRu}</div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
                 {dose1} мг × {(f1.bioavailability * 100).toFixed(0)}% = {eff1.absorbed} мг усвоено
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Биодоступность</div>
               <div style={{
                 fontSize: 16, fontWeight: 800,

@@ -21,7 +21,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
         <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
         <div style={{ display:'flex', gap:6 }}>
           <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
-            style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
+            style={{ flex:1, minWidth:0, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
           <button onClick={() => {
             if (!stackName.trim()) { showToast('Введите название'); return; }
             // Сохраняем живой план из движка: SUPPORT_LEVELS — пустая заготовка,
@@ -49,7 +49,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
           return (
             <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
               <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
-                <div style={{ flex:1 }}>
+                <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
                   <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{stack.date ? new Date(stack.date).toLocaleDateString('ru') : ''} · {stack.subs.length} добавок</div>
                   {(stack as any).notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).notes}</div>}
@@ -67,9 +67,9 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
                       const desc = sub?.description || (pharma ? pharmaSummary(pharma) : '') || '';
                       return (
                         <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                            <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
-                            {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                            <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', minWidth:0 }}>{name}</span>
+                            {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)', flexShrink:0 }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
                           </div>
                           {desc && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{desc}</div>}
                         </div>

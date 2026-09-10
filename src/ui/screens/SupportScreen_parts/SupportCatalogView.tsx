@@ -75,7 +75,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                             return (
                               <div key={sub?.id||'x'}>
                                 <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
-                                  <div style={{ flex:1 }}>
+                                  <div style={{ flex:1, minWidth:0 }}>
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {(sub?.categories||[]).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
@@ -135,7 +135,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                 return (
                                   <div key={id}>
                                     <div onClick={() => setSelectedSub(isSelected ? null : id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
-                                      <div style={{ flex:1 }}>
+                                      <div style={{ flex:1, minWidth:0 }}>
                                         <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ')}</div>
                                       </div>
@@ -275,7 +275,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                   {clsExpanded && clsSubs.map((sub: any) => (
                                     <div key={sub?.id||'x'}>
                                       <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 22px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
-                                        <div style={{ flex:1 }}>
+                                        <div style={{ flex:1, minWidth:0 }}>
                                           <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {(sub?.categories||[]).slice(0,3).map((c: any) => { const ci = getCategoryInfo(c); return <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ci.label||c||''}</span>; })}
@@ -338,7 +338,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                               return remaining.map((sub: any) => (
                                 <div key={sub?.id||'x'}>
                                   <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ flex:1 }}>
+                                    <div style={{ flex:1, minWidth:0 }}>
                                       <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {(sub?.categories||[]).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{CATEGORY_LABELS[c]?.label || c||''}</span>)}

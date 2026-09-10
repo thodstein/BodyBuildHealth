@@ -143,7 +143,7 @@ const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategorie
           <div style={{ fontSize: 12, fontWeight: 700, color: showCompare ? '#00e68a' : 'var(--text-light)' }}>Сравнение форм</div>
           <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{compareIds.length > 0 ? `${compareIds.length} из 4 · нажмите + на препаратах` : 'Выберите 2–4 препарата для сравнения'}</div>
         </div>
-        {compareIds.length > 0 && <div style={{ display: 'flex', gap: 3 }}>{compareIds.map(id => { const e = catalog.find(x => x.id === id); return e ? <span key={id} style={{ padding: '2px 6px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: 'rgba(0,230,138,0.12)', color: '#00e68a', whiteSpace: 'nowrap' }}>{e.nameRu}</span> : null; })}</div>}
+        {compareIds.length > 0 && <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', minWidth: 0, justifyContent: 'flex-end' }}>{compareIds.map(id => { const e = catalog.find(x => x.id === id); return e ? <span key={id} style={{ padding: '2px 6px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: 'rgba(0,230,138,0.12)', color: '#00e68a', whiteSpace: 'nowrap' }}>{e.nameRu}</span> : null; })}</div>}
       </div>
       {showCompare && <ComparePanel compareEntries={compareEntries} compareIds={compareIds} handleCompare={handleCompare} />}
       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>{filtered.length} из {catalog.length} веществ</div>
