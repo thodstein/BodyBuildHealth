@@ -8,6 +8,7 @@
 - **NEW `bb-prep-post-show-log.engine.ts`** (P6): CRUD `he_prep_postshow_v1` (кап 6, битый стор → []), 5 маркеров восстановления, comedown-памятка без доз.
 - **UI**: чип-замок P1, доза trial P2, колонка «Клетч.» P3, бейдж тапер≠делод + last-hard чипы P4, селектор треков 56px P5, блок восстановления P6, бейдж diet-break P7 (белый текст, 44px+, без нового CSS).
 - **Проверено**: NEW `bb-taper-pro2` 20/20 + соседи 282/282 + bb-область 2206/2207 (1 падение — чужое `bb-diagnostics-max-pro` female-symmetry, моих импортов нет) + UI 20/20 + `tsc` 0 + `verify:apk-design` OK. Контекст питания не тронут (трек едет через план).
+- **Доводка (закоммичена pathspec)**: закрыты 4 честных гэпа — доза trial в сборке (`carbDoseGPerKg` сквозь plan/overlay/питание/кэш, BbAuto считает из `lastTest`), трек при пересборке (`postShowTrack` из текущего плана), display-таблица с брейками (`bb-prep-cycle`, только P7-ветка), лог в экспорте (coach-JSON + секция печати, callsites передают лог). Тест 27/27 + prep-cycle 48/48 + соседи 311/311, `tsc` 0 по своим (2 ошибки — чужой `BBDiagnosticsHub` WIP), apk-verify OK. В `BbAutoConstructor` чужой ханк PRO-3 R2 — в коммит взяты только 5 своих ханков (байтовый фильтр + `apply --cached --unidiff-zero`), чужое цело.
 - Файлы: MOD движок/BbAuto/PeakWeekCard, NEW движок лога + NEW тест + PRO-2 док. Коммит pathspec своих, без пуша.
 
 ## Тапер ББ PRO: план выполнен полностью Э0–Э9 кодом (Sep 11 2026, в worktree БЕЗ коммита)

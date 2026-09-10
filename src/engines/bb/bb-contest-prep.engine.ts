@@ -20,6 +20,12 @@
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
 import type { BBPlan } from './bb-builder.engine';
+// PRO-2 P6: тип записей восстановления + маркеры/памятка для экспорта (value-импорт
+// безопасен: bb-prep-post-show-log ни от кого не зависит, циклов нет).
+import {
+  postShowRecoveryMarkers, postShowComedownNotes,
+  type PostShowWeekEntry,
+} from './bb-prep-post-show-log.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Типы
@@ -803,11 +809,11 @@ function peakWeekCacheKey(eff: BBContestPrepConfig): string {
   ];
   return parts.map(p => String(p ?? '')).join('|');
 }
-function peakWeekCached(eff: BBContestPrepConfig): PeakWeekDayPlan[] {
-  const key = peakWeekCacheKey(eff);
+function peakWeekCached(eff: BBContestPrepConfig, carbDoseGPerKg?: number): PeakWeekDayPlan[] {
+  const key = `${peakWeekCacheKey(eff)}|dose:${carbDoseGPerKg ?? ''}`;
   const hit = _peakWeekCache.get(key);
   if (hit) return hit;
-  const built = buildPeakWeek(eff);
+  const built = buildPeakWeek(eff, carbDoseGPerKg != null ? { carbDoseGPerKg } : undefined);
   if (_peakWeekCache.size >= 32) {
     const firstKey = _peakWeekCache.keys().next().value;
     if (firstKey) _peakWeekCache.delete(firstKey);
@@ -1404,7 +1410,7 @@ export function computeReadiness(cfg: BBContestPrepConfig): BBContestPrepResult[
 // Сборка полного результата
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepResult {
+export function buildBBContestPrep(rawCfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): BBContestPrepResult {
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) {
     throw new Error(`Некорректный конфиг тапера ББ: ${v.errors.join(' ')}`);
@@ -1414,7 +1420,8 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
   const cfg: BBContestPrepConfig = { ...base, showDate };
   const profile = CATEGORY_PROFILES[cfg.category];
   const taper = buildTrainingTaper(cfg);
-  const peakWeek = buildPeakWeek(cfg);
+  // PRO-2 P2: персональная доза trial (без неё — средний коридора, back-compat).
+  const peakWeek = buildPeakWeek(cfg, opts?.carbDoseGPerKg != null ? { carbDoseGPerKg: opts.carbDoseGPerKg } : undefined);
   const showTimeline = buildShowTimeline(cfg);
   const readiness = computeReadiness(cfg);
 
@@ -1434,6 +1441,9 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
     `💧 Вода: ${cfg.waterStrategy}; 🧂 натрий: ${cfg.sodiumStrategy}; калий ${peakWeek[0]?.potassiumMg ?? 3500} мг — не снижается.`,
     `🎭 Позирование ${POSING_BY_DAY[1]}–${POSING_BY_DAY[7]} мин/день; день шоу — памп-рутина backstage.`,
   ];
+  if (opts?.carbDoseGPerKg != null) {
+    rationale.push(`🧪 Доза trial: ${opts.carbDoseGPerKg} г/кг total (персональная, вместо среднего коридора).`);
+  }
   if (competitions.length > 0) {
     rationale.push(`🏁 Соревнования (${competitions.length}): ${competitions.map(c => `${c.name}${c.priority ? ` [${c.priority}]` : ''}`).join(', ')}.`);
     if (mainCompetition) rationale.push(`⭐ Главный старт: «${mainCompetition.name}»${mainCompetition.date ? ` (${mainCompetition.date})` : ''} — пик-неделя и тапер строятся под него.`);
@@ -1453,15 +1463,16 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
 /**
  * День пик-недели для конкретной даты. null — дата вне окна [шоу−6, шоу].
  * День 1 = D-6, день 7 = шоу.
+ * PRO-2 P2: opts.carbDoseGPerKg — персональная доза trial (в ключе кэша).
  */
-export function peakWeekDayForDate(dateIso: string, cfg: BBContestPrepConfig): PeakWeekDayPlan | null {
+export function peakWeekDayForDate(dateIso: string, cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): PeakWeekDayPlan | null {
   if (!isValidIsoDate(dateIso)) return null;
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return null;
   const showDate = resolveShowDate(cfg);
   const diff = daysBetween(dateIso, showDate); // дней от date до шоу
   if (diff < 0 || diff > 6) return null;
-  const peakWeek = peakWeekCached({ ...cfg, showDate });
+  const peakWeek = peakWeekCached({ ...cfg, showDate }, opts?.carbDoseGPerKg);
   // diff = дней от date до шоу: 0 → шоу (день 7), 6 → день 1 (D-6).
   return peakWeek[6 - diff] ?? null;
 }
@@ -1474,8 +1485,9 @@ export function computePeakWeekNutritionTargets(
   dateIso: string,
   base: PeakNutritionBase,
   cfg: BBContestPrepConfig,
+  opts?: { carbDoseGPerKg?: number },
 ): PeakNutritionTargets {
-  const day = peakWeekDayForDate(dateIso, cfg);
+  const day = peakWeekDayForDate(dateIso, cfg, opts);
   if (!day) {
     return {
       kcal: base.kcal, proteinG: base.proteinG, fatG: base.fatG, carbsG: base.carbsG,
@@ -1574,7 +1586,7 @@ function toPeakWeekSession(
 export function applyTrainingTaperToBBPlan(
   plan: BBPlan,
   rawCfg: BBContestPrepConfig,
-  opts?: { weekNumber?: number; force?: boolean },
+  opts?: { weekNumber?: number; force?: boolean; carbDoseGPerKg?: number },
 ): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
@@ -1668,7 +1680,8 @@ export function applyTrainingTaperToBBPlan(
     // Guard только против ПРОШЛЫХ применений (peakWeek) при !force; с force —
     // пересобираем пик-неделю по актуальным настройкам (обновление плана).
     if (wk.peakWeek !== true || force) {
-      const peakWeek = buildPeakWeek(cfg);
+      // PRO-2 P2: пик-неделя строится с персональной дозой trial (без неё — коридор по умолчанию).
+      const peakWeek = buildPeakWeek(cfg, opts?.carbDoseGPerKg != null ? { carbDoseGPerKg: opts.carbDoseGPerKg } : undefined);
       wk.phase = 'peaking';
       wk.taper = true;
       wk.peakWeek = true;
@@ -1774,6 +1787,8 @@ export interface ContestPrepApplyOpts {
    *  (объём как в плане, RIR 1–3, без отказа); 0.85 — поддерживающий объём
    *  при дефиците (Helms 2022). По умолчанию 1.0. */
   prepVolumeMult?: number;
+  /** PRO-2 P2: персональная доза загрузки trial (г/кг total) — в пик-неделю плана. */
+  carbDoseGPerKg?: number;
 }
 
 /**
@@ -1805,7 +1820,7 @@ export function applyContestPrepToBBPlan(
 
   // 1) Taper + пик-неделя на последние taperWeeks+1 недель.
   //    force=true: повторное наложение ОБНОВЛЯЕТ уже размеченные недели (изменения настроек).
-  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true }) as BBPlanWithPrep;
+  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true, carbDoseGPerKg: opts.carbDoseGPerKg }) as BBPlanWithPrep;
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
@@ -2170,6 +2185,11 @@ export interface BBContestPrepPlan {
     waterMode: PrepWaterMode;
     sodiumMode: PrepSodiumMode;
     carbMode: PrepCarbMode;
+    /**
+     * PRO-2 P2: персональная доза загрузки (г/кг total, из trialCarbDoseGPerKg).
+     * Опционально — без неё buildPeakWeek идёт по среднему коридора (back-compat).
+     */
+    carbDoseGPerKg?: number;
   };
 
   phases: PrepPhaseRange[];
@@ -2333,6 +2353,8 @@ export interface BuildPrepPlanOpts {
   testPeakWeekId?: string;
   /** PRO-2 P5: трек post-show (дефолт 'recovery'). */
   postShowTrack?: 'recovery' | 'reverse';
+  /** PRO-2 P2: персональная доза загрузки trial (г/кг total) — в plan.peakWeek. */
+  carbDoseGPerKg?: number;
 }
 
 export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
@@ -2437,6 +2459,10 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       waterMode: allowedManipulation && canonicalWaterStrategy(cfg.waterStrategy) !== 'stable' ? 'moderate' : 'stable',
       sodiumMode: allowedManipulation && canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable' ? 'moderate' : 'stable',
       carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : cfg.carbLoadStrategy === 'undulating' ? 'moderate' : cfg.carbLoadStrategy === 'linear' ? 'moderate' : 'moderate',
+      // PRO-2 P2: доза trial едет в плане (питание и пик-неделя читают её отсюда).
+      carbDoseGPerKg: opts.carbDoseGPerKg != null && Number.isFinite(opts.carbDoseGPerKg)
+        ? Math.min(12, Math.max(3, opts.carbDoseGPerKg))
+        : undefined,
     },
     phases,
     trainingPlanId: opts.trainingPlanId,
@@ -2734,9 +2760,14 @@ export function nutritionTargetsForPrepDate(
   base: PeakNutritionBase,
   opts?: { isHeavyTrainDay?: boolean; postShowTrack?: 'recovery' | 'reverse' },
 ): PeakNutritionTargets {
-  const day = peakWeekDayForDate(dateIso, configFromPlan(plan));
+  // PRO-2 P2: пик-неделя читает персональную дозу из плана (без неё — коридор по умолчанию).
+  const peakCfg = configFromPlan(plan);
+  const peakDose = plan.peakWeek.carbDoseGPerKg != null
+    ? { carbDoseGPerKg: plan.peakWeek.carbDoseGPerKg }
+    : undefined;
+  const day = peakWeekDayForDate(dateIso, peakCfg, peakDose);
   if (day) {
-    return computePeakWeekNutritionTargets(dateIso, base, configFromPlan(plan));
+    return computePeakWeekNutritionTargets(dateIso, base, peakCfg, peakDose);
   }
   const phase = prepPhaseForDate(plan, dateIso);
   const potassiumMg = plan.sex === 'female' ? 3500 : 4000;
@@ -3335,7 +3366,7 @@ export function prepNutritionSignals(plan: BBContestPrepPlan): string[] {
   return signals;
 }
 
-export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance }): string {  const profile = CATEGORY_PROFILES[plan.category];
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance; postShowLog?: PostShowWeekEntry[] }): string {  const profile = CATEGORY_PROFILES[plan.category];
   const post = buildPostShowPlan(plan);
   const peakWeek = buildPeakWeek(configFromPlan(plan));
   const timeline = buildShowTimeline(configFromPlan(plan));
@@ -3383,6 +3414,20 @@ ${timeline.map(t => `<tr><td>${t.time}</td><td><b>${escHtml(t.action)}</b></td><
 <ul>${rows(post.notes)}</ul>
 <div class="muted">🏋️ ${escHtml(post.training.join(' '))}</div>
 <div class="muted">⚖️ ${escHtml(post.weightCheck)}</div>
+${(() => {
+  const log = (extra?.postShowLog ?? []).filter(e => e && Number.isInteger(e.week));
+  if (log.length === 0) return '';
+  const last = [...log].sort((a, b) => a.week - b.week)[log.length - 1];
+  const m = postShowRecoveryMarkers(last, plan.preparation.startingWeightKg);
+  return `<h2>🔄 Восстановление post-show (лог ${m.recoveredCount}/5)</h2>` +
+    `<table><tr><th>Нед</th><th>Дата</th><th>Вес</th><th>Сон</th><th>Голод</th><th>Цикл</th><th>Сила %</th></tr>` +
+    [...log].sort((a, b) => a.week - b.week).map(e =>
+      `<tr><td>${e.week}</td><td>${escHtml(e.dateIso)}</td><td>${e.weightKg ?? '—'}</td>` +
+      `<td>${e.sleepH ?? '—'}</td><td>${e.hunger1_5 ?? '—'}</td><td>${escHtml(e.cycle ?? '—')}</td>` +
+      `<td>${e.strengthReturnPct ?? '—'}</td></tr>`).join('') +
+    `</table><div class="muted">Маркеры: вес +5% ${m.weightRegained ? '✓' : '—'} · сон ${m.sleepOk ? '✓' : '—'} · голод ${m.hungerOk ? '✓' : '—'} · цикл ${m.cycleOk ? '✓' : '—'} · сила ${m.strengthOk ? '✓' : '—'}</div>` +
+    `<ul>${rows(postShowComedownNotes())}</ul>`;
+})()}
 
 <h2>⚖️ Адаптация по весу</h2>
 <div class="muted">Анализ средних за 7 дней; целевой темп ${plan.preparation.targetRatePctPerWeek}%/нед. Одна переменная за раз: калории ±150–175 ИЛИ кардио ±20 мин/нед. В taper/пик корректировки запрещены.</div>
@@ -3483,7 +3528,7 @@ export function buildPrepIcs(plan: BBContestPrepPlan): string {
 }
 
 /** JSON-снапшот плана для тренера (компактный, без лишних полей). */
-export function buildPrepCoachJson(plan: BBContestPrepPlan): string {
+export function buildPrepCoachJson(plan: BBContestPrepPlan, opts?: { postShowLog?: PostShowWeekEntry[] }): string {
   return JSON.stringify({
     id: plan.id,
     showDate: plan.showDate,
@@ -3496,6 +3541,8 @@ export function buildPrepCoachJson(plan: BBContestPrepPlan): string {
     phases: plan.phases.map(p => ({ key: p.key, label: p.label, weekStart: p.weekStart, weekEnd: p.weekEnd, dateStart: p.dateStart, dateEnd: p.dateEnd })),
     adjustments: plan.adjustments ?? [],
     safety: plan.safety,
+    // PRO-2 P6: лог восстановления едет тренеру вместе со снапшотом.
+    postShowLog: opts?.postShowLog ?? [],
     updatedAt: plan.updatedAt,
   }, null, 2);
 }

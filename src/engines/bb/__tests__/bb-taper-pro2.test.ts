@@ -21,6 +21,7 @@ import {
   isPrepDietBreakDay,
   prepRefeedDates,
   isPrepRefeedDay,
+  configFromPlan,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
   type TestPeakWeekResult,
@@ -264,5 +265,92 @@ describe('PRO-2 P7 — diet-break длинного препа', () => {
     expect(isPrepRefeedDay(bday, long)).toBe(false);
     // календарь рефидов не содержит брейк-дней
     for (const d of prepRefeedDates(long)) expect(isPrepDietBreakDay(d, long)).toBe(false);
+  });
+});
+
+// ── Доводка: доза в сборке, трек при пересборке, таблица с брейками, экспорт лога ──
+describe('PRO-2 доводка — доза едет в план и питание', () => {
+  it('buildBBContestPrepPlan хранит дозу; пик-день отражает dosed-бюджет', () => {
+    const [lo] = CATEGORY_PROFILES.mens_physique.carbTotalBudgetGPerKg;
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2, carbDoseGPerKg: lo });
+    expect(plan.peakWeek.carbDoseGPerKg).toBe(lo);
+    const base = { kcal: 2600, proteinG: 170, fatG: 65, carbsG: 300, waterMl: 3000, sodiumMg: 2800 };
+    const peakStart = plan.phases.find(p => p.key === 'peak_week')!.dateStart;
+    const t = nutritionTargetsForPrepDate(peakStart, plan, base);
+    expect(t.phase).toBe('deplete_1');
+    // полный load-бюджет дня пика = доза × вес (деплеция не входит, проверяем через buildPeakWeek)
+    const dosed = buildPeakWeek(configFromPlan(plan), { carbDoseGPerKg: lo });
+    const sum = dosed.filter(d => d.phase.startsWith('load')).reduce((a, d) => a + d.carbsG, 0);
+    expect(sum).toBe(Math.round(80 * lo));
+    expect(t.carbsG).toBe(dosed[0].carbsG);
+  });
+  it('без дозы план хранит undefined и идёт по коридору (back-compat)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    expect(plan.peakWeek.carbDoseGPerKg).toBe(undefined);
+  });
+  it('buildBBContestPrep с дозой: rationale + dosed-бюджет', async () => {
+    const { buildBBContestPrep } = await import('../bb-contest-prep.engine');
+    const [lo] = CATEGORY_PROFILES.mens_physique.carbTotalBudgetGPerKg;
+    const res = buildBBContestPrep(baseConfig(), { carbDoseGPerKg: lo });
+    expect(res.rationale.join(' ')).toMatch(/Доза trial/);
+    const sum = res.peakWeek.filter(d => d.phase.startsWith('load')).reduce((a, d) => a + d.carbsG, 0);
+    expect(sum).toBe(Math.round(80 * lo));
+  });
+});
+
+describe('PRO-2 доводка — трек хранится в плане', () => {
+  it('reverse opt-in переживает чтение живого рациона из плана', () => {
+    const base = { kcal: 2600, proteinG: 170, fatG: 65, carbsG: 300, waterMl: 3000, sodiumMg: 2800 };
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2, postShowTrack: 'reverse' });
+    expect(plan.postShowTrack).toBe('reverse');
+    const postDay = addDaysIso(plan.showDate, 10);
+    // без opts — трек берётся из плана
+    const t = nutritionTargetsForPrepDate(postDay, plan, base);
+    expect(t.note).toMatch(/reverse/);
+  });
+});
+
+describe('PRO-2 доводка — display-таблица знает брейки', () => {
+  it('20 нед: нед 8 и 16 — Diet break без рефида; нед 3 — рефид', async () => {
+    const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 20, taperWeeks: 2 });
+    const cfg = { category: 'mens_physique', sex: 'male', weightKg: 80 } as any;
+    const table = buildPrepNutritionPlan(plan, cfg);
+    const w8 = table.weeks.find(w => w.week === 8)!;
+    const w16 = table.weeks.find(w => w.week === 16)!;
+    const w3 = table.weeks.find(w => w.week === 3)!;
+    expect(w8.note).toMatch(/Diet break/);
+    expect(w8.refeed).toBe(false);
+    expect(w16.note).toMatch(/Diet break/);
+    expect(w16.refeed).toBe(false);
+    expect(w3.refeed).toBe(true);
+  });
+  it('12 нед: брейков нет, рефиды как раньше (3/6/9 + финал)', async () => {
+    const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 12, taperWeeks: 2 });
+    const cfg = { category: 'mens_physique', sex: 'male', weightKg: 80 } as any;
+    const table = buildPrepNutritionPlan(plan, cfg);
+    expect(table.weeks.some(w => w.note.includes('Diet break'))).toBe(false);
+    expect(table.weeks.find(w => w.week === 3)!.refeed).toBe(true);
+    expect(table.weeks.find(w => w.week === 6)!.refeed).toBe(true);
+  });
+});
+
+describe('PRO-2 доводка — post-show лог в экспорте', () => {
+  it('coach JSON несёт postShowLog; печать рисует секцию восстановления', async () => {
+    const { buildPrepCoachJson, buildContestPrepPrintHtml } = await import('../bb-contest-prep.engine');
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const log = [
+      { week: 1 as const, dateIso: addDaysIso(plan.showDate, 7), weightKg: 82, sleepH: 7.5, hunger1_5: 2, cycle: 'na' as const, strengthReturnPct: 96 },
+    ];
+    const json = JSON.parse(buildPrepCoachJson(plan, { postShowLog: log }));
+    expect(json.postShowLog).toHaveLength(1);
+    expect(json.postShowLog[0].weightKg).toBe(82);
+    // без лога — пустой массив, секция в печати отсутствует
+    expect(JSON.parse(buildPrepCoachJson(plan)).postShowLog).toEqual([]);
+    const html = buildContestPrepPrintHtml(plan, { postShowLog: log });
+    expect(html).toContain('Восстановление post-show');
+    expect(html).toContain('82');
+    expect(buildContestPrepPrintHtml(plan)).not.toContain('Восстановление post-show');
   });
 });

@@ -1006,11 +1006,17 @@ export const BbAutoConstructor: React.FC = () => {
       if (risk.level==='high' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front')) { flash(`⛔ ${risk.note}`); setPrepBusy(false); return; }
       if (cfg.waterStrategy==='high' && !cfg.hasTrialPeak) { flash('⛔ High water требует trial peak за 21-28д + confirm'); setPrepBusy(false); return; }
       if (isShortCycle(prepWeeks + prepTaperWeeks + 1) && cfg.carbLoadStrategy==='back') { flash('⛔ ShortCycle 4-6 нед: берите linear/moderate, не back'); setPrepBusy(false); return; }
+      // PRO-2 P2: персональная доза загрузки из trial (без trial — коридор по умолчанию).
+      const trialDose = lastTest ? trialCarbDoseGPerKg(lastTest, cfg.category, cfg.sex) : undefined;
+      // PRO-2 P5: трек post-show не сбрасывается пересборкой (берём из текущего плана).
+      const keepTrack = prepPlan?.postShowTrack ?? 'recovery';
       const plan = buildBBContestPrepPlan(cfg, {
         prepWeeks: Math.min(52, Math.max(1, prepWeeks)),
         taperWeeks: Math.min(4, Math.max(1, prepTaperWeeks)),
         prepVolumeMult: prepVolumeMode,
         source: 'bb_auto',
+        carbDoseGPerKg: trialDose,
+        postShowTrack: keepTrack,
       });
       setPrepPlan(plan);
       if (applyToPlan) {
@@ -1024,6 +1030,7 @@ export const BbAutoConstructor: React.FC = () => {
           taperWeeks: plan.taper.weeks,
           prepVolumeMult: prepVolumeMode,
           force: true, // обновить уже наложенный taper/пик актуальными настройками
+          carbDoseGPerKg: trialDose, // PRO-2 P2: доза trial в пик-неделю плана
         });
         setBuiltPlan(updated);
         setPrepApplied(true);
@@ -1106,7 +1113,7 @@ export const BbAutoConstructor: React.FC = () => {
         : undefined;
       const win = window.open('', '_blank', 'width=900,height=700');
       if (!win) { flash('Браузер заблокировал окно печати — разрешите всплывающие окна'); return; }
-      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance }));
+      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance, postShowLog: getPostShowLog(prepPlan.id) }));
       win.document.close();
       win.focus();
       setTimeout(() => { try { win.print(); } catch { /* ignore */ } }, 300);
@@ -1135,7 +1142,7 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportPrepJson = () => {
     if (!prepPlan) return;
     try {
-      const blob = new Blob([buildPrepCoachJson(prepPlan)], { type: 'application/json;charset=utf-8' });
+      const blob = new Blob([buildPrepCoachJson(prepPlan, { postShowLog: getPostShowLog(prepPlan.id) })], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1588,6 +1595,42 @@ export const BbAutoConstructor: React.FC = () => {
         if (typeof bbDiag.teenNote === 'string' && bbDiag.teenNote) {
           try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
           pro2parts.push('🧒 teen-режим');
+        }
+        // PRO-3 R2: L/R-добивка и острая готовность ПРИМЕНЯЮТСЯ (к вставке коррекций,
+        // не к мезоциклу — острая готовность не должна переписывать структуру блока).
+        // Остальное (LVP/сухожилия/return-to/MMC/веса) — сохраняется + тост, сборку не меняет.
+        if (bbDiag.lvp && typeof bbDiag.lvp === 'object' && (bbDiag.lvp as { text?: unknown }).text) {
+          try { localStorage.setItem('he_bb_last_lvp', JSON.stringify(bbDiag.lvp)); } catch {}
+          pro2parts.push(`LVP ${(bbDiag.lvp as { text: string }).text}`);
+        }
+        if (bbDiag.tendon && typeof bbDiag.tendon === 'object') {
+          try { localStorage.setItem('he_bb_last_tendon', JSON.stringify(bbDiag.tendon)); } catch {}
+          const t = bbDiag.tendon as { elbowLevel?: string; shoulderLevel?: string };
+          if (t.elbowLevel === 'stop' || t.shoulderLevel === 'stop') pro2parts.push('⛔ сухожилия — стоп');
+        }
+        if (bbDiag.returnTo && typeof bbDiag.returnTo === 'object' && (bbDiag.returnTo as { text?: unknown }).text) {
+          try { localStorage.setItem('he_bb_last_return_to', JSON.stringify(bbDiag.returnTo)); } catch {}
+          pro2parts.push('возврат 3 ступени');
+        }
+        if (bbDiag.readinessAction && typeof bbDiag.readinessAction === 'object') {
+          try { localStorage.setItem('he_bb_diag_readiness_action', JSON.stringify(bbDiag.readinessAction)); } catch {}
+          const ra = bbDiag.readinessAction as { level?: string; volumeMult?: number; rirShift?: number };
+          if (ra.level === 'red') pro2parts.push(`готовность red → вставка ×${ra.volumeMult ?? 0.75} RIR+${ra.rirShift ?? 1}`);
+        }
+        if (bbDiag.lrTopUp && typeof bbDiag.lrTopUp === 'object' && Object.keys(bbDiag.lrTopUp).length) {
+          try { localStorage.setItem('he_bb_lr_topup', JSON.stringify(bbDiag.lrTopUp)); } catch {}
+          const names = Object.entries(bbDiag.lrTopUp).map(([g, v]) => `${g}: ${(v as { side: string }).side === 'left' ? 'левая' : 'правая'} +${(v as { sets: number }).sets}`).join(', ');
+          pro2parts.push(`добивка слабой ${names}`);
+        }
+        if (Array.isArray(bbDiag.lrDirection) && bbDiag.lrDirection.length) {
+          try { localStorage.setItem('he_bb_lr_direction', JSON.stringify(bbDiag.lrDirection)); } catch {}
+        }
+        if (typeof bbDiag.mmc === 'string' && bbDiag.mmc) {
+          try { localStorage.setItem('he_bb_last_mmc', bbDiag.mmc); } catch {}
+        }
+        if (typeof bbDiag.workingRange === 'string' && bbDiag.workingRange) {
+          try { localStorage.setItem('he_bb_last_working_range', bbDiag.workingRange); } catch {}
+          pro2parts.push('рабочий вес-ориентир');
         }
         if (pro2parts.length) {
           setBridgeMsg((prev: string) => prev ? `${prev} · ${pro2parts.join(' · ')}` : `🔗 Диагностика PRO-2: ${pro2parts.join(' · ')}`);

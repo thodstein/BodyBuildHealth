@@ -243,3 +243,31 @@ harm-reduction + «👨‍⚕️ под контролем врача», доз�
   не тронут — трек едет через план (дефолт recovery), сигнатура расширена опционально.
 - НЕ закоммичено (чекаут/коммит запрещены): файлы в worktree — MOD движок/BbAuto/PeaкWeekCard,
   NEW движок post-show-лога + NEW тест + этот док.
+
+## 8. Доводка: закрыты 4 честных гэпа (добивка кодом, закоммичена pathspec)
+
+По вопросу «что осталось» найдены и закрыты пп. 1–3 и 5 (P4-тайминг в сессиях — вне скоупа,
+остался дисплей-only осознанно).
+
+- **Доза в сборке (был гэп №1)**: `carbDoseGPerKg` проброшен сквозь `buildBBContestPrepPlan.opts` →
+  `plan.peakWeek.carbDoseGPerKg` → `nutritionTargetsForPrepDate` (пик-ветка) + `buildBBContestPrep.opts`
+  + `applyTrainingTaperToBBPlan.opts` + `ContestPrepApplyOpts` → пик-неделя плана; кэш
+  `peakWeekCached` с дозой в ключе; BbAuto `assembleContestPrep` считает дозу из `lastTest` и
+  передаёт в оба пути (UI-строка «применится через Пересобрать» теперь правда). Без дозы/теста —
+  байт-в-байт. Тесты +3.
+- **Трек при пересборке (был гэп №2)**: `assembleContestPrep` передаёт
+  `postShowTrack: prepPlan?.postShowTrack ?? 'recovery'` — селектор больше не сбрасывается.
+  Тест +1 (reverse в плане → живые цели reverse без opts).
+- **Таблица с брейками (был гэп №3)**: `buildPrepNutritionPlan` (`bb-prep-cycle.engine.ts`, единственное
+  касание чужой зоны — только P7-ветка) читает `prepDietBreaks`/`isPrepRefeedDay`: нед 8/16/… —
+  Diet break без рефида, остальные рефиды — по календарю движка (паритет живые цели ↔ таблица).
+  Тесты +2.
+- **Лог в экспорте (был гэп №5)**: `buildPrepCoachJson(plan, {postShowLog})` несёт записи;
+  `buildContestPrepPrintHtml(plan, {…, postShowLog})` рисует секцию «Восстановление post-show»
+  (таблица + маркеры + comedown); оба callsites BbAuto передают `getPostShowLog(prepPlan.id)`.
+  Тест +1 (JSON + наличие/отсутствие секции).
+- **Проверено**: PRO-2 тест 27/27 + prep-cycle 48/48 + соседи 311/311 + `tsc` 0 по своим файлам
+  (2 ошибки — чужой `BBDiagnosticsHub.tsx` WIP: `report` TDZ, файл не тронут) + `verify:apk-design` OK.
+- **Шторм-процедура**: в `BbAutoConstructor.tsx` параллельный агент держит свой ханк PRO-3 R2 —
+  в коммит взяты только 5 своих ханков (фильтр патча побайтово через Python + `git apply --cached
+  --unidiff-zero`; без флага zero-контекст не применяется). Чужое не тронуто, не стейджено, не откачено.

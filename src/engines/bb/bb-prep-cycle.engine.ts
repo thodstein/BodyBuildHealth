@@ -30,6 +30,7 @@ import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
   isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, prepPhaseForDate, buildPeakWeek, configFromPlan,
   prepWeightAdvice, prepTrainingCompliance, isMonotonicTaper,
+  prepDietBreaks, isPrepRefeedDay,
   type PrepWeightAdvice, type PrepWeightStatus,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
@@ -646,6 +647,15 @@ export function buildPrepNutritionPlan(
     let carbsG: number;
     let note: string;
     let refeed = false;
+    // PRO-2 P7: единый источник рефидов/брейков — календарь движка (не i%3):
+    // последний день недели i; брейк-неделя — на поддержании, без рефида.
+    const weekStart = prepPlan.preparation.startDate;
+    const weekLastDay = isValidIsoDate(weekStart) ? isoAddDays(weekStart, i * 7 - 1) : '';
+    const weekDays = isValidIsoDate(weekStart)
+      ? Array.from({ length: 7 }, (_, d) => isoAddDays(weekStart, (i - 1) * 7 + d))
+      : [];
+    const breakSet = new Set(prepDietBreaks(prepPlan));
+    const isBreakWeek = weekDays.length === 7 && weekDays.every(d => breakSet.has(d));
     if (phaseKey === 'taper') {
       // Тапер: калории стабильны (усталость падает, катаболизм не нужен), карбс чуть выше (гликоген).
       kcal = baseKcal;
@@ -654,16 +664,23 @@ export function buildPrepNutritionPlan(
         ? ' вода/натрий плавно снижаются к пик-неделе (подтверждено).'
         : ' вода/натрий стабильны.';
       note = `Тапер: калории стабильны, карбс слегка выше — подготовка гликогена к пик-неделе;${wna}`;
+    } else if (isBreakWeek) {
+      // PRO-2 P7: diet-break — неделя на поддержании (ступень дефицита на паузе),
+      // точные ккал дня — в живых целях рациона; рефида нет (не двойной бонус).
+      kcal = baseKcal;
+      refeed = false;
+      carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
+      note = `🏖 Diet break (нед ${i}): неделя на поддержании — гормоны/психика восстанавливаются, дефицит продолжится.`;
     } else if (phaseKey === 'final_preparation') {
       // Финал подготовки: лёгкий дефицит, рефид раз в неделю.
       kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal * 0.97));
-      refeed = true;
+      refeed = weekLastDay ? isPrepRefeedDay(weekLastDay, prepPlan) : true;
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
       note = 'Финал подготовки: лёгкий дефицит (×0.97), белок и жиры не режутся, 1 рефид-день/нед.';
     } else {
       // Подготовка: ступенчатая прогрессия — каждые 2 недели −120 ккал (поддержание темпа).
       kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal - Math.floor((i - 1) / 2) * 120));
-      refeed = i % 3 === 0; // каждые 3 недели — рефид-день
+      refeed = weekLastDay ? isPrepRefeedDay(weekLastDay, prepPlan) : i % 3 === 0; // календарь движка (брейки исключены)
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
       note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100 * 10) / 10}%/нед${refeed ? ', 1 рефид-день (карбс до ~поддержания)' : ''}, вода/натрий стабильны.`;
     }
