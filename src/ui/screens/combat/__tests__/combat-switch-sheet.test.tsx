@@ -189,4 +189,16 @@ describe('Combat cycles', () => {
     expect(screen.getByRole('button', { name: /Собрать PRO-план.*combat_4/ })).toBeTruthy();
     expect(document.body.textContent).toContain('применён');
   });
+
+  it('фильтр по виду спорта режет список', () => {
+    render(<CombatConstructor />);
+    go('4 Сплит');
+    const group = screen.getByRole('group', { name: 'Фильтр циклов по виду спорта' });
+    fireEvent.click(within(group).getByRole('button', { name: /Борьба/ }));
+    expect(screen.queryByText('Бокс · база 8 нед')).toBeNull();
+    expect(screen.getByText('Борьба · база 6 нед')).toBeTruthy();
+    expect(screen.getByText('Борьба · пик 8 нед')).toBeTruthy();
+    fireEvent.click(within(group).getByRole('button', { name: 'Все' }));
+    expect(screen.getByText('Бокс · база 8 нед')).toBeTruthy();
+  });
 });

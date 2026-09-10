@@ -10,7 +10,16 @@ import { finalizeCombatPlan } from '../combat-finalize.engine';
 describe('combat cycle library', () => {
   it('все циклы валидны (паттерн/дни/недели)', () => {
     expect(validateCombatCycles()).toEqual([]);
-    expect(COMBAT_CYCLE_LIBRARY.length).toBeGreaterThanOrEqual(6);
+    expect(COMBAT_CYCLE_LIBRARY.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('каждый вид спорта покрыт: бокс 3, борьба 2, ММА 4, кик 2, общая 2', () => {
+    const by = (d: string) => COMBAT_CYCLE_LIBRARY.filter(c => c.discipline === d).length;
+    expect(by('boxing')).toBe(3);
+    expect(by('wrestling')).toBe(2);
+    expect(by('mma')).toBe(4);
+    expect(by('kickboxing')).toBe(2);
+    expect(by('general')).toBe(2);
   });
 
   it('id уникальны, getCombatCycle находит/не находит', () => {

@@ -119,6 +119,7 @@ export const CombatConstructor: React.FC = () => {
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     outsideMetrics,
   } = useCombatWizard();
+  const [cycFilter, setCycFilter] = React.useState<string>('all');
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
 
@@ -948,8 +949,13 @@ export const CombatConstructor: React.FC = () => {
                 <div style={{ fontSize: 11, color: '#fff' }}>Одна кнопка — дисциплина, цель, недели, дни, модель и сплит</div>
               </div>
             </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Фильтр циклов по виду спорта">
+              {([['all', 'Все'], ['boxing', '🥊 Бокс'], ['wrestling', '🤼 Борьба'], ['mma', '🥋 ММА'], ['kickboxing', '🦵 Кик'], ['general', '🏋️ Общая']] as const).map(([id, label]) => (
+                <ChipToggle key={id} active={cycFilter === id} onClick={() => { setCycFilter(id); buzzStep(); }}>{label}</ChipToggle>
+              ))}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {COMBAT_CYCLE_LIBRARY.map(c => (
+              {COMBAT_CYCLE_LIBRARY.filter(c => cycFilter === 'all' || c.discipline === cycFilter).map(c => (
                 <div
                   key={c.id}
                   className="cb-cycle-card"

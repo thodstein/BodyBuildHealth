@@ -20,6 +20,9 @@ export interface CombatCycleTemplate {
 }
 
 export const COMBAT_CYCLE_LIBRARY: CombatCycleTemplate[] = [
+  // ── Бокс: Boxing Science (кэмп 8–10 нед, 2–3 пика нагрузки, делоад, тапер;
+  // Train Like a Champion: max strength 4–8 → strength-speed 3–5 → speed-strength 3–5;
+  // любители: 3 фазы movement/strength/fitness) ──
   {
     id: 'cb-box-base-8', name: 'Бокс · база 8 нед',
     discipline: 'boxing', goal: 'power', weeks: 8, daysPerWeek: 3,
@@ -27,22 +30,48 @@ export const COMBAT_CYCLE_LIBRARY: CombatCycleTemplate[] = [
     blurb: 'Верх/низ/фулбоди: шея, ротация, взрывные медболы. Линейный рост объёма.',
   },
   {
+    id: 'cb-box-champion-10', name: 'Бокс · чемпионский кэмп 10 нед',
+    discipline: 'boxing', goal: 'camp', weeks: 10, daysPerWeek: 3,
+    periodizationModel: 'atr_10', patternId: 'combat_3',
+    blurb: 'По мотивам Boxing Science: макс. сила → скорость-силы → скорость + тапер к бою.',
+  },
+  {
+    id: 'cb-box-amateur-6', name: 'Бокс · любительский сезон 6 нед',
+    discipline: 'boxing', goal: 'endurance', weeks: 6, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: 'Три кита любителей: движение, сила, фитнес. 2×/нед рядом с залом.',
+  },
+  // ── Борьба: межсезонье база → макс → мощность ──
+  {
     id: 'cb-wrestle-base-6', name: 'Борьба · база 6 нед',
     discipline: 'wrestling', goal: 'power', weeks: 6, daysPerWeek: 3,
     periodizationModel: 'atr_10', patternId: 'combat_3b',
     blurb: 'Тяги унилатерально, шея ×1.3, хват. ATR-укороченный: накопление → реализация.',
   },
   {
+    id: 'cb-wrestle-peak-8', name: 'Борьба · пик 8 нед',
+    discipline: 'wrestling', goal: 'power', weeks: 8, daysPerWeek: 4,
+    periodizationModel: 'atr_10', patternId: 'combat_4',
+    blurb: 'Межсезонье: гипертрофия/ОФП → макс. сила → мощность. 4×/нед.',
+  },
+  // ── ММА: linear off-season, block camp, contrast (EliteFTS), Bible-taper ──
+  {
+    id: 'cb-mma-offseason-12', name: 'ММА · межсезонье 12 нед',
+    discipline: 'mma', goal: 'power', weeks: 12, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3',
+    blurb: 'Линейно: гипертрофия/ОФП 4 → макс. сила 4 → мощность 4. Слабые места растут здесь.',
+  },
+  {
     id: 'cb-mma-camp-8', name: 'ММА · кэмп к бою 8 нед',
     discipline: 'mma', goal: 'camp', weeks: 8, daysPerWeek: 4,
     periodizationModel: 'atr_10', patternId: 'combat_4',
-    blurb: 'Полный кэмп: сила + борьба + кондиция 3 системы, тапер к дате боя.',
+    blurb: 'Блочно: сила 3–4 → мощность 2–3 → кондиция + тапер 8–14 дней.',
   },
   {
-    id: 'cb-kick-cond-6', name: 'Кикбоксинг · кондиция 6 нед',
-    discipline: 'kickboxing', goal: 'endurance', weeks: 6, daysPerWeek: 3,
-    periodizationModel: 'linear_12', patternId: 'combat_3',
-    blurb: 'Ноги + ротация кора, силовая выносливость 8-15, короткие отдыхи.',
+    id: 'cb-mma-contrast-8', name: 'ММА · контрастный силовой 8 нед',
+    discipline: 'mma', goal: 'power', weeks: 8, daysPerWeek: 3,
+    periodizationModel: 'conjugate', patternId: 'combat_3',
+    blurb: 'По мотивам EliteFTS: тяж + плио парами (присед/прыжок, жим/медбол, тяга/сплит).',
   },
   {
     id: 'cb-mma-cut-4', name: 'ММА · весогонка + пик 4 нед',
@@ -50,11 +79,31 @@ export const COMBAT_CYCLE_LIBRARY: CombatCycleTemplate[] = [
     periodizationModel: 'conjugate', patternId: 'combat_3b',
     blurb: 'Сопряжённая волна под дефицит: объём ×0.75, RIR 3-4, без отказа.',
   },
+  // ── Кикбоксинг: пирамиды HIIT, muscle buffering, fight-HIIT + тапер ──
+  {
+    id: 'cb-kick-cond-6', name: 'Кикбоксинг · кондиция 6 нед',
+    discipline: 'kickboxing', goal: 'endurance', weeks: 6, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3',
+    blurb: 'Ноги + ротация кора, силовая выносливость 8-15, короткие отдыхи.',
+  },
+  {
+    id: 'cb-kick-fight-10', name: 'Кикбоксинг · к бою 10 нед',
+    discipline: 'kickboxing', goal: 'camp', weeks: 10, daysPerWeek: 3,
+    periodizationModel: 'atr_10', patternId: 'combat_3b',
+    blurb: 'Пирамиды HIIT → muscle buffering → fight-раунды + тапер. Ноги в приоритете.',
+  },
+  // ── Общая: ОФП и линейная сила ──
   {
     id: 'cb-general-ofp-6', name: 'Общая ОФП 6 нед',
     discipline: 'general', goal: 'maintenance', weeks: 6, daysPerWeek: 2,
     periodizationModel: 'linear_12', patternId: 'combat_2a',
     blurb: 'Минимум 2×/нед на фоне высокой внезальной: RIR 3-4, поддержка.',
+  },
+  {
+    id: 'cb-general-strength-8', name: 'Общая · сила 8 нед',
+    discipline: 'general', goal: 'power', weeks: 8, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3',
+    blurb: 'Линейная волна 5→4→3 на базе, двойная прогрессия в подсобке.',
   },
 ];
 
