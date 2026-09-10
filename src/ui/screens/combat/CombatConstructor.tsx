@@ -955,7 +955,9 @@ export const CombatConstructor: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {COMBAT_CYCLE_LIBRARY.filter(c => cycFilter === 'all' || c.discipline === cycFilter).map(c => (
+              {COMBAT_CYCLE_LIBRARY.filter(c => cycFilter === 'all' || c.discipline === cycFilter).map(c => {
+                const edge = DISCIPLINE_COLOR[c.discipline] || '#a855f7';
+                return (
                 <div
                   key={c.id}
                   className="cb-cycle-card"
@@ -963,6 +965,7 @@ export const CombatConstructor: React.FC = () => {
                     textAlign: 'left', padding: 12, borderRadius: 14,
                     background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
                     border: '1px solid rgba(255,255,255,0.06)',
+                    borderLeft: `3px solid ${edge}`,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.14)',
                   }}
                 >
@@ -970,11 +973,16 @@ export const CombatConstructor: React.FC = () => {
                     <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{c.name}</span>
                     <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{c.blurb}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    <span className="cb-cycle-author" style={{ fontSize: 10, fontWeight: 800, color: edge, background: `${edge}1f`, padding: '3px 8px', borderRadius: 20, border: `1px solid ${edge}55` }}>✒ {c.author}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{ruLabel(LEVEL_RU, c.level)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{GOAL_RU[c.goal] || c.goal}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>{c.blurb}</div>
                   <div style={{ fontSize: 11, color: '#fff', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>Модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</b></div>
                   <button
                     onClick={() => {
-                      setDiscipline(c.discipline); setGoal(c.goal); setWeeks(c.weeks); setDays(c.daysPerWeek);
+                      setDiscipline(c.discipline); setGoal(c.goal); setLevel(c.level); setWeeks(c.weeks); setDays(c.daysPerWeek);
                       setPeriodizationModel(c.periodizationModel); setPatternId(c.patternId);
                       buzzStep(); setMsg(`✦ Цикл «${c.name}» применён — жмите «Собрать PRO-план»`); setTimeout(() => setMsg(''), 2600);
                     }}
@@ -984,7 +992,8 @@ export const CombatConstructor: React.FC = () => {
                     ✦ Применить «{c.name}»
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

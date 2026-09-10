@@ -201,4 +201,14 @@ describe('Combat cycles', () => {
     fireEvent.click(within(group).getByRole('button', { name: 'Все' }));
     expect(screen.getByText('Бокс · база 8 нед')).toBeTruthy();
   });
+
+  it('авторские бейджи видны, применение ставит уровень', () => {
+    render(<CombatConstructor />);
+    go('4 Сплит');
+    expect(screen.getByText(/EliteFTS · Matt Mills/)).toBeTruthy();
+    expect(screen.getByText(/Train Like a Champion/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Применить «ММА · кэмп к бою 8 нед»/ }));
+    go('1 Параметры');
+    expect(document.body.textContent).toContain('Продвинутый');
+  });
 });

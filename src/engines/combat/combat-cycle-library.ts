@@ -1,7 +1,7 @@
 /**
  * combat-cycle-library.ts — библиотека готовых циклов единоборств.
- * Именные шаблоны (база/кэмп/весогонка/ОФП) поверх ATR/Linear/Conjugate:
- * цикл = дисциплина + цель + недели + дни + модель + сплит-паттерн.
+ * Именные авторские шаблоны (школа/система указана у каждого) поверх
+ * ATR/Linear/Conjugate: цикл = дисциплина + цель + недели + дни + модель + сплит.
  * Применение — одной кнопкой в шаге «Сплит» (только параметры, движок 1-в-1).
  */
 import { COMBAT_PATTERNS } from './combat-split-patterns';
@@ -10,8 +10,11 @@ import type { CombatInput } from './combat.types';
 export interface CombatCycleTemplate {
   id: string;
   name: string;
+  /** Авторская школа/система, по чьей опубликованной структуре собран цикл */
+  author: string;
   discipline: CombatInput['discipline'];
   goal: CombatInput['goal'];
+  level: CombatInput['level'];
   weeks: number;
   daysPerWeek: 2 | 3 | 4;
   periodizationModel: CombatInput['periodizationModel'];
@@ -24,84 +27,84 @@ export const COMBAT_CYCLE_LIBRARY: CombatCycleTemplate[] = [
   // Train Like a Champion: max strength 4–8 → strength-speed 3–5 → speed-strength 3–5;
   // любители: 3 фазы movement/strength/fitness) ──
   {
-    id: 'cb-box-base-8', name: 'Бокс · база 8 нед',
-    discipline: 'boxing', goal: 'power', weeks: 8, daysPerWeek: 3,
+    id: 'cb-box-base-8', name: 'Бокс · база 8 нед', author: 'Boxing Science · база',
+    discipline: 'boxing', goal: 'power', level: 'intermediate', weeks: 8, daysPerWeek: 3,
     periodizationModel: 'linear_12', patternId: 'combat_3',
     blurb: 'Верх/низ/фулбоди: шея, ротация, взрывные медболы. Линейный рост объёма.',
   },
   {
-    id: 'cb-box-champion-10', name: 'Бокс · чемпионский кэмп 10 нед',
-    discipline: 'boxing', goal: 'camp', weeks: 10, daysPerWeek: 3,
+    id: 'cb-box-champion-10', name: 'Бокс · чемпионский кэмп 10 нед', author: 'Boxing Science · Train Like a Champion',
+    discipline: 'boxing', goal: 'camp', level: 'advanced', weeks: 10, daysPerWeek: 3,
     periodizationModel: 'atr_10', patternId: 'combat_3',
-    blurb: 'По мотивам Boxing Science: макс. сила → скорость-силы → скорость + тапер к бою.',
+    blurb: 'Макс. сила → скорость-силы → скорость + тапер к бою.',
   },
   {
-    id: 'cb-box-amateur-6', name: 'Бокс · любительский сезон 6 нед',
-    discipline: 'boxing', goal: 'endurance', weeks: 6, daysPerWeek: 2,
+    id: 'cb-box-amateur-6', name: 'Бокс · любительский сезон 6 нед', author: 'Boxing Science · Amateur',
+    discipline: 'boxing', goal: 'endurance', level: 'beginner', weeks: 6, daysPerWeek: 2,
     periodizationModel: 'linear_12', patternId: 'combat_2a',
     blurb: 'Три кита любителей: движение, сила, фитнес. 2×/нед рядом с залом.',
   },
   // ── Борьба: межсезонье база → макс → мощность ──
   {
-    id: 'cb-wrestle-base-6', name: 'Борьба · база 6 нед',
-    discipline: 'wrestling', goal: 'power', weeks: 6, daysPerWeek: 3,
+    id: 'cb-wrestle-base-6', name: 'Борьба · база 6 нед', author: 'Борцовская школа · база',
+    discipline: 'wrestling', goal: 'power', level: 'intermediate', weeks: 6, daysPerWeek: 3,
     periodizationModel: 'atr_10', patternId: 'combat_3b',
     blurb: 'Тяги унилатерально, шея ×1.3, хват. ATR-укороченный: накопление → реализация.',
   },
   {
-    id: 'cb-wrestle-peak-8', name: 'Борьба · пик 8 нед',
-    discipline: 'wrestling', goal: 'power', weeks: 8, daysPerWeek: 4,
+    id: 'cb-wrestle-peak-8', name: 'Борьба · пик 8 нед', author: 'Борцовская школа · пик',
+    discipline: 'wrestling', goal: 'power', level: 'advanced', weeks: 8, daysPerWeek: 4,
     periodizationModel: 'atr_10', patternId: 'combat_4',
     blurb: 'Межсезонье: гипертрофия/ОФП → макс. сила → мощность. 4×/нед.',
   },
   // ── ММА: linear off-season, block camp, contrast (EliteFTS), Bible-taper ──
   {
-    id: 'cb-mma-offseason-12', name: 'ММА · межсезонье 12 нед',
-    discipline: 'mma', goal: 'power', weeks: 12, daysPerWeek: 3,
+    id: 'cb-mma-offseason-12', name: 'ММА · межсезонье 12 нед', author: 'MMA linear · межсезонье',
+    discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 12, daysPerWeek: 3,
     periodizationModel: 'linear_12', patternId: 'combat_3',
     blurb: 'Линейно: гипертрофия/ОФП 4 → макс. сила 4 → мощность 4. Слабые места растут здесь.',
   },
   {
-    id: 'cb-mma-camp-8', name: 'ММА · кэмп к бою 8 нед',
-    discipline: 'mma', goal: 'camp', weeks: 8, daysPerWeek: 4,
+    id: 'cb-mma-camp-8', name: 'ММА · кэмп к бою 8 нед', author: 'MMA block · файт-кэмп',
+    discipline: 'mma', goal: 'camp', level: 'advanced', weeks: 8, daysPerWeek: 4,
     periodizationModel: 'atr_10', patternId: 'combat_4',
     blurb: 'Блочно: сила 3–4 → мощность 2–3 → кондиция + тапер 8–14 дней.',
   },
   {
-    id: 'cb-mma-contrast-8', name: 'ММА · контрастный силовой 8 нед',
-    discipline: 'mma', goal: 'power', weeks: 8, daysPerWeek: 3,
+    id: 'cb-mma-contrast-8', name: 'ММА · контрастный силовой 8 нед', author: 'EliteFTS · Matt Mills',
+    discipline: 'mma', goal: 'power', level: 'advanced', weeks: 8, daysPerWeek: 3,
     periodizationModel: 'conjugate', patternId: 'combat_3',
-    blurb: 'По мотивам EliteFTS: тяж + плио парами (присед/прыжок, жим/медбол, тяга/сплит).',
+    blurb: 'Тяж + плио парами: присед/прыжок, жим/медбол, тяга/сплит-присед.',
   },
   {
-    id: 'cb-mma-cut-4', name: 'ММА · весогонка + пик 4 нед',
-    discipline: 'mma', goal: 'weight_cut', weeks: 4, daysPerWeek: 3,
+    id: 'cb-mma-cut-4', name: 'ММА · весогонка + пик 4 нед', author: 'ISSN · весогонка',
+    discipline: 'mma', goal: 'weight_cut', level: 'intermediate', weeks: 4, daysPerWeek: 3,
     periodizationModel: 'conjugate', patternId: 'combat_3b',
     blurb: 'Сопряжённая волна под дефицит: объём ×0.75, RIR 3-4, без отказа.',
   },
   // ── Кикбоксинг: пирамиды HIIT, muscle buffering, fight-HIIT + тапер ──
   {
-    id: 'cb-kick-cond-6', name: 'Кикбоксинг · кондиция 6 нед',
-    discipline: 'kickboxing', goal: 'endurance', weeks: 6, daysPerWeek: 3,
+    id: 'cb-kick-cond-6', name: 'Кикбоксинг · кондиция 6 нед', author: 'Boxing Science · кондиция',
+    discipline: 'kickboxing', goal: 'endurance', level: 'intermediate', weeks: 6, daysPerWeek: 3,
     periodizationModel: 'linear_12', patternId: 'combat_3',
     blurb: 'Ноги + ротация кора, силовая выносливость 8-15, короткие отдыхи.',
   },
   {
-    id: 'cb-kick-fight-10', name: 'Кикбоксинг · к бою 10 нед',
-    discipline: 'kickboxing', goal: 'camp', weeks: 10, daysPerWeek: 3,
+    id: 'cb-kick-fight-10', name: 'Кикбоксинг · к бою 10 нед', author: 'Boxing Science · fight HIIT',
+    discipline: 'kickboxing', goal: 'camp', level: 'advanced', weeks: 10, daysPerWeek: 3,
     periodizationModel: 'atr_10', patternId: 'combat_3b',
     blurb: 'Пирамиды HIIT → muscle buffering → fight-раунды + тапер. Ноги в приоритете.',
   },
   // ── Общая: ОФП и линейная сила ──
   {
-    id: 'cb-general-ofp-6', name: 'Общая ОФП 6 нед',
-    discipline: 'general', goal: 'maintenance', weeks: 6, daysPerWeek: 2,
+    id: 'cb-general-ofp-6', name: 'Общая ОФП 6 нед', author: 'ОФП · поддержка',
+    discipline: 'general', goal: 'maintenance', level: 'beginner', weeks: 6, daysPerWeek: 2,
     periodizationModel: 'linear_12', patternId: 'combat_2a',
     blurb: 'Минимум 2×/нед на фоне высокой внезальной: RIR 3-4, поддержка.',
   },
   {
-    id: 'cb-general-strength-8', name: 'Общая · сила 8 нед',
-    discipline: 'general', goal: 'power', weeks: 8, daysPerWeek: 3,
+    id: 'cb-general-strength-8', name: 'Общая · сила 8 нед', author: 'Линейная волна · сила',
+    discipline: 'general', goal: 'power', level: 'intermediate', weeks: 8, daysPerWeek: 3,
     periodizationModel: 'linear_12', patternId: 'combat_3',
     blurb: 'Линейная волна 5→4→3 на базе, двойная прогрессия в подсобке.',
   },
@@ -114,11 +117,14 @@ export function getCombatCycle(id: string): CombatCycleTemplate | null {
 /** Проверка библиотеки: все patternId существуют, дни совпадают со сплитом. */
 export function validateCombatCycles(): string[] {
   const errs: string[] = [];
+  const levels = ['beginner', 'intermediate', 'advanced', 'enhanced'];
   for (const c of COMBAT_CYCLE_LIBRARY) {
     const p = COMBAT_PATTERNS.find(p => p.id === c.patternId);
     if (!p) { errs.push(`${c.id}: нет паттерна ${c.patternId}`); continue; }
     if (p.sessionsPerRotation !== c.daysPerWeek) errs.push(`${c.id}: дни ${c.daysPerWeek} !== сплит ${p.sessionsPerRotation}`);
     if (c.weeks < 2 || c.weeks > 12) errs.push(`${c.id}: недели вне 2-12`);
+    if (!c.author) errs.push(`${c.id}: нет автора`);
+    if (!levels.includes(c.level as string)) errs.push(`${c.id}: уровень ${c.level}`);
   }
   return errs;
 }
