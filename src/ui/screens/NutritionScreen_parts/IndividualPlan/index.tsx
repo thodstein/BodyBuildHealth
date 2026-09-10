@@ -105,19 +105,20 @@ const isTabAllowed = (key: PlanTab, mode: PlannerMode): boolean => {
   return key === 'settings' || key === 'plan';
 };
 
-const IndividualPlanInner: React.FC = () => {
+const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { planTab, setPlanTab, plannerMode } = usePlanCtx();
   const tab = planTab as PlanTab;
   const setTab = (t: PlanTab) => setPlanTab(t);
-  const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => { try { return localStorage.getItem('he_disclaimer_dismissed') === 'true'; } catch { return false; } });
 
-  const visibleTabs = TAB_META.filter(t => isTabAllowed(t.key, plannerMode));
+  // embedded (внутри NutritionScreen): Отчёт/Нагрузка/Тапер живут топ-табами
+  // верхнего уровня — во внутренней ленте только ядро рациона.
+  // Стендалон (тесты/изоляция): все 6 как было.
+  const visibleTabs = TAB_META.filter(t => isTabAllowed(t.key, plannerMode)).filter(t => !embedded || t.key === 'settings' || t.key === 'plan' || t.key === 'composer');
   // Если активная вкладка скрыта в текущем режиме — рендерим Настройки
   const activeTab: PlanTab = visibleTabs.some(t => t.key === tab) ? tab : 'settings';
 
   return (
     <>
-      {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
       <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 84, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
         <div className="plan-tabbar" style={{
           display:'flex', gap:4, padding:4, overflowX:'auto', scrollbarWidth:'none',
@@ -157,7 +158,31 @@ const IndividualPlanInner: React.FC = () => {
   );
 };
 
-export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null }> = ({ profile, course, labs, labAnalysis }) => {
+/**
+ * NutritionPlanScope — поднятый провайдер планировщика для NutritionScreen:
+ * один контекст на все топ-табы (рацион/кухня/анализ), состояние плана
+ * переживает переключение верхних вкладок. Тост-хост и error-boundary едут вместе.
+ */
+export const NutritionPlanScope: React.FC<{
+  profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null;
+  children: React.ReactNode;
+}> = ({ profile, course, labs, labAnalysis, children }) => {
+  return (
+    <PlannerErrorBoundary>
+      <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
+        {children}
+        <PlannerToastHost />
+      </IndividualPlanProvider>
+    </PlannerErrorBoundary>
+  );
+};
+
+export const IndividualPlan: React.FC<{
+  profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null;
+  /** embedded: рендер внутри NutritionPlanScope — без своего провайдера, лента ужата до ядра. */
+  embedded?: boolean;
+}> = ({ profile, course, labs, labAnalysis, embedded }) => {
+  if (embedded) return <IndividualPlanInner embedded />;
   return (
     <PlannerErrorBoundary>
       <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
@@ -167,29 +192,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     </PlannerErrorBoundary>
   );
 };
-
-const MedicalDisclaimer: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
-  <div style={{
-    margin:8, padding:'14px 16px', borderRadius:16,
-    background:'linear-gradient(180deg, rgba(239,68,68,0.09), rgba(239,68,68,0.04))',
-    border:'1px solid rgba(239,68,68,0.18)', fontSize:10, lineHeight:1.55,
-    boxShadow:'0 8px 24px rgba(239,68,68,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
-    backdropFilter:'blur(12px)',
-  }}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10, gap:12}}>
-      <span style={{display:'inline-flex', alignItems:'center', gap:8, fontWeight:800,color:'#fca5a5',fontSize:12, letterSpacing:'-0.2px'}}>
-        <span style={{width:28,height:28,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(239,68,68,0.14)',border:'1px solid rgba(239,68,68,0.22)',fontSize:14}}>⚠️</span>
-        Медицинская информация
-      </span>
-      <button onClick={onDismiss} style={{padding:'7px 12px',borderRadius:999,background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.22)',color:'#fca5a5',cursor:'pointer',fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>Понятно</button>
-    </div>
-    <div style={{color:'rgba(255,255,255,0.78)', lineHeight:1.6, fontSize:10}}>
-      <p style={{margin:'0 0 6px'}}>Данный планировщик питания <b style={{color:'#fff'}}>не является медицинским прибором</b>. Перед началом любой диеты или приёма добавок проконсультируйтесь с врачом.</p>
-      <p style={{margin:'0 0 6px'}}>Информация о добавках (NAC, TUDCA, берберин, омега-3 и др.) носит ознакомительный характер. Дозировки ориентировочные и должны уточняться с лечащим врачом.</p>
-      <p style={{margin:0}}><b style={{color:'#fecaca'}}>Анаболические стероиды — рецептурные препараты.</b> Их применение без назначения врача незаконно и сопряжено с рисками: гепатотоксичность, кардиомиопатия, тромбоз, бесплодие. Приложение не поощряет использование ААС и предоставляет информацию исключительно для снижения вреда.</p>
-    </div>
-  </div>
-);
 
 const ReportTab: React.FC = () => {
   const { generateFullNutritionReport, nutritionReport, plannerMode, dayPlan } = usePlanCtx();
@@ -614,3 +616,6 @@ const ReportTab: React.FC = () => {
     </div>
   );
 };
+
+/** Отчёт рациона как топ-таб (экспорт для NutritionScreen; внутри — тот же ReportTab). */
+export const PlanReportTab: React.FC = ReportTab;

@@ -37,7 +37,7 @@ afterEach(async () => {
 });
 
 describe('NutritionScreen native hero', () => {
-  it('1. native → тот же hero + «съедено сегодня» + 2 карточки', async () => {
+  it('1. native → тот же hero + «съедено сегодня» + 4 карточки', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<NutritionScreen />);
@@ -47,7 +47,7 @@ describe('NutritionScreen native hero', () => {
     expect(img?.getAttribute('src')).toContain('nutrition-hero.jpg');
     expect(container.querySelector('.nutrition-hero-stats')).not.toBeNull();
     expect(screen.getByText(/ккал ·/)).not.toBeNull();
-    expect(container.querySelectorAll('.nutrition-hero-card').length).toBe(2);
+    expect(container.querySelectorAll('.nutrition-hero-card').length).toBe(4);
   });
 
   it('2. web/Telegram → hero без stats-блока (классика нетронута)', async () => {
@@ -55,7 +55,7 @@ describe('NutritionScreen native hero', () => {
     const { container } = render(<NutritionScreen />);
     expect(container.querySelector('.nutrition-hero-stats')).toBeNull();
     expect(screen.getByText('Питание')).not.toBeNull();
-    expect(container.querySelectorAll('.nutrition-hero-card').length).toBe(2);
+    expect(container.querySelectorAll('.nutrition-hero-card').length).toBe(4);
   });
 
   it('3. навигация hero → вкладки → назад работает на native', async () => {
@@ -78,10 +78,10 @@ describe('NutritionScreen native hero', () => {
   it('4. навигация hero → вкладки работает в web', async () => {
     await resetPlatform();
     const { container } = render(<NutritionScreen />);
-    const planning = container.querySelector(
-      '.nutrition-hero-card[data-section="planning"]',
+    const ration = container.querySelector(
+      '.nutrition-hero-card[data-section="ration"]',
     ) as HTMLElement;
-    fireEvent.click(planning);
+    fireEvent.click(ration);
     expect(container.querySelector('.nutrition-chips')).not.toBeNull();
   });
 
@@ -106,7 +106,7 @@ describe('NutritionScreen native hero', () => {
     await resetPlatform();
     const { container } = render(<NutritionScreen />);
     const cards = container.querySelectorAll('.nutrition-hero-card svg');
-    expect(cards.length).toBe(2);
+    expect(cards.length).toBe(4);
     fireEvent.click(
       container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
     );
@@ -143,21 +143,50 @@ describe('NutritionScreen native hero', () => {
       container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
     );
     const sections = container.querySelectorAll('.nutrition-section');
-    expect(sections.length).toBe(5);
-    const plan = Array.from(sections).find((s) => s.textContent === 'План') as HTMLElement;
-    fireEvent.click(plan);
-    expect(plan.dataset.active).toBe('true');
+    expect(sections.length).toBe(6);
+    const ration = Array.from(sections).find((s) => s.textContent === 'Рацион') as HTMLElement;
+    fireEvent.click(ration);
+    expect(ration.dataset.active).toBe('true');
     const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
-    expect(chips.length).toBe(9);
+    expect(chips.length).toBe(4);
     expect(chips.some((c) => c.textContent?.includes('План'))).toBe(true);
+    expect(chips.some((c) => c.textContent?.includes('Тапер'))).toBe(true);
   });
 
   it('10. волна 22: переключатель есть и в web (общая навигация)', async () => {
     await resetPlatform();
     const { container } = render(<NutritionScreen />);
     fireEvent.click(
-      container.querySelector('.nutrition-hero-card[data-section="planning"]') as HTMLElement,
+      container.querySelector('.nutrition-hero-card[data-section="ration"]') as HTMLElement,
     );
-    expect(container.querySelectorAll('.nutrition-section').length).toBe(5);
+    expect(container.querySelectorAll('.nutrition-section').length).toBe(6);
+  });
+
+  it('11. распил-2: Анализ держит Отчёт и Нагрузку как топ-табы со скоупом плана', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="analysis"]') as HTMLElement,
+    );
+    const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
+    expect(chips.length).toBe(6);
+    const report = chips.find((c) => c.textContent?.includes('Отчёт')) as HTMLElement;
+    fireEvent.click(report);
+    expect(document.body.textContent).toMatch(/Сгенерировать отчёт/);
+    const load = chips.find((c) => c.textContent?.includes('Нагрузка')) as HTMLElement;
+    fireEvent.click(load);
+    expect(document.body.textContent).toMatch(/Нагрузка БЖУ на органы/);
+  });
+
+  it('12. распил-2: Тапер — топ-таб Рациона со скоупом плана', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="ration"]') as HTMLElement,
+    );
+    const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
+    const peak = chips.find((c) => c.textContent?.includes('Тапер')) as HTMLElement;
+    fireEvent.click(peak);
+    expect(document.body.textContent).toMatch(/Тапер ББ/);
   });
 });

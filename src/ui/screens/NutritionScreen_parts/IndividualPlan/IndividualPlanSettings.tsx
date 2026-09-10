@@ -669,10 +669,10 @@ export const IndividualPlanSettings: React.FC = () => {
                  ✕ Отключить тапер
                </button>
              ) : (
-               /* Чистка-2026 (C4): было две кнопки в одну вкладку — «⚙ Настроить» и
-                  «🏁 Включить тапер» дублировали setPlanTab('peak'). Оставлена одна. */
-               <button
-                 onClick={() => setPlanTab('peak')}
+                /* Чистка-2026 (C4) + распил-2: стендалон — внутренняя вкладка peak;
+                   embedded (NutritionScreen) — топ-таб через событие (внутренней peak там нет). */
+                <button
+                  onClick={() => { try { setPlanTab('peak'); } catch {} try { window.dispatchEvent(new CustomEvent('nutrition-open-tab', { detail: 'peak' })); } catch {} }}
                  style={{
                    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
                    background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.35)', color: '#22c55e',

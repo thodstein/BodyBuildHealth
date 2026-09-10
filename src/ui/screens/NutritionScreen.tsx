@@ -8,7 +8,9 @@ import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
-import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
+import { IndividualPlan, NutritionPlanScope, PlanReportTab } from './NutritionScreen_parts/IndividualPlan';
+import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
+import { PeakWeekTab } from './NutritionScreen_parts/IndividualPlan/PeakWeekTab';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
@@ -37,14 +39,19 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
-type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic';
+type NutritionSection = 'diary' | 'planning' | 'ration' | 'kitchen' | 'analysis' | 'overview' | 'analytics' | 'all';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'planreport' | 'organload' | 'peak';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports', 'peri'],
   planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes', 'restaurant', 'metabolic'],
+  // Распил перегруженного «Планирования» (9 чипов) на 3 ленты: рацион / кухня / анализ.
+  // planning оставлен legacy-алиасом (диплинки/тесты), в UI-переключателе не показывается.
+  ration: ['mealplan', 'favorites', 'cart', 'peak'],
+  kitchen: ['catalog', 'recipes', 'restaurant', 'customfood'],
+  analysis: ['reference', 'info', 'usefulness', 'metabolic', 'planreport', 'organload'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
 };
 
@@ -63,6 +70,9 @@ const TAB_LABELS: Record<string, string> = {
   quests: '🎯 Квесты',
   peri: '🥤 Пери-воркаут',
   metabolic: '⚖️ Метаболика',
+  planreport: '📊 Отчёт',
+  organload: '🧬 Нагрузка',
+  peak: '🏁 Тапер',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -1369,6 +1379,23 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     } catch {}
   }, []);
 
+  // Мост из глубины плана на верхние табы (напр. «🏁 Настроить тапер» в Настройках → топ-таб Тапер).
+  // Поднятие провайдера разорвало прямой setPlanTab('peak') — событие чинит навигацию без связности.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const tab = (e as CustomEvent<string>).detail as ActiveTab;
+        if (!tab) return;
+        setTab(tab);
+        setPage('tabs');
+        if (tab === 'peak') setNutritionSection('ration');
+        else if (tab === 'planreport' || tab === 'organload') setNutritionSection('analysis');
+      } catch {}
+    };
+    window.addEventListener('nutrition-open-tab', handler as EventListener);
+    return () => window.removeEventListener('nutrition-open-tab', handler as EventListener);
+  }, []);
+
   // Daily aggregates: group food entries by date for correct weekly averages and charts
   const dailyAggregates = useMemo(() => {
     const days = Object.entries(dailyLogs).sort(([a], [b]) => a.localeCompare(b));
@@ -1458,7 +1485,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     switch (tab) {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} onDiaryChange={reloadDiary} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div className="native-skeleton-row" style={{padding:20}} aria-label="Загрузка графиков"><div className="native-skeleton" /><div className="native-skeleton" /><div className="native-skeleton" /></div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} targets={macroTargets} /></Suspense></InfoErrorBoundary>;
-      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
+      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} embedded /></InfoErrorBoundary>;
       case 'cart': return <InfoErrorBoundary label="Корзина"><CartTab /></InfoErrorBoundary>;
       case 'restaurant': return <InfoErrorBoundary label="Ресторан"><RestaurantTab /></InfoErrorBoundary>;
       case 'favorites': return <InfoErrorBoundary label="Избранное"><FavoritesTab /></InfoErrorBoundary>;
@@ -1483,6 +1510,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       case 'peri': return <InfoErrorBoundary label="Пери-воркаут"><PeriWorkoutCard /></InfoErrorBoundary>;
       case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
       case 'metabolic': return <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>;
+      case 'planreport': return <InfoErrorBoundary label="Отчёт плана"><PlanReportTab /></InfoErrorBoundary>;
+      case 'organload': return <InfoErrorBoundary label="Нагрузка БЖУ"><OrganLoadCalculator /></InfoErrorBoundary>;
+      case 'peak': return <InfoErrorBoundary label="Тапер ББ"><PeakWeekTab /></InfoErrorBoundary>;
       default: return null;
     }
   };
@@ -1511,7 +1541,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           <div className="nutrition-hero-cards" style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
               { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: 'notebook' as const, title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
-              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: 'bowl' as const, title: 'Планирование питания', desc: 'План, каталог, рецепты, рестораны, справочник', color: '#f97316' },
+              { section: 'ration' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: 'bowl' as const, title: 'Мой рацион', desc: 'План, избранное, корзина', color: '#f97316' },
+              { section: 'kitchen' as NutritionSection, tab: 'catalog' as ActiveTab, icon: 'bag' as const, title: 'Кухня', desc: 'Каталог, рецепты, рестораны', color: '#eab308' },
+              { section: 'analysis' as NutritionSection, tab: 'reference' as ActiveTab, icon: 'bookOpen' as const, title: 'Знания и анализ', desc: 'Справочник, полезность, метаболика', color: '#38bdf8' },
             ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} className="nutrition-hero-card" data-section={card.section} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
@@ -1563,7 +1595,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           </button>
         )}
         <span style={{ fontSize:9, color:'#fff' }}>
-          {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
+          {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : 'Всё'}
         </span>
         </div>
         {/* Переключатель разделов: внутри ленты было не выйти из hero-секции */}
@@ -1574,8 +1606,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           {([
             { id: 'all' as NutritionSection, label: 'Все' },
             { id: 'diary' as NutritionSection, label: 'Дневник' },
-            { id: 'planning' as NutritionSection, label: 'План' },
-            { id: 'analytics' as NutritionSection, label: 'Аналитика' },
+            { id: 'ration' as NutritionSection, label: 'Рацион' },
+            { id: 'kitchen' as NutritionSection, label: 'Кухня' },
+            { id: 'analysis' as NutritionSection, label: 'Анализ' },
             { id: 'overview' as NutritionSection, label: 'Обзор' },
           ]).map(s => (
             <button key={s.id} onClick={() => setNutritionSection(s.id)} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
@@ -1655,9 +1688,11 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       })()}
 
       <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 140px' }}>
+        <NutritionPlanScope profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
         </div>
+        </NutritionPlanScope>
       </div>
     </div>
   );

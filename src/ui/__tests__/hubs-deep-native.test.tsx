@@ -96,13 +96,13 @@ describe('labs/risk deep nav', () => {
     expect(container.querySelectorAll('.risk-subtab').length).toBeGreaterThan(0);
   });
 
-  it('5. Nutrition: план → таббар конструктора', async () => {
+  it('5. Nutrition: рацион → таббар конструктора', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<NutritionScreen />);
     fireEvent.click(
       container.querySelector(
-        '.nutrition-hero-card[data-section="planning"]',
+        '.nutrition-hero-card[data-section="ration"]',
       ) as HTMLElement,
     );
     fireEvent.click(
