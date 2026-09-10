@@ -45,6 +45,41 @@ type Props = {
   onExportProgram?: () => void;
 };
 
+/* Карта качества шея/хват/core по неделям — переиспользуется в шаге «Качество» */
+export const CbQualityMap: React.FC<{ plan: CombatPlan }> = ({ plan }) => (
+  <SectionCard icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — шея/хват/core" accent>
+    <CardHeader icon="✦" title="Карта качества — сеты/нед" subtitle="vs MEV/MRV · подсветка зон" accent />
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {(['neck', 'grip', 'core'] as const).map(kind => (
+        <div key={kind} style={{ display: 'flex', gap: 8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: kind === 'neck' ? '#c4b5fd' : kind === 'grip' ? '#fbbf24' : '#6ee7b7', minWidth: 48, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{kind==='neck'?'🦴': kind==='grip'?'✊':'🌀'}</span>{kind === 'neck' ? 'Шея' : kind === 'grip' ? 'Хват' : 'Core'}</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+            {plan.weeksData.map(wk => {
+              let sets = 0;
+              if (kind === 'neck') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
+              if (kind === 'grip') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip') || e.id.includes('pinch') || e.id.includes('wrist') || e.id.includes('farmer') || e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
+              if (kind === 'core') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'pallof_rotation_press', 'suitcase_carry', 'landmine_rotation'].includes(e.id)).reduce((a, e) => a + e.sets, 0), 0);
+              let col = '#a855f7';
+              if (kind === 'core') col = sets < 4 ? '#f59e0b' : sets <= 10 ? '#a855f7' : '#eab308';
+              else {
+                const lm = getCombat(plan.level, kind as any);
+                const st = lm ? (sets < lm.mev ? 'below' : sets <= lm.mav ? 'optimal' : sets <= lm.mrv ? 'high' : 'over') : 'optimal';
+                col = st === 'below' ? '#f59e0b' : st === 'optimal' ? '#a855f7' : st === 'high' ? '#eab308' : '#ef4444';
+              }
+              return (
+                <span key={wk.week} style={{ padding: '4px 8px', borderRadius: 10, background: col + '14', border: `0.5px solid ${col}2e`, color: col, fontSize: 10.5, fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>
+                  Н{wk.week} · <Highlight color={col}>{sets}</Highlight>{wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight color="#a855f7">Фиолетовый</Highlight> оптимум · <Highlight color="#f59e0b">янтарь</Highlight> недобор · <Highlight color="#eab308">жёлтый</Highlight> высоко · <Highlight color="#ef4444">красный</Highlight> перебор</div>
+  </SectionCard>
+);
+
 export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,
   annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
@@ -146,37 +181,7 @@ export const CombatPlanView: React.FC<Props> = ({
       )}
 
       {/* Карта качества — Apple с Highlights */}
-      <SectionCard icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — шея/хват/core" accent>
-        <CardHeader icon="✦" title="Карта качества — сеты/нед" subtitle="vs MEV/MRV · подсветка зон" accent />
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {(['neck', 'grip', 'core'] as const).map(kind => (
-            <div key={kind} style={{ display: 'flex', gap: 8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: kind === 'neck' ? '#c4b5fd' : kind === 'grip' ? '#fbbf24' : '#6ee7b7', minWidth: 48, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{kind==='neck'?'🦴': kind==='grip'?'✊':'🌀'}</span>{kind === 'neck' ? 'Шея' : kind === 'grip' ? 'Хват' : 'Core'}</span>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-                {plan.weeksData.map(wk => {
-                  let sets = 0;
-                  if (kind === 'neck') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
-                  if (kind === 'grip') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip') || e.id.includes('pinch') || e.id.includes('wrist') || e.id.includes('farmer') || e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
-                  if (kind === 'core') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'pallof_rotation_press', 'suitcase_carry', 'landmine_rotation'].includes(e.id)).reduce((a, e) => a + e.sets, 0), 0);
-                  let col = '#a855f7';
-                  if (kind === 'core') col = sets < 4 ? '#f59e0b' : sets <= 10 ? '#a855f7' : '#eab308';
-                  else {
-                    const lm = getCombat(plan.level, kind as any);
-                    const st = lm ? (sets < lm.mev ? 'below' : sets <= lm.mav ? 'optimal' : sets <= lm.mrv ? 'high' : 'over') : 'optimal';
-                    col = st === 'below' ? '#f59e0b' : st === 'optimal' ? '#a855f7' : st === 'high' ? '#eab308' : '#ef4444';
-                  }
-                  return (
-                    <span key={wk.week} style={{ padding: '4px 8px', borderRadius: 10, background: col + '14', border: `0.5px solid ${col}2e`, color: col, fontSize: 10.5, fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>
-                      Н{wk.week} · <Highlight color={col}>{sets}</Highlight>{wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight color="#a855f7">Фиолетовый</Highlight> оптимум · <Highlight color="#f59e0b">янтарь</Highlight> недобор · <Highlight color="#eab308">жёлтый</Highlight> высоко · <Highlight color="#ef4444">красный</Highlight> перебор</div>
-      </SectionCard>
+      <CbQualityMap plan={plan} />
 
       {diaryLoad != null && (
         <InfoBanner tone={diaryLoad > 30 ? 'warn' : 'info'}>

@@ -32,7 +32,7 @@ import {
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
 import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, STEP_PILL, IN as T_IN } from '../TrainingScreen_parts/training-ui';
-import { CombatPlanView } from './CombatPlanView';
+import { CombatPlanView, CbQualityMap } from './CombatPlanView';
 
 type Step = WizardStep;
 const STEP_LABEL_RU: Record<Step, string> = {
@@ -1013,11 +1013,11 @@ export const CombatConstructor: React.FC = () => {
           {plan.validation?.warnings.map((w, i) => (
             <InfoBanner key={i} tone="warn">{w}</InfoBanner>
           ))}
+          <CbQualityMap plan={plan} />
           {plan.rationale?.length ? (
-            <details style={{ background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>
-              <summary style={{ fontSize:11, fontWeight:700, color:'#d8b4fe', cursor:'pointer' }}>📄 Подробный отчёт (текст)</summary>
-              <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
-            </details>
+            <CbSec title="📄 Подробный отчёт (текст)" summary={`${plan.rationale.length} строк`}>
+              <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
+            </CbSec>
           ) : null}
           {renderNavRow('plan', 'export')}
         </div>

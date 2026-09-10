@@ -120,7 +120,39 @@ describe('Combat sheet select', () => {
     expect(onSwapEx).toHaveBeenCalledTimes(1);
     expect(typeof onSwapEx.mock.calls[0][3]).toBe('string');
   });
+}); // end Combat sheet select
 
+describe('Combat quality step', () => {
+  it('карта качества рендерится в плане', () => {
+    const plan = finalizeCombatPlan(buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 2, daysPerWeek: 3 } as any));
+    render(
+      <CombatPlanView
+        plan={plan}
+        historyLen={0}
+        onUndo={() => {}}
+        onUpdateEx={() => {}}
+        onMoveEx={() => {}}
+        onSwapEx={() => {}}
+      />,
+    );
+    expect(screen.getByText('Карта качества')).toBeTruthy();
+    expect(screen.getByText('Шея')).toBeTruthy();
+    expect(screen.getByText('Хват')).toBeTruthy();
+  });
+
+  it('e2e: сборка → шаг Качество с картой и отчётом-аккордеоном', async () => {
+    render(<CombatConstructor />);
+    go('4 Сплит');
+    fireEvent.click(screen.getByRole('button', { name: /Собрать PRO-план/ }));
+    await screen.findByText('Сводка плана', {}, { timeout: 12000 });
+    go('6 Качество');
+    expect(screen.getByText('Карта качества')).toBeTruthy();
+    openSec(/Подробный отчёт/);
+    expect(document.body.textContent).toContain('Единоборства:');
+  }, 15000);
+});
+
+describe('Combat plan controls', () => {
   it('в плане нет нативных селектов', () => {
     const plan = finalizeCombatPlan(buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 2, daysPerWeek: 3 } as any));
     const { container } = render(
@@ -136,4 +168,4 @@ describe('Combat sheet select', () => {
     expect(container.querySelectorAll('select').length).toBe(0);
     expect(container.querySelectorAll("input[type='checkbox']").length).toBe(0);
   });
-});
+}); // end Combat plan controls
