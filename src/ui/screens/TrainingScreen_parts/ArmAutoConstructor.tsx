@@ -56,7 +56,7 @@ function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth
 }
 function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
   return (
-    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px' }}>
+    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px', flexWrap: 'wrap' }}>
       <div className="ad-head-ic" aria-hidden style={{ fontSize: 30, lineHeight: 1, width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
       <div className="ad-head-tx" style={{ flex: 1, minWidth: 0 }}>
         <h2 className="ad-head-title" style={{ ...H, margin: 0 }}>{title}</h2>
