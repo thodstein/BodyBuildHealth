@@ -3781,3 +3781,27 @@ html.app-native {
   content-visibility: auto;
   contain-intrinsic-size: auto 140px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * BOTTOM-DASHBOARD DOCK (все платформы: APK + TG + web).
+ * Нижний дашборд навигации закреплён в самом низу экрана телефона:
+ * док-станция без плавающего зазора (left/right/bottom 0, скругление
+ * только сверху). Safe-зона уходит в padding, а не в отступ — системный
+ * жест-бар/3-кнопки пилюлю не едят. На десктопе (>700px + точный
+ * указатель) остаётся плавающая пилюля как было.
+ * Только позиция/подача, логика и движки не тронуты.
+ * ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  :root {
+    --tabbar-offset: 0px;
+  }
+  .tabs {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    padding: 8px 6px max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px), 12px);
+  }
+}

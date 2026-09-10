@@ -3555,12 +3555,17 @@ html.app-native .nav-btn.active[data-badge]:not([data-badge='']):not([data-badge
   border-color: rgba(var(--accent-rgb), 0.9);
 }
 
-/* Узкие экраны: иконки и кегль ужимаются, строка не ломается. */
+/* Узкие экраны: иконки и кегль ужимаются, строка не ломается.
+ * Док остаётся в самом низу (left/right/bottom 0) — плавающий зазор
+ * 8px убран, иначе дашборд отрывается от низа телефона. */
 @media (max-width: 380px) {
   html.app-native .tabs {
-    left: 8px;
-    right: 8px;
-    padding: 6px 4px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    padding: 6px 4px max(env(safe-area-inset-bottom, 0px), 28px);
   }
   html.app-native .nav-btn {
     font-size: 8px;
