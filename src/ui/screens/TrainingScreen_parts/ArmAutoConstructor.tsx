@@ -58,8 +58,8 @@ function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth
 }
 function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
   return (
-    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px', flexWrap: 'wrap' }}>
-      <div className="ad-head-ic" aria-hidden style={{ fontSize: 30, lineHeight: 1, width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
+    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', flexWrap: 'wrap' }}>
+      <div className="ad-head-ic" aria-hidden style={{ fontSize: 26, lineHeight: 1, width: 44, height: 44, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
       <div className="ad-head-tx" style={{ flex: 1, minWidth: 0 }}>
         <h2 className="ad-head-title" style={{ ...H, margin: 0 }}>{title}</h2>
         {sub ? <p className="ad-head-sub" style={{ ...SMALL, margin: '4px 0 0', color: '#fff' }}>{sub}</p> : null}
@@ -69,34 +69,34 @@ function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?:
   );
 }
 function AdCard({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD }} {...rest}>{children}</div>;
+  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD, padding: '10px 12px' }} {...rest}>{children}</div>;
 }
 function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn' }) {
   const [open, setOpen] = React.useState(defaultOpen ?? true);
   const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
   if (!collapsible) {
     return (
-      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', marginTop: 8 }}>
-        <div className="ad-sec-t" style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 6 }}>{dot}{title}</div>
-        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6 }}>{hint}</div> : null}
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '8px 10px', marginTop: 6 }}>
+        <div className="ad-sec-t" style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{dot}{title}</div>
+        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 4 }}>{hint}</div> : null}
         {children}
       </div>
     );
   }
   return (
-    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: open ? '10px 12px' : '0 12px', marginTop: 8 }}>
-      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '11px 0', cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, textAlign: 'left' }}>
+    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: open ? '8px 10px' : '0 10px', marginTop: 6 }}>
+      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, textAlign: 'left' }}>
         <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
         {dot}
         <span className="ad-sec-t" style={{ flex: 1 }}>{title}</span>
         {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: '#fff' }}>{summary}</span> : null}
       </button>
-      {open ? <div className="ad-sec-body" data-collapsed={!open} style={{ paddingBottom: 10 }}>{hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6 }}>{hint}</div> : null}{children}</div> : <div className="ad-sec-body" data-collapsed={!open} style={{ display: 'none' }}>{children}</div>}
+      {open ? <div className="ad-sec-body" data-collapsed={!open} style={{ paddingBottom: 8 }}>{hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 4 }}>{hint}</div> : null}{children}</div> : <div className="ad-sec-body" data-collapsed={!open} style={{ display: 'none' }}>{children}</div>}
     </div>
   );
 }
 function AdGrid({ cols, children }: { cols: '2' | '3' | 'auto' | 'auto-sm'; children: React.ReactNode }) {
-  return <div className="ad-grid" data-cols={cols} style={{ display: 'grid', gap: 8, gridTemplateColumns: cols === '3' ? 'repeat(auto-fit, minmax(150px, 1fr))' : cols === '2' ? 'repeat(auto-fit, minmax(180px, 1fr))' : '1fr' }}>{children}</div>;
+  return <div className="ad-grid" data-cols={cols} style={{ display: 'grid', gap: 6, gridTemplateColumns: cols === '3' ? 'repeat(auto-fit, minmax(150px, 1fr))' : cols === '2' ? 'repeat(auto-fit, minmax(180px, 1fr))' : '1fr' }}>{children}</div>;
 }
 function AdField({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   const styled = React.Children.map(children, (ch) => {
@@ -115,13 +115,13 @@ function AdBtn({ variant = 'primary', block, hero, children, onClick, ...rest }:
 }
 function AdBanner({ tone = 'info', children, hook }: { tone?: 'info' | 'ok' | 'warn' | 'bad'; children: React.ReactNode; hook?: string }) {
   const color = tone === 'ok' ? '#00e68a' : tone === 'warn' ? '#f59e0b' : tone === 'bad' ? '#ef4444' : '#60a5fa';
-  return <div className="ad-banner" data-tone={tone} {...(hook ? { 'data-arm': hook } : {})} style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: `${color}14`, border: `1px solid ${color}44`, borderLeft: `3px solid ${color}`, fontSize: 12, color: '#fff', lineHeight: 1.5 }}>{children}</div>;
+  return <div className="ad-banner" data-tone={tone} {...(hook ? { 'data-arm': hook } : {})} style={{ marginTop: 6, padding: '8px 10px', borderRadius: 12, background: `${color}14`, border: `1px solid ${color}44`, borderLeft: `3px solid ${color}`, fontSize: 12, color: '#fff', lineHeight: 1.5 }}>{children}</div>;
 }
 function AdEmpty({ icon, title, sub, children }: { icon: string; title: string; sub?: string; children?: React.ReactNode }) {
-  return <div className="ad-empty" style={{ textAlign: 'center', padding: '28px 16px' }}><div className="ad-empty-ic" aria-hidden style={{ fontSize: 40 }}>{icon}</div><div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 8 }}>{title}</div>{sub ? <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>{sub}</p> : null}{children ? <div style={{ marginTop: 12 }}>{children}</div> : null}</div>;
+  return <div className="ad-empty" style={{ textAlign: 'center', padding: '18px 12px' }}><div className="ad-empty-ic" aria-hidden style={{ fontSize: 32 }}>{icon}</div><div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 6 }}>{title}</div>{sub ? <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>{sub}</p> : null}{children ? <div style={{ marginTop: 10 }}>{children}</div> : null}</div>;
 }
 function AdCta({ children }: { children: React.ReactNode }) {
-  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, position: 'sticky', bottom: 8, zIndex: 5 }}>{children}</div>;
+  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, position: 'sticky', bottom: 8, zIndex: 5 }}>{children}</div>;
 }
 
 type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export'|'year';
