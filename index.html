@@ -58,6 +58,74 @@
       if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) root.style.setProperty('--boot-spin', hex);
     } catch (e) {}
   </script>
+  <script>
+    // Boot watchdog: если модульный бандл не стартовал за 20с (битая/старая
+    // web-сборка внутри APK, слишком старый WebView, зависший шаг bootstrap) —
+    // показать диагностику вместо вечного спиннера. main.tsx гасит его флагом
+    // window.__appBooted после первого рендера. В TG/web при нормальном старте
+    // скрипт ничего не рисует — 1-в-1.
+    (function () {
+      try {
+        window.__bootErrors = window.__bootErrors || [];
+        window.__bootLog = window.__bootLog || [];
+        function stamp(msg) { try { window.__bootLog.push(new Date().toISOString().slice(11, 19) + ' ' + msg); } catch (e) {} }
+        window.addEventListener('error', function (e) {
+          try {
+            var t = e.target;
+            var url = (t && (t.src || t.href)) || '';
+            var msg = e.message || (url ? 'resource-load-failed' : 'error');
+            window.__bootErrors.push(msg + (url ? ' :: ' + url : ''));
+          } catch (err) {}
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          try { window.__bootErrors.push('promise: ' + ((e.reason && e.reason.message) || String(e.reason))); } catch (err) {}
+        });
+        stamp('watchdog-armed');
+        setTimeout(function () {
+          try {
+            if (window.__appBooted) return;
+            if (document.getElementById('he-boot-watchdog')) return;
+            var errs = window.__bootErrors.slice(-6);
+            var hasAssetFail = errs.some(function (m) { return m.indexOf('assets/') !== -1; });
+            var hint = hasAssetFail
+              ? 'Похоже, в APK битая или неполная web-сборка (не загрузились файлы assets/). Решение: пересобрать командой npm run build:native и переустановить APK.'
+              : 'Приложение не успело стартовать за 20 секунд. Чаще всего помогает перезагрузка; если повторяется — сбросьте локальные данные (аккаунт Telegram сохранится в облаке, локальный дневник — нет).';
+            var diag = 'UA: ' + (navigator.userAgent || '?') + '\n'
+              + 'online: ' + (navigator.onLine ? 'yes' : 'no') + '\n'
+              + 'bootLog: ' + (window.__bootLog.join(' | ') || '-') + '\n'
+              + 'errors: ' + (errs.join(' ;; ') || 'none');
+            var box = document.createElement('div');
+            box.id = 'he-boot-watchdog';
+            box.setAttribute('role', 'alert');
+            box.style.cssText = 'position:fixed;inset:0;z-index:10000;background:#050b16;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:system-ui,sans-serif;gap:12px;';
+            var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+            box.innerHTML = '<h2 style="margin:0;font-size:18px;">⚠️ Не удалось загрузить приложение</h2>'
+              + '<p style="margin:0;color:#aaa;font-size:14px;max-width:420px;">' + esc(hint) + '</p>'
+              + '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">'
+              + '<button id="he-boot-reload" style="padding:12px 20px;min-height:44px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:15px;">⟳ Перезагрузить</button>'
+              + '<button id="he-boot-wipe" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">🗑 Сбросить данные</button>'
+              + '<button id="he-boot-copy" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">📋 Диагностика</button>'
+              + '</div>'
+              + '<pre id="he-boot-diag" style="display:none;max-width:100%;overflow:auto;text-align:left;font-size:11px;color:#8e8e93;background:#0a0a0f;border:1px solid #2a2a2a;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;">' + esc(diag) + '</pre>';
+            document.body.appendChild(box);
+            document.getElementById('he-boot-reload').onclick = function () { location.reload(); };
+            document.getElementById('he-boot-wipe').onclick = function () {
+              try { localStorage.clear(); } catch (e) {}
+              try { indexedDB.deleteDatabase('HealthEngineDB_v3'); } catch (e) {}
+              location.reload();
+            };
+            document.getElementById('he-boot-copy').onclick = function () {
+              var pre = document.getElementById('he-boot-diag');
+              if (pre) pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(diag).catch(function () {});
+              } catch (e) {}
+            };
+          } catch (e) {}
+        }, 20000);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div id="app">

@@ -87,6 +87,33 @@ function fixMobileViewport() {
   try { onKeyboardClose(() => {}); } catch (e) { console.warn('onKeyboardClose failed:', e); }
 }
 
+function bootStamp(msg: string) {
+  try {
+    const w = window as unknown as { __bootLog?: string[] };
+    w.__bootLog = w.__bootLog || [];
+    w.__bootLog.push(new Date().toISOString().slice(11, 19) + ' ' + msg);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Гонка промиса с таймаутом: зависший шаг bootstrap превращается в видимую ошибку, а не вечный спиннер. */
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error(label + ': timeout ' + ms + 'ms')), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    try {
+      if (timer) clearTimeout(timer);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function showBootstrapError(msg: string) {
   const app = document.getElementById('app');
   if (app) {
@@ -151,9 +178,12 @@ async function bootstrap() {
     }
   }
 
+  bootStamp('bootstrap-start');
   try {
-    await db.init();
+    await withTimeout(db.init(), 10000, 'db.init');
+    bootStamp('db-ok');
   } catch (e) {
+    bootStamp('db-fail');
     showBootstrapError('Ошибка инициализации базы данных. Перезагрузите.');
     return;
   }
@@ -169,13 +199,20 @@ async function bootstrap() {
   }
 
   try {
-    await registry.init();
+    await withTimeout(registry.init(), 10000, 'registry.init');
     const cryptoKey = import.meta.env.VITE_CRYPTO_KEY || '';
     const savedKey = cryptoKey ? btoa(cryptoKey) : localStorage.getItem('he_crypto_key') || '';
     if (savedKey) {
       localStorage.setItem('he_crypto_key', savedKey);
-      await initEncryption(atob(savedKey));
+      // PBKDF2 на 100k итераций держит главный поток десятки секунд на слабом
+      // телефоне, а ключ нужен только облачному бэкапу/реалтайму (пост-логин) —
+      // поэтому вне критического пути: первый рендер его не ждёт.
+      bootStamp('crypto-bg-start');
+      void initEncryption(atob(savedKey))
+        .then(() => bootStamp('crypto-bg-ok'))
+        .catch((e) => console.warn('Crypto init failed:', e));
     }
+    bootStamp('registry-ok');
   } catch (e) {
     console.warn('Crypto/Registry init failed:', e);
   }
@@ -202,6 +239,13 @@ async function bootstrap() {
           <AppUpdateBanner />
         </>,
       );
+      // Первый рендер ушёл — гасим boot-watchdog из index.html.
+      try {
+        (window as unknown as { __appBooted?: boolean }).__appBooted = true;
+      } catch {
+        /* ignore */
+      }
+      bootStamp('render-ok');
       // OTA live-update: WebView стартовал — гасим readyTimeout,
       // иначе плагин откатит только что поставленный бандл.
       try {
@@ -223,7 +267,9 @@ async function bootstrap() {
   };
 
   try {
-    await renderAuthModule(app, onLogin);
+    bootStamp('auth-start');
+    await withTimeout(renderAuthModule(app, onLogin), 20000, 'auth');
+    bootStamp('auth-done');
   } catch (e) {
     console.error('[bootstrap] renderAuthModule failed:', e);
     showBootstrapError('Ошибка авторизации: ' + ((e as Error)?.message || e));

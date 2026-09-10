@@ -24,6 +24,15 @@ function toAppProfile(p: LocalUserProfile): UserProfile {
   };
 }
 
+function newLocalId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {
+    /* fallback ниже */
+  }
+  return 'local_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
 export async function renderAuthModule(container: HTMLElement, onLogin: (profile: UserProfile) => void) {
   // Try Telegram WebApp auth first
   const tg = (window as any).Telegram?.WebApp;
@@ -73,7 +82,7 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
     // Create default user
     // Auto-create without password
     const defaultUser: LocalUserProfile = {
-      id: crypto.randomUUID(),
+      id: newLocalId(),
       email: 'user@local',
       name: 'Пользователь',
       passwordHash: '',
