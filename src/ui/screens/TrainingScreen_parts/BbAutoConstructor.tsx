@@ -128,7 +128,6 @@ import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
-import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import {
   loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d,
   type PrepWeekCheckin,

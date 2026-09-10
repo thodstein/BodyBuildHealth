@@ -20,7 +20,7 @@ export interface SMAutoAngles {
 }
 
 export interface SMAutoAnglesResult {
-  valid: boolean;
+  valid: true;
   verdict: 'ok' | 'warn' | 'critical';
   angles: SMAutoAngles;
   lines: string[];

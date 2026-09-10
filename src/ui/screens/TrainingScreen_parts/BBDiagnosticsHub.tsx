@@ -384,7 +384,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       const sum = summarizePoseAngles(samples);
       if (!sum) return null;
       const avg = avgAnglesOfSummary(sum);
-      const status = livePoseStatus({ hip: avg.hip ?? 0, knee: avg.knee ?? 0, ankle: avg.ankle ?? 0, shoulder: avg.shoulder ?? 0, elbow: avg.elbow ?? 0, trunk: avg.hip ?? 0, t: 0 } as any);
+      const status = livePoseStatus({ hip: avg.hip ?? 0, knee: avg.knee ?? 0, ankle: avg.ankle ?? 0, shoulder: avg.shoulder ?? 0, trunk: avg.hip ?? 0, t: 0 } as any);
       return { summary: sum, avg, status };
     } catch { return null; }
   }, [state.poseCsvText]);
@@ -577,10 +577,10 @@ export const BBDiagnosticsHub: React.FC = () => {
               vbtLossPct: vbt?.lossPct ?? null,
               dangerMuscles: danger,
             });
-          } catch { return null; }
+          } catch { return undefined; }
         })(),
         redFlags: (() => {
-          try { return assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain }); } catch { return null; }
+          try { return assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain }); } catch { return undefined; }
         })(),
         barPath: (() => {
           try {
@@ -1355,9 +1355,11 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const c = weakCauses[z];
                   if (!c) return null;
                   const col = c.cause === 'recovery' ? '#ef4444' : c.cause === 'volume' ? '#f59e0b' : '#a78bfa';
+                  const causeRuMap: Record<string, string> = { volume: 'объём', recovery: 'восстановление', technique: 'техника', strength: 'сила', mobility: 'подвижность', fatigue: 'усталость', activation: 'включение мышцы', genetics: 'особенности строения' };
+                  const causeRu = causeRuMap[String(c.cause)] || String(c.cause);
                   return (
                     <div key={z} style={{ padding: '8px 10px', borderRadius: 8, background: `${col}0f`, border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
-                      <b style={{ color: col }}>{weakRu(z)}: причина — {c.cause === 'volume' ? 'объём' : c.cause === 'recovery' ? 'восстановление' : c.cause === 'technique' ? 'техника' : c.cause === 'strength' ? 'сила' : c.cause === 'mobility' ? 'подвижность' : c.cause === 'fatigue' ? 'усталость' : c.cause === 'activation' ? 'включение мышцы' : c.cause === 'genetics' ? 'особенности строения' : c.cause} ({Math.round(c.confidence * 100)}%)</b>
+                      <b style={{ color: col }}>{weakRu(z)}: причина — {causeRu} ({Math.round(c.confidence * 100)}%)</b>
                       <div style={{ color: '#fff' }}>{c.evidence.join(' · ') || '—'}</div>
                       {(() => {
                         let t: { deltaPct: number; sessions: number } | null = null;
