@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { pharmaSummary } from './SupportBioavailabilityData';
 import { writeSupportStacks } from '../../../engines/stack-storage';
 
 export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -63,7 +64,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
                       const pharma = PHARMA_DB[id];
                       const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
                       const dosage = stack.dosages?.[id];
-                      const desc = sub?.description || pharma?.description || '';
+                      const desc = sub?.description || (pharma ? pharmaSummary(pharma) : '') || '';
                       return (
                         <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>

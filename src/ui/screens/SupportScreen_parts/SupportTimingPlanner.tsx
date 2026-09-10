@@ -5,7 +5,7 @@ import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import {
   type EnrichedEntry, type TimeSlot, type TimingSlot, type SubstanceTiming, type FormWithBio,
   TIMING_SLOTS, CATEGORY_TIMING, getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
-  ROUTE_LABELS_MAP,
+  ROUTE_LABELS_MAP, pharmaSummary,
 } from './SupportBioavailabilityData';
 import { S } from './SupportShared';
 
@@ -34,7 +34,7 @@ function buildCatalog(): EnrichedEntry[] {
     if (!ph || !ph.name) continue;
     const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
     const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: pharmaSummary(ph), forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
   }
   for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
     if (!pp?.name) continue;

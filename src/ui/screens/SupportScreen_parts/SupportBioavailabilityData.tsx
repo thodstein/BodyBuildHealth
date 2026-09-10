@@ -718,6 +718,23 @@ export const FORM_RECOMMENDER: Record<string, FormRecommendation[]> = {
   ],
 };
 
+// ─── Pharma-описание из полей БД (effects + risks) ───
+// У PHARMA_DB нет текстового description — без сборки карточки фармы
+// (биодоступность, тайминг, стеки) показывали пустое место. Собираем
+// честно из данных записи: топ-эффекты + топ-риски, ничего не выдумываем.
+export function pharmaSummary(ph: any): string {
+  if (!ph) return '';
+  if (ph.description) return ph.description as string;
+  const eff = Array.isArray(ph.effects)
+    ? ph.effects.map((e: any) => (e && typeof e === 'object' ? e.effect : e)).filter(Boolean).slice(0, 3)
+    : [];
+  const risks = Array.isArray(ph.risks) ? ph.risks.filter(Boolean).slice(0, 3) : [];
+  let d = eff.join('; ');
+  if (risks.length > 0) d += (d ? '. Риски: ' : 'Риски: ') + risks.join('; ') + '.';
+  else if (d) d += '.';
+  return d;
+}
+
 // ─── Build enriched catalog (shared by SupportBioavailability + SupportEffectiveDose) ───
 // Три источника (каталог → фарма → пептиды) пересекаются по id (напр. cjc1295,
 // bpc157, tb500 есть и в каталоге, и в PEPTIDE_DB): без дедупа список рисует
@@ -752,7 +769,7 @@ export function buildBioavailabilityCatalog(): EnrichedEntry[] {
     if (!ph || !ph.name) continue;
     const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
     const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    pushUnique({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+    pushUnique({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: pharmaSummary(ph), forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
   }
   for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
     if (!pp || !pp.name) continue;
