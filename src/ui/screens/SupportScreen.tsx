@@ -3134,11 +3134,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '124px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '132px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
-        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, paddingTop:'env(safe-area-inset-top, 0px)', background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
@@ -3165,7 +3165,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== PROTOCOLS HEADER (glass) ===== */}
       {section === 'protocols' && (
-        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, paddingTop:'env(safe-area-inset-top, 0px)', background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
@@ -3174,7 +3174,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== INFO HEADER (glass, readable pills) ===== */}
       {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
-        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="support-topbar" data-sup="topbar" style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, paddingTop:'env(safe-area-inset-top, 0px)', background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
           <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>

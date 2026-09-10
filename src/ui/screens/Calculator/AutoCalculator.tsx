@@ -30,9 +30,20 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     return match ? Math.max(1, Number(match[0].replace(',', '.'))) : 1;
   };
 
+  // Дебаунс тяжёлого пересчёта: каждое нажатие в маппере правит state,
+  // а calculateSupportTZ гоняет 400+ веществ × 28 механизмов синхронно —
+  // на телефоне это фризило ввод. Инпуты остаются мгновенными (state),
+  // тяжёлый результат догоняет через 250мс после последнего изменения.
+  const [deferredState, setDeferredState] = useState<CalculatorState>(state);
+  const [deferredWeek, setDeferredWeek] = useState<number>(effectiveWeek);
+  React.useEffect(() => {
+    const t = setTimeout(() => { setDeferredState(state); setDeferredWeek(effectiveWeek); }, 250);
+    return () => clearTimeout(t);
+  }, [state, effectiveWeek]);
+
   const result = useMemo<CalculatorResult>(() => {
     try {
-      return calculateSupportTZ({ ...state, courseWeek: effectiveWeek });
+      return calculateSupportTZ({ ...deferredState, courseWeek: deferredWeek });
     } catch (error) {
       console.error('AutoCalculator calculation failed', error);
       return {
@@ -42,12 +53,16 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         negativeBlocks: [], comparisonBeforeAfter: [], timestamp: new Date().toISOString(),
       } as CalculatorResult;
     }
-  }, [state, effectiveWeek]);
+  }, [deferredState, deferredWeek]);
 
+  // Персист тоже дебаунсим: JSON всего стейта на каждый кейстрок — лишние мс на телефоне.
   React.useEffect(() => {
-    try {
-      localStorage.setItem('he_autocalc_state', JSON.stringify(state));
-    } catch {}
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem('he_autocalc_state', JSON.stringify(state));
+      } catch {}
+    }, 500);
+    return () => clearTimeout(t);
   }, [state]);
 
   React.useEffect(() => {

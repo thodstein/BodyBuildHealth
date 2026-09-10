@@ -1405,6 +1405,32 @@
   border-color: rgba(255,255,255,0.12) !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * §28. КАЛЬКУЛЯТОР — ширина телефона (TG + база APK).
+ * Фазовая сетка 1fr×5 на 360px давала колонки ~60px — контент рвал
+ * карточку вширь. На телефоне — 2 колонки. Таблицы маппера — в скролл.
+ * Только подача, движок/математика 1-в-1.
+ * ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .support-screen.support-root .sup-autocalc [style*='1fr 1fr 1fr 1fr 1fr'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .support-screen.support-root .sup-autocalc [style*='repeat(3, 1fr'],
+  .support-screen.support-root .sup-autocalc [style*='repeat(3,1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+.support-screen.support-root .sup-autocalc {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.support-screen.support-root .sup-autocalc table {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
 /* ─── 27.4. ДНЕВНИК — gauge + табы + ряды ──────────────────── */
 .support-screen.support-root .sup-diary > div[style*='border-radius: 14'] {
   background: linear-gradient(180deg, rgba(22,30,52,0.76), rgba(14,20,38,0.76)) !important;

@@ -184,9 +184,11 @@ html.app-native:has(.train-sup.sup-apk) .native-fab-wrap {
  * TG/web — байт-в-байт (каждый селектор — с html.app-native).
  * ═══════════════════════════════════════════════════════════════════ */
 
-/* ─── 13.1. INFO-ТОПБАР: шторка + лента пилюль ───────────────────── */
+/* ─── 13.1. INFO-ТОПБАР: шторка + лента пилюль ─────────────────────
+ * top вместо padding: высота бара не меняется → офсеты контента целы.
+ * Fallback 28px: WebView часто отдаёт env()=0, реальная шторка ~28px+. */
 html.app-native .train-sup.sup-apk [data-sup='topbar'] {
-  padding-top: max(env(safe-area-inset-top, 0px), 0px) !important;
+  top: max(env(safe-area-inset-top, 0px), 28px) !important;
 }
 
 html.app-native .train-sup.sup-apk [data-sup='pills'] {
@@ -1472,4 +1474,29 @@ html.app-native .train-sup.sup-apk .sup-diary > div[style*='border-radius: 14'] 
 }
 html.app-native .train-sup.sup-apk .sup-diary [style*='cursor: pointer'] {
   backdrop-filter: blur(14px) saturate(150%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §22. КАЛЬКУЛЯТОР — ширина телефона APK.
+ * Зеркало support-design §28 + стекло автозаполнения.
+ * Только native (каждый селектор — с html.app-native, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  html.app-native .train-sup.sup-apk .sup-autocalc [style*='1fr 1fr 1fr 1fr 1fr'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-autocalc [style*='repeat(3, 1fr'],
+  html.app-native .train-sup.sup-apk .sup-autocalc [style*='repeat(3,1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+html.app-native .train-sup.sup-apk .sup-autocalc {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html.app-native .train-sup.sup-apk .sup-autocalc table {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }

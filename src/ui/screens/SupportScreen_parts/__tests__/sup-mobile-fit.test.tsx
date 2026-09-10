@@ -488,7 +488,7 @@ describe('SUP mobile fit (360px)', () => {
     expect(calc, 'calc card').not.toBeNull();
     fireEvent.click(calc as HTMLElement);
     expect(container.querySelector("[data-sup='topbar']"), 'gen topbar').not.toBeNull();
-    expect(root.style.paddingTop, 'gen offset').toBe('124px');
+    expect(root.style.paddingTop, 'gen offset').toBe('108px');
     cleanup();
     // Протоколы: шапка BackNav ≈57px → отступ 60px
     localStorage.removeItem('he_sup_nav_v1');
@@ -506,7 +506,7 @@ describe('SUP mobile fit (360px)', () => {
     fireEvent.click(info);
     expect(third.container.querySelector("[data-sup='topbar']"), 'info topbar').not.toBeNull();
     const root3 = third.container.querySelector('.support-screen') as HTMLElement;
-    expect(root3.style.paddingTop, 'info offset').toBe('132px');
+    expect(root3.style.paddingTop, 'info offset').toBe('112px');
     third.unmount();
   });
 });
