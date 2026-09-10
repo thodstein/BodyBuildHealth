@@ -384,10 +384,15 @@ describe('buildLMSPlan', () => {
     expect(plan.progressionRationale).toContain('Taper');
   });
 
-  it('Taper не применяется при ACWR deload (опасная зона)', () => {
+  it('Taper применяется при ACWR deload (составная разгрузка, Ф1.2)', () => {
     const plan = buildCycle01Plan({ acwr: { ratio: 1.6, zone: 'dangerous' } });
-    // при ACWR deload taper не применяется (acwrDeload=true)
-    expect(plan.progressionRationale).not.toContain('Taper');
+    // Ф1.2: ACWR ×0.65 + тапер составно — финальные недели не тяжелее рабочей базы
+    const w = plan.weeks;
+    const w10 = w[9].days.flatMap(d => d.exercises.flatMap(e => e.workSets.map(s => s.sets))).reduce((a, b) => a + b, 0);
+    const w11 = w[10].days.flatMap(d => d.exercises.flatMap(e => e.workSets.map(s => s.sets))).reduce((a, b) => a + b, 0);
+    const w12 = w[11].days.flatMap(d => d.exercises.flatMap(e => e.workSets.map(s => s.sets))).reduce((a, b) => a + b, 0);
+    expect(w11, `W11 ${w11} ≤ W10 ${w10}`).toBeLessThanOrEqual(w10);
+    expect(w12, `W12 ${w12} ≤ W11 ${w11}`).toBeLessThanOrEqual(w11);
   });
 
   it('Taper не применяется для faithful (explicit weeks)', () => {

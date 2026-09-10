@@ -140,6 +140,8 @@ export interface LMSPlanWeek {
   taperWeek?: boolean;
   /** Неделя имитации соревнований (mock meet) — прикиды как тренировочные синглы за 10-14 дней до старта. */
   mockMeet?: boolean;
+  /** Ф1.2: делод-неделя из meta.deloadWeeks (объём ×0.5, RIR+2; faithful — только метка). */
+  deload?: boolean;
   /** Неделя соревнований в конце тапера — прикиды (опенер/вторая/третья) как подходы дня старта. */
   meetWeek?: boolean;
   /** Восстановительная неделя ПОСЛЕ соревнований (post-meet): объём ×0.5, RIR +3. */
@@ -1224,6 +1226,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       : '';
 
   const weeks: LMSPlanWeek[] = [];
+  const deloadNotes: string[] = [];
   const sourceLayouts = template.weeks && template.weeks.length > 0
     ? template.weeks
     : Array.from({ length: totalWeeks }, () => template.week1);
@@ -1235,6 +1238,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     // Для auto-прогрессирующих циклов применяем объёмную модуляцию фазы (реальный пик/разгрузка).
     // Для faithful (явная раскладка всех недель) уважаем источник — модуляции нет.
     const phaseVolMod = faithful || hasExplicitWeeks ? 1.0 : MesoPhaseConfigs[phase].volumeMod;
+    // Ф1.2: делод-недели из meta.deloadWeeks — билдер раньше полностью их
+    // игнорировал (делод доходил только через ACWR/autoReg). 17 циклов
+    // объявляют делоды, но планы собирались без единой разгрузки.
+    const metaDeload = !!((template.meta as any).deloadWeeks as number[] | undefined)?.includes(weekNumber);
+    if (metaDeload) deloadNotes.push(`🔋 Делод нед ${weekNumber} (meta): объём ×0.5, RIR+2${faithful ? ' — faithful: только метка' : ''}.`);
 
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
@@ -1284,6 +1292,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
           // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
           sets = Math.round(sets * acwrVolMod);
+          // Ф1.2: meta-делод (meta.deloadWeeks) — объём ×0.5 с флором (faithful сохраняет источник)
+          if (metaDeload && !faithful) sets = Math.max(1, Math.round(sets * 0.5));
           if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
           // Авторегуляция: объём (все) — применяется поверх ACWR
           sets = Math.round(sets * arVolMult);
@@ -1295,7 +1305,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
           // RIR с ACWR + авторегуляцией
           const baseRir = faithful ? (s.rir ?? 0) : rirBase;
-          const adjRir = Math.max(0, baseRir + acwrRirShift + arRirShift);
+          const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + (metaDeload && !faithful ? 2 : 0)));
 
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
@@ -1536,6 +1546,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       days,
       sourcePhase: sourceSnapshots[w % sourceSnapshots.length]?.phase,
       sourcePhaseOrigin: sourceSnapshots[w % sourceSnapshots.length]?.phaseOrigin,
+      deload: metaDeload ? true : undefined,
     });
   }
 
@@ -1556,15 +1567,20 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
     (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
     input.acwr ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.` : '',
+    ...deloadNotes,
     input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
     pmAutoNote,
     ...weakNotes,
   ].filter(Boolean).join(' ');
 
   // P1: Авто-taper к финальным 2 неделям (peaking phase) — снижение объёма, интенсивность сохранена.
-  // Применяется только для auto-прогрессирующих циклов (не faithful) и при отсутствии ACWR-deload.
+  // Применяется только для auto-прогрессирующих циклов (не faithful).
+  // Ф1.2: ACWR-deload больше НЕ отменяет тапер — двойная разгрузка гвардится
+  // внутри applyPLTaper (недели уже <60% предыдущей — скипаются), а состав
+  // (×0.65 ACWR × тапер-кривая) корректен для опасной зоны: финал должен
+  // приближаться к старту, а не держать полный рабочий объём.
   // B1: уважает выбранную модель (peakMode) и число недель (taperWeeks) вместо хардкода classic/2.
-  const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
+  const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4)
     ? applyPLTaper(weeks, totalWeeks, { taperWeeks: input.taperWeeks, mode: input.peakMode, peakCycleId: input.peakCycleId })
     : weeks;
 
