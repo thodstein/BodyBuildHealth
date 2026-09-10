@@ -133,32 +133,32 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
           <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="#fff">Не подключено</Badge>
         )}
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
+      {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
       {pendingDiff && !pendingDiff.unchanged && (
-        <div style={{ fontSize: 10, color: '#fff', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontWeight: 700, color: '#93c5fd' }}>🔄 Пересчёт под ACWR{pendingDiff.acwr != null ? ` (${pendingDiff.acwr.toFixed(2)})` : ''}{pendingDiff.legDaysNote} — что изменится:</div>
-          <div style={{ color: '#fff' }} role="status">{pendingDiff.diffText}</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button style={BTN_PRIMARY} onClick={applyRecalc} aria-label="Применить пересчёт кардио">✅ Применить</button>
-            <button style={BTN} onClick={() => setPendingDiff(null)} aria-label="Отменить пересчёт кардио">✕ Отмена</button>
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(96,165,250,0.09)', border: '1px solid rgba(96,165,250,0.36)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontWeight: 800, color: '#93c5fd', fontSize: 11.5 }}>🔄 Пересчёт под ACWR{pendingDiff.acwr != null ? ` (${pendingDiff.acwr.toFixed(2)})` : ''}{pendingDiff.legDaysNote} — что изменится:</div>
+          <div style={{ color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }} role="status">{pendingDiff.diffText}</div>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_PRIMARY, minHeight: 44 }} onClick={applyRecalc} aria-label="Применить пересчёт кардио">✅ Применить</button>
+            <button style={{ ...BTN, minHeight: 44 }} onClick={() => setPendingDiff(null)} aria-label="Отменить пересчёт кардио">✕ Отмена</button>
           </div>
         </div>
       )}
       {todayText && (
-        <div style={{ fontSize: 11, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 10, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', lineHeight: 1.45 }}>
-          <span style={{ fontWeight: 700 }}>🔔 Сегодня:</span>
+        <div style={{ fontSize: 11.5, color: '#4ade80', background: 'rgba(0,230,138,0.09)', border: '1px solid rgba(0,230,138,0.26)', borderLeft: '3px solid #00e68a', borderRadius: 11, padding: '8px 11px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', lineHeight: 1.5, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontWeight: 800 }}>🔔 Сегодня:</span>
           <span style={{ flex: 1 }}>{todayText}</span>
-          <button style={{ ...BTN_PRIMARY, minHeight: 28, padding: '4px 10px', fontSize: 11 }} onClick={openCardio} aria-label="Начать сессию в дневнике">▶ Старт</button>
+          <button style={{ ...BTN_PRIMARY, minHeight: 44, padding: '8px 14px', fontSize: 12 }} onClick={openCardio} aria-label="Начать сессию в дневнике">▶ Старт</button>
         </div>
       )}
       {nextText && (
-        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '6px 10px' }}>
+        <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 11, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
           ⏭ Следующая сессия: {nextText}
         </div>
       )}
       {dayLoad && (dayLoad.cardioMinutes > 0 || dayLoad.strengthSessions > 0) && (
-        <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.14)', borderRadius: 10, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700 }}>🔥 Нагрузка дня:</span>
+        <div style={{ fontSize: 11.5, color: '#fbbf24', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', borderLeft: '3px solid #f59e0b', borderRadius: 11, padding: '8px 11px', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontWeight: 800 }}>🔥 Нагрузка дня:</span>
           <Badge bg="rgba(0,230,138,0.10)" border="rgba(0,230,138,0.20)" color="#4ade80">кардио {dayLoad.cardioMinutes} мин</Badge>
           <Badge bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.20)" color="#f59e0b">сила {dayLoad.strengthSessions} сесс</Badge>
           <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">итого {dayLoad.totalLoad}</Badge>
@@ -169,7 +169,7 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
         {link && (
           <>
             <button style={BTN_SMALL} onClick={recalc} title="Адаптировать под текущий ACWR">🔄 Пересчитать под ACWR</button>
-            <button style={{ ...BTN_DANGER, minHeight: 30, padding: '5px 10px', fontSize: 11 }} onClick={() => { clearCardioLink(); flashMsg('🔓 Кардио отключено'); }}>Отключить</button>
+            <button style={{ ...BTN_DANGER, minHeight: 44, padding: '8px 13px' }} onClick={() => { clearCardioLink(); flashMsg('🔓 Кардио отключено'); }}>Отключить</button>
           </>
         )}
       </div>

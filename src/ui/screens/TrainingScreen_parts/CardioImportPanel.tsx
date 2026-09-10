@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { saveCardioLogEntry, estimateCardioEntryKcal } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
 import type { CardioType } from '../../../engines/lms/cardio.engine';
 
 function parseGpx(text: string): { durationMin: number; distanceKm: number | null; avgHr: number | null; dateIso: string | null } | null {
@@ -165,32 +165,32 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
   return (
     <div className="train-cardioimport" style={CARD}>
       <div style={ROW}>
-        <span style={LABEL}>📥 Импорт GPX/TCX</span>
+        <span style={{ ...LABEL, fontSize: 12.5 }}>📥 Импорт GPX/TCX</span>
         <span style={HINT_SM}>часы / Strava → факт в дневник</span>
-        <button style={BTN_SMALL} onClick={stravaSync} title="Скоро: OAuth Strava/Garmin">🔗 Strava sync (скоро)</button>
+        <button style={{ ...BTN_SMALL, marginLeft: 'auto' }} onClick={stravaSync} title="Скоро: OAuth Strava/Garmin">🔗 Strava sync (скоро)</button>
       </div>
-      {flash && <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }} role="status">{flash}</div>}
+      {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
       <div style={ROW}>
-        <label style={{ ...BTN_SMALL, cursor: 'pointer' }}>
+        <label style={{ ...BTN_SMALL, minHeight: 44, padding: '10px 14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
           📂 Выбрать файл
-          <input type="file" accept=".gpx,.tcx,.xml" onChange={onFile} style={{ display: 'none' }} />
+          <input type="file" accept=".gpx,.tcx,.xml" onChange={onFile} style={{ display: 'none' }} aria-label="Выбрать GPX/TCX файл" />
         </label>
         <span style={HINT_SM}>GPX (трэки) или TCX (Garmin). Парсинг локально, без сети.</span>
       </div>
       {preview && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 10, padding: 10 }}>
-          <div style={{ fontSize: 11, color: '#fff' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.26)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: 12 }}>
+          <div style={{ fontSize: 12, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
             Предпросмотр: <b>{preview.durationMin} мин</b>{preview.distanceKm != null ? ` · ${preview.distanceKm} км` : ''}{preview.avgHr != null ? ` · HR ${preview.avgHr}` : ''} · {preview.fileName}
           </div>
           <div style={ROW}>
             <span style={LABEL}>Тип</span>
             {(['zone2', 'miss', 'hiit', 'recovery'] as CardioType[]).map(t => (
-              <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)}>{t.toUpperCase()}</button>
+              <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)} aria-pressed={type === t}>{t.toUpperCase()}</button>
             ))}
           </div>
           <div style={ROW}>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 10px', color: '#fff', fontSize: 12 }} aria-label="Дата импорта" />
-            <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить как {type.toUpperCase()}</button>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }} aria-label="Дата импорта" />
+            <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={save}>💾 Сохранить как {type.toUpperCase()}</button>
           </div>
         </div>
       )}

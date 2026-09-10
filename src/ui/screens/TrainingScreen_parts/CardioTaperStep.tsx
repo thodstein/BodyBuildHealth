@@ -53,31 +53,33 @@ export const CardioTaperStep: React.FC<{
     <div className="train-cardiotaper" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <SectionCard title="📉 Индивидуальный taper-план">
         <div style={ROW}>
-          <span style={LABEL}>Пред-нагрузка 28д</span>
+          <span style={{ ...LABEL, fontSize: 11.5 }}>Пред-нагрузка 28д</span>
           {[0, 10, 20].map(v => (
             <button
               key={v}
               onClick={() => { setOverloadPct(v); setApplied(false); }}
               aria-label={`Пред-нагрузка ${v}%`}
+              aria-pressed={overloadPct === v}
               style={overloadPct === v
-                ? { ...BTN, borderColor: 'rgba(0,230,138,0.5)', color: '#00e68a', background: 'rgba(0,230,138,0.12)' }
-                : BTN}
+                ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontVariantNumeric: 'tabular-nums' }
+                : { ...BTN, minHeight: 44, fontVariantNumeric: 'tabular-nums' }}
             >
               {v === 0 ? 'Норма' : `+${v}%`}
             </button>
           ))}
         </div>
         <div style={ROW}>
-          <span style={LABEL}>Усталость</span>
+          <span style={{ ...LABEL, fontSize: 11.5 }}>Усталость</span>
           {(['AF', 'F-OR'] as FatigueClass[]).map(f => (
             <button
               key={f}
               onClick={() => { setFatigue(f); setApplied(false); }}
               aria-label={`Усталость ${f}`}
+              aria-pressed={fatigue === f}
               title={f === 'AF' ? 'Острая усталость (обычная)' : 'Функциональное перенапряжение: нужен длиннее и глубже (Front 2024)'}
               style={fatigue === f
-                ? { ...BTN, borderColor: 'rgba(0,230,138,0.5)', color: '#00e68a', background: 'rgba(0,230,138,0.12)' }
-                : BTN}
+                ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)' }
+                : { ...BTN, minHeight: 44 }}
             >
               {f === 'AF' ? 'AF (острая)' : 'F-OR (перегруз)'}
             </button>
@@ -103,14 +105,14 @@ export const CardioTaperStep: React.FC<{
             {applied ? '✅ Taper применён — окно уже размечено (повтор ничего не меняет).' : 'Изменений нет: окно уже taper/peak/deload либо цикл короче окна.'}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {changes.map(c => (
-              <div key={c.week} style={{ fontSize: 12, color: '#fff' }}>
+              <div key={c.week} style={{ fontSize: 12, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
                 Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}
               </div>
             ))}
             <button
-              style={{ ...BTN_PRIMARY, alignSelf: 'flex-start', marginTop: 4 }}
+              style={{ ...BTN_PRIMARY, minHeight: 48, alignSelf: 'flex-start', marginTop: 4 }}
               onClick={() => { if (preview) { onApply(preview.cycle, `📉 индивид. taper −${plan.reductionPct}%/${plan.durationDays}д к нед ${effShowWeek}`); setApplied(true); } }}
             >
               ✓ Применить taper ({changes.length} изм.)
