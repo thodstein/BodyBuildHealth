@@ -1260,7 +1260,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       // tier filter removed — no longer filtering by tier
     }
     if (categoryFilter !== 'all') {
-      filtered = filtered.filter(s => (s.categories||[]).some(c => c === categoryFilter));
+      filtered = filtered.filter(s => (Array.isArray(s.categories) ? s.categories : []).some(c => c === categoryFilter));
     }
     // Apply TZ organ filter
     if (catalogOrgans.length > 0) {
@@ -1287,8 +1287,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         (s.name||'').toLowerCase().includes(sq) ||
         (s.id||'').toLowerCase().includes(sq) ||
         (s.description||'').toLowerCase().includes(sq) ||
-        (s.categories||[]).some(c => (c||'').toLowerCase().includes(sq)) ||
-        (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(sq))
+        (Array.isArray(s.categories) ? s.categories : []).some(c => (c||'').toLowerCase().includes(sq)) ||
+        (Array.isArray(s.mechanisms) ? s.mechanisms : []).some(m => (m||'').toLowerCase().includes(sq))
       );
     }
     const groups: Record<string, SupportSubstance[]> = {};
@@ -1532,8 +1532,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   // Phase 5.12: Auto-classify all substances into 4 tiers
   const classifyTier = (sub: SupportSubstance): 'core' | 'base' | 'boost' | 'max' => {
     const type = (sub.type || '').toLowerCase();
-    const cats = (sub.categories || []).map(c => c.toLowerCase());
-    const mechs = (sub.mechanisms || []).map(m => m.toLowerCase());
+    // Битая запись каталога (поле строкой вместо массива) раньше роняла
+    // весь экран чёрным — чиним классом, не крашем.
+    const cats = (Array.isArray(sub.categories) ? sub.categories : []).map(c => (c || '').toLowerCase());
+    const mechs = (Array.isArray(sub.mechanisms) ? sub.mechanisms : []).map(m => (m || '').toLowerCase());
     const id = (sub.id || '').toLowerCase();
     const name = (sub.name || '').toLowerCase();
     const searchStr = type + ' ' + cats.join(' ') + ' ' + mechs.join(' ') + ' ' + id + ' ' + name;
@@ -2033,7 +2035,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     } catch (e) { return null; }
   }
 // Helper to render SUPPORT_CATALOG_DATA for a substance
-const renderCatalogDetail = (subId: string): React.ReactNode => {
+// Внутренняя версия без защиты: любой throw здесь раньше ронял весь экран
+// (чёрный экран по тапу на препарат — у инфо-каталога нет error boundary,
+// а safeRender ловит только создание элемента, не рендер поддерева).
+const renderCatalogDetailInner = (subId: string): React.ReactNode => {
   const canonicalId = CANONICAL_ID_MAP[subId] || CANONICAL_ID_MAP[subId.toLowerCase()] || subId.toLowerCase();
   const entry = SUPPORT_CATALOG_DATA[canonicalId] || SUPPORT_CATALOG_DATA[subId];
   if (!entry) return null;
@@ -2272,20 +2277,28 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{enrich.labMarkers.join(' · ')}</span>
               </div>
             )}
-            {enrich.restrictions && enrich.restrictions.length > 0 && (
-              <div>
-                <span style={{ fontSize: 8, color: 'rgba(239,68,68,0.8)' }}>⚠ Ограничения: </span>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{enrich.restrictions.join(' · ')}</span>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+              {enrich.restrictions && enrich.restrictions.length > 0 && (
+                <div>
+                  <span style={{ fontSize: 8, color: 'rgba(239,68,68,0.8)' }}>⚠ Ограничения: </span>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{enrich.restrictions.join(' · ')}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
-    </div>
-  );
-};
-;
+      </div>
+    );
+  };
+  // Безопасная обёртка: битая запись каталога (нет id, поле не-массив и т.п.)
+  // даёт пустую деталь вместо чёрного экрана на весь таб.
+  const renderCatalogDetail = (subId: string): React.ReactNode => {
+    try {
+      if (!subId || typeof subId !== 'string') return null;
+      return renderCatalogDetailInner(subId);
+    } catch { return null; }
+  };
+  ;
 
   const synergiesContent = (filtered: any[], merged: any[], cats: Record<string, boolean>, tab?: string): React.ReactNode => {
     return safeRender('synergies_content', () => {
@@ -2867,6 +2880,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     replaceSelectedSub,
     replaceTargetMech,
     replaceTargetOrgan,
+    renderCatalogDetail,
     reportGenerated,
     reproMode,
     neuroMode,
@@ -3207,7 +3221,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           {/* Content */}
           <div data-sup="content" style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
       {renderView(infoView, 'catalog', () =>
-        <div data-sup="catalog"><SupportCatalogView s={s} /></div>
+        <div data-sup="catalog"><InfoErrorBoundary label="Каталог"><SupportCatalogView s={s} /></InfoErrorBoundary></div>
       )}
       {renderView(infoView, 'stacks', () =>
         <div data-sup="stacks"><SupportStacksView s={s} /></div>
