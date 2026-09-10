@@ -14,15 +14,16 @@ import {
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL } from './CardioUI';
 
 const DAY_CELL: React.CSSProperties = {
-  flex: '1 1 40px', minWidth: 44, borderRadius: 10, padding: '6px 4px', textAlign: 'center',
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 10,
-  minHeight: 56, display: 'flex', flexDirection: 'column', gap: 3,
+  flex: '1 1 48px', minWidth: 48, borderRadius: 11, padding: '8px 4px', textAlign: 'center',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11,
+  minHeight: 64, display: 'flex', flexDirection: 'column', gap: 3, fontVariantNumeric: 'tabular-nums',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 const SEL: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 12,
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 14, minHeight: 44, outline: 'none',
 };
-const NUM: React.CSSProperties = { ...SEL, width: 62 };
+const NUM: React.CSSProperties = { ...SEL, width: 72 };
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };

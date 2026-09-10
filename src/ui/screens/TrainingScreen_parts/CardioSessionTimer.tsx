@@ -11,11 +11,12 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, ProgressBar } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, ProgressBar, TYPE_COLOR } from './CardioUI';
 
 const INPUT: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12, width: 76,
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 14, width: 84, minHeight: 44,
+  outline: 'none', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.20)',
 };
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -240,7 +241,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
         <span style={LABEL}>⚡ Быстрый старт сессии</span>
         <span style={HINT_SM}>таймер · фазы · ЧСС-зона · аудио</span>
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
+      {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
 
       {active && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, alignItems: 'center', padding: '8px 0' }}>
@@ -248,7 +249,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
             {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
           </div>
-          <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 44, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1 }}>{fmt(active.remainingSec)}</div>
+          <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 54, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1.5, textShadow: active.remainingSec < 60 ? '0 0 24px rgba(239,68,68,0.45)' : '0 0 24px rgba(0,230,138,0.40)' }}>{fmt(active.remainingSec)}</div>
           <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={active.durationMin * 60 - active.remainingSec} aria-valuemin={0} aria-valuemax={active.durationMin * 60} aria-label="Прогресс сессии">
             <ProgressBar value={active.durationMin * 60 - active.remainingSec} max={active.durationMin * 60} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 4 }}>
@@ -312,16 +313,16 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {todaySessions.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>По плану на сегодня кардио нет.</div>}
           {todaySessions.map((s, i) => (
-            <div key={i} style={ROW}>
-              <span style={{ fontSize: 12, flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
+            <div key={i} style={{ ...ROW, flexWrap: 'nowrap', background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${TYPE_COLOR[s.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 12, padding: '9px 10px', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 12.5, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontWeight: 800 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
                 {s.targetHr?.max && (
-                  <span style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
+                  <span style={{ fontSize: 10.5, color: 'rgba(96,165,250,0.9)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
                 )}
               </span>
-              <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin, s.targetHr)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
-              <button style={BTN} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
-              <button style={BTN} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
+              <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s.type, s.durationMin, s.targetHr)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+              <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
+              <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
             </div>
           ))}
         </div>
