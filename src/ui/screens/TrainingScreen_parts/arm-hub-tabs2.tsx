@@ -12,7 +12,7 @@ import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanne
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 
 export function HubPressureTab({ H }: { H: any }) {
-  const { state, setState, toggleWeakPoint, toggleLegacy, mockGuard, forceVecPro, bwNum, weightClassAuto, tablePreview, muState, setMuState, saveMu, tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap, tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts } = H;
+  const { state, setState, toggleWeakPoint, toggleLegacy, mockGuard, bwNum, weightClassAuto, tablePreview, muState, setMuState, saveMu, tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap, tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts } = H;
   return (
     <div>
       <AdGrid cols="2">
@@ -47,6 +47,10 @@ export function HubPressureTab({ H }: { H: any }) {
           <div className="ad-muted">
             Выбрано давления: {state.weakPoints.filter((wp: string)=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).join(', ')}
             <span> ⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
+            {state.weakPoints.filter((wp: string)=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).map((wp: string)=>{
+              const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
+              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике</div>;
+            })}
           </div>
         )}
       </AdSec>
@@ -54,9 +58,8 @@ export function HubPressureTab({ H }: { H: any }) {
         <AdSec title="Humerus (side)">
           <div className="ad-muted">{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
         </AdSec>
-        <AdSec title="Force Vector PRO">
-          <div className="ad-muted">Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure} · Total {forceVecPro.totalScore} {forceVecPro.asymmetryPct!=null? `· Асим ${forceVecPro.asymmetryPct}%`:''}</div>
-          <div className="ad-muted">Side ref {Math.round(bwNum*0.6)}кг · Back ref {Math.round(bwNum*0.8)}кг · WAF {weightClassAuto}</div>
+        <AdSec title="Side/Back vs норма WAF">
+          <div className="ad-muted">Side ref {Math.round(bwNum*0.6)}кг · Back ref {Math.round(bwNum*0.8)}кг · WAF {weightClassAuto} (вектор и асимметрия — во вкладке «✊ Хват»)</div>
         </AdSec>
       </AdGrid>
       <AdSec title="🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол">
@@ -234,7 +237,7 @@ export function HubStrengthTab({ H }: { H: any }) {
 }
 
 export function HubRecoveryTab({ H }: { H: any }) {
-  const { acwr, tendonAcwr, state, report, tendonWeeklyLimit, angles, anglesVerified, perMuscleAcwrSumP0, armMobility, mob, setMob, mobRetest, setMobRetest, onMobToProfile, mobMsg, autoregP0, cnsHeavyP0, guardsP0, armPlan, rh, setRh, buildRehabPlanFn, scoring, showScoring, forceHistory } = H;
+  const { acwr, tendonAcwr, state, report, tendonWeeklyLimit, angles, anglesVerified, perMuscleAcwrSumP0, armMobility, mob, setMob, mobRetest, setMobRetest, onMobToProfile, mobMsg, autoregP0, cnsHeavyP0, guardsP0, armPlan, rh, setRh, buildRehabPlanFn, forceHistory } = H;
   return (
     <div>
       <AdGrid cols="2">
@@ -333,11 +336,6 @@ export function HubRecoveryTab({ H }: { H: any }) {
           </div>;
         } catch { return null; } })()}
       </AdSec>
-      {showScoring && scoring && (
-        <div className="ad-muted">
-          <b>RSS {scoring.score} {H.scoreLabel(scoring.level)}</b> · v{Math.round(scoring.verification*100)}% · {scoring.findings.slice(0,2).map((f: any)=>f.text).join(' · ')}
-        </div>
-      )}
       {forceHistory.stats.length>0 && (
         <AdSec title="Fatigue 12-нед (патент WO2026106582A1)">
           <div className="ad-muted">Avg {forceHistory.stats[0]?.avg}→{forceHistory.stats[forceHistory.stats.length-1]?.avg} · Max {forceHistory.stats[0]?.max}→{forceHistory.stats[forceHistory.stats.length-1]?.max} · Fatigue {forceHistory.fatigue?.first}%→{forceHistory.fatigue?.last}% ({forceHistory.fatigue?.improving? '↓ адаптация':'↑ усталость'})</div>

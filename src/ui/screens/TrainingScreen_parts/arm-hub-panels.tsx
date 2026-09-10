@@ -6,9 +6,7 @@
 import React from 'react';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engine';
-import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
-import { angleJointForWeakPoint, isValidAngleForArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
@@ -77,7 +75,7 @@ export function HubHead({ H }: { H: any }) {
 }
 
 export function HubControls({ H }: { H: any }) {
-  const { state, setState, weightClassAuto, applyToConstructor, tab, setTab } = H;
+  const { state, setState, weightClassAuto, tab, setTab } = H;
   return (
     <div style={HUB_SECTION_GAP}>
       <div>
@@ -106,7 +104,6 @@ export function HubControls({ H }: { H: any }) {
           {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
         </div>
       </div>
-      <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
       <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
     </div>
   );
@@ -120,25 +117,7 @@ export function HubOutput({ H }: { H: any }) {
         <div className="ad-muted">{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''} {(report as any).weakPoints?.length? `· точек ${(report as any).weakPoints.join(', ')}` : ''}</div>
         {report.findings.length>3 && <div className="ad-sec">{report.findings.map((f:any,i:number)=><div key={i} className="ad-finding" data-level={f.level} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e' }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
         {(diag as any).biomechCards?.length ? (
-          <div className="ad-list">
-            {(diag as any).biomechCards.map((c:any)=>{
-              const aj = angleJointForWeakPoint(c.weakPoint);
-              const curDeg = aj==='wrist' ? (parseFloat(state.wristDeg)||10) : aj==='elbow' ? (parseFloat(state.elbowDeg)||110) : (parseFloat(state.forearmDeg)||90);
-              const valid = aj==='none' ? null : isValidAngleForArmWeakPoint(c.weakPoint, curDeg);
-              return (
-              <div key={c.weakPoint} className="ad-sec ad-bio" data-valid={valid===null?'na':valid?'ok':'bad'}>
-                <div className="ad-row">
-                  <span><b>{c.label}</b></span>
-                  <span className="ad-tag ad-angle">{c.angleRangeDeg[0]}-{c.angleRangeDeg[1]}° {c.keyJoint} {valid===null?'• угол н/п — контроль по технике':valid?'✅':'⚠ вне'}</span>
-                  <span className="ad-muted">{c.weakMuscles.join('/')}</span>
-                </div>
-                <div className="ad-muted">{c.reason}</div>
-                <div className="ad-tip"><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT warn {H.vbtThresholdForWeakPoint(c.weakPoint).warnPct}%/stop {H.vbtThresholdForWeakPoint(c.weakPoint).stopPct}%</div>
-                <div className="ad-muted">День {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.dayTags[0] || '—'} · {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.sets}×{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.repsRange.join('-')} RIR{ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.rir} {ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds?`hold ${ARM_CORRECTIONS[c.weakPoint as ArmWeakPoint]?.holdSeconds}с`:''} · {c.technique.join('/')}</div>
-              </div>
-              );
-            })}
-          </div>
+          <div className="ad-muted">Биомех-карточки ({(diag as any).biomechCards.length}: {(diag as any).biomechCards.map((c:any)=>c.weakPoint).join(', ')}) — полностью во вкладке «🤚 Кисть/Ротация» (углы + коррекции + VBT-пороги), здесь не дублируем.</div>
         ) : diag.priorities.length===0 ? <div className="ad-muted">Слабые зоны не выявлены — баланс. {H.dynamicReport && (H.dynamicReport as any).asymmetry ? `· ${(H.dynamicReport as any).tactic}` : ''}</div> : (
           <div className="ad-list">
             {diag.priorities.map((p: any,i: number)=>(
@@ -164,11 +143,6 @@ export function HubOutput({ H }: { H: any }) {
           <AdBanner tone="warn">
             <b>Динамика F/t:</b> avgFt {(H.dynamicReport as any).avgFt ?? '—'} кг/с · total {(H.dynamicReport as any).totalF ?? '—'}кг · tactic {(H.dynamicReport as any).tactic} · {Object.entries((H.dynamicReport as any).metrics).map(([k,v]:any)=> v? `${k}:${v.ftIndex}`:'' ).filter(Boolean).join(' · ') || ''}
           </AdBanner>
-        )}
-        {H.showScoring && H.scoring && (
-          <div className="ad-muted">
-            <b>RSS {H.scoring.score} {scoreLabel(H.scoring.score)}</b> · v{Math.round(H.scoring.verification*100)}% · {H.scoring.findings.map((f: any)=>f.text).join(' · ')} {H.scoring.floors.length? `· floor ${H.scoring.floors.join(', ')}` : ''}
-          </div>
         )}
       </AdSec>
     </AdCard>
@@ -226,23 +200,6 @@ export function HubP0Panel({ H }: { H: any }) {
           {criticalSideP0 && <span className="ad-tip">🔴 критично — side только ремень/изометрия</span>}
         </div>
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
-      </AdSec>
-    </AdCard>
-  );
-}
-
-export function HubTableStrip({ H }: { H: any }) {
-  const { tablePreview, forceHistory } = H;
-  return (
-    <AdCard>
-      <AdSec title="🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол" hint="≥50% тренировок — стол. Тейпер 2–3 нед: 0.65/0.45, side×0.5, RIR+1/+2. Moderate 50-75% 1-3мин / Heavy 75-100% 10с-1мин / Stress 100-125% 5-10с.">
-        <div className="ad-strip" data-arm="hub-strip">
-          {tablePreview.map(({ wk, kind }: any) => {
-            const col = kind==='moderate'? '#22c55e' : kind==='heavy'? '#f59e0b' : '#ef4444';
-            return <div key={wk} className="ad-stat" style={{ borderTopColor: col }}><div className="ad-stat-v">{wk}</div><div className="ad-stat-l">{kind}</div></div>;
-          })}
-        </div>
-        {forceHistory.trend && <div className="ad-tip">{forceHistory.trend.text}</div>}
       </AdSec>
     </AdCard>
   );
