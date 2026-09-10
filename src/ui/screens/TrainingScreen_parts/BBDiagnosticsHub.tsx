@@ -4,7 +4,7 @@
  * Хедер RSS 0-100 + verification + ACWR/SFR-чипы. Мост weakpoints (+preferredExerciseIds/exerciseSwap/labDiagnosis) → BbAutoConstructor.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { CARD, DIM, ACCENT } from './training-ui';
+import { CARD, ACCENT } from './training-ui';
 import { applyToPlanner } from './planner-bridge';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -17,7 +17,11 @@ import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { livePoseStatus, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { lrVerdictsFromSessions } from '../../../engines/bb/bb-lr-volume.engine';
+import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
+import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
+import { bbBarPathVerdict } from '../../../engines/bb/bb-bar-path.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
 import { isSpecializationTargetConflict, canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
 import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
@@ -34,7 +38,7 @@ import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-dete
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
-import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
+import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, teenTrainingNote, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
@@ -54,11 +58,19 @@ type BBState = {
   wristCm: string;
   sex: '' | 'male' | 'female';
   sleepHours: string;
+  pain010: string;
+  age: string;
+  cyclePhase: '' | 'follicular' | 'luteal';
   specWeeks: string;
   showSpecBlock: boolean;
   stimCheating: boolean;
   stimShortRom: boolean;
   stimSetupNote: string;
+  poseCsvText: string;
+  acutePain: boolean;
+  swelling: boolean;
+  numbness: boolean;
+  jointClickPain: boolean;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -75,21 +87,29 @@ const DEFAULT_STATE: BBState = {
   wristCm: '',
   sex: '',
   sleepHours: '',
+  pain010: '',
+  age: '',
+  cyclePhase: '',
   specWeeks: '8',
   showSpecBlock: false,
   stimCheating: false,
   stimShortRom: false,
   stimSetupNote: '',
+  poseCsvText: '',
+  acutePain: false,
+  swelling: false,
+  numbness: false,
+  jointClickPain: false,
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
-  { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'гранулярные 1-2 + e1RM + Reeves' },
-  { id: 'symmetry', label: 'Симметрия', icon: '⚖️', desc: 'L/R + V-taper + FFMI' },
-  { id: 'exercise', label: 'Упражнения', icon: '🏋️', desc: 'диагностика+PROF-коррекция+Δ' },
-  { id: 'stimulus', label: 'Стимул', icon: '💪', desc: 'lengthened + pattern + BFR' },
-  { id: 'volume', label: 'Объём', icon: '📊', desc: 'MEV/MAV/MRV чип' },
-  { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'ACWR per-muscle + Unified' },
-  { id: 'mobility', label: 'Мобильность/VBT', icon: '🦿', desc: 'OHS6 + VBT 20-25%' },
+  { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'зоны 1–2 + сила + пропорции' },
+  { id: 'symmetry', label: 'Симметрия', icon: '⚖️', desc: 'лево/право + конус + индекс массы' },
+  { id: 'exercise', label: 'Упражнения', icon: '🏋️', desc: 'разбор + техника + изменение' },
+  { id: 'stimulus', label: 'Стимул', icon: '💪', desc: 'растянутая + рисунок + жгуты' },
+  { id: 'volume', label: 'Объём', icon: '📊', desc: 'минимум/норма/максимум' },
+  { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'нагрузка по мышцам + сон' },
+  { id: 'mobility', label: 'Подвижность', icon: '🦿', desc: 'присед-тест + скорость 20–25%' },
 ];
 
 const GRANULAR_OPTS: Array<{ id: string; label: string }> = [
@@ -109,6 +129,126 @@ const GRANULAR_OPTS: Array<{ id: string; label: string }> = [
   { id: 'traps', label: 'Трапеции' },
   { id: 'forearms', label: 'Предплечья' },
 ];
+
+/** Русские подписи профилей/мышц для вывода (движковые id не меняются). */
+const PROFILE_RU: Record<string, string> = { lengthened: 'растянутая', mid: 'средняя', short: 'пиковая', all: 'все' };
+const profileRu = (p: string | null | undefined): string => (p && PROFILE_RU[p]) || String(p || '—');
+const FLAG_RU: Record<string, string> = {
+  synergistTakeover: 'нагрузку забирают соседи', stabilityGap: 'не хватает стабильности', wrongHead: 'бьёт мимо слабой головки',
+  singleAngle: 'один угол — нужен второй', shortOnly: 'только короткая позиция', missingLengthened: 'нет растянутой позиции',
+  jointOverload: 'перегруз сустава', mobilityBlock: 'мешает подвижность', asymRisk: 'риск перекоса',
+  tempoOff: 'темп не тот', romShort: 'амплитуда укорочена', cheating: 'читинг',
+};
+const flagRu = (f: string): string => FLAG_RU[f] || f;
+const CIRC_RU: Record<string, string> = {
+  heightCm: 'рост', weightKg: 'вес', chest: 'грудь', waist: 'талия', hips: 'бёдра', neck: 'шея',
+  shoulderWidth: 'плечи', bicepL: 'бицепс Л', bicepR: 'бицепс П', bicep: 'бицепс',
+  thighL: 'бедро Л', thighR: 'бедро П', calfL: 'голень Л', calfR: 'голень П',
+  forearmL: 'предплечье Л', forearmR: 'предплечье П', wristCm: 'запястье',
+};
+const circRu = (k: string): string => CIRC_RU[k] || k;
+const weakRu = (z: string): string => GRANULAR_OPTS.find((o) => o.id === z)?.label || MUSCLE_LABEL_RU[z] || z;
+const weakListRu = (zs: string[]): string => zs.map(weakRu).join(' · ');
+
+/** Компактная кнопка-карточка вместо галочки (44px, АПК-тап). */
+const BbCheckCard: React.FC<{ active: boolean; title: string; desc?: string; onToggle: () => void; accent?: string }> = ({ active, title, desc, onToggle, accent = '#00e68a' }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={active}
+    aria-pressed={active}
+    aria-label={title}
+    data-bb="check-card"
+    data-on={active ? '1' : '0'}
+    onClick={onToggle}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '8px 10px', borderRadius: 12,
+      border: `1px solid ${active ? accent : 'rgba(255,255,255,0.10)'}`, cursor: 'pointer', textAlign: 'left',
+      background: active ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 12, fontWeight: 700,
+    }}
+  >
+    <span aria-hidden style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? accent : 'rgba(255,255,255,0.08)', color: active ? '#06281c' : '#fff', fontSize: 13, fontWeight: 900 }}>{active ? '✓' : ''}</span>
+    <span style={{ lineHeight: 1.25 }}>{title}{desc ? <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.85 }}>{desc}</span> : null}</span>
+  </button>
+);
+
+/** Красивое числовое поле: подпись + инпут 44px/16px + степпер. */
+const BbNum: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; width?: number | string; step?: number; testId?: string }> = ({ label, value, onChange, placeholder, width = '100%', step, testId }) => (
+  <label data-bb="num-field" style={{ fontSize: 11, color: '#fff', display: 'block', minWidth: 0 }}>
+    <span style={{ display: 'block', marginBottom: 3, lineHeight: 1.2 }}>{label}</span>
+    <span style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+      {step ? (
+        <button type="button" data-bb="num-minus" aria-label={`Уменьшить ${label}`} onClick={() => { const n = parseFloat(value); onChange(Number.isFinite(n) ? String(Math.max(0, Math.round((n - step) * 10) / 10)) : ''); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>−</button>
+      ) : null}
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        inputMode="decimal"
+        data-bb="num-input"
+        data-testid={testId}
+        aria-label={label}
+        style={{ flex: 1, width, minHeight: 44, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 10px', fontSize: 16 }}
+      />
+      {step ? (
+        <button type="button" data-bb="num-plus" aria-label={`Увеличить ${label}`} onClick={() => { const n = parseFloat(value); onChange(Number.isFinite(n) ? String(Math.round((n + step) * 10) / 10) : String(step)); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.30)', background: 'rgba(0,230,138,0.12)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>+</button>
+      ) : null}
+    </span>
+  </label>
+);
+
+/** Красивый попап-выбор вместо нативного селекта (кнопка 44px + шит). */
+const BbSheetSelect: React.FC<{ label: string; value: string; options: Array<{ id: string; label: string; hint?: string }>; onChange: (id: string) => void; testId?: string }> = ({ label, value, options, onChange, testId }) => {
+  const [open, setOpen] = useState(false);
+  const cur = options.find((o) => o.id === value) || null;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open ]);
+  return (
+    <span data-bb="sheet-select" style={{ display: 'block', minWidth: 0 }}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`${label}: ${cur ? cur.label : 'не выбрано'}`}
+        data-bb="sheet-trigger"
+        data-testid={testId}
+        onClick={() => setOpen((o) => !o)}
+        style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.8 }}>{label}</span>
+        <span style={{ flex: 1 }}>{cur ? cur.label : '— выбери —'}</span>
+        <span aria-hidden style={{ color: '#fff', opacity: 0.8 }}>▾</span>
+      </button>
+      {open && (
+        <span data-bb="sheet-backdrop" onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <span role="dialog" aria-modal="true" aria-label={label} data-bb="sheet-card" onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)', maxHeight: '70vh', overflowY: 'auto', background: '#101827', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none', borderRadius: '18px 18px 0 0', padding: '12px 12px calc(16px + env(safe-area-inset-bottom, 0px))' }}>
+            <span style={{ display: 'block', width: 40, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{label}</span>
+            {options.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                aria-pressed={value === o.id}
+                data-bb="sheet-option"
+                data-active={value === o.id ? '1' : '0'}
+                onClick={() => { onChange(o.id); setOpen(false); }}
+                style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, borderRadius: 12, border: `1px solid ${value === o.id ? 'rgba(0,230,138,0.45)' : 'rgba(255,255,255,0.10)'}`, background: value === o.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span aria-hidden style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>{value === o.id ? '●' : ''}</span>
+                <span style={{ flex: 1 }}>{o.label}{o.hint ? <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.8 }}>{o.hint}</span> : null}</span>
+              </button>
+            ))}
+            <button type="button" data-bb="sheet-done" onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Готово</button>
+          </span>
+        </span>
+      )}
+    </span>
+  );
+};
 
 export const BBDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<BBState>(() => {
@@ -226,13 +366,54 @@ export const BBDiagnosticsHub: React.FC = () => {
     return bbVbtRecommendation('squat', best, last, w);
   }, [state.vbtBest, state.vbtLast, state.vbtWeight]);
 
-  const mockPose = useMemo(() => {
+  // P4: разбор траектории из поля ввода (без нового ввода — тот же csvText)
+  const barLast = useMemo(() => {
     try {
-      const frames = createMockPoseStream();
-      const ang = estimateAnglesFromLandmarks(frames[0] as any);
-      return { angles: ang, status: livePoseStatus(ang as any) };
-    } catch { return { angles: { hip: 0, knee: 0, ankle: 0, shoulder: 0 } as any, status: { faults: [] } as any }; }
-  }, []);
+      const pts = parseKinoveaCSV(state.csvText);
+      if (!pts) return null;
+      const res = analyzeBarTracking(pts as any);
+      if (!res) return null;
+      return { xLoop: res.xLoop, yMax: res.yMax, vmax: res.vmax, verdict: bbBarPathVerdict(res.xLoop, res.yMax) };
+    } catch { return null; }
+  }, [state.csvText]);
+  // P5: живые углы из вставленной таблицы (трекер поз/ручной замер), вместо мока
+  const poseLive = useMemo(() => {
+    try {
+      const samples = parsePoseAnglesCsv(state.poseCsvText);
+      if (!samples) return null;
+      const sum = summarizePoseAngles(samples);
+      if (!sum) return null;
+      const avg = avgAnglesOfSummary(sum);
+      const status = livePoseStatus({ hip: avg.hip ?? 0, knee: avg.knee ?? 0, ankle: avg.ankle ?? 0, shoulder: avg.shoulder ?? 0, elbow: avg.elbow ?? 0, trunk: avg.hip ?? 0, t: 0 } as any);
+      return { summary: sum, avg, status };
+    } catch { return null; }
+  }, [state.poseCsvText]);
+  // P1: L/R-объём из дневника
+  const lrVerdicts = useMemo(() => {
+    try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; }
+  }, [diarySessions]);
+  // P2/P3: готовность + красные флаги
+  const redFlags = useMemo(() => {
+    try {
+      return assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+    } catch { return { active: false, blocked: false, items: [], text: '' } as any; }
+  }, [state.acutePain, state.swelling, state.numbness, state.jointClickPain]);
+  const readiness = useMemo(() => {
+    try {
+      const pain = state.pain010 ? parseFloat(state.pain010) : null;
+      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+      const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+      return assessBbReadiness({
+        sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
+        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        dangerMuscles: danger,
+      });
+    } catch { return { level: 'green', reasons: [], advice: '' } as any; }
+  }, [state.pain010, state.sleepHours, perMuscleAcwr, vbt]);
+  const teenNote = useMemo(() => {
+    try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; }
+  }, [state.age]);
 
   const measNum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
@@ -280,9 +461,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       if (state.sex !== 'female') return [];
       const w = parseFloat(state.circ.waist || ''); const h = parseFloat(state.circ.hips || '');
-      return femaleSymmetryNotes({ waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: null });
+      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
+      return femaleSymmetryNotes(
+        { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
+        { cyclePhase: (state.cyclePhase || 'any') as any },
+      );
     } catch { return []; }
-  }, [state.sex, state.circ]);
+  }, [state.sex, state.circ, state.cyclePhase]);
   const sleepNum = state.sleepHours ? parseFloat(state.sleepHours) : null;
 
   const toggleWeak = (id: string) => {
@@ -364,7 +549,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     applyToPlanner({
       kind: 'weakpoints',
-      label: `ББ диагностика MAX PRO: ${report.weakZonesGranular.join(', ')}`,
+      label: `ББ-диагностика: ${report.weakZonesGranular.map(weakRu).join(', ')}`,
       data: {
         groups: report.weakZonesGranular,
         weakPoints: report.weakZonesGranular,
@@ -382,7 +567,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       },
       source: 'intellectual',
     });
-    setToast(`✓ Применено в ББ-авто: ${report.weakZonesGranular.join(', ')} (score ${score})`);
+    setToast(`✓ Применено в ББ-авто: ${report.weakZonesGranular.map(weakRu).join(', ')} (оценка ${score})`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
@@ -723,7 +908,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     const delta = (() => { try { return bbPlan && action ? simulateCorrection(bbPlan, action, targetExId || selectedExRaw?.id || null) : null; } catch { return null; } })();
     applyToPlanner({
       kind: 'weakpoints',
-      label: `ББ: ${weak.join(', ') || 'техника'} → ${action.targetName || action.type}`,
+      label: `ББ: ${weak.map(weakRu).join(', ') || 'техника'} → ${action.targetName || action.type}`,
       data: {
         groups: weak.length ? weak : report.weakMusclesCanonical,
         weakPoints: weak.length ? weak : report.weakMusclesCanonical,
@@ -816,6 +1001,18 @@ export const BBDiagnosticsHub: React.FC = () => {
   // 💉 Инъекция коррекций в сохранённый план (лениво — мемы ниже недоступны из-за TDZ).
   // Пишет he_bb_plan_saved (+снапшот he_bb_plan_saved_prev) и будит конструктор событием he-bb-plan-saved.
   const handleInjectToPlan = () => {
+    try {
+      const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+      if (gate.blocked) {
+        setToast(`⛔ ${gate.text}`);
+        setTimeout(() => setToast(''), 3000);
+        return;
+      }
+      if (gate.active) {
+        setToast(`⚠ ${gate.text} — вставляем только технику, без объёма`);
+        setTimeout(() => setToast(''), 3000);
+      }
+    } catch { /* noop */ }
     const zones = report.weakZonesGranular.slice(0, 2);
     if (!zones.length) {
       setToast('Выбери 1-2 слабые зоны — нечего вставлять');
@@ -894,13 +1091,13 @@ export const BBDiagnosticsHub: React.FC = () => {
       const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
       const next = pushPlanSnapshot(hist, {
         date: new Date().toISOString().slice(0, 10),
-        label: `до инъекции ${zones.join(', ')}`,
+        label: `до вставки: ${zones.map(weakRu).join(', ')}`,
         plan,
       });
       localStorage.setItem('he_bb_plan_history', JSON.stringify(next));
     } catch { /* noop */ }
     try {
-      working.rationale = [...(working.rationale || []), `ББ-диагностика: инъекция коррекций (${zones.join(', ')})`];
+      working.rationale = [...(working.rationale || []), `ББ-диагностика: вставка коррекций (${zones.map(weakRu).join(', ')})`];
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: working, date: new Date().toISOString() }));
     } catch {
       setToast('Не влезло в хранилище — очисти старые планы');
@@ -957,68 +1154,68 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 860, margin: '0 auto' }}>
-      <div style={{ ...CARD, padding: '14px 14px 12px', background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(0,230,138,0.22)', position: 'relative', overflow: 'hidden' }}>
+    <div className="train-bbdiag" data-bb="hub-root" style={{ padding: '6px 6px 12px', color: '#fff', maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ ...CARD, padding: '10px 10px 8px', margin: 0, background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(0,230,138,0.22)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(0,230,138,0.14),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>💪</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ББ-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Отстающие × e1RM/Reeves + симметрия + 🏋️ Упражнения (SFR/lengthened/паттерн/темп/техника PROF) + объём MEV/MAV/MRV + ACWR + OHS6 + VBT.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Отстающие × сила/пропорции + симметрия + 🏋️ Упражнения (стимул/растянутая/рисунок/темп/техника) + объём + нагрузка + присед-тест + скорость.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
-            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'WARN' : 'CRITICAL'} · v{report.score.verification}</div>
+            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {report.score.verification}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{report.weakMusclesCanonical.length ? `${report.weakMusclesCanonical.length} слабые` : 'баланс'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{report.weakMusclesCanonical.length ? `${report.weakMusclesCanonical.length} слабые` : 'баланс'}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Стимул {report.stimulus.scorePenalty ? `−${report.stimulus.scorePenalty}` : 'OK'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>Стимул {report.stimulus.scorePenalty ? `−${report.stimulus.scorePenalty}` : 'порядок'}</span>
           {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {planAudit.avgSfr ?? '—'}</span>}
-          {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e' }}>len {(planAudit.lengthenedRatio * 100).toFixed(0)}%</span>}
-          {report.score.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {report.score.floors[0]}</span>}
+          {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e' }}>раст. {(planAudit.lengthenedRatio * 100).toFixed(0)}%</span>}
+          {report.score.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>порог: {report.score.floors[0]}</span>}
         </div>
         <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
-          Выбери слабые зоны + упражнение → диагноз 12 флагов + PROF «как дать в мышцу» → Δ-эффект. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны + технику/темп/замену в конструктор (SFR + lengthened + паттерн).
+          Выбери слабые зоны + упражнение → разбор 12 признаков + «как дать в мышцу» → изменение эффекта. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны + технику/темп/замену в конструктор (стимул + растянутая позиция + рисунок движения).
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 10 }}>
           <span style={{ padding: '4px 8px', borderRadius: 999, background: Object.keys(measNum).length >= 3 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: Object.keys(measNum).length >= 3 ? '#22c55e' : '#f59e0b' }}>1.Замеры {Object.keys(measNum).length >= 3 ? '✓' : '→ Симметрия'}</span>
           <span style={{ padding: '4px 8px', borderRadius: 999, background: diarySessions.length >= 4 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: diarySessions.length >= 4 ? '#22c55e' : '#f59e0b' }}>2.Дневник/план {diarySessions.length >= 4 ? `✓ ${diarySessions.length}` : '→ введи тренировки'}</span>
-          <span style={{ padding: '4px 8px', borderRadius: 999, background: report.weakZonesGranular.length ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: report.weakZonesGranular.length ? '#22c55e' : DIM }}>3.Коррекция {report.weakZonesGranular.length ? `→ ${report.weakZonesGranular.join(', ')}` : '— выбери зону'}</span>
-          <label style={{ marginLeft: 'auto', color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>Пол <select value={state.sex} onChange={e => setState(s => ({ ...s, sex: e.target.value as any }))} style={{ background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '3px 6px', fontSize: 10 }}><option value="">—</option><option value="male">М</option><option value="female">Ж</option></select></label>
-          <label style={{ color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>Сон <input value={state.sleepHours} onChange={e => setState(s => ({ ...s, sleepHours: e.target.value }))} placeholder="7.5" style={{ width: 44, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '3px 6px', fontSize: 10 }} /></label>
+          <span style={{ padding: '4px 8px', borderRadius: 999, background: report.weakZonesGranular.length ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: report.weakZonesGranular.length ? '#22c55e' : '#fff' }}>3.Коррекция {report.weakZonesGranular.length ? `→ ${report.weakZonesGranular.join(', ')}` : '— выбери зону'}</span>
+          <span style={{ marginLeft: 'auto', minWidth: 150, flex: '0 1 170px' }}><BbSheetSelect label="Пол" value={state.sex} onChange={(v) => setState(s => ({ ...s, sex: v as any }))} options={[{ id: '', label: 'Не указан' }, { id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]} testId="bb-sex" /></span>
+          <span style={{ minWidth: 130, flex: '0 1 150px' }}><BbNum label="Сон, ч" value={state.sleepHours} onChange={(v) => setState(s => ({ ...s, sleepHours: v }))} placeholder="7,5" step={0.5} /></span>
         </div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
 
-      <div style={{ ...CARD, padding: 12 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ ...CARD, padding: 10, margin: 0 }} data-bb="tabs-card">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }} data-bb="tabs-row">
           {TAB_DEFS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as any)} aria-pressed={tab === t.id} style={{ padding: '6px 12px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#00e68a' : '#1f3a5f', background: tab === t.id ? 'rgba(0,230,138,0.14)' : '#0a1629', color: tab === t.id ? '#00e68a' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+            <button key={t.id} onClick={() => setTab(t.id as any)} aria-pressed={tab === t.id} data-bb="tab" data-active={tab === t.id ? '1' : '0'} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.12)', background: tab === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
               {t.icon} {t.label}
             </button>
           ))}
-          <button onClick={applyToConstructor} style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>→ Применить в ББ-авто</button>
+          <button onClick={applyToConstructor} data-bb="apply-top" style={{ marginLeft: 'auto', minHeight: 44, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ В ББ-авто</button>
         </div>
 
         {tab === 'weak' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Отстающие — гранулярные зоны (1-2)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Отстающие — зоны роста (1–2)</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {GRANULAR_OPTS.map(o => (
-                <button key={o.id} onClick={() => toggleWeak(o.id)} aria-pressed={state.weakManual.includes(o.id)} style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid', borderColor: state.weakManual.includes(o.id) ? '#00e68a' : '#1f3a5f', background: state.weakManual.includes(o.id) ? 'rgba(0,230,138,0.14)' : '#0a1629', color: state.weakManual.includes(o.id) ? '#00e68a' : DIM, fontSize: 11 }}>{o.label}</button>
+                <button key={o.id} onClick={() => toggleWeak(o.id)} aria-pressed={state.weakManual.includes(o.id)} data-bb="weak-zone" data-active={state.weakManual.includes(o.id) ? '1' : '0'} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 999, border: '1px solid', borderColor: state.weakManual.includes(o.id) ? '#00e68a' : 'rgba(255,255,255,0.12)', background: state.weakManual.includes(o.id) ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: state.weakManual.includes(o.id) ? '#00e68a' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{o.label}</button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Авто-кандидаты: {report.weakCandidates.length ? report.weakCandidates.map(c => `${c.muscle}${c.granular ? `(${c.granular})` : ''} ${c.deltaPct}% [${c.source}]`).join(' · ') : '— баланс (дневник/объём/замеры не выдали)'}</div>
-            <div style={{ fontSize: 10, color: DIM, background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Авто-кандидаты: {report.weakCandidates.length ? report.weakCandidates.map(c => `${MUSCLE_LABEL_RU[c.muscle] || c.muscle}${c.granular ? ` (${c.granular})` : ''} ${c.deltaPct}%`).join(' · ') : '— баланс (дневник/объём/замеры не выдали)'}</div>
+            <div style={{ fontSize: 10, color: '#fff', background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>
               Выбрано: {report.weakZonesGranular.join(', ') || '—'} → канонические: {report.weakMusclesCanonical.join(', ') || '—'} (×1.15 объём + бонус упражнения в ББ-авто)
             </div>
             {report.weakZonesGranular.length === 0 && lastWeakHeads.length > 0 && (
-              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: DIM, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span>Прошлый разбор: {lastWeakHeads.join(', ')}</span>
-                <button onClick={() => setState((s) => ({ ...s, weakManual: lastWeakHeads.slice(0, 2) }))} style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>↩ Вернуть в работу</button>
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>Прошлый разбор: {lastWeakHeads.map(weakRu).join(', ')}</span>
+                <button onClick={() => setState((s) => ({ ...s, weakManual: lastWeakHeads.slice(0, 2) }))} data-bb="restore-weak" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Вернуть в работу</button>
               </div>
             )}
             {report.weakZonesGranular.length > 0 && (
@@ -1029,14 +1226,14 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const col = c.cause === 'recovery' ? '#ef4444' : c.cause === 'volume' ? '#f59e0b' : '#a78bfa';
                   return (
                     <div key={z} style={{ padding: '8px 10px', borderRadius: 8, background: `${col}0f`, border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
-                      <b style={{ color: col }}>{z}: причина — {c.cause} ({Math.round(c.confidence * 100)}%)</b>
-                      <div style={{ color: DIM }}>{c.evidence.join(' · ') || '—'}</div>
+                      <b style={{ color: col }}>{weakRu(z)}: причина — {c.cause === 'volume' ? 'объём' : c.cause === 'recovery' ? 'восстановление' : c.cause === 'technique' ? 'техника' : c.cause === 'strength' ? 'сила' : c.cause === 'mobility' ? 'подвижность' : c.cause === 'fatigue' ? 'усталость' : c.cause} ({Math.round(c.confidence * 100)}%)</b>
+                      <div style={{ color: '#fff' }}>{c.evidence.join(' · ') || '—'}</div>
                       {(() => {
                         let t: { deltaPct: number; sessions: number } | null = null;
                         try { t = (e1rmTrend as any)[z] || (e1rmTrend as any)[canonicalMuscle(z)] || null; } catch { /* noop */ }
                         if (!t || !Number.isFinite(t.deltaPct)) {
                           if (diarySessions.length > 0) {
-                            return <div style={{ color: DIM }}>Дневник e1RM: мало данных — нужны замеры 3+ нед назад для тренда</div>;
+                            return <div style={{ color: '#fff' }}>Дневник e1RM: мало данных — нужны замеры 3+ нед назад для тренда</div>;
                           }
                           return null;
                         }
@@ -1058,13 +1255,22 @@ export const BBDiagnosticsHub: React.FC = () => {
               </div>
             )}
             <div style={{ fontSize: 10, color: '#fff', marginTop: 6, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', borderRadius: 8, padding: '8px 10px' }}>
-              Подсказка: две зоны одной мышцы (delt_mid+delt_rear) — можно, плечи+delt_mid — конфликт.
+              Подсказка: две зоны одной мышцы (средняя + задняя дельты) — можно, плечи + зона — конфликт.
+            </div>
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="lr-card">
+              <b style={{ color: '#fff' }}>↔ Лево/право по дневнику (унилатеральные — своей стороне, штанга — поровну)</b>
+              {lrVerdicts.length === 0 && <div style={{ color: '#fff', marginTop: 4 }}>Пока пусто — нужны унилатеральные сеты в дневнике (гантели, по одной стороне).</div>}
+              {lrVerdicts.slice(0, 4).map((v) => (
+                <div key={v.group} style={{ color: v.verdict === 'norm' ? '#22c55e' : v.verdict === 'watch' ? '#f59e0b' : '#ef4444', marginTop: 4 }}>
+                  {MUSCLE_LABEL_RU[v.group] || v.group}: Л {v.left} · П {v.right}{v.asymPct != null ? ` · перекос ${v.asymPct}%` : ''} — {v.text}
+                </div>
+              ))}
             </div>
             {report.weakZonesGranular.length > 0 && (
               <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, lineHeight: 1.5 }}>
                 <b style={{ color: ACCENT }}>Покрытие головок планом:</b>
-                {!bbPlan && <div style={{ color: DIM }}>Нет плана ББ — собери в ББ-авто, покрытие появится здесь.</div>}
-                {bbPlan && headCoverage.length === 0 && <div style={{ color: DIM }}>—</div>}
+                {!bbPlan && <div style={{ color: '#fff' }}>Нет плана ББ — собери в ББ-авто, покрытие появится здесь.</div>}
+                {bbPlan && headCoverage.length === 0 && <div style={{ color: '#fff' }}>—</div>}
                 {headCoverage.map((hc) => (
                   <div key={hc.head} style={{ color: hc.covered ? '#22c55e' : '#f59e0b', marginTop: 2 }}>
                     {hc.covered ? '✓' : '✗'} {hc.head}{hc.covered ? ` — ${hc.by.join(', ')}` : ' — нет упражнения в плане (см. топ-3 выше)'}
@@ -1074,8 +1280,8 @@ export const BBDiagnosticsHub: React.FC = () => {
             )}
             {report.weakZonesGranular.length > 0 && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                <button onClick={handleInjectToPlan} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>
-                {hasInjectPrev && <button onClick={handleRollbackInject} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откатить инъекцию</button>}
+                <button onClick={handleInjectToPlan} data-bb="inject" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>
+                {hasInjectPrev && <button onClick={handleRollbackInject} data-bb="rollback" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>↩ Откатить вставку</button>}
               </div>
             )}
             {planHistory.length > 0 && (
@@ -1083,8 +1289,8 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <b style={{ color: ACCENT }}>🕓 Журнал плана ({planHistory.length}):</b>
                 {planHistory.map((s, i) => (
                   <div key={`${s.date}-${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-                    <span style={{ color: DIM }}>{s.date} · {s.label || 'снимок'}</span>
-                    <button onClick={() => handleRestoreSnapshot(i)} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>↩ Восстановить</button>
+                    <span style={{ color: '#fff' }}>{s.date} · {s.label || 'снимок'}</span>
+                    <button onClick={() => handleRestoreSnapshot(i)} data-bb="snapshot-restore" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Восстановить</button>
                   </div>
                 ))}
               </div>
@@ -1094,51 +1300,54 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'symmetry' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Симметрия — замеры (см) + идеал Reeves/McCallum</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              {['heightCm', 'weightKg', 'chest', 'waist', 'shoulderWidth', 'neck'].map(k => (
-                <label key={k} style={{ fontSize: 10, color: DIM }}>{k}<br /><input value={state.circ[k] || ''} onChange={e => setState(s => ({ ...s, circ: { ...s.circ, [k]: e.target.value } }))} placeholder={k} style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Симметрия — замеры (см) + идеал Ривса/Маккаллума</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="circ-main">
+              {[{ k: 'heightCm', ru: 'Рост, см' }, { k: 'weightKg', ru: 'Вес, кг' }, { k: 'chest', ru: 'Грудь, см' }, { k: 'waist', ru: 'Талия, см' }, { k: 'hips', ru: 'Бёдра, см' }, { k: 'shoulderWidth', ru: 'Плечи (ширина), см' }, { k: 'neck', ru: 'Шея, см' }].map(({ k, ru }) => (
+                <BbNum key={k} label={ru} value={state.circ[k] || ''} onChange={(v) => setState(s => ({ ...s, circ: { ...s.circ, [k]: v } }))} placeholder="—" step={0.5} />
               ))}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              {['bicepL', 'bicepR', 'thighL', 'thighR', 'calfL', 'calfR', 'forearmL', 'forearmR'].map(k => (
-                <label key={k} style={{ fontSize: 10, color: DIM }}>{k}<br /><input value={state.circ[k] || ''} onChange={e => setState(s => ({ ...s, circ: { ...s.circ, [k]: e.target.value } }))} placeholder={k} style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="circ-lr">
+              {[{ k: 'bicepL', ru: 'Бицепс левый, см' }, { k: 'bicepR', ru: 'Бицепс правый, см' }, { k: 'thighL', ru: 'Бедро левое, см' }, { k: 'thighR', ru: 'Бедро правое, см' }, { k: 'calfL', ru: 'Голень левая, см' }, { k: 'calfR', ru: 'Голень правая, см' }, { k: 'forearmL', ru: 'Предплечье левое, см' }, { k: 'forearmR', ru: 'Предплечье правое, см' }].map(({ k, ru }) => (
+                <BbNum key={k} label={ru} value={state.circ[k] || ''} onChange={(v) => setState(s => ({ ...s, circ: { ...s.circ, [k]: v } }))} placeholder="—" step={0.5} />
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 10, color: DIM }}>Запястье см (McCallum)<br /><input value={state.wristCm} onChange={e => setState(s => ({ ...s, wristCm: e.target.value }))} placeholder="17.5" style={{ width: 110, marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }} /></label>
-              <label style={{ fontSize: 10, color: DIM }}>Пол<br /><select value={state.sex} onChange={e => setState(s => ({ ...s, sex: e.target.value as any }))} style={{ marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}><option value="">—</option><option value="male">М</option><option value="female">Ж</option></select></label>
-              {mcCallum && <span style={{ fontSize: 10, color: '#60a5fa', alignSelf: 'end' }}>McCallum: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <BbNum label="Запястье, см (Маккаллум)" value={state.wristCm} onChange={(v) => setState(s => ({ ...s, wristCm: v }))} placeholder="17,5" step={0.5} />
+              <BbSheetSelect label="Пол" value={state.sex} onChange={(v) => setState(s => ({ ...s, sex: v as any }))} options={[{ id: '', label: 'Не указан' }, { id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]} testId="bb-sex-sym" />
+              <BbNum label="Возраст, лет" value={state.age} onChange={(v) => setState(s => ({ ...s, age: v }))} placeholder="—" step={1} />
+              <BbSheetSelect label="Фаза цикла" value={state.cyclePhase} onChange={(v) => setState(s => ({ ...s, cyclePhase: v as any }))} options={[{ id: '', label: 'Неважно' }, { id: 'follicular', label: 'Фолликулярная' }, { id: 'luteal', label: 'Лютеиновая (+вода)' }]} testId="bb-cycle" />
+              {mcCallum && <span style={{ fontSize: 10, color: '#60a5fa', alignSelf: 'end' }}>Маккаллум: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}
               {triadDev != null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: triadDev >= 12 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: triadDev >= 12 ? '#ef4444' : '#22c55e', alignSelf: 'end' }}>Триада шея=биц=икры Δ {triadDev}%</span>}
             </div>
-            {femaleNotes.length > 0 && <div style={{ fontSize: 10, color: '#f9a8d4', background: 'rgba(249,168,212,0.06)', border: '1px solid rgba(249,168,212,0.14)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>{femaleNotes.join(' · ')}</div>}
+            {femaleNotes.length > 0 && <div style={{ fontSize: 10, color: '#f9a8d4', background: 'rgba(249,168,212,0.06)', border: '1px solid rgba(249,168,212,0.14)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }} data-bb="female-notes">{femaleNotes.join(' · ')}</div>}
+            {teenNote && <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }} data-bb="teen-note">🧒 {teenNote} — это не диагноз, при сомнениях к тренеру/врачу.</div>}
             <div style={{ padding: '8px 10px', borderRadius: 8, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${report.symmetry.score < 70 ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
-              <div style={{ fontSize: 10, color: DIM }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${k} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
-              <div style={{ fontSize: 10, color: report.symmetry.score < 70 ? '#ef4444' : DIM, marginTop: 4 }}>{report.symmetry.issues.join(' · ') || 'Пропорции в норме'}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${circRu(k)} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
+              <div style={{ fontSize: 10, color: report.symmetry.score < 70 ? '#ef4444' : '#fff', marginTop: 4 }}>{report.symmetry.issues.join(' · ') || 'Пропорции в норме'}</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
                 <b style={{ fontSize: 11, color: '#fff' }}>📸 Трекинг замеров</b>
-                <button onClick={takeMeasureSnapshot} style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
-                <span style={{ fontSize: 10, color: DIM }}>снимков: {measureHist.length} · перепроверка через ~4 нед</span>
+                <button onClick={takeMeasureSnapshot} data-bb="snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
+                <span style={{ fontSize: 10, color: '#fff' }}>снимков: {measureHist.length} · перепроверка через ~4 нед</span>
               </div>
-              {measureHist.length === 0 && <div style={{ fontSize: 10, color: DIM }}>Пока пусто — введи замеры и нажми «Снимок», дельты появятся здесь и в причинах (genetics).</div>}
+              {measureHist.length === 0 && <div style={{ fontSize: 10, color: '#fff' }}>Пока пусто — введи замеры и нажми «Снимок», дельты появятся здесь и в причинах (наследственность).</div>}
               {measureHist.length > 0 && (() => {
                 const last = measureHist[measureHist.length - 1];
                 const deltas = measureDeltas(last, measNum as any);
                 const keys = Object.keys(deltas);
-                if (!keys.length) return <div style={{ fontSize: 10, color: DIM }}>Снимок {last.date} — введи новые замеры для дельты.</div>;
+                if (!keys.length) return <div style={{ fontSize: 10, color: '#fff' }}>Снимок {last.date} — введи новые замеры для дельты.</div>;
                 return (
                   <div>
-                    <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>vs {last.date}:</div>
+                    <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>vs {last.date}:</div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {keys.map((k) => {
                         const d = deltas[k];
                         const goodUp = k !== 'waist';
                         const good = d.deltaPct === 0 ? null : (d.deltaPct > 0) === goodUp;
-                        const col = good == null ? DIM : good ? '#22c55e' : '#f59e0b';
-                        return <span key={k} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: col }}>{k} {d.from}→{d.to} ({d.deltaPct > 0 ? '+' : ''}{d.deltaPct}%)</span>;
+                        const col = good == null ? '#fff' : good ? '#22c55e' : '#f59e0b';
+                        return <span key={k} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: col }}>{circRu(k)} {d.from}→{d.to} ({d.deltaPct > 0 ? '+' : ''}{d.deltaPct}%)</span>;
                       })}
                     </div>
                   </div>
@@ -1150,22 +1359,22 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'exercise' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Упражнения — диагностика + PROF-коррекция → эффект в плане (максимально)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Упражнения — разбор + техника → эффект в плане (подробно)</div>
             {/* Лента аудита */}
             {planAudit ? (
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(168,85,247,0.06))', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>SFR {planAudit.avgSfr ?? '—'}/5 {planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '⚠ низко' : 'OK'}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>lengthened {(planAudit.lengthenedRatio * 100).toFixed(0)}% {planAudit.lengthenedRatio < 0.3 ? '⚠ мало' : 'OK'}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.unilateralRatio < 0.08 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.unilateralRatio < 0.08 ? '#f59e0b' : '#22c55e' }}>uni {(planAudit.unilateralRatio * 100).toFixed(0)}% {planAudit.unilateralRatio < 0.08 ? '→ добавь' : 'OK'}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.fatigueDensity > 1.35 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.fatigueDensity > 1.35 ? '#ef4444' : DIM }}>усталость {planAudit.fatigueDensity.toFixed(2)} {planAudit.fatigueDensity > 1.35 ? '⚠ высоко' : ''}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>{planAudit.totalExercises} упр · {planAudit.totalSets} сетов</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>растяж. {(planAudit.lengthenedRatio * 100).toFixed(0)}% {planAudit.lengthenedRatio < 0.3 ? '⚠ мало' : 'порядок'}</span>}
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.unilateralRatio < 0.08 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.unilateralRatio < 0.08 ? '#f59e0b' : '#22c55e' }}>одност. {(planAudit.unilateralRatio * 100).toFixed(0)}% {planAudit.unilateralRatio < 0.08 ? '→ добавь' : 'порядок'}</span>}
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.fatigueDensity > 1.35 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.fatigueDensity > 1.35 ? '#ef4444' : '#fff' }}>усталость {planAudit.fatigueDensity.toFixed(2)} {planAudit.fatigueDensity > 1.35 ? '⚠ высоко' : ''}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{planAudit.totalExercises} упр · {planAudit.totalSets} сетов</span>
                 </div>
                 {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Флаги: {planAudit.flags.join(' · ')}</div>}
-                <div style={{ color: DIM, marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {report.weakZonesGranular.join(', ') || '—'} · asym {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
+                <div style={{ color: '#fff', marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {report.weakZonesGranular.join(', ') || '—'} · asym {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
               </div>
             ) : (
-              <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: DIM, marginBottom: 8 }}>Нет плана ББ — собери в ББ-авто, тогда аудит портфеля появится здесь.</div>
+              <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff', marginBottom: 8 }}>Нет плана ББ — собери в ББ-авто, тогда аудит портфеля появится здесь.</div>
             )}
 
             {/* Секция 1: Аудит портфеля по мышцам */}
@@ -1176,13 +1385,13 @@ export const BBDiagnosticsHub: React.FC = () => {
                   {Object.entries(planAudit.byMuscle).map(([m, bm]) => (
                     <div key={m} style={{ padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.04)', background: bm.totalSets >= 6 && bm.angleCoverage.covered === 1 ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                        <b style={{ color: '#fff', fontSize: 11 }}>{m}</b>
+                        <b style={{ color: '#fff', fontSize: 11 }}>{MUSCLE_LABEL_RU[m] || m}</b>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: bm.avgSfr != null && bm.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', color: bm.avgSfr != null && bm.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {bm.avgSfr ?? '—'}</span>
-                        <span style={{ fontSize: 10, color: DIM }}>len {bm.lengthened}/{bm.totalSets} · mid {bm.mid} · short {bm.shortened}</span>
+                        <span style={{ fontSize: 10, color: '#fff' }}>раст. {bm.lengthened}/{bm.totalSets} · сред. {bm.mid} · пик. {bm.shortened}</span>
                         <span style={{ fontSize: 10, color: bm.angleCoverage.missing.length ? '#f59e0b' : '#22c55e' }}>углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} {bm.angleCoverage.missing.length ? `→ нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')}` : 'OK'}</span>
-                        <span style={{ fontSize: 10, color: bm.strictCoverage.missing.length ? '#f59e0b' : DIM }}>строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
-                        <span style={{ fontSize: 10, color: bm.regionalCoverage.missing.length ? '#f59e0b' : DIM }}>подрег {bm.regionalCoverage.covered}/{bm.regionalCoverage.total}</span>
-                        <span style={{ fontSize: 10, color: DIM }}>{bm.totalSets} сет · уни {bm.unilateral} · устал {bm.fatigueDensity.toFixed(2)}</span>
+                        <span style={{ fontSize: 10, color: bm.strictCoverage.missing.length ? '#f59e0b' : '#fff' }}>строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
+                        <span style={{ fontSize: 10, color: bm.regionalCoverage.missing.length ? '#f59e0b' : '#fff' }}>подрег {bm.regionalCoverage.covered}/{bm.regionalCoverage.total}</span>
+                        <span style={{ fontSize: 10, color: '#fff' }}>{bm.totalSets} сет · уни {bm.unilateral} · устал {bm.fatigueDensity.toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {bm.exercises.map((eff, i) => {
@@ -1190,7 +1399,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                           const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
                           return (
                             <span key={i} title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
-                              {eff.name} · SFR{eff.sfr ?? '—'} {eff.profile === 'lengthened' ? '📐' : eff.profile === 'short' ? '🔹' : '▪'} {eff.unilateral ? '↔' : ''} {eff.angleClass ? `·${eff.angleClass}` : ''} {eff.strictGroup ? `·${eff.strictGroup.key}` : ''} ·{sc}
+                              {eff.name} · СФР {eff.sfr ?? '—'} {eff.profile === 'lengthened' ? '📐' : eff.profile === 'short' ? '🔹' : '▪'} {eff.unilateral ? '↔' : ''} {eff.angleClass ? `·${eff.angleClass}` : ''} {eff.strictGroup ? `·${eff.strictGroup.key}` : ''} ·{sc}
                             </span>
                           );
                         })}
@@ -1205,24 +1414,20 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ padding: '10px', borderRadius: 10, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 10 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
-                <button onClick={selectWorstExercise} style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>🎯 Худшее в плане</button>
+                <button onClick={selectWorstExercise} data-bb="worst" style={{ marginLeft: 'auto', minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🎯 Худшее в плане</button>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                <select value={state.exerciseSelectedId || ''} onChange={e => setState(s => ({ ...s, exerciseSelectedId: e.target.value || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} style={{ flex: 1, minWidth: 180, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
-                  <option value="">— выбери упражнение —</option>
-                  {EXERCISE_CATALOG.slice(0, 80).map(c => <option key={c.id} value={c.id}>{c.name} · {c.group} · SFR{sfrOf(c as any) ?? '—'}</option>)}
-                </select>
-                <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.04)', color: DIM, fontSize: 11, cursor: 'pointer' }}>Сброс</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }} data-bb="ex-picker">
+                <BbSheetSelect label="Упражнение" value={state.exerciseSelectedId || ''} onChange={(v) => setState(s => ({ ...s, exerciseSelectedId: v || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} testId="bb-exercise" options={[{ id: '', label: 'Не выбрано' }, ...EXERCISE_CATALOG.slice(0, 80).map((c) => ({ id: c.id, label: `${c.name}`, hint: `${MUSCLE_LABEL_RU[(c as any).group] || (c as any).group} · СФР ${sfrOf(c as any) ?? '—'}` }))]} />
+                <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} data-bb="ex-reset" style={{ minHeight: 44, minWidth: 64, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Сброс</button>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                <span style={{ fontSize: 10, color: DIM }}>Как выполняешь:</span>
-                <label style={{ fontSize: 10, color: state.stimCheating ? '#f59e0b' : DIM, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={state.stimCheating} onChange={e => setState(s => ({ ...s, stimCheating: e.target.checked }))} /> читинг/раскачка</label>
-                <label style={{ fontSize: 10, color: state.stimShortRom ? '#f59e0b' : DIM, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={state.stimShortRom} onChange={e => setState(s => ({ ...s, stimShortRom: e.target.checked }))} /> амплитуда укорочена</label>
-                <input value={state.stimSetupNote} onChange={e => setState(s => ({ ...s, stimSetupNote: e.target.value }))} placeholder="отклонение: напр. локти вперёд" style={{ flex: 1, minWidth: 140, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 10 }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="exec-cards">
+                <BbCheckCard active={state.stimCheating} title="Читинг / раскачка" desc="включаю рывок корпусом" onToggle={() => setState(s => ({ ...s, stimCheating: !s.stimCheating }))} accent="#f59e0b" />
+                <BbCheckCard active={state.stimShortRom} title="Амплитуда укорочена" desc="не довожу до конца" onToggle={() => setState(s => ({ ...s, stimShortRom: !s.stimShortRom }))} accent="#f59e0b" />
               </div>
+              <div style={{ marginBottom: 6 }}><BbNum label="Отклонение в технике (например: локти вперёд)" value={state.stimSetupNote} onChange={(v) => setState(s => ({ ...s, stimSetupNote: v }))} placeholder="Опиши отклонение" /></div>
               {selectedDiagnosis?.stimulus?.record && selectedDiagnosis.stimulus.record.cheating.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, color: DIM }}>Проверь себя:</span>
+                  <span style={{ fontSize: 10, color: '#fff' }}>Проверь себя:</span>
                   {selectedDiagnosis.stimulus.record.cheating.map((ch, i) => {
                     const active = state.stimSetupNote.toLowerCase().includes(ch.deviation.toLowerCase().split(' ')[0]);
                     return (
@@ -1237,7 +1442,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                           return { ...s, stimSetupNote: next.join(', ') };
                         })}
                         aria-pressed={active}
-                        style={{ padding: '3px 8px', borderRadius: 20, border: '1px solid', borderColor: active ? '#f59e0b' : '#1f3a5f', background: active ? 'rgba(245,158,11,0.14)' : '#0a1629', color: active ? '#f59e0b' : DIM, fontSize: 10, cursor: 'pointer' }}
+                        style={{ minHeight: 44, padding: '8px 12px', borderRadius: 20, border: '1px solid', borderColor: active ? '#f59e0b' : 'rgba(255,255,255,0.12)', background: active ? 'rgba(245,158,11,0.14)' : 'rgba(255,255,255,0.04)', color: active ? '#f59e0b' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                       >
                         {active ? '✓ ' : ''}{ch.deviation}
                       </button>
@@ -1246,24 +1451,24 @@ export const BBDiagnosticsHub: React.FC = () => {
                 </div>
               )}
               {!selectedDiagnosis ? (
-                <div style={{ fontSize: 10, color: DIM }}>Выбери упражнение — появится диагноз 12 флагов + PROF-чек + оценка 0-100.</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Выбери упражнение — появится разбор 12 признаков + проверка техники + оценка 0–100.</div>
               ) : (
                 <div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ padding: '4px 10px', borderRadius: 20, background: selectedDiagnosis.score >= 70 ? 'rgba(34,197,94,0.12)' : selectedDiagnosis.score >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${selectedDiagnosis.score >= 70 ? 'rgba(34,197,94,0.22)' : selectedDiagnosis.score >= 50 ? 'rgba(245,158,11,0.22)' : 'rgba(239,68,68,0.22)'}`, color: selectedDiagnosis.score >= 70 ? '#22c55e' : selectedDiagnosis.score >= 50 ? '#f59e0b' : '#ef4444', fontWeight: 800, fontSize: 11 }}>Оценка {selectedDiagnosis.score}/100</span>
-                    <span style={{ fontSize: 10, color: DIM }}>{selectedDiagnosis.effect.name} · {selectedDiagnosis.effect.muscle || '—'} · SFR{selectedDiagnosis.effect.sfr ?? '—'} · {selectedDiagnosis.effect.profile ?? '—'} · {selectedDiagnosis.effect.angleClass ?? '—'} · {selectedDiagnosis.effect.strictGroup?.key ?? '—'} · {selectedDiagnosis.effect.jointStress ?? '—'} · {selectedDiagnosis.effect.unilateral ? '↔ unilateral' : 'bilateral'}</span>
-                    {selectedProf && <span style={{ fontSize: 10, color: '#a78bfa' }}>PROF {selectedProf.label}: {selectedProf.cues[0]}</span>}
+                    <span style={{ fontSize: 10, color: '#fff' }}>{selectedDiagnosis.effect.name} · {MUSCLE_LABEL_RU[selectedDiagnosis.effect.muscle || ''] || selectedDiagnosis.effect.muscle || '—'} · СФР {selectedDiagnosis.effect.sfr ?? '—'} · {profileRu(selectedDiagnosis.effect.profile)} · {selectedDiagnosis.effect.angleClass ?? '—'} · {selectedDiagnosis.effect.strictGroup?.key ?? '—'} · {selectedDiagnosis.effect.jointStress ?? '—'} · {selectedDiagnosis.effect.unilateral ? '↔ одностороннее' : 'двустороннее'}</span>
+                    {selectedProf && <span style={{ fontSize: 10, color: '#a78bfa' }}>Техника {selectedProf.label}: {selectedProf.cues[0]}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {selectedDiagnosis.flags.map(f => <span key={f} style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b', fontSize: 10, fontWeight: 600 }}>{f}</span>)}
-                    {selectedDiagnosis.flags.length === 0 && <span style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 10 }}>OK — выполнение чистое</span>}
+                    {selectedDiagnosis.flags.map(f => <span key={f} title={f} style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b', fontSize: 10, fontWeight: 600 }}>{flagRu(f)}</span>)}
+                    {selectedDiagnosis.flags.length === 0 && <span style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 10 }}>Порядок — выполнение чистое</span>}
                   </div>
                   <div style={{ fontSize: 10, color: selectedDiagnosis.issues.length ? '#fbbf24' : '#22c55e', lineHeight: 1.5, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px' }}>{selectedDiagnosis.issues.join(' · ') || 'Замечаний нет — эталон для ББ'}</div>
-                  {selectedDiagnosis.profGaps.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>PROF гэпы: {selectedDiagnosis.profGaps.map(g => g.issue).join(' · ')}</div>}
+                  {selectedDiagnosis.profGaps.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>Разрывы техники: {selectedDiagnosis.profGaps.map(g => g.issue).join(' · ')}</div>}
                   {selectedDiagnosis.stimulus && selectedDiagnosis.stimulus.score != null && (
                     <div style={{ fontSize: 10, marginTop: 4, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.5 }}>
                       <b style={{ color: '#00e68a' }}>🎯 Стимул в цель: {selectedDiagnosis.stimulus.score}/100</b>
-                      <span style={{ color: DIM }}> — {selectedDiagnosis.stimulus.headsHit.join(', ') || '—'}</span>
+                      <span style={{ color: '#fff' }}> — {selectedDiagnosis.stimulus.headsHit.join(', ') || '—'}</span>
                       {selectedDiagnosis.stimulus.headsMissed.length > 0 && <span style={{ color: '#f59e0b' }}> · мимо: {selectedDiagnosis.stimulus.headsMissed.join(', ')}</span>}
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                         {Object.entries(selectedDiagnosis.stimulus.breakdown || {}).map(([k, v]) => (
@@ -1273,12 +1478,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                     </div>
                   )}
                   {selectedProf && (selectedProf.setupChecklist || selectedProf.leakTo) && (
-                    <div style={{ fontSize: 10, color: DIM, marginTop: 4, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 10, color: '#fff', marginTop: 4, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.5 }}>
                       {selectedProf.setupChecklist && <div><b style={{ color: '#fff' }}>Сетап:</b> {selectedProf.setupChecklist.join(' · ')}</div>}
                       {selectedProf.leakTo && <div style={{ color: '#f87171' }}>Утечка: {selectedProf.leakTo}</div>}
                     </div>
                   )}
-                  {selectedExRaw && (() => { try { const instr = buildExerciseInstructions({ exerciseId: selectedExRaw.id || undefined, exerciseName: selectedExRaw.name, muscle: selectedExRaw.muscle || undefined } as any); return <div style={{ fontSize: 10, color: DIM, marginTop: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Техника ({instr.source}) · паттерн {instr.pattern} · темп {instr.tempo} · {instr.order}</b><br />{instr.cues.slice(0, 3).join(' · ')}<br /><span style={{ color: '#f87171' }}>Ошибки: {instr.mistakes.slice(0, 3).join(' · ')}</span></div>; } catch { return null; } })()}
+                  {selectedExRaw && (() => { try { const instr = buildExerciseInstructions({ exerciseId: selectedExRaw.id || undefined, exerciseName: selectedExRaw.name, muscle: selectedExRaw.muscle || undefined } as any); return <div style={{ fontSize: 10, color: '#fff', marginTop: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Техника ({instr.source}) · паттерн {instr.pattern} · темп {instr.tempo} · {instr.order}</b><br />{instr.cues.slice(0, 3).join(' · ')}<br /><span style={{ color: '#f87171' }}>Ошибки: {instr.mistakes.slice(0, 3).join(' · ')}</span></div>; } catch { return null; } })()}
                 </div>
               )}
             </div>
@@ -1286,7 +1491,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             {/* Секция 3: PROF-коррекция выполнения (центральная) */}
             {selectedDiagnosis && selectedProf && (
               <div style={{ padding: '10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(168,85,247,0.08),rgba(0,230,138,0.06))', border: '1px solid rgba(168,85,247,0.18)', marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>3 · PROF-коррекция выполнения — как дать именно в мышцу ({selectedProf.label})</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>3 · Техника выполнения — как дать именно в мышцу ({selectedProf.label})</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8, fontSize: 10 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Угол:</b> {selectedProf.angle || '—'}</div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.04)' }}><b style={{ color: '#fff' }}>Локти:</b> {selectedProf.elbow || '—'}</div>
@@ -1297,8 +1502,8 @@ export const BBDiagnosticsHub: React.FC = () => {
                   {selectedProf.cues.map((c, i) => <span key={i} style={{ padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.14)', color: '#00e68a', fontSize: 10, fontWeight: 600 }}>{i + 1}. {c}</span>)}
                 </div>
                 <div style={{ fontSize: 10, color: '#f87171', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>Ошибки: {selectedProf.errors.join(' · ')}</div>
-                <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>Mind-muscle: {selectedProf.mindMuscle} · TUT ↑, пауза в растянутой = stretch-mediated (Maeo 2023)</div>
-                <button onClick={() => handleApplyExerciseCorrection({ type: 'modifyExecution', execCues: selectedProf.cues, reason: `PROF техника ${selectedProf.label}`, confidence: 0.85, deltaPreview: `Проработка ${selectedProf.label}` } as any, selectedExRaw?.id || null)} style={{ marginTop: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>▶ Применить технику PROF в план</button>
+                <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.14)', borderRadius: 8, padding: '6px 8px' }}>Связь с мышцей: {selectedProf.mindMuscle} · время под нагрузкой ↑, пауза в растянутой работает лучше</div>
+                <button onClick={() => handleApplyExerciseCorrection({ type: 'modifyExecution', execCues: selectedProf.cues, reason: `Техника: ${selectedProf.label}`, confidence: 0.85, deltaPreview: `Проработка: ${selectedProf.label}` } as any, selectedExRaw?.id || null)} data-bb="apply-exec" style={{ marginTop: 8, width: '100%', minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>▶ Применить технику в план</button>
               </div>
             )}
 
@@ -1315,21 +1520,21 @@ export const BBDiagnosticsHub: React.FC = () => {
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{a.targetName || a.tempo || a.execCues?.[0] || a.type}</span>
                         <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', color: '#a78bfa' }}>conf {(a.confidence * 100).toFixed(0)}%</span>
                       </div>
-                      <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, marginBottom: 4 }}>{a.reason}</div>
+                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, marginBottom: 4 }}>{a.reason}</div>
                       <div style={{ fontSize: 10, color: '#60a5fa', marginBottom: 6 }}>{a.deltaPreview} {delta?.summary ? `· Δ ${delta.summary}` : ''} {delta?.issuesResolved?.length ? `→ исправит: ${delta.issuesResolved.join(', ')}` : ''}</div>
-                      <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: i === 0 ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', color: i === 0 ? '#06281c' : '#fff', border: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>▶ Применить в ББ-авто</button>
+                      <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} data-bb="apply-correction" style={{ width: '100%', minHeight: 48, padding: '10px 12px', borderRadius: 10, background: i === 0 ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', color: i === 0 ? '#06281c' : '#fff', border: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>▶ Применить в ББ-авто</button>
                     </div>
                   );
                 })}
                 {selectedCorrections.length > 3 && (
-                  <details style={{ fontSize: 10, color: DIM }}>
+                  <details style={{ fontSize: 10, color: '#fff' }}>
                     <summary style={{ cursor: 'pointer', color: ACCENT }}>Ещё {selectedCorrections.length - 3} коррекции</summary>
                     <div style={{ marginTop: 6 }}>
                       {selectedCorrections.slice(3).map((a, i) => (
                         <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 4 }}>
                           <div style={{ fontWeight: 700, color: '#fff' }}>{a.type} {a.targetName || a.tempo || ''}</div>
-                          <div style={{ color: DIM }}>{a.reason}</div>
-                          <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>Применить</button>
+                          <div style={{ color: '#fff' }}>{a.reason}</div>
+                          <button onClick={() => handleApplyExerciseCorrection(a as any, selectedExRaw?.id || null)} data-bb="apply-correction-more" style={{ marginTop: 4, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Применить</button>
                         </div>
                       ))}
                     </div>
@@ -1340,21 +1545,13 @@ export const BBDiagnosticsHub: React.FC = () => {
 
             {/* Секция 5: Библиотека */}
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>5 · Библиотека SFR+паттернов (максимум на каждое)</div>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Детали объёма — <b>📐 Объём-хаб → Объём</b> · качество плана — <b>→ Качество</b> · нагрузка — <b>⚡ Интеллект</b> (без дублей, здесь только выбор).</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                <label style={{ fontSize: 10, color: DIM }}>SFR≥
-                  <select value={String(state.exerciseFilterSfr)} onChange={e => setState(s => ({ ...s, exerciseFilterSfr: parseInt(e.target.value) }))} style={{ marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }}>
-                    <option value="0">все</option><option value="4">4</option><option value="5">5</option>
-                  </select>
-                </label>
-                <label style={{ fontSize: 10, color: DIM }}>Профиль
-                  <select value={state.exerciseFilterProfile} onChange={e => setState(s => ({ ...s, exerciseFilterProfile: e.target.value }))} style={{ marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }}>
-                    <option value="all">все</option><option value="lengthened">lengthened</option><option value="mid">mid</option><option value="short">short</option>
-                  </select>
-                </label>
-                <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={state.exerciseFilterUnilateral} onChange={e => setState(s => ({ ...s, exerciseFilterUnilateral: e.target.checked }))} /> unilateral</label>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>5 · Библиотека упражнений (подробно по каждому)</div>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Детали объёма — <b>📐 Объём-хаб → Объём</b> · качество плана — <b>→ Качество</b> · нагрузка — <b>⚡ Интеллект</b> (без дублей, здесь только выбор).</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="lib-filters">
+                <BbSheetSelect label="Стимул от " value={String(state.exerciseFilterSfr)} onChange={(v) => setState(s => ({ ...s, exerciseFilterSfr: parseInt(v) }))} options={[{ id: '0', label: 'Любой' }, { id: '4', label: '4 и выше' }, { id: '5', label: 'Только 5' }]} />
+                <BbSheetSelect label="Профиль" value={state.exerciseFilterProfile} onChange={(v) => setState(s => ({ ...s, exerciseFilterProfile: v }))} options={[{ id: 'all', label: 'Все' }, { id: 'lengthened', label: 'Растянутая' }, { id: 'mid', label: 'Средняя' }, { id: 'short', label: 'Пиковая' }]} />
               </div>
+              <div style={{ marginBottom: 6 }}><BbCheckCard active={state.exerciseFilterUnilateral} title="Только односторонние" desc="гантели, по одной стороне" onToggle={() => setState(s => ({ ...s, exerciseFilterUnilateral: !s.exerciseFilterUnilateral }))} /></div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 160, overflowY: 'auto' }}>
                 {exerciseLibraryFiltered.map(c => {
                   const eff = (() => { try { return calcExerciseEffect(c as any, {}); } catch { return null; } })();
@@ -1365,7 +1562,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const bcol = hitsWeak ? '#00e68a' : col;
                   return (
                     <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
-                      {hitsWeak ? '🎯 ' : ''}{c.name} · SFR{eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
+                      {hitsWeak ? '🎯 ' : ''}{c.name} · СФР {eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
                     </span>
                   );
                 })}
@@ -1376,14 +1573,14 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'stimulus' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Стимул — lengthened / pattern / compound (из плана)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Стимул — растянутая позиция / рисунок / база (из плана)</div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: DIM }}>Глобально: lengthened {report.stimulus.global.lengthened} · mid {report.stimulus.global.midRange} · shortened {report.stimulus.global.shortened} · base {report.stimulus.global.compound} / iso {report.stimulus.global.isolation}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Всего: растянутых {report.stimulus.global.lengthened} · средних {report.stimulus.global.midRange} · пиковых {report.stimulus.global.shortened} · база {report.stimulus.global.compound} / изоляция {report.stimulus.global.isolation}</div>
               <div style={{ fontSize: 10, color: report.stimulus.issues.length ? '#f59e0b' : '#22c55e', marginTop: 4 }}>{report.stimulus.issues.join(' · ') || 'Стимул сбалансирован'}</div>
-              {report.stimulus.bfrEligible.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>BFR пригодны: {report.stimulus.bfrEligible.join(', ')} (20-30% 30-15-15-15 30с)</div>}
-              <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Паттерны: {Object.entries(report.stimulus.global.patterns).map(([k, v]) => `${k}:${v}`).join(' · ') || '—'}</div>
+              {report.stimulus.bfrEligible.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Жгуты подходят: {report.stimulus.bfrEligible.join(', ')} (20–30%, схема 30-15-15-15, пауза 30 с)</div>}
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }} data-bb="stimulus-chip">Детали углов и строгих групп — во вкладке <b>🏋️ Упражнения → Аудит портфеля</b> (здесь только вердикт, без дублей).</div>
             </div>
-            <div style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px' }}>
               План-баланс: {balance ? balance.issues.slice(0, 2).join(' · ') : '— нет плана (собери в ББ-авто)'} · <span style={{ color: ACCENT }}>→ Качество: детали в QualityHub</span>
             </div>
           </div>
@@ -1391,7 +1588,7 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'volume' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Объём — MEV/MAV/MRV (канон VolumeHub)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Объём — минимум / норма / максимум (из дневника за 7 дней)</div>
             {factVolume ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {Object.entries(factVolume).slice(0, 8).map(([m, v]) => {
@@ -1401,104 +1598,134 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const pct = lm.mrv ? Math.round(sets / lm.mrv * 100) : 0;
                   const status = sets < lm.mev ? 'ниже MEV' : sets <= lm.mav ? 'оптимум' : sets <= lm.mrv ? '→MRV' : '>MRV';
                   const col = sets < lm.mev ? '#f59e0b' : sets > lm.mrv ? '#ef4444' : '#22c55e';
-                  return <div key={m} style={{ padding: '6px 8px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: DIM }}><b style={{ color: '#fff' }}>{MUSCLE_LABEL_RU[m] || m}</b> {sets} сет · MEV{lm.mev} MAV{lm.mav} MRV{lm.mrv} · <span style={{ color: col }}>{status} {pct}%</span></div>;
+                  return <div key={m} style={{ padding: '6px 8px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff' }}><b style={{ color: '#fff' }}>{MUSCLE_LABEL_RU[m] || m}</b> {sets} сет · MEV{lm.mev} MAV{lm.mav} MRV{lm.mrv} · <span style={{ color: col }}>{status} {pct}%</span></div>;
                 })}
               </div>
-            ) : <div style={{ fontSize: 10, color: DIM, background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>Нет дневника за 7д — объём не посчитан. Введи тренировки или открой <b>→ Объём-хаб</b> для детальной таблицы.</div>}
-            <div style={{ fontSize: 10, color: DIM, marginTop: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', borderRadius: 8, padding: '8px 10px' }}>
-              Канон MEV/MAV/MRV — в <b>📐 Объём-хаб → Объём</b> (Isratel, Schoenfeld). Здесь — чип-факт за 7д. Тоннаж/КПШ — в <b>→ Тоннаж</b>.
+            ) : <div style={{ fontSize: 10, color: '#fff', background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>Нет дневника за 7д — объём не посчитан. Введи тренировки или открой <b>→ Объём-хаб</b> для детальной таблицы.</div>}
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', borderRadius: 8, padding: '8px 10px' }}>
+              Нормы минимума/оптимума/максимума — в <b>📐 Объём-хаб → Объём</b>. Здесь — факт за 7 дней. Тоннаж — в <b>→ Тоннаж</b>.
             </div>
           </div>
         )}
 
         {tab === 'recovery' && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Восстановление — per-muscle ACWR + сон/VBT + Unified snapshot</div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ fontSize: 10, color: DIM }}>Сон ч/ночь <input value={state.sleepHours} onChange={e => setState(s => ({ ...s, sleepHours: e.target.value }))} placeholder="7.5" style={{ width: 52, marginLeft: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '4px 6px', fontSize: 10 }} /></label>
-              {sleepNum != null && Number.isFinite(sleepNum) && sleepNum < 6.5 && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>Сон {sleepNum}ч — сначала сон, +объём запрещён</span>}
-              {vbt && vbt.lossPct > 30 && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b' }}>VBT −{vbt.lossPct}% → RIR+1, делоад</span>}
+          <div data-bb="recovery-tab">
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Восстановление — нагрузка по мышцам + сон + скорость + общий снимок</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="recovery-inputs">
+              <BbNum label="Сон, часов за ночь" value={state.sleepHours} onChange={(v) => setState(s => ({ ...s, sleepHours: v }))} placeholder="7,5" step={0.5} />
+              <BbNum label="Боль сегодня, 0–10" value={state.pain010} onChange={(v) => setState(s => ({ ...s, pain010: v }))} placeholder="0" step={1} />
             </div>
+            <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: readiness.level === 'green' ? 'rgba(34,197,94,0.08)' : readiness.level === 'yellow' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="readiness">
+              <b style={{ color: '#fff' }}>{readiness.level === 'green' ? '🟢 Готовность: зелёный' : readiness.level === 'yellow' ? '🟡 Готовность: жёлтый' : '🔴 Готовность: красный'}</b>
+              <div style={{ color: '#fff', marginTop: 2 }}>{readiness.advice}</div>
+              {readiness.reasons.length > 0 && <div style={{ color: '#fff', opacity: 0.9, marginTop: 2 }}>{readiness.reasons.join(' · ')}</div>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="red-flags">
+              <BbCheckCard active={state.acutePain} title="Острая боль" desc="в суставе или мышце" onToggle={() => setState(s => ({ ...s, acutePain: !s.acutePain }))} accent="#ef4444" />
+              <BbCheckCard active={state.swelling} title="Отёк" desc="сустав опух" onToggle={() => setState(s => ({ ...s, swelling: !s.swelling }))} accent="#ef4444" />
+              <BbCheckCard active={state.numbness} title="Онемение" desc="покалывание в руке/ноге" onToggle={() => setState(s => ({ ...s, numbness: !s.numbness }))} accent="#ef4444" />
+              <BbCheckCard active={state.jointClickPain} title="Щелчки с болью" desc="щёлкает и болит" onToggle={() => setState(s => ({ ...s, jointClickPain: !s.jointClickPain }))} accent="#f59e0b" />
+            </div>
+            {(redFlags as any).active && (
+              <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: (redFlags as any).blocked ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }} data-bb="red-flags-note">
+                {(redFlags as any).blocked ? '⛔ ' : '⚠ '}{(redFlags as any).text} — это скрининг, не диагноз: при сомнениях к врачу.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {Object.entries(perMuscleAcwr).length ? Object.entries(perMuscleAcwr).map(([m, v]) => {
                 const col = v.zone === 'dangerous' ? '#ef4444' : v.zone === 'caution' ? '#f59e0b' : v.zone === 'undertrained' ? '#3b82f6' : '#22c55e';
-                return <span key={m} style={{ padding: '4px 8px', borderRadius: 999, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 700 }}>{m} {v.ratio} {v.zone}</span>;
-              }) : <span style={{ fontSize: 10, color: DIM }}>Недостаточно дневника (≥4 сессии)</span>}
+                const zRu = v.zone === 'dangerous' ? 'перегруз' : v.zone === 'caution' ? 'осторожно' : v.zone === 'undertrained' ? 'недогруз' : 'норма';
+                return <span key={m} style={{ padding: '4px 8px', borderRadius: 999, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 700 }}>{MUSCLE_LABEL_RU[m] || m} {v.ratio} {zRu}</span>;
+              }) : <span style={{ fontSize: 10, color: '#fff' }}>Недостаточно дневника (≥4 сессии)</span>}
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: DIM }}>
-              Unified: ACWR {acwr ? `${acwr.ratio.toFixed(2)} ${acwr.zone}` : '—'} · monotony {unifiedSnap?.monotony ?? '—'} · recovery {unifiedSnap?.recovery ?? '—'} · <span style={{ color: ACCENT }}>→ Интеллект → Нагрузка/Восстановление</span>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }}>
+              Общее: нагрузка {acwr ? `${acwr.ratio.toFixed(2)}` : '—'} · однообразие {unifiedSnap?.monotony ?? '—'} · восстановление {unifiedSnap?.recovery ?? '—'} · <span style={{ color: '#fff' }}>→ Интеллект → Нагрузка/Восстановление</span>
             </div>
-            {report.score.floors.some(f => f.includes('ACWR')) && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 6 }}>⚠ ACWR danger — снизь объём на 25% для перегруженных мышц (Adherence-floor 0.75)</div>}
+            {report.score.floors.some(f => f.includes('ACWR')) && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>⚠ Перегруз — снизь объём на 25% для перегруженных мышц</div>}
           </div>
         )}
 
         {tab === 'mobility' && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Мобильность — OHS 6 + VBT 20-25% гипертрофия</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHeelsFlat} onChange={e => setState(s => ({ ...s, ohsHeelsFlat: e.target.checked }))} /> Пятки плоско</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={!state.ohsKneeValgus} onChange={e => setState(s => ({ ...s, ohsKneeValgus: !e.target.checked }))} /> Без вальгуса</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsHipBelowParallel} onChange={e => setState(s => ({ ...s, ohsHipBelowParallel: e.target.checked }))} /> Таз ниже паралл</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsTrunkUpright} onChange={e => setState(s => ({ ...s, ohsTrunkUpright: e.target.checked }))} /> Корпус upright</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsArmsOverMidfoot} onChange={e => setState(s => ({ ...s, ohsArmsOverMidfoot: e.target.checked }))} /> Руки над стопой</label>
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={state.ohsLumbarNeutral} onChange={e => setState(s => ({ ...s, ohsLumbarNeutral: e.target.checked }))} /> Нейтраль поясницы</label>
+          <div data-bb="mobility-tab">
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Мобильность — присед с руками вверх (6 признаков) + скорость штанги 20–25%</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ohs-grid">
+              <BbCheckCard active={state.ohsHeelsFlat} title="Пятки плоско" desc="стопы не отрываются" onToggle={() => setState(s => ({ ...s, ohsHeelsFlat: !s.ohsHeelsFlat }))} />
+              <BbCheckCard active={!state.ohsKneeValgus} title="Без вальгуса" desc="колени не сводятся" onToggle={() => setState(s => ({ ...s, ohsKneeValgus: !s.ohsKneeValgus }))} />
+              <BbCheckCard active={state.ohsHipBelowParallel} title="Таз ниже параллели" desc="глубина приседа" onToggle={() => setState(s => ({ ...s, ohsHipBelowParallel: !s.ohsHipBelowParallel }))} />
+              <BbCheckCard active={state.ohsTrunkUpright} title="Корпус вертикально" desc="грудь вверх" onToggle={() => setState(s => ({ ...s, ohsTrunkUpright: !s.ohsTrunkUpright }))} />
+              <BbCheckCard active={state.ohsArmsOverMidfoot} title="Руки над стопой" desc="руки над серединой стопы" onToggle={() => setState(s => ({ ...s, ohsArmsOverMidfoot: !s.ohsArmsOverMidfoot }))} />
+              <BbCheckCard active={state.ohsLumbarNeutral} title="Нейтраль поясницы" desc="без округления" onToggle={() => setState(s => ({ ...s, ohsLumbarNeutral: !s.ohsLumbarNeutral }))} />
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ohs.level === 'ok' ? '#22c55e' : ohs.level === 'warn' ? '#f59e0b' : '#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver ? `· ${ohs.primaryDriver}` : ''}</div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>{ohs.recommendation}</div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Присед-тест {ohs.totalScore}/6 · {ohs.level === 'ok' ? 'хорошо' : ohs.level === 'warn' ? 'есть замечания' : 'нужна работа'} · несдано {ohs.failed}{ohs.primaryDriver ? ` · ${ohs.primaryDriver}` : ''}</div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{ohs.recommendation}</div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <label style={{ fontSize: 11, color: DIM }}>Knee-to-wall см<br /><input value={state.kneeToWallCm} onChange={e => setState(s => ({ ...s, kneeToWallCm: e.target.value }))} placeholder="12" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
-              <label style={{ fontSize: 11, color: DIM }}>Голеностоп °<br /><input value={state.ankleDeg} onChange={e => setState(s => ({ ...s, ankleDeg: e.target.value }))} placeholder="35" style={{ width: '100%', marginTop: 4, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '6px 8px', fontSize: 12 }} /></label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
+              <BbNum label="Колено к стене, см" value={state.kneeToWallCm} onChange={(v) => setState(s => ({ ...s, kneeToWallCm: v }))} placeholder="12" step={0.5} />
+              <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} />
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: DIM }}>Heel 2.5см</span>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : '#1f3a5f', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : '#0a1629', color: state.heelRetest === 'better' ? '#22c55e' : DIM, fontSize: 11 }}>Лучше</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : '#1f3a5f', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : '#0a1629', color: state.heelRetest === 'same' ? '#f59e0b' : DIM, fontSize: 11 }}>Без</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid #1f3a5f', background: '#0a1629', color: DIM, fontSize: 11 }}>Сброс</button>
-              <span style={{ fontSize: 10, color: DIM }}>OHS ≥{OHS_NORMS.kneeToWallCm.optimal}см norm</span>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }} data-bb="heel-row">
+              <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>Подпятка 2,5 см</span>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} aria-pressed={state.heelRetest === 'better'} data-bb="heel-better" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'better' ? '#22c55e' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Стало лучше</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} aria-pressed={state.heelRetest === 'same'} data-bb="heel-same" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'same' ? '#f59e0b' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Без изменений</button>
+              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} data-bb="heel-reset" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Сброс</button>
+              <span style={{ fontSize: 11, color: '#fff' }}>Норма ≥{OHS_NORMS.kneeToWallCm.optimal} см</span>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>VBT — потеря скорости (гипертрофия 20-25%)</div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="vbt-card">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Скорость штанги — падение за подход (норма роста 20–25%)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                <label style={{ fontSize: 10, color: DIM }}>Best м/с<br /><input value={state.vbtBest} onChange={e => setState(s => ({ ...s, vbtBest: e.target.value }))} placeholder="0.85" style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Last м/с<br /><input value={state.vbtLast} onChange={e => setState(s => ({ ...s, vbtLast: e.target.value }))} placeholder="0.62" style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
-                <label style={{ fontSize: 10, color: DIM }}>Вес кг<br /><input value={state.vbtWeight} onChange={e => setState(s => ({ ...s, vbtWeight: e.target.value }))} placeholder="80" style={{ width: '100%', marginTop: 2, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '6px', fontSize: 11 }} /></label>
+                <BbNum label="Лучшая, м/с" value={state.vbtBest} onChange={(v) => setState(s => ({ ...s, vbtBest: v }))} placeholder="0,85" step={0.05} />
+                <BbNum label="Последняя, м/с" value={state.vbtLast} onChange={(v) => setState(s => ({ ...s, vbtLast: v }))} placeholder="0,62" step={0.05} />
+                <BbNum label="Вес, кг" value={state.vbtWeight} onChange={(v) => setState(s => ({ ...s, vbtWeight: v }))} placeholder="80" step={2.5} />
               </div>
-              {vbt && <div style={{ fontSize: 10, color: vbt.exceeded ? '#ef4444' : '#22c55e', marginTop: 6 }}>{vbt.recommendation} {vbt.suggestedRirShift ? `(RIR ${vbt.suggestedRirShift > 0 ? '+' : ''}${vbt.suggestedRirShift})` : ''}</div>}
+              {vbt && <div style={{ fontSize: 11, color: vbt.exceeded ? '#ef4444' : '#22c55e', marginTop: 6 }}>{vbt.recommendation} {vbt.suggestedRirShift ? `(запас ${vbt.suggestedRirShift > 0 ? '+' : ''}${vbt.suggestedRirShift})` : ''}</div>}
             </div>
-            <textarea value={state.csvText} onChange={e => setState(s => ({ ...s, csvText: e.target.value }))} placeholder="Kinovea CSV (time,x,y) — опционально" style={{ width: '100%', height: 60, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: 'monospace' }} />
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button onClick={handleCsvParse} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.14)', border: '1px solid #1f3a5f', color: '#00e68a', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
-              <button onClick={applyMobilityToProfile} style={{ padding: '6px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(OK)'}</button>
+            <textarea value={state.csvText} onChange={e => setState(s => ({ ...s, csvText: e.target.value }))} placeholder="Таблица траектории из видеоразбора (время, x, y) — необязательно" aria-label="Таблица траектории из видеоразбора" data-bb="csv-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+            {barLast && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: barLast.verdict.flag === 'ok' ? 'rgba(34,197,94,0.08)' : barLast.verdict.flag === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }} data-bb="bar-srd">
+                <b>Петля {barLast.xLoop} см · {barLast.verdict.type}</b> — {barLast.verdict.text} (порог 4/6 см)
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              <button onClick={handleCsvParse} data-bb="csv-parse" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📊 Разобрать таблицу траектории</button>
+              <button onClick={applyMobilityToProfile} data-bb="mobility-to-profile" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(порядок)'}</button>
             </div>
-            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {(mockPose.status as any).faults?.join(' · ') || 'OK (mock)'}</div>
-            <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>OHS из <code>strength-sport-ohs</code> (канон WL) · VBT 20-25% гипертрофия (Wood 2026) · Enode/BlazePose reuse из WL. <span style={{ color: '#60a5fa' }}>→ Суставы и ортопедия</span> · <span style={{ color: '#a78bfa' }}>→ Анализ силы → VBT</span></div>
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 11, color: '#fff' }} data-bb="pose-live">
+              <b>📐 Углы из таблицы (трекер поз/замер по кадрам: время, таз, колено, голеностоп, плечо)</b>
+              <textarea value={state.poseCsvText} onChange={e => setState(s => ({ ...s, poseCsvText: e.target.value }))} placeholder="0;90;80;40;170 — строки по кадрам, необязательно" aria-label="Таблица углов суставов" data-bb="pose-input" style={{ width: '100%', height: 52, marginTop: 6, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+              {!poseLive && <div style={{ marginTop: 4 }}>Пока пусто — вставь таблицу, появятся средние углы и замечания. Без твоих данных углов нет.</div>}
+              {poseLive && (
+                <div style={{ marginTop: 4 }}>
+                  Средние: таз {poseLive.avg.hip ?? '—'}° · колено {poseLive.avg.knee ?? '—'}° · голеностоп {poseLive.avg.ankle ?? '—'}° · плечо {poseLive.avg.shoulder ?? '—'}° (кадров: {poseLive.summary.n}) — {poseLive.status.faults.join(' · ') || 'замечаний нет'}
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Тест из методики взятия штанги · скорость 20–25% для роста · разбор траектории из видео. Углы — только из твоей таблицы, порог петли 4/6 см. <span style={{ color: '#fff' }}>→ Суставы и ортопедия</span> · <span style={{ color: '#fff' }}>→ Анализ силы → скорость</span></div>
           </div>
         )}
       </div>
 
-      <div style={{ ...CARD, padding: 12, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.16)' }}>
-        <div style={{ fontSize: 11, color: DIM, marginBottom: 6 }}>Выбрано: {report.weakZonesGranular.join(' · ') || '— баланс'} · score {score} · ver {report.score.verification} {report.score.floors.join(' · ')}</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{report.findings.slice(0, 3).join(' · ') || '—'}</div>
-        {sLevel === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>⚠️ CRITICAL — урезание MRV и коррекция до пика. Проверь OHS + объём.</div>}
+      <div style={{ ...CARD, padding: 10, margin: 0, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.16)' }} data-bb="footer">
+        <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>Выбрано: {weakListRu(report.weakZonesGranular) || '— баланс'} · оценка {score} · пров. {report.score.verification} {report.score.floors.join(' · ')}</div>
+        <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>{report.findings.slice(0, 3).join(' · ') || '—'}</div>
+        {sLevel === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>⚠️ Критично — урезание предельного объёма и коррекция до пика. Проверь присед-тест + объём.</div>}
         {specBlock && (
-          <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 10, lineHeight: 1.5 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-              <b style={{ color: '#a78bfa' }}>Спец-блок {specBlock.lengthWeeks} нед: {report.weakZonesGranular.join(', ')}</b>
-              <label style={{ marginLeft: 'auto', color: DIM }}>нед <input value={state.specWeeks} onChange={e => setState(s => ({ ...s, specWeeks: e.target.value }))} style={{ width: 36, background: '#0a1629', color: '#fff', border: '1px solid #1f3a5f', borderRadius: 6, padding: '2px 6px', fontSize: 10 }} /></label>
-              <button onClick={() => setState(s => ({ ...s, showSpecBlock: !s.showSpecBlock }))} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>{state.showSpecBlock ? 'Скрыть' : 'Недели'}</button>
+          <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 11, lineHeight: 1.5 }} data-bb="spec-block">
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+              <b style={{ color: '#fff' }}>Спец-блок {specBlock.lengthWeeks} нед: {report.weakZonesGranular.map(weakRu).join(', ')}</b>
+              <span style={{ marginLeft: 'auto', minWidth: 120, flex: '0 1 140px' }}><BbNum label="Длина, нед" value={state.specWeeks} onChange={(v) => setState(s => ({ ...s, specWeeks: v }))} placeholder="8" step={1} /></span>
+              <button onClick={() => setState(s => ({ ...s, showSpecBlock: !s.showSpecBlock }))} data-bb="spec-toggle" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{state.showSpecBlock ? 'Скрыть' : 'Недели'}</button>
             </div>
-            <div style={{ color: DIM }}>{specBlock.rationale.join(' · ')}</div>
-            {state.showSpecBlock && <div style={{ marginTop: 4, color: '#fff' }}>{specBlock.weeks.slice(0, 8).map((w) => `Н${w.week}: ${Object.entries(w.targetSets).map(([k, v]) => `${k} ${v}`).join(', ')} ×${Object.entries(w.frequency).map(([, f]) => `${f}`).join('/')}/нед`).join(' · ')}</div>}
+            <div style={{ color: '#fff' }}>{specBlock.rationale.join(' · ')}</div>
+            {state.showSpecBlock && <div style={{ marginTop: 4, color: '#fff' }}>{specBlock.weeks.slice(0, 8).map((w) => `Н${w.week}: ${Object.entries(w.targetSets).map(([k, v]) => `${MUSCLE_LABEL_RU[k] || k} ${v}`).join(', ')} ×${Object.entries(w.frequency).map(([, f]) => `${f}`).join('/')}/нед`).join(' · ')}</div>}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={applyToConstructor} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ББ-авто ({report.weakZonesGranular.join(', ') || 'баланс'})</button>
-          <button onClick={handleExport} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
-          <button onClick={handleExportCsv} style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-bb="export-row">
+          <button onClick={applyToConstructor} data-bb="apply-bottom" style={{ flex: '2 1 200px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>→ Применить в ББ-авто ({report.weakZonesGranular.map(weakRu).join(', ') || 'баланс'})</button>
+          <button onClick={handleExport} data-bb="export-html" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🖨 Печать</button>
+          <button onClick={handleExportCsv} data-bb="export-csv" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📊 Таблица</button>
         </div>
-        <div style={{ fontSize: 10, color: DIM, marginTop: 8 }}>Объём-канон: <b>📐 Объём-хаб</b> · Нагрузка-канон: <b>⚡ Интеллект</b> · Суставы: <b>🦴 Суставы и ортопедия</b> · Сила: <b>🏋️ Анализ силы</b> — без дублей, чипы read-only.</div>
+        <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Объём: <b>📐 Объём-хаб</b> · Нагрузка: <b>⚡ Интеллект</b> · Суставы: <b>🦴 Суставы и ортопедия</b> · Сила: <b>🏋️ Анализ силы</b> — без дублей, только чтение.</div>
       </div>
     </div>
   );

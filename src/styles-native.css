@@ -13541,3 +13541,88 @@ html.app-native .pl-popupoverlay input:focus-visible {
     transform: none !important;
   }
 }
+
+/* ─── 116. BB-DIAG PRO — хаб ББ-диагностики: тач-нормы, попапы, ввод ───
+ * Корень: .train-bbdiag (BBDiagnosticsHub) + хуки data-bb (hub-root/tabs-row/
+ * tab/apply-top/weak-zone/check-card/num-field/num-input/sheet-trigger/
+ * sheet-card/sheet-option/sheet-done/ohs-grid/ankle-grid/heel-row/vbt-card/
+ * csv-input/csv-parse/mobility-to-profile/ex-picker/apply-exec/apply-correction/
+ * lib-filters/footer/spec-block/export-row/apply-bottom/export-html/export-csv).
+ * Все кнопки 44-52px, ввод 16px без iOS-зума, шит во всю ширину с safe-area,
+ * цифры tabular, press + focus-visible, 380px, reduced-motion.
+ * Только APK: TG/web — инлайн-стили едины, слой только усиливает. */
+html.app-native .train-bbdiag {
+  overflow-x: clip !important;
+}
+html.app-native .train-bbdiag button {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+html.app-native .train-bbdiag button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-bbdiag button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-bbdiag input,
+html.app-native .train-bbdiag textarea {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  border-radius: 10px !important;
+  color: rgba(255, 255, 255, 1) !important;
+}
+html.app-native .train-bbdiag textarea {
+  min-height: 64px !important;
+  line-height: 1.45 !important;
+}
+html.app-native .train-bbdiag input:focus-visible,
+html.app-native .train-bbdiag textarea:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 1px !important;
+}
+html.app-native .train-bbdiag [data-bb="tabs-row"] {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  padding-bottom: 4px !important;
+  scroll-snap-type: x proximity !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+html.app-native .train-bbdiag [data-bb="tab"] {
+  scroll-snap-align: start !important;
+  flex-shrink: 0 !important;
+}
+html.app-native .train-bbdiag [data-bb="apply-bottom"],
+html.app-native .train-bbdiag [data-bb="export-html"],
+html.app-native .train-bbdiag [data-bb="export-csv"] {
+  min-height: 52px !important;
+  border-radius: 12px !important;
+}
+html.app-native .train-bbdiag [data-bb="sheet-card"] {
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
+}
+html.app-native .train-bbdiag [data-bb="sheet-option"],
+html.app-native .train-bbdiag [data-bb="sheet-done"] {
+  min-height: 48px !important;
+  font-size: 13px !important;
+}
+html.app-native .train-bbdiag [data-bb="check-card"] {
+  border-radius: 12px !important;
+}
+html.app-native .train-bbdiag [data-bb="export-row"] {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 28px) !important;
+}
+@media (max-width: 380px) {
+  html.app-native .train-bbdiag [data-bb="ohs-grid"] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .train-bbdiag button {
+    font-size: 12px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-bbdiag button:active {
+    transform: none !important;
+  }
+}

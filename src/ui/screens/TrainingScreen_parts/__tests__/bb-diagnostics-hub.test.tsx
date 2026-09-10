@@ -28,10 +28,11 @@ describe('BBDiagnosticsHub', () => {
   });
   it('mobility OHS toggle and apply to profile', () => {
     render(<BBDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Мобильность\/VBT/)[0]);
-    const chk = screen.getByLabelText(/Пятки плоско/);
-    fireEvent.click(chk);
-    expect(chk).not.toBeChecked();
+    fireEvent.click(screen.getAllByText(/Подвижность/)[0]);
+    const card = screen.getByRole('switch', { name: /Пятки плоско/ });
+    expect(card.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(card);
+    expect(screen.getByRole('switch', { name: /Пятки плоско/ }).getAttribute('aria-checked')).toBe('false');
   });
   it('exercise tab renders 5 sections', () => {
     localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [
@@ -40,10 +41,10 @@ describe('BBDiagnosticsHub', () => {
     ] }] }));
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
-    expect(screen.getAllByText(/диагностика \+ PROF-коррекция/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/разбор \+ техника/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Аудит портфеля по мышцам/)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Диагноз упражнения/)[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/Библиотека SFR/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Библиотека упражнений/)[0]).toBeInTheDocument();
   });
   it('exercise tab without plan shows empty-state, no crash', () => {
     render(<BBDiagnosticsHub />);
@@ -53,10 +54,11 @@ describe('BBDiagnosticsHub', () => {
   it('exercise select and reset do not crash', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
-    const sel = document.querySelector('select') as HTMLSelectElement;
-    expect(sel).not.toBeNull();
+    const trig = screen.getByTestId('bb-exercise');
+    expect(trig).toBeInTheDocument();
+    expect(trig.textContent).toMatch(/не выбрано/i);
     fireEvent.click(screen.getAllByText(/Сброс/)[0]);
-    expect(sel.value).toBe('');
+    expect(screen.getByTestId('bb-exercise').textContent).toMatch(/не выбрано/i);
   });
   it('header shows SFR/len chips when plan present', () => {
     localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 3, rir: 2 }] }] }] }));
@@ -76,10 +78,10 @@ describe('BBDiagnosticsHub', () => {
     const dev = screen.getAllByText(/локти вперёд/)[0];
     fireEvent.click(dev);
     expect(dev.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getAllByText('synergistTakeover')[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/нагрузку забирают соседи/)[0]).toBeInTheDocument();
     // повторный клик снимает тап и флаг
     fireEvent.click(screen.getAllByText(/локти вперёд/)[0]);
-    expect(screen.queryByText('synergistTakeover')).toBeNull();
+    expect(screen.queryByText(/нагрузку забирают соседи/)).toBeNull();
   });
   it('weak zone card shows e1RM trend chip from diary', () => {
     localStorage.setItem('he_workout_log_v1', JSON.stringify([
@@ -112,12 +114,11 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getByRole('button', { name: /Упражнения/ }));
     const chips = Array.from(document.querySelectorAll('[title*="SFR"]'));
     fireEvent.click(chips.find((el) => /блок/i.test(el.getAttribute('title') || ''))!);
-    fireEvent.click(screen.getByLabelText(/читинг\/раскачка/));
-    expect(screen.getByLabelText(/читинг\/раскачка/)).toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: /Читинг \/ раскачка/ }));
+    expect(screen.getByRole('switch', { name: /Читинг \/ раскачка/ }).getAttribute('aria-checked')).toBe('true');
     // переключаемся на другое упражнение — тапы сброшены
     fireEvent.click(chips.find((el) => /Жим штанги лёжа/i.test(el.getAttribute('title') || ''))!);
-    expect(screen.getByLabelText(/читинг\/раскачка/)).not.toBeChecked();
-    expect(screen.queryByText('stabilityGap')).toBeNull();
+    expect(screen.getByRole('switch', { name: /Читинг \/ раскачка/ }).getAttribute('aria-checked')).toBe('false');
   });
   it('past analysis from BB-auto can be restored with one click', () => {
     localStorage.setItem('he_bb_last_weak_heads', JSON.stringify(['chest_upper']));
@@ -144,7 +145,7 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getAllByText(/Покрытие головок планом/)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/✓ chest_upper/)[0]).toBeInTheDocument();
     // откат возвращает исходник
-    fireEvent.click(screen.getByRole('button', { name: /Откатить инъекцию/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Откатить вставку/ }));
     expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
     expect(localStorage.getItem('he_bb_plan_saved_prev')).toBeNull();
   });
@@ -158,7 +159,7 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
     const hist = JSON.parse(localStorage.getItem('he_bb_plan_history') || '[]');
     expect(hist.length).toBe(1);
-    expect(hist[0].label).toMatch(/до инъекции/);
+    expect(hist[0].label).toMatch(/до вставки/);
     expect(screen.getAllByText(/Журнал плана/)[0]).toBeInTheDocument();
     // правим план вручную, затем восстанавливаем снимок
     localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: { weeks: [] } }));
@@ -217,10 +218,67 @@ describe('BBDiagnosticsHub', () => {
     try {
       render(<BBDiagnosticsHub />);
       fireEvent.click(screen.getAllByText('Верх груди')[0]);
-      fireEvent.click(screen.getByRole('button', { name: /🖨 HTML/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Печать/ }));
       expect(screen.getAllByText(/HTML экспорт/)[0]).toBeInTheDocument();
     } finally {
       (document as any).createElement = origCreate;
     }
+  });
+  it('P1: L/R-карточка показывает слабую сторону из унилатерального дневника', () => {
+    const s = (n: number) => Array.from({ length: n }, () => ({ weightKg: 20, reps: 10 }));
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-09-01', exercises: [{ muscleGroup: 'biceps', side: 'left', sets: s(5) }, { muscleGroup: 'biceps', side: 'right', sets: s(2) }] },
+    ]));
+    render(<BBDiagnosticsHub />);
+    expect(screen.getAllByText(/Слабее: правая/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/добивка \+25%/)[0]).toBeInTheDocument();
+  });
+  it('P2/P3: готовность и красные флаги; стоп блокирует вставку', () => {
+    const saved = JSON.stringify({ plan: { weeks: [
+      { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
+    ] }, date: '2026-01-01' });
+    localStorage.setItem('he_bb_plan_saved', saved);
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Восстановление/ }));
+    expect(screen.getAllByText(/Готовность: зелёный/)[0]).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Боль сегодня/), { target: { value: '8' } });
+    expect(screen.getAllByText(/Готовность: красный/)[0]).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: /Острая боль/ }));
+    expect(screen.getAllByText(/вставка объёма заблокирована/)[0]).toBeInTheDocument();
+    // вставка заблокирована: план не меняется, снимка нет
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
+    expect(screen.getAllByText(/Стоп:/)[0]).toBeInTheDocument();
+    expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
+    expect(localStorage.getItem('he_bb_plan_saved_prev')).toBeNull();
+  });
+  it('P4/P5: петля SRD-бейдж из таблицы траектории + живые углы из таблицы', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Подвижность/)[0]);
+    fireEvent.change(screen.getByLabelText(/Таблица траектории/), { target: { value: 't,x,y\n0,0,0\n0.1,5,10\n0.2,8,20' } });
+    expect(screen.getAllByText(/Петля 8 см/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/порог 4\/6 см/)[0]).toBeInTheDocument();
+    expect(screen.queryByText(/черновик.*таз/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Таблица углов/), { target: { value: 't,hip,knee,ankle,shoulder\n0,90,80,40,170\n0.1,92,82,42,172' } });
+    expect(screen.getAllByText(/Средние:/)[0]).toBeInTheDocument();
+  });
+  it('P6: стимул без дубля углов — ссылка на Упражнения', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Стимул/ }));
+    expect(screen.getAllByText(/Детали углов и строгих групп/)[0]).toBeInTheDocument();
+  });
+  it('P7: teen-гейт 14 лет + женская лютеиновая пометка', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Симметрия/ }));
+    fireEvent.change(screen.getByLabelText(/Возраст, лет/), { target: { value: '14' } });
+    expect(screen.getAllByText(/без отказа/)[0]).toBeInTheDocument();
+    // пол через попап-шит симметрии (шапка тоже несёт «Пол» — берём по testId)
+    fireEvent.click(screen.getByTestId('bb-sex-sym'));
+    fireEvent.click(screen.getAllByText('Женский')[0]);
+    fireEvent.click(screen.getByTestId('bb-cycle'));
+    fireEvent.click(screen.getAllByText(/Лютеиновая/)[0]);
+    fireEvent.change(screen.getByLabelText(/Талия, см/), { target: { value: '70' } });
+    fireEvent.change(screen.getByLabelText(/Бёдра, см/), { target: { value: '95' } });
+    expect(screen.getAllByText(/Лютеиновая фаза/)[0]).toBeInTheDocument();
   });
 });

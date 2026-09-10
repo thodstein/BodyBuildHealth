@@ -43,6 +43,14 @@ import { carryPhysics } from '../../../engines/strength-sport/strength-sport-car
 import { stoneMoment } from '../../../engines/strength-sport/strength-sport-stone-moment.engine';
 import { buildSMGripProfile, smGripFailsCalibrated, loadSMGripProfile, saveSMGripProfile } from '../../../engines/strength-sport/strength-sport-sm-grip-calibration.engine';
 import { heazlewoodCheck, axialMomentCheck, mixedGripCheck } from '../../../engines/strength-sport/strength-sport-sm-safety.engine';
+import { logDiameterClass, scaleLogAttempt, logDiameterNote } from '../../../engines/strength-sport/strength-sport-sm-log-diameter.engine';
+import { diagnoseStoneSecondPullForSex, resolveAthleteSex, athleteSexLabel } from '../../../engines/strength-sport/strength-sport-sm-sex-norms.engine';
+import { diagnoseStonePhaseTiming, diagnoseCarrySplits } from '../../../engines/strength-sport/strength-sport-sm-phase-timing.engine';
+import { scoreSMBicepsRisk } from '../../../engines/strength-sport/strength-sport-sm-biceps-risk.engine';
+import { diagnoseSMHoldEvent } from '../../../engines/strength-sport/strength-sport-sm-hold-event.engine';
+import { buildSMFormatPlan, SM_EVENT_FORMAT_LABEL, type SMEventFormat } from '../../../engines/strength-sport/strength-sport-sm-format-attempts.engine';
+import { smAutoAnglesFromCsv } from '../../../engines/strength-sport/strength-sport-sm-auto-angles.engine';
+import { smAttemptsFor } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -125,6 +133,19 @@ type SMState = {
   poseLift: string;
   poseLive: '' | 'loading' | 'ok' | 'fail';
   poseSex: '' | 'male' | 'female';
+  // SM PRO2: формат ивента + пофазный тайминг + бицепс-анамнез + холд/медли
+  eventFormat: SMEventFormat;
+  workPct: string;
+  stonePull1S: string;
+  stoneLapS: string;
+  stonePull2S: string;
+  carrySplit1S: string;
+  carrySplit2S: string;
+  carrySplit3S: string;
+  bicepsHistory: boolean;
+  herculesSec: string;
+  herculesKg: string;
+  medleyDrops: string;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -146,6 +167,11 @@ const DEFAULT_STATE: SMState = {
   poseCsv: '', poseLift: 'yoke_walk',
   poseLive: '',
   poseSex: '',
+  eventFormat: 'max', workPct: '90',
+  stonePull1S: '', stoneLapS: '', stonePull2S: '',
+  carrySplit1S: '', carrySplit2S: '', carrySplit3S: '',
+  bicepsHistory: false,
+  herculesSec: '', herculesKg: '', medleyDrops: '',
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -153,8 +179,8 @@ const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> 
   { id: 'carry', label: 'Переноски', icon: '🚜', desc: 'йок/фермер/рама' },
   { id: 'load', label: 'Загрузки', icon: '🪨', desc: 'камни/мешок/кега' },
   { id: 'grip', label: 'Хват/Кор', icon: '✊', desc: 'хват + кор + кондиция' },
-  { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'OHS 6 + sway' },
-  { id: 'video', label: 'Видео', icon: '📹', desc: 'Kinovea/sway' },
+  { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'ОГС (OHS) 6 + качание' },
+  { id: 'video', label: 'Видео', icon: '📹', desc: 'Кинова (Kinovea) + качание' },
 ];
 
 const PRESS_OPTS = [
@@ -234,7 +260,7 @@ const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ 
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: '#f5b04c' }}>{label.toUpperCase()}</span>
         <span style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</span>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)', flexShrink: 0 }}>▾</span>
+          <span style={{ fontSize: 12, color: '#fff', flexShrink: 0 }}>▾</span>
         </span>
       </button>
       {open && (
@@ -250,7 +276,7 @@ const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ 
                     <span style={{ width: 22, height: 22, borderRadius: 11, border: '2px solid', borderColor: active ? '#f5b04c' : 'rgba(255,255,255,0.30)', background: active ? '#f59e0b' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{active ? '✓' : ''}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
-                      {o.desc && <span style={{ display: 'block', fontSize: 13, color: active ? '#f5b04c' : 'rgba(255,255,255,0.55)', marginTop: 2 }}>{o.desc}</span>}
+                      {o.desc && <span style={{ display: 'block', fontSize: 13, color: active ? '#f5b04c' : '#fff', marginTop: 2 }}>{o.desc}</span>}
                     </span>
                   </button>
                 );
@@ -258,6 +284,66 @@ const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ 
             </div>
             <div style={{ padding: '12px 16px' }}>
               <button onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+/** Красивый ввод числа: карточка 56px + шит со степпером, быстрыми кнопками и полем. Все кнопки ≥48px (АПК). */
+const HubNum: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; unit?: string; step?: number }> = ({ label, value, onChange, placeholder, unit, step }) => {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+  React.useEffect(() => { if (open) setDraft(value); }, [open, value]);
+  const st = step ?? 1;
+  const bump = (d: number) => {
+    const cur = parseFloat(draft);
+    const base = Number.isFinite(cur) ? cur : 0;
+    const next = Math.round((base + d) * 10) / 10;
+    setDraft(String(next));
+  };
+  const commit = (v: string) => { onChange(v); setOpen(false); };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-label={`${label}: ${value || placeholder || 'не задано'}`}
+        style={{
+          width: '100%', padding: '8px 14px', minHeight: 56, borderRadius: 14, cursor: 'pointer',
+          background: 'rgba(22,30,52,0.88)', border: '1px solid rgba(140,190,255,0.16)',
+          color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+          textAlign: 'left', fontFamily: HUB_SF,
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, color: '#fff', textTransform: 'uppercase' }}>{label}{unit ? ` · ${unit}` : ''}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{value || placeholder || '—'}</span>
+          <span style={{ fontSize: 12, color: '#fff', flexShrink: 0 }}>✎</span>
+        </span>
+      </button>
+      {open && (
+        <div className="hub-sheet-backdrop" onClick={() => setOpen(false)} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.62)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'hubFade 0.22s ease' }}>
+          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid rgba(140,190,255,0.16)', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
+            <div style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' }} />
+            <div style={{ padding: '14px 16px 10px', fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'center' }}>{label}{unit ? ` (${unit})` : ''}</div>
+            <div style={{ padding: '0 16px', display: 'flex', gap: 8, alignItems: 'stretch' }}>
+              <button type="button" onClick={() => bump(-st)} aria-label="Уменьшить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>−</button>
+              <input value={draft} onChange={e => setDraft(e.target.value)} inputMode="decimal" placeholder={placeholder || '0'} aria-label={label} style={{ flex: 1, minWidth: 0, background: 'rgba(22,30,52,0.95)', color: '#fff', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '12px 14px', fontSize: 20, fontWeight: 800, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }} />
+              <button type="button" onClick={() => bump(st)} aria-label="Увеличить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>+</button>
+            </div>
+            <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[['−5', -5 * st], ['−1', -st], ['+1', st], ['+5', 5 * st]].map(([t, d]) => (
+                <button key={t as string} type="button" onClick={() => bump(d as number)} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{t as string}</button>
+              ))}
+              <button type="button" onClick={() => setDraft('')} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Очистить</button>
+            </div>
+            <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
+              <button type="button" onClick={() => setOpen(false)} style={{ flex: 1, minHeight: 52, borderRadius: 14, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: HUB_SF }}>Отмена</button>
+              <button type="button" onClick={() => commit(draft)} style={{ flex: 2, minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -279,6 +365,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const [csvText, setCsvText] = useState<string>('');
   const [poseResult, setPoseResult] = useState<{ verdict: string; lines: string[]; n: number } | null>(null);
   const [carryPath, setCarryPath] = useState<{ type: string; verdict: string; lines: string[] } | null>(null);
+  const [autoAngles, setAutoAngles] = useState<{ verdict: string; lines: string[] } | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -580,6 +667,76 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try { return loadSMLVPProfile(smLvpLiftFor(state.lvpLift) || state.lvpLift); } catch { return null; }
   }, [state.lvpLift, state.lvpResult]);
 
+  // ── SM PRO2: диаметр лога + пол + фазы + бицепс + холд + формат ──
+  const logDiamCm = useMemo(() => {
+    const v = parseFloat(state.diameterCm);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }, [state.diameterCm]);
+  const logDiamCls = useMemo(() => logDiameterClass(logDiamCm), [logDiamCm]);
+  const profileSex = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      const p = raw ? JSON.parse(raw) : null;
+      return (p?.personal?.sex ?? p?.settings?.personal?.sex ?? null) as string | null;
+    } catch { return null; }
+  }, []);
+  const athleteSex = useMemo(() => resolveAthleteSex(state.poseSex, profileSex), [state.poseSex, profileSex]);
+  const scaledLogAttempts = useMemo(() => {
+    const pm = parseFloat(state.logKg);
+    if (!Number.isFinite(pm) || !pm || logDiamCm == null) return null;
+    try {
+      const a = smAttemptsFor(pm, (state.strategy as never) || ('balanced' as never), 2.5);
+      return {
+        opener: scaleLogAttempt(a.opener, logDiamCm),
+        second: scaleLogAttempt(a.second, logDiamCm),
+        third: scaleLogAttempt(a.third, logDiamCm),
+      };
+    } catch { return null; }
+  }, [state.logKg, state.strategy, logDiamCm]);
+  const numOrNull = (s: string): number | null => {
+    const v = parseFloat(s);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  const stonePhase = useMemo(() => diagnoseStonePhaseTiming({
+    pull1S: numOrNull(state.stonePull1S),
+    lapS: numOrNull(state.stoneLapS),
+    pull2S: numOrNull(state.stonePull2S),
+    sex: athleteSex,
+  }), [state.stonePull1S, state.stoneLapS, state.stonePull2S, athleteSex]);
+  const sexStonePull = useMemo(() => diagnoseStoneSecondPullForSex(
+    numOrNull(state.stonePull2S), athleteSex,
+  ), [state.stonePull2S, athleteSex]);
+  const carrySplitDiag = useMemo(() => diagnoseCarrySplits([
+    numOrNull(state.carrySplit1S), numOrNull(state.carrySplit2S), numOrNull(state.carrySplit3S),
+  ]), [state.carrySplit1S, state.carrySplit2S, state.carrySplit3S]);
+  const bicepsRisk = useMemo(() => scoreSMBicepsRisk({
+    stonePlanned: (parseFloat(state.stoneKg) || 0) > 0,
+    mixedGrip: state.mixGrip === 'mixed',
+    intensityPct: numOrNull(state.workPct),
+    armsBent: state.armsBent,
+    gripFails,
+    historyBiceps: state.bicepsHistory,
+  }), [state.stoneKg, state.mixGrip, state.workPct, state.armsBent, gripFails, state.bicepsHistory]);
+  const holdEventDiag = useMemo(() => {
+    const dRaw = parseFloat(state.medleyDrops);
+    const drops = state.medleyDrops !== '' && Number.isFinite(dRaw) && dRaw >= 0 ? dRaw : null;
+    return diagnoseSMHoldEvent({
+      herculesSec: numOrNull(state.herculesSec),
+      herculesKg: numOrNull(state.herculesKg),
+      medleyDrops: drops,
+    });
+  }, [state.herculesSec, state.herculesKg, state.medleyDrops]);
+  const formatPlan = useMemo(() => {
+    try {
+      return buildSMFormatPlan({
+        format: state.eventFormat,
+        pmKg: numOrNull(state.logKg),
+        strategy: (state.strategy as never) || ('balanced' as never),
+        heightFromM: numOrNull(state.platformHeightCm) != null ? (parseFloat(state.platformHeightCm) / 100) : null,
+      });
+    } catch { return null; }
+  }, [state.eventFormat, state.logKg, state.strategy, state.platformHeightCm]);
+
   const toggle = (key: keyof Pick<SMState, 'pressWeak'|'carryWeak'|'loadWeak'|'gripWeak'>, id: string) => {
     setState(s => {
       const arr = (s as any)[key] as string[];
@@ -659,6 +816,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       logDip: logDipDiag,
       lvp: smLvpStored,
       weakPointsSM: smWeakPoints,
+      logDiameter: logDiamCls ? { cm: logDiamCm, cls: logDiamCls, scaledLogAttempts } : null,
+      athleteSex,
+      phaseTiming: { stone: stonePhase, carry: carrySplitDiag, sexStonePull },
+      bicepsRisk: { score: bicepsRisk.score, level: bicepsRisk.level, gate: bicepsRisk.gate, lines: bicepsRisk.lines },
+      holdEvent: holdEventDiag,
+      eventFormat: state.eventFormat,
+      formatPlan,
+      autoAngles,
     };
     applyToPlanner({
       kind: 'weakpoints',
@@ -709,7 +874,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         const raw = localStorage.getItem('he_workout_log');
         void raw;
       } catch { /* noop */ }
-      setToast('✓ Прогресс сохранён (60 кап)');
+      setToast('✓ Прогресс сохранён (лимит 60)');
       setTimeout(() => setToast(''), 2000);
     } catch { /* noop */ }
   };
@@ -722,7 +887,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         fatGripMm: parseInt(state.fatGripMm) || 50,
       });
       saveSMGripProfile(p);
-      setToast(`✓ Grip-профиль: pinch ${p.pinchSec}с / crush ${p.crushSec}с / support ${p.supportSec}с`);
+      setToast(`✓ Профиль хвата: щипок ${p.pinchSec} сек / сдавливание ${p.crushSec} сек / опора ${p.supportSec} сек`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -735,7 +900,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const next = appendOHSSnapshot(hist, { date: today, score: ohs.totalScore, failed: ohs.failed, level: ohs.level });
       localStorage.setItem(SM_OHS_HIST_KEY, JSON.stringify(next));
       const tr = ohsScoreTrend(next);
-      setToast(`✓ OHS-снапшот ${ohs.totalScore}/6${tr && tr.n >= 2 ? ` · тренд ${tr.delta >= 0 ? '+' : ''}${tr.delta}` : ''}`);
+      setToast(`✓ Снапшот приседа (OHS) ${ohs.totalScore}/6${tr && tr.n >= 2 ? ` · тренд ${tr.delta >= 0 ? '+' : ''}${tr.delta}` : ''}`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -744,7 +909,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try {
       const b = buildSMBackup();
       downloadSMBackup(`sm-backup-${new Date().toISOString().slice(0, 10)}.json`);
-      setToast(`✓ Бэкап SM: ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)}КБ`);
+      setToast(`✓ Резервная копия: ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)} КБ`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -753,7 +918,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try {
       const l = parseFloat(state.leftMax);
       const r = parseFloat(state.rightMax);
-      if (!Number.isFinite(l) || !Number.isFinite(r) || !l || !r) { setToast('Введи L/R макс'); setTimeout(() => setToast(''), 2000); return; }
+      if (!Number.isFinite(l) || !Number.isFinite(r) || !l || !r) { setToast('Введи левый/правый макс'); setTimeout(() => setToast(''), 2000); return; }
       const d = diagnoseSMGripAsymmetry({ leftKg: l, rightKg: r });
       if (!d) return;
       const key = 'he_sm_grip_hist_v1';
@@ -763,7 +928,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const next = appendSMGripSnapshot(hist, { date: today, left: l, right: r, diffPct: d.diffPct, metric: 'kg' });
       localStorage.setItem(key, JSON.stringify(next));
       const tr = smGripTrend(next);
-      setToast(`✓ Grip-снапшот ${d.diffPct}%${tr && tr.n >= 2 ? ` · тренд ${tr.deltaPp}п.п.` : ''}`);
+      setToast(`✓ Снапшот хвата ${d.diffPct}%${tr && tr.n >= 2 ? ` · тренд ${tr.deltaPp} п.п.` : ''}`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -773,7 +938,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const ics = buildSMIcs(smSpec, { title: 'Стронг спец-блок' });
     if (!ics) return;
     downloadSMIcs(ics, `sm-spec-${new Date().toISOString().slice(0, 10)}.ics`);
-    setToast('✓ ICS спец-блока');
+    setToast('✓ Календарь спец-блока (ICS)');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -782,21 +947,35 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const weeks = buildSMAnnualOverlay(smSpec, { startWeek: parseInt(state.annualStartWeek) || 1 });
     if (!weeks) return;
     saveSMAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1);
-    setToast(`✓ Годовой overlay: ${weeks.length} нед → he_sm_annual_sync_v1`);
+    setToast(`✓ Годовая подложка: ${weeks.length} нед → годовой план`);
     setTimeout(() => setToast(''), 2500);
   };
 
+  const ruVerdict = (v: string): string => v === 'ok' ? 'ОК' : v === 'warn' ? 'ВНИМАНИЕ' : v === 'critical' ? 'КРИТ' : v;
   const handlePoseParse = () => {
     const r = smPoseCheckFromCsv(state.poseCsv, state.poseLift, state.poseSex || null);
-    if (!r) { setToast('Углы не распознаны (t,hip,knee,ankle,shoulder)'); setTimeout(() => setToast(''), 2000); return; }
+    if (!r) { setToast('Углы не распознаны (время,таз,колено,голеностоп,плечо)'); setTimeout(() => setToast(''), 2000); return; }
     setPoseResult({ verdict: r.result.verdict, lines: r.result.lines, n: r.result.n });
-    setToast(`✓ Углы: n=${r.result.n} → ${r.result.verdict.toUpperCase()}`);
+    setToast(`✓ Углы: n=${r.result.n} → ${ruVerdict(r.result.verdict)}`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const handleAutoAngles = () => {
+    const r = smAutoAnglesFromCsv(state.poseCsv, state.poseLift);
+    if (!r.valid) {
+      setAutoAngles(null);
+      setToast(`✕ ${r.error}`);
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setAutoAngles({ verdict: r.verdict, lines: r.lines });
+    setToast(`✓ Авто-углы: n=${r.angles.n} → ${ruVerdict(r.verdict)}`);
     setTimeout(() => setToast(''), 2500);
   };
 
   const handleCsvParse = () => {
     const pts = parseKinoveaCSV(csvText);
-    if (!pts) { setToast('CSV не распознан'); setTimeout(()=>setToast(''),2000); return; }
+    if (!pts) { setToast('Таблица не распознана (нужен CSV Кинова)'); setTimeout(()=>setToast(''),2000); return; }
     const res = analyzeBarTracking(pts);
     if (!res) { setToast('Нет точек'); return; }
     const sway = Math.round(res.xLoop * 10)/10;
@@ -805,7 +984,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const path = diagnoseCarryPathFromPoints(pts.map((p) => ({ x: p.x, y: p.y, t: p.t })));
       setCarryPath(path ? { type: path.type, verdict: path.verdict, lines: path.lines } : null);
     } catch { setCarryPath(null); }
-    setToast(`✓ Kinovea: sway ${sway}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
+    setToast(`✓ Кинова (Kinovea): качание ${sway} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
   };
 
@@ -815,7 +994,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try {
       const ok = await ensurePoseModel();
       setState(s => ({ ...s, poseLive: ok ? 'ok' : 'fail' }));
-      setToast(ok ? '✓ MediaPipe доступен — live-углы следующим шагом' : '✕ MediaPipe недоступен (нет сети/CDN)');
+      setToast(ok ? '✓ Модель поз доступна — живые углы следующим шагом' : '✕ Модель поз недоступна (нет сети)');
       setTimeout(() => setToast(''), 2500);
     } catch {
       setState(s => ({ ...s, poseLive: 'fail' }));
@@ -843,7 +1022,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       (p.training as any).mobilityRestrictions = uniq;
       localStorage.setItem('he_profile_v2', JSON.stringify(p));
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
-      setToast(`✓ Мобильность ${uniq.join(', ') || 'OK'} → профиль`);
+      setToast(`✓ Подвижность ${uniq.join(', ') || 'ОК'} → профиль`);
       setTimeout(() => setToast(''), 2500);
     } catch {}
   };
@@ -860,6 +1039,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     progress: smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · лог ${smTrend.logDeltaKg ?? '—'}кг · йок ${smTrend.yokeDeltaS ?? '—'}с` : null,
     causes: smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`),
     specBlock: smSpec ? `${smSpec.weakPoints.join(', ')} × ${smSpec.totalWeeks}нед` : null,
+    logDiameter: logDiamCls ? `${logDiamCm} см (${logDiamCls})${scaledLogAttempts ? ` → ${scaledLogAttempts.opener}/${scaledLogAttempts.second}/${scaledLogAttempts.third} кг` : ''}` : null,
+    athleteSex: athleteSexLabel(athleteSex),
+    sexStonePull: sexStonePull ? sexStonePull.lines.join(' · ') : null,
+    stonePhases: stonePhase ? stonePhase.lines.join(' · ') : null,
+    carrySplits: carrySplitDiag ? carrySplitDiag.lines.join(' · ') : null,
+    biceps: `${bicepsRisk.score}/100 ${bicepsRisk.level}${bicepsRisk.gate ? ' · ГЕЙТ: только лямки/нейтраль' : ''}`,
+    holdEvent: holdEventDiag ? holdEventDiag.lines.join(' · ') : null,
+    eventFormat: `${SM_EVENT_FORMAT_LABEL[state.eventFormat]}${formatPlan ? ` · ${formatPlan.lines.join(' · ')}` : ''}`,
+    autoAngles: autoAngles ? autoAngles.lines.join(' · ') : null,
   });
 
   const handleExport = () => {
@@ -880,7 +1068,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     };
     const html = buildSMDiagnosticsHtml(snap);
     downloadSMHtml(html, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.html`);
-    setToast('✓ HTML экспорт');
+    setToast('✓ Печать (HTML) готова');
     setTimeout(()=>setToast(''),2000);
   };
   const handleExportCsv = () => {
@@ -900,7 +1088,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       ...proSnapExtra(),
     };
     downloadSMCsv(snap, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.csv`);
-    setToast('✓ CSV экспорт');
+    setToast('✓ Выгрузка (CSV) готова');
     setTimeout(()=>setToast(''),2000);
   };
 
@@ -912,22 +1100,21 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   };
 
   return (
-    <div className="train-strongdiag" style={{ padding: '14px 12px 22px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <style>{`.train-strongdiag input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:#f59e0b; cursor:pointer; }.train-strongdiag input:not([type="checkbox"]):focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:rgba(255,255,255,0.40); font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
-      <div style={{ ...CARD, padding: '18px 18px 16px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -24, right: -24, width: 150, height: 150, borderRadius: 150, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 22, flexShrink: 0, boxShadow: '0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🏋️‍♂️</div>
+    <div className="train-strongdiag" style={{ padding: '10px 8px 16px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <style>{`.train-strongdiag input:focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag input::placeholder, .train-strongdiag textarea::placeholder{ color:rgba(255,255,255,0.75); opacity:1; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; min-height:44px; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:#fff; font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+      <div style={{ ...CARD, padding: '12px 12px 10px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 20, flexShrink: 0, boxShadow: '0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🏋️‍♂️</div>
           <div style={{ flex: '1 1 180px', minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', lineHeight: 1.15, letterSpacing: -0.3 }}>Стронгмен-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.45, opacity: 0.85, marginTop: 4 }}>16 фаз × углы + биомеханика + VBT + OHS + хват + sway + симулятор.</div>
+            <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>16 фаз × углы + биомеханика + скорость (VBT) + присед над головой (OHS) + хват + качание (sway) + симулятор.</div>
           </div>
           <div style={{ textAlign: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <div style={{ width: 60, height: 60, borderRadius: 30, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 16, boxShadow: `0 0 20px ${sColor}44` }}>{score}</div>
-            <div style={{ fontSize: 11, color: sColor, fontWeight: 800, marginTop: 4 }}>{level==='ok'?'ОК':level==='warn'?'WARN':'CRITICAL'} · v{scoring.verification}</div>
+            <div style={{ fontSize: 11, color: sColor, fontWeight: 800, marginTop: 4 }}>{level==='ok'?'ОК':level==='warn'?'ВНИМАНИЕ':'КРИТ'} · v{scoring.verification}</div>
           </div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:8, marginBottom:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:6, marginBottom:6 }}>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${ohs.level==='ok'?'#22c55e':'#ef4444'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>OHS · МОБИЛЬНОСТЬ</span>
             <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>{ohs.totalScore}/6</span>
@@ -938,17 +1125,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           </div>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>SWAY · CARRY</span>
-            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff' }}>{swayDiag ? `sway ${swayDiag.swayCm}см` : '—'}</span>
+            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff' }}>{swayDiag ? `качание ${swayDiag.swayCm} см` : '—'}</span>
           </div>
           <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
             <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>VBT · ПОТЕРЯ</span>
             <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : '—'}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 6 }}>
           <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
           <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
-          {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>floor: {scoring.floors[0]}</span>}
+          {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#fff' }}>порог: {scoring.floors[0]}</span>}
         </div>
         {(diaryWeaks.length>0 || diaryPhases.length>0) && (
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
@@ -956,28 +1143,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {diaryPhases.length>0 && <span style={{ padding:'6px 12px', borderRadius:20, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', color:'#a78bfa', fontSize:12, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
           </div>
         )}
-        <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '12px 14px', lineHeight: 1.45 }}>
-          Выбери слабые фазы (числовые углы + биомеханика McGill/Harris) + sway (3/5см) + VBT 15% + grip tri-modal → RSS-скор. Кнопка <b style={{ color: '#f59e0b' }}>«Применить в Стронг-конструктор»</b> отправит с smBiomech + контест (mode:strongman).
+        <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', lineHeight: 1.4 }}>
+          Выбери слабые фазы (углы + биомеханика) + качание 3/5 см + скорость 15% + хват из 3 тестов → общий балл. Кнопка <b style={{ color: '#fff' }}>«Применить в Стронг-конструктор»</b> отправит данные с биомеханикой и контестом.
         </div>
-        <details style={{ marginTop: 10, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <summary style={{ padding: '13px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 52, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
+        <details style={{ marginTop: 6, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <summary style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
           <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column' }}>
         {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 12, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
-        {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#60a5fa' }}>Enode xLoop {swayCm}см → {enodeCorrected}см (Chavda 2024 bias) · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin}</div>}
-        <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>Axial {axialProgress.curM}м / {axialProgress.mrv}м MRV ({axialProgress.pct}%) · {axialQuant.text} · {axialQuant.recipe} · cond {state.conditioningFail? 'FAIL — prowler 10×100ft' : 'ok — alactic 8×10с/50с'} · {swayDiag? `sway ${swayDiag.swayCm}см` : 'sway —'}</div>
+        {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#fff' }}>Поправка Энода: {swayCm} см → {enodeCorrected} см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с</div>}
+        <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>Осевая: {axialProgress.curM} м / {axialProgress.mrv} м (лимит {axialProgress.pct}%) · {axialQuant.text} · {axialQuant.recipe} · кондиция {state.conditioningFail? 'провалена — санки 10×30 м' : 'в норме — рывки 8×10 сек/50 сек'} · {swayDiag? `качание ${swayDiag.swayCm} см` : 'качание —'}</div>
         {carryPhys && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#60a5fa' }}>🚜 Йок-физика (Legg/Hindle): {carryPhys.note}</div>}
         {stoneMom && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#f59e0b' }}>🪨 Камень-момент (Harris): {stoneMom.note}</div>}
-        {contestSim && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#a78bfa' }}>🏆 Симулятор: {contestSim.predictedPlace} место из 10 · total {contestSim.totalPoints}pts · слабые {contestSim.weakEvents.join(', ') || '—'} · порядок {contestSim.recOrder.join(' → ')}</div>}
-        {attemptsBridge && attemptsBridge.rationale.length > 1 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#22c55e' }}>🎯 Попытки: {attemptsBridge.rationale.slice(1, 4).join(' · ')}{attemptsBridge.medley ? ` · Medley ${attemptsBridge.medley.totalTimeS}с/cap ${attemptsBridge.medley.timeCapS}с` : ''}</div>}
+        {contestSim && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#fff' }}>🏆 Симулятор: {contestSim.predictedPlace} место из 10 · сумма {contestSim.totalPoints} очков · слабые {contestSim.weakEvents.join(', ') || '—'} · порядок {contestSim.recOrder.join(' → ')}</div>}
+        {attemptsBridge && attemptsBridge.rationale.length > 1 && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#fff' }}>🎯 Попытки: {attemptsBridge.rationale.slice(1, 4).join(' · ')}{attemptsBridge.medley ? ` · Медли (medley) ${attemptsBridge.medley.totalTimeS} сек / лимит ${attemptsBridge.medley.timeCapS} сек` : ''}</div>}
         {smCauses.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>🧬 Причины: {smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`).join(' · ')}</div>}
         {smRankTop.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(94,234,212,0.08)', border: '1px solid rgba(94,234,212,0.18)', fontSize: 12, color: '#5ee' }}>⭐ Топ-коррекция: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%`).join(' · ')}</div>}
-        {smSpec && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', fontSize: 12, color: '#fca5a5' }}>📅 Спец-блок: {smSpec.weakPoints.join(', ')} × {smSpec.totalWeeks}нед · {smSpec.weeks[0]?.note || ''} · dayMap event-день</div>}
+        {smSpec && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', fontSize: 12, color: '#fff' }}>📅 Спец-блок: {smSpec.weakPoints.join(', ')} × {smSpec.totalWeeks} нед · {smSpec.weeks[0]?.note || ''} · раскладка по дням ивента</div>}
         {bicepsWarn.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: '#ef4444' }}>🦾 Безопасность: {bicepsWarn.join(' · ')}</div>}
-        {holdDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#22c55e' }}>✊ Hold: {holdDiag.verdict}</div>}
+        {holdDiag && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#fff' }}>✊ Удержание: {holdDiag.verdict}</div>}
         {anthroDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>📏 Антро: {anthroDiag.loadAdvice} {anthroDiag.pickupAdvice}</div>}
         {logDipDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: logDipDiag.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>📐 Лог-дип: {logDipDiag.text}{logDipDiag.drivePowerW != null ? ` · drive ~${logDipDiag.drivePowerW}Вт` : ''}</div>}
-        {gripAsymDiag && gripAsymDiag.isAsym && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#f59e0b' }}>⚖️ Grip-асимметрия: {gripAsymDiag.text}</div>}
+        {gripAsymDiag && gripAsymDiag.isAsym && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#fff' }}>⚖️ Асимметрия хвата: {gripAsymDiag.text}</div>}
           </div>
         </details>
         {toast && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 13 }}>{toast}</div>}
@@ -988,8 +1175,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, padding: 14, position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 14, alignItems: 'center', scrollbarWidth: 'none', paddingBottom: 2 }}>
+      <div style={{ ...CARD, padding: 10, position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 8, alignItems: 'center', scrollbarWidth: 'none', paddingBottom: 2 }}>
           {TAB_DEFS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : '#fff', cursor:'pointer', fontSize:14, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
               {t.icon} {t.label}
@@ -1000,8 +1187,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='press' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Жим — лог/аксель (4 фазы, дип 8-12см)</div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Жим — лог/аксель (4 фазы, дип 8-12 см)</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {PRESS_OPTS.map(o=>{ const on = state.pressWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#ef4444' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(239,68,68,0.20), rgba(245,158,11,0.10))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(239,68,68,0.35)' : 'none' }}>
                   <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ff6b6b' : 'rgba(255,255,255,0.30)', background: on ? '#ef4444' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
@@ -1020,13 +1207,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Лог кг<br/><input value={state.logKg} onChange={e=>setState(s=>({...s, logKg:e.target.value}))} placeholder="100" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Аксель кг<br/><input value={state.axleKg} onChange={e=>setState(s=>({...s, axleKg:e.target.value}))} placeholder="120" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Лог" unit="кг" value={state.logKg} onChange={v=>setState(s=>({...s, logKg:v}))} placeholder="100" step={2.5} />
+              <HubNum label="Аксель" unit="кг" value={state.axleKg} onChange={v=>setState(s=>({...s, axleKg:v}))} placeholder="120" step={2.5} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT лог best м/с<br/><input value={state.vbtLogBest} onChange={e=>setState(s=>({...s, vbtLogBest:e.target.value}))} placeholder="0.85" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT лог last м/с<br/><input value={state.vbtLogLast} onChange={e=>setState(s=>({...s, vbtLogLast:e.target.value}))} placeholder="0.65" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="VBT лог — лучшая" unit="м/с" value={state.vbtLogBest} onChange={v=>setState(s=>({...s, vbtLogBest:v}))} placeholder="0.85" step={0.05} />
+              <HubNum label="VBT лог — последняя" unit="м/с" value={state.vbtLogLast} onChange={v=>setState(s=>({...s, vbtLogLast:v}))} placeholder="0.65" step={0.05} />
             </div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Ивенты: {Object.keys(EVENT_META).slice(0,4).join(', ')} — {VBT_SS_THRESHOLDS.log_press ? `VBT log ${VBT_SS_THRESHOLDS.log_press.optimalMin}/${VBT_SS_THRESHOLDS.log_press.stopMin} м/с` : ''}</div>
             <details open style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
@@ -1034,27 +1221,40 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ marginTop:6 }}><HubPopupSelect label="Контест" value={state.contestId} onChange={v=>setState(s=>({...s, contestId:v}))} options={[{ id:'', label:'Без контеста (база)', desc:'общий план' }, ...Object.entries(CONTEST_PRESETS as any).map(([id,c]:any)=> ({ id: String(id), label: String(c.name) }))]} /></div>
               <HubToggle checked={state.turnNeeded} onChange={v=>setState(s=>({...s, turnNeeded:v}))} label="Разворот 180° (йок/фермер)" style={{ marginTop:6 }} />
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Платформа см<br/><input value={state.platformHeightCm} onChange={e=>setState(s=>({...s, platformHeightCm:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Tacky есть" style={{ marginTop:16 }} />
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+                <HubNum label="Платформа" unit="см" value={state.platformHeightCm} onChange={v=>setState(s=>({...s, platformHeightCm:v}))} placeholder="140" step={5} />
+                <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Смола липкая (tacky) есть" />
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Диаметр лога см<br/><input value={state.diameterCm} onChange={e=>setState(s=>({...s, diameterCm:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+                <HubNum label="Диаметр лога" unit="см" value={state.diameterCm} onChange={v=>setState(s=>({...s, diameterCm:v}))} placeholder="30" step={1} />
                 <HubPopupSelect label="Покрытие" value={state.surface} onChange={v=>setState(s=>({...s, surface:v}))} options={[{ id:'', label:'Не выбрано' }, { id:'резина', label:'Резина' }, { id:'трава', label:'Трава' }, { id:'асфальт', label:'Асфальт' }, { id:'песок', label:'Песок' }]} />
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Дип см (8-12)<br/><input value={state.logDipCm} onChange={e=>setState(s=>({...s, logDipCm:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Дип мс (~200)<br/><input value={state.logDipMs} onChange={e=>setState(s=>({...s, logDipMs:e.target.value}))} placeholder="200" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Вес тела кг<br/><input value={state.bodyweightKg} onChange={e=>setState(s=>({...s, bodyweightKg:e.target.value}))} placeholder="105" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Тяга кг (axle)<br/><input value={state.deadliftKg} onChange={e=>setState(s=>({...s, deadliftKg:e.target.value}))} placeholder="250" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+                <HubNum label="Дип 8–12" unit="см" value={state.logDipCm} onChange={v=>setState(s=>({...s, logDipCm:v}))} placeholder="10" step={1} />
+                <HubNum label="Дип время" unit="мс" value={state.logDipMs} onChange={v=>setState(s=>({...s, logDipMs:v}))} placeholder="200" step={10} />
+                <HubNum label="Вес тела" unit="кг" value={state.bodyweightKg} onChange={v=>setState(s=>({...s, bodyweightKg:v}))} placeholder="105" step={1} />
+                <HubNum label="Тяга (аксель)" unit="кг" value={state.deadliftKg} onChange={v=>setState(s=>({...s, deadliftKg:v}))} placeholder="250" step={2.5} />
               </div>
               {logDipDiag && <div style={{ fontSize:12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{logDipDiag.text} (Renals braking/propulsion, Zhang dip 0.20с)</div>}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:6 }}>
-                <HubPopupSelect label="Стратегия попыток" value={state.strategy} onChange={v=>setState(s=>({...s, strategy:v}))} options={[{ id:'conservative', label:'Conservative', desc:'85 / 92 / 98' }, { id:'balanced', label:'Balanced', desc:'88 / 95 / 100' }, { id:'aggressive', label:'Aggressive', desc:'90 / 97 / 102' }]} />
-                <HubPopupSelect label="Хват тяги" value={state.mixGrip} onChange={v=>setState(s=>({...s, mixGrip:v}))} options={[{ id:'overhand', label:'Overhand / hook' }, { id:'mixed', label:'Mixed', desc:'риск бицепса' }, { id:'straps', label:'Straps' }]} />
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+                <HubPopupSelect label="Стратегия попыток" value={state.strategy} onChange={v=>setState(s=>({...s, strategy:v}))} options={[{ id:'conservative', label:'Осторожная', desc:'85 / 92 / 98' }, { id:'balanced', label:'Сбалансированная', desc:'88 / 95 / 100' }, { id:'aggressive', label:'Агрессивная', desc:'90 / 97 / 102' }]} />
+                <HubPopupSelect label="Хват тяги" value={state.mixGrip} onChange={v=>setState(s=>({...s, mixGrip:v}))} options={[{ id:'overhand', label:'Верхний / крюк' }, { id:'mixed', label:'Разнохват', desc:'риск бицепса' }, { id:'straps', label:'Лямки' }]} />
               </div>
               <HubToggle checked={state.armsBent} onChange={v=>setState(s=>({...s, armsBent:v}))} label="Руки согнуты на камне/шине (риск бицепса)" style={{ marginTop:6 }} />
-              {attemptsBridge && attemptsBridge.rationale.length > 0 && <div style={{ fontSize:12, color:'#22c55e', marginTop:4 }}>{attemptsBridge.rationale.slice(0, 4).join(' · ')}</div>}
+              {attemptsBridge && attemptsBridge.rationale.length > 0 && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{attemptsBridge.rationale.slice(0, 4).join(' · ')}</div>}
+              <div style={{ marginTop:6 }}>
+                <HubPopupSelect label="Формат ивента" value={state.eventFormat} onChange={v=>setState(s=>({...s, eventFormat:v as SMEventFormat}))} options={[{ id:'max', label:SM_EVENT_FORMAT_LABEL.max }, { id:'reps', label:SM_EVENT_FORMAT_LABEL.reps }, { id:'medley', label:SM_EVENT_FORMAT_LABEL.medley }, { id:'height', label:SM_EVENT_FORMAT_LABEL.height }]} />
+              </div>
+              {logDiamCls && (
+                <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>
+                  {logDiameterNote(logDiamCm)}
+                  {scaledLogAttempts && ` → лог: ${scaledLogAttempts.opener}/${scaledLogAttempts.second}/${scaledLogAttempts.third} кг`}
+                  {logDiamCls === 'large' ? ' · большой лог тяжелее — снижай заявку' : logDiamCls === 'small' ? ' · малый лог быстрее — можно смелее' : ''}
+                </div>
+              )}
+              {formatPlan && state.eventFormat !== 'max' && (
+                <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>📋 {formatPlan.lines.join(' · ')}</div>
+              )}
               </div>
             </details>
           </div>
@@ -1062,8 +1262,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='carry' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Переноски — йок/фермер/рама (5 фаз, sway 3/5см)</div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Переноски — йок/фермер/рама (5 фаз, качание 3/5 см)</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {CARRY_OPTS.map(o=>{ const on = state.carryWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(239,68,68,0.08))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(245,158,11,0.35)' : 'none' }}>
                   <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ffb84d' : 'rgba(255,255,255,0.30)', background: on ? '#f59e0b' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
@@ -1081,29 +1281,35 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Йок кг<br/><input value={state.yokeKg} onChange={e=>setState(s=>({...s, yokeKg:e.target.value}))} placeholder="300" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Фермер кг (на руку)<br/><input value={state.farmersKg} onChange={e=>setState(s=>({...s, farmersKg:e.target.value}))} placeholder="120" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Йок" unit="кг" value={state.yokeKg} onChange={v=>setState(s=>({...s, yokeKg:v}))} placeholder="300" step={5} />
+              <HubNum label="Фермер (на руку)" unit="кг" value={state.farmersKg} onChange={v=>setState(s=>({...s, farmersKg:v}))} placeholder="120" step={2.5} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Sway см<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="2.5" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT йок best м/с<br/><input value={state.vbtYokeBest} onChange={e=>setState(s=>({...s, vbtYokeBest:e.target.value}))} placeholder="1.45" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT йок last м/с<br/><input value={state.vbtYokeLast} onChange={e=>setState(s=>({...s, vbtYokeLast:e.target.value}))} placeholder="1.20" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.5" step={0.5} />
+              <HubNum label="VBT йок — лучшая" unit="м/с" value={state.vbtYokeBest} onChange={v=>setState(s=>({...s, vbtYokeBest:v}))} placeholder="1.45" step={0.05} />
+              <HubNum label="VBT йок — последняя" unit="м/с" value={state.vbtYokeLast} onChange={v=>setState(s=>({...s, vbtYokeLast:v}))} placeholder="1.20" step={0.05} />
             </div>
-            {swayDiag && <div style={{ fontSize:12, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444', marginTop:4 }}>{swayDiag.text} · SRD 3/5см · VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
+            {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · порог 3/5 см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
             {vbtLoss && <div style={{ fontSize:12, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
-            {carryPhys ? <div style={{ fontSize:12, color:'#60a5fa', marginTop:4 }}>Физика: {carryPhys.note} · Hindle 1.69м/с stride 1.14м rate 1.62Hz</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (таб Жим) + йок кг → speed/stride/cadence/feasible</div>}
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
-              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео переноски — sway из Kinovea (xLoop)</div>
-              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Сними сбоку 30fps → Kinovea CSV → вкладка Видео → sway автоматически</div>
+            {carryPhys ? <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика: {carryPhys.note} · скорость 1.69 м/с, шаг 1.14 м, темп 1.62 Гц</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (вкладка Жим) + йок, кг → скорость/шаг/темп/оценка</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Отрезок 0–5 м" unit="сек" value={state.carrySplit1S} onChange={v=>setState(s=>({...s, carrySplit1S:v}))} placeholder="4.0" step={0.5} />
+              <HubNum label="Отрезок 5–15 м" unit="сек" value={state.carrySplit2S} onChange={v=>setState(s=>({...s, carrySplit2S:v}))} placeholder="7.0" step={0.5} />
+              <HubNum label="Отрезок 15–20 м" unit="сек" value={state.carrySplit3S} onChange={v=>setState(s=>({...s, carrySplit3S:v}))} placeholder="4.5" step={0.5} />
+            </div>
+            {carrySplitDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⏱ {carrySplitDiag.lines.join(' · ')}</div>}
+            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
+              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео переноски — качание из Кинова (Kinovea)</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Сними сбоку 30 кадров/с → таблица Кинова (CSV) → вкладка Видео → качание само</div>
             </div>
           </div>
         )}
 
         {tab==='load' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Загрузки — камни/мешок/кега (anterior load, high-hips)</div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Загрузки — камни/мешок/кега (передняя нагрузка, высокие бёдра)</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {LOAD_OPTS.map(o=>{ const on = state.loadWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#22c55e' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(34,197,94,0.20), rgba(34,197,94,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(34,197,94,0.35)' : 'none' }}>
                   <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#4ade80' : 'rgba(255,255,255,0.30)', background: on ? '#22c55e' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
@@ -1121,40 +1327,47 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Камень кг<br/><input value={state.stoneKg} onChange={e=>setState(s=>({...s, stoneKg:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Sway камня см<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="2.0" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Камень" unit="кг" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="140" step={2.5} />
+              <HubNum label="Качание камня (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.0" step={0.5} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT камень best м/с<br/><input value={state.vbtStoneBest} onChange={e=>setState(s=>({...s, vbtStoneBest:e.target.value}))} placeholder="0.75" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT камень last м/с<br/><input value={state.vbtStoneLast} onChange={e=>setState(s=>({...s, vbtStoneLast:e.target.value}))} placeholder="0.55" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="VBT камень — лучшая" unit="м/с" value={state.vbtStoneBest} onChange={v=>setState(s=>({...s, vbtStoneBest:v}))} placeholder="0.75" step={0.05} />
+              <HubNum label="VBT камень — последняя" unit="м/с" value={state.vbtStoneLast} onChange={v=>setState(s=>({...s, vbtStoneLast:v}))} placeholder="0.55" step={0.05} />
             </div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Контест пресеты: {Object.values(CONTEST_PRESETS as any).slice(0,3).map((c:any)=>c.name).join(', ')} · stone VBT {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с · платформа {state.platformHeightCm || '—'}см</div>
-            <div style={{ fontSize:12, color: state.tackyUsed ? '#22c55e' : '#f59e0b', marginTop:4 }}>{state.tackyUsed ? '✓ Tacky учтён — руки не сгибать' : '⚠ Без tacky — риск сгибания рук + бицепс tear'}</div>
+            <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{state.tackyUsed ? '✓ Смола (tacky) учтена — руки не сгибать' : '⚠ Без смолы — риск сгибания рук + разрыв бицепса'}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Рабочий % от макса" unit="%" value={state.workPct} onChange={v=>setState(s=>({...s, workPct:v}))} placeholder="90" step={1} />
+              <HubNum label="Камень 1-я тяга" unit="сек" value={state.stonePull1S} onChange={v=>setState(s=>({...s, stonePull1S:v}))} placeholder="2.5" step={0.5} />
+              <HubNum label="Камень колени" unit="сек" value={state.stoneLapS} onChange={v=>setState(s=>({...s, stoneLapS:v}))} placeholder="1.5" step={0.5} />
+              <HubNum label="Камень 2-я тяга" unit="сек" value={state.stonePull2S} onChange={v=>setState(s=>({...s, stonePull2S:v}))} placeholder="2.5" step={0.5} />
+            </div>
+            {stonePhase && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⏱ {stonePhase.lines.join(' · ')}</div>}
           </div>
         )}
 
         {tab==='grip' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Хват / Кор / Кондиция (tri-modal + axial)</div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Хват / Кор / Кондиция (3 теста + осевая нагрузка)</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {GRIP_OPTS.map(o=>{ const on = state.gripWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#a855f7' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(168,85,247,0.20), rgba(168,85,247,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}>
                   <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#c084fc' : 'rgba(255,255,255,0.30)', background: on ? '#a855f7' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
                   <span>{o.label}</span>
                 </button> );})}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Support (фермер) сек<br/><input value={state.gripHoldSec} onChange={e=>setState(s=>({...s, gripHoldSec:e.target.value}))} placeholder="60" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Pinch сек<br/><input value={state.pinchHoldSec} onChange={e=>setState(s=>({...s, pinchHoldSec:e.target.value}))} placeholder="20" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Crush (axle) сек<br/><input value={state.axleHoldSec} onChange={e=>setState(s=>({...s, axleHoldSec:e.target.value}))} placeholder="30" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6 }}>
+              <HubNum label="Опора · Support (фермер)" unit="сек" value={state.gripHoldSec} onChange={v=>setState(s=>({...s, gripHoldSec:v}))} placeholder="60" step={5} />
+              <HubNum label="Щипок · Pinch" unit="сек" value={state.pinchHoldSec} onChange={v=>setState(s=>({...s, pinchHoldSec:v}))} placeholder="20" step={1} />
+              <HubNum label="Сдавливание · Crush (аксель)" unit="сек" value={state.axleHoldSec} onChange={v=>setState(s=>({...s, axleHoldSec:v}))} placeholder="30" step={1} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Планка сек<br/><input value={state.corePlankSec} onChange={e=>setState(s=>({...s, corePlankSec:e.target.value}))} placeholder="120" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провал (medley >60с)" style={{ marginTop:16 }} />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Планка" unit="сек" value={state.corePlankSec} onChange={v=>setState(s=>({...s, corePlankSec:v}))} placeholder="120" step={5} />
+              <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провалена (медли дольше 60 сек)" />
             </div>
-            <div style={{ fontSize:12, color: gripFails>=2?'#ef4444':'#22c55e', marginTop:4 }}>Grip fails {gripFails}/3 (калибр {gripFailsCal}/3) {gripFails>=2?'— prehab hammer 3×12 + pinch 2×15': '— норма'} · axial {axialOverload?'перегруз ≥12 сетов+300м — QL suitcase 2×20м': 'норм'} · {axialQuant.text}</div>
-            <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>ACWR {acwr? `${acwr.ratio.toFixed(2)} ${acwr.zone}` : '—'} · conditioning как в strength-sport-conditioning (alactic 8×10с/50с)</div>
+            <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>Хват: провалы {gripFails}/3 (калибровка {gripFailsCal}/3) {gripFails>=2?'— профилактика: молот 3×12 + щипок 2×15': '— норма'} · осевая {axialOverload?'перегруз — чемодан 2×20 м': 'в норме'} · {axialQuant.text}</div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Нагрузка (ACWR) {acwr? `${acwr.ratio.toFixed(2)}` : '—'} · кондиция: рывки 8×10 сек/50 сек</div>
             {(() => {
               const sess = smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null });
               return (
@@ -1165,21 +1378,32 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })()}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:8 }}>
-              <HubPopupSelect label="Pinch-блок" value={state.pinchWidth} onChange={v=>setState(s=>({...s, pinchWidth:v}))} options={[{ id:'2in', label:'2″', desc:'норма 30с' }, { id:'3in', label:'3″', desc:'норма 20с' }, { id:'4in', label:'4″', desc:'норма 15с' }]} />
-              <HubPopupSelect label="CoC" value={state.cocLevel} onChange={v=>setState(s=>({...s, cocLevel:v}))} options={[{ id:'coc1', label:'CoC 1', desc:'норма 20с' }, { id:'coc1_5', label:'CoC 1.5', desc:'норма 30с' }, { id:'coc2', label:'CoC 2', desc:'норма 40с' }]} />
-              <HubPopupSelect label="FatGrip мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'axle' }, { id:'60', label:'60', desc:'толстый' }]} />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubPopupSelect label="Щипковый блок · Pinch" value={state.pinchWidth} onChange={v=>setState(s=>({...s, pinchWidth:v}))} options={[{ id:'2in', label:'2″', desc:'норма 30 сек' }, { id:'3in', label:'3″', desc:'норма 20 сек' }, { id:'4in', label:'4″', desc:'норма 15 сек' }]} />
+              <HubPopupSelect label="Кистевой эспандер · CoC" value={state.cocLevel} onChange={v=>setState(s=>({...s, cocLevel:v}))} options={[{ id:'coc1', label:'CoC 1', desc:'норма 20 сек' }, { id:'coc1_5', label:'CoC 1.5', desc:'норма 30 сек' }, { id:'coc2', label:'CoC 2', desc:'норма 40 сек' }]} />
+              <HubPopupSelect label="Толстый гриф · FatGrip, мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'аксель' }, { id:'60', label:'60', desc:'толстый' }]} />
             </div>
             <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Grip-профиль</button>
-              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>SBS r=0.40 — support/pinch/crush раздельно</span>
+              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Профиль хвата</button>
+              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Опора/щипок/сдавливание — раздельно</span>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Лог-hold сек<br/><input value={state.logHoldSec} onChange={e=>setState(s=>({...s, logHoldSec:e.target.value}))} placeholder="10" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Фермер-hold сек<br/><input value={state.farmersHoldSec} onChange={e=>setState(s=>({...s, farmersHoldSec:e.target.value}))} placeholder="60" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Axle DOH кг<br/><input value={state.axleDohKg} onChange={e=>setState(s=>({...s, axleDohKg:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Удержание лога" unit="сек" value={state.logHoldSec} onChange={v=>setState(s=>({...s, logHoldSec:v}))} placeholder="10" step={1} />
+              <HubNum label="Удержание фермера" unit="сек" value={state.farmersHoldSec} onChange={v=>setState(s=>({...s, farmersHoldSec:v}))} placeholder="60" step={5} />
+              <HubNum label="Аксель верхним хватом" unit="кг" value={state.axleDohKg} onChange={v=>setState(s=>({...s, axleDohKg:v}))} placeholder="140" step={2.5} />
             </div>
-            {holdDiag && <div style={{ fontSize:12, color: holdDiag.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
+            {holdDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
+            <HubToggle checked={state.bicepsHistory} onChange={v=>setState(s=>({...s, bicepsHistory:v}))} label="Травма бицепса в прошлом" style={{ marginTop:6 }} />
+            <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>
+              🦾 Риск бицепса {bicepsRisk.score}/100 ({bicepsRisk.level === 'high' ? 'высокий' : bicepsRisk.level === 'moderate' ? 'умеренный' : 'низкий'})
+              {bicepsRisk.gate ? ' · ГЕЙТ: только лямки/нейтраль' : ''} · {bicepsRisk.lines.slice(-1)[0]}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Геркулес удержание" unit="сек" value={state.herculesSec} onChange={v=>setState(s=>({...s, herculesSec:v}))} placeholder="40" step={5} />
+              <HubNum label="Геркулес вес" unit="кг/рука" value={state.herculesKg} onChange={v=>setState(s=>({...s, herculesKg:v}))} placeholder="160" step={5} />
+              <HubNum label="Падения в медли" unit="шт" value={state.medleyDrops} onChange={v=>setState(s=>({...s, medleyDrops:v}))} placeholder="0" step={1} />
+            </div>
+            {holdEventDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🏛 {holdEventDiag.lines.join(' · ')}</div>}
             {weakPoints.map(id=>{
               const bio = smBiomechForWeak(id);
               if (!bio || !['grip_support','core_brace','conditioning','farmers_grip'].includes(bio.weakPoint)) return null;
@@ -1190,125 +1414,130 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='mobility' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Мобильность — OHS 6 + асимметрия + sway</div>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Подвижность — присед над головой (OHS) 6 + асимметрия + качание</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:8 }}>
                             <HubToggle checked={state.ohsHeelsFlat} onChange={v=>setState(s=>({...s, ohsHeelsFlat:v}))} label="Пятки плоско" />
               <HubToggle checked={!state.ohsKneeValgus} onChange={v=>setState(s=>({...s, ohsKneeValgus:!v}))} label="Колени без вальгуса" />
               <HubToggle checked={state.ohsHipBelowParallel} onChange={v=>setState(s=>({...s, ohsHipBelowParallel:v}))} label="Таз ниже параллели" />
-              <HubToggle checked={state.ohsTrunkUpright} onChange={v=>setState(s=>({...s, ohsTrunkUpright:v}))} label="Корпус upright" />
+              <HubToggle checked={state.ohsTrunkUpright} onChange={v=>setState(s=>({...s, ohsTrunkUpright:v}))} label="Корпус вертикально" />
               <HubToggle checked={state.ohsArmsOverMidfoot} onChange={v=>setState(s=>({...s, ohsArmsOverMidfoot:v}))} label="Руки над стопой" />
               <HubToggle checked={state.ohsLumbarNeutral} onChange={v=>setState(s=>({...s, ohsLumbarNeutral:v}))} label="Нейтраль поясницы" />
             </div>
             <div style={{ padding:'12px 14px', borderRadius:14, background: ohs.level==='ok'?'rgba(34,197,94,0.08)': ohs.level==='warn'?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)', border:`1px solid ${ohs.level==='ok'?'rgba(34,197,94,0.18)': ohs.level==='warn'?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`, marginBottom:8 }}>
-              <div style={{ fontSize:14, fontWeight:800, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>OHS {ohs.totalScore}/6 {ohs.level.toUpperCase()} · fail {ohs.failed} {ohs.primaryDriver? `· драйвер ${ohs.primaryDriver}`:''}</div>
-              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{ohs.recommendation} {ohs.needsPhysio?'· нужен физио':''}</div>
-              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Нормы knee-to-wall ≥{OHS_NORMS.kneeToWallCm.optimal}см (cutoff {OHS_NORMS.kneeToWallCm.cutoff}), ankle {OHS_NORMS.ankleDeg.range}</div>
+              <div style={{ fontSize:14, fontWeight:800, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>Присед над головой (OHS) {ohs.totalScore}/6 {ohs.level==='ok'?'ОК':ohs.level==='warn'?'ВНИМАНИЕ':'КРИТ'} · провалы {ohs.failed} {ohs.primaryDriver? `· причина ${ohs.primaryDriver}`:''}</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{ohs.recommendation} {ohs.needsPhysio?'· нужен врач':''}</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Нормы колено-стена (Knee-to-wall) ≥{OHS_NORMS.kneeToWallCm.optimal} см (порог {OHS_NORMS.kneeToWallCm.cutoff}), голеностоп {OHS_NORMS.ankleDeg.range}</div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 OHS-снапшот</button>
+                <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот приседа (OHS)</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smOhsTrend && smOhsTrend.n >= 2 ? `тренд ${smOhsTrend.delta >= 0 ? '+' : ''}${smOhsTrend.delta} за ${smOhsTrend.n} зам.` : `история ${smOhsHist.length}/10`}</span>
               </div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⚖️ Пол атлета: {athleteSexLabel(athleteSex)}{athleteSex ? ' — нормы камня/йока по полу' : ' — укажи пол во вкладке Видео или в профиле'}</div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginBottom:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Knee-to-wall см<br/><input value={state.kneeToWallCm} onChange={e=>setState(s=>({...s, kneeToWallCm:e.target.value}))} placeholder="12" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Голеностоп °<br/><input value={state.ankleDeg} onChange={e=>setState(s=>({...s, ankleDeg:e.target.value}))} placeholder="35" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
+              <HubNum label="Колено-стена (Knee-to-wall)" unit="см" value={state.kneeToWallCm} onChange={v=>setState(s=>({...s, kneeToWallCm:v}))} placeholder="12" step={1} />
+              <HubNum label="Голеностоп" unit="°" value={state.ankleDeg} onChange={v=>setState(s=>({...s, ankleDeg:v}))} placeholder="35" step={1} />
             </div>
-            <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
-              <span style={{ fontSize:13, color:'#fff' }}>Heel-raise 2.5см</span>
-              <button onClick={()=>setState(s=>({...s, heelRetest:'better'}))} style={{ padding:'10px 16px', borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='better'?'#22c55e':'rgba(140,190,255,0.16)', background: state.heelRetest==='better'?'rgba(34,197,94,0.14)':'rgba(22,30,52,0.88)', color: state.heelRetest==='better'?'#22c55e':'#fff', fontSize:13 }}>Лучше</button>
-              <button onClick={()=>setState(s=>({...s, heelRetest:'same'}))} style={{ padding:'10px 16px', borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='same'?'#f59e0b':'rgba(140,190,255,0.16)', background: state.heelRetest==='same'?'rgba(245,158,11,0.14)':'rgba(22,30,52,0.88)', color: state.heelRetest==='same'?'#f59e0b':'#fff', fontSize:13 }}>Без изм</button>
-              <button onClick={()=>setState(s=>({...s, heelRetest:''}))} style={{ padding:'10px 16px', borderRadius:999, border:'1px solid rgba(140,190,255,0.16)', background:'rgba(22,30,52,0.88)', color:'#fff', fontSize:13 }}>Сброс</button>
+            <div style={{ display:'flex', gap:6, marginBottom:6, alignItems:'center', flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, color:'#fff' }}>Подъём пятки 2.5 см (heel-raise)</span>
+              <button onClick={()=>setState(s=>({...s, heelRetest:'better'}))} aria-pressed={state.heelRetest==='better'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='better'?'#22c55e':'rgba(140,190,255,0.16)', background: state.heelRetest==='better'?'rgba(34,197,94,0.14)':'rgba(22,30,52,0.88)', color: '#fff', fontSize:13, fontWeight:700 }}>Лучше</button>
+              <button onClick={()=>setState(s=>({...s, heelRetest:'same'}))} aria-pressed={state.heelRetest==='same'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='same'?'#f59e0b':'rgba(140,190,255,0.16)', background: state.heelRetest==='same'?'rgba(245,158,11,0.14)':'rgba(22,30,52,0.88)', color: '#fff', fontSize:13, fontWeight:700 }}>Без изм</button>
+              <button onClick={()=>setState(s=>({...s, heelRetest:''}))} aria-label="Сбросить тест пятки" style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid rgba(140,190,255,0.16)', background:'rgba(22,30,52,0.88)', color:'#fff', fontSize:13, fontWeight:700 }}>Сброс</button>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Левая макс кг<br/><input value={state.leftMax} onChange={e=>setState(s=>({...s, leftMax:e.target.value}))} placeholder="100" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Правая макс кг<br/><input value={state.rightMax} onChange={e=>setState(s=>({...s, rightMax:e.target.value}))} placeholder="102" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Левая макс" unit="кг" value={state.leftMax} onChange={v=>setState(s=>({...s, leftMax:v}))} placeholder="100" step={2.5} />
+              <HubNum label="Правая макс" unit="кг" value={state.rightMax} onChange={v=>setState(s=>({...s, rightMax:v}))} placeholder="102" step={2.5} />
             </div>
             {asymmetry && (
               <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background: asymmetry.isCrit?'rgba(239,68,68,0.08)': asymmetry.isAsym?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${asymmetry.isCrit?'rgba(239,68,68,0.2)': asymmetry.isAsym?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
-                <div style={{ fontSize:14, fontWeight:800, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'CRITICAL ≥12%': asymmetry.isAsym?'WARN ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker}`:''}</div>
+                <div style={{ fontSize:14, fontWeight:800, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'КРИТ ≥12%': asymmetry.isAsym?'ВНИМАНИЕ ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker === 'left' ? 'слева' : 'справа'}`:''}</div>
                 <div style={{ fontSize:12, color:'#fff' }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood). {gripAsymDiag ? gripAsymDiag.text : ''}</div>
-                <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Grip-снапшот L/R</button>
+                <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот хвата (лев/прав)</button>
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Рост см (антро)<br/><input value={state.anthroHeight} onChange={e=>setState(s=>({...s, anthroHeight:e.target.value}))} placeholder="182" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>Размах рук см<br/><input value={state.anthroArmSpan} onChange={e=>setState(s=>({...s, anthroArmSpan:e.target.value}))} placeholder="186" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Рост (антро)" unit="см" value={state.anthroHeight} onChange={v=>setState(s=>({...s, anthroHeight:v}))} placeholder="182" step={1} />
+              <HubNum label="Размах рук" unit="см" value={state.anthroArmSpan} onChange={v=>setState(s=>({...s, anthroArmSpan:v}))} placeholder="186" step={1} />
             </div>
             {anthroDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{anthroDiag.loadAdvice} {anthroDiag.pickupAdvice} (tacky ≈{anthroDiag.tackyHeightCm}см)</div>}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Sway см (lateral)<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="2.5" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Tacky (магния)" />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Качание боковое (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.5" step={0.5} />
+              <HubToggle checked={state.tackyUsed} onChange={v=>setState(s=>({...s, tackyUsed:v}))} label="Смола липкая (tacky)" />
             </div>
-            {swayDiag && <div style={{ fontSize:12, color: swayDiag.severity==='ok'?'#22c55e':'#ef4444', marginTop:4 }}>{swayDiag.text} · измеряй видео сбоку 30fps</div>}
+            {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · снимай видео сбоку 30 кадров/с</div>}
           </div>
         )}
 
         {tab==='video' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:10, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Видео — Kinovea sway + carry VBT</div>
-            <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>Полевая методика: телефон сбоку 30fps → Kinovea (free) → трек центра масс/йока → xLoop = sway. VBT carry: скорость ходьбы м/с.</div>
-            <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см (sway = xLoop)" style={{ width:'100%', height:80, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
-            <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleCsvParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📊 Разобрать Kinovea CSV → sway</button>
-              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Или введи sway/VBT вручную</span>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Видео — Кинова (Kinovea): качание (Sway) + скорость переноски (VBT)</div>
+            <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>Полевая методика: телефон сбоку 30 кадров/с → Кинова (Kinovea, бесплатно) → трек центра масс/йока → петля по горизонтали = качание. Скорость переноски: скорость ходьбы, м/с.</div>
+            <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Вставь файл Кинова (Kinovea CSV): время,x,y или t,x,y; x,y в см (качание = петля)" style={{ width:'100%', height:64, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
+            <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+              <button onClick={handleCsvParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📊 Разобрать Kinovea CSV → Sway (качание)</button>
+              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Или введи качание/скорость вручную</span>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:8 }}>
-              <label style={{ fontSize:13, color:'#fff' }}>Sway см<br/><input value={state.swayCm} onChange={e=>setState(s=>({...s, swayCm:e.target.value}))} placeholder="3.2" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>yMax см<br/><input value={state.stoneKg} onChange={e=>setState(s=>({...s, stoneKg:e.target.value}))} placeholder="85" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-              <label style={{ fontSize:13, color:'#fff' }}>VBT yoke м/с<br/><input value={state.vbtYokeLast} onChange={e=>setState(s=>({...s, vbtYokeLast:e.target.value}))} placeholder="1.25" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="3.2" step={0.5} />
+              <HubNum label="Высота подъёма (yMax)" unit="см" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="85" step={5} />
+              <HubNum label="VBT йок — скорость" unit="м/с" value={state.vbtYokeLast} onChange={v=>setState(s=>({...s, vbtYokeLast:v}))} placeholder="1.25" step={0.05} />
             </div>
-            {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>SRD sway 3/5см — {swayDiag.isReal?'реально >SRD':'в пределах шума'}</div></div>}
+            {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>Порог качания 3/5 см — {swayDiag.isReal?'реально выше порога':'в пределах шума'}</div></div>}
             {vbtLoss && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:12, color:'#fff' }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
             <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
             <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:6 }}>
-              <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Enode: raw {swayCm ?? '—'}см → {enodeCorrected ?? '—'}см (xLoop bias Chavda 2024)<br/><span style={{ fontSize:10, color:'#60a5fa' }}>raw {swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
+              <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Поправка Энода (Enode): было {swayCm ?? '—'} см → стало {enodeCorrected ?? '—'} см<br/><span style={{ fontSize:10, color:'#fff' }}>{swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
               <div style={{ padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
-            <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:12, color:'#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
+            <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:12, color:'#fff' }}>Поз-трекинг (заглушка BlazePose): таз {mockPose.angles.hip}° колено {mockPose.angles.knee}° голеностоп {mockPose.angles.ankle}° плечо {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'ОК (заглушка)'}</div>
             {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:14, fontWeight:800, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (Hindle-нормы)</summary>
+              <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (нормы)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
-              <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Трекер поз → экспорт CSV (t,hip,knee,ankle,shoulder) → вставь ниже. Йок: hip ROM [30,46] / knee [43,65]; лог: shoulder ≥150°.</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Трекер поз → выгрузка таблицы (время,таз,колено,голеностоп,плечо) → вставь ниже. Йок: таз 30–46° / колено 43–65°; лог: плечо ≥150°.</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
-                <HubPopupSelect label="Лифт" value={state.poseLift} onChange={v=>setState(s=>({...s, poseLift:v}))} options={[{ id:'yoke_walk', label:'Yoke' }, { id:'farmers_walk', label:'Farmers' }, { id:'log_press', label:'Log' }]} />
+                <HubPopupSelect label="Снаряд (углы)" value={state.poseLift} onChange={v=>setState(s=>({...s, poseLift:v}))} options={[{ id:'yoke_walk', label:'Йок (Yoke)' }, { id:'farmers_walk', label:'Фермер (Farmers)' }, { id:'log_press', label:'Лог (Log)' }]} />
                 <HubPopupSelect label="Пол" value={state.poseSex} onChange={v=>setState(s=>({...s, poseSex:v as '' | 'male' | 'female'}))} options={[{ id:'', label:'Не указан' }, { id:'male', label:'Мужской' }, { id:'female', label:'Женский' }]} />
-                <div style={{ display:'flex', alignItems:'flex-end' }}><button onClick={handlePoseParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🦿 Разобрать углы</button></div>
+                <div style={{ display:'flex', alignItems:'flex-end', gap:6, flexWrap:'wrap' }}>
+                  <button onClick={handlePoseParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🦿 Разобрать углы</button>
+                  <button onClick={handleAutoAngles} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📐 Авто-углы (ROM)</button>
+                </div>
               </div>
-              <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'t,hip,knee,ankle,shoulder\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
-              {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color: poseResult.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>n={poseResult.n} · {poseResult.verdict.toUpperCase()} · {poseResult.lines.join(' · ')}</div>}
+              <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'время,таз,колено,голеностоп,плечо\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
+              {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color: '#fff' }}>n={poseResult.n} · {ruVerdict(poseResult.verdict)} · {poseResult.lines.join(' · ')}</div>}
+              {autoAngles && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color: '#fff' }}>📐 {ruVerdict(autoAngles.verdict)} · {autoAngles.lines.join(' · ')}</div>}
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={checkPoseLive} style={{ padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>📷 Live-проверка модели</button>
-                {state.poseLive === 'loading' && <span style={{ fontSize: 12, color: '#fff' }}>проверяем CDN…</span>}
-                {state.poseLive === 'ok' && <span style={{ fontSize: 12, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
-                {state.poseLive === 'fail' && <span style={{ fontSize: 12, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
+                <button onClick={checkPoseLive} style={{ padding:'12px 16px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>📷 Живая проверка модели</button>
+                {state.poseLive === 'loading' && <span style={{ fontSize: 12, color: '#fff' }}>проверяем сеть…</span>}
+                {state.poseLive === 'ok' && <span style={{ fontSize: 12, color: '#fff' }}>✓ модель доступна — живые углы следующим шагом</span>}
+                {state.poseLive === 'fail' && <span style={{ fontSize: 12, color: '#fff' }}>✕ нет сети — работай через таблицу выше</span>}
               </div>
               </div>
             </details>
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
-              <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📈 LVP-калибровка SM (ramp → r²≥0.85)</summary>
+              <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>📈 Калибровка скорость-нагрузка (рампа → r²≥0.85)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-                <HubPopupSelect label="Лифт" value={state.lvpLift} onChange={v=>setState(s=>({...s, lvpLift:v}))} options={[{ id:'yoke_walk', label:'Yoke' }, { id:'farmers_walk', label:'Farmers' }, { id:'stone_load', label:'Stone' }, { id:'log_press', label:'Log' }]} />
-                <label style={{ fontSize:13, color:'#fff' }}>50% м/с<br/><input value={state.lvp50} onChange={e=>setState(s=>({...s, lvp50:e.target.value}))} placeholder="1.90" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>65% м/с<br/><input value={state.lvp65} onChange={e=>setState(s=>({...s, lvp65:e.target.value}))} placeholder="1.60" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>75% м/с<br/><input value={state.lvp75} onChange={e=>setState(s=>({...s, lvp75:e.target.value}))} placeholder="1.40" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>90% м/с<br/><input value={state.lvp90} onChange={e=>setState(s=>({...s, lvp90:e.target.value}))} placeholder="1.10" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+                <HubPopupSelect label="Снаряд (профиль скорость-нагрузка)" value={state.lvpLift} onChange={v=>setState(s=>({...s, lvpLift:v}))} options={[{ id:'yoke_walk', label:'Йок (Yoke)' }, { id:'farmers_walk', label:'Фермер (Farmers)' }, { id:'stone_load', label:'Камень (Stone)' }, { id:'log_press', label:'Лог (Log)' }]} />
+                <HubNum label="Скорость 50%" unit="м/с" value={state.lvp50} onChange={v=>setState(s=>({...s, lvp50:v}))} placeholder="1.90" step={0.05} />
+                <HubNum label="Скорость 65%" unit="м/с" value={state.lvp65} onChange={v=>setState(s=>({...s, lvp65:v}))} placeholder="1.60" step={0.05} />
+                <HubNum label="Скорость 75%" unit="м/с" value={state.lvp75} onChange={v=>setState(s=>({...s, lvp75:v}))} placeholder="1.40" step={0.05} />
+                <HubNum label="Скорость 90%" unit="м/с" value={state.lvp90} onChange={v=>setState(s=>({...s, lvp90:v}))} placeholder="1.10" step={0.05} />
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
                 <button onClick={handleLvpFit} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📈 Fit LVP</button>
-                <span style={{ fontSize:12, color:'#fff' }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'ramp 50/65/75/90 → r²≥0.85')}</span>
+                <span style={{ fontSize:12, color:'#fff' }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'рампа 50/65/75/90 → r²≥0.85')}</span>
               </div>
               </div>
             </details>
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📊 Прогресс стронга (йок / фермер / лог / лестница)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-                <label style={{ fontSize:13, color:'#fff' }}>Йок 20м с<br/><input value={state.progYoke20m} onChange={e=>setState(s=>({...s, progYoke20m:e.target.value}))} placeholder="12.0" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Фермер 40м с<br/><input value={state.progFarmers40m} onChange={e=>setState(s=>({...s, progFarmers40m:e.target.value}))} placeholder="28.0" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Лог кг<br/><input value={state.progLogMax} onChange={e=>setState(s=>({...s, progLogMax:e.target.value}))} placeholder="110" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Лестница кг<br/><input value={state.progStoneLadder} onChange={e=>setState(s=>({...s, progStoneLadder:e.target.value}))} placeholder="140" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-                <label style={{ fontSize:13, color:'#fff' }}>Вес кг<br/><input value={state.progBw} onChange={e=>setState(s=>({...s, progBw:e.target.value}))} placeholder="105" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+                <HubNum label="Йок 20 м" unit="сек" value={state.progYoke20m} onChange={v=>setState(s=>({...s, progYoke20m:v}))} placeholder="12.0" step={0.5} />
+                <HubNum label="Фермер 40 м" unit="сек" value={state.progFarmers40m} onChange={v=>setState(s=>({...s, progFarmers40m:v}))} placeholder="28.0" step={0.5} />
+                <HubNum label="Лог макс" unit="кг" value={state.progLogMax} onChange={v=>setState(s=>({...s, progLogMax:v}))} placeholder="110" step={2.5} />
+                <HubNum label="Лестница камней" unit="кг" value={state.progStoneLadder} onChange={v=>setState(s=>({...s, progStoneLadder:v}))} placeholder="140" step={2.5} />
+                <HubNum label="Вес тела" unit="кг" value={state.progBw} onChange={v=>setState(s=>({...s, progBw:v}))} placeholder="105" step={1} />
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
                 <button onClick={handleSaveProgress} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Снапшот прогресса</button>
@@ -1316,39 +1545,47 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
               </div>
             </details>
-            <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
-              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео sway — измеряй lateral как max(x)-min(x) в Kinovea</div>
-              <div style={{ marginTop:6, width:'100%', height:60, background:'rgba(255,255,255,0.03)', borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, border:'1px solid rgba(255,255,255,0.04)' }}>preview — sway 3см норма, &gt;5см критично (McGill lateral bend)</div>
+            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
+              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео качания — измеряй боковое как макс(x)−мин(x) в Кинова (Kinovea)</div>
+              <div style={{ marginTop:6, width:'100%', minHeight:52, background:'rgba(255,255,255,0.03)', borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, border:'1px solid rgba(255,255,255,0.04)' }}>Качание (Sway) 3 см — норма, больше 5 см — крит (McGill)</div>
             </div>
           </div>
         )}
       </div>
 
-      <div style={{ ...CARD, padding: 14, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
-        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:8 }}>📋 Итог и применение</div>
-        <details style={{ marginBottom:10, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
-          <summary style={{ padding:'13px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>Сводка расчёта — findings, ранжир, спец-блок</summary>
+      <div style={{ ...CARD, padding: 10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6 }}>📋 Итог и применение</div>
+        <details style={{ marginBottom:6, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
+          <summary style={{ padding:'12px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — находки, ранжир, спец-блок</summary>
           <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>
-        <div style={{ fontSize:12, color:'#fff' }}>Findings: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
-        {scoring.floors.length>0 && <div style={{ fontSize:12, color:'#ef4444' }}>Floors: {scoring.floors.join(' · ')}</div>}
+        <div style={{ fontSize:12, color:'#fff' }}>Находки: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
+        {scoring.floors.length>0 && <div style={{ fontSize:12, color:'#fff' }}>Пороги: {scoring.floors.join(' · ')}</div>}
         <div style={{ fontSize:13, color:'#fff' }}>Выбрано: {weakPoints.length? weakPoints.join(' · ') : '— баланс'} {smWeakPoints.length? `→ ${smWeakPoints.join(' · ')}` : ''}</div>
-        {smRankTop.length > 0 && <div style={{ fontSize:12, color:'#5ee' }}>Ранжир: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}% (score ${c.score})`).join(' · ')}</div>}
+        {smRankTop.length > 0 && <div style={{ fontSize:12, color:'#fff' }}>Ранжир: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%`).join(' · ')}</div>}
         {smSpec && <div style={{ fontSize:12, color:'#fff' }}>Спец-блок {smSpec.totalWeeks}нед: {smSpec.weeks.slice(0, 3).map((w) => `нед${w.week} ${Object.values(w.targetSets)[0]}×5`).join(' · ')}… · {smSpec.rationale[0]}</div>}
+        {logDiamCls && <div style={{ fontSize:12, color:'#fff' }}>Диаметр: {logDiameterNote(logDiamCm)}{scaledLogAttempts ? ` → ${scaledLogAttempts.opener}/${scaledLogAttempts.second}/${scaledLogAttempts.third} кг` : ''}</div>}
+        <div style={{ fontSize:12, color:'#fff' }}>Пол: {athleteSexLabel(athleteSex)}{sexStonePull ? ` · ${sexStonePull.lines.join(' · ')}` : ''}</div>
+        {stonePhase && <div style={{ fontSize:12, color:'#fff' }}>Фазы камня: {stonePhase.lines.join(' · ')}</div>}
+        {carrySplitDiag && <div style={{ fontSize:12, color:'#fff' }}>Отрезки: {carrySplitDiag.lines.join(' · ')}</div>}
+        <div style={{ fontSize:12, color:'#fff' }}>Бицепс: {bicepsRisk.score}/100 ({bicepsRisk.level === 'high' ? 'высокий' : bicepsRisk.level === 'moderate' ? 'умеренный' : 'низкий'}){bicepsRisk.gate ? ' · ГЕЙТ: только лямки/нейтраль' : ''}</div>
+        {holdEventDiag && <div style={{ fontSize:12, color:'#fff' }}>Ивент-холд: {holdEventDiag.lines.join(' · ')}</div>}
+        {formatPlan && <div style={{ fontSize:12, color:'#fff' }}>Формат ({SM_EVENT_FORMAT_LABEL[state.eventFormat]}): {formatPlan.lines.join(' · ')}</div>}
+        {autoAngles && <div style={{ fontSize:12, color:'#fff' }}>Авто-углы: {autoAngles.lines.join(' · ')}</div>}
           </div>
         </details>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:6, marginBottom:8 }}>
-          <label style={{ fontSize:13, color:'#fff' }}>Спец-блок нед (4-8)<br/><input value={state.specWeeks} onChange={e=>setState(s=>({...s, specWeeks:e.target.value}))} placeholder="6" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
-          <label style={{ fontSize:13, color:'#fff' }}>Год: старт-неделя<br/><input value={state.annualStartWeek} onChange={e=>setState(s=>({...s, annualStartWeek:e.target.value}))} placeholder="1" style={{ width:'100%', marginTop:4, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 12px', fontSize:14 }} /></label>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
+          <HubNum label="Спец-блок" unit="нед (4–8)" value={state.specWeeks} onChange={v=>setState(s=>({...s, specWeeks:v}))} placeholder="6" step={1} />
+          <HubNum label="Год: старт-неделя" unit="нед" value={state.annualStartWeek} onChange={v=>setState(s=>({...s, annualStartWeek:v}))} placeholder="1" step={1} />
         </div>
         <button onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
-        <div style={{ display:'flex', gap:8, marginTop:10 }}>
-          <button onClick={handleExport} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🖨 HTML</button>
-          <button onClick={handleExportCsv} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📥 CSV</button>
-          <button onClick={handleExportIcs} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📅 ICS</button>
-          <button onClick={handleSaveAnnual} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🗓 Год</button>
-          <button onClick={handleSMBackup} style={{ flex:1, padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📦 Бэкап</button>
+        <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+          <button onClick={handleExport} aria-label="Печать отчёта (HTML)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🖨 Печать (HTML)</button>
+          <button onClick={handleExportCsv} aria-label="Выгрузить таблицу (CSV)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📥 Выгрузка (CSV)</button>
+          <button onClick={handleExportIcs} aria-label="Календарь спец-блока (ICS)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📅 Календарь (ICS)</button>
+          <button onClick={handleSaveAnnual} aria-label="Отправить в годовой план" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🗓 В годовой план</button>
+          <button onClick={handleSMBackup} aria-label="Скачать резервную копию" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📦 Резервная копия</button>
         </div>
-        <div style={{ fontSize:12, color:'#fff', marginTop:8 }}>SM-storage: {(smStoreBytes.total / 1024).toFixed(1)}КБ · quota-safe (истории урезаются при переполнении, чужие ключи не трогаем)</div>
+        <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Хранилище: {(smStoreBytes.total / 1024).toFixed(1)} КБ · защита от переполнения (истории урезаются, чужие ключи не трогаем)</div>
       </div>
 
       <div style={{ position:'sticky', bottom:0, zIndex:20, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'0 -12px -22px', background:'rgba(9,18,34,0.88)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>

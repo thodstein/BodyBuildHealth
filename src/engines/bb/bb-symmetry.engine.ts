@@ -196,16 +196,38 @@ export function symmetryTriadDeviation(meas: { neck?: number | null; bicep?: num
 }
 
 /** Female-ориентиры: талия/бёдра ~0.7, акцент glute/thigh (health+aesthetics, не жёсткий floor). */
-export function femaleSymmetryNotes(meas: { waist?: number | null; hips?: number | null; thigh?: number | null }): string[] {
+export function femaleSymmetryNotes(
+  meas: { waist?: number | null; hips?: number | null; thigh?: number | null },
+  opts?: { cyclePhase?: '' | 'follicular' | 'luteal' | 'any' },
+): string[] {
   const out: string[] = [];
   const w = Number(meas.waist);
   const h = Number(meas.hips);
   if (Number.isFinite(w) && Number.isFinite(h) && h > 0) {
     const r = w / h;
-    if (r > 0.8) out.push(`Талия/бёдра ${r.toFixed(2)} > 0.80 — акцент glute + дефицит мягкий`);
+    if (r > 0.8) out.push(`Талия/бёдра ${r.toFixed(2)} > 0.80 — акцент ягодицы + мягкий дефицит`);
+    else if (r >= 0.65 && r <= 0.8) out.push(`Талия/бёдра ${r.toFixed(2)} — коридор нормы (0.65–0.80), держим курс`);
     else if (r < 0.6) out.push(`Талия/бёдра ${r.toFixed(2)} < 0.60 — держим верх (спина/дельты) для баланса`);
+    else out.push(`Талия/бёдра ${r.toFixed(2)} — погранично, смотрим бедро и фазу цикла`);
+  }
+  const thigh = Number(meas.thigh);
+  if (Number.isFinite(thigh) && Number.isFinite(h) && h > 0 && thigh > 0) {
+    const tr = thigh / h;
+    if (tr < 0.3) out.push(`Бедро/бёдра ${tr.toFixed(2)} < 0.30 — бедру нужен объём (присед/выпады)`);
+  }
+  if (opts?.cyclePhase === 'luteal') {
+    out.push('Лютеиновая фаза: +0.5–1 кг воды — норма, замеры сравниваем по среднему за 7 дней');
   }
   return out;
+}
+
+/** Teen-гейт 14–15: подросткам — техника и умеренность, без отказа и максимумов. */
+export function teenTrainingNote(age?: number | null): string | null {
+  const a = Number(age);
+  if (!Number.isFinite(a) || a <= 0) return null;
+  if (a < 14) return 'Возраст до 14 — только ОФП с тренером, штанга ни к чему';
+  if (a <= 15) return '14–15 лет: техника без отказа, штанга 50–70%, максимумы запрещены';
+  return null;
 }
 
 /** Снимок замеров для трекинга («перепроверка через 4 нед»). Чистые функции — IO в хабе. */
