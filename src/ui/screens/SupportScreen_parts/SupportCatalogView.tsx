@@ -86,9 +86,9 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                    <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                    <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                  </div>
-                                 {isSelected && sub && (
-                                  <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                  {isSelected && sub && (
+                                   <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                     {!!sub.description && <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>}
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
                                        {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
                                      </div>
@@ -144,8 +144,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
                                     {isSelected && (
-                                      <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>
+                                       <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                         {!!sub.description && <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>}
                                         {(sub.mechanisms||[]).length > 0 && (
                                           <div style={{ marginBottom:3 }}>
                                             <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
@@ -288,9 +288,9 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                         <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                          <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                        </div>
-                                       {selectedSub === sub?.id && sub && (
-                                         <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                        {selectedSub === sub?.id && sub && (
+                                          <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                            {!!sub.description && <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>}
                                           <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
                                            {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
                                            </div>
@@ -352,8 +352,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
                                   {selectedSub === sub?.id && sub && (
-                                    <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                     <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                       {!!sub.description && <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>}
                                       <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
                                          {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
                                        </div>

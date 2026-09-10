@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import { readSupportStacks } from '../../../engines/stack-storage';
-import { ALL_INTERACTIONS } from '../../../data/support-database';
+import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
 import { readFavRecommendations, deleteFavRecommendation, queueMixToSupportPlan } from '../../../engines/training-plan-save.engine';
@@ -259,7 +259,12 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             const getInfo = (id: string) => {
               const sub = catalogSubstances.find((s:any) => s.id === id);
               const d = dosages[id];
-              return { id, name: sub?.name || id.replace(/_/g, ' '), mg: d?.mg ?? 0, timing: d?.timing || '', desc: sub?.description || '' };
+              // Движок не всегда отдаёт дозу (режим/уровень без расчёта) — честный
+              // фолбэк на каталожную дозировку вместо прочерка «—».
+              const catDose = (SUPPORT_CATALOG_DATA as any)?.[id]?.dosage;
+              const mg = (d?.mg ?? 0) || catDose?.mg || 0;
+              const timing = d?.timing || catDose?.timing || '';
+              return { id, name: sub?.name || id.replace(/_/g, ' '), mg, timing, desc: sub?.description || '' };
             };
             return (
               <>
@@ -339,12 +344,15 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           // может не быть в каталоге — тогда честные фолбэки, а не пропуск.
                           const sub = catalogSubstances.find((s:any) => s.id === id);
                           const d = dosages[id];
-                          const dispDose = d?.mg
-                            ? (d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`)
+                          const catDose = (SUPPORT_CATALOG_DATA as any)?.[id]?.dosage;
+                          const effMg = d?.mg || catDose?.mg || 0;
+                          const effTiming = d?.timing || catDose?.timing || '';
+                          const dispDose = effMg
+                            ? (effMg >= 1000 && id !== 'omega3' ? `${(effMg/1000).toFixed(effMg%1000===0?0:1)}г` : `${effMg}мг`)
                             : '—';
                           return (
                             <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                              <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
+                              <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{effTiming || '—'}</td>
                               <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
                               <td style={{ padding:'3px 5px', color:'#00e68a' }}>{dispDose}</td>
                             </tr>
@@ -445,11 +453,14 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                                 {planSubs.map((id: string) => {
                                   const sub = catalogSubstances.find((s: any) => s.id === id);
                                   const d = planDosages[id];
+                                  const catDose = (SUPPORT_CATALOG_DATA as any)?.[id]?.dosage;
+                                  const mg = d?.mg || catDose?.mg || 0;
+                                  const timing = d?.timing || catDose?.timing || '';
                                   return (
                                     <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
                                       <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
-                                      <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d?.mg ? `${d.mg}мг` : '—'}</td>
-                                      <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
+                                      <td style={{ padding:'3px 5px', color:'#00e68a' }}>{mg ? `${mg}мг` : '—'}</td>
+                                      <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{timing || '—'}</td>
                                     </tr>
                                   );
                                 })}

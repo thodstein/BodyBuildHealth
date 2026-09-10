@@ -1441,6 +1441,25 @@
   min-width: 0 !important;
   flex: 1 1 140px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §30. ПРОБЕЛЫ ВНИЗУ — убираем тройной мёртвый скролл.
+ * Корень уже чистит обе панели (56 суббар + 68 навбар + 16 зазор + safe):
+ * внутренние 70-150px сверху давали до 290px пустоты. Оставляем 24px воздуха.
+ * Только подача.
+ * ═══════════════════════════════════════════════════════════════════ */
+.support-screen.support-root [data-sup='content'] {
+  padding-bottom: 24px !important;
+}
+.support-screen.support-root .sup-diary {
+  padding-bottom: 24px !important;
+}
+.support-screen.support-root [style*='tabbar-clear'] {
+  padding-bottom: 24px !important;
+}
+.support-screen.support-root .sup-pepcalc {
+  min-height: 0 !important;
+}
 .support-screen.support-root .sup-weekplan [style*='font-size: 5'] {
   font-size: 8px !important;
   line-height: 1.3 !important;
