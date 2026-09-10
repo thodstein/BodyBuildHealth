@@ -117,18 +117,19 @@ export function useStrengthSportWizard() {
       }
       // Стратегия попыток из хаба (раньше молча терялась — всегда был 'balanced')
       if (p.strategy) setContestStrategy(p.strategy);
+      // VBT/sway/уровень живут вне гейта слабых: иначе VBT-only пакеты молча умирали.
+      if (p.diagnosticLevel) setDiagnosticLevel(p.diagnosticLevel);
+      // VBT history from SM hub — в отдельный стейт (формат {liftId:[точки]},
+      // в vbtMap нельзя: там ключи week-day-ex-set, build() такое отбрасывает)
+      if (Object.keys(p.hubVelocity).length > 0) {
+        try { setHubVelocity(prev => ({ ...prev, ...p.hubVelocity })); } catch {}
+      }
+      if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
+      // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
+      if (p.swayCm != null) setSwayCmBridge(p.swayCm);
       if (Array.isArray(p.weakPoints) && p.weakPoints.length > 0) {
         setWeakPoints(p.weakPoints);
-        if (p.diagnosticLevel) setDiagnosticLevel(p.diagnosticLevel);
         if (p.mode) setMode(p.mode as any);
-        // VBT history from SM hub — в отдельный стейт (формат {liftId:[точки]},
-        // в vbtMap нельзя: там ключи week-day-ex-set, build() такое отбрасывает)
-        if (Object.keys(p.hubVelocity).length > 0) {
-          try { setHubVelocity(prev => ({ ...prev, ...p.hubVelocity })); } catch {}
-        }
-        if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
-        // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
-        if (p.swayCm != null) setSwayCmBridge(p.swayCm);
       }
     };
     try {

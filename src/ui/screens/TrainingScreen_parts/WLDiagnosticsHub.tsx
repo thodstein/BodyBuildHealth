@@ -842,6 +842,12 @@ export const WLDiagnosticsHub: React.FC = () => {
         wlWeakPoints: weakPoints,
         barPath: state.barPath,
         vbt: state.vbtVel || state.vbtBest,
+        // VBT для ТА-конструктора числами (строка vbt выше — legacy, не убирать):
+        // скаляр режет объём/RIR, история {all:[best,last]} идёт в EWMA-гейты билда.
+        ...(vbtLoss && vbtLoss.lossPct > 0 ? { velocityLossPct: vbtLoss.lossPct } : {}),
+        ...(parseFloat(state.vbtBest) > 0 && parseFloat(state.vbtLast) > 0
+          ? { velocityHistory: { all: [parseFloat(state.vbtBest), parseFloat(state.vbtLast)] } }
+          : {}),
         score, level, verification: scoring.verification,
         biomech: biomechDetails,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },

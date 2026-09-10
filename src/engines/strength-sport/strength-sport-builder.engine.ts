@@ -26,7 +26,7 @@ import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-at
 import { buildWLMeetPlan } from './strength-sport-attempts.engine';
 import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER, taperForWLWeekFromEnd, taperForWeekFromEnd, buildTaperRationale, isAutoDeloadWeek, autoDeloadWeeks } from './strength-sport-taper.engine';
 import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
-import { VBT_SS_THRESHOLDS, velocityWeightAdjustFactor, vbtEwma, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
+import { VBT_SS_THRESHOLDS, velocityWeightAdjustFactor, vbtEwma, diagnoseVelocityLossEwma, vbtHistoryForLift } from './strength-sport-vbt.engine';
 import { POOL_BY_TAG, OLY_IDS, STRONG_IDS, isOly, isStrong, STRONG_FALLBACK, filterPool, gentleFactor } from './strength-sport-pool.engine';
 import { hrvReport } from './strength-sport-hrv.engine';
 import { carryPhysics, dynamicCarryDistance } from './strength-sport-carry-physics.engine';
@@ -193,7 +193,8 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   const vHist = (input as any).velocityHistory as Record<string, number[]> | undefined;
   let histLoss = 0;
   if (vHist) {
-    const hist = vHist[id] || vHist[id.toLowerCase()] || (vHist as any)['all'];
+    // per-lift ключи (`clean`/`squat`) маппятся на id плана (`clean_and_jerk`/`back_squat`) через vbtHistoryForLift
+    const hist = vbtHistoryForLift(vHist, id);
     if (Array.isArray(hist) && hist.length >= 2) {
       const best = Math.max(...hist);
       const last = hist[hist.length - 1];
@@ -240,7 +241,7 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     let ewmaLoss: number | null = null;
     try {
       const vHist2 = (input as any).velocityHistory as Record<string, number[]> | undefined;
-      const hArr = vHist2 ? (vHist2[id] || vHist2[String(id).toLowerCase()]) : null;
+      const hArr = vbtHistoryForLift(vHist2, id);
       if (Array.isArray(hArr) && hArr.length >= 2) {
         const diag = diagnoseVelocityLossEwma(hArr, histThreshLow as any);
         if (diag && diag.lossPct > 0) ewmaLoss = diag.lossPct;
@@ -1039,7 +1040,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   // S-1: WL attempts 6 — если есть ПМ рывка и толчка
   let wlMeetPlan: any = null;
   if (mode === 'weightlifting' && (input.workMax as any)?.snatch && (input.workMax as any)?.cleanJerk) {
-    try { wlMeetPlan = buildWLMeetPlan((input.workMax as any).snatch, (input.workMax as any).cleanJerk, 'balanced', { bodyweight: input.bodyweight as any, sex: input.sex as any, age: input.age as any }); } catch {}
+    try { wlMeetPlan = buildWLMeetPlan((input.workMax as any).snatch, (input.workMax as any).cleanJerk, ((input as any).contestStrategy as any) || 'balanced', { bodyweight: input.bodyweight as any, sex: input.sex as any, age: input.age as any }); } catch {}
     if (wlMeetPlan) snap.wlMeetPlan = wlMeetPlan;
   }
   const plan: StrengthSportPlan = {

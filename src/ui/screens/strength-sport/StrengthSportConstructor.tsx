@@ -176,7 +176,8 @@ export const StrengthSportConstructor: React.FC = () => {
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
       weakPoints: weakPoints.length ? weakPoints : undefined,
       contest: mode==='strongman' ? contest : undefined,
-      contestStrategy: mode==='strongman' ? contestStrategy : undefined,
+      // Стратегия попыток действует и на ТА-раскладку (раньше WL всегда считал 'balanced')
+      contestStrategy: contestStrategy || undefined,
       diagnosticLevel: (diagnosticLevel as any) || undefined,
       cycleId: cycleId || undefined,
       cycleMode: cycleId ? cycleMode : undefined,
@@ -185,7 +186,20 @@ export const StrengthSportConstructor: React.FC = () => {
     } as any;
     try {
       const prev = loadStrengthSportPlans()[0];
-      if (prev) input = applyMesocycleProgression(prev, input) as any;
+      // Идемпотентность пересборки: повторный клик с теми же параметрами
+      // НЕ должен снова накручивать ПМ (+2% за клик, кумулятивно). Хэш входа
+      // до прогрессии стабилен между одинаковыми сборками; смена любого
+      // параметра — новый мезоцикл, прогрессия применяется один раз.
+      const progHash = JSON.stringify({ mode, goal, level, weeks, days, workMax, focus, methodology, dupMode, intensityTech, equipment, injuries, mobility, sex, bodyweight, age, competitionDate, patternId, cycleId, cycleMode, weakPoints, contestStrategy });
+      const lastHash = (() => { try { return localStorage.getItem('he_ss_prog_hash_v1'); } catch { return null; } })();
+      if (prev && lastHash !== progHash) {
+        input = applyMesocycleProgression(prev, input) as any;
+      } else if (prev) {
+        (input as any).previousPlanId = prev.id;
+      }
+      // Хэш пишем при КАЖДОЙ сборке (а не только с прогрессией): иначе первая
+      // сборка без prev ничего не запоминала и вторая идентичная снова прогрессировала.
+      try { localStorage.setItem('he_ss_prog_hash_v1', progHash); } catch {}
     } catch {}
     // Интернет-цикл (ss-cycles): дословный faithful по умолчанию, иначе параметрический билдер
     let p: StrengthSportPlan;

@@ -80,6 +80,12 @@ describe('parseSmBridgePayload', () => {
     expect(p.hubVelocity).toEqual({ yoke_walk: [1.5] });
   });
 
+  it('пустые массивы зон режим не переключают', () => {
+    expect(parseSmBridgePayload({ smWeakPoints: [] }).mode).toBeNull();
+    expect(parseSmBridgePayload({ wlWeakPoints: [] }).mode).toBeNull();
+    expect(parseSmBridgePayload({ smWeakPoints: ['farmers_grip'] }).mode).toBe('strongman');
+  });
+
   it('vbtLossPct — фолбэк при битом velocityLossPct; оба битые → null', () => {
     expect(parseSmBridgePayload({ velocityLossPct: 'мусор', vbtLossPct: 12 }).velocityLossPct).toBe(12);
     expect(parseSmBridgePayload({ velocityLossPct: 'мусор' }).velocityLossPct).toBeNull();

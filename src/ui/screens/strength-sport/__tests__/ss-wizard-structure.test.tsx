@@ -99,6 +99,21 @@ describe('SS wizard structure (combat-style, 7 steps)', () => {
     expect(document.body.textContent).toContain('Пресет контеста');
   });
 
+  it('пересборка теми же параметрами не накручивает ПМ', async () => {
+    render(<StrengthSportConstructor />);
+    goToSplit();
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await screen.findByText('Сводка плана', {}, { timeout: 8000 });
+    const wm1 = JSON.parse(localStorage.getItem('he_strength_sport_plan_v1') || '{}').inputSnapshot?.workMax;
+    expect(wm1).toBeTruthy();
+    clickStepPill(3);
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await screen.findByText('Сводка плана', {}, { timeout: 8000 });
+    const wm2 = JSON.parse(localStorage.getItem('he_strength_sport_plan_v1') || '{}').inputSnapshot?.workMax;
+    // Без хэш-гарда второй клик давал бы +2% поверх (храповик мезоцикла)
+    expect(wm2).toEqual(wm1);
+  }, 20000);
+
   it('выдача: сборка ведёт на план, экспорт доступен', async () => {
     render(<StrengthSportConstructor />);
     goToSplit();

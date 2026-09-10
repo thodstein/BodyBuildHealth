@@ -59,10 +59,12 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   // но с валидацией events-массива.
   const rawContest = validContest(d.contest) ? d.contest : validContest(d.smContest) ? d.smContest : null;
   const hasContest = rawContest != null;
-  // Паритет со старым intake: truthy-массив (даже пустой) уже переключал режим.
-  const mode: SmBridgeMode | null = hasContest || d.smWeakPoints
+  // Пустой массив режим не переключает (раньше truthy-[] давал strongman из ничего).
+  const hasSmWp = Array.isArray(d.smWeakPoints) && d.smWeakPoints.length > 0;
+  const hasWlWp = Array.isArray(d.wlWeakPoints) && d.wlWeakPoints.length > 0;
+  const mode: SmBridgeMode | null = hasContest || hasSmWp
     ? 'strongman'
-    : d.wlWeakPoints
+    : hasWlWp
       ? 'weightlifting'
       : null;
   const diagnosticLevel =

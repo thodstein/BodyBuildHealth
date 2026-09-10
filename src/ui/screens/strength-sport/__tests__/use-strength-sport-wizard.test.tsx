@@ -84,6 +84,28 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.weakPoints.length).toBeGreaterThan(0);
   });
 
+  it('мост VBT-only без слабых: скорость и sway доходят до стейта', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          velocityLossPct: 22,
+          velocityHistory: { snatch: [1.6, 1.2] },
+          swayCm: 3.5,
+          level: 'warn',
+        } as any,
+      });
+    });
+    expect(result.current.velocityLoss).toBe(22);
+    expect(result.current.hubVelocity).toEqual({ snatch: [1.6, 1.2] });
+    expect(result.current.swayCmBridge).toBe(3.5);
+    expect(result.current.diagnosticLevel).toBe('warn');
+    expect(result.current.weakPoints).toEqual([]);
+    expect(result.current.mode).toBe('weightlifting');
+  });
+
   it('персист: cycleId/cycleMode переживают перемонтирование', () => {
     const h1 = renderHook(() => useStrengthSportWizard());
     act(() => { h1.result.current.setCycleId('ss-ta-general-8'); });

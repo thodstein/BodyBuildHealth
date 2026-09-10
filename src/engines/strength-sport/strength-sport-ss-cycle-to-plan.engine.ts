@@ -31,7 +31,7 @@ import { outsideFrequencyPenalty } from '../outside-load.engine';
 import { conditioningForWeek } from './strength-sport-conditioning';
 import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, validateWeightCutProtocolSS } from './strength-sport-weight-cut.engine';
 import { hrvReport } from './strength-sport-hrv.engine';
-import { velocityWeightAdjustFactor, diagnoseVelocityLossEwma } from './strength-sport-vbt.engine';
+import { velocityWeightAdjustFactor, diagnoseVelocityLossEwma, vbtHistoryForLift } from './strength-sport-vbt.engine';
 import { getExerciseById } from '../../core/exercise-catalog';
 import { outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
 import type {
@@ -99,7 +99,7 @@ function vbtThresholds(id: string): { low: number; high: number; isTA: boolean }
 
 function histLossFor(id: string, vHist: Record<string, number[]> | undefined): number {
   if (!vHist) return 0;
-  const hist = vHist[id] || vHist[id.toLowerCase()] || (vHist as any)['all'];
+  const hist = vbtHistoryForLift(vHist, id);
   if (!Array.isArray(hist) || hist.length < 2) return 0;
   const best = Math.max(...hist);
   const last = hist[hist.length - 1];
@@ -455,7 +455,7 @@ export function buildSSCyclePlan(
           if (finalRirBump > 0) finalSets = finalSets.map(s => ({ ...s, rir: Math.min(4, s.rir + finalRirBump) }));
           // Вес: EWMA-VBT + HRV — паритет с билдером
           try {
-            const hArr = vHist ? (vHist[espec.id] || vHist[espec.id.toLowerCase()]) : null;
+            const hArr = vbtHistoryForLift(vHist, espec.id);
             let ewmaLoss: number | null = null;
             if (Array.isArray(hArr) && hArr.length >= 2) {
               const diag = diagnoseVelocityLossEwma(hArr, th.low as any);
