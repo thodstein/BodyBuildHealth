@@ -178,9 +178,14 @@ describe('ACWR + Taper intersection', () => {
     });
   }
 
-  it('ACWR dangerous → Taper skipped (no double reduction)', () => {
+  it('ACWR dangerous → Taper применяется составно (Ф1.2: без двойной срезки)', () => {
     const plan = buildPlan({ acwr: { ratio: 1.6, zone: 'dangerous' } });
-    expect(plan.progressionRationale).not.toContain('Taper');
+    // Ф1.2: ACWR ×0.65 + тапер составно (двойная срезка гардится в applyPLTaper —
+    // недели уже <60% предыдущей скипаются). Финальные недели не тяжелее рабочей.
+    const weeks = plan.weeks;
+    const w10 = weeks[9].days.flatMap(d => d.exercises.flatMap(e => e.workSets.map(s => s.sets))).reduce((a, b) => a + b, 0);
+    const w12 = weeks[11].days.flatMap(d => d.exercises.flatMap(e => e.workSets.map(s => s.sets))).reduce((a, b) => a + b, 0);
+    expect(w12, `W12 ${w12} ≤ W10 ${w10}`).toBeLessThanOrEqual(w10);
     expect(plan.progressionRationale).toContain('ACWR');
   });
 
