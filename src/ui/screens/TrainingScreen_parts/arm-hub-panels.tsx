@@ -250,6 +250,80 @@ export function HubTabNext({ H }: { H: any }) {
   );
 }
 
+const SCEN_KEY = 'he_arm_diag_scenarios';
+type DiagScenario = { id: string; date: string; fields: Record<string, string>; weakPoints: string[] };
+function loadScenarios(): DiagScenario[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SCEN_KEY) : null;
+    const j = raw ? JSON.parse(raw) : [];
+    return Array.isArray(j) ? j.filter((s) => s && typeof s === 'object').slice(0, 6) : [];
+  } catch { return []; }
+}
+function saveScenarios(list: DiagScenario[]): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(SCEN_KEY, JSON.stringify(list.slice(0, 6))); } catch {}
+}
+
+export function HubScenarios({ H }: { H: any }) {
+  const { state, setState } = H;
+  const [scens, setScens] = React.useState<DiagScenario[]>(() => loadScenarios());
+  const take = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const s: DiagScenario = {
+      id: `${d.getTime()}`,
+      date: `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      fields: { rtKg: state.rtKg, axleKg: state.axleKg, pinchSec: state.pinchSec, sideKg: state.sideKg, backKg: state.backKg, leftKg: state.leftKg, rightKg: state.rightKg, bwKg: state.bwKg },
+      weakPoints: [...state.weakPoints],
+    };
+    setScens((p) => { const n = [s, ...p].slice(0, 6); saveScenarios(n); return n; });
+  };
+  const load = (s: DiagScenario) => setState((prev: any) => ({ ...prev, ...s.fields, weakPoints: [...s.weakPoints] }));
+  const drop = (id: string) => setScens((p) => { const n = p.filter((s) => s.id !== id); saveScenarios(n); return n; });
+  const deltaLine = (s: DiagScenario) => {
+    const parts: string[] = [];
+    const num = (a: string, b: string, label: string) => {
+      const x = parseFloat(a); const y = parseFloat(b);
+      if (Number.isFinite(x) && Number.isFinite(y) && x > 0 && y > 0 && x !== y) parts.push(`${label} ${y > x ? '+' : ''}${Math.round((y - x) * 10) / 10}`);
+    };
+    num(s.fields.rtKg, state.rtKg, 'RT');
+    num(s.fields.sideKg, state.sideKg, 'Side');
+    num(s.fields.backKg, state.backKg, 'Back');
+    num(s.fields.pinchSec, state.pinchSec, 'Pinch');
+    const added = state.weakPoints.filter((w: string) => !s.weakPoints.includes(w));
+    const gone = s.weakPoints.filter((w: string) => !state.weakPoints.includes(w));
+    if (added.length) parts.push(`точки +${added.join('+')}`);
+    if (gone.length) parts.push(`точки −${gone.join('−')}`);
+    return parts.length ? `Δ vs сейчас: ${parts.join(' · ')}` : 'Δ vs сейчас: без изменений';
+  };
+  return (
+    <AdCard>
+      <AdSec title={`📸 Сценарии замеров (${scens.length}/6)`} collapsible defaultOpen={false} summary={scens.length ? 'было/стало' : 'сними сейчас'}>
+        <div className="ad-row">
+          <AdBtn variant="dark" onClick={take}>📸 Снапшот текущего</AdBtn>
+          {scens.length === 0 && <span className="ad-muted">Сними замер — через недели сравнишь прогресс RT/Side/точек.</span>}
+        </div>
+        {scens.length > 0 && (
+          <div className="ad-list">
+            {scens.map((s) => (
+              <div key={s.id} className="ad-sec" data-arm="scenario">
+                <div className="ad-row">
+                  <span><b>{s.date}</b></span>
+                  <span className="ad-muted">RT {s.fields.rtKg || '—'} · Side {s.fields.sideKg || '—'} · точки {s.weakPoints.join(', ') || '—'}</span>
+                </div>
+                <div className="ad-muted">{deltaLine(s)}</div>
+                <div className="ad-row">
+                  <AdBtn variant="dark" onClick={() => load(s)}>📥 Загрузить</AdBtn>
+                  <AdBtn variant="dark" onClick={() => drop(s.id)}>✕</AdBtn>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </AdSec>
+    </AdCard>
+  );
+}
+
 export function HubAction({ H }: { H: any }) {
   const { applyToConstructor, state, diag, dynamicReport, report } = H;
   return (

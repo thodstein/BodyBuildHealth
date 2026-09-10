@@ -305,6 +305,15 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Новичкам пресс опасен');
   });
 
+  it('P6: сценарий замеров снимается и сравнивает', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '68' } });
+    fireEvent.click(screen.getByText('📸 Снапшот текущего'));
+    expect(document.body.textContent).toContain('Δ vs сейчас: без изменений');
+    fireEvent.change(screen.getByPlaceholderText('60'), { target: { value: '70' } });
+    expect(document.body.textContent).toContain('RT +2');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });
