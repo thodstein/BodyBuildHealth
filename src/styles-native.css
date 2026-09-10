@@ -4954,7 +4954,9 @@ html.app-native .labs-topnav button {
 
 html.app-native .labs-subtabs {
   position: sticky !important;
-  top: calc(max(env(safe-area-inset-top, 0px), 24px) + 56px) !important;
+  /* Топнав: minHeight 56 + паддинги 20 + бордер 1 = ~77px; было 56px — лента
+   * залезала под шапку на ~21px и активная зелёная пилюля резалась в полукруг. */
+  top: calc(max(env(safe-area-inset-top, 0px), 24px) + 77px) !important;
   z-index: 19 !important;
   background: linear-gradient(180deg, rgba(5, 11, 22, 0.96), rgba(5, 11, 22, 0.82)) !important;
   backdrop-filter: blur(16px) !important;
@@ -13067,4 +13069,57 @@ html.app-native .nd-gauge-mini {
   html.app-native .nd-storebtn:active {
     transform: none !important;
   }
+}
+
+/* --- 76. BOTTOM-DASHBOARD CLEARANCE + NUTRITION SUBNAV --- */
+/* Пилюля .tabs занимает снизу: height var(--nav-height) + offset 10px +
+ * safe-zone (native fallback 28px). Старые блоки с paddingBottom 80 и
+ * фиксированные таймеры на nav-height+14px уходили под неё.
+ * Правило: только отступы/позиция, логика и движки не тронуты. */
+html.app-native .screen {
+  scroll-padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native main {
+  scroll-padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nutrition-tabs {
+  overflow: hidden !important;
+}
+html.app-native .nutrition-tabs-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+}
+html.app-native .nutrition-tabs-body {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nutrition-chips-head {
+  scrollbar-width: none !important;
+}
+html.app-native .nutrition-chips-head::-webkit-scrollbar {
+  display: none !important;
+}
+html.app-native .labs-labdiary {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nut-advisor {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .risk-info {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nut-progress {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nut-quests {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nut-customproducts {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .nut-achieve {
+  padding-bottom: var(--tabbar-clear) !important;
+}
+html.app-native .sup-diary {
+  padding-bottom: var(--tabbar-clear) !important;
 }

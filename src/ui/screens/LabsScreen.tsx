@@ -721,8 +721,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab pills — FIX: липкая под шапкой (56px + safe-area), без перекрытия */}
-          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:'calc(env(safe-area-inset-top, 0px) + 56px)', zIndex:19, background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', margin:'0 -12px', paddingLeft:12, paddingRight:12, scrollSnapType:'x proximity' }}>
+          {/* Sub-tab pills — FIX: липкая под шапкой (топнав ~77px: minHeight 56 + паддинги 20 + бордер 1), без перекрытия/полупилюль */}
+          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:'calc(env(safe-area-inset-top, 0px) + 77px)', zIndex:19, background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', margin:'0 -12px', paddingLeft:12, paddingRight:12, scrollSnapType:'x proximity' }}>
             {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
               const active = subTab === t.id;
               return (
@@ -1223,7 +1223,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ≡≡≡ COMBINED JOURNAL TAB (diary + reports + archive) ≡≡≡ */}
       {subTab === 'journal' && (
-        <div style={{ paddingBottom: 80 }}>
+        <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
           {/* Internal sub-tab — TOP APK 44px */}
           <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', padding:'2px 2px 8px', scrollbarWidth:'none' }}>
             {([
