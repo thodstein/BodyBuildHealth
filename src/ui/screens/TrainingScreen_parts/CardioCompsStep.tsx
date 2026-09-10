@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
+import { peakBlockHint, type CardioCompPriority } from '../../../engines/lms/cardio-peak-block.engine';
 import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
 
 export interface CompDraft { name: string; week: string; date?: string }
@@ -30,8 +31,11 @@ export const CardioCompsStep: React.FC<{
     }
     if (!draft.name.trim() || !Number.isFinite(wNum) || wNum < 1) return;
     const week = Math.min(Math.max(1, Math.round(wNum)), totalWeeks);
-    setComps([...comps, { id: `comp-${Date.now()}`, name: draft.name.trim(), week }]);
+    setComps([...comps, { id: `comp-${Date.now()}`, name: draft.name.trim(), week, priority: 'B' }]);
     setDraft({ name: '', week: '', date: '' });
+  };
+  const setPriority = (id: string, priority: CardioCompPriority) => {
+    setComps(comps.map(c => (c.id === id ? { ...c, priority } : c)));
   };
 
   return (
@@ -59,6 +63,14 @@ export const CardioCompsStep: React.FC<{
                   <span style={{ cursor: 'grab', color: '#fff', fontSize: 14, userSelect: 'none', padding: '4px 6px', minWidth: 24, textAlign: 'center' }} aria-hidden>⋮⋮</span>
                   <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
                   <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
+                  <select value={c.priority ?? 'B'} onChange={e => setPriority(c.id, e.target.value as CardioCompPriority)}
+                    aria-label={`Приоритет старта ${c.name}`}
+                    title={peakBlockHint((c.priority ?? 'B') as CardioCompPriority)}
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 13, minHeight: 44 }}>
+                    <option value="A">A · главный</option>
+                    <option value="B">B · контрольный</option>
+                    <option value="C">C · тренировочный</option>
+                  </select>
                   <span style={{ fontSize: 11, color: '#fff' }}>
                     {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
                   </span>
@@ -121,7 +133,7 @@ export const CardioCompsStep: React.FC<{
           />
           <button style={{ ...BTN_CTA, flex: '1 1 160px' }} onClick={add}>+ Добавить старт</button>
         </div>
-        <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.5 }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную.</div>
+        <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.5 }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную. Приоритет: A — taper 2 нед + пик; B — taper 1 нед + пик; C — без taper.</div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
       </SectionCard>
     </div>

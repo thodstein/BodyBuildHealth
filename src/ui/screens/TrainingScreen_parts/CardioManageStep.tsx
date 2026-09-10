@@ -16,6 +16,7 @@ import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../en
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
 import { CardioTaperStep } from './CardioTaperStep';
+import { CardioCatalogSection } from './CardioCatalogSection';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
@@ -50,7 +51,13 @@ export const CardioManageStep: React.FC<{
   onChanged: () => void;
   /** PRO taper-применение: персист делает родитель (snapshot + save + flash). */
   onApplyTaper?: (next: CardioCycle, reason: string) => void;
-}> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario, onApplyTaper }) => {
+  /** Каталог именных циклов: параметры мастера для ранжирования + сборка шаблона. */
+  goal?: import('../../../engines/lms/cardio.engine').CardioGoal;
+  level?: import('../../../engines/lms/cardio.engine').CardioLevel;
+  daysAvailable?: number;
+  lowImpact?: boolean;
+  onApplyTemplate?: (templateId: string) => void;
+}> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario, onApplyTaper, goal, level, daysAvailable, lowImpact, onApplyTemplate }) => {
   const [copyFlash, setCopyFlash] = useState(false);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
@@ -179,13 +186,14 @@ export const CardioManageStep: React.FC<{
   const libraryPages = Math.max(1, Math.ceil(filteredLibrary.length / LIB_PAGE_SIZE));
   const pagedLibrary = filteredLibrary.slice(libraryPage * LIB_PAGE_SIZE, (libraryPage + 1) * LIB_PAGE_SIZE);
 
-  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'taper' | 'library' | 'scenarios'>('integrations');
+  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'taper' | 'library' | 'catalog' | 'scenarios'>('integrations');
   const TABS = [
     { id: 'integrations', label: 'Интеграции', icon: '🔗' },
     { id: 'export', label: 'Экспорт', icon: '📤' },
     { id: 'week', label: 'Неделя', icon: '🛠' },
     { id: 'taper', label: 'Тапер', icon: '📉' },
     { id: 'library', label: 'Библиотека', icon: '📚' },
+    { id: 'catalog', label: 'Каталог', icon: '📖' },
     { id: 'scenarios', label: 'Сценарии', icon: '📸' },
   ] as const;
 
@@ -390,6 +398,12 @@ export const CardioManageStep: React.FC<{
           </div>
           {comparison && <InfoBanner tone="info">{comparison}</InfoBanner>}
         </SectionCard>
+      )}
+
+      {tab === 'catalog' && (
+        onApplyTemplate
+          ? <CardioCatalogSection goal={goal ?? 'health'} level={level ?? 'intermediate'} daysAvailable={daysAvailable ?? 4} lowImpact={!!lowImpact} onApplyTemplate={onApplyTemplate} />
+          : <EmptyState icon="📖" title="Каталог недоступен" desc="Обновите конструктор: нет обработчика сборки шаблона." />
       )}
 
       {tab === 'scenarios' && (

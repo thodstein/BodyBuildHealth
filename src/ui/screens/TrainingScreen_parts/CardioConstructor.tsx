@@ -20,6 +20,9 @@ import {
   latestFieldTestMetrics,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
+import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
+import { buildCardioCycleFromTemplate } from '../../../engines/lms/cardio-templates.engine';
+import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
@@ -367,6 +370,36 @@ export const CardioConstructor: React.FC = () => {
   }, []);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
+
+  /** Каталог → конструктор: собрать именной шаблон с параметрами атлета. */
+  const applyTemplate = (templateId: string) => {
+    const tpl = getCardioCycleTemplateById(templateId);
+    if (!tpl) { flashMsg('⚠ Шаблон не найден'); return; }
+    const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
+    const c = buildCardioCycleFromTemplate(tpl, {
+      bodyWeight,
+      bodyFatPct: bf,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      sex, level, daysAvailable, equipment, lowImpact, legDays,
+      ...previewFactors,
+    });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    setCycle(c);
+    reload();
+    flashMsg(`📚 «${tpl.meta.title}» — собрано и активировано`);
+  };
+  const applyTemplateRef = React.useRef(applyTemplate);
+  applyTemplateRef.current = applyTemplate;
+  // Мост каталога: заявка при монтировании + живые заявки без перемонтажа.
+  useEffect(() => {
+    const un = subscribeCardioTemplatePending(id => { if (id) applyTemplateRef.current(id); });
+    const pending = consumeCardioTemplatePending();
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (pending) t = setTimeout(() => applyTemplateRef.current(pending), 0);
+    return () => { un(); if (t) clearTimeout(t); };
+  }, []);
 
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
@@ -1181,6 +1214,8 @@ export const CardioConstructor: React.FC = () => {
           onCompare={compareWith} onRemove={removeCycle} onChanged={refreshActive}
           onSaveScenario={saveScenario} onLoadScenario={loadScenario} onRemoveScenario={deleteScenario}
           onApplyTaper={applyTaper}
+          goal={goal} level={level} daysAvailable={daysAvailable} lowImpact={lowImpact}
+          onApplyTemplate={applyTemplate}
         />
       )}
       {step === 'diary' && (
