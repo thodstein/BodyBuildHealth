@@ -2073,3 +2073,115 @@
   flex-shrink: 1;
   scroll-snap-align: none;
 }
+
+/* ─── ХАБ БЕЗ ГОРИЗОНТАЛЬНОГО СКРОЛЛА: все ленты → перенос ─── */
+/* Жалоба: прокрутка в сторону в хабе. Тот же приём №6, но для .train-armdiag:
+ * чипы/полосы/шаги/история переносятся, скролл-контейнеров в хабе — ноль.
+ * Sticky у .ad-steps сохраняется (wrap липкость не ломает, в отличие от clip). */
+:is(.train-armdiag) .ad-chips,
+:is(.train-armdiag) .ad-strip,
+:is(.train-armdiag) .ad-steps {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  scroll-snap-type: none;
+}
+
+:is(.train-armdiag) .ad-chips > *,
+:is(.train-armdiag) .ad-strip > *,
+:is(.train-armdiag) .ad-steps > * {
+  flex-shrink: 1;
+  scroll-snap-align: none;
+}
+
+:is(.train-armdiag) [data-arm='hist-strip'] {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  scroll-snap-type: none;
+}
+
+:is(.train-armdiag) [data-arm='hist-strip'] .ad-stat {
+  flex-shrink: 1;
+  scroll-snap-align: none;
+  min-width: 0;
+}
+
+/* Страховка от страничного скролла: корень хаба не шире вьюпорта */
+:is(.train-armdiag).ad-wrap {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+:is(.train-armdiag) .ad-tabpanel {
+  overflow-x: clip;
+}
+
+/* Длинные mono/textarea (Kinovea CSV) — в ширину карточки, без распирания */
+:is(.train-armdiag) .ad-mono {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ─── ХАБ КОМПАКТ: убрать пустые места (только воздух, не логика) ─── */
+:is(.train-armdiag).ad-wrap {
+  padding: 8px;
+}
+
+:is(.train-armdiag) .ad-card {
+  padding: 12px;
+  margin: 0 0 8px;
+}
+
+:is(.train-armdiag) .ad-sec {
+  padding: 10px;
+  margin-top: 8px;
+}
+
+:is(.train-armdiag) .ad-sec-t {
+  margin: 0 0 6px;
+}
+
+:is(.train-armdiag) .ad-head {
+  margin: 2px 0 8px;
+}
+
+:is(.train-armdiag) .ad-banner {
+  margin: 0 0 8px;
+}
+
+:is(.train-armdiag) .ad-chips {
+  padding: 2px 2px 4px;
+}
+
+:is(.train-armdiag) .ad-strip {
+  padding: 2px 2px 4px;
+}
+
+:is(.train-armdiag) [data-arm='hist-strip'] {
+  padding: 2px 2px 4px;
+}
+
+:is(.train-armdiag) .ad-video-ph {
+  padding: 12px;
+}
+
+:is(.train-armdiag) .ad-empty {
+  padding: 16px 12px;
+}
+
+:is(.train-armdiag) .ad-cta {
+  padding: 8px;
+  margin: 8px -4px -4px;
+}
+
+:is(.train-armdiag) .ad-list {
+  gap: 8px;
+}
+
+:is(.train-armdiag) .ad-finding {
+  margin-bottom: 4px;
+}
+
+:is(.train-armdiag) .ad-volbar {
+  margin: 6px 0;
+}

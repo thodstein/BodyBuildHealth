@@ -19,9 +19,9 @@ import { CARD } from './training-ui';
 const HUB_HERO: React.CSSProperties = {
   ...CARD,
   borderTop: '2px solid rgba(245, 158, 11, 0.5)',
-  padding: '14px 16px',
+  padding: '10px 12px',
 };
-const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 };
+const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 };
 import { LEVEL_OPTS, TAB_DEFS } from './arm-hub-shared';
 
 export function HubHead({ H }: { H: any }) {
