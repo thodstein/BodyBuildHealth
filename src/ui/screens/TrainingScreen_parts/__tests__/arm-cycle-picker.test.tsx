@@ -41,6 +41,16 @@ describe('Arm cycle picker', () => {
     }
   });
 
+  it('клик по карточке ставит недели цикла (exact-fit без согласия)', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
+    const top = rankArmCycles({ ...BASE })[0].cycle;
+    fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
+    fireEvent.click(screen.getByRole('button', { name: '🎛 Параметры' }));
+    expect((screen.getByLabelText('Недель') as HTMLInputElement).value).toBe(String(top.weeks));
+  });
+
   it('клик по карточке ставит цикл в шит и подсвечивает', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));

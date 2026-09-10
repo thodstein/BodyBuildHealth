@@ -546,6 +546,7 @@ export function ArmAutoConstructor() {
           const found = ARM_CYCLE_LIBRARY.find((c) => c.id === id);
           if (!found) { flash(`⚠ Цикл ${id || '—'} не найден в библиотеке`); return; }
           setCycId(id);
+          if (found.weeks > 0) setWeeks(Math.max(2, Math.min(52, found.weeks)));
           setStep('params');
           flash(`↩ Именной цикл из библиотеки: ${found.name}`);
         } catch {}
@@ -822,7 +823,19 @@ export function ArmAutoConstructor() {
   };
   // Стабильные колбэки для мемо-списков (иначе memo бесполезно)
   const pickSplit = React.useCallback((id: string) => setPatternId(id), []);
-  const pickCycle = React.useCallback((id: string) => setCycId(prev => prev === id ? '' : id), []);
+  // Выбор именного цикла ставит его недели → exact-fit без согласия.
+  // Иначе движок молча строил generic («цикл нельзя собрать»).
+  const cycIdRef = React.useRef(cycId);
+  cycIdRef.current = cycId;
+  const pickCycleId = React.useCallback((id: string) => {
+    if (!id) { setCycId(''); return; }
+    if (cycIdRef.current === id) { setCycId(''); return; }
+    setCycId(id);
+    try {
+      const c = ARM_CYCLE_LIBRARY.find(x => x.id === id);
+      if (c && c.weeks > 0) setWeeks(Math.max(2, Math.min(52, c.weeks)));
+    } catch {}
+  }, []);
 
   // №1: ручные правки упражнений (overlay; сбрасываются при пересборке)
   const [armEdits, setArmEdits] = useState<Record<string, ArmExerciseEdit>>({});
@@ -843,6 +856,7 @@ export function ArmAutoConstructor() {
   const [yearWeeks, setYearWeeks] = useState<number>(52);
   const [yearSuggest, setYearSuggest] = useState<boolean>(true);
   const [yearBuilt, setYearBuilt] = useState<any[] | null>(null);
+  const [yearBusy, setYearBusy] = useState(false);
   const yearBlocks = useMemo(() => {
     try { return buildArmYearBlocks(yearSeries, Math.max(4, Math.min(52, yearWeeks || 52)), {}, { suggestCycles: yearSuggest, discipline }); }
     catch { return []; }
@@ -1313,12 +1327,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {builtPlan && <AdBtn variant="ghost" block onClick={() => setStep('plan')}>Далее: План →</AdBtn>}
             <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
           </AdCta>
-          <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
+          <AdSec title="📚 Именной цикл" hint="Выбор цикла ставит его недели (exact-fit, согласие не нужно). Пусто = обычный план." collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
             {rankedCycles.length > 0 && (
-              <CyclePickerList items={rankedCycles} cycId={cycId} onPick={pickCycle} levelRu={CYC_LEVEL_RU} phaseRu={CYC_PHASE_RU} />
+              <CyclePickerList items={rankedCycles} cycId={cycId} onPick={pickCycleId} levelRu={CYC_LEVEL_RU} phaseRu={CYC_PHASE_RU} />
             )}
             <AdGrid cols="2">
-              <AdSheetSelect label="Цикл" value={cycId} onChange={setCycId} hook="cycle-select" options={[
+              <AdSheetSelect label="Цикл" value={cycId} onChange={pickCycleId} hook="cycle-select" options={[
                 { id:'', label:'— обычный план —', desc:'параметрический план без шаблона' },
                 ...ARM_CYCLE_LIBRARY.map(c=> ({ id: c.id, label: `${c.name} (${c.weeks}н)`, desc: `${c.daysPerWeek}×/нед · ${c.rpe}` })),
               ]} />
@@ -1860,8 +1874,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             </div>
           </AdSec>
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={()=>{
+            <AdBtn variant="primary" block hero disabled={yearBusy} onClick={async ()=>{
+              if (yearBusy) return;
+              setYearBusy(true);
               try {
+                // yield кадра: тяжёлая сборка не фризит UI, видна busy-строка
+                await new Promise(r=>setTimeout(r, 30));
                 const res = yearBlocks.map((b: any)=>{
                   const cfg: any = {
                     discipline, level, technique, gripFocus, workMax,
@@ -1877,8 +1895,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 setYearBuilt(res);
                 const warns = res.reduce((a: number, r: any)=>a + (r.warnings || []).length, 0);
                 flash(`🗓 Год собран: ${res.length} блоков · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns}`);
-              } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); }
-            }}>🗓 Собрать год</AdBtn>
+              } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); } finally { setYearBusy(false); }
+            }}>{yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}</AdBtn>
             <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>
           </AdCta>
           {yearBuilt && (

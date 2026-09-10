@@ -38,12 +38,13 @@ describe('Arm year step', () => {
     expect(after).not.toBe(before);
   });
 
-  it('сборка года: итог с тейперами и без падений', () => {
+  it('сборка года: busy-строка, итог с тейперами, без фриза', async () => {
     const { container } = goYear();
     fireEvent.click(screen.getByText('🗓 Собрать год'));
-    const res = container.querySelector("[data-arm='year-result']");
-    expect(res, 'result').not.toBeNull();
-    expect(document.body.textContent).toContain('Год собран');
+    expect(screen.getByText('⏳ Собираем год…')).toBeTruthy();
+    const res = await screen.findByText('🗓 Год собран', { exact: false });
+    expect(res).toBeTruthy();
+    expect(container.querySelector("[data-arm='year-result']")).not.toBeNull();
     expect(document.body.textContent).toContain('тейпер');
-  }, 30000);
+  }, 60000);
 });

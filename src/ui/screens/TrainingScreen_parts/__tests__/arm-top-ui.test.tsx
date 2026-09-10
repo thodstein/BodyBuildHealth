@@ -148,15 +148,17 @@ describe('Arm TOP UI: матчап + Table-IQ', () => {
     expect(document.body.textContent).toContain('FOR-7');
   });
 
-  it('цикл: выбор toproll_6 показывает fit-подсказку', () => {
+  it('цикл: выбор toproll_6 ставит недели и собирается exact', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     openSec(/Именной цикл/);
     fireEvent.click(screen.getByRole('button', { name: /^Цикл:/ }));
     fireEvent.click(within(screen.getByRole('dialog')).getByText(/Toproll 6-week/));
-    // окно 8 vs цикл 6 → proposed + просьба согласия
-    expect(document.body.textContent).toMatch(/Цикл: Окно 8/);
-    expect(document.body.textContent).toMatch(/согласие/);
+    // недели подтянулись под цикл → exact без согласия, сборка с циклом
+    expect(document.body.textContent).toMatch(/exact 6 нед/);
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
+    expect(document.body.textContent).toMatch(/Toproll/);
   });
 
   it('ось humerus-2026: флаги дают строку и предупреждение', () => {
