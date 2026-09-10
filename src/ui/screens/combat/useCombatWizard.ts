@@ -13,7 +13,7 @@ import type { VbtHistoryEntry } from '../../../engines/combat/combat-vbt.engine'
 import { loadAnnualCB } from '../../../engines/combat/combat-annual';
 import type { AnnualCB } from '../../../engines/combat/combat-annual';
 
-export type WizardStep = 'params' | 'outside' | 'split' | 'plan';
+export type WizardStep = 'params' | 'athlete' | 'outside' | 'split' | 'plan' | 'quality' | 'export';
 
 export function useCombatWizard() {
   const [step, setStep] = useState<WizardStep>('params');
