@@ -13123,3 +13123,63 @@ html.app-native .nut-achieve {
 html.app-native .sup-diary {
   padding-bottom: var(--tabbar-clear) !important;
 }
+
+/* ─── 114. COMBAT BB-STYLE — 7 шагов, свитчи, аккордеоны ───
+ * Новая навигация — STEP_PILL-пилюли (не kit-sectionnav): лента со snap,
+ * пилюли 44px + tabular, press/focus. CbSec-шапки 48px. CbSwitch — press
+ * 0.97 + focus-visible. Трёхколоночные сетки атлета/боя на 380px в 1 колонку.
+ * Только APK, без hex. */
+html.app-native .combat-constructor .cb-steps {
+  scrollbar-width: none !important;
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native .combat-constructor .cb-steps::-webkit-scrollbar {
+  display: none;
+}
+html.app-native .combat-constructor .cb-steps button {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor .cb-steps button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-constructor .cb-steps button:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .combat-constructor .cb-sec-head {
+  min-height: 48px !important;
+  border-radius: 10px !important;
+}
+html.app-native .combat-constructor .cb-sec-head:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: -2px !important;
+}
+html.app-native .combat-constructor .cb-switch:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .combat-constructor .cb-switch:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.7) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor .cb-pane[data-pane='athlete'] div[style*='grid-template-columns: 1fr 1fr 1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 380px) {
+  html.app-native .combat-constructor .cb-pane[data-pane='outside'] div[style*='grid-template-columns: 1fr 1fr 1fr'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-steps button:active {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .combat-constructor .cb-switch:active {
+    transform: none !important;
+  }
+}

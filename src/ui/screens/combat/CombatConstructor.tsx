@@ -75,9 +75,10 @@ const CbSec: React.FC<{
         type="button"
         onClick={() => { setOpen(v => !v); buzzStep(); }}
         aria-expanded={open}
+        className="cb-sec-head"
         style={{
           width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '11px 12px', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.03))',
+          padding: '11px 12px', minHeight: 48, cursor: 'pointer', background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.03))',
           border: 'none', borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign: 'left',
         }}
       >
